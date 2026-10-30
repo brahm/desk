@@ -13,7 +13,61 @@ document compatibility with Apple iWork '09 (Pages, Numbers and Keynote
 9.3). Documents are saved as OpenDocument (ODF) files, with documented
 extensions for what standard ODF cannot hold.
 
-The project is at the planning stage, and there is no code yet.
+The project is in early development. The repository has the layout of
+the planned code, and each app only opens an empty window so far.
+
+## Building
+
+Desk needs Rust 1.92 or later, and the development files of GTK 4.14
+and Libadwaita 1.5 or later. On Debian and Ubuntu:
+
+```sh
+sudo apt install libgtk-4-dev libadwaita-1-dev
+```
+
+On Fedora:
+
+```sh
+sudo dnf install gtk4-devel libadwaita-devel
+```
+
+Then run an app with Cargo:
+
+```sh
+cargo run --package desk-writer
+cargo run --package desk-tables
+cargo run --package desk-slides
+```
+
+## Repository layout
+
+The code is one Cargo workspace, with one crate per directory in
+[crates](crates):
+
+| Crate | Purpose |
+|---|---|
+| `desk-writer`, `desk-tables`, `desk-slides` | The three apps |
+| `desk-ui` | Interface shared by the apps, and the only library that uses GTK |
+| `desk-model` | Document model shared by the apps |
+| `desk-text` | Text shaping and paragraph layout |
+| `desk-layout` | Pagination and composition of pages, slides and sheets |
+| `desk-render` | Display list, effects and the Cairo back end |
+| `desk-table` | Table model shared by the apps |
+| `desk-formula` | Formula parser, dependency graph and functions |
+| `desk-chart` | Chart model and drawing |
+| `desk-anim` | Slide transitions and builds |
+| `desk-contacts` | Contacts for merge fields |
+| `desk-odf` | OpenDocument package reader and writer, with the Desk extensions |
+| `desk-iwork` | Reader for iWork '09 and '08 documents |
+| `desk-filters` | Import and export filters |
+| `desk-convert` | Command-line converter that runs without GTK |
+| `desk-testkit` | Reference corpus, visual comparison and parity reports for the tests |
+
+The CI checks formatting, Clippy warnings, tests and documentation, the
+minimum Rust version, the licenses and advisories of dependencies (with
+cargo-deny) and REUSE compliance. It also checks two dependency rules:
+the MPL-2.0 libraries use no other Desk crate, and only `desk-ui` and the
+apps use GTK.
 
 ## License
 

@@ -1,0 +1,16 @@
+[package]
+name = "desk-table"
+description = "Table model shared by the Desk apps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+desk-formula.workspace = true
+desk-model.workspace = true
+
+[lints]
+workspace = true

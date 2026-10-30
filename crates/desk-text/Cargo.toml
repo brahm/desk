@@ -1,0 +1,12 @@
+[package]
+name = "desk-text"
+description = "Text shaping and paragraph layout"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

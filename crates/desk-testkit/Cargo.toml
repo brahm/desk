@@ -1,0 +1,17 @@
+[package]
+name = "desk-testkit"
+description = "Reference corpus, visual comparison and parity reports for the tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+desk-filters.workspace = true
+desk-layout.workspace = true
+desk-render.workspace = true
+
+[lints]
+workspace = true

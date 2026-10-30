@@ -1,0 +1,15 @@
+[package]
+name = "desk-anim"
+description = "Slide transitions and builds"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+desk-model.workspace = true
+
+[lints]
+workspace = true

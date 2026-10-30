@@ -1,0 +1,20 @@
+[package]
+name = "desk-filters"
+description = "Import and export filters of the Desk apps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+desk-anim.workspace = true
+desk-chart.workspace = true
+desk-iwork.workspace = true
+desk-model.workspace = true
+desk-odf.workspace = true
+desk-table.workspace = true
+
+[lints]
+workspace = true
