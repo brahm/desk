@@ -15,3 +15,13 @@
 //! checks this rule.
 
 #![forbid(unsafe_code)]
+
+/// XML namespaces used in ODF documents.
+pub mod ns {
+    /// Namespace URI of the `desk:` extensions to ODF.
+    ///
+    /// Every document that Desk saves with extensions carries this URI, so it
+    /// must not change. An incompatible revision of the extensions gets a new
+    /// URI instead.
+    pub const DESK: &str = "https://brahm.com.br/ns/desk/1.0";
+}

@@ -10,7 +10,7 @@ use desk_ui::AppInfo;
 use desk_ui::gtk::glib;
 
 const APP: AppInfo = AppInfo {
-    id: "io.github.brahm.Desk.Tables",
+    id: "br.com.brahm.Desk.Tables",
     name: "Desk Tables",
     version: env!("CARGO_PKG_VERSION"),
     icon_name: "x-office-spreadsheet-symbolic",

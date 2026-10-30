@@ -10,7 +10,7 @@ use desk_ui::AppInfo;
 use desk_ui::gtk::glib;
 
 const APP: AppInfo = AppInfo {
-    id: "io.github.brahm.Desk.Writer",
+    id: "br.com.brahm.Desk.Writer",
     name: "Desk Writer",
     version: env!("CARGO_PKG_VERSION"),
     icon_name: "x-office-document-symbolic",
