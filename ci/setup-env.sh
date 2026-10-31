@@ -4,6 +4,7 @@
 
 # Installs everything that ci/check-all.sh needs, on Ubuntu 24.04 like the
 # CI: the GTK and Libadwaita libraries, the fonts the tests measure with,
+# the Poppler tools the PDF tests read back with,
 # the stable Rust toolchain and the minimum supported one, cargo-deny and
 # reuse. It is the setup script of the cloud environment and works on a
 # developer machine too. Running it again only updates what is there.
@@ -23,7 +24,7 @@ $sudo apt-get update
 $sudo apt-get install --yes --no-install-recommends \
     build-essential pkg-config curl ca-certificates git python3-pip \
     libgtk-4-dev libadwaita-1-dev libcairo2-dev libfontconfig-dev \
-    fonts-liberation fonts-dejavu-core
+    fonts-liberation fonts-dejavu-core poppler-utils
 
 if ! command -v rustup >/dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |

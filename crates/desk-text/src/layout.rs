@@ -79,6 +79,8 @@ pub struct GlyphRun {
     pub size: f32,
     /// The index of the character format in [`ParagraphText::formats`].
     pub format: u32,
+    /// The color of the text (FMT-11).
+    pub color: Rgba,
     /// The glyphs.
     pub glyphs: Vec<Glyph>,
     /// Where the run starts.
@@ -433,6 +435,7 @@ impl TextSystem {
                     font: run.font().clone(),
                     size: run.font_size(),
                     format: format_index,
+                    color: format.color,
                     glyphs,
                     x: x0,
                     advance: glyph_run.advance(),
@@ -445,6 +448,9 @@ impl TextSystem {
                     font: font.clone(),
                     size: *size,
                     format: glyph_runs.last().map_or(0, |r| r.format),
+                    color: glyph_runs
+                        .last()
+                        .map_or(text.formats()[0].color, |r| r.color),
                     glyphs: vec![Glyph {
                         id: *id,
                         x: end_x,
