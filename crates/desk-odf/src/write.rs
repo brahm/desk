@@ -99,12 +99,25 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
 }
 
+/// A font family as a quoted CSS string.
+fn quote(family: &str) -> String {
+    let mut out = String::from("'");
+    for c in family.chars() {
+        if matches!(c, '\'' | '\\') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out.push('\'');
+    out
+}
+
 fn font_faces(w: &mut Writer, fonts: &BTreeSet<&str>) {
     w.start("office:font-face-decls");
     for font in fonts {
         w.start("style:font-face")
             .attr("style:name", font)
-            .attr("svg:font-family", &format!("'{font}'"))
+            .attr("svg:font-family", &quote(font))
             .end();
     }
     w.end();

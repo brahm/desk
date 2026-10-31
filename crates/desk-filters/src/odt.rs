@@ -22,6 +22,10 @@ use desk_odf as odf;
 /// The ODF name of the default paragraph style.
 const DEFAULT_STYLE: &str = "Standard";
 
+/// The name of the default paragraph style of a file without a `Standard`
+/// style.
+const DEFAULT_NAME: &str = "Body";
+
 /// The size of superscripts and subscripts written, in percent. Desk
 /// draws them at this size whatever a file says.
 const SCRIPT_SCALE: f64 = 66.0;
@@ -300,6 +304,11 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         .styles
         .iter()
         .find(|s| s.family == odf::Family::Paragraph && s.name == DEFAULT_STYLE);
+    // Without a Standard style the default keeps the name of a new
+    // document, which no other style may then take.
+    if standard.is_none() {
+        used_names.insert((odf::Family::Paragraph, DEFAULT_NAME.to_owned()));
+    }
     for style in &source.styles {
         let id = if Some(style) == standard {
             default
@@ -316,7 +325,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         names.insert(id, name);
     }
     let defaults = &source.default_style;
-    let mut default_style = ParagraphStyle::new(default, "Body");
+    let mut default_style = ParagraphStyle::new(default, DEFAULT_NAME);
     default_style.paragraph = para_attrs(&defaults.paragraph);
     default_style.character = char_attrs(&defaults.text);
     if let Some(standard) = standard {

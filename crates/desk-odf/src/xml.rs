@@ -206,14 +206,20 @@ fn push_text(stack: &mut [Element], text: &str) {
     }
 }
 
-/// Writes XML text, escaping what must be escaped.
-pub(crate) fn escape(out: &mut String, text: &str) {
+/// Writes XML text, or an attribute value when `attribute` is set,
+/// escaping what must be escaped. A reader turns a carriage return into a
+/// line feed, and tabs and line ends in attribute values into spaces, so
+/// those are written as character references to come back as they were.
+pub(crate) fn escape(out: &mut String, text: &str, attribute: bool) {
     for c in text.chars() {
         match c {
             '&' => out.push_str("&amp;"),
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
+            '\r' => out.push_str("&#13;"),
+            '\n' if attribute => out.push_str("&#10;"),
+            '\t' if attribute => out.push_str("&#9;"),
             _ => out.push(c),
         }
     }
@@ -256,7 +262,7 @@ impl Writer {
     pub fn attr(&mut self, name: &str, value: &str) -> &mut Self {
         debug_assert!(self.in_tag);
         write!(self.out, " {name}=\"").unwrap();
-        escape(&mut self.out, value);
+        escape(&mut self.out, value, true);
         self.out.push('"');
         self
     }
@@ -272,7 +278,7 @@ impl Writer {
     /// Writes text inside the current element.
     pub fn text(&mut self, text: &str) -> &mut Self {
         self.close_tag();
-        escape(&mut self.out, text);
+        escape(&mut self.out, text, false);
         self
     }
 

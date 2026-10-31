@@ -170,8 +170,32 @@ impl Reader {
     }
 }
 
-fn unquote(family: &str) -> String {
-    family.trim().trim_matches(['\'', '"']).to_owned()
+/// The first family of a CSS font family list, as `svg:font-family` and
+/// `fo:font-family` hold: a quoted string, with backslash escapes, or
+/// the words up to the first comma.
+fn unquote(families: &str) -> String {
+    let families = families.trim_start();
+    let mut chars = families.chars();
+    match chars.next() {
+        Some(quote @ ('\'' | '"')) => {
+            let mut family = String::new();
+            while let Some(c) = chars.next() {
+                match c {
+                    '\\' => family.extend(chars.next()),
+                    c if c == quote => break,
+                    c => family.push(c),
+                }
+            }
+            family
+        }
+        _ => families
+            .split(',')
+            .next()
+            .unwrap_or_default()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" "),
+    }
 }
 
 /// A line under or through text, from its style and type attributes.
@@ -195,7 +219,9 @@ fn text_position(value: &str) -> (Option<TextPosition>, Option<f64>) {
         "sub" => Some(TextPosition::Sub),
         _ => parse_percent(p).map(TextPosition::Percent),
     });
-    (position, parts.next().and_then(parse_percent))
+    // A scale means nothing without a position.
+    let scale = position.and(parts.next().and_then(parse_percent));
+    (position, scale)
 }
 
 fn length(e: &Element, ns: &str, name: &str) -> Option<Length> {
