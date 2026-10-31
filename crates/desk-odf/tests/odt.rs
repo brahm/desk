@@ -23,6 +23,14 @@ fn content(body: &str) -> String {
     )
 }
 
+/// Keeps a written file for ci/validate-odf.sh, which validates it against
+/// the ODF schemas, when `DESK_ODF_OUT` names a directory.
+fn keep(name: &str, bytes: &[u8]) {
+    if let Some(dir) = std::env::var_os("DESK_ODF_OUT") {
+        std::fs::write(std::path::Path::new(&dir).join(name), bytes).unwrap();
+    }
+}
+
 fn texts(document: &TextDocument) -> Vec<String> {
     document.body.iter().map(Paragraph::text).collect()
 }
@@ -197,6 +205,7 @@ fn full_document() -> TextDocument {
 fn a_document_comes_back_as_it_was_written() {
     let document = full_document();
     let bytes = write_odt(&document).unwrap();
+    keep("odf-full.odt", &bytes);
     let read = read_odt(&bytes).unwrap();
     assert_eq!(read, document);
 }
@@ -277,6 +286,53 @@ fn font_names_resolve_through_the_declarations() {
 }
 
 #[test]
+fn font_families_are_css_lists() {
+    let document = read_streams(
+        &format!(
+            "{CONTENT_START}<office:automatic-styles>\
+             <style:style style:name=\"T1\" style:family=\"text\"><style:text-properties fo:font-family=\"&quot;Gill Sans&quot;, serif\"/></style:style>\
+             <style:style style:name=\"T2\" style:family=\"text\"><style:text-properties fo:font-family=\" Gill   Sans , serif\"/></style:style>\
+             <style:style style:name=\"T3\" style:family=\"text\"><style:text-properties fo:font-family=\"'O\\'Neil, Bold'\"/></style:style>\
+             </office:automatic-styles><office:body><office:text/></office:body></office:document-content>"
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    let family = |name| {
+        document
+            .style(Family::Text, name)
+            .unwrap()
+            .properties
+            .text
+            .font_family
+            .clone()
+    };
+    assert_eq!(family("T1").as_deref(), Some("Gill Sans"));
+    assert_eq!(family("T2").as_deref(), Some("Gill Sans"));
+    assert_eq!(family("T3").as_deref(), Some("O'Neil, Bold"));
+
+    // Found by the fuzzer: a quote in a family name was written unescaped.
+    let mut written = TextDocument::default();
+    written.automatic_styles.push(Style {
+        name: "T1".into(),
+        display_name: None,
+        family: Family::Text,
+        parent: None,
+        next: None,
+        properties: Properties {
+            text: TextProperties {
+                font_family: Some("O'Neil \\ Sans".into()),
+                ..TextProperties::default()
+            },
+            ..Properties::default()
+        },
+    });
+    let read = read_odt(&write_odt(&written).unwrap()).unwrap();
+    assert_eq!(read.automatic_styles, written.automatic_styles);
+}
+
+#[test]
 fn hostile_input_is_refused_cleanly() {
     assert!(matches!(read_odt(b"not a zip"), Err(OdfError::Zip(_))));
 
@@ -326,4 +382,22 @@ fn a_spreadsheet_is_not_a_text_document() {
         read_odt(&bytes),
         Err(OdfError::Missing("content.xml"))
     ));
+}
+
+/// Found by the fuzzer: a scale with a position that does not parse was
+/// kept, and then lost on writing.
+#[test]
+fn a_text_position_that_does_not_parse_is_dropped_whole() {
+    let document = read_streams(
+        &format!(
+            "{CONTENT_START}<office:automatic-styles>\
+             <style:style style:name=\"T1\" style:family=\"text\"><style:text-properties style:text-position=\"high 58%\"/></style:style>\
+             </office:automatic-styles><office:body><office:text/></office:body></office:document-content>"
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    let text = &document.style(Family::Text, "T1").unwrap().properties.text;
+    assert_eq!((text.position, text.position_scale), (None, None));
 }

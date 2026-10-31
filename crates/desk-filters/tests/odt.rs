@@ -14,6 +14,14 @@ use desk_model::{
 };
 use desk_odf as odf;
 
+/// Keeps a written file for ci/validate-odf.sh, which validates it against
+/// the ODF schemas, when `DESK_ODF_OUT` names a directory.
+fn keep(name: &str, bytes: &[u8]) {
+    if let Some(dir) = std::env::var_os("DESK_ODF_OUT") {
+        std::fs::write(std::path::Path::new(&dir).join(name), bytes).unwrap();
+    }
+}
+
 /// Everything a reader of the document sees: the styles by name, and each
 /// paragraph's style name, resolved format and runs.
 fn describe(document: &Document) -> String {
@@ -265,6 +273,7 @@ fn sample() -> Document {
 fn a_document_written_and_read_again_is_the_same() {
     let document = sample();
     let bytes = write_odt(&document).unwrap();
+    keep("filters-sample.odt", &bytes);
     let read = read_odt(&bytes).unwrap();
     assert_eq!(describe(&read), describe(&document));
     // And once more, from what was read.
@@ -418,6 +427,7 @@ fn foreign() -> odf::TextDocument {
 #[test]
 fn fmt_files_from_other_programs_map_to_styles_and_direct_formatting() {
     let document = import(&foreign()).unwrap();
+    keep("filters-foreign.odt", &write_odt(&document).unwrap());
     let styles = document.styles();
     let default = styles.default_paragraph();
     assert_eq!(styles.get(default).unwrap().name(), "Standard");
@@ -456,4 +466,52 @@ fn an_empty_file_gives_one_empty_paragraph() {
     let document = import(&odf::TextDocument::default()).unwrap();
     assert_eq!(document.body().len(), 1);
     assert_eq!(document.page_setup(), &PageSetup::a4());
+}
+
+/// Found by the fuzzer: without a `Standard` style, a style named like the
+/// default took its name, and the next round trip renamed it.
+#[test]
+fn a_style_named_like_the_default_keeps_one_name() {
+    let source = odf::TextDocument {
+        styles: vec![odf::Style {
+            name: "Body".into(),
+            display_name: None,
+            family: odf::Family::Paragraph,
+            parent: None,
+            next: None,
+            properties: odf::Properties::default(),
+        }],
+        ..odf::TextDocument::default()
+    };
+    let document = import(&source).unwrap();
+    let mut names: Vec<_> = document
+        .styles()
+        .iter()
+        .map(|s| s.name().to_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["Body", "Body 2"]);
+    let again = import(&export(&document)).unwrap();
+    assert_eq!(describe(&again), describe(&document));
+}
+
+/// Found by the fuzzer: a carriage return in a style name came back as a
+/// space.
+#[test]
+fn control_characters_in_style_names_are_kept() {
+    let source = odf::TextDocument {
+        styles: vec![odf::Style {
+            name: "a".into(),
+            display_name: Some("a\rb\tc\nd".into()),
+            family: odf::Family::Paragraph,
+            parent: None,
+            next: None,
+            properties: odf::Properties::default(),
+        }],
+        ..odf::TextDocument::default()
+    };
+    let document = import(&source).unwrap();
+    let again = read_odt(&write_odt(&document).unwrap()).unwrap();
+    assert_eq!(describe(&again), describe(&document));
+    assert!(describe(&again).contains(r#""a\rb\tc\nd""#));
 }

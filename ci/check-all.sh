@@ -5,6 +5,9 @@
 # Runs every check of the CI on the working tree, in the same order, and
 # stops at the first that fails. Run it before opening or updating a pull
 # request; ci/setup-env.sh installs what it needs.
+#
+# The fuzz targets run for FUZZ_SECONDS each, 30 by default; the CI runs
+# them for longer.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,6 +21,7 @@ step() {
 
 step 'Formatting'
 cargo fmt --all --check
+cargo fmt --manifest-path fuzz/Cargo.toml --check
 step 'Clippy'
 cargo clippy --workspace --all-targets --locked -- --deny warnings
 step 'Tests'
@@ -28,6 +32,10 @@ step 'Dependency rules'
 ci/check-deps.sh
 step "Minimum Rust version ($msrv)"
 cargo "+$msrv" check --workspace --all-targets --locked
+step 'ODF validation'
+ci/validate-odf.sh
+step 'Fuzzing'
+ci/fuzz.sh "${FUZZ_SECONDS:-30}"
 step 'Licenses and advisories of dependencies'
 cargo deny check
 step 'REUSE compliance'

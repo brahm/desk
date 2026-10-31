@@ -1,0 +1,45 @@
+# Fuzz targets for the readers of untrusted files. They build with
+# cargo-fuzz on a nightly toolchain, so this crate stays out of the
+# workspace; ci/fuzz.sh runs them.
+
+[package]
+name = "desk-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.10"
+desk-filters = { path = "../crates/desk-filters" }
+desk-odf = { path = "../crates/desk-odf" }
+
+# Not part of the main workspace.
+[workspace]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "odt_streams"
+path = "fuzz_targets/odt_streams.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "odt_package"
+path = "fuzz_targets/odt_package.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "odt_import"
+path = "fuzz_targets/odt_import.rs"
+test = false
+doc = false
+bench = false
