@@ -1,0 +1,38 @@
+title = "Fontes ausentes"
+rows = ["DOC-05"]
+description = "Um parágrafo em cada fonte do Mac que tem uma substituta livre de mesmas métricas. No Pages são as fontes originais; no Desk, as substitutas."
+# The lines break where they do in Pages, but TeX Gyre Pagella kerns other
+# pairs than the Palatino of the Mac, which moves a word up to 1.63 pt.
+position_tolerance = 2.0
+
+[defaults]
+size = 12
+space_after = 12
+
+[[paragraphs]]
+filler = 40
+font = "Helvetica"
+
+[[paragraphs]]
+filler = 40
+font = "Times"
+
+[[paragraphs]]
+filler = 40
+font = "Courier"
+
+[[paragraphs]]
+filler = 40
+font = "Arial"
+
+[[paragraphs]]
+filler = 40
+font = "Times New Roman"
+
+[[paragraphs]]
+filler = 40
+font = "Courier New"
+
+[[paragraphs]]
+filler = 40
+font = "Palatino"

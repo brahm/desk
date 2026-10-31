@@ -97,7 +97,11 @@ fn convert(input: &Path, output: &Path) -> Result<(), String> {
             std::fs::write(output, bytes).map_err(|e| format!("{}: {e}", written()))
         }
         Some(Format::Pdf) => {
-            let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+            let mut system = desk_text::TextSystem::new();
+            let layout = desk_layout::paginate(&document, &mut system);
+            for choice in system.substitutions() {
+                eprintln!("desk-convert: warning: {}", substitution(&choice));
+            }
             let pages = desk_render::DisplayList::pages(&layout);
             desk_render::Painter::new()
                 .and_then(|mut painter| painter.write_pdf(&pages, document.metadata(), output))
@@ -108,6 +112,21 @@ fn convert(input: &Path, output: &Path) -> Result<(), String> {
             written()
         )),
     }
+}
+
+/// A font substitution, in one sentence (DOC-05).
+fn substitution(choice: &desk_text::FontChoice) -> String {
+    let how = match choice.kind {
+        desk_text::FontMatch::Metric => ", which has the same metrics",
+        desk_text::FontMatch::Style => ", which looks alike; lines may break elsewhere",
+        desk_text::FontMatch::Fallback | desk_text::FontMatch::Installed => {
+            "; lines may break elsewhere"
+        }
+    };
+    format!(
+        "the font {} is not installed, so {} is used{how}",
+        choice.requested, choice.used
+    )
 }
 
 fn main() -> ExitCode {
@@ -167,6 +186,19 @@ mod tests {
                 input: "-draft.numbers".into(),
                 output: "out.ods".into(),
             })
+        );
+    }
+
+    #[test]
+    fn doc_05_substitutions_are_described() {
+        let choice = desk_text::FontChoice {
+            requested: "Helvetica".into(),
+            used: "Liberation Sans".into(),
+            kind: desk_text::FontMatch::Metric,
+        };
+        assert_eq!(
+            substitution(&choice),
+            "the font Helvetica is not installed, so Liberation Sans is used, which has the same metrics"
         );
     }
 

@@ -468,3 +468,83 @@ fn int_02_the_text_of_a_line_ends_above_its_leading() {
     assert_eq!(line.baseline - line.top, 11.0);
     assert_eq!(line.text_bottom - line.top, 14.0);
 }
+
+#[test]
+fn doc_05_missing_fonts_are_laid_out_with_their_substitutes() {
+    let mut system = TextSystem::new();
+    let helvetica = system.font_choice("Helvetica");
+    if helvetica.is_substitution() {
+        // Liberation Sans has the metrics of Helvetica.
+        assert_eq!(&*helvetica.used, "Liberation Sans");
+        assert_eq!(helvetica.kind, desk_text::FontMatch::Metric);
+        let format = |family: &str| CharFormat {
+            font_family: Arc::from(family),
+            ..CharFormat::default()
+        };
+        let text = "Lines break where they did on the Mac.";
+        let a = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[(text, format("Helvetica"))],
+        );
+        let b = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[(text, format("Liberation Sans"))],
+        );
+        assert_eq!(a.lines[0].advance, b.lines[0].advance);
+    }
+    let missing = system.font_choice("Desk Missing Serif");
+    assert_eq!(&*missing.used, "Liberation Serif");
+    assert_eq!(missing.kind, desk_text::FontMatch::Fallback);
+    let listed: Vec<_> = system
+        .substitutions()
+        .into_iter()
+        .map(|c| c.requested)
+        .collect();
+    assert!(
+        listed.iter().any(|r| &**r == "Desk Missing Serif"),
+        "{listed:?}"
+    );
+    assert!(!listed.iter().any(|r| &**r == "Liberation Sans"));
+}
+
+#[test]
+fn doc_05_fonts_of_the_mac_keep_the_lines_and_ligatures_of_pages() {
+    let mut system = TextSystem::new();
+    let format = |family: &str| CharFormat {
+        font_family: Arc::from(family),
+        font_size: Length::from_points(12),
+        ..CharFormat::default()
+    };
+    // As Pages measured on the reference machine: Helvetica at 12 pt has
+    // lines 14 pt tall, with the leading over the text, and Palatino 16 pt,
+    // whatever font stands for them.
+    for (family, height, baseline) in [("Helvetica", 14.0, 11.0), ("Palatino", 16.0, 13.0)] {
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[("Line", format(family))],
+        );
+        let line = &layout.lines[0];
+        assert_eq!(line.height, height, "{family}");
+        assert_eq!(line.baseline - line.top, baseline, "{family}");
+    }
+    // Pages joins fi and fl in Palatino, and nothing else: the ligature
+    // draws the letters it joins, and offsets stay those of the model.
+    let text = "office fly";
+    let layout = lay(
+        &mut system,
+        ParaFormat::default(),
+        &[(text, format("Palatino"))],
+    );
+    let line = &layout.lines[0];
+    assert_eq!(line.range, 0..text.len());
+    let run = &line.runs[0];
+    assert_eq!(run.text, text);
+    assert_eq!(run.glyphs.len(), text.chars().count() - 2);
+    assert_eq!(
+        run.clusters.iter().map(|c| c.1).sum::<u32>() as usize,
+        run.glyphs.len()
+    );
+}

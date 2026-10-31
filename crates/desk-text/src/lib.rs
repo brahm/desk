@@ -14,6 +14,9 @@
 //! control. `experiments/text-engine` has the comparison behind this
 //! choice.
 //!
+//! A family that the system does not have is laid out with a free font
+//! that stands for it, as the [`fonts`] module chooses (DOC-05).
+//!
 //! The crate knows nothing about pages: a [`LineSpace`] says where each
 //! line may go, and the caller places paragraphs one after another.
 //!
@@ -29,10 +32,12 @@
 //! println!("{} lines", layout.lines.len());
 //! ```
 
+pub mod fonts;
 mod input;
 mod layout;
 mod space;
 
+pub use fonts::{FontChoice, FontMatch, PagesFont};
 pub use input::{ParagraphText, SMALL_CAPS_SCALE};
 pub use layout::{
     Decoration, Glyph, GlyphRun, Line, MIN_SEGMENT_WIDTH, ParagraphLayout, SCRIPT_SCALE,
