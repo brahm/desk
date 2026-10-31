@@ -12,6 +12,10 @@ publish.workspace = true
 desk-filters.workspace = true
 desk-layout.workspace = true
 desk-render.workspace = true
+desk-text.workspace = true
+
+[dev-dependencies]
+desk-model.workspace = true
 
 [lints]
 workspace = true

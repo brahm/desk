@@ -8,13 +8,15 @@
 //! the automated tests.
 
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const USAGE: &str = "\
 Usage: desk-convert <INPUT> <OUTPUT>
 
 Converts INPUT to the format that the file name extension of OUTPUT names.
+Reads OpenDocument text (.odt) and writes PDF (.pdf) or OpenDocument
+text (.odt).
 
 Options:
   -h, --help     Print this help
@@ -53,6 +55,54 @@ fn parse_args(args: impl IntoIterator<Item = OsString>) -> Result<Command, Strin
     }
 }
 
+/// The format a file name extension names.
+#[derive(Debug, PartialEq, Eq)]
+enum Format {
+    Odt,
+    Pdf,
+}
+
+fn format_of(path: &Path) -> Option<Format> {
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    match extension.as_str() {
+        "odt" | "ott" => Some(Format::Odt),
+        "pdf" => Some(Format::Pdf),
+        _ => None,
+    }
+}
+
+fn convert(input: &Path, output: &Path) -> Result<(), String> {
+    let Some(Format::Odt) = format_of(input) else {
+        return Err(format!(
+            "cannot read {}: only .odt files are read so far",
+            input.display()
+        ));
+    };
+    let bytes =
+        std::fs::read(input).map_err(|e| format!("cannot read {}: {e}", input.display()))?;
+    let document = desk_filters::read_odt(&bytes)
+        .map_err(|e| format!("cannot read {}: {e}", input.display()))?;
+    let written = || format!("cannot write {}", output.display());
+    match format_of(output) {
+        Some(Format::Odt) => {
+            let bytes =
+                desk_filters::write_odt(&document).map_err(|e| format!("{}: {e}", written()))?;
+            std::fs::write(output, bytes).map_err(|e| format!("{}: {e}", written()))
+        }
+        Some(Format::Pdf) => {
+            let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+            let pages = desk_render::DisplayList::pages(&layout);
+            desk_render::Painter::new()
+                .and_then(|mut painter| painter.write_pdf(&pages, document.metadata(), output))
+                .map_err(|e| format!("{}: {e}", written()))
+        }
+        None => Err(format!(
+            "{}: only .pdf and .odt files are written",
+            written()
+        )),
+    }
+}
+
 fn main() -> ExitCode {
     match parse_args(std::env::args_os().skip(1)) {
         Ok(Command::Help) => {
@@ -63,14 +113,13 @@ fn main() -> ExitCode {
             println!("desk-convert {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Ok(Command::Convert { input, output }) => {
-            eprintln!(
-                "desk-convert: cannot convert {} to {}: conversion is not implemented yet",
-                input.display(),
-                output.display()
-            );
-            ExitCode::FAILURE
-        }
+        Ok(Command::Convert { input, output }) => match convert(&input, &output) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(message) => {
+                eprintln!("desk-convert: {message}");
+                ExitCode::FAILURE
+            }
+        },
         Err(message) => {
             eprintln!("desk-convert: {message}\n\n{USAGE}");
             ExitCode::from(2)
@@ -112,6 +161,14 @@ mod tests {
                 output: "out.ods".into(),
             })
         );
+    }
+
+    #[test]
+    fn formats_come_from_the_extension() {
+        assert_eq!(format_of(Path::new("a.ODT")), Some(Format::Odt));
+        assert_eq!(format_of(Path::new("dir.pdf/a.pdf")), Some(Format::Pdf));
+        assert_eq!(format_of(Path::new("a.pages")), None);
+        assert_eq!(format_of(Path::new("pdf")), None);
     }
 
     #[test]

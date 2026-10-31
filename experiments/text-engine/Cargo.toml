@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Proof of concept for the text engine decision in phase 1: the same
+# paragraph, hyphenated and wrapped around a shape, laid out with Parley and
+# with a minimal engine of our own. It is its own workspace, so it stays out
+# of the Desk build, the CI and the dependency checks.
+[workspace]
+
+[package]
+name = "text-engine-poc"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.92"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+cairo-rs = { version = "0.22.9", features = ["png"] }
+harfrust = "0.12.0"
+hyphenation = { version = "0.8.4", features = ["embed_all"] }
+icu_segmenter = "2.4.0"
+parley = "0.12.0"
+skrifa = "0.49.0"

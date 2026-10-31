@@ -19,6 +19,28 @@ publish = false
 adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
 
+# Persistent collections for the document model, so that snapshots are cheap.
+imbl = "7.0.2"
+proptest = "1.12.0"
+unicode-segmentation = "1.13.3"
+
+# Text layout, as decided by the proof of concept in experiments/text-engine.
+# icu_segmenter and skrifa are pinned to the versions Parley itself uses.
+icu_segmenter = "2.4.0"
+parley = "0.12.0"
+skrifa = "0.44.0"
+
+# Drawing and PDF output in desk-render. Cairo 1.16 is needed for PDF
+# metadata; FreeType hands Cairo the fonts that Parley chose. The default
+# use_glib feature stays on: without it, cloning a Cairo object does not
+# take a reference, and the object is freed twice.
+cairo-rs = { version = "0.22.9", features = ["freetype", "pdf", "png", "v1_16"] }
+freetype-rs = "0.38.0"
+
+# The format libraries: zip packages and XML streams.
+quick-xml = "0.42.0"
+zip = { version = "9.2.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
 desk-anim = { path = "crates/desk-anim" }
 desk-chart = { path = "crates/desk-chart" }
 desk-contacts = { path = "crates/desk-contacts" }
