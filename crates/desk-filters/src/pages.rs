@@ -61,12 +61,20 @@ pub fn font_face(postscript: &str) -> (String, bool, bool) {
     let style = style.to_ascii_lowercase();
     let bold = ["bold", "black", "heavy"].iter().any(|w| style.contains(w));
     let italic = ["italic", "oblique"].iter().any(|w| style.contains(w));
-    // Spaces where a lower case letter or a digit meets a capital, as in
-    // TimesNewRoman.
+    // Spaces where a lower case letter or a digit meets a capital, or a
+    // lower case letter a digit.
     let mut family = String::new();
     let mut previous: Option<char> = None;
     for c in base.chars() {
-        if c.is_uppercase() && previous.is_some_and(|p| p.is_lowercase() || p.is_ascii_digit()) {
+        let breaks = match previous {
+            // TimesNewRoman, and Bodoni72.
+            Some(p) => {
+                (c.is_uppercase() && (p.is_lowercase() || p.is_ascii_digit()))
+                    || (c.is_ascii_digit() && p.is_lowercase())
+            }
+            None => false,
+        };
+        if breaks {
             family.push(' ');
         }
         family.push(c);
@@ -514,5 +522,13 @@ mod tests {
             ("Helvetica".into(), false, true)
         );
         assert_eq!(font_face("ArialMT"), ("Arial".into(), false, false));
+        assert_eq!(
+            font_face("Bodoni72-Book"),
+            ("Bodoni 72".into(), false, false)
+        );
+        assert_eq!(
+            font_face("HelveticaNeue-Bold"),
+            ("Helvetica Neue".into(), true, false)
+        );
     }
 }

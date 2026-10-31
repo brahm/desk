@@ -24,7 +24,7 @@ jobs:
       - name: Install GTK, Libadwaita, the test fonts and Poppler
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation poppler-utils
+          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

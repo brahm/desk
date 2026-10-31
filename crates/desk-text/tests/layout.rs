@@ -468,3 +468,43 @@ fn int_02_the_text_of_a_line_ends_above_its_leading() {
     assert_eq!(line.baseline - line.top, 11.0);
     assert_eq!(line.text_bottom - line.top, 14.0);
 }
+
+#[test]
+fn doc_05_missing_fonts_are_laid_out_with_their_substitutes() {
+    let mut system = TextSystem::new();
+    let helvetica = system.font_choice("Helvetica");
+    if helvetica.is_substitution() {
+        // Liberation Sans has the metrics of Helvetica.
+        assert_eq!(&*helvetica.used, "Liberation Sans");
+        assert_eq!(helvetica.kind, desk_text::FontMatch::Metric);
+        let format = |family: &str| CharFormat {
+            font_family: Arc::from(family),
+            ..CharFormat::default()
+        };
+        let text = "Lines break where they did on the Mac.";
+        let a = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[(text, format("Helvetica"))],
+        );
+        let b = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[(text, format("Liberation Sans"))],
+        );
+        assert_eq!(a.lines[0].advance, b.lines[0].advance);
+    }
+    let missing = system.font_choice("Desk Missing Serif");
+    assert_eq!(&*missing.used, "Liberation Serif");
+    assert_eq!(missing.kind, desk_text::FontMatch::Fallback);
+    let listed: Vec<_> = system
+        .substitutions()
+        .into_iter()
+        .map(|c| c.requested)
+        .collect();
+    assert!(
+        listed.iter().any(|r| &**r == "Desk Missing Serif"),
+        "{listed:?}"
+    );
+    assert!(!listed.iter().any(|r| &**r == "Liberation Sans"));
+}

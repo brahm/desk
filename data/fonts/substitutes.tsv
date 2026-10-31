@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The free fonts that stand for fonts a document names and the system does
+# not have (DOC-05), in order of preference. Desk uses the font itself
+# whenever it is installed. "metric" substitutes have the same advance
+# widths, so lines break in the same places; "style" substitutes only look
+# alike. data/fonts/README.md lists the licenses.
+requested	substitute	match
+Helvetica	Liberation Sans	metric
+Helvetica	TeX Gyre Heros	metric
+Helvetica	Nimbus Sans	metric
+Arial	Liberation Sans	metric
+Arial	Nimbus Sans	metric
+Helvetica Neue	TeX Gyre Heros	style
+Helvetica Neue	Liberation Sans	style
+Times	Liberation Serif	metric
+Times	TeX Gyre Termes	metric
+Times	Nimbus Roman	metric
+Times Roman	Liberation Serif	metric
+Times New Roman	Liberation Serif	metric
+Times New Roman	Nimbus Roman	metric
+Courier	Liberation Mono	metric
+Courier	TeX Gyre Cursor	metric
+Courier	Nimbus Mono PS	metric
+Courier New	Liberation Mono	metric
+Courier New	Nimbus Mono PS	metric
+Palatino	TeX Gyre Pagella	metric
+Palatino	P052	metric
+Palatino Linotype	TeX Gyre Pagella	metric
+Palatino Linotype	P052	metric
+Book Antiqua	TeX Gyre Pagella	metric
+Bookman	TeX Gyre Bonum	metric
+Bookman	URW Bookman	metric
+Bookman Old Style	TeX Gyre Bonum	metric
+New Century Schoolbook	TeX Gyre Schola	metric
+New Century Schoolbook	C059	metric
+Century Schoolbook	TeX Gyre Schola	metric
+Avant Garde	TeX Gyre Adventor	metric
+Avant Garde	URW Gothic	metric
+Zapf Chancery	TeX Gyre Chorus	metric
+Zapf Chancery	Z003	metric
+Apple Chancery	TeX Gyre Chorus	style
+Georgia	Gelasio	metric
+Calibri	Carlito	metric
+Cambria	Caladea	metric
+Menlo	DejaVu Sans Mono	metric
+Monaco	DejaVu Sans Mono	style
+Andale Mono	DejaVu Sans Mono	style
+Verdana	DejaVu Sans	style
+Tahoma	DejaVu Sans	style
+Lucida Grande	DejaVu Sans	style
+Geneva	DejaVu Sans	style
+Trebuchet MS	DejaVu Sans	style
+Gill Sans	TeX Gyre Heros	style
+Futura	TeX Gyre Adventor	style
+Avenir	TeX Gyre Adventor	style
+Optima	TeX Gyre Heros	style
+Baskerville	TeX Gyre Pagella	style
+Big Caslon	TeX Gyre Pagella	style
+Hoefler Text	TeX Gyre Pagella	style
+Cochin	TeX Gyre Pagella	style
+Didot	TeX Gyre Termes	style
+Bodoni 72	TeX Gyre Termes	style
+American Typewriter	TeX Gyre Cursor	style
+American Typewriter	Liberation Mono	style
+Marker Felt	TeX Gyre Chorus	style
+Zapfino	TeX Gyre Chorus	style
+Snell Roundhand	TeX Gyre Chorus	style

@@ -8,7 +8,9 @@
 //! in `experiments/text-engine` settled: that keeps hyphens, the space
 //! around wrapped objects and the rules that must match Pages in our code.
 
+use std::collections::HashMap;
 use std::ops::Range;
+use std::sync::Arc;
 
 use desk_model::{Alignment, Baseline, CharFormat, LINE_BREAK, LineSpacing, LineStyle, Rgba};
 use icu_segmenter::LineSegmenter;
@@ -20,6 +22,7 @@ use parley::{
     VerticalAlign,
 };
 
+use crate::fonts::{FontChoice, choose};
 use crate::input::{ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
 
@@ -133,6 +136,8 @@ pub struct ParagraphLayout {
 pub struct TextSystem {
     fonts: FontContext,
     layouts: LayoutContext<u32>,
+    /// The font chosen for each family named so far.
+    choices: HashMap<Arc<str>, FontChoice>,
 }
 
 impl Default for TextSystem {
@@ -165,16 +170,46 @@ impl TextSystem {
         Self {
             fonts: FontContext::new(),
             layouts: LayoutContext::new(),
+            choices: HashMap::new(),
         }
     }
 
+    /// The font that lays out a family: the family itself when it is
+    /// installed, or the free font that stands for it (DOC-05).
+    pub fn font_choice(&mut self, family: &str) -> FontChoice {
+        if let Some(choice) = self.choices.get(family) {
+            return choice.clone();
+        }
+        let collection = &mut self.fonts.collection;
+        let choice = choose(family, |name| collection.family_id(name).is_some());
+        self.choices.insert(family.into(), choice.clone());
+        choice
+    }
+
+    /// The families laid out so far with another font, by name: what the
+    /// Warnings window lists.
+    pub fn substitutions(&self) -> Vec<FontChoice> {
+        let mut out: Vec<FontChoice> = self
+            .choices
+            .values()
+            .filter(|c| c.is_substitution())
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| a.requested.cmp(&b.requested));
+        out
+    }
+
     fn build(&mut self, text: &ParagraphText) -> Layout<u32> {
+        let formats = text.formats();
+        let families: Vec<Arc<str>> = formats
+            .iter()
+            .map(|f| self.font_choice(&f.font_family).used)
+            .collect();
         let mut builder = self
             .layouts
             // Font metrics rounded to whole points, as Pages lays out lines.
             .ranged_builder(&mut self.fonts, text.text(), 1.0, true);
-        let formats = text.formats();
-        for property in properties(&formats[0], false) {
+        for property in properties(&formats[0], &families[0], false) {
             builder.push_default(property);
         }
         builder.push_default(StyleProperty::Brush(0));
@@ -186,7 +221,7 @@ impl TextSystem {
                 continue;
             }
             let index = range.format as usize;
-            for property in properties(&formats[index], range.small_caps) {
+            for property in properties(&formats[index], &families[index], range.small_caps) {
                 builder.push(property, range.range.clone());
             }
             builder.push(StyleProperty::Brush(range.format), range.range.clone());
@@ -505,7 +540,12 @@ fn alignment(alignment: Alignment) -> parley::Alignment {
 ///
 /// Superscripts and subscripts are shifted once the line is laid out, by
 /// [`script_shift`], since Parley rounds shifts to whole points.
-fn properties(format: &CharFormat, small_caps: bool) -> Vec<StyleProperty<'_, u32>> {
+/// `family` is the font chosen for the family of the format.
+fn properties<'a>(
+    format: &'a CharFormat,
+    family: &'a str,
+    small_caps: bool,
+) -> Vec<StyleProperty<'a, u32>> {
     let mut size = format.font_size.to_pt() as f32;
     let raise = format.baseline_shift.to_pt() as f32;
     if format.baseline != Baseline::Normal {
@@ -515,7 +555,7 @@ fn properties(format: &CharFormat, small_caps: bool) -> Vec<StyleProperty<'_, u3
         size *= SMALL_CAPS_SCALE;
     }
     let mut properties = vec![
-        StyleProperty::FontFamily(FontFamily::named(&format.font_family)),
+        StyleProperty::FontFamily(FontFamily::named(family)),
         StyleProperty::FontSize(size),
         StyleProperty::FontWeight(if format.bold {
             FontWeight::BOLD
