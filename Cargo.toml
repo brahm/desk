@@ -18,6 +18,9 @@ publish = false
 # 1.5, as in Ubuntu 24.04.
 adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+# Builds the app icons into desk-ui as GResources. It runs the
+# glib-compile-resources tool, which comes with the GLib development files.
+glib-build-tools = "0.22.8"
 
 # Persistent collections for the document model, so that snapshots are cheap.
 imbl = "7.0.2"

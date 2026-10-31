@@ -1,4 +1,9 @@
-# Desk
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="data/logo/desk-logo-dark.svg">
+    <img src="data/logo/desk-logo.svg" alt="Desk" width="560">
+  </picture>
+</h1>
 
 Desk is a free office suite for the Linux desktop, made of three apps
 that share one document model:
@@ -30,6 +35,10 @@ On Fedora:
 ```sh
 sudo dnf install gtk4-devel libadwaita-devel
 ```
+
+The build also runs `glib-compile-resources`, which comes with the GLib
+development files that these packages install, to build the app icons
+into the apps.
 
 Then run an app with Cargo:
 
@@ -68,6 +77,45 @@ minimum Rust version, the licenses and advisories of dependencies (with
 cargo-deny) and REUSE compliance. It also checks two dependency rules:
 the MPL-2.0 libraries use no other Desk crate, and only `desk-ui` and the
 apps use GTK.
+
+## Icons and logo
+
+The icons follow the app icon guidelines of the GNOME HIG: soft shading,
+a folded corner in the color of each app, and the colors that people
+know from the matching office apps (blue for the word processor, green
+for the spreadsheet and orange for the presentations). They are in
+[data/icons](data/icons), laid out as in the `hicolor` theme, so they
+install as they are under `$prefix/share/icons/hicolor`:
+
+| File | Use |
+|---|---|
+| `scalable/apps/br.com.brahm.Desk.{Writer,Tables,Slides}.svg` | Full color app icons, on a 128 px canvas |
+| `symbolic/apps/br.com.brahm.Desk.{Writer,Tables,Slides}-symbolic.svg` | Symbolic app icons, on a 16 px canvas |
+| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}.svg` | ODF documents |
+| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}-template.svg` | ODF templates: a second sheet behind the document, the sample content faded and a dashed frame around the area to fill in |
+
+The MIME icons use the names that shared-mime-info derives from each
+MIME type, so the desktop picks them for ODF files when the icon theme
+in use has none of its own. A Flatpak can only export icons whose names
+start with the app ID, so a Flatpak build will have to install copies of
+them under such names.
+
+The app icons and their symbolic versions are also built into the apps
+as GResources (listed in
+[crates/desk-ui/resources](crates/desk-ui/resources)), so the apps show
+them in their windows and About dialogs when run with Cargo, before
+anything is installed.
+
+The suite icon, a tray holding one document of each app, is in
+[data/logo](data/logo) as `desk.svg`. The logo sets it next to the
+"Desk" wordmark, whose letters are drawn as office charts: a bar chart
+in the D, a pie chart in the e, graph paper in the s and a spreadsheet
+in the k. There is a version for light backgrounds (`desk-logo.svg`)
+and one for dark backgrounds (`desk-logo-dark.svg`), each also exported
+as a PNG with a transparent background, 2048 px wide (`desk-logo.png`
+and `desk-logo-dark.png`), for About pages, the website and store
+listings. The letters, labels and figures are Inter Display converted
+to outlines, so the logo does not need the font to render.
 
 ## License
 
