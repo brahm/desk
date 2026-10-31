@@ -1,0 +1,22 @@
+title = "Recuos"
+rows = ["FMT-18"]
+description = "Recuo da primeira linha, recuos à esquerda e à direita, e um recuo deslocado."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+space_after = 12
+
+[[paragraphs]]
+filler = 50
+first_line_indent = 36
+
+[[paragraphs]]
+filler = 50
+left_indent = 72
+right_indent = 72
+
+[[paragraphs]]
+filler = 50
+left_indent = 36
+first_line_indent = -36

@@ -1,0 +1,31 @@
+title = "Espaçamento entre linhas"
+rows = ["FMT-14"]
+description = "Os seis modos do Inspetor de Texto: simples, duplo, múltiplo, pelo menos, exatamente e entre."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+space_after = 12
+
+[[paragraphs]]
+filler = 45
+
+[[paragraphs]]
+filler = 45
+line_spacing = { multiple = 200 }
+
+[[paragraphs]]
+filler = 45
+line_spacing = { multiple = 150 }
+
+[[paragraphs]]
+filler = 45
+line_spacing = { at_least = 24 }
+
+[[paragraphs]]
+filler = 45
+line_spacing = { exactly = 18 }
+
+[[paragraphs]]
+filler = 45
+line_spacing = { between = 8 }

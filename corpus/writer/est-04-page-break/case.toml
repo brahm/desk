@@ -1,0 +1,17 @@
+title = "Quebra de página"
+rows = ["EST-04"]
+description = "Um parágrafo que começa em nova página, logo depois de outro curto. O seguinte, já no topo de uma página, não cria outra."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+
+[[paragraphs]]
+text = "Primeira página."
+
+[[paragraphs]]
+filler = 40
+page_break_before = true
+
+[[paragraphs]]
+filler = 40

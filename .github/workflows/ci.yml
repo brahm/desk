@@ -43,6 +43,15 @@ jobs:
           RUSTDOCFLAGS: --deny warnings
       - name: Check dependency rules
         run: ci/check-deps.sh
+      - name: Compare the corpus with Pages
+        run: cargo run --locked --package desk-testkit --bin desk-parity
+      - name: Keep the parity report and the diff images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-report
+          path: target/parity
+          if-no-files-found: ignore
 
   msrv:
     name: Build with the minimum Rust version

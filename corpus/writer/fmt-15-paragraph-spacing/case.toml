@@ -1,0 +1,26 @@
+title = "Espaço antes e depois do parágrafo"
+rows = ["FMT-15"]
+description = "Entre dois parágrafos vale o maior dos dois espaços. O espaço antes do primeiro parágrafo da página é ignorado."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+
+[[paragraphs]]
+filler = 30
+space_before = 36
+
+[[paragraphs]]
+filler = 30
+space_after = 24
+
+[[paragraphs]]
+filler = 30
+space_before = 6
+
+[[paragraphs]]
+filler = 30
+space_before = 30
+
+[[paragraphs]]
+filler = 30
