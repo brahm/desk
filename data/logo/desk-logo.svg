@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="592" height="168" viewBox="0 0 592 168">
+<title>Desk</title>
+<svg x="4" y="28" width="124" height="124" viewBox="0 0 128 128">
+<defs>
+    <linearGradient id="w-paper" x1="0" y1="10" x2="0" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f6f5f4"/>
+    </linearGradient>
+    <linearGradient id="w-gold" x1="0" y1="-8" x2="0" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8e45c"/>
+      <stop offset="0.55" stop-color="#f5c211"/>
+      <stop offset="1" stop-color="#c88800"/>
+    </linearGradient>
+    <linearGradient id="w-barrel" x1="0" y1="-8.5" x2="0" y2="8.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#77767b"/>
+      <stop offset="0.35" stop-color="#3d3846"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+    <linearGradient id="w-grip" x1="0" y1="-6.5" x2="0" y2="6.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5e5c64"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+  </defs>
+  <!-- Pad of paper -->
+  <rect x="24" y="16" width="80" height="100" rx="4" fill="#c0bfbc" transform="rotate(4 64 66)"/>
+  <rect x="24" y="14" width="80" height="100" rx="4" fill="#ffffff" transform="rotate(4 64 66)"/>
+  <rect x="22" y="14" width="80" height="102" rx="4" fill="#c0bfbc"/>
+  <rect x="22" y="10" width="80" height="102" rx="4" fill="url(#w-paper)"/>
+  <rect x="22.5" y="10.5" width="79" height="101" rx="3.5" fill="none" stroke="#ffffff" stroke-opacity="0.6"/>
+  <!-- Text -->
+  <rect x="32" y="22" width="44" height="6" rx="2" fill="#3584e4"/>
+  <g fill="#c0bfbc">
+    <rect x="32" y="36" width="60" height="3" rx="1.5"/>
+    <rect x="32" y="44" width="56" height="3" rx="1.5"/>
+    <rect x="32" y="52" width="60" height="3" rx="1.5"/>
+    <rect x="32" y="60" width="48" height="3" rx="1.5"/>
+    <rect x="32" y="72" width="58" height="3" rx="1.5"/>
+    <rect x="32" y="80" width="40" height="3" rx="1.5"/>
+  </g>
+  <!-- Fresh ink -->
+  <path d="M32 96c3-5 5-5 6 0s3 5 6 0 4-4 5-1" fill="none" stroke="#1a5fb4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Shadow of the pen on the paper -->
+  <g transform="translate(53 99) rotate(135)" fill="#000000" fill-opacity="0.12">
+    <path d="M0 0 L-14 -6.5 L-22 -7 L-22 7 L-14 6.5 Z"/>
+    <rect x="-80" y="-8.5" width="60" height="17" rx="8.5"/>
+  </g>
+  <!-- Fountain pen -->
+  <g transform="translate(49 94) rotate(135)">
+    <path d="M0 0 L-14 -6.5 C-17 -7.5 -20 -7 -22 -6.5 L-22 6.5 C-20 7 -17 7.5 -14 6.5 Z" fill="url(#w-gold)"/>
+    <rect x="-13" y="-0.6" width="12.5" height="1.2" fill="#865e3c"/>
+    <circle cx="-13" cy="0" r="1.8" fill="#865e3c"/>
+    <rect x="-31" y="-6.5" width="10" height="13" rx="1" fill="url(#w-grip)"/>
+    <rect x="-35" y="-8.5" width="5" height="17" rx="1" fill="url(#w-gold)"/>
+    <rect x="-80" y="-8.5" width="46" height="17" rx="8" fill="url(#w-barrel)"/>
+    <rect x="-71" y="-8.5" width="3" height="17" fill="url(#w-gold)"/>
+    <rect x="-77" y="-6" width="40" height="2" rx="1" fill="#ffffff" fill-opacity="0.3"/>
+  </g>
+</svg><svg x="188" y="28" width="124" height="124" viewBox="0 0 128 128">
+<defs>
+    <linearGradient id="s-body" x1="36" y1="0" x2="92" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62a0ea"/>
+      <stop offset="0.35" stop-color="#3584e4"/>
+      <stop offset="1" stop-color="#1a5fb4"/>
+    </linearGradient>
+    <linearGradient id="s-desk" x1="0" y1="32" x2="0" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c3dbf8"/>
+      <stop offset="1" stop-color="#62a0ea"/>
+    </linearGradient>
+    <linearGradient id="s-lip" x1="0" y1="50" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3584e4"/>
+      <stop offset="1" stop-color="#1c71d8"/>
+    </linearGradient>
+    <linearGradient id="s-mic" x1="0" y1="8" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5e5c64"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+  </defs>
+  <!-- Base -->
+  <rect x="28" y="106" width="72" height="12" rx="3" fill="#1a5fb4"/>
+  <rect x="28" y="104" width="72" height="9" rx="3" fill="#3584e4"/>
+  <!-- Column -->
+  <path d="M34 56 L94 56 L87 106 L41 106 Z" fill="url(#s-body)"/>
+  <path d="M46 66 L82 66 L78 98 L50 98 Z" fill="#1c71d8" fill-opacity="0.45"/>
+  <path d="M47 67 L81 67 L77.2 97 L50.8 97 Z" fill="none" stroke="#99c1f1" stroke-opacity="0.5"/>
+  <!-- Emblem: a slide -->
+  <rect x="52" y="73" width="24" height="17" rx="2" fill="#ffffff"/>
+  <rect x="55" y="76" width="18" height="3" rx="1" fill="#3584e4"/>
+  <rect x="55" y="82" width="4" height="5" rx="0.5" fill="#ff7800"/>
+  <rect x="61" y="81" width="4" height="6" rx="0.5" fill="#f6d32d"/>
+  <rect x="67" y="83" width="4" height="4" rx="0.5" fill="#33d17a"/>
+  <!-- Microphone -->
+  <path d="M95 44 C97 30 92 22 83 17" fill="none" stroke="#3d3846" stroke-width="3" stroke-linecap="round"/>
+  <g transform="rotate(30 78 14)">
+    <rect x="70" y="9" width="14" height="10" rx="5" fill="url(#s-mic)"/>
+    <rect x="72" y="10.5" width="7" height="2" rx="1" fill="#ffffff" fill-opacity="0.35"/>
+  </g>
+  <!-- Reading desk -->
+  <path d="M28 34 L100 34 L110 50 L18 50 Z" fill="url(#s-desk)"/>
+  <rect x="17" y="49" width="94" height="10" rx="2.5" fill="#1a5fb4"/>
+  <rect x="17" y="48" width="94" height="8" rx="2.5" fill="url(#s-lip)"/>
+  <rect x="19" y="49" width="90" height="1.5" rx="0.75" fill="#ffffff" fill-opacity="0.4"/>
+  <!-- Notes on the desk -->
+  <path d="M46 37 L76 37 L78 47 L44 47 Z" fill="#ffffff"/>
+  <path d="M49 40 H71 M49 43.5 H66" stroke="#c0bfbc" stroke-width="1.5" stroke-linecap="round"/>
+  <ellipse cx="95" cy="44" rx="4" ry="1.8" fill="#3d3846"/>
+</svg><svg x="96" y="20" width="132" height="132" viewBox="0 0 128 128">
+<defs>
+    <linearGradient id="t-paper" x1="0" y1="10" x2="0" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f6f5f4"/>
+    </linearGradient>
+    <linearGradient id="t-bar" x1="0" y1="40" x2="0" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#57e389"/>
+      <stop offset="1" stop-color="#2ec27e"/>
+    </linearGradient>
+    <linearGradient id="t-pie" x1="70" y1="64" x2="118" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62a0ea"/>
+      <stop offset="1" stop-color="#1c71d8"/>
+    </linearGradient>
+    <linearGradient id="t-slice" x1="96" y1="60" x2="120" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f9f06b"/>
+      <stop offset="1" stop-color="#f6d32d"/>
+    </linearGradient>
+  </defs>
+  <!-- Sheet with a table -->
+  <rect x="20" y="14" width="88" height="80" rx="4" fill="#c0bfbc"/>
+  <rect x="20" y="10" width="88" height="80" rx="4" fill="url(#t-paper)"/>
+  <path d="M24 10h80a4 4 0 0 1 4 4v10H20V14a4 4 0 0 1 4-4z" fill="#deddda"/>
+  <g fill="#deddda">
+    <rect x="42" y="24" width="1" height="66"/>
+    <rect x="64" y="24" width="1" height="66"/>
+    <rect x="86" y="24" width="1" height="66"/>
+    <rect x="20" y="37" width="88" height="1"/>
+    <rect x="20" y="50" width="88" height="1"/>
+    <rect x="20" y="63" width="88" height="1"/>
+    <rect x="20" y="76" width="88" height="1"/>
+  </g>
+  <g fill="#9a9996">
+    <rect x="25" y="15.5" width="12" height="3" rx="1.5"/>
+    <rect x="47" y="15.5" width="12" height="3" rx="1.5"/>
+    <rect x="69" y="15.5" width="12" height="3" rx="1.5"/>
+    <rect x="91" y="15.5" width="12" height="3" rx="1.5"/>
+  </g>
+  <g fill="#c0bfbc">
+    <rect x="70" y="29" width="12" height="3" rx="1.5"/>
+    <rect x="92" y="29" width="10" height="3" rx="1.5"/>
+    <rect x="70" y="42" width="10" height="3" rx="1.5"/>
+    <rect x="92" y="42" width="12" height="3" rx="1.5"/>
+    <rect x="92" y="55" width="9" height="3" rx="1.5"/>
+  </g>
+  <!-- Bar chart -->
+  <rect x="14" y="66" width="18" height="50" rx="3" fill="#26a269"/>
+  <rect x="14" y="62" width="18" height="50" rx="3" fill="url(#t-bar)"/>
+  <rect x="36" y="46" width="18" height="70" rx="3" fill="#26a269"/>
+  <rect x="36" y="42" width="18" height="70" rx="3" fill="url(#t-bar)"/>
+  <rect x="58" y="80" width="18" height="36" rx="3" fill="#26a269"/>
+  <rect x="58" y="76" width="18" height="36" rx="3" fill="url(#t-bar)"/>
+  <g fill="#ffffff" fill-opacity="0.35">
+    <rect x="16" y="64" width="14" height="2" rx="1"/>
+    <rect x="38" y="44" width="14" height="2" rx="1"/>
+    <rect x="60" y="78" width="14" height="2" rx="1"/>
+  </g>
+  <!-- Pie chart -->
+  <path d="M94 93 L116.55 84.79 A24 24 0 1 1 94 69 Z" fill="#1a5fb4"/>
+  <path d="M94 88 L116.55 79.79 A24 24 0 1 1 94 64 Z" fill="url(#t-pie)"/>
+  <path d="M96.9 88.9 L96.9 64.9 A24 24 0 0 1 119.45 80.69 Z" fill="#e5a50a"/>
+  <path d="M96.9 83.9 L96.9 59.9 A24 24 0 0 1 119.45 75.69 Z" fill="url(#t-slice)"/>
+</svg>
+<path d="M371.103515625 122.0C393.41796875 122.0 407.041015625 107.986328125 407.041015625 85.57421875C407.041015625 63.259765625 393.271484375 49.24609375 371.396484375 49.24609375H345.419921875V122.0ZM360.458984375 109.353515625V61.892578125H370.46875C384.921875 61.892578125 391.904296875 70.291015625 391.904296875 85.57421875C391.904296875 100.90625 385.01953125 109.353515625 370.322265625 109.353515625ZM436.73046875 123.171875C449.23046875 123.171875 459.19140625 116.04296875 461.095703125 105.7890625H447.9609375C446.642578125 109.79296875 442.78515625 112.380859375 437.169921875 112.380859375C429.6015625 112.380859375 425.20703125 107.44921875 424.962890625 99.83203125H461.6328125V95.974609375C461.6328125 80.251953125 451.427734375 69.265625 436.2421875 69.265625C421.447265625 69.265625 410.94921875 80.544921875 410.94921875 96.267578125C410.94921875 111.94140625 421.10546875 123.171875 436.73046875 123.171875ZM425.060546875 90.65234375C425.841796875 84.20703125 430.08984375 80.203125 436.53515625 80.203125C443.029296875 80.203125 447.326171875 84.20703125 448.05859375 90.65234375ZM488.783203125 123.26953125C502.259765625 123.26953125 511.634765625 116.53125 511.634765625 106.228515625C511.634765625 98.66015625 506.849609375 94.16796875 496.44921875 92.1171875L486.68359375 90.212890625C482.728515625 89.3828125 480.43359375 87.673828125 480.43359375 85.037109375C480.43359375 81.9609375 483.412109375 79.568359375 488.34375 79.568359375C493.421875 79.568359375 496.9375 82.64453125 497.03515625 86.794921875H510.365234375C510.072265625 76.052734375 501.283203125 69.36328125 487.953125 69.36328125C474.525390625 69.36328125 466.078125 75.80859375 466.078125 85.57421875C466.078125 93.58203125 471.400390625 98.66015625 481.41015625 100.61328125L490.443359375 102.37109375C494.642578125 103.201171875 497.1328125 104.8125 497.1328125 107.546875C497.1328125 110.720703125 493.861328125 112.966796875 488.5390625 112.966796875C482.923828125 112.966796875 479.603515625 110.28125 479.06640625 105.7890625H464.90625C465.78515625 116.873046875 475.404296875 123.26953125 488.783203125 123.26953125ZM517.349609375 122.0H531.75390625V105.642578125L535.904296875 101.052734375L551.08984375 122.0H567.935546875L546.6953125 92.80078125L566.861328125 70.4375H549.966796875L531.900390625 90.1640625H531.75390625V49.24609375H517.349609375Z" fill="#3d3846"/>
+</svg>

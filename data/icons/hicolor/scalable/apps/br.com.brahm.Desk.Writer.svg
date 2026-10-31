@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="10" x2="0" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f6f5f4"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="-8" x2="0" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8e45c"/>
+      <stop offset="0.55" stop-color="#f5c211"/>
+      <stop offset="1" stop-color="#c88800"/>
+    </linearGradient>
+    <linearGradient id="barrel" x1="0" y1="-8.5" x2="0" y2="8.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#77767b"/>
+      <stop offset="0.35" stop-color="#3d3846"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+    <linearGradient id="grip" x1="0" y1="-6.5" x2="0" y2="6.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5e5c64"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+  </defs>
+  <!-- Pad of paper -->
+  <rect x="24" y="16" width="80" height="100" rx="4" fill="#c0bfbc" transform="rotate(4 64 66)"/>
+  <rect x="24" y="14" width="80" height="100" rx="4" fill="#ffffff" transform="rotate(4 64 66)"/>
+  <rect x="22" y="14" width="80" height="102" rx="4" fill="#c0bfbc"/>
+  <rect x="22" y="10" width="80" height="102" rx="4" fill="url(#paper)"/>
+  <rect x="22.5" y="10.5" width="79" height="101" rx="3.5" fill="none" stroke="#ffffff" stroke-opacity="0.6"/>
+  <!-- Text -->
+  <rect x="32" y="22" width="44" height="6" rx="2" fill="#3584e4"/>
+  <g fill="#c0bfbc">
+    <rect x="32" y="36" width="60" height="3" rx="1.5"/>
+    <rect x="32" y="44" width="56" height="3" rx="1.5"/>
+    <rect x="32" y="52" width="60" height="3" rx="1.5"/>
+    <rect x="32" y="60" width="48" height="3" rx="1.5"/>
+    <rect x="32" y="72" width="58" height="3" rx="1.5"/>
+    <rect x="32" y="80" width="40" height="3" rx="1.5"/>
+  </g>
+  <!-- Fresh ink -->
+  <path d="M32 96c3-5 5-5 6 0s3 5 6 0 4-4 5-1" fill="none" stroke="#1a5fb4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Shadow of the pen on the paper -->
+  <g transform="translate(53 99) rotate(135)" fill="#000000" fill-opacity="0.12">
+    <path d="M0 0 L-14 -6.5 L-22 -7 L-22 7 L-14 6.5 Z"/>
+    <rect x="-80" y="-8.5" width="60" height="17" rx="8.5"/>
+  </g>
+  <!-- Fountain pen -->
+  <g transform="translate(49 94) rotate(135)">
+    <path d="M0 0 L-14 -6.5 C-17 -7.5 -20 -7 -22 -6.5 L-22 6.5 C-20 7 -17 7.5 -14 6.5 Z" fill="url(#gold)"/>
+    <rect x="-13" y="-0.6" width="12.5" height="1.2" fill="#865e3c"/>
+    <circle cx="-13" cy="0" r="1.8" fill="#865e3c"/>
+    <rect x="-31" y="-6.5" width="10" height="13" rx="1" fill="url(#grip)"/>
+    <rect x="-35" y="-8.5" width="5" height="17" rx="1" fill="url(#gold)"/>
+    <rect x="-80" y="-8.5" width="46" height="17" rx="8" fill="url(#barrel)"/>
+    <rect x="-71" y="-8.5" width="3" height="17" fill="url(#gold)"/>
+    <rect x="-77" y="-6" width="40" height="2" rx="1" fill="#ffffff" fill-opacity="0.3"/>
+  </g>
+</svg>

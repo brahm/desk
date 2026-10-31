@@ -69,6 +69,32 @@ cargo-deny) and REUSE compliance. It also checks two dependency rules:
 the MPL-2.0 libraries use no other Desk crate, and only `desk-ui` and the
 apps use GTK.
 
+## Icons and logo
+
+The icons follow the app icon guidelines of the GNOME HIG, and are
+original drawings inspired by the motifs of iWork '09: a fountain pen on
+paper, charts in front of a table, and a lectern. They are in
+[data/icons](data/icons), laid out as in the `hicolor` theme, so they
+install as they are under `$prefix/share/icons/hicolor`:
+
+| File | Use |
+|---|---|
+| `scalable/apps/br.com.brahm.Desk.{Writer,Tables,Slides}.svg` | Full color app icons, on a 128 px canvas |
+| `symbolic/apps/br.com.brahm.Desk.{Writer,Tables,Slides}-symbolic.svg` | Symbolic app icons, on a 16 px canvas |
+| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}.svg` | ODF documents |
+| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}-template.svg` | ODF templates, drawn with a dashed margin |
+
+The MIME icons use the names that shared-mime-info derives from each
+MIME type, so the desktop picks them for ODF files when the icon theme
+in use has none of its own. A Flatpak can only export icons whose names
+start with the app ID, so a Flatpak build will have to install copies of
+them under such names.
+
+The suite logo is in [data/logo](data/logo), for light
+(`desk-logo.svg`) and dark (`desk-logo-dark.svg`) backgrounds. Its
+wordmark is Inter Display Bold converted to outlines, so it does not
+need the font to render.
+
 ## License
 
 Desk uses two licenses:
