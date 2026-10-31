@@ -1,0 +1,57 @@
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - site/**
+      - data/logo/**
+      - data/icons/hicolor/scalable/apps/**
+      - ci/build-site.sh
+      - .github/workflows/pages.yml
+  pull_request:
+    paths:
+      - site/**
+      - data/logo/**
+      - data/icons/hicolor/scalable/apps/**
+      - ci/build-site.sh
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time, and never cancel one that has started.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the website
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assemble the site
+        run: ci/build-site.sh _site
+      # The Flatpak repository joins the site here when it exists: a step
+      # that puts the signed OSTree repository in _site/repo and the
+      # .flatpakrepo and .flatpakref files at the root. See site/README.md.
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: Publish on GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
