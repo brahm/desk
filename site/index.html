@@ -14,128 +14,218 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="hero">
-    <div class="wrap">
-      <h1 class="logo">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="img/desk-logo-dark.svg">
-          <img src="img/desk-logo.svg" alt="Desk" width="560" height="163">
-        </picture>
-      </h1>
-      <p class="tagline">Uma suíte de escritório para o GNOME, para quem nunca superou o iWork '09.</p>
-      <p class="status"><span class="dot" aria-hidden="true"></span> Em desenvolvimento. A primeira versão de testes sai em breve.</p>
-      <div class="actions">
-        <a class="button primary" href="https://github.com/brahm/desk">Ver no GitHub</a>
-        <a class="button" href="https://github.com/brahm/desk/issues">Reportar um bug ou pedir algo</a>
-      </div>
+  <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+    <symbol id="i-bug" viewBox="0 0 16 16"><path fill="currentColor" d="M5.5 1.5 6.8 3a3 3 0 0 1 2.4 0l1.3-1.5.8.7-1.2 1.3c.5.4.8 1 .9 1.5H13v1.5h-2v1.5h2v1.5h-2.1A3 3 0 0 1 11 10v.5h2V12h-2.3A3 3 0 0 1 8 14a3 3 0 0 1-2.7-2H3v-1.5h2V10l.1-.5H3V8h2V6.5H3V5h2.1c.1-.6.4-1.1.9-1.5L4.7 2.2zM7.25 6v6h1.5V6z"/></symbol>
+    <symbol id="i-idea" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a5 5 0 0 0-3 9v1.5c0 .3.2.5.5.5h5c.3 0 .5-.2.5-.5V10a5 5 0 0 0-3-9zm0 1.5a3.5 3.5 0 0 1 2 6.4l-.5.3v1.3h-3V9.2l-.5-.3a3.5 3.5 0 0 1 2-6.4zM6 13h4v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-code" viewBox="0 0 16 16"><path fill="currentColor" d="m5 3.5 1 1L2.5 8 6 11.5l-1 1L.5 8zm6 0L15.5 8 11 12.5l-1-1L13.5 8 10 4.5zM9.2 2l1.4.5-3.8 11.5-1.4-.5z"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 16 16"><path fill="currentColor" d="M3 1h6.5L13 4.5V15H3zm1.5 1.5v11h7V5.5H8.5v-3zM6 8h4v1.25H6zm0 2.5h4v1.25H6z"/></symbol>
+    <symbol id="i-lang" viewBox="0 0 16 16"><path fill="currentColor" d="M1 2h8v1.5H6.5c-.3 1.6-1 3-2 4.1.6.5 1.3.9 2 1.2l-.5 1.4c-.9-.4-1.7-.9-2.5-1.5-.8.6-1.6 1.1-2.5 1.5L.5 8.8c.8-.3 1.5-.7 2-1.2-.6-.7-1.1-1.5-1.4-2.4l1.4-.5c.2.6.6 1.2 1 1.7.6-.8 1.1-1.8 1.3-2.9H1zm10 4h1.6L16 15h-1.6l-.8-2.2H10L9.2 15H7.6zm.8 2.2-1.3 3.1h2.6z"/></symbol>
+    <symbol id="i-license" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8.1 4.5A3.5 3.5 0 1 0 10.8 10l-1.1-1A2 2 0 1 1 9.7 7l1.1-1a3.5 3.5 0 0 0-2.7-1.5z"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 16 16"><path fill="currentColor" d="M11 1a4 4 0 0 0-3.8 5.2L1.6 11.8a1.4 1.4 0 0 0 0 2l.6.6a1.4 1.4 0 0 0 2 0l5.6-5.6A4 4 0 0 0 15 5l-.1-.8-2.4 2.4-1.9-.2-.2-1.9 2.4-2.4A4 4 0 0 0 11 1z"/></symbol>
+    <symbol id="i-desktop" viewBox="0 0 16 16"><path fill="currentColor" d="M1 2h14v9H9v2h2v1.5H5V13h2v-2H1zm1.5 1.5v6h11v-6z"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 16 16"><path fill="currentColor" d="M1 1h6.4L15 8.6 8.6 15 1 7.4zm1.5 1.5v4.3l6.1 6.1 4.3-4.3-6.1-6.1zM5 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></symbol>
+    <symbol id="i-person" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zm0 1.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9c3.3 0 6 1.7 6 4v2H2v-2c0-2.3 2.7-4 6-4zm0 1.5c-2.6 0-4.5 1.3-4.5 2.5v.5h9V13c0-1.2-1.9-2.5-4.5-2.5z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 16 16"><path fill="currentColor" d="M5.5 2.5 11 8l-5.5 5.5-1-1L9 8 4.5 3.5z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><path fill="currentColor" d="m13 3.5 1.1 1.1L6 12.6 1.9 8.5 3 7.4l3 3z"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#"><img src="img/desk.svg" alt="" width="24" height="24"> Desk</a>
+      <nav aria-label="Seções">
+        <a href="#apps">Aplicativos</a>
+        <a href="#participe">Participe</a>
+        <a href="https://github.com/brahm/desk">GitHub</a>
+      </nav>
     </div>
   </header>
 
-  <main>
-    <section class="wrap" id="apps" aria-labelledby="apps-title">
-      <h2 id="apps-title">Três aplicativos, um só jeito de trabalhar</h2>
-      <p class="lead">Os três compartilham o mesmo modelo de documento, então uma tabela, um gráfico ou um texto se comportam igual em qualquer um deles.</p>
-      <ul class="apps">
-        <li class="app">
-          <img src="img/br.com.brahm.Desk.Writer.svg" alt="" width="96" height="96">
-          <h3>Desk Writer</h3>
-          <p>Processador de texto e layout de página, do trabalho da faculdade ao folheto da padaria.</p>
+  <main class="page">
+    <section class="app-header">
+      <img class="app-icon" src="img/desk.svg" alt="" width="128" height="128">
+      <h1>Desk</h1>
+      <p class="summary">Escreva, calcule e apresente</p>
+      <p class="developer">por Brahm, com Claude</p>
+      <div class="actions">
+        <a class="pill suggested" href="#instalar">Instalar <span class="soon">em breve</span></a>
+        <a class="pill" href="https://github.com/brahm/desk">Código-fonte</a>
+      </div>
+      <ul class="badges" aria-label="Características">
+        <li><svg aria-hidden="true"><use href="#i-license"/></svg> Software livre</li>
+        <li><svg aria-hidden="true"><use href="#i-desktop"/></svg> Feito para o GNOME</li>
+        <li><svg aria-hidden="true"><use href="#i-tools"/></svg> Em desenvolvimento</li>
+      </ul>
+    </section>
+
+    <section id="apps" aria-labelledby="apps-title">
+      <h2 id="apps-title">Aplicativos da suíte</h2>
+      <ul class="boxed-list">
+        <li class="row app-row">
+          <img src="img/br.com.brahm.Desk.Writer.svg" alt="" width="64" height="64">
+          <div class="row-text">
+            <h3>Desk Writer</h3>
+            <p>Processador de texto e layout de página, do trabalho da faculdade ao folheto da padaria.</p>
+          </div>
         </li>
-        <li class="app">
-          <img src="img/br.com.brahm.Desk.Tables.svg" alt="" width="96" height="96">
-          <h3>Desk Tables</h3>
-          <p>Planilhas com várias tabelas soltas numa mesma folha, fórmulas e gráficos bonitos.</p>
+        <li class="row app-row">
+          <img src="img/br.com.brahm.Desk.Tables.svg" alt="" width="64" height="64">
+          <div class="row-text">
+            <h3>Desk Tables</h3>
+            <p>Planilhas com várias tabelas soltas numa mesma folha, fórmulas e gráficos bonitos.</p>
+          </div>
         </li>
-        <li class="app">
-          <img src="img/br.com.brahm.Desk.Slides.svg" alt="" width="96" height="96">
-          <h3>Desk Slides</h3>
-          <p>Apresentações com transições e animações que fazem a plateia esquecer de olhar o celular.</p>
+        <li class="row app-row">
+          <img src="img/br.com.brahm.Desk.Slides.svg" alt="" width="64" height="64">
+          <div class="row-text">
+            <h3>Desk Slides</h3>
+            <p>Apresentações com transições e animações que fazem a plateia esquecer de olhar o celular.</p>
+          </div>
         </li>
       </ul>
     </section>
 
-    <section class="wrap prose" id="motivacao" aria-labelledby="motivacao-title">
-      <h2 id="motivacao-title">Por que o Desk existe</h2>
+    <section class="description" aria-labelledby="sobre-title">
+      <h2 id="sobre-title">Sobre</h2>
       <p>Na faculdade eu usava Linux. Mas a vida insistia em me mandar arquivos do Microsoft Office e pedir coisas no Photoshop, e por volta de 2008 eu me rendi e fui para o Mac. Foi lá que conheci o iWork, que vinha junto com o computador. Foi amor à primeira vista: em pouco tempo eu tinha abandonado o Microsoft Office por completo.</p>
       <p>Os anos passaram, a Apple reescreveu o iWork para 64 bits e a versão nova chegou sem várias funções úteis que até hoje não voltaram. Fiquei com saudade do iWork '09, e nunca passou.</p>
       <p>Agora o Linux voltou a ser o meu sistema principal, e eu resolvi fazer para ele o equivalente ao iWork que eu queria ter. O LibreOffice é um projeto admirável, mas nunca foi para mim: tem muita coisa que eu não uso e não conversa visualmente com o GNOME, que é o meu ambiente favorito. O Desk é a minha tentativa de juntar as duas coisas: a simplicidade do iWork '09 e a cara de um aplicativo GNOME de verdade.</p>
-      <p class="signature">Brahm</p>
+      <p>Algumas coisas que você pode esperar:</p>
+      <ul class="features">
+        <li>Os três aplicativos compartilham o mesmo modelo de documento, então uma tabela, um gráfico ou um texto se comportam igual em qualquer um deles.</li>
+        <li>Feito com Rust, GTK 4 e Libadwaita, seguindo as diretrizes de interface do GNOME.</li>
+        <li>Documentos salvos em OpenDocument (ODF), e os arquivos antigos do iWork '09 e '08 abrindo também.</li>
+        <li>O motor dos documentos é separado da interface, em bibliotecas que outros projetos podem usar. Já existe até um conversor de linha de comando que funciona sem interface gráfica nenhuma.</li>
+        <li>E se a comunidade pedir muito, a gente porta para o Plasma. <span aria-label="sorriso">:)</span></li>
+      </ul>
+      <p>O Desk está sendo feito por mim junto com o Claude, a IA da Anthropic. Isso não é desculpa para atalho: cada função do Pages, do Numbers e do Keynote '09 virou uma linha de uma matriz de paridade (são 585), cada mudança passa por revisão e por um CI que roda formatação, lint, testes e verificação de licenças, e o resultado é comparado, pixel a pixel, com PDFs gerados pelo iWork 9.3 de verdade numa máquina virtual.</p>
     </section>
 
-    <section class="wrap" id="como" aria-labelledby="como-title">
-      <h2 id="como-title">Como estamos construindo</h2>
-      <div class="cards">
-        <article class="card">
-          <h3>Eu e o Claude, com rigor</h3>
-          <p>O Desk está sendo feito por mim junto com o Claude, a IA da Anthropic. Isso não é desculpa para atalho: cada função do Pages, do Numbers e do Keynote '09 virou uma linha de uma matriz de paridade (são 585), cada mudança passa por revisão e por um CI que roda formatação, lint, testes e verificação de licenças, e o resultado é comparado, pixel a pixel, com PDFs gerados pelo iWork 9.3 de verdade numa máquina virtual.</p>
-        </article>
-        <article class="card">
-          <h3>Motor separado da interface</h3>
-          <p>O motor dos documentos (texto, layout, tabelas, fórmulas, leitura e gravação de arquivos) é escrito como bibliotecas independentes da interface. As de formato de arquivo são MPL-2.0, para que outros projetos possam usar. Já existe até um conversor de linha de comando que funciona sem interface gráfica nenhuma.</p>
-        </article>
-        <article class="card">
-          <h3>Feito para o GNOME</h3>
-          <p>Rust, GTK 4 e Libadwaita, seguindo as diretrizes de interface do GNOME. Os documentos são salvos em OpenDocument (ODF), e os arquivos antigos do iWork '09 e '08 vão abrir também. E se a comunidade pedir muito, a gente porta para o Plasma. <span aria-label="sorriso">:)</span></p>
-        </article>
+    <section id="plano" aria-labelledby="plano-title">
+      <h2 id="plano-title">O que vem por aí</h2>
+      <div class="card">
+        <p class="card-intro">Começamos pelo Desk Writer, porque o motor de texto é a parte mais difícil e os outros dois apps dependem dele. A primeira versão de testes sai em breve, e as outras vão saindo aos poucos, conforme cada etapa fica pronta.</p>
+        <ol class="timeline">
+          <li class="done">
+            <h3>Fundação <span class="tag done">pronto</span></h3>
+            <p>Estrutura do código, CI, licenças, ícones e uma máquina virtual com o iWork 9.3 que gera os documentos de referência.</p>
+          </li>
+          <li class="current">
+            <h3>Núcleo de texto <span class="tag current">em andamento</span></h3>
+            <p>Modelo de documento, motor de texto e paginação. Já lê e grava ODT e gera PDF pela linha de comando.</p>
+          </li>
+          <li>
+            <h3>Leitor do iWork</h3>
+            <p>Abrir os seus arquivos .pages antigos e medir, função por função, o quanto já estamos parecidos com o original.</p>
+          </li>
+          <li>
+            <h3>Editor mínimo e versão de testes</h3>
+            <p>Abrir, editar e salvar texto formatado no Desk Writer, distribuído como Flatpak noturno.</p>
+          </li>
+          <li>
+            <h3>Estilos, listas e estrutura do documento</h3>
+            <p>Ortografia, seções, colunas, cabeçalhos, notas e sumário. Aqui sai o primeiro beta.</p>
+          </li>
+          <li>
+            <h3>Objetos, tabelas, fórmulas e gráficos</h3>
+            <p>Imagens, formas e efeitos, e o motor de tabelas e gráficos, que é a base do Desk Slides e do Desk Tables.</p>
+          </li>
+          <li>
+            <h3>Revisão, modelos, impressão e formatos</h3>
+            <p>Controle de alterações, comentários, modelos, mala direta, e exportação para PDF, Word, RTF e ePub.</p>
+          </li>
+          <li>
+            <h3>Desk Writer 1.0, e depois Slides e Tables</h3>
+            <p>Paridade com o Pages '09 e a versão 1.0. O Desk Slides e o Desk Tables começam assim que o motor de objetos e o de tabelas estiverem prontos.</p>
+          </li>
+        </ol>
       </div>
     </section>
 
-    <section class="wrap" id="plano" aria-labelledby="plano-title">
-      <h2 id="plano-title">Plano de desenvolvimento</h2>
-      <p class="lead">Começamos pelo Desk Writer, porque o motor de texto é a parte mais difícil e os outros dois apps dependem dele. As versões vão saindo aos poucos, conforme cada etapa fica pronta, num repositório Flatpak próprio.</p>
-      <ol class="timeline">
-        <li class="done">
-          <h3>Fundação</h3>
-          <p>Estrutura do código, CI, licenças, ícones e uma máquina virtual com o iWork 9.3 que gera os documentos de referência.</p>
-        </li>
-        <li class="current">
-          <h3>Núcleo de texto <span class="tag">em andamento</span></h3>
-          <p>Modelo de documento, motor de texto e paginação. Já lê e grava ODT e gera PDF pela linha de comando.</p>
-        </li>
-        <li>
-          <h3>Leitor do iWork</h3>
-          <p>Abrir os seus arquivos .pages antigos e medir, função por função, o quanto já estamos parecidos com o original.</p>
-        </li>
-        <li>
-          <h3>Editor mínimo e versão de testes</h3>
-          <p>Abrir, editar e salvar texto formatado no Desk Writer, distribuído como Flatpak noturno.</p>
-        </li>
-        <li>
-          <h3>Estilos, listas e estrutura do documento</h3>
-          <p>Ortografia, seções, colunas, cabeçalhos, notas e sumário. Aqui sai o primeiro beta.</p>
-        </li>
-        <li>
-          <h3>Objetos, tabelas, fórmulas e gráficos</h3>
-          <p>Imagens, formas e efeitos, e o motor de tabelas e gráficos, que é a base do Desk Slides e do Desk Tables.</p>
-        </li>
-        <li>
-          <h3>Revisão, modelos, impressão e formatos</h3>
-          <p>Controle de alterações, comentários, modelos, mala direta, e exportação para PDF, Word, RTF e ePub.</p>
-        </li>
-        <li>
-          <h3>Desk Writer 1.0, e depois Slides e Tables</h3>
-          <p>Paridade com o Pages '09 e a versão 1.0. O Desk Slides e o Desk Tables começam assim que o motor de objetos e o de tabelas estiverem prontos.</p>
-        </li>
-      </ol>
+    <section id="instalar" aria-labelledby="instalar-title">
+      <h2 id="instalar-title">Instalar</h2>
+      <div class="card">
+        <p class="card-intro">Ainda não há versão para instalar. Quando a primeira versão de testes sair, o Desk vai ser distribuído como Flatpak, num repositório próprio, e vai bastar adicionar o repositório e instalar o aplicativo:</p>
+        <pre><code>flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
+flatpak install desk br.com.brahm.Desk.Writer</code></pre>
+        <p class="card-note">Esses comandos só vão funcionar quando a primeira versão sair. Enquanto isso, dá para compilar a partir do <a href="https://github.com/brahm/desk#building">código-fonte</a>.</p>
+      </div>
     </section>
 
-    <section class="wrap" id="contribua" aria-labelledby="contribua-title">
-      <div class="callout">
-        <h2 id="contribua-title">Venha construir junto</h2>
-        <p>O Desk é software livre e está só começando, então toda ajuda conta: testar as versões de teste quando saírem, reportar bugs, pedir funções que você sente falta, mandar arquivos antigos do iWork para o corpus de testes ou contribuir com código. Somos uma pessoa e uma IA: paciência com a gente, e obrigado desde já.</p>
-        <div class="actions">
-          <a class="button primary" href="https://github.com/brahm/desk/issues/new">Abrir uma issue</a>
-          <a class="button" href="https://github.com/brahm/desk">Código no GitHub</a>
-        </div>
-      </div>
+    <section id="participe" aria-labelledby="participe-title">
+      <h2 id="participe-title">Participe</h2>
+      <p class="section-intro">O Desk é software livre e está só começando, então toda ajuda conta. Somos uma pessoa e uma IA: paciência com a gente, e obrigado desde já.</p>
+      <ul class="boxed-list">
+        <li>
+          <a class="row link-row" href="https://github.com/brahm/desk/issues/new">
+            <span class="row-icon"><svg aria-hidden="true"><use href="#i-bug"/></svg></span>
+            <span class="row-text"><strong>Reportar um problema</strong><span>Achou um bug? Conte o que aconteceu e como repetir.</span></span>
+            <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
+          </a>
+        </li>
+        <li>
+          <a class="row link-row" href="https://github.com/brahm/desk/issues/new">
+            <span class="row-icon"><svg aria-hidden="true"><use href="#i-idea"/></svg></span>
+            <span class="row-text"><strong>Pedir uma funcionalidade</strong><span>Sente falta de alguma coisa do iWork '09? Peça.</span></span>
+            <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
+          </a>
+        </li>
+        <li>
+          <a class="row link-row" href="https://github.com/brahm/desk/issues/new">
+            <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>
+            <span class="row-text"><strong>Enviar documentos antigos do iWork</strong><span>Arquivos do Pages, Numbers e Keynote '09 ajudam a testar a compatibilidade.</span></span>
+            <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
+          </a>
+        </li>
+        <li>
+          <a class="row link-row" href="https://github.com/brahm/desk">
+            <span class="row-icon"><svg aria-hidden="true"><use href="#i-code"/></svg></span>
+            <span class="row-text"><strong>Contribuir com código</strong><span>O código está no GitHub, em Rust, com o CI rodando tudo antes de cada merge.</span></span>
+            <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
+          </a>
+        </li>
+        <li>
+          <div class="row">
+            <span class="row-icon"><svg aria-hidden="true"><use href="#i-lang"/></svg></span>
+            <span class="row-text"><strong>Traduzir</strong><span>As traduções abrem quando a interface tiver textos para traduzir.</span></span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section id="detalhes" aria-labelledby="detalhes-title">
+      <h2 id="detalhes-title">Detalhes</h2>
+      <ul class="boxed-list">
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-tag"/></svg></span>
+          <span class="row-text"><strong>Versão</strong><span>Nenhuma ainda. A primeira versão de testes sai em breve.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-license"/></svg></span>
+          <span class="row-text"><strong>Licença</strong><span>Aplicativos em GPL-3.0-or-later, bibliotecas de formato de arquivo em MPL-2.0</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-tools"/></svg></span>
+          <span class="row-text"><strong>Feito com</strong><span>Rust, GTK 4 e Libadwaita</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-desktop"/></svg></span>
+          <span class="row-text"><strong>Plataforma</strong><span>GNOME 51, distribuído como Flatpak</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>
+          <span class="row-text"><strong>Formatos</strong><span>OpenDocument (ODF), e leitura do iWork '09 e '08</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-person"/></svg></span>
+          <span class="row-text"><strong>Desenvolvido por</strong><span>Brahm, com Claude</span></span>
+        </li>
+      </ul>
     </section>
   </main>
 
   <footer class="footer">
-    <div class="wrap">
-      <p>Os aplicativos são GPL-3.0-or-later, e as bibliotecas de formato de arquivo são MPL-2.0.</p>
-      <p>O Desk é um projeto independente, sem relação com a Apple. iWork, Pages, Numbers e Keynote são marcas da Apple Inc. GNOME é marca da GNOME Foundation.</p>
-    </div>
+    <p>O Desk ainda não faz parte do GNOME Circle, mas é para lá que estamos olhando.</p>
+    <p>O Desk é um projeto independente, sem relação com a Apple. iWork, Pages, Numbers e Keynote são marcas da Apple Inc. GNOME é marca da GNOME Foundation.</p>
   </footer>
 </body>
 </html>
