@@ -81,7 +81,14 @@ fn convert(input: &Path, output: &Path) -> Result<(), String> {
             let bytes = std::fs::read(input).map_err(|e| read(&e))?;
             desk_filters::read_odt(&bytes).map_err(|e| read(&e))?
         }
-        Some(Format::Pages) => desk_filters::read_pages_at(input).map_err(|e| read(&e))?,
+        Some(Format::Pages) => {
+            let (document, log) =
+                desk_filters::read_pages_at_logged(input).map_err(|e| read(&e))?;
+            for entry in log.entries() {
+                eprintln!("desk-convert: warning: {entry}");
+            }
+            document
+        }
         _ => {
             return Err(format!(
                 "cannot read {}: only .odt and .pages files are read so far",

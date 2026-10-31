@@ -98,9 +98,12 @@ pub struct PagesDocument {
     pub stylesheet: Stylesheet,
     /// The paragraphs of the body.
     pub body: Vec<Paragraph>,
-    /// The kinds of content that the reader skipped, by element name, once
-    /// each: what an import cannot show yet.
-    pub skipped: Vec<String>,
+    /// The kinds of content that the reader skipped, by element name, in
+    /// the order first met, with how many of each: what an import cannot
+    /// show yet. Besides the elements of the body, `headers`, `footers`
+    /// and `drawables` count the headers, footers and floating objects of
+    /// the document, which are outside the body.
+    pub skipped: Vec<(String, usize)>,
 }
 
 /// Reads a Pages document from the text of its index.
@@ -117,7 +120,27 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         return Err(IworkError::WrongType(kind));
     }
     let ids = Ids::new(&root);
+    let mut skipped = Vec::new();
+    // Pages saves a header and a footer for each section even when they
+    // are empty, so only those with text count.
+    for name in ["headers", "footers"] {
+        let count = root
+            .children_named(SF, name)
+            .map(|part| part.elements().filter(|e| has_text(e)).count())
+            .sum::<usize>();
+        if count > 0 {
+            skipped.push((name.to_owned(), count));
+        }
+    }
+    let count = root
+        .children_named(SL, "drawables")
+        .map(floating_objects)
+        .sum::<usize>();
+    if count > 0 {
+        skipped.push(("drawables".to_owned(), count));
+    }
     let mut document = PagesDocument {
+        skipped,
         metadata: root
             .child(SF, "metadata")
             .map(|m| metadata(&ids, m))
@@ -217,6 +240,44 @@ fn page_geometry(info: &Element) -> PageGeometry {
     page
 }
 
+/// Elements under `sl:drawables` that only group the floating objects: of
+/// the pages, and of the masters of each section.
+const DRAWABLE_GROUPS: &[&str] = &[
+    "masters-group",
+    "section-drawables",
+    "page-group",
+    "foregroundmaster-group",
+    "backgroundmaster-group",
+];
+
+/// How many floating objects the drawables of a document hold.
+fn floating_objects(drawables: &Element) -> usize {
+    let mut count = 0;
+    let mut stack = vec![drawables];
+    while let Some(group) = stack.pop() {
+        for child in group.elements() {
+            if DRAWABLE_GROUPS.contains(&child.name.local.as_str()) {
+                stack.push(child);
+            } else if group.name.local != "section-drawables" {
+                // The section drawables also hold their style.
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+/// Whether an element holds text other than white space.
+fn has_text(element: &Element) -> bool {
+    std::iter::once(element)
+        .chain(element.descendants())
+        .any(|e| {
+            e.children
+                .iter()
+                .any(|n| matches!(n, Node::Text(t) if !t.trim().is_empty()))
+        })
+}
+
 /// Elements that hold nothing to show, or that Pages saves only to lay
 /// out faster.
 const IGNORED: &[&str] = &[
@@ -238,8 +299,9 @@ struct BodyReader<'a, 'b> {
 impl BodyReader<'_, '_> {
     fn skip(&mut self, element: &Element) {
         let name = &element.name.local;
-        if !self.document.skipped.contains(name) {
-            self.document.skipped.push(name.clone());
+        match self.document.skipped.iter_mut().find(|(n, _)| n == name) {
+            Some((_, count)) => *count += 1,
+            None => self.document.skipped.push((name.clone(), 1)),
         }
     }
 

@@ -64,6 +64,21 @@ impl Element {
         })
     }
 
+    /// Every element inside this one, in document order, without
+    /// recursion so that deep documents cannot overflow the stack.
+    pub fn descendants(&self) -> impl Iterator<Item = &Element> {
+        let mut out = Vec::new();
+        let mut stack: Vec<&Element> = self.elements().collect();
+        stack.reverse();
+        while let Some(element) = stack.pop() {
+            out.push(element);
+            let start = stack.len();
+            stack.extend(element.elements());
+            stack[start..].reverse();
+        }
+        out.into_iter()
+    }
+
     /// The first child element with a name.
     pub fn child(&self, ns: &str, local: &str) -> Option<&Element> {
         self.elements().find(|e| e.name.is(ns, local))

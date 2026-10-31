@@ -5,7 +5,8 @@
 //! form that Pages 4.3 saves (DOC-22). The corpus checks whole documents
 //! saved by Pages itself, in desk-testkit.
 
-use desk_filters::read_pages;
+use desk_filters::log::{Content, Formatting, Warning};
+use desk_filters::{read_pages, read_pages_logged};
 use desk_model::{
     Alignment, Baseline, Capitalization, Document, LINE_BREAK, Length, LineSpacing, LineStyle,
     Rgba, StyleFamily,
@@ -209,4 +210,53 @@ fn doc_22_a_cycle_of_parents_ends() {
             .by_name(StyleFamily::Paragraph, "A")
             .is_some()
     );
+}
+
+#[test]
+fn doc_22_what_the_model_cannot_hold_is_logged() {
+    let lists = r#"<sf:liststyle sf:name="Bullet" sf:ident="list-style-1" sfa:ID="L-1"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="text"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>
+<sf:liststyle sf:name="None" sf:ident="list-style-default" sfa:ID="L-0"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="none"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>"#;
+    let anon = format!(
+        r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-1"><sf:property-map><sf:listStyle><sf:liststyle-ref sfa:IDREF="L-1"/></sf:listStyle>{}</sf:property-map></sf:paragraphstyle>
+<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-2"><sf:property-map><sf:listStyle><sf:liststyle-ref sfa:IDREF="L-0"/></sf:listStyle>{}{}<sf:textShadow><sf:null/></sf:textShadow></sf:property-map></sf:paragraphstyle>
+<sf:characterstyle sf:parent-ident="character-style-null" sfa:ID="A-3"><sf:property-map>{}</sf:property-map></sf:characterstyle>"#,
+        number("tracking", "0.1", "f"),
+        number("tracking", "0", "f"),
+        number("ligatures", "1", "i"),
+        number("tracking", "0.2", "f"),
+    );
+    let body = r#"<sf:p sf:style="A-1">Um item<sf:crbr/></sf:p>
+<sf:p sf:style="A-2">Nada perdido aqui<sf:crbr/></sf:p>
+<sf:p sf:style="A-2">Mas <sf:span sf:style="A-3">aqui</sf:span>, e uma imagem <sf:attachment-ref sfa:IDREF="X-1"/><sf:attachment-ref sfa:IDREF="X-2"/></sf:p>"#;
+    let outside = r#"<sf:headers><sf:header sf:name="Odd"><sf:text-storage sf:kind="header"><sf:text-body><sf:p>Cabeçalho</sf:p></sf:text-body></sf:text-storage></sf:header><sf:header sf:name="Even"><sf:text-storage sf:kind="header"><sf:text-body><sf:p sf:style="x"> </sf:p></sf:text-body></sf:text-storage></sf:header></sf:headers>
+<sl:drawables><sl:masters-group><sl:section-drawables><sf:style/><sl:foregroundmaster-group/><sl:backgroundmaster-group/></sl:section-drawables></sl:masters-group><sl:page-group><sf:drawable-shape/><sf:image/></sl:page-group></sl:drawables>
+"#;
+    let source = index(&format!("{STYLES}{lists}"), &anon, body).replace(
+        "<sf:text-storage sf:kind=\"body\"",
+        &format!("{outside}<sf:text-storage sf:kind=\"body\""),
+    );
+    let (document, log) = read_pages_logged(source.as_bytes()).unwrap();
+    assert_eq!(document.body().len(), 3);
+    let entries: Vec<(Warning, usize)> = log
+        .entries()
+        .iter()
+        .map(|e| (e.warning.clone(), e.count))
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            (Warning::Content(Content::Headers), 1),
+            (Warning::Content(Content::FloatingObjects), 2),
+            (Warning::Content(Content::InlineObjects), 2),
+            (Warning::Formatting(Formatting::Lists), 1),
+            (Warning::Formatting(Formatting::CharacterSpacing), 2),
+        ]
+    );
+    assert_eq!(
+        log.entries()[4].to_string(),
+        "Left out character spacing, in 2 paragraphs"
+    );
+    // The documents of the other tests lose nothing.
+    let (_, log) = read_pages_logged(index(STYLES, "", BODY).as_bytes()).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
 }
