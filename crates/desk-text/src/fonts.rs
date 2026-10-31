@@ -43,6 +43,58 @@ impl FontChoice {
     }
 }
 
+/// How Pages lays out a font of the Mac, as measured on the reference
+/// machine (`data/fonts/originals.tsv`). Desk lays the family out this way
+/// whatever font stands for it, so that its lines are as tall and as wide
+/// as in Pages (DOC-05).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PagesFont {
+    /// The height of the text above the baseline, in ems.
+    pub ascent: f32,
+    /// The depth of the text below the baseline, in ems.
+    pub descent: f32,
+    /// The space added to each line, in ems.
+    pub leading: f32,
+    /// Whether the leading goes above the text, as with Apple's own fonts,
+    /// rather than below it.
+    pub leading_above: bool,
+    /// Whether fi and fl are joined into ligatures. No other letters are.
+    pub ligatures: bool,
+}
+
+/// How Pages lays out a family, when it was measured.
+pub fn pages_font(family: &str) -> Option<PagesFont> {
+    static TABLE: OnceLock<Vec<(&'static str, PagesFont)>> = OnceLock::new();
+    let table = TABLE.get_or_init(|| {
+        include_str!("../../../data/fonts/originals.tsv")
+            .lines()
+            .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+            .skip(1)
+            .filter_map(|line| {
+                let fields: Vec<&str> = line.split('\t').collect();
+                let [family, ascent, descent, leading, place, ligatures] = fields[..] else {
+                    return None;
+                };
+                Some((
+                    family,
+                    PagesFont {
+                        ascent: ascent.parse().ok()?,
+                        descent: descent.parse().ok()?,
+                        leading: leading.parse().ok()?,
+                        leading_above: place == "above",
+                        ligatures: ligatures == "fi fl",
+                    },
+                ))
+            })
+            .collect()
+    });
+    let family = family.trim();
+    table
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(family))
+        .map(|&(_, font)| font)
+}
+
 /// A row of the table.
 struct Substitute {
     requested: &'static str,
@@ -141,6 +193,16 @@ mod tests {
             Some(("TeX Gyre Heros", false))
         );
         assert_eq!(substitutes("Unknown").count(), 0);
+    }
+
+    #[test]
+    fn the_fonts_of_pages_read() {
+        let helvetica = pages_font("helvetica").unwrap();
+        assert_eq!(helvetica.ascent, 0.77002);
+        assert!(helvetica.leading_above && helvetica.ligatures);
+        let arial = pages_font("Arial").unwrap();
+        assert!(!arial.leading_above && !arial.ligatures);
+        assert_eq!(pages_font("Optima"), None);
     }
 
     #[test]

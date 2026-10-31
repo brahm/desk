@@ -18,6 +18,23 @@ The rules:
 4. Otherwise Liberation Sans, Serif or Mono, after the kind of font the
    name suggests.
 
+A free font with the same advance widths still has its own vertical
+metrics, ligatures and kerning, so Desk also lays a family out as Pages
+does with the original, after [`originals.tsv`](originals.tsv), measured
+on the reference machine (DOC-05):
+
+- **The height of the lines** comes from the ascent, descent and leading
+  of the original. Apple's own fonts (Helvetica, Times, Courier,
+  Palatino) have no line gap, and Pages gives their lines a leading of a
+  fifth of their height, over the text: Helvetica at 12 pt has lines
+  14 pt tall, Palatino 16 pt.
+- **Ligatures** are those of Pages: fi and fl in Times and Palatino, and
+  nothing in Courier or in Microsoft's fonts, whatever the substitute
+  offers. The PDF keeps the letters a ligature joins as its text.
+- **Kerning** is the substitute's. TeX Gyre Pagella kerns other pairs
+  than the Palatino of the Mac, which moves a word up to 1.6 pt within a
+  line, but lines break in the same places.
+
 Some original fonts can be downloaded legally even though they may not be
 redistributed. Microsoft's core fonts for the web (Arial, Times New
 Roman, Courier New, Georgia, Verdana, Trebuchet MS and others) are such

@@ -508,3 +508,43 @@ fn doc_05_missing_fonts_are_laid_out_with_their_substitutes() {
     );
     assert!(!listed.iter().any(|r| &**r == "Liberation Sans"));
 }
+
+#[test]
+fn doc_05_fonts_of_the_mac_keep_the_lines_and_ligatures_of_pages() {
+    let mut system = TextSystem::new();
+    let format = |family: &str| CharFormat {
+        font_family: Arc::from(family),
+        font_size: Length::from_points(12),
+        ..CharFormat::default()
+    };
+    // As Pages measured on the reference machine: Helvetica at 12 pt has
+    // lines 14 pt tall, with the leading over the text, and Palatino 16 pt,
+    // whatever font stands for them.
+    for (family, height, baseline) in [("Helvetica", 14.0, 11.0), ("Palatino", 16.0, 13.0)] {
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[("Line", format(family))],
+        );
+        let line = &layout.lines[0];
+        assert_eq!(line.height, height, "{family}");
+        assert_eq!(line.baseline - line.top, baseline, "{family}");
+    }
+    // Pages joins fi and fl in Palatino, and nothing else: the ligature
+    // draws the letters it joins, and offsets stay those of the model.
+    let text = "office fly";
+    let layout = lay(
+        &mut system,
+        ParaFormat::default(),
+        &[(text, format("Palatino"))],
+    );
+    let line = &layout.lines[0];
+    assert_eq!(line.range, 0..text.len());
+    let run = &line.runs[0];
+    assert_eq!(run.text, text);
+    assert_eq!(run.glyphs.len(), text.chars().count() - 2);
+    assert_eq!(
+        run.clusters.iter().map(|c| c.1).sum::<u32>() as usize,
+        run.glyphs.len()
+    );
+}

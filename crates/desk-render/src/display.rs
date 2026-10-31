@@ -31,6 +31,11 @@ pub enum Item {
         color: Rgba,
         /// The glyphs.
         glyphs: Vec<PlacedGlyph>,
+        /// The text that the glyphs draw, for the text of a PDF.
+        text: String,
+        /// How many bytes of `text` each cluster draws with how many glyphs,
+        /// in order. Empty when they are not known.
+        clusters: Vec<(u32, u32)>,
     },
     /// A filled rectangle, as for underlines and strikethroughs.
     Rect {
@@ -77,6 +82,8 @@ impl DisplayList {
                     font: run.font.clone(),
                     size: run.size,
                     color: run.color,
+                    text: run.text.clone(),
+                    clusters: run.clusters.clone(),
                     glyphs: run
                         .glyphs
                         .iter()

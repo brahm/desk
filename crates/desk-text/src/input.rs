@@ -4,12 +4,20 @@
 //! The text of a paragraph as the layout sees it.
 //!
 //! The model keeps the text as it was typed. Capitalization (FMT-07) is
-//! applied here, when the text is laid out, so the laid out text can differ
+//! applied here, when the text is laid out, and so are the ligatures that
+//! Pages makes with some fonts (DOC-05), so the laid out text can differ
 //! from the model text. Offsets in the results are always model offsets.
 
 use std::ops::Range;
 
 use desk_model::{Capitalization, CharFormat, ParaFormat, Paragraph, Styles};
+
+use crate::fonts::pages_font;
+
+/// U+FB01 LATIN SMALL LIGATURE FI.
+pub(crate) const FI: char = '\u{fb01}';
+/// U+FB02 LATIN SMALL LIGATURE FL.
+pub(crate) const FL: char = '\u{fb02}';
 
 /// The size of synthesized small capitals, relative to the font size.
 ///
@@ -77,8 +85,28 @@ impl ParagraphText {
                     out.formats.len() - 1
                 }
             } as u32;
-            for c in text.chars() {
+            // Pages joins fi and fl, and no other letters, in the fonts of
+            // the Mac that have those ligatures (DOC-05).
+            let ligatures = format.capitalization == Capitalization::None
+                && pages_font(&format.font_family).is_some_and(|f| f.ligatures);
+            let mut chars = text.chars().peekable();
+            while let Some(c) = chars.next() {
                 let start = out.text.len();
+                let ligature = match (c, chars.peek()) {
+                    ('f', Some('i')) if ligatures => Some(FI),
+                    ('f', Some('l')) if ligatures => Some(FL),
+                    _ => None,
+                };
+                if let Some(ligature) = ligature {
+                    chars.next();
+                    out.text.push(ligature);
+                    out.offsets.push((start, model_offset));
+                    out.push_range(start..out.text.len(), index, false);
+                    model_offset += 2;
+                    transformed = true;
+                    previous = Some('i');
+                    continue;
+                }
                 let word_start = !previous.is_some_and(char::is_alphanumeric);
                 // As in Pages (FMT-07), everything but capitals is drawn
                 // small, spaces included.

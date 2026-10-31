@@ -37,7 +37,7 @@ mod input;
 mod layout;
 mod space;
 
-pub use fonts::{FontChoice, FontMatch};
+pub use fonts::{FontChoice, FontMatch, PagesFont};
 pub use input::{ParagraphText, SMALL_CAPS_SCALE};
 pub use layout::{
     Decoration, Glyph, GlyphRun, Line, MIN_SEGMENT_WIDTH, ParagraphLayout, SCRIPT_SCALE,

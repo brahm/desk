@@ -101,6 +101,8 @@ impl Painter {
                     size,
                     color,
                     glyphs,
+                    text,
+                    clusters,
                 } => {
                     cr.set_font_face(&self.face(font)?);
                     cr.set_font_matrix(Matrix::new(
@@ -116,7 +118,24 @@ impl Painter {
                         .iter()
                         .map(|g| cairo::Glyph::new(g.id.into(), f64::from(g.x), f64::from(g.y)))
                         .collect();
-                    cr.show_glyphs(&glyphs)?;
+                    if clusters.is_empty() {
+                        cr.show_glyphs(&glyphs)?;
+                    } else {
+                        // With the text, so that ligatures read as the
+                        // letters they join.
+                        let clusters: Vec<cairo::TextCluster> = clusters
+                            .iter()
+                            .map(|&(bytes, glyphs)| {
+                                cairo::TextCluster::new(bytes as i32, glyphs as i32)
+                            })
+                            .collect();
+                        cr.show_text_glyphs(
+                            text,
+                            &glyphs,
+                            &clusters,
+                            cairo::TextClusterFlags::None,
+                        )?;
+                    }
                 }
                 Item::Rect {
                     x,

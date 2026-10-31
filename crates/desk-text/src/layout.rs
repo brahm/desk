@@ -22,8 +22,8 @@ use parley::{
     VerticalAlign,
 };
 
-use crate::fonts::{FontChoice, choose};
-use crate::input::{ParagraphText, SMALL_CAPS_SCALE};
+use crate::fonts::{FontChoice, PagesFont, choose, pages_font};
+use crate::input::{FI, FL, ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
 
 /// U+00AD SOFT HYPHEN: a place where a word may break, with a hyphen drawn
@@ -80,6 +80,13 @@ pub struct GlyphRun {
     pub format: u32,
     /// The color of the text (FMT-11).
     pub color: Rgba,
+    /// The text that the glyphs draw, for the text of a PDF: ligatures
+    /// stand for the letters they join.
+    pub text: String,
+    /// The clusters of the text, in order: how many bytes of `text` each
+    /// draws with how many glyphs. Empty when the glyphs cannot be told
+    /// apart.
+    pub clusters: Vec<(u32, u32)>,
     /// The glyphs.
     pub glyphs: Vec<Glyph>,
     /// Where the run starts.
@@ -154,12 +161,37 @@ struct Cluster {
     run: usize,
 }
 
+/// The box of a run on a line, in whole points as Pages rounds it: how far
+/// it reaches over and under the baseline, its leading and its descent.
+#[derive(Clone, Copy)]
+struct RunBox {
+    over: f32,
+    under: f32,
+    leading: f32,
+    descent: f32,
+}
+
+impl RunBox {
+    fn max(self, other: Self) -> Self {
+        Self {
+            over: self.over.max(other.over),
+            under: self.under.max(other.under),
+            leading: self.leading.max(other.leading),
+            descent: self.descent.max(other.descent),
+        }
+    }
+}
+
 /// What a line was committed with, kept to describe it afterwards.
 struct Placed {
     x: f32,
     width: f32,
     top: f32,
     height: f32,
+    /// Where the text of the line was committed, and its box: the
+    /// baseline is `text_top + over`. No box for a line without text.
+    text_top: f32,
+    line_box: Option<RunBox>,
     hyphenated: bool,
     hyphen: Option<(FontData, f32, u32, f32)>,
 }
@@ -244,15 +276,16 @@ impl TextSystem {
         // manual line break).
         layout.break_all_lines(None);
         let mut runs: Vec<(FontData, f32)> = Vec::new();
-        // The leading of each run, rounded as the line heights are.
-        let mut leadings: Vec<f32> = Vec::new();
+        // The box of each run, rounded as the line heights are.
+        let mut boxes: Vec<RunBox> = Vec::new();
         let mut clusters: Vec<Cluster> = Vec::new();
         for line in layout.lines() {
             for item in line.items() {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                     let run = glyph_run.run();
                     runs.push((run.font().clone(), run.font_size()));
-                    leadings.push(run.font_metrics().leading.round());
+                    let format = &text.formats()[glyph_run.style().brush as usize];
+                    boxes.push(run_box(format, run.font_size(), run.font_metrics()));
                     for cluster in run.clusters() {
                         clusters.push(Cluster {
                             start: cluster.text_range().start,
@@ -366,18 +399,25 @@ impl TextSystem {
                     (breaker.committed_y() as f32) - line_y
                 };
                 let before_line = breaker.state().clone();
-                let height = commit(&mut breaker, y);
+                let laid_out = commit(&mut breaker, y);
+                // The line is as tall as the boxes of its runs, as in Pages,
+                // which also measures some fonts otherwise than they say
+                // (DOC-05). A line without text keeps the height that
+                // Parley gave it.
+                let line_box = span(pos, line_end)
+                    .iter()
+                    .map(|c| boxes[c.run])
+                    .reduce(RunBox::max);
+                let height = line_box.map_or(laid_out, |b| b.over + b.under);
+                let mut text_top = y;
                 // As Pages measured on the reference machine (FMT-14): the
                 // text sits at the top of the line and any extra space goes
                 // below it, except with exact spacing, where the text sits
                 // on the bottom less its descent and leading. A multiple
                 // scales the line without its leading.
-                let leading = span(pos, line_end)
-                    .iter()
-                    .map(|c| leadings[c.run])
-                    .reduce(f32::max)
-                    .or_else(|| leadings.first().copied())
-                    .unwrap_or(0.0);
+                let leading = line_box
+                    .or_else(|| boxes.first().copied())
+                    .map_or(0.0, |b| b.leading);
                 let pitch = match format.line_spacing {
                     LineSpacing::Multiple { percent } => {
                         (height - leading) * percent as f32 / 100.0 + leading
@@ -386,7 +426,8 @@ impl TextSystem {
                     LineSpacing::Exactly(exact) => {
                         let exact = exact.to_pt() as f32;
                         breaker.revert_to(before_line);
-                        commit(&mut breaker, y + (exact - height));
+                        text_top = y + (exact - height);
+                        commit(&mut breaker, text_top);
                         exact
                     }
                     LineSpacing::Between(extra) => height + extra.to_pt() as f32,
@@ -407,6 +448,8 @@ impl TextSystem {
                     // The line box; exact spacing moves only the text in it.
                     top: y,
                     height: pitch,
+                    text_top,
+                    line_box,
                     hyphenated: hyphen.is_some(),
                     hyphen,
                 });
@@ -425,6 +468,12 @@ impl TextSystem {
         let mut lines = Vec::with_capacity(placed.len());
         for (line, place) in layout.lines().zip(&placed) {
             let metrics = line.metrics();
+            // Where Pages puts the baseline, and how far that moves what
+            // Parley laid out.
+            let baseline = place
+                .line_box
+                .map_or(metrics.baseline, |b| place.text_top + b.over);
+            let delta = baseline - metrics.baseline;
             let mut glyph_runs = Vec::new();
             let mut decorations = Vec::new();
             let mut end_x = place.x;
@@ -436,7 +485,7 @@ impl TextSystem {
                 let run = glyph_run.run();
                 let format_index = glyph_run.style().brush;
                 let format = &text.formats()[format_index as usize];
-                let shift = script_shift(format, run.font_size(), run.font_metrics());
+                let shift = script_shift(format, run.font_size(), run.font_metrics()) - delta;
                 let glyphs: Vec<Glyph> = glyph_run
                     .positioned_glyphs()
                     .map(|g| Glyph {
@@ -450,7 +499,8 @@ impl TextSystem {
                 end_x = end_x.max(x1);
                 let baseline = glyphs.first().map_or(glyph_run.baseline() - shift, |g| g.y);
                 let m = run.font_metrics();
-                descent = Some(descent.map_or(m.descent, |d| d.max(m.descent)).round());
+                let run_descent = run_box(format, run.font_size(), m).descent;
+                descent = Some(descent.map_or(run_descent, |d| d.max(run_descent)));
                 if format.underline != LineStyle::None {
                     decorations.push(Decoration {
                         x0,
@@ -474,11 +524,14 @@ impl TextSystem {
                         },
                     });
                 }
+                let (run_text, clusters) = run_text(source, run, glyphs.len());
                 glyph_runs.push(GlyphRun {
                     font: run.font().clone(),
                     size: run.font_size(),
                     format: format_index,
                     color: format.color,
+                    text: run_text,
+                    clusters,
                     glyphs,
                     x: x0,
                     advance: glyph_run.advance(),
@@ -494,14 +547,16 @@ impl TextSystem {
                     color: glyph_runs
                         .last()
                         .map_or(text.formats()[0].color, |r| r.color),
+                    text: "-".into(),
+                    clusters: vec![(1, 1)],
                     glyphs: vec![Glyph {
                         id: *id,
                         x: end_x,
-                        y: metrics.baseline,
+                        y: baseline,
                     }],
                     x: end_x,
                     advance: *hyphen_advance,
-                    baseline: metrics.baseline,
+                    baseline,
                 });
                 advance += hyphen_advance;
             }
@@ -515,8 +570,8 @@ impl TextSystem {
                 advance,
                 top: place.top,
                 height: place.height,
-                baseline: metrics.baseline,
-                text_bottom: descent.map_or(place.top + place.height, |d| metrics.baseline + d),
+                baseline,
+                text_bottom: descent.map_or(place.top + place.height, |d| baseline + d),
                 runs: glyph_runs,
                 decorations,
                 hyphenated: place.hyphenated,
@@ -569,6 +624,10 @@ fn properties<'a>(
         }),
         StyleProperty::VerticalAlign(VerticalAlign::length(raise)),
     ];
+    if pages_font(&format.font_family).is_some() {
+        // The ligatures are those of Pages, made with the text (DOC-05).
+        properties.push(StyleProperty::FontFeatures("\"liga\" 0, \"clig\" 0".into()));
+    }
     if format.language.tag() != "und"
         && let Ok(language) = Language::parse(format.language.tag())
     {
@@ -584,11 +643,78 @@ fn properties<'a>(
 /// run and `metrics` its font's metrics at that size.
 fn script_shift(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> f32 {
     let full = format.font_size.to_pt() as f32 / size - 1.0;
+    let (ascent, descent, _, _) = vertical_metrics(format, size, metrics);
     match format.baseline {
         Baseline::Normal => 0.0,
-        Baseline::Superscript => metrics.ascent * full,
-        Baseline::Subscript => -metrics.descent * full,
+        Baseline::Superscript => ascent * full,
+        Baseline::Subscript => -descent * full,
     }
+}
+
+/// The ascent, descent and leading of a run in points, and whether its
+/// leading goes above the text: those Pages uses for its family when they
+/// were measured (DOC-05), otherwise those of its font. `size` is the size
+/// of the run and `metrics` its font's metrics at that size.
+fn vertical_metrics(
+    format: &CharFormat,
+    size: f32,
+    metrics: &parley::FontMetrics,
+) -> (f32, f32, f32, bool) {
+    match pages_font(&format.font_family) {
+        Some(PagesFont {
+            ascent,
+            descent,
+            leading,
+            leading_above,
+            ..
+        }) => (ascent * size, descent * size, leading * size, leading_above),
+        None => (metrics.ascent, metrics.descent, metrics.leading, false),
+    }
+}
+
+/// The box of a run, in whole points. The leading is split around the text
+/// as Parley splits it, the larger half below, or goes above it; a shift of
+/// the baseline moves the box.
+fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> RunBox {
+    let (ascent, descent, leading, leading_above) = vertical_metrics(format, size, metrics);
+    let (ascent, descent, leading) = (ascent.round(), descent.round(), leading.round());
+    let over = if leading_above {
+        ascent + leading
+    } else {
+        ascent + (leading / 2.0).floor()
+    };
+    let raise = (format.baseline_shift.to_pt() as f32).round();
+    RunBox {
+        over: over + raise,
+        under: ascent + descent + leading - over - raise,
+        leading,
+        descent,
+    }
+}
+
+/// The text that a run draws and its clusters, as [`GlyphRun::text`] and
+/// [`GlyphRun::clusters`] describe them, given how many glyphs it has.
+fn run_text(source: &str, run: &parley::Run<'_, u32>, glyphs: usize) -> (String, Vec<(u32, u32)>) {
+    let mut text = String::new();
+    let mut clusters = Vec::new();
+    let mut count = 0;
+    for cluster in run.visual_clusters() {
+        let start = text.len();
+        for c in source[cluster.text_range()].chars() {
+            match c {
+                FI => text.push_str("fi"),
+                FL => text.push_str("fl"),
+                c => text.push(c),
+            }
+        }
+        let n = cluster.glyphs().count();
+        count += n;
+        clusters.push(((text.len() - start) as u32, n as u32));
+    }
+    if count != glyphs {
+        clusters.clear();
+    }
+    (text, clusters)
 }
 
 /// The hyphen glyph of a font and its advance at a size.
