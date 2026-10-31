@@ -9,19 +9,50 @@
 //! nothing about the Desk document model; the mapping between ODF and the
 //! model lives in `desk-filters`.
 //!
+//! So far it reads and writes text documents (ODT) as a [`TextDocument`]:
+//! paragraphs and spans, paragraph and text styles, the page layout and
+//! the document information.
+//!
+//! Files come from anywhere, so the readers treat them as hostile: they
+//! use no unsafe code, cap the size of every stream and the depth of the
+//! XML, and expand no entities.
+//!
 //! Like the other format libraries, this crate is licensed under the
 //! MPL-2.0 so that other programs can reuse it. For the same reason it must
 //! not depend on the other Desk crates, which are GPL-3.0-or-later. The CI
 //! checks this rule.
+//!
+//! ```
+//! use desk_odf::{Paragraph, Span, TextDocument, read_odt, write_odt};
+//!
+//! let mut document = TextDocument::default();
+//! document.body.push(Paragraph {
+//!     spans: vec![Span { style: None, text: "Olá".into() }],
+//!     ..Paragraph::default()
+//! });
+//! let bytes = write_odt(&document)?;
+//! assert_eq!(read_odt(&bytes)?.body[0].text(), "Olá");
+//! # Ok::<(), desk_odf::OdfError>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
-/// XML namespaces used in ODF documents.
-pub mod ns {
-    /// Namespace URI of the `desk:` extensions to ODF.
-    ///
-    /// Every document that Desk saves with extensions carries this URI, so it
-    /// must not change. An incompatible revision of the extensions gets a new
-    /// URI instead.
-    pub const DESK: &str = "https://brahm.com.br/ns/desk/1.0";
-}
+mod error;
+pub mod ns;
+mod package;
+mod read;
+mod text;
+mod units;
+mod write;
+mod xml;
+
+pub use error::OdfError;
+pub use package::{MAX_STREAM, MEDIA_TYPE, read_odt, write_odt};
+pub use read::read_streams;
+pub use text::{
+    Break, Family, LINE_BREAK, Line, LineColor, LineHeight, Meta, PageLayout, Paragraph,
+    ParagraphProperties, Properties, Span, Style, TextAlign, TextDocument, TextPosition,
+    TextProperties, TextTransform,
+};
+pub use units::{Color, Length};
+pub use write::{Streams, VERSION, write_streams};

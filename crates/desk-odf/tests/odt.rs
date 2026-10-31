@@ -1,0 +1,329 @@
+// SPDX-FileCopyrightText: 2026 Desk contributors
+// SPDX-License-Identifier: MPL-2.0
+
+//! Reading and writing text documents.
+
+use desk_odf::{
+    Break, Color, Family, LINE_BREAK, Length, Line, LineColor, LineHeight, Meta, OdfError,
+    PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TextAlign, TextDocument,
+    TextPosition, TextProperties, TextTransform, read_odt, read_streams, write_odt,
+};
+
+const CONTENT_START: &str = r#"<office:document-content
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">"#;
+
+fn content(body: &str) -> String {
+    format!(
+        "{CONTENT_START}<office:body><office:text>{body}</office:text></office:body></office:document-content>"
+    )
+}
+
+fn texts(document: &TextDocument) -> Vec<String> {
+    document.body.iter().map(Paragraph::text).collect()
+}
+
+fn span(style: Option<&str>, text: &str) -> Span {
+    Span {
+        style: style.map(str::to_owned),
+        text: text.to_owned(),
+    }
+}
+
+fn full_document() -> TextDocument {
+    TextDocument {
+        meta: Meta {
+            title: Some("Relatório & <notas>".into()),
+            subject: Some("Assunto".into()),
+            description: Some("Comentários".into()),
+            keywords: vec!["um".into(), "dois".into()],
+            initial_creator: Some("Brahm".into()),
+            creator: Some("Brahm".into()),
+            generator: Some("Desk".into()),
+        },
+        default_style: Properties {
+            paragraph: ParagraphProperties {
+                widows: Some(2),
+                orphans: Some(2),
+                ..ParagraphProperties::default()
+            },
+            text: TextProperties {
+                font_family: Some("Liberation Serif".into()),
+                font_size: Some(Length(12.0)),
+                language: Some("pt".into()),
+                country: Some("BR".into()),
+                ..TextProperties::default()
+            },
+        },
+        styles: vec![
+            Style {
+                name: "Body".into(),
+                family: Family::Paragraph,
+                next: Some("Body".into()),
+                properties: Properties {
+                    paragraph: ParagraphProperties {
+                        align: Some(TextAlign::Justify),
+                        line_height: Some(LineHeight::Percent(150.0)),
+                        margin_top: Some(Length(6.0)),
+                        margin_bottom: Some(Length(12.0)),
+                        margin_left: Some(Length(36.0)),
+                        margin_right: Some(Length(18.0)),
+                        text_indent: Some(Length(-18.0)),
+                        ..ParagraphProperties::default()
+                    },
+                    text: TextProperties::default(),
+                },
+                ..Style::default()
+            },
+            Style {
+                name: "Heading_20_1".into(),
+                display_name: Some("Heading 1".into()),
+                family: Family::Paragraph,
+                parent: Some("Body".into()),
+                next: Some("Body".into()),
+                properties: Properties {
+                    paragraph: ParagraphProperties {
+                        break_before: Some(Break::Page),
+                        keep_with_next: Some(true),
+                        keep_together: Some(true),
+                        line_height_at_least: Some(Length(20.0)),
+                        ..ParagraphProperties::default()
+                    },
+                    text: TextProperties {
+                        font_family: Some("Liberation Sans".into()),
+                        font_size: Some(Length(18.0)),
+                        font_weight: Some(700),
+                        ..TextProperties::default()
+                    },
+                },
+            },
+            Style {
+                name: "Emphasis".into(),
+                family: Family::Text,
+                properties: Properties {
+                    text: TextProperties {
+                        italic: Some(true),
+                        ..TextProperties::default()
+                    },
+                    ..Properties::default()
+                },
+                ..Style::default()
+            },
+        ],
+        automatic_styles: vec![
+            Style {
+                name: "P1".into(),
+                family: Family::Paragraph,
+                parent: Some("Body".into()),
+                properties: Properties {
+                    paragraph: ParagraphProperties {
+                        line_height: Some(LineHeight::Exactly(Length(14.5))),
+                        line_spacing: Some(Length(3.0)),
+                        ..ParagraphProperties::default()
+                    },
+                    ..Properties::default()
+                },
+                ..Style::default()
+            },
+            Style {
+                name: "T1".into(),
+                family: Family::Text,
+                properties: Properties {
+                    text: TextProperties {
+                        underline: Some(Line::Double),
+                        line_through: Some(Line::Single),
+                        line_through_color: Some(LineColor::Color(Color { r: 255, g: 0, b: 0 })),
+                        color: Some(Color { r: 0, g: 0, b: 255 }),
+                        position: Some(TextPosition::Super),
+                        position_scale: Some(66.0),
+                        transform: Some(TextTransform::Uppercase),
+                        small_caps: Some(true),
+                        ..TextProperties::default()
+                    },
+                    ..Properties::default()
+                },
+                ..Style::default()
+            },
+            Style {
+                name: "T2".into(),
+                family: Family::Text,
+                properties: Properties {
+                    text: TextProperties {
+                        position: Some(TextPosition::Percent(-15.0)),
+                        line_through_color: Some(LineColor::FontColor),
+                        font_size_percent: Some(80.0),
+                        ..TextProperties::default()
+                    },
+                    ..Properties::default()
+                },
+                ..Style::default()
+            },
+        ],
+        page_layout: PageLayout {
+            width: Some(Length(612.0)),
+            height: Some(Length(792.0)),
+            margin_top: Some(Length(72.0)),
+            margin_bottom: Some(Length(54.0)),
+            margin_left: Some(Length(90.0)),
+            margin_right: Some(Length(36.0)),
+        },
+        body: vec![
+            Paragraph {
+                style: Some("Heading_20_1".into()),
+                outline_level: Some(1),
+                spans: vec![span(None, "Título")],
+            },
+            Paragraph {
+                style: Some("P1".into()),
+                outline_level: None,
+                spans: vec![
+                    span(None, "  two leading spaces, a\ttab, "),
+                    span(Some("T1"), "styled   three"),
+                    span(None, " after a space "),
+                    span(Some("Emphasis"), " and"),
+                    span(Some("T2"), &format!("a{LINE_BREAK}line break")),
+                ],
+            },
+            Paragraph::default(),
+        ],
+    }
+}
+
+#[test]
+fn a_document_comes_back_as_it_was_written() {
+    let document = full_document();
+    let bytes = write_odt(&document).unwrap();
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read, document);
+}
+
+#[test]
+fn the_package_starts_with_the_media_type_stored() {
+    let bytes = write_odt(&TextDocument::default()).unwrap();
+    // The local header of the first entry, then its name and its content.
+    assert_eq!(&bytes[..4], b"PK\x03\x04");
+    assert_eq!(&bytes[30..38], b"mimetype");
+    assert_eq!(
+        &bytes[38..38 + 39],
+        b"application/vnd.oasis.opendocument.text"
+    );
+}
+
+#[test]
+fn white_space_collapses_as_odf_says() {
+    let document = read_streams(
+        &content(
+            "<text:p>  one \n  two<text:span> three </text:span> four<text:s text:c=\"3\"/>five</text:p>\
+             <text:p><text:s/>six<text:tab/>seven<text:line-break/>eight</text:p>",
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        texts(&document),
+        [
+            "one two three four   five".to_owned(),
+            format!(" six\tseven{LINE_BREAK}eight")
+        ]
+    );
+}
+
+#[test]
+fn lists_sections_and_tables_give_their_paragraphs() {
+    let document = read_streams(
+        &content(
+            "<text:h text:outline-level=\"2\">Heading</text:h>\
+             <text:list><text:list-item><text:p>item</text:p></text:list-item></text:list>\
+             <text:section><text:p>in a section</text:p></text:section>\
+             <text:p>with <text:a>a link</text:a><text:note><text:note-body><text:p>note</text:p></text:note-body></text:note>\
+             <draw:frame><draw:text-box><text:p>frame</text:p></draw:text-box></draw:frame>.</text:p>",
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        texts(&document),
+        ["Heading", "item", "in a section", "with a link."]
+    );
+    assert_eq!(document.body[0].outline_level, Some(2));
+}
+
+#[test]
+fn font_names_resolve_through_the_declarations() {
+    let document = read_streams(
+        &format!(
+            "{CONTENT_START}<office:font-face-decls><style:font-face style:name=\"F1\" svg:font-family=\"&apos;Times New Roman&apos;\"/></office:font-face-decls>\
+             <office:automatic-styles>\
+             <style:style style:name=\"T1\" style:family=\"text\"><style:text-properties style:font-name=\"F1\"/></style:style>\
+             <style:style style:name=\"T2\" style:family=\"text\"><style:text-properties fo:font-family=\"Courier\" fo:font-weight=\"600\" fo:font-style=\"oblique\"/></style:style>\
+             </office:automatic-styles><office:body><office:text/></office:body></office:document-content>"
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    let t1 = &document.style(Family::Text, "T1").unwrap().properties.text;
+    assert_eq!(t1.font_family.as_deref(), Some("Times New Roman"));
+    let t2 = &document.style(Family::Text, "T2").unwrap().properties.text;
+    assert_eq!(t2.font_family.as_deref(), Some("Courier"));
+    assert_eq!(t2.font_weight, Some(600));
+    assert_eq!(t2.italic, Some(true));
+}
+
+#[test]
+fn hostile_input_is_refused_cleanly() {
+    assert!(matches!(read_odt(b"not a zip"), Err(OdfError::Zip(_))));
+
+    let deep = format!(
+        "{CONTENT_START}<office:body><office:text>{}{}</office:text></office:body></office:document-content>",
+        "<text:span>".repeat(1000),
+        "</text:span>".repeat(1000)
+    );
+    assert!(matches!(
+        read_streams(&deep, None, None),
+        Err(OdfError::Malformed(_))
+    ));
+    assert!(read_streams("<office:document-content", None, None).is_err());
+    assert!(read_streams(&content("<text:p>&unknown;</text:p>"), None, None).is_err());
+    assert!(matches!(
+        read_streams("<x/>", None, None),
+        Err(OdfError::Malformed(_))
+    ));
+
+    // A huge space count is capped.
+    let document = read_streams(
+        &content("<text:p><text:s text:c=\"999999999\"/></text:p>"),
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(document.body[0].text().len(), 1024);
+}
+
+#[test]
+fn a_spreadsheet_is_not_a_text_document() {
+    use std::io::Write;
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    zip.start_file("mimetype", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all(b"application/vnd.oasis.opendocument.spreadsheet")
+        .unwrap();
+    let bytes = zip.finish().unwrap().into_inner();
+    assert!(matches!(read_odt(&bytes), Err(OdfError::WrongType(_))));
+
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    zip.start_file("mimetype", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all(desk_odf::MEDIA_TYPE.as_bytes()).unwrap();
+    let bytes = zip.finish().unwrap().into_inner();
+    assert!(matches!(
+        read_odt(&bytes),
+        Err(OdfError::Missing("content.xml"))
+    ));
+}

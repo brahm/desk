@@ -37,6 +37,10 @@ skrifa = "0.44.0"
 cairo-rs = { version = "0.22.9", features = ["freetype", "pdf", "png", "v1_16"] }
 freetype-rs = "0.38.0"
 
+# The format libraries: zip packages and XML streams.
+quick-xml = "0.42.0"
+zip = { version = "9.2.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
 desk-anim = { path = "crates/desk-anim" }
 desk-chart = { path = "crates/desk-chart" }
 desk-contacts = { path = "crates/desk-contacts" }
