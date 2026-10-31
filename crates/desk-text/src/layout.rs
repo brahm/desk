@@ -27,13 +27,9 @@ use crate::space::LineSpace;
 /// at the end of the line when it does.
 pub const SOFT_HYPHEN: char = '\u{ad}';
 
-/// The size of superscripts and subscripts, relative to the font size.
-/// To be checked against Pages in the reference VM.
-pub const SCRIPT_SCALE: f32 = 0.66;
-/// How far a superscript is raised, relative to the font size.
-pub const SUPERSCRIPT_RAISE: f32 = 0.33;
-/// How far a subscript is lowered, relative to the font size.
-pub const SUBSCRIPT_DROP: f32 = 0.15;
+/// The size of superscripts and subscripts, relative to the font size, as
+/// measured in Pages (FMT-06).
+pub const SCRIPT_SCALE: f32 = 2.0 / 3.0;
 
 /// The narrowest piece of a line that is worth filling.
 pub const MIN_SEGMENT_WIDTH: f32 = 18.0;
@@ -109,6 +105,10 @@ pub struct Line {
     pub height: f32,
     /// The baseline.
     pub baseline: f32,
+    /// The bottom of the text: the baseline plus the descent, without the
+    /// leading or any extra space below. Pages fits a line on a page when
+    /// this fits (EST-05).
+    pub text_bottom: f32,
     /// The glyphs, in runs.
     pub runs: Vec<GlyphRun>,
     /// Underlines and strikethroughs.
@@ -171,28 +171,22 @@ impl TextSystem {
     fn build(&mut self, text: &ParagraphText) -> Layout<u32> {
         let mut builder = self
             .layouts
-            .ranged_builder(&mut self.fonts, text.text(), 1.0, false);
+            // Font metrics rounded to whole points, as Pages lays out lines.
+            .ranged_builder(&mut self.fonts, text.text(), 1.0, true);
         let formats = text.formats();
         for property in properties(&formats[0], false) {
             builder.push_default(property);
         }
         builder.push_default(StyleProperty::Brush(0));
-        builder.push_default(StyleProperty::LineHeight(
-            match text.paragraph().line_spacing {
-                LineSpacing::Multiple { percent } => {
-                    LineHeight::MetricsRelative(percent as f32 / 100.0)
-                }
-                LineSpacing::Exactly(length) => LineHeight::Absolute(length.to_pt() as f32),
-                LineSpacing::AtLeast(_) | LineSpacing::Between(_) => {
-                    LineHeight::MetricsRelative(1.0)
-                }
-            },
-        ));
+        // Every line is laid out at the height of its fonts, and the
+        // spacing of the paragraph is applied when the lines are placed.
+        builder.push_default(StyleProperty::LineHeight(LineHeight::MetricsRelative(1.0)));
         for range in &text.ranges {
             if range.format == 0 && !range.small_caps {
                 continue;
             }
-            for property in properties(&formats[range.format as usize], range.small_caps) {
+            let index = range.format as usize;
+            for property in properties(&formats[index], range.small_caps) {
                 builder.push(property, range.range.clone());
             }
             builder.push(StyleProperty::Brush(range.format), range.range.clone());
@@ -215,12 +209,15 @@ impl TextSystem {
         // manual line break).
         layout.break_all_lines(None);
         let mut runs: Vec<(FontData, f32)> = Vec::new();
+        // The leading of each run, rounded as the line heights are.
+        let mut leadings: Vec<f32> = Vec::new();
         let mut clusters: Vec<Cluster> = Vec::new();
         for line in layout.lines() {
             for item in line.items() {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                     let run = glyph_run.run();
                     runs.push((run.font().clone(), run.font_size()));
+                    leadings.push(run.font_metrics().leading.round());
                     for cluster in run.clusters() {
                         clusters.push(Cluster {
                             start: cluster.text_range().start,
@@ -334,23 +331,30 @@ impl TextSystem {
                     (breaker.committed_y() as f32) - line_y
                 };
                 let before_line = breaker.state().clone();
-                let mut height = commit(&mut breaker, y);
-                let mut line_top = y;
+                let height = commit(&mut breaker, y);
+                // As Pages measured on the reference machine (FMT-14): the
+                // text sits at the top of the line and any extra space goes
+                // below it, except with exact spacing, where the text sits
+                // on the bottom less its descent and leading. A multiple
+                // scales the line without its leading.
+                let leading = span(pos, line_end)
+                    .iter()
+                    .map(|c| leadings[c.run])
+                    .reduce(f32::max)
+                    .or_else(|| leadings.first().copied())
+                    .unwrap_or(0.0);
                 let pitch = match format.line_spacing {
-                    LineSpacing::AtLeast(min) => {
-                        let min = min.to_pt() as f32;
-                        if height < min {
-                            // The extra space goes above the line.
-                            breaker.revert_to(before_line);
-                            line_top = y + (min - height);
-                            height = commit(&mut breaker, line_top);
-                            min
-                        } else {
-                            height
-                        }
+                    LineSpacing::Multiple { percent } => {
+                        (height - leading) * percent as f32 / 100.0 + leading
+                    }
+                    LineSpacing::AtLeast(min) => height.max(min.to_pt() as f32),
+                    LineSpacing::Exactly(exact) => {
+                        let exact = exact.to_pt() as f32;
+                        breaker.revert_to(before_line);
+                        commit(&mut breaker, y + (exact - height));
+                        exact
                     }
                     LineSpacing::Between(extra) => height + extra.to_pt() as f32,
-                    _ => height,
                 };
                 if pitch > guess + 0.001 {
                     // Taller than the band was measured for: measure the
@@ -365,7 +369,8 @@ impl TextSystem {
                 placed.push(Placed {
                     x,
                     width,
-                    top: line_top,
+                    // The line box; exact spacing moves only the text in it.
+                    top: y,
                     height: pitch,
                     hyphenated: hyphen.is_some(),
                     hyphen,
@@ -388,6 +393,7 @@ impl TextSystem {
             let mut glyph_runs = Vec::new();
             let mut decorations = Vec::new();
             let mut end_x = place.x;
+            let mut descent = None::<f32>;
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
@@ -395,19 +401,21 @@ impl TextSystem {
                 let run = glyph_run.run();
                 let format_index = glyph_run.style().brush;
                 let format = &text.formats()[format_index as usize];
+                let shift = script_shift(format, run.font_size(), run.font_metrics());
                 let glyphs: Vec<Glyph> = glyph_run
                     .positioned_glyphs()
                     .map(|g| Glyph {
                         id: g.id,
                         x: g.x,
-                        y: g.y,
+                        y: g.y - shift,
                     })
                     .collect();
                 let x0 = glyph_run.offset();
                 let x1 = x0 + glyph_run.advance();
                 end_x = end_x.max(x1);
-                let baseline = glyphs.first().map_or(glyph_run.baseline(), |g| g.y);
+                let baseline = glyphs.first().map_or(glyph_run.baseline() - shift, |g| g.y);
                 let m = run.font_metrics();
+                descent = Some(descent.map_or(m.descent, |d| d.max(m.descent)).round());
                 if format.underline != LineStyle::None {
                     decorations.push(Decoration {
                         x0,
@@ -473,6 +481,7 @@ impl TextSystem {
                 top: place.top,
                 height: place.height,
                 baseline: metrics.baseline,
+                text_bottom: descent.map_or(place.top + place.height, |d| metrics.baseline + d),
                 runs: glyph_runs,
                 decorations,
                 hyphenated: place.hyphenated,
@@ -493,19 +502,14 @@ fn alignment(alignment: Alignment) -> parley::Alignment {
 }
 
 /// The Parley style of a character format.
+///
+/// Superscripts and subscripts are shifted once the line is laid out, by
+/// [`script_shift`], since Parley rounds shifts to whole points.
 fn properties(format: &CharFormat, small_caps: bool) -> Vec<StyleProperty<'_, u32>> {
     let mut size = format.font_size.to_pt() as f32;
-    let mut raise = format.baseline_shift.to_pt() as f32;
-    match format.baseline {
-        Baseline::Normal => {}
-        Baseline::Superscript => {
-            raise += size * SUPERSCRIPT_RAISE;
-            size *= SCRIPT_SCALE;
-        }
-        Baseline::Subscript => {
-            raise -= size * SUBSCRIPT_DROP;
-            size *= SCRIPT_SCALE;
-        }
+    let raise = format.baseline_shift.to_pt() as f32;
+    if format.baseline != Baseline::Normal {
+        size *= SCRIPT_SCALE;
     }
     if small_caps {
         size *= SMALL_CAPS_SCALE;
@@ -531,6 +535,20 @@ fn properties(format: &CharFormat, small_caps: bool) -> Vec<StyleProperty<'_, u3
         properties.push(StyleProperty::Locale(Some(language)));
     }
     properties
+}
+
+/// How far a run is raised for a superscript, or lowered (negative) for a
+/// subscript, as Pages measured on the reference machine (FMT-06): a
+/// superscript until its top meets the top of the text at full size, a
+/// subscript until its bottom meets the bottom. `size` is the size of the
+/// run and `metrics` its font's metrics at that size.
+fn script_shift(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> f32 {
+    let full = format.font_size.to_pt() as f32 / size - 1.0;
+    match format.baseline {
+        Baseline::Normal => 0.0,
+        Baseline::Superscript => metrics.ascent * full,
+        Baseline::Subscript => -metrics.descent * full,
+    }
 }
 
 /// The hyphen glyph of a font and its advance at a size.

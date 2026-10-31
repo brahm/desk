@@ -36,7 +36,7 @@ mod space;
 pub use input::{ParagraphText, SMALL_CAPS_SCALE};
 pub use layout::{
     Decoration, Glyph, GlyphRun, Line, MIN_SEGMENT_WIDTH, ParagraphLayout, SCRIPT_SCALE,
-    SOFT_HYPHEN, SUBSCRIPT_DROP, SUPERSCRIPT_RAISE, TextSystem,
+    SOFT_HYPHEN, TextSystem,
 };
 pub use parley::FontData;
 pub use space::{Column, LineSpace};

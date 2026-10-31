@@ -80,7 +80,9 @@ impl ParagraphText {
             for c in text.chars() {
                 let start = out.text.len();
                 let word_start = !previous.is_some_and(char::is_alphanumeric);
-                let small = format.capitalization == Capitalization::SmallCaps && c.is_lowercase();
+                // As in Pages (FMT-07), everything but capitals is drawn
+                // small, spaces included.
+                let small = format.capitalization == Capitalization::SmallCaps && !c.is_uppercase();
                 let upper = match format.capitalization {
                     Capitalization::None => false,
                     Capitalization::AllCaps | Capitalization::SmallCaps => true,
@@ -178,15 +180,15 @@ mod tests {
     }
 
     #[test]
-    fn small_caps_mark_lower_case_letters() {
+    fn small_caps_mark_all_but_capitals() {
         let text = ParagraphText::from_runs(
             ParaFormat::default(),
             CharFormat::default(),
-            [("Ab", format(Capitalization::SmallCaps))],
+            [("Ab Cd", format(Capitalization::SmallCaps))],
         );
-        assert_eq!(text.text(), "AB");
+        assert_eq!(text.text(), "AB CD");
         let small: Vec<_> = text.ranges.iter().map(|r| r.small_caps).collect();
-        assert_eq!(small, [false, true]);
+        assert_eq!(small, [false, true, false, true]);
     }
 
     #[test]

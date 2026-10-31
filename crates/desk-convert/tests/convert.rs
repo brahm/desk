@@ -80,7 +80,7 @@ fn odt_becomes_pdf() {
     let info = String::from_utf8(info.stdout).unwrap();
     assert!(info.contains("Title:           Conversão"), "{info}");
     // A4, the page size of a new document.
-    assert!(info.contains("595.276 x 841.89 pts"), "{info}");
+    assert!(info.contains("595 x 842 pts"), "{info}");
 }
 
 #[test]

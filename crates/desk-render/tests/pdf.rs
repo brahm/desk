@@ -60,7 +60,7 @@ fn glyphs_are_placed_on_the_page_with_their_color() {
     let pages = DisplayList::pages(&layout);
     assert_eq!(pages.len(), 1);
     let list = &pages[0];
-    assert!((list.width - 595.276).abs() < 0.01);
+    assert!((list.width - 595.0).abs() < 0.01);
     let glyphs: Vec<_> = list
         .items
         .iter()

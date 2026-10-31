@@ -173,8 +173,13 @@ fn fmt_06_superscript_is_smaller_and_raised() {
     let runs = &layout.lines[0].runs;
     assert_eq!(runs.len(), 4);
     assert_eq!(runs[1].size, 12.0 * SCRIPT_SCALE);
-    assert!(runs[1].baseline < runs[0].baseline - 2.0);
-    assert!(runs[3].baseline > runs[2].baseline + 1.0);
+    // As in Pages: the top of a superscript meets the top of the text and
+    // the bottom of a subscript its bottom. Liberation Sans rises 0.905 em
+    // and falls 0.212 em, and 4 pt are lost to the smaller size.
+    let raise = runs[0].baseline - runs[1].baseline;
+    let drop = runs[3].baseline - runs[2].baseline;
+    assert!((raise - 0.905 * 4.0).abs() < 0.01, "{raise}");
+    assert!((drop - 0.212 * 4.0).abs() < 0.01, "{drop}");
 }
 
 #[test]
@@ -254,68 +259,52 @@ fn fmt_12_alignment() {
 
 #[test]
 fn fmt_14_six_line_spacing_modes() {
+    // As Pages lays out lines, measured on the reference machine: the
+    // ascent, descent and leading of Liberation Sans at 12 pt round to 11,
+    // 3 and 0, so a single line is 14 pt.
     let mut system = TextSystem::new();
     let with = |line_spacing| ParaFormat {
         line_spacing,
         ..ParaFormat::default()
     };
     let pitch = |layout: &ParagraphLayout| layout.lines[1].top - layout.lines[0].top;
-    let single = plain(
-        &mut system,
-        with(LineSpacing::Multiple { percent: 100 }),
-        TEXT,
+    let layout = |system: &mut TextSystem, spacing| plain(system, with(spacing), TEXT);
+    let single = layout(&mut system, LineSpacing::SINGLE);
+    assert!((pitch(&single) - 14.0).abs() < 0.01, "{}", pitch(&single));
+    // The text sits at the top of the line in every mode but one, and the
+    // extra space goes below it.
+    let baseline = single.lines[0].baseline;
+    let check = |layout: ParagraphLayout, expected: f32, shift: f32| {
+        assert!(
+            (pitch(&layout) - expected).abs() < 0.01,
+            "pitch {} instead of {expected}",
+            pitch(&layout)
+        );
+        assert!(
+            (layout.lines[0].baseline - (baseline + shift)).abs() < 0.01,
+            "baseline {} instead of {}",
+            layout.lines[0].baseline,
+            baseline + shift
+        );
+    };
+    check(
+        layout(&mut system, LineSpacing::Multiple { percent: 150 }),
+        21.0,
+        0.0,
     );
-    let one_half = plain(
-        &mut system,
-        with(LineSpacing::Multiple { percent: 150 }),
-        TEXT,
+    check(layout(&mut system, LineSpacing::DOUBLE), 28.0, 0.0);
+    let pt = Length::from_points;
+    check(layout(&mut system, LineSpacing::AtLeast(pt(30))), 30.0, 0.0);
+    check(layout(&mut system, LineSpacing::AtLeast(pt(5))), 14.0, 0.0);
+    check(layout(&mut system, LineSpacing::Between(pt(6))), 20.0, 0.0);
+    // Exact spacing puts the text on the bottom of the line, less its
+    // descent and leading.
+    check(
+        layout(&mut system, LineSpacing::Exactly(pt(30))),
+        30.0,
+        16.0,
     );
-    let double = plain(
-        &mut system,
-        with(LineSpacing::Multiple { percent: 200 }),
-        TEXT,
-    );
-    let base = pitch(&single);
-    assert!(base > 12.0 && base < 16.0, "{base}");
-    assert!((pitch(&one_half) - 1.5 * base).abs() < 0.05);
-    assert!((pitch(&double) - 2.0 * base).abs() < 0.05);
-
-    let exactly = plain(
-        &mut system,
-        with(LineSpacing::Exactly(Length::from_points(30))),
-        TEXT,
-    );
-    assert!((pitch(&exactly) - 30.0).abs() < 0.01);
-    let tight = plain(
-        &mut system,
-        with(LineSpacing::Exactly(Length::from_points(8))),
-        TEXT,
-    );
-    assert!((pitch(&tight) - 8.0).abs() < 0.01);
-
-    let at_least = plain(
-        &mut system,
-        with(LineSpacing::AtLeast(Length::from_points(30))),
-        TEXT,
-    );
-    assert!((pitch(&at_least) - 30.0).abs() < 0.01);
-    // The extra space goes above the text.
-    let line = &at_least.lines[0];
-    assert!((line.baseline - (single.lines[0].baseline + 30.0 - base)).abs() < 0.05);
-    let below = plain(
-        &mut system,
-        with(LineSpacing::AtLeast(Length::from_points(5))),
-        TEXT,
-    );
-    assert!((pitch(&below) - base).abs() < 0.01);
-
-    let between = plain(
-        &mut system,
-        with(LineSpacing::Between(Length::from_points(6))),
-        TEXT,
-    );
-    assert!((pitch(&between) - (base + 6.0)).abs() < 0.05);
-    assert!((between.lines[0].baseline - single.lines[0].baseline).abs() < 0.01);
+    check(layout(&mut system, LineSpacing::Exactly(pt(8))), 8.0, -6.0);
 }
 
 #[test]
@@ -462,4 +451,20 @@ fn indents_wider_than_the_column_overflow_instead_of_hanging() {
     };
     let layout = plain(&mut system, squeezed, "word");
     assert_eq!(layout.lines.len(), 1);
+}
+
+#[test]
+fn int_02_the_text_of_a_line_ends_above_its_leading() {
+    // Liberation Serif at 12 pt, as Pages rounds it: 11 pt above the
+    // baseline, 3 below and 1 of leading, which a page need not hold.
+    let mut system = TextSystem::new();
+    let serif = CharFormat {
+        font_family: Arc::from("Liberation Serif"),
+        ..CharFormat::default()
+    };
+    let layout = lay(&mut system, ParaFormat::default(), &[("Lorem", serif)]);
+    let line = &layout.lines[0];
+    assert_eq!(line.height, 15.0);
+    assert_eq!(line.baseline - line.top, 11.0);
+    assert_eq!(line.text_bottom - line.top, 14.0);
 }
