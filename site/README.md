@@ -10,6 +10,22 @@ the app icons from [data](../data) so that they have one source. Open
 [Website workflow](../.github/workflows/pages.yml) builds it on every
 pull request that touches it and publishes it from `main`.
 
+## Translations
+
+The page is written in English at the root, and each translation is a
+copy in a directory named by its language code, as GNOME names its
+translations: `pt-BR/index.html` for Brazilian Portuguese. Pages in a
+directory reach the shared files with `../`. When you add a language:
+
+- add it to the language menu in the header bar of every page, with
+  `hreflang` and `lang`, and `aria-current="page"` on the page's own;
+- add it to the `<link rel="alternate" hreflang="...">` list in the head
+  of every page, where `x-default` stays English.
+
+Those two lists are where a later step can pick the language of the
+browser, and where they can be generated once the page moves to a
+gettext template for every language that GNOME supports.
+
 ## Sharing the site with the Flatpak repository
 
 The Flatpak repository of Desk is published on the same GitHub Pages

@@ -107,6 +107,78 @@ h1, h2, h3 {
 .topbar nav {
   display: flex;
   gap: 4px;
+  margin-left: auto;
+}
+
+/* Language menu. Each page lists every translation, with hreflang, and
+   the head of each page lists them again as alternate links, so that a
+   later script or server rule can pick the language of the browser. */
+
+.lang-menu {
+  position: relative;
+}
+
+.lang-menu summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.lang-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.lang-menu summary:hover,
+.lang-menu[open] summary {
+  background: var(--button);
+}
+
+.lang-menu summary:focus-visible {
+  outline: 2px solid var(--accent-bg);
+  outline-offset: 2px;
+}
+
+.lang-menu summary svg {
+  width: 16px;
+  height: 16px;
+}
+
+.lang-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.lang-list a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.lang-list a:hover {
+  background: var(--row-hover);
+}
+
+.lang-list a[aria-current="page"] {
+  font-weight: 700;
+  color: var(--accent);
 }
 
 .topbar nav a {
@@ -149,25 +221,26 @@ h1, h2, h3 {
 
 .page > .app-header {
   margin-top: 0;
-  padding: 48px 0 8px;
+  padding: 56px 0 8px;
   text-align: center;
 }
 
-.app-icon {
-  width: 128px;
-  height: 128px;
+.logo {
+  max-width: 440px;
+  margin: 0 auto;
 }
 
-.app-header h1 {
-  font-size: 2.4rem;
-  font-weight: 800;
-  margin: 12px 0 0;
+.logo img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
+
 
 .summary {
   font-size: 1.3rem;
   font-weight: 600;
-  margin: 4px 0 0;
+  margin: 20px 0 0;
   color: var(--strong);
 }
 
@@ -487,12 +560,12 @@ code {
 }
 
 @media (max-width: 520px) {
-  .topbar nav a:not(:last-child) {
+  .topbar nav {
     display: none;
   }
 
-  .app-header h1 {
-    font-size: 2rem;
+  .lang-menu {
+    margin-left: auto;
   }
 
   .summary {

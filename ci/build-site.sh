@@ -18,6 +18,12 @@ rm -rf "$out"
 mkdir -p "$out/img"
 
 cp site/index.html site/style.css "$out/"
+# One directory per translation, named by its language code.
+for page in site/*/index.html; do
+    lang=$(basename "$(dirname "$page")")
+    mkdir -p "$out/$lang"
+    cp "$page" "$out/$lang/"
+done
 cp data/logo/desk.svg data/logo/desk-logo.svg data/logo/desk-logo-dark.svg \
     data/logo/desk-logo.png "$out/img/"
 cp data/icons/hicolor/scalable/apps/br.com.brahm.Desk.*.svg "$out/img/"
