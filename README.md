@@ -5,6 +5,17 @@
   </picture>
 </h1>
 
+<p align="center">
+  <a href="https://brahm.github.io/desk/">Website</a> ·
+  <a href="https://github.com/brahm/desk/issues">Report a bug or ask for a feature</a>
+</p>
+
+<p align="center">
+  <img src="data/icons/hicolor/scalable/apps/br.com.brahm.Desk.Writer.svg" alt="" width="64">
+  <img src="data/icons/hicolor/scalable/apps/br.com.brahm.Desk.Tables.svg" alt="" width="64">
+  <img src="data/icons/hicolor/scalable/apps/br.com.brahm.Desk.Slides.svg" alt="" width="64">
+</p>
+
 Desk is a free office suite for the Linux desktop, made of three apps
 that share one document model:
 
@@ -18,8 +29,17 @@ document compatibility with Apple iWork '09 (Pages, Numbers and Keynote
 9.3). Documents are saved as OpenDocument (ODF) files, with documented
 extensions for what standard ODF cannot hold.
 
-The project is in early development. The repository has the layout of
-the planned code, and each app only opens an empty window so far.
+The project is in early development, starting with Desk Writer. The
+libraries can already read and write simple ODT text documents, lay
+them out into pages and export them to PDF with `desk-convert`, while
+the apps still open an empty window. A first test version will come
+out as a nightly Flatpak once Desk Writer can open, edit and save
+formatted text, and more will follow as each phase of the plan is done.
+
+Desk is built by one person working with Claude, Anthropic's AI, with
+the same engineering rigor expected of any team: every feature of the
+iWork '09 apps is a row of a parity matrix, and the output is compared
+with PDFs made by iWork 9.3 itself.
 
 ## Building
 
@@ -116,6 +136,21 @@ as a PNG with a transparent background, 2048 px wide (`desk-logo.png`
 and `desk-logo-dark.png`), for About pages, the website and store
 listings. The letters, labels and figures are Inter Display converted
 to outlines, so the logo does not need the font to render.
+
+## Contributing
+
+Desk is just starting, and every kind of help counts: trying the test
+versions when they come out, reporting bugs, asking for the features you
+miss, sending old iWork documents for the test corpus, or sending code.
+Open an [issue](https://github.com/brahm/desk/issues) for any of these.
+Before you open a pull request, run `ci/check-all.sh`, which runs every
+check of the CI; `ci/setup-env.sh` installs what it needs.
+
+## Website
+
+The website at <https://brahm.github.io/desk/> lives in [site](site),
+and shares GitHub Pages with the future Flatpak repository; see
+[site/README.md](site/README.md).
 
 ## License
 

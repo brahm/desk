@@ -1,0 +1,591 @@
+/* The layout follows the app pages of apps.gnome.org, and the colors
+   follow Libadwaita: a light window, white cards with rounded corners,
+   boxed lists of rows and pill buttons. */
+:root {
+  --window: #fafafb;
+  --card: #ffffff;
+  --fg: rgba(0, 0, 6, 0.8);
+  --strong: #1e1e24;
+  --dim: rgba(0, 0, 6, 0.55);
+  --border: rgba(0, 0, 6, 0.07);
+  --accent-bg: #3584e4;
+  --accent-bg-hover: #4a90e8;
+  --accent: #1c71d8;
+  --button: rgba(0, 0, 6, 0.08);
+  --button-hover: rgba(0, 0, 6, 0.12);
+  --row-hover: rgba(0, 0, 6, 0.03);
+  --success: #26a269;
+  --warning: #c88800;
+  --code: #f2f2f4;
+  --headerbar: rgba(250, 250, 251, 0.85);
+  --card-shadow: 0 0 0 1px rgba(0, 0, 6, 0.03), 0 1px 3px 1px rgba(0, 0, 6, 0.07), 0 2px 6px 2px rgba(0, 0, 6, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --window: #222226;
+    --card: #2e2e32;
+    --fg: #ffffff;
+    --strong: #ffffff;
+    --dim: rgba(255, 255, 255, 0.6);
+    --border: rgba(0, 0, 6, 0.36);
+    --accent: #78aeed;
+    --button: rgba(255, 255, 255, 0.1);
+    --button-hover: rgba(255, 255, 255, 0.15);
+    --row-hover: rgba(255, 255, 255, 0.04);
+    --success: #8ff0a4;
+    --warning: #f8e45c;
+    --code: #1d1d20;
+    --headerbar: rgba(34, 34, 38, 0.85);
+    --card-shadow: 0 0 0 1px rgba(0, 0, 6, 0.09), 0 1px 3px 1px rgba(0, 0, 6, 0.18), 0 2px 6px 2px rgba(0, 0, 6, 0.09);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 64px;
+}
+
+body {
+  margin: 0;
+  background: var(--window);
+  color: var(--fg);
+  font-family: "Adwaita Sans", "Inter", "Cantarell", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent);
+}
+
+img {
+  max-width: 100%;
+}
+
+h1, h2, h3 {
+  color: var(--strong);
+  line-height: 1.25;
+}
+
+/* Header bar */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--headerbar);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--strong);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Language menu. Each page lists every translation, with hreflang, and
+   the head of each page lists them again as alternate links, so that a
+   later script or server rule can pick the language of the browser. */
+
+.lang-menu {
+  position: relative;
+}
+
+.lang-menu summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.lang-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.lang-menu summary:hover,
+.lang-menu[open] summary {
+  background: var(--button);
+}
+
+.lang-menu summary:focus-visible {
+  outline: 2px solid var(--accent-bg);
+  outline-offset: 2px;
+}
+
+.lang-menu summary svg {
+  width: 16px;
+  height: 16px;
+}
+
+.lang-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.lang-list a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.lang-list a:hover {
+  background: var(--row-hover);
+}
+
+.lang-list a[aria-current="page"] {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.topbar nav a {
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.topbar nav a:hover {
+  background: var(--button);
+}
+
+/* Page */
+
+.page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.page > section {
+  margin-top: 48px;
+}
+
+.page h2 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+
+.section-intro {
+  margin: -4px 0 14px;
+  color: var(--dim);
+}
+
+/* App header */
+
+.page > .app-header {
+  margin-top: 0;
+  padding: 56px 0 8px;
+  text-align: center;
+}
+
+.logo {
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+
+.summary {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 20px 0 0;
+  color: var(--strong);
+}
+
+.developer {
+  margin: 4px 0 24px;
+  color: var(--dim);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 999px;
+  background: var(--button);
+  color: var(--strong);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+.pill:hover {
+  background: var(--button-hover);
+}
+
+.pill.suggested {
+  background: var(--accent-bg);
+  color: #ffffff;
+}
+
+.pill.suggested:hover {
+  background: var(--accent-bg-hover);
+}
+
+.pill:focus-visible,
+.link-row:focus-visible,
+.topbar a:focus-visible {
+  outline: 2px solid var(--accent-bg);
+  outline-offset: 2px;
+}
+
+.soon {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.badges {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.badges li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.badges svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+/* Boxed lists and cards */
+
+.boxed-list,
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.boxed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.boxed-list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  min-height: 56px;
+}
+
+.link-row {
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+.link-row:hover {
+  background: var(--row-hover);
+}
+
+.row-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+
+.row-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.row-text strong {
+  color: var(--strong);
+  font-weight: 600;
+}
+
+.row-text span {
+  color: var(--dim);
+  font-size: 0.9rem;
+}
+
+.chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--dim);
+}
+
+.app-row {
+  padding: 16px;
+  gap: 16px;
+}
+
+.app-row img {
+  flex: none;
+  width: 64px;
+  height: 64px;
+}
+
+.app-row h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.app-row p {
+  margin: 2px 0 0;
+  color: var(--dim);
+}
+
+.card {
+  padding: 20px 20px 4px;
+}
+
+.card-intro {
+  margin: 0 0 20px;
+}
+
+.card-note {
+  color: var(--dim);
+  font-size: 0.9rem;
+}
+
+pre {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: var(--code);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+code {
+  font-family: "Adwaita Mono", "Source Code Pro", ui-monospace, monospace;
+}
+
+/* Description */
+
+.description p {
+  margin: 0 0 14px;
+}
+
+.features {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.features li {
+  margin-bottom: 6px;
+}
+
+/* Plan */
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeline li {
+  position: relative;
+  padding: 0 0 18px 30px;
+}
+
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0.4em;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--dim);
+  background: var(--card);
+}
+
+.timeline li::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: calc(0.4em + 14px);
+  bottom: 2px;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline li:last-child::after {
+  display: none;
+}
+
+.timeline li.done::before {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.timeline li.current::before {
+  background: var(--warning);
+  border-color: var(--warning);
+}
+
+.timeline h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.timeline p {
+  margin: 2px 0 0;
+  color: var(--dim);
+  font-size: 0.95rem;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  margin-left: 4px;
+  border-radius: 999px;
+  vertical-align: 0.12em;
+}
+
+.tag.done {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+}
+
+.tag.current {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+/* Footer */
+
+.footer {
+  max-width: 800px;
+  margin: 64px auto 0;
+  padding: 24px 16px 48px;
+  border-top: 1px solid var(--border);
+  color: var(--dim);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.footer p {
+  margin: 0 0 6px;
+}
+
+@media (max-width: 520px) {
+  .topbar nav {
+    display: none;
+  }
+
+  .lang-menu {
+    margin-left: auto;
+  }
+
+  .summary {
+    font-size: 1.15rem;
+  }
+
+  .app-row {
+    align-items: flex-start;
+  }
+
+  .app-row img {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* The symbols of the row icons: kept in the page, but out of the layout. */
+.sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
