@@ -30,6 +30,8 @@ step 'Documentation'
 RUSTDOCFLAGS='--deny warnings' cargo doc --workspace --no-deps --locked
 step 'Dependency rules'
 ci/check-deps.sh
+step 'Parity with Pages'
+cargo run --locked --quiet --package desk-testkit --bin desk-parity
 step "Minimum Rust version ($msrv)"
 cargo "+$msrv" check --workspace --all-targets --locked
 step 'ODF validation'

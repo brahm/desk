@@ -58,12 +58,11 @@ impl PageSetup {
         }
     }
 
-    /// A4 in portrait, 210 by 297 mm.
+    /// A4 in portrait, 210 by 297 mm rounded to whole points as Pages and
+    /// macOS keep it: 595 by 842 pt. Where the last line of a page falls
+    /// depends on that rounding (INT-02).
     pub const fn a4() -> Self {
-        Self::with_size(
-            Length::from_millipoints(595_276),
-            Length::from_millipoints(841_890),
-        )
+        Self::with_size(Length::from_points(595), Length::from_points(842))
     }
 
     /// US Letter in portrait, 8.5 by 11 inches.

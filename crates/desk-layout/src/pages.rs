@@ -93,10 +93,11 @@ impl Block {
         last.top + last.height - self.lines[a].top
     }
 
-    /// How many lines from `a` on fit in `room`.
+    /// How many lines from `a` on fit in `room`: as in Pages, a line fits
+    /// when its text does, without the leading below it.
     fn fitting(&self, a: usize, room: f32) -> usize {
         (a..self.lines.len())
-            .take_while(|&b| self.height(a, b + 1) <= room + TOLERANCE)
+            .take_while(|&b| self.lines[b].text_bottom - self.lines[a].top <= room + TOLERANCE)
             .count()
     }
 }

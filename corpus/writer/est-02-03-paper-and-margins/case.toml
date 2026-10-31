@@ -1,0 +1,20 @@
+title = "Papel Carta em paisagem com margens próprias"
+rows = ["EST-02", "EST-03"]
+description = "Carta deitado, com margens de 0,5 pol. em cima, 2 pol. embaixo, 1,5 pol. à esquerda e 0,75 pol. à direita."
+
+[page]
+size = "letter"
+landscape = true
+margin_top = 36
+margin_bottom = 144
+margin_left = 108
+margin_right = 54
+
+[defaults]
+font = "Liberation Sans"
+size = 12
+
+[[paragraphs]]
+filler = 200
+repeat = 3
+space_after = 6

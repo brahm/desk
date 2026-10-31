@@ -1,0 +1,12 @@
+title = "O texto flui de página em página"
+rows = ["INT-02", "EST-03"]
+description = "Duas páginas de texto corrido no modelo em branco, com as margens de uma polegada."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+
+[[paragraphs]]
+filler = 140
+repeat = 8
+space_after = 6

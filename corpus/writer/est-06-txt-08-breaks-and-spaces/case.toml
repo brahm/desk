@@ -1,0 +1,14 @@
+title = "Quebra de linha manual e espaço inseparável"
+rows = ["EST-06", "TXT-08"]
+description = "Quebras de linha dentro de um parágrafo, e palavras ligadas por espaços inseparáveis que não se separam no fim da linha."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+space_after = 12
+
+[[paragraphs]]
+text = "Primeira linha\nsegunda linha do mesmo parágrafo\nterceira linha"
+
+[[paragraphs]]
+text = "Um texto comprido o bastante para chegar ao fim da linha, onde estas palavras ficam juntas: São\u00a0Paulo\u00a0do\u00a0Brasil e mais algumas palavras."

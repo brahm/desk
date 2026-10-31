@@ -1,0 +1,25 @@
+title = "Tamanho, linha de base e maiúsculas"
+rows = ["FMT-05", "FMT-06", "FMT-07"]
+description = "Tamanhos de 9 a 24 pt, sobrescrito e subscrito, e as três formas de maiúsculas."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+
+[[paragraphs]]
+runs = [{ text = "Nove ", size = 9 }, { text = "doze ", size = 12 }, { text = "dezoito ", size = 18 }, { text = "vinte e quatro", size = 24 }]
+
+[[paragraphs]]
+runs = [{ text = "E = mc" }, { text = "2", baseline = "superscript" }, { text = " e H" }, { text = "2", baseline = "subscript" }, { text = "O na mesma linha." }]
+
+[[paragraphs]]
+text = "todas maiúsculas nesta linha"
+capitalization = "all_caps"
+
+[[paragraphs]]
+text = "Versalete Nesta Linha"
+capitalization = "small_caps"
+
+[[paragraphs]]
+text = "inicial de cada palavra em maiúscula"
+capitalization = "title"

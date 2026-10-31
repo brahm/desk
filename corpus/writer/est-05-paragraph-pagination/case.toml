@@ -1,0 +1,29 @@
+title = "Paginação do parágrafo"
+rows = ["EST-05"]
+description = "Um título mantido com o parágrafo seguinte, um parágrafo de linhas mantidas juntas e o controle de viúvas e órfãs, cada um na virada de uma página."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+space_after = 6
+
+# Enche a primeira página até quase o fim.
+[[paragraphs]]
+filler = 560
+
+[[paragraphs]]
+text = "Título mantido com o seguinte"
+size = 16
+bold = true
+keep_with_next = true
+
+[[paragraphs]]
+filler = 80
+keep_lines_together = true
+
+[[paragraphs]]
+filler = 470
+
+[[paragraphs]]
+filler = 90
+widow_control = true

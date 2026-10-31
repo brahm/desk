@@ -1,0 +1,24 @@
+title = "Alinhamento horizontal"
+rows = ["FMT-12"]
+description = "O mesmo texto alinhado à esquerda, ao centro, à direita e justificado. A última linha do justificado fica à esquerda."
+
+[defaults]
+font = "Liberation Serif"
+size = 12
+space_after = 12
+
+[[paragraphs]]
+filler = 60
+align = "left"
+
+[[paragraphs]]
+filler = 60
+align = "center"
+
+[[paragraphs]]
+filler = 60
+align = "right"
+
+[[paragraphs]]
+filler = 60
+align = "justify"

@@ -1,0 +1,14 @@
+title = "Cor do texto"
+rows = ["FMT-11"]
+description = "Palavras em vermelho, verde e azul, e um parágrafo inteiro em cinza."
+
+[defaults]
+font = "Liberation Sans"
+size = 14
+
+[[paragraphs]]
+runs = [{ text = "vermelho", color = "#cc0000" }, { text = " verde", color = "#008800" }, { text = " azul", color = "#0033cc" }]
+
+[[paragraphs]]
+filler = 40
+color = "#666666"

@@ -1,0 +1,22 @@
+title = "Negrito, itálico, sublinhado e tachado"
+rows = ["FMT-01", "FMT-02"]
+description = "Cada linha mostra um estilo de texto, simples ou duplo, no meio de uma frase."
+
+[defaults]
+font = "Liberation Sans"
+size = 12
+
+[[paragraphs]]
+runs = [{ text = "Texto em " }, { text = "negrito", bold = true }, { text = " no meio da frase." }]
+
+[[paragraphs]]
+runs = [{ text = "Texto em " }, { text = "itálico", italic = true }, { text = " no meio da frase." }]
+
+[[paragraphs]]
+runs = [{ text = "Texto em " }, { text = "negrito e itálico", bold = true, italic = true }, { text = "." }]
+
+[[paragraphs]]
+runs = [{ text = "Sublinhado " }, { text = "simples", underline = "single" }, { text = " e " }, { text = "duplo", underline = "double" }, { text = "." }]
+
+[[paragraphs]]
+runs = [{ text = "Tachado " }, { text = "simples", strikethrough = "single" }, { text = " e " }, { text = "duplo", strikethrough = "double" }, { text = "." }]
