@@ -71,9 +71,12 @@ apps use GTK.
 
 ## Icons and logo
 
-The icons follow the app icon guidelines of the GNOME HIG, and are
-original drawings inspired by the motifs of iWork '09: a fountain pen on
-paper, charts in front of a table, and a lectern. They are in
+The icons follow the app icon guidelines of the GNOME HIG. They are
+original drawings with realistic shading: a fountain pen on paper, charts
+in front of a worksheet, and a projection screen. Each app has the color
+that people know from the matching office apps: blue for the word
+processor, green for the spreadsheet and orange-red for the
+presentations. They are in
 [data/icons](data/icons), laid out as in the `hicolor` theme, so they
 install as they are under `$prefix/share/icons/hicolor`:
 

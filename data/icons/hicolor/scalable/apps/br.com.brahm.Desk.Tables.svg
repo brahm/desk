@@ -1,63 +1,77 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="paper" x1="0" y1="10" x2="0" y2="92" gradientUnits="userSpaceOnUse">
+    <radialGradient id="shadow" cx="64" cy="117" r="52" gradientTransform="matrix(1 0 0 0.13 0 101.8)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x1="20" y1="10" x2="108" y2="92" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f6f5f4"/>
+      <stop offset="1" stop-color="#ebebeb"/>
     </linearGradient>
-    <linearGradient id="bar" x1="0" y1="40" x2="0" y2="112" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#57e389"/>
-      <stop offset="1" stop-color="#2ec27e"/>
+    <linearGradient id="header" x1="0" y1="10" x2="0" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#21a366"/>
+      <stop offset="1" stop-color="#107c41"/>
     </linearGradient>
-    <linearGradient id="pie" x1="70" y1="64" x2="118" y2="112" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#62a0ea"/>
-      <stop offset="1" stop-color="#1c71d8"/>
+    <linearGradient id="front" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4fd394"/>
+      <stop offset="0.35" stop-color="#21a366"/>
+      <stop offset="1" stop-color="#107c41"/>
     </linearGradient>
-    <linearGradient id="slice" x1="96" y1="60" x2="120" y2="84" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f9f06b"/>
-      <stop offset="1" stop-color="#f6d32d"/>
+    <linearGradient id="pietop" x1="70" y1="70" x2="110" y2="102" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#21a366"/>
+      <stop offset="1" stop-color="#0b5a2f"/>
+    </linearGradient>
+    <linearGradient id="pieside" x1="66" y1="0" x2="118" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0e6b38"/>
+      <stop offset="0.4" stop-color="#0b5a2f"/>
+      <stop offset="1" stop-color="#063d1f"/>
+    </linearGradient>
+    <linearGradient id="slice" x1="95" y1="66" x2="119" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b6f0d0"/>
+      <stop offset="1" stop-color="#33c481"/>
     </linearGradient>
   </defs>
-  <!-- Sheet with a table -->
-  <rect x="20" y="14" width="88" height="80" rx="4" fill="#c0bfbc"/>
-  <rect x="20" y="10" width="88" height="80" rx="4" fill="url(#paper)"/>
-  <path d="M24 10h80a4 4 0 0 1 4 4v10H20V14a4 4 0 0 1 4-4z" fill="#deddda"/>
-  <g fill="#deddda">
-    <rect x="42" y="24" width="1" height="66"/>
-    <rect x="64" y="24" width="1" height="66"/>
-    <rect x="86" y="24" width="1" height="66"/>
-    <rect x="20" y="37" width="88" height="1"/>
-    <rect x="20" y="50" width="88" height="1"/>
-    <rect x="20" y="63" width="88" height="1"/>
-    <rect x="20" y="76" width="88" height="1"/>
+  <ellipse cx="64" cy="117" rx="52" ry="7" fill="url(#shadow)"/>
+  <!-- Worksheet -->
+  <rect x="20" y="10" width="88" height="82" rx="2" fill="url(#paper)" stroke="#a8a8a8" stroke-width="0.6"/>
+  <path d="M22 10h84a2 2 0 0 1 2 2v10H20V12a2 2 0 0 1 2-2z" fill="url(#header)"/>
+  <rect x="20" y="22" width="10" height="70" fill="#f0f0f0"/>
+  <g fill="none" stroke="#d0d0d0" stroke-width="0.8">
+    <path d="M30 22V92M50 22V92M70 22V92M90 22V92"/>
+    <path d="M20 31H108M20 40H108M20 49H108M20 58H108M20 67H108M20 76H108M20 85H108"/>
   </g>
-  <g fill="#9a9996">
-    <rect x="25" y="15.5" width="12" height="3" rx="1.5"/>
-    <rect x="47" y="15.5" width="12" height="3" rx="1.5"/>
-    <rect x="69" y="15.5" width="12" height="3" rx="1.5"/>
-    <rect x="91" y="15.5" width="12" height="3" rx="1.5"/>
+  <path d="M50 10V22M70 10V22M90 10V22" stroke="#ffffff" stroke-opacity="0.35" stroke-width="0.8"/>
+  <g fill="#ffffff" fill-opacity="0.9">
+    <rect x="34" y="15" width="12" height="2" rx="0.5"/>
+    <rect x="54" y="15" width="12" height="2" rx="0.5"/>
+    <rect x="74" y="15" width="12" height="2" rx="0.5"/>
+    <rect x="94" y="15" width="10" height="2" rx="0.5"/>
   </g>
-  <g fill="#c0bfbc">
-    <rect x="70" y="29" width="12" height="3" rx="1.5"/>
-    <rect x="92" y="29" width="10" height="3" rx="1.5"/>
-    <rect x="70" y="42" width="10" height="3" rx="1.5"/>
-    <rect x="92" y="42" width="12" height="3" rx="1.5"/>
-    <rect x="92" y="55" width="9" height="3" rx="1.5"/>
+  <g fill="#6b6b6b" fill-opacity="0.7">
+    <rect x="78" y="25.5" width="9" height="1.6"/><rect x="98" y="25.5" width="7" height="1.6"/>
+    <rect x="80" y="34.5" width="7" height="1.6"/><rect x="96" y="34.5" width="9" height="1.6"/>
+    <rect x="78" y="43.5" width="9" height="1.6"/><rect x="98" y="43.5" width="7" height="1.6"/>
+    <rect x="97" y="52.5" width="8" height="1.6"/>
+    <rect x="22.5" y="25.5" width="5" height="1.6"/><rect x="22.5" y="34.5" width="5" height="1.6"/>
+    <rect x="22.5" y="43.5" width="5" height="1.6"/><rect x="22.5" y="52.5" width="5" height="1.6"/>
   </g>
-  <!-- Bar chart -->
-  <rect x="14" y="66" width="18" height="50" rx="3" fill="#26a269"/>
-  <rect x="14" y="62" width="18" height="50" rx="3" fill="url(#bar)"/>
-  <rect x="36" y="46" width="18" height="70" rx="3" fill="#26a269"/>
-  <rect x="36" y="42" width="18" height="70" rx="3" fill="url(#bar)"/>
-  <rect x="58" y="80" width="18" height="36" rx="3" fill="#26a269"/>
-  <rect x="58" y="76" width="18" height="36" rx="3" fill="url(#bar)"/>
-  <g fill="#ffffff" fill-opacity="0.35">
-    <rect x="16" y="64" width="14" height="2" rx="1"/>
-    <rect x="38" y="44" width="14" height="2" rx="1"/>
-    <rect x="60" y="78" width="14" height="2" rx="1"/>
+  <!-- 3D bar chart -->
+  <g>
+    <path d="M14 66 L20 62 L36 62 L30 66 Z" fill="#7ee2b0"/>
+    <path d="M30 66 L36 62 L36 108 L30 112 Z" fill="#0b5a2f"/>
+    <rect x="14" y="66" width="16" height="46" fill="url(#front)"/>
+    <path d="M36 44 L42 40 L58 40 L52 44 Z" fill="#7ee2b0"/>
+    <path d="M52 44 L58 40 L58 108 L52 112 Z" fill="#0b5a2f"/>
+    <rect x="36" y="44" width="16" height="68" fill="url(#front)"/>
+    <path d="M58 80 L64 76 L80 76 L74 80 Z" fill="#7ee2b0"/>
+    <path d="M74 80 L80 76 L80 108 L74 112 Z" fill="#0b5a2f"/>
+    <rect x="58" y="80" width="16" height="32" fill="url(#front)"/>
   </g>
-  <!-- Pie chart -->
-  <path d="M94 93 L116.55 84.79 A24 24 0 1 1 94 69 Z" fill="#1a5fb4"/>
-  <path d="M94 88 L116.55 79.79 A24 24 0 1 1 94 64 Z" fill="url(#pie)"/>
-  <path d="M96.9 88.9 L96.9 64.9 A24 24 0 0 1 119.45 80.69 Z" fill="#e5a50a"/>
-  <path d="M96.9 83.9 L96.9 59.9 A24 24 0 0 1 119.45 75.69 Z" fill="url(#slice)"/>
+  <!-- 3D pie chart -->
+  <path d="M66 86 V94 A26 16 0 0 0 118 94 V86 A26 16 0 0 1 66 86 Z" fill="url(#pieside)"/>
+  <path d="M92 86 L116.43 80.53 A26 16 0 1 1 92 70 Z" fill="url(#pietop)"/>
+  <path d="M92 86 L116.43 80.53" stroke="#063d1f" stroke-opacity="0.5" stroke-width="0.8"/>
+  <path d="M95 82 L119.43 76.53 V84.53 L95 90 Z" fill="#1d8f55"/>
+  <path d="M95 82 L95 66 A26 16 0 0 1 119.43 76.53 Z" fill="url(#slice)"/>
+  <path d="M70 80 A24 13 0 0 1 86 72" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5" stroke-linecap="round"/>
 </svg>

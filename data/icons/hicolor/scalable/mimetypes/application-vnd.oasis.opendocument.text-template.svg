@@ -1,25 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="paper" x1="0" y1="8" x2="0" y2="118" gradientUnits="userSpaceOnUse">
+    <linearGradient id="paper" x1="20" y1="8" x2="108" y2="118" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f6f5f4"/>
+      <stop offset="0.7" stop-color="#f7f7f7"/>
+      <stop offset="1" stop-color="#e4e4e4"/>
     </linearGradient>
+    <linearGradient id="fold" x1="88" y1="28" x2="98" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f2f2f2"/>
+      <stop offset="1" stop-color="#c8c8c8"/>
+    </linearGradient>
+    <radialGradient id="shadow" cx="64" cy="120" r="46" gradientTransform="matrix(1 0 0 0.1 0 108)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <path d="M24 8H88L108 28V114a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="#c0bfbc" transform="translate(0 2)"/>
-  <path d="M24 8H88L108 28V114a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="url(#paper)"/>
-  <path d="M88 8V24a4 4 0 0 0 4 4H108z" fill="#deddda"/>
-  <path d="M29.5 15.5H84L100.5 32V108.5a2 2 0 0 1-2 2H29.5a2 2 0 0 1-2-2V17.5a2 2 0 0 1 2-2z" fill="none" stroke="#9a9996" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <rect x="32" y="24" width="40" height="6" rx="2" fill="#3584e4"/>
-  <rect x="32" y="38" width="64" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="46" width="60" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="54" width="64" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="62" width="52" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="70" width="64" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="78" width="58" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="86" width="36" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="94" width="30" height="3" rx="1.5" fill="#c0bfbc"/>
+  <ellipse cx="64" cy="120" rx="46" ry="5" fill="url(#shadow)"/>
+  <path d="M22 8H88L108 28V116a2 2 0 0 1-2 2H22a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" fill="url(#paper)" stroke="#a8a8a8" stroke-width="0.6"/>
+  <path d="M88 8V26a2 2 0 0 0 2 2H108z" fill="url(#fold)" stroke="#a8a8a8" stroke-width="0.6" stroke-linejoin="round"/>
+  <path d="M29.5 15.5H84L100.5 32V110.5H27.5V15.5z" fill="none" stroke="#8a8a8a" stroke-width="1" stroke-dasharray="3 2.5"/>
+  <rect x="32" y="24" width="40" height="4.5" fill="#185abd"/>
+  <rect x="32" y="36" width="64" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="41" width="62" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="46" width="64" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="51" width="60" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="56" width="40" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="64" width="64" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="69" width="62" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="74" width="64" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="79" width="36" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="84" width="34" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="92" width="32" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="97" width="26" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
   <g transform="translate(72 82) scale(2)">
-    <path fill="#3d3846" d="M5 0h6v2H5z"/>
-    <path fill="#e5a50a" fill-rule="evenodd" d="M5 3h6c0.5 2 2.5 3.5 2 6l-5 6.5L3 9c-0.5-2.5 1.5-4 2-6zm3 4.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 1 0 0-2.5zM7.5 10.5v3.2l0.5 0.6 0.5-0.6v-3.2z"/>
+    <path fill="#185abd" d="M5 0h6v2H5z"/>
+    <path fill="#c99a1c" fill-rule="evenodd" d="M5 3h6c0.5 2 2.5 3.5 2 6l-5 6.5L3 9c-0.5-2.5 1.5-4 2-6zm3 4.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 1 0 0-2.5zM7.5 10.5v3.2l0.5 0.6 0.5-0.6v-3.2z"/>
   </g>
 </svg>

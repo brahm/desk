@@ -1,27 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="paper" x1="0" y1="8" x2="0" y2="118" gradientUnits="userSpaceOnUse">
+    <linearGradient id="paper" x1="20" y1="8" x2="108" y2="118" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f6f5f4"/>
+      <stop offset="0.7" stop-color="#f7f7f7"/>
+      <stop offset="1" stop-color="#e4e4e4"/>
     </linearGradient>
+    <linearGradient id="fold" x1="88" y1="28" x2="98" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f2f2f2"/>
+      <stop offset="1" stop-color="#c8c8c8"/>
+    </linearGradient>
+    <radialGradient id="shadow" cx="64" cy="120" r="46" gradientTransform="matrix(1 0 0 0.1 0 108)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <path d="M24 8H88L108 28V114a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="#c0bfbc" transform="translate(0 2)"/>
-  <path d="M24 8H88L108 28V114a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="url(#paper)"/>
-  <path d="M88 8V24a4 4 0 0 0 4 4H108z" fill="#deddda"/>
-  <path d="M36 34h56a4 4 0 0 1 4 4v8H32v-8a4 4 0 0 1 4-4z" fill="#33d17a"/>
-  <rect x="32" y="46" width="64" height="40" fill="#ffffff"/>
-  <path d="M32.5 46V85.5H95.5V46M32 56h64M32 66h64M32 76h64M48.5 34v52M64.5 34v52M80.5 34v52" fill="none" stroke="#c0bfbc"/>
-  <path d="M48.5 34v12M64.5 34v12M80.5 34v12" stroke="#ffffff" stroke-opacity="0.5"/>
-  <rect x="68" y="50" width="10" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="68" y="60" width="12" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="68" y="70" width="9" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="84" y="50" width="10" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="84" y="60" width="8" height="3" rx="1.5" fill="#c0bfbc"/>
-  <rect x="32" y="22" width="36" height="5" rx="2" fill="#26a269"/>
+  <ellipse cx="64" cy="120" rx="46" ry="5" fill="url(#shadow)"/>
+  <path d="M22 8H88L108 28V116a2 2 0 0 1-2 2H22a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" fill="url(#paper)" stroke="#a8a8a8" stroke-width="0.6"/>
+  <path d="M88 8V26a2 2 0 0 0 2 2H108z" fill="url(#fold)" stroke="#a8a8a8" stroke-width="0.6" stroke-linejoin="round"/>
+  <path d="M32 34h64v10H32z" fill="#107c41"/>
+  <rect x="32" y="44" width="64" height="44" fill="#ffffff"/>
+  <rect x="32" y="44" width="8" height="44" fill="#f0f0f0"/>
+  <path d="M32.3 34V87.7H95.7V34M32 55h64M32 66h64M32 77h64M40 44v44M58.5 34v54M77 34v54" fill="none" stroke="#c8c8c8" stroke-width="0.8"/>
+  <rect x="42" y="38" width="12" height="1.8" fill="#ffffff" fill-opacity="0.9"/>
+  <rect x="61" y="38" width="12" height="1.8" fill="#ffffff" fill-opacity="0.9"/>
+  <rect x="80" y="38" width="12" height="1.8" fill="#ffffff" fill-opacity="0.9"/>
+  <rect x="64" y="49" width="9" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="64" y="60" width="11" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="64" y="71" width="8" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="84" y="49" width="10" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="84" y="60" width="8" height="1.8" fill="#5c5c5c" fill-opacity="0.55"/>
+  <rect x="32" y="22" width="36" height="4.5" fill="#107c41"/>
   <g transform="translate(72 82) scale(2)">
-    <rect fill="#2ec27e" x="1" y="8" width="3" height="7" rx="0.5"/>
-    <rect fill="#2ec27e" x="5" y="2" width="3" height="13" rx="0.5"/>
-    <path fill="#3584e4" d="M12 11.5V8a3.5 3.5 0 1 0 3.5 3.5z"/>
-    <path fill="#f5c211" d="M12.5 11V7.5a3.5 3.5 0 0 1 3.5 3.5z"/>
+    <rect fill="#21a366" x="1" y="8" width="3" height="7" rx="0.3"/>
+    <rect fill="#21a366" x="5" y="2" width="3" height="13" rx="0.3"/>
+    <path fill="#107c41" d="M12 11.5V8a3.5 3.5 0 1 0 3.5 3.5z"/>
+    <path fill="#33c481" d="M12.5 11V7.5a3.5 3.5 0 0 1 3.5 3.5z"/>
   </g>
 </svg>
