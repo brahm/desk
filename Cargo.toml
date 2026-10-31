@@ -19,6 +19,11 @@ publish = false
 adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
 
+# Persistent collections for the document model, so that snapshots are cheap.
+imbl = "7.0.2"
+proptest = "1.12.0"
+unicode-segmentation = "1.13.3"
+
 desk-anim = { path = "crates/desk-anim" }
 desk-chart = { path = "crates/desk-chart" }
 desk-contacts = { path = "crates/desk-contacts" }
