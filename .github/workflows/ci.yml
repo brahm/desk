@@ -84,10 +84,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Install Fontconfig
+      - name: Install Cairo, GLib, FreeType and Fontconfig
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libfontconfig-dev
+          sudo apt-get install --yes --no-install-recommends libcairo2-dev libglib2.0-dev libfreetype-dev libfontconfig-dev
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:
