@@ -110,6 +110,8 @@ pub struct PagesResult {
     /// What became of it.
     #[serde(flatten)]
     pub outcome: Outcome,
+    /// What the import left out, as the Warnings window would list it.
+    pub warnings: Vec<String>,
 }
 
 /// Lays out a case, writes its PDF into `out`, and compares it with the
@@ -125,12 +127,20 @@ pub fn run_case(case: &Case, out: &Path) -> CaseResult {
     let from_pages = case.pages_document().map(|path| {
         let out = out.join("from-pages");
         let pdf = out.join("desk.pdf");
-        let outcome = match desk_filters::read_pages_at(&path) {
-            Ok(document) => run(case, &document, &out, &pdf),
+        let mut warnings = Vec::new();
+        let outcome = match desk_filters::read_pages_at_logged(&path) {
+            Ok((document, log)) => {
+                warnings = log.entries().iter().map(ToString::to_string).collect();
+                run(case, &document, &out, &pdf)
+            }
             Err(error) => Err(format!("o documento do Pages não abriu: {error}")),
         }
         .unwrap_or_else(|message| Outcome::Error { message });
-        PagesResult { pdf, outcome }
+        PagesResult {
+            pdf,
+            outcome,
+            warnings,
+        }
     });
     CaseResult {
         name: case.name.clone(),
@@ -399,6 +409,13 @@ impl Report {
                     relative(&pages.pdf)
                 );
                 details(&mut md, &pages.outcome, &relative);
+                if !pages.warnings.is_empty() {
+                    let _ = writeln!(
+                        md,
+                        "  Deixado de fora na importação: {}.",
+                        pages.warnings.join("; ")
+                    );
+                }
             }
         }
         if !self.unknown_rows.is_empty() {

@@ -10,8 +10,11 @@
 //! own defaults, which are the defaults of the model except for widow
 //! control, on in Pages; styles without a parent get every property set,
 //! so that they do not inherit from Body as styles of the model would.
+//!
+//! What the model cannot hold yet, such as headers or list bullets, is
+//! left out and recorded in an [`ImportLog`].
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use desk_iwork::pages::{self as iwork, PAGE_BREAK};
 use desk_iwork::sf::{Family, LineSpacingMode, Properties, Style as IworkStyle, Stylesheet, Value};
@@ -22,6 +25,7 @@ use desk_model::{
 };
 
 use crate::FilterError;
+use crate::log::{Content, Formatting, ImportLog, Warning};
 
 /// The identifier of Body in the templates of Pages.
 const BODY_IDENT: &str = "paragraph-style-32";
@@ -32,12 +36,81 @@ const NULL_CHARACTER: &str = "character-style-null";
 
 /// Reads a Pages document from the bytes of a flat file or of its index.
 pub fn read_pages(bytes: &[u8]) -> Result<Document, FilterError> {
-    import(&desk_iwork::read_pages(bytes)?)
+    read_pages_logged(bytes).map(|(document, _)| document)
 }
 
 /// Reads a Pages document on disk, a package folder or a flat file.
 pub fn read_pages_at(path: &std::path::Path) -> Result<Document, FilterError> {
-    import(&desk_iwork::read_pages_at(path)?)
+    read_pages_at_logged(path).map(|(document, _)| document)
+}
+
+/// Reads a Pages document from bytes, with what was left out.
+pub fn read_pages_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterError> {
+    import_logged(&desk_iwork::read_pages(bytes)?)
+}
+
+/// Reads a Pages document on disk, with what was left out.
+pub fn read_pages_at_logged(path: &std::path::Path) -> Result<(Document, ImportLog), FilterError> {
+    import_logged(&desk_iwork::read_pages_at(path)?)
+}
+
+/// The content that a skipped element of `desk-iwork` stands for.
+fn content(element: &str) -> Content {
+    match element {
+        "headers" => Content::Headers,
+        "footers" => Content::Footers,
+        "drawables" => Content::FloatingObjects,
+        "attachment" | "attachment-ref" => Content::InlineObjects,
+        "footnote" | "endnote" => Content::Footnotes,
+        "annotation" | "annotation-field" => Content::Comments,
+        "page-number" | "page-count" | "date-time" | "filename" => Content::Fields,
+        other => Content::Other(other.to_owned()),
+    }
+}
+
+/// Whether a property is set to something other than `neutral`, which is
+/// what Pages saves when it has no effect.
+fn differs(value: &Value, neutral: f64) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Number(n) => *n != neutral,
+        Value::String(s) => !s.is_empty(),
+        _ => true,
+    }
+}
+
+/// The formatting that a property map sets and the model cannot hold.
+fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
+    for (name, value) in &properties.0 {
+        let lost = match name.as_str() {
+            "listStyle" => {
+                matches!(value, Value::ListStyle { labels: true, .. }).then_some(Formatting::Lists)
+            }
+            "tabs" => differs(value, 0.0).then_some(Formatting::TabStops),
+            // Pages' default, half an inch.
+            "defaultTabStops" => matches!(value, Value::Number(n) if (n - 36.0).abs() > 1.0
+                    && (n - 35.43307).abs() > 0.01)
+            .then_some(Formatting::TabStops),
+            "tracking" => differs(value, 0.0).then_some(Formatting::CharacterSpacing),
+            "textShadow" => differs(value, 0.0).then_some(Formatting::TextShadows),
+            "outline" => differs(value, 0.0).then_some(Formatting::OutlinedText),
+            "underlineColor" | "word_underline" | "word_strikethrough" => {
+                differs(value, 0.0).then_some(Formatting::LineDetails)
+            }
+            "textBackground" => differs(value, 0.0).then_some(Formatting::TextHighlights),
+            "paragraphFill" => differs(value, 0.0).then_some(Formatting::ParagraphBackgrounds),
+            "paragraphStroke" | "paragraphBorderType" => {
+                differs(value, 0.0).then_some(Formatting::ParagraphBorders)
+            }
+            "dropCap" => differs(value, 0.0).then_some(Formatting::DropCaps),
+            "hidden" => differs(value, 0.0).then_some(Formatting::HiddenText),
+            // 1 is the default ligatures of the font.
+            "ligatures" => differs(value, 1.0).then_some(Formatting::FontFeatures),
+            "atsuFontFeatures" => differs(value, 0.0).then_some(Formatting::FontFeatures),
+            _ => None,
+        };
+        out.extend(lost);
+    }
 }
 
 /// The defaults of Pages for what no style sets.
@@ -453,6 +526,37 @@ impl<'a> Importer<'a> {
 
 /// Maps a Pages document to the model.
 pub fn import(source: &iwork::PagesDocument) -> Result<Document, FilterError> {
+    import_logged(source).map(|(document, _)| document)
+}
+
+/// The formatting of a paragraph of Pages that the model cannot hold: what
+/// the styles of the paragraph and of its runs set.
+fn paragraph_losses(sheet: &Stylesheet, paragraph: &iwork::Paragraph) -> BTreeSet<Formatting> {
+    let mut lost = BTreeSet::new();
+    let styles = std::iter::once(&paragraph.style).chain(paragraph.runs.iter().map(|r| &r.style));
+    for style in styles {
+        if let Some(found) = style.as_deref().and_then(|s| sheet.find(s)) {
+            for style in sheet.ancestry(found) {
+                lost_formatting(&style.properties, &mut lost);
+            }
+        }
+    }
+    lost
+}
+
+/// Maps a Pages document to the model, with what was left out.
+pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportLog), FilterError> {
+    let mut log = ImportLog::default();
+    for (element, count) in &source.skipped {
+        log.add(Warning::Content(content(element)), *count);
+    }
+    // Each paragraph counts once for each kind of formatting it loses.
+    for paragraph in &source.body {
+        for formatting in paragraph_losses(&source.stylesheet, paragraph) {
+            log.add(Warning::Formatting(formatting), 1);
+        }
+    }
+
     let mut importer = Importer::new(&source.stylesheet)?;
     let first = importer
         .document
@@ -496,7 +600,7 @@ pub fn import(source: &iwork::PagesDocument) -> Result<Document, FilterError> {
             keywords: meta.keywords.clone(),
         },
     })?;
-    Ok(document)
+    Ok((document, log))
 }
 
 #[cfg(test)]

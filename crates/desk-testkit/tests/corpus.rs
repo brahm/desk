@@ -128,7 +128,9 @@ fn doc_22_documents_of_pages_import_as_their_cases() {
         let Some(path) = case.pages_document() else {
             continue;
         };
-        let imported = desk_filters::read_pages_at(&path).unwrap();
+        let (imported, log) = desk_filters::read_pages_at_logged(&path).unwrap();
+        // The cases use only what the model holds, so nothing is left out.
+        assert!(log.is_empty(), "{}: {:?}", case.name, log.entries());
         let built = case.spec.document().unwrap();
         assert_eq!(resolved(&imported), resolved(&built), "{}", case.name);
         assert_eq!(imported.page_setup(), built.page_setup(), "{}", case.name);

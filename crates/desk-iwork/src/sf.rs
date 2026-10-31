@@ -92,6 +92,14 @@ pub enum Value {
         /// The multiple or the length, depending on the mode.
         amount: f64,
     },
+    /// A list style: its name, and whether any level draws a label, a
+    /// bullet or a number. The style named None draws none.
+    ListStyle {
+        /// The name, as the Styles drawer shows it.
+        name: Option<String>,
+        /// Whether a level has a label.
+        labels: bool,
+    },
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -122,6 +130,13 @@ impl Value {
                     .attr(SF, "amt")
                     .and_then(|v| v.trim().parse().ok())
                     .unwrap_or(1.0),
+            },
+            "liststyle" => Self::ListStyle {
+                name: element.attr(SF, "name").map(str::to_owned),
+                labels: element.descendants().any(|e| {
+                    e.name.is(SF, "list-label-typeinfo")
+                        && e.attr(SF, "type").is_some_and(|t| t != "none")
+                }),
             },
             other => Self::Other(other.to_owned()),
         }
