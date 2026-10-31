@@ -1,0 +1,41 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+# The format libraries (desk-odf, desk-iwork and desk-formula) set
+# MPL-2.0 in their own manifests.
+license = "GPL-3.0-or-later"
+repository = "https://github.com/brahm/desk"
+publish = false
+
+[workspace.dependencies]
+# Only desk-ui uses these, and the apps reach them through its re-exports.
+# The features set the oldest versions supported: GTK 4.14 and Libadwaita
+# 1.5, as in Ubuntu 24.04.
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+
+desk-anim = { path = "crates/desk-anim" }
+desk-chart = { path = "crates/desk-chart" }
+desk-contacts = { path = "crates/desk-contacts" }
+desk-filters = { path = "crates/desk-filters" }
+desk-formula = { path = "crates/desk-formula" }
+desk-iwork = { path = "crates/desk-iwork" }
+desk-layout = { path = "crates/desk-layout" }
+desk-model = { path = "crates/desk-model" }
+desk-odf = { path = "crates/desk-odf" }
+desk-render = { path = "crates/desk-render" }
+desk-table = { path = "crates/desk-table" }
+desk-testkit = { path = "crates/desk-testkit" }
+desk-text = { path = "crates/desk-text" }
+desk-ui = { path = "crates/desk-ui" }
+
+[workspace.lints.rust]
+missing_docs = "warn"
+# Unsafe code is allowed only at the boundaries with C libraries, with a
+# local #[allow(unsafe_code)]. The format libraries forbid it outright.
+unsafe_code = "deny"

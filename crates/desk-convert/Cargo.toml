@@ -1,0 +1,17 @@
+[package]
+name = "desk-convert"
+description = "Command-line converter for Desk documents, without GTK"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+desk-filters.workspace = true
+desk-layout.workspace = true
+desk-render.workspace = true
+
+[lints]
+workspace = true
