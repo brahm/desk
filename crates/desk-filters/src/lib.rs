@@ -8,8 +8,11 @@
 //! writes Word, Excel, CSV, PowerPoint, RTF and plain text files, and
 //! exports ePub.
 //!
-//! So far it reads and writes ODF text documents, in the [`odt`] module.
+//! So far it reads and writes ODF text documents, in the [`odt`] module,
+//! and reads the text of Pages documents, in the [`pages`] module.
 
 pub mod odt;
+pub mod pages;
 
 pub use odt::{FilterError, read_odt, write_odt};
+pub use pages::{read_pages, read_pages_at};

@@ -244,6 +244,11 @@ version = "0.1.0"
 [[package]]
 name = "desk-iwork"
 version = "0.1.0"
+dependencies = [
+ "flate2",
+ "quick-xml",
+ "zip",
+]
 
 [[package]]
 name = "desk-layout"

@@ -56,6 +56,11 @@ each within `position_tolerance` points of its place (1.5 by default).
 The share of pixels that differ is measured too, and fails the case only
 when the case sets `pixel_tolerance`, in percent.
 
+When the case has `case.pages`, Desk also imports that document, as
+Pages saved it, and compares its layout with the same PDF. Both must
+match: the first checks the layout, the second the reader of `.pages`
+files.
+
 ## Running it
 
 ```sh
@@ -63,6 +68,7 @@ cargo run -p desk-testkit --bin desk-parity
 ```
 
 writes `target/parity/report.md`, `report.json`, and for each case the PDF
-of Desk and, when there is a reference, the diff images: in red what only
+of Desk (and in `from-pages/` the one made from `case.pages`) and, when
+there is a reference, the diff images: in red what only
 Pages drew, in blue what only Desk drew. The CI keeps them as the
 `parity-report` artifact.

@@ -4,7 +4,9 @@
 //! Running the corpus and the parity report.
 //!
 //! Each case is laid out and written as PDF by Desk, then compared with
-//! the PDF of Pages when there is one. The report puts each row of the
+//! the PDF of Pages when there is one. When Pages also saved the case as a
+//! document, Desk imports that document, lays it out and compares it with
+//! the same PDF, which checks the reader of `.pages` files (DOC-22). The report puts each row of the
 //! matrix next to the cases that check it and the tests named after it,
 //! in Markdown for people and in JSON for tools.
 
@@ -13,6 +15,8 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+
+use desk_model::Document;
 
 use crate::case::{Case, DEFAULT_POSITION_TOLERANCE};
 use crate::compare::{LayoutDiff, PixelDiff, compare_pixels, compare_words, words};
@@ -81,6 +85,31 @@ pub struct CaseResult {
     /// What became of it.
     #[serde(flatten)]
     pub outcome: Outcome,
+    /// What became of the document that Pages saved for it, imported, when
+    /// there is one.
+    pub from_pages: Option<PagesResult>,
+}
+
+impl CaseResult {
+    /// Whether the case, or the document of Pages imported, failed or
+    /// could not run.
+    pub fn is_failure(&self) -> bool {
+        self.outcome.is_failure()
+            || self
+                .from_pages
+                .as_ref()
+                .is_some_and(|p| p.outcome.is_failure())
+    }
+}
+
+/// The result of importing the document of a case that Pages saved.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PagesResult {
+    /// The PDF that Desk wrote from it.
+    pub pdf: PathBuf,
+    /// What became of it.
+    #[serde(flatten)]
+    pub outcome: Outcome,
 }
 
 /// Lays out a case, writes its PDF into `out`, and compares it with the
@@ -88,22 +117,33 @@ pub struct CaseResult {
 pub fn run_case(case: &Case, out: &Path) -> CaseResult {
     let out = out.join(&case.name);
     let pdf = out.join("desk.pdf");
-    let outcome = match run(case, &out, &pdf) {
-        Ok(outcome) => outcome,
-        Err(message) => Outcome::Error { message },
-    };
+    let outcome = match case.spec.document() {
+        Ok(document) => run(case, &document, &out, &pdf),
+        Err(error) => Err(error.to_string()),
+    }
+    .unwrap_or_else(|message| Outcome::Error { message });
+    let from_pages = case.pages_document().map(|path| {
+        let out = out.join("from-pages");
+        let pdf = out.join("desk.pdf");
+        let outcome = match desk_filters::read_pages_at(&path) {
+            Ok(document) => run(case, &document, &out, &pdf),
+            Err(error) => Err(format!("o documento do Pages não abriu: {error}")),
+        }
+        .unwrap_or_else(|message| Outcome::Error { message });
+        PagesResult { pdf, outcome }
+    });
     CaseResult {
         name: case.name.clone(),
         title: case.spec.title.clone(),
         rows: case.spec.rows.clone(),
         pdf,
         outcome,
+        from_pages,
     }
 }
 
-fn run(case: &Case, out: &Path, pdf: &Path) -> Result<Outcome, String> {
-    let document = case.spec.document().map_err(|e| e.to_string())?;
-    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+fn run(case: &Case, document: &Document, out: &Path, pdf: &Path) -> Result<Outcome, String> {
+    let layout = desk_layout::paginate(document, &mut desk_text::TextSystem::new());
     let pages = desk_render::DisplayList::pages(&layout);
     std::fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
     desk_render::Painter::new()
@@ -249,7 +289,7 @@ impl Report {
                 let checking: Vec<&CaseResult> =
                     cases.iter().filter(|c| c.rows.contains(&row.id)).collect();
                 let tests = tests.get(&row.id).cloned().unwrap_or_default();
-                let status = if checking.iter().any(|c| c.outcome.is_failure()) {
+                let status = if checking.iter().any(|c| c.is_failure()) {
                     Status::Differs
                 } else if checking
                     .iter()
@@ -288,7 +328,7 @@ impl Report {
 
     /// Whether a case failed, or names a row the matrix does not have.
     pub fn has_failures(&self) -> bool {
-        !self.unknown_rows.is_empty() || self.cases.iter().any(|c| c.outcome.is_failure())
+        !self.unknown_rows.is_empty() || self.cases.iter().any(CaseResult::is_failure)
     }
 
     /// The report as JSON.
@@ -350,33 +390,15 @@ impl Report {
                 case.rows.join(", "),
                 relative(&case.pdf)
             );
-            match &case.outcome {
-                Outcome::NoReference { pages } => {
-                    let _ = writeln!(md, "  O Desk fez {pages} página(s).");
-                }
-                Outcome::Pass { layout, pixels } => {
-                    let _ = writeln!(
-                        md,
-                        "  {} página(s); a maior distância de uma palavra é {:.2} pt; até {:.2}% dos pixels diferem.",
-                        layout.desk_pages,
-                        layout.max_offset,
-                        pixels.worst()
-                    );
-                }
-                Outcome::Fail { reason, pixels, .. } => {
-                    let _ = writeln!(md, "  Motivo: {reason}.");
-                    if let Some(pixels) = pixels {
-                        let images: Vec<String> = pixels
-                            .images
-                            .iter()
-                            .map(|p| format!("`{}`", relative(p)))
-                            .collect();
-                        let _ = writeln!(md, "  Diferenças: {}.", images.join(", "));
-                    }
-                }
-                Outcome::Error { message } => {
-                    let _ = writeln!(md, "  Erro: {message}.");
-                }
+            details(&mut md, &case.outcome, &relative);
+            if let Some(pages) = &case.from_pages {
+                let _ = writeln!(
+                    md,
+                    "  Do documento do Pages: {}. PDF do Desk: `{}`.",
+                    pages.outcome.label(),
+                    relative(&pages.pdf)
+                );
+                details(&mut md, &pages.outcome, &relative);
             }
         }
         if !self.unknown_rows.is_empty() {
@@ -401,6 +423,38 @@ impl Report {
             );
         }
         md
+    }
+}
+
+/// The details of an outcome, under its line in the list of cases.
+fn details(md: &mut String, outcome: &Outcome, relative: &dyn Fn(&Path) -> String) {
+    match outcome {
+        Outcome::NoReference { pages } => {
+            let _ = writeln!(md, "  O Desk fez {pages} página(s).");
+        }
+        Outcome::Pass { layout, pixels } => {
+            let _ = writeln!(
+                md,
+                "  {} página(s); a maior distância de uma palavra é {:.2} pt; até {:.2}% dos pixels diferem.",
+                layout.desk_pages,
+                layout.max_offset,
+                pixels.worst()
+            );
+        }
+        Outcome::Fail { reason, pixels, .. } => {
+            let _ = writeln!(md, "  Motivo: {reason}.");
+            if let Some(pixels) = pixels {
+                let images: Vec<String> = pixels
+                    .images
+                    .iter()
+                    .map(|p| format!("`{}`", relative(p)))
+                    .collect();
+                let _ = writeln!(md, "  Diferenças: {}.", images.join(", "));
+            }
+        }
+        Outcome::Error { message } => {
+            let _ = writeln!(md, "  Erro: {message}.");
+        }
     }
 }
 

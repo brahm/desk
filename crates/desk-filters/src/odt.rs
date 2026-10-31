@@ -35,6 +35,8 @@ const SCRIPT_SCALE: f64 = 66.0;
 pub enum FilterError {
     /// The ODF package could not be read or written.
     Odf(odf::OdfError),
+    /// The iWork document could not be read.
+    Iwork(desk_iwork::IworkError),
     /// The document could not be built.
     Model(ModelError),
 }
@@ -43,6 +45,7 @@ impl fmt::Display for FilterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Odf(error) => error.fmt(f),
+            Self::Iwork(error) => error.fmt(f),
             Self::Model(error) => write!(f, "the document could not be built: {error:?}"),
         }
     }
@@ -53,6 +56,12 @@ impl std::error::Error for FilterError {}
 impl From<odf::OdfError> for FilterError {
     fn from(error: odf::OdfError) -> Self {
         Self::Odf(error)
+    }
+}
+
+impl From<desk_iwork::IworkError> for FilterError {
+    fn from(error: desk_iwork::IworkError) -> Self {
+        Self::Iwork(error)
     }
 }
 

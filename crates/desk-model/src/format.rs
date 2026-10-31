@@ -54,6 +54,15 @@ macro_rules! formatting {
             }
         }
 
+        impl From<$format> for $attrs {
+            /// Every attribute set, to the value it has in the format.
+            fn from(format: $format) -> Self {
+                Self {
+                    $($field: Some(format.$field),)*
+                }
+            }
+        }
+
         impl $attrs {
             /// Whether no attribute is set.
             pub fn is_empty(&self) -> bool {

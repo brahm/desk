@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<sl:document xmlns:sf="http://developer.apple.com/namespaces/sf" xmlns:sfa="http://developer.apple.com/namespaces/sfa" xmlns:sl="http://developer.apple.com/namespaces/sl" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<sf:metadata><sf:title><sf:string sfa:string="T"/></sf:title><sf:authors><sf:array><sf:string sfa:string="A"/></sf:array></sf:authors></sf:metadata>
+<sl:slprint-info sl:page-width="595" sl:page-height="842"><sf:page-margins sf:top="72" sf:left="72" sf:bottom="72" sf:right="72"/></sl:slprint-info>
+<sl:stylesheet sfa:ID="S-2"><sf:styles>
+<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32" sfa:ID="P-1"><sf:property-map><sf:fontName><sf:string sfa:string="LiberationSerif"/></sf:fontName><sf:spaceAfter><sf:number sfa:number="12" sfa:type="f"/></sf:spaceAfter><sf:language><sf:string sfa:string="pt_BR"/></sf:language></sf:property-map></sf:paragraphstyle>
+<sf:paragraphstyle sf:name="Quote" sf:ident="q" sf:parent-ident="paragraph-style-32" sfa:ID="P-3"><sf:property-map><sf:leftIndent><sf:number sfa:number="36" sfa:type="f"/></sf:leftIndent></sf:property-map></sf:paragraphstyle>
+<sf:characterstyle sf:name="Emphasis" sf:ident="c-1" sf:parent-ident="character-style-null" sfa:ID="C-1"><sf:property-map><sf:bold><sf:number sfa:number="1" sfa:type="c"/></sf:bold></sf:property-map></sf:characterstyle>
+<sf:paragraphstyle-ref sfa:IDREF="P-3"/>
+</sf:styles><sf:anon-styles>
+<sf:paragraphstyle sf:parent-ident="q" sfa:ID="A-1"><sf:property-map><sf:firstLineIndent><sf:number sfa:number="72" sfa:type="f"/></sf:firstLineIndent><sf:lineSpacing><sf:linespacing sf:amt="1.5" sf:mode="relative"/></sf:lineSpacing><sf:alignment><sf:number sfa:number="3" sfa:type="i"/></sf:alignment></sf:property-map></sf:paragraphstyle>
+<sf:characterstyle sf:parent-ident="c-1" sfa:ID="A-2"><sf:property-map><sf:superscript><sf:number sfa:number="1" sfa:type="i"/></sf:superscript><sf:fontColor><sf:color xsi:type="sfa:calibrated-rgb-color-type" sfa:r="1" sfa:g="0" sfa:b="0" sfa:a="1"/></sf:fontColor><sf:strikethruColor><sf:null/></sf:strikethruColor></sf:property-map></sf:characterstyle>
+</sf:anon-styles></sl:stylesheet>
+<sf:text-storage sf:kind="body" sfa:ID="W-8"><sf:stylesheet-ref sfa:IDREF="S-2"/><sf:text-body><sf:section><sf:layout>
+<sf:p sf:style="paragraph-style-32">Um <sf:span sf:style="A-2">dois</sf:span> tr&#xEA;s<sf:lnbr/>quatro<sf:tab/>cinco<sf:crbr/></sf:p>
+<sf:p sf:style="A-1">Antes<sf:pgbr/>depois <sf:span sf:style="c-1">fim</sf:span></sf:p>
+</sf:layout></sf:section></sf:text-body></sf:text-storage>
+</sl:document>

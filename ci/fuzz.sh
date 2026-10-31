@@ -30,12 +30,20 @@ seeds_of() {
     esac
 }
 
+# The dictionary of the format of each target's input.
+dict_of() {
+    case $1 in
+        pages_*) echo iwork.dict ;;
+        *) echo odf.dict ;;
+    esac
+}
+
 for target in "${targets[@]}"; do
     printf '\n==> Fuzzing %s for %s seconds\n' "$target" "$seconds"
     # The corpus grows as the fuzzer runs; it stays out of the repository.
     corpus=../target/fuzz-corpus/$target
     mkdir -p "$corpus"
     cargo +nightly fuzz run "$target" "$corpus" "$(seeds_of "$target")" -- \
-        -dict=odf.dict -max_len=65536 -max_total_time="$seconds" \
+        -dict="$(dict_of "$target")" -max_len=65536 -max_total_time="$seconds" \
         -timeout=10 -rss_limit_mb=2048 -print_final_stats=1
 done
