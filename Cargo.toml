@@ -24,6 +24,12 @@ imbl = "7.0.2"
 proptest = "1.12.0"
 unicode-segmentation = "1.13.3"
 
+# Text layout, as decided by the proof of concept in experiments/text-engine.
+# icu_segmenter and skrifa are pinned to the versions Parley itself uses.
+icu_segmenter = "2.4.0"
+parley = "0.12.0"
+skrifa = "0.44.0"
+
 desk-anim = { path = "crates/desk-anim" }
 desk-chart = { path = "crates/desk-chart" }
 desk-contacts = { path = "crates/desk-contacts" }

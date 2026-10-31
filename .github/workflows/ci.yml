@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Install GTK and Libadwaita
+      - name: Install GTK, Libadwaita and the test fonts
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev
+          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
