@@ -71,12 +71,10 @@ apps use GTK.
 
 ## Icons and logo
 
-The icons follow the app icon guidelines of the GNOME HIG. They are
-original drawings with realistic shading: a fountain pen on paper, charts
-in front of a worksheet, and a projection screen. Each app has the color
-that people know from the matching office apps: blue for the word
-processor, green for the spreadsheet and orange-red for the
-presentations. They are in
+The icons follow the app icon guidelines of the GNOME HIG: soft shading,
+a folded corner in the color of each app, and the colors that people
+know from the matching office apps (blue for the word processor, green
+for the spreadsheet and orange for the presentations). They are in
 [data/icons](data/icons), laid out as in the `hicolor` theme, so they
 install as they are under `$prefix/share/icons/hicolor`:
 
@@ -85,7 +83,7 @@ install as they are under `$prefix/share/icons/hicolor`:
 | `scalable/apps/br.com.brahm.Desk.{Writer,Tables,Slides}.svg` | Full color app icons, on a 128 px canvas |
 | `symbolic/apps/br.com.brahm.Desk.{Writer,Tables,Slides}-symbolic.svg` | Symbolic app icons, on a 16 px canvas |
 | `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}.svg` | ODF documents |
-| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}-template.svg` | ODF templates, drawn with a dashed margin |
+| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}-template.svg` | ODF templates, drawn as a stack of sheets with a dashed layout |
 
 The MIME icons use the names that shared-mime-info derives from each
 MIME type, so the desktop picks them for ODF files when the icon theme
@@ -93,10 +91,11 @@ in use has none of its own. A Flatpak can only export icons whose names
 start with the app ID, so a Flatpak build will have to install copies of
 them under such names.
 
-The suite logo is in [data/logo](data/logo), for light
-(`desk-logo.svg`) and dark (`desk-logo-dark.svg`) backgrounds. Its
-wordmark is Inter Display Bold converted to outlines, so it does not
-need the font to render.
+The suite icon, a tray holding one document of each app, is in
+[data/logo](data/logo) as `desk.svg`, with the logo next to the "Desk"
+wordmark for light (`desk-logo.svg`) and dark (`desk-logo-dark.svg`)
+backgrounds. The wordmark is Inter Display Bold converted to outlines,
+so it does not need the font to render.
 
 ## License
 

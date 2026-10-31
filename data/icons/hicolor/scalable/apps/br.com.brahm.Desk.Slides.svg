@@ -1,79 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <defs>
-    <radialGradient id="shadow" cx="64" cy="118" r="44" gradientTransform="matrix(1 0 0 0.14 0 101.5)" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#000000" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="case" x1="0" y1="11" x2="0" y2="21" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8c8c8c"/>
-      <stop offset="0.3" stop-color="#f5f5f5"/>
-      <stop offset="0.55" stop-color="#c4c4c4"/>
-      <stop offset="1" stop-color="#4a4a4a"/>
-    </linearGradient>
-    <linearGradient id="cap" x1="0" y1="10" x2="0" y2="22" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3a3a3a"/>
-      <stop offset="0.35" stop-color="#7a7a7a"/>
-      <stop offset="1" stop-color="#1a1a1a"/>
-    </linearGradient>
-    <linearGradient id="screen" x1="16" y1="20" x2="112" y2="88" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#e3e3e3"/>
-    </linearGradient>
-    <linearGradient id="slide" x1="26" y1="28" x2="102" y2="80" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ed6c47"/>
-      <stop offset="0.5" stop-color="#d35230"/>
-      <stop offset="1" stop-color="#b7472a"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="54" cy="44" r="44" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#2e2e2e"/>
-      <stop offset="0.45" stop-color="#9a9a9a"/>
-      <stop offset="1" stop-color="#262626"/>
-    </linearGradient>
-    <linearGradient id="slat" x1="0" y1="86" x2="0" y2="91" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#6a6a6a"/>
-      <stop offset="0.4" stop-color="#3a3a3a"/>
-      <stop offset="1" stop-color="#151515"/>
-    </linearGradient>
-  </defs>
-  <ellipse cx="64" cy="118" rx="44" ry="6" fill="url(#shadow)"/>
-  <!-- Tripod -->
-  <g stroke-linecap="round" fill="none">
-    <path d="M64 98 L66 112" stroke="#1f1f1f" stroke-width="2.5"/>
-    <path d="M64 98 L32 117" stroke="#2b2b2b" stroke-width="3"/>
-    <path d="M64 98 L96 117" stroke="#2b2b2b" stroke-width="3"/>
-    <path d="M64 98 L32 117 M64 98 L96 117" stroke="#9a9a9a" stroke-width="0.8" stroke-opacity="0.8"/>
-  </g>
-  <rect x="61.5" y="86" width="5" height="16" fill="url(#metal)"/>
-  <rect x="60" y="96" width="8" height="5" rx="1" fill="#1f1f1f"/>
-  <!-- Screen -->
-  <rect x="17" y="18" width="94" height="70" fill="url(#screen)"/>
-  <rect x="17" y="18" width="94" height="70" fill="none" stroke="#9a9a9a" stroke-width="0.6"/>
-  <rect x="17" y="18" width="94" height="3" fill="#000000" fill-opacity="0.08"/>
-  <!-- Projected slide -->
-  <rect x="25" y="27" width="78" height="53" fill="url(#slide)"/>
-  <rect x="31" y="33" width="44" height="5" fill="#ffffff"/>
-  <g fill="#ffffff" fill-opacity="0.85">
-    <rect x="31" y="44" width="28" height="1.8"/>
-    <rect x="31" y="49" width="24" height="1.8"/>
-    <rect x="31" y="54" width="27" height="1.8"/>
-    <rect x="31" y="59" width="20" height="1.8"/>
-  </g>
-  <g fill="#ffd8c8">
-    <rect x="66" y="60" width="7" height="14"/>
-    <rect x="76" y="52" width="7" height="22"/>
-    <rect x="86" y="45" width="7" height="29"/>
-  </g>
-  <path d="M64 74.5 H96" stroke="#ffffff" stroke-width="1"/>
-  <rect x="25" y="27" width="78" height="53" fill="url(#glow)"/>
-  <!-- Bottom slat and pull handle -->
-  <rect x="15" y="86" width="98" height="5" rx="1.5" fill="url(#slat)"/>
-  <path d="M60 91 v3 a4 3 0 0 0 8 0 v-3" fill="none" stroke="#2b2b2b" stroke-width="1.6"/>
-  <!-- Case -->
-  <rect x="12" y="11" width="104" height="10" rx="5" fill="url(#case)"/>
-  <rect x="9" y="10" width="7" height="12" rx="2" fill="url(#cap)"/>
-  <rect x="112" y="10" width="7" height="12" rx="2" fill="url(#cap)"/>
+<defs>
+<radialGradient id="s1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(62 105) scale(30 4.5)"><stop offset="0" stop-color="#000000" stop-opacity="0.22"/><stop offset="0.6" stop-color="#000000" stop-opacity="0.077"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient>
+<linearGradient id="g2" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d2d3d6"/><stop offset="0.45" stop-color="#a9abaf"/><stop offset="1" stop-color="#7c7e83"/></linearGradient>
+<linearGradient id="g3" x1="42" y1="27" x2="112" y2="87" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffb04d"/><stop offset="1" stop-color="#ef6512"/></linearGradient>
+<linearGradient id="g4" x1="40" y1="25" x2="106" y2="82" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fbf3ea"/><stop offset="1" stop-color="#eedfcf"/></linearGradient>
+<linearGradient id="g5" x1="59.2" y1="0" x2="65.4" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8a8c91"/><stop offset="0.45" stop-color="#c9cacd"/><stop offset="1" stop-color="#7a7c81"/></linearGradient>
+<linearGradient id="g6" x1="21.4" y1="24" x2="21.4" y2="76" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fdfaf5"/><stop offset="1" stop-color="#f3ece4"/></linearGradient>
+<linearGradient id="g7" x1="0" y1="13.6" x2="0" y2="18.6" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d7d8db"/><stop offset="0.4" stop-color="#b1b3b7"/><stop offset="1" stop-color="#7f8186"/></linearGradient>
+<linearGradient id="g8" x1="0" y1="17.3" x2="0" y2="25.1" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d7d8db"/><stop offset="0.4" stop-color="#b1b3b7"/><stop offset="1" stop-color="#7f8186"/></linearGradient>
+<linearGradient id="g9" x1="0" y1="74.5" x2="0" y2="80.7" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d7d8db"/><stop offset="0.4" stop-color="#b1b3b7"/><stop offset="1" stop-color="#7f8186"/></linearGradient>
+<linearGradient id="g10" x1="28" y1="35" x2="60" y2="67" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffa63e"/><stop offset="1" stop-color="#ef6512"/></linearGradient>
+<linearGradient id="g11" x1="46" y1="33" x2="62" y2="49" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffb24e"/><stop offset="1" stop-color="#f98a26"/></linearGradient>
+<linearGradient id="g12" x1="65" y1="0" x2="94" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fd9a36"/><stop offset="1" stop-color="#f88a2b"/></linearGradient>
+</defs>
+<ellipse cx="62" cy="105" rx="30" ry="4.5" fill="url(#s1)"/>
+<g transform="rotate(-4 76 57)">
+<rect x="42" y="27" width="70" height="60" rx="5" fill="url(#g3)"/>
+<rect x="40" y="25" width="66" height="57" rx="4" fill="url(#g4)"/>
+</g>
+<path d="M62.2 91 L42 105 M62.2 91 L82.5 105" stroke="#8c8e93" stroke-width="5.4" stroke-linecap="round"/>
+<path d="M62.2 91 L42 105 M62.2 91 L82.5 105" stroke="#c4c5c9" stroke-width="1.4" stroke-linecap="round" transform="translate(-0.5 -1)"/>
+<rect x="59.2" y="78" width="6.2" height="18" rx="3" fill="url(#g5)"/>
+<rect x="21.4" y="24" width="80.6" height="52" rx="2" fill="url(#g6)"/>
+<rect x="21.4" y="24" width="80.6" height="52" rx="2" fill="none" stroke="#dcd3c9" stroke-width="0.5"/>
+<rect x="55.8" y="13.6" width="14.2" height="5" rx="2.4" fill="url(#g7)"/>
+<rect x="19.4" y="17.3" width="83.6" height="7.8" rx="3.9" fill="url(#g8)"/>
+<rect x="19.4" y="74.5" width="83.4" height="6.2" rx="3.1" fill="url(#g9)"/>
+<rect x="22" y="18.2" width="78" height="1.6" rx="0.8" fill="#ffffff" fill-opacity="0.6"/>
+<rect x="22" y="75.3" width="78" height="1.3" rx="0.65" fill="#ffffff" fill-opacity="0.6"/>
+<path d="M43.9 51.2 H59.9 A16 16 0 1 1 43.9 35.2 Z" fill="url(#g10)"/>
+<path d="M46.1 49 V33 A16 16 0 0 1 62.1 49 Z" fill="url(#g11)"/>
+<rect x="65.3" y="40.6" width="28.3" height="5.5" rx="2.75" fill="url(#g12)"/>
+<rect x="65.3" y="50.5" width="22.2" height="4.8" rx="2.4" fill="#fcb87b"/>
+<rect x="65.3" y="58.4" width="30.1" height="4.6" rx="2.3" fill="#fcb87b"/>
 </svg>
