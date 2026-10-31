@@ -116,3 +116,32 @@ fn errors_are_reported() {
     assert!(!broken.status.success());
     assert!(String::from_utf8_lossy(&broken.stderr).contains("zip"));
 }
+
+#[test]
+fn doc_22_pages_becomes_pdf_and_odt() {
+    let dir = scratch("pages");
+    let input = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/writer/fmt-01-02-emphasis/case.pages");
+    let pdf = dir.join("out.pdf");
+    let run = convert(&input, &pdf);
+    assert!(
+        run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let text = Command::new("pdftotext")
+        .arg(&pdf)
+        .arg("-")
+        .output()
+        .unwrap();
+    let text = String::from_utf8(text.stdout).unwrap();
+    assert!(
+        text.contains("Texto em negrito no meio da frase."),
+        "{text}"
+    );
+
+    let odt = dir.join("out.odt");
+    assert!(convert(&input, &odt).status.success());
+    let document = desk_filters::read_odt(&std::fs::read(&odt).unwrap()).unwrap();
+    assert_eq!(document.body().len(), 5);
+}

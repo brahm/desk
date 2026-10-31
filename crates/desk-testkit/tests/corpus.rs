@@ -99,3 +99,38 @@ fn a_case_matches_its_own_pdf_and_not_another() {
     assert!(report.to_markdown(&out).contains("diferente do Pages"));
     assert!(report.to_json().contains("\"status\": \"differs\""));
 }
+
+/// Each paragraph of a document, resolved: its text, its format and the
+/// format of each run.
+fn resolved(document: &desk_model::Document) -> Vec<String> {
+    let styles = document.styles();
+    document
+        .body()
+        .iter()
+        .map(|paragraph| {
+            let mut format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
+            // Pages has widow control on by default, and the cases only
+            // say where it matters.
+            format.widow_control = false;
+            let mut line = format!("{format:?}");
+            for run in paragraph.runs() {
+                let character = styles.resolve_character(paragraph.style(), run.style, &run.attrs);
+                line.push_str(&format!("\n  {:?} {character:?}", run.text()));
+            }
+            line
+        })
+        .collect()
+}
+
+#[test]
+fn doc_22_documents_of_pages_import_as_their_cases() {
+    for case in Case::load_all(corpus().join("writer")).unwrap() {
+        let Some(path) = case.pages_document() else {
+            continue;
+        };
+        let imported = desk_filters::read_pages_at(&path).unwrap();
+        let built = case.spec.document().unwrap();
+        assert_eq!(resolved(&imported), resolved(&built), "{}", case.name);
+        assert_eq!(imported.page_setup(), built.page_setup(), "{}", case.name);
+    }
+}

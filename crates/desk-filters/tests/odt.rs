@@ -515,3 +515,58 @@ fn control_characters_in_style_names_are_kept() {
     assert_eq!(describe(&again), describe(&document));
     assert!(describe(&again).contains(r#""a\rb\tc\nd""#));
 }
+
+#[test]
+fn fmt_22_languages_of_styles_and_runs_are_kept() {
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let runs = ["pt-BR", "en-US", "sr-Latn-RS", "de", "und"].map(|tag| {
+        Run::with_attrs(
+            tag,
+            None,
+            CharAttrs {
+                language: Some(Language::new(tag)),
+                ..CharAttrs::default()
+            },
+        )
+    });
+    let paragraph =
+        Paragraph::from_runs(document.new_id(), body, ParaAttrs::default(), runs.to_vec()).unwrap();
+    let first = document.body().get(0).unwrap().id();
+    document
+        .apply(Op::InsertParagraph {
+            index: 1,
+            paragraph,
+        })
+        .unwrap();
+    document
+        .apply(Op::RemoveParagraph { paragraph: first })
+        .unwrap();
+
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-languages.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let paragraph = read.body().get(0).unwrap();
+    let tags: Vec<String> = paragraph
+        .runs()
+        .map(|run| {
+            read.styles()
+                .resolve_character(paragraph.style(), run.style, &run.attrs)
+                .language
+                .tag()
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(tags, ["pt-BR", "en-US", "sr-Latn-RS", "de", "und"]);
+
+    // ODF splits a tag into a language, a script and a country.
+    let odt = odf::read_odt(&bytes).unwrap();
+    let serbian = odt
+        .automatic_styles
+        .iter()
+        .map(|style| &style.properties.text)
+        .find(|text| text.language.as_deref() == Some("sr"))
+        .unwrap();
+    assert_eq!(serbian.script.as_deref(), Some("Latn"));
+    assert_eq!(serbian.country.as_deref(), Some("RS"));
+}

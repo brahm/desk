@@ -43,3 +43,10 @@ path = "fuzz_targets/odt_import.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "pages_import"
+path = "fuzz_targets/pages_import.rs"
+test = false
+doc = false
+bench = false

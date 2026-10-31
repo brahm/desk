@@ -15,7 +15,8 @@ const USAGE: &str = "\
 Usage: desk-convert <INPUT> <OUTPUT>
 
 Converts INPUT to the format that the file name extension of OUTPUT names.
-Reads OpenDocument text (.odt) and writes PDF (.pdf) or OpenDocument
+Reads OpenDocument text (.odt) and Pages '09 and '08 documents (.pages,
+a package folder or a flat file), and writes PDF (.pdf) or OpenDocument
 text (.odt).
 
 Options:
@@ -59,6 +60,7 @@ fn parse_args(args: impl IntoIterator<Item = OsString>) -> Result<Command, Strin
 #[derive(Debug, PartialEq, Eq)]
 enum Format {
     Odt,
+    Pages,
     Pdf,
 }
 
@@ -66,22 +68,27 @@ fn format_of(path: &Path) -> Option<Format> {
     let extension = path.extension()?.to_str()?.to_ascii_lowercase();
     match extension.as_str() {
         "odt" | "ott" => Some(Format::Odt),
+        "pages" => Some(Format::Pages),
         "pdf" => Some(Format::Pdf),
         _ => None,
     }
 }
 
 fn convert(input: &Path, output: &Path) -> Result<(), String> {
-    let Some(Format::Odt) = format_of(input) else {
-        return Err(format!(
-            "cannot read {}: only .odt files are read so far",
-            input.display()
-        ));
+    let read = |e: &dyn std::fmt::Display| format!("cannot read {}: {e}", input.display());
+    let document = match format_of(input) {
+        Some(Format::Odt) => {
+            let bytes = std::fs::read(input).map_err(|e| read(&e))?;
+            desk_filters::read_odt(&bytes).map_err(|e| read(&e))?
+        }
+        Some(Format::Pages) => desk_filters::read_pages_at(input).map_err(|e| read(&e))?,
+        _ => {
+            return Err(format!(
+                "cannot read {}: only .odt and .pages files are read so far",
+                input.display()
+            ));
+        }
     };
-    let bytes =
-        std::fs::read(input).map_err(|e| format!("cannot read {}: {e}", input.display()))?;
-    let document = desk_filters::read_odt(&bytes)
-        .map_err(|e| format!("cannot read {}: {e}", input.display()))?;
     let written = || format!("cannot write {}", output.display());
     match format_of(output) {
         Some(Format::Odt) => {
@@ -96,7 +103,7 @@ fn convert(input: &Path, output: &Path) -> Result<(), String> {
                 .and_then(|mut painter| painter.write_pdf(&pages, document.metadata(), output))
                 .map_err(|e| format!("{}: {e}", written()))
         }
-        None => Err(format!(
+        Some(Format::Pages) | None => Err(format!(
             "{}: only .pdf and .odt files are written",
             written()
         )),
@@ -167,7 +174,8 @@ mod tests {
     fn formats_come_from_the_extension() {
         assert_eq!(format_of(Path::new("a.ODT")), Some(Format::Odt));
         assert_eq!(format_of(Path::new("dir.pdf/a.pdf")), Some(Format::Pdf));
-        assert_eq!(format_of(Path::new("a.pages")), None);
+        assert_eq!(format_of(Path::new("a.pages")), Some(Format::Pages));
+        assert_eq!(format_of(Path::new("a.numbers")), None);
         assert_eq!(format_of(Path::new("pdf")), None);
     }
 

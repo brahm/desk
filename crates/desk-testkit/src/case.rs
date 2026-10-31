@@ -54,6 +54,9 @@ pub const CASE_FILE: &str = "case.toml";
 /// The name of the PDF that Pages exported for a case.
 pub const REFERENCE_PDF: &str = "reference.pdf";
 
+/// The document that Pages saved for a case, a package folder.
+pub const PAGES_DOCUMENT: &str = "case.pages";
+
 /// Why a case could not be loaded.
 #[derive(Debug)]
 pub enum CaseError {
@@ -132,6 +135,11 @@ impl Case {
     /// The PDF that Pages exported, if the virtual machine has made it.
     pub fn reference(&self) -> Option<PathBuf> {
         Some(self.dir.join(REFERENCE_PDF)).filter(|p| p.is_file())
+    }
+
+    /// The document that Pages saved, if the virtual machine has made it.
+    pub fn pages_document(&self) -> Option<PathBuf> {
+        Some(self.dir.join(PAGES_DOCUMENT)).filter(|p| p.exists())
     }
 }
 

@@ -5,8 +5,9 @@
 //!
 //! Usage: `desk-parity [OUT]`, from anywhere in the repository. It writes
 //! `report.md`, `report.json` and, for each case, the PDF of Desk and the
-//! diff images into OUT, `target/parity` by default, and fails when a case
-//! differs from Pages or could not run.
+//! diff images into OUT, `target/parity` by default, and fails when a case,
+//! or the document that Pages saved for it, differs from Pages or could not
+//! run.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -54,7 +55,15 @@ fn run() -> Result<bool, String> {
         std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
     }
     for case in &report.cases {
-        println!("{}: {}", case.name, case.outcome.label());
+        match &case.from_pages {
+            Some(pages) => println!(
+                "{}: {}; from the Pages document: {}",
+                case.name,
+                case.outcome.label(),
+                pages.outcome.label()
+            ),
+            None => println!("{}: {}", case.name, case.outcome.label()),
+        }
     }
     println!("The report is in {}.", out.join("report.md").display());
     Ok(!report.has_failures())
