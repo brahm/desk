@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Install GTK, Libadwaita and the test fonts
+      - name: Install GTK, Libadwaita, the test fonts and Poppler
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation
+          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation poppler-utils
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
