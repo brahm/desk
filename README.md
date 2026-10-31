@@ -83,7 +83,7 @@ install as they are under `$prefix/share/icons/hicolor`:
 | `scalable/apps/br.com.brahm.Desk.{Writer,Tables,Slides}.svg` | Full color app icons, on a 128 px canvas |
 | `symbolic/apps/br.com.brahm.Desk.{Writer,Tables,Slides}-symbolic.svg` | Symbolic app icons, on a 16 px canvas |
 | `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}.svg` | ODF documents |
-| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}-template.svg` | ODF templates, drawn as a stack of sheets with a dashed layout |
+| `scalable/mimetypes/application-vnd.oasis.opendocument.{text,spreadsheet,presentation}-template.svg` | ODF templates: a second sheet behind the document, the sample content faded and a dashed frame around the area to fill in |
 
 The MIME icons use the names that shared-mime-info derives from each
 MIME type, so the desktop picks them for ODF files when the icon theme
@@ -92,10 +92,15 @@ start with the app ID, so a Flatpak build will have to install copies of
 them under such names.
 
 The suite icon, a tray holding one document of each app, is in
-[data/logo](data/logo) as `desk.svg`, with the logo next to the "Desk"
-wordmark for light (`desk-logo.svg`) and dark (`desk-logo-dark.svg`)
-backgrounds. The wordmark is Inter Display Bold converted to outlines,
-so it does not need the font to render.
+[data/logo](data/logo) as `desk.svg`. The logo sets it next to the
+"Desk" wordmark, whose letters are drawn as office charts: a bar chart
+in the D, a pie chart in the e, graph paper in the s and a spreadsheet
+in the k. There is a version for light backgrounds (`desk-logo.svg`)
+and one for dark backgrounds (`desk-logo-dark.svg`), each also exported
+as a PNG with a transparent background, 2048 px wide (`desk-logo.png`
+and `desk-logo-dark.png`), for About pages, the website and store
+listings. The letters, labels and figures are Inter Display converted
+to outlines, so the logo does not need the font to render.
 
 ## License
 
