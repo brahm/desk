@@ -13,28 +13,37 @@
 pub use adw;
 pub use gtk;
 
+use std::sync::Once;
+
 use adw::prelude::*;
 use gtk::gio;
+
+/// Resource path of the icons built into the apps, which follow the layout
+/// of the `hicolor` icon theme.
+const ICONS: &str = "/br/com/brahm/Desk/icons";
 
 /// What the shared interface needs to know about an app.
 #[derive(Debug, Clone, Copy)]
 pub struct AppInfo {
-    /// Application ID, which names the app on D-Bus and in Flatpak.
+    /// Application ID, which names the app on D-Bus and in Flatpak, and
+    /// names its icons.
     pub id: &'static str,
     /// Name shown to people, such as "Desk Writer".
     pub name: &'static str,
     /// Version shown in the About dialog.
     pub version: &'static str,
-    /// Icon shown in the empty window and in the About dialog, until the
-    /// app has an icon of its own.
-    pub icon_name: &'static str,
 }
 
 /// Runs the app until its last window closes, and returns its exit code.
 pub fn run(info: AppInfo) -> gtk::glib::ExitCode {
+    register_icons();
     let app = adw::Application::builder().application_id(info.id).build();
 
     app.connect_startup(move |app| {
+        if let Some(display) = gtk::gdk::Display::default() {
+            gtk::IconTheme::for_display(&display).add_resource_path(ICONS);
+        }
+        gtk::Window::set_default_icon_name(info.id);
         add_actions(app, info);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
         app.set_accels_for_action("window.close", &["<Control>w"]);
@@ -42,6 +51,26 @@ pub fn run(info: AppInfo) -> gtk::glib::ExitCode {
     app.connect_activate(move |app| new_window(app, info).present());
 
     app.run()
+}
+
+/// Whether `name` is one of the icons built into the apps: a full color app
+/// icon, named after the application ID, or its symbolic version, whose name
+/// ends in `-symbolic`.
+pub fn has_icon(name: &str) -> bool {
+    register_icons();
+    ["scalable", "symbolic"].iter().any(|dir| {
+        let path = format!("{ICONS}/{dir}/apps/{name}.svg");
+        gio::resources_get_info(&path, gio::ResourceLookupFlags::NONE).is_ok()
+    })
+}
+
+/// Registers the icons that the build script compiled into the app.
+fn register_icons() {
+    static REGISTER: Once = Once::new();
+    REGISTER.call_once(|| {
+        gio::resources_register_include!("icons.gresource")
+            .expect("the build script makes a valid resource bundle");
+    });
 }
 
 fn add_actions(app: &adw::Application, info: AppInfo) {
@@ -69,7 +98,7 @@ fn new_window(app: &adw::Application, info: AppInfo) -> adw::ApplicationWindow {
     header_bar.pack_end(&menu_button);
 
     let status_page = adw::StatusPage::builder()
-        .icon_name(info.icon_name)
+        .icon_name(info.id)
         .title(info.name)
         .description("This app is at an early stage of development and cannot open documents yet.")
         .build();
@@ -90,7 +119,7 @@ fn new_window(app: &adw::Application, info: AppInfo) -> adw::ApplicationWindow {
 fn show_about(app: &adw::Application, info: AppInfo) {
     let dialog = adw::AboutDialog::builder()
         .application_name(info.name)
-        .application_icon(info.icon_name)
+        .application_icon(info.id)
         .version(info.version)
         .developer_name("Desk contributors")
         .copyright("© 2026 Desk contributors")

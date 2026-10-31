@@ -15,5 +15,8 @@ desk-model.workspace = true
 desk-render.workspace = true
 gtk.workspace = true
 
+[build-dependencies]
+glib-build-tools.workspace = true
+
 [lints]
 workspace = true

@@ -13,7 +13,6 @@ const APP: AppInfo = AppInfo {
     id: "br.com.brahm.Desk.Slides",
     name: "Desk Slides",
     version: env!("CARGO_PKG_VERSION"),
-    icon_name: "x-office-presentation-symbolic",
 };
 
 fn main() -> glib::ExitCode {
@@ -27,5 +26,11 @@ mod tests {
     #[test]
     fn app_id_is_valid() {
         assert!(gio::Application::id_is_valid(super::APP.id));
+    }
+
+    #[test]
+    fn app_has_its_icons() {
+        assert!(desk_ui::has_icon(super::APP.id));
+        assert!(desk_ui::has_icon(&format!("{}-symbolic", super::APP.id)));
     }
 }

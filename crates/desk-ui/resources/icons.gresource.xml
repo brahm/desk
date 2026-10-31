@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Desk contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+The app icons, laid out as in the hicolor icon theme so that GTK finds them
+by name once their prefix is added to the icon theme.
+-->
+<gresources>
+  <gresource prefix="/br/com/brahm/Desk/icons">
+    <file>scalable/apps/br.com.brahm.Desk.Writer.svg</file>
+    <file>scalable/apps/br.com.brahm.Desk.Tables.svg</file>
+    <file>scalable/apps/br.com.brahm.Desk.Slides.svg</file>
+    <file>symbolic/apps/br.com.brahm.Desk.Writer-symbolic.svg</file>
+    <file>symbolic/apps/br.com.brahm.Desk.Tables-symbolic.svg</file>
+    <file>symbolic/apps/br.com.brahm.Desk.Slides-symbolic.svg</file>
+  </gresource>
+</gresources>

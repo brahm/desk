@@ -1,4 +1,9 @@
-# Desk
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="data/logo/desk-logo-dark.svg">
+    <img src="data/logo/desk-logo.svg" alt="Desk" width="560">
+  </picture>
+</h1>
 
 Desk is a free office suite for the Linux desktop, made of three apps
 that share one document model:
@@ -30,6 +35,10 @@ On Fedora:
 ```sh
 sudo dnf install gtk4-devel libadwaita-devel
 ```
+
+The build also runs `glib-compile-resources`, which comes with the GLib
+development files that these packages install, to build the app icons
+into the apps.
 
 Then run an app with Cargo:
 
@@ -90,6 +99,12 @@ MIME type, so the desktop picks them for ODF files when the icon theme
 in use has none of its own. A Flatpak can only export icons whose names
 start with the app ID, so a Flatpak build will have to install copies of
 them under such names.
+
+The app icons and their symbolic versions are also built into the apps
+as GResources (listed in
+[crates/desk-ui/resources](crates/desk-ui/resources)), so the apps show
+them in their windows and About dialogs when run with Cargo, before
+anything is installed.
 
 The suite icon, a tray holding one document of each app, is in
 [data/logo](data/logo) as `desk.svg`. The logo sets it next to the
