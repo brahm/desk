@@ -7,3 +7,9 @@
 //! from iWork '09 and '08 documents, through `desk-iwork`. It also reads and
 //! writes Word, Excel, CSV, PowerPoint, RTF and plain text files, and
 //! exports ePub.
+//!
+//! So far it reads and writes ODF text documents, in the [`odt`] module.
+
+pub mod odt;
+
+pub use odt::{FilterError, read_odt, write_odt};
