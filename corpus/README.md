@@ -61,6 +61,15 @@ Pages saved it, and compares its layout with the same PDF. Both must
 match: the first checks the layout, the second the reader of `.pages`
 files.
 
+## Documents of Pages
+
+`fixtures/pages/` holds documents that Pages '09 saved on the reference
+machine, each with the PDF it exported, for what a case in `case.toml`
+cannot describe. `lossy-import.pages` has one of each thing that Desk
+does not import yet, such as headers, images, footnotes, comments and
+fields, and the tests of `desk-filters` check that the import lists each
+of them as left out.
+
 ## Running it
 
 ```sh

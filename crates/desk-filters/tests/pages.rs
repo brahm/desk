@@ -260,3 +260,48 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
     let (_, log) = read_pages_logged(index(STYLES, "", BODY).as_bytes()).unwrap();
     assert!(log.is_empty(), "{:?}", log.entries());
 }
+
+#[test]
+fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
+    // Saved by Pages '09 on the reference machine, with one of each
+    // thing that the model cannot hold yet.
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages/lossy-import.pages");
+    let (document, log) = desk_filters::read_pages_at_logged(&path).unwrap();
+    let entries: Vec<(Warning, usize)> = log
+        .entries()
+        .iter()
+        .map(|e| (e.warning.clone(), e.count))
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            (Warning::Content(Content::Headers), 1),
+            (Warning::Content(Content::Footers), 1),
+            (Warning::Content(Content::FloatingObjects), 1),
+            (Warning::Content(Content::InlineObjects), 1),
+            (Warning::Content(Content::Footnotes), 1),
+            (Warning::Content(Content::Comments), 1),
+            (Warning::Content(Content::Fields), 2),
+            (Warning::Formatting(Formatting::Lists), 2),
+            (Warning::Formatting(Formatting::TabStops), 1),
+            (Warning::Formatting(Formatting::CharacterSpacing), 1),
+            (Warning::Formatting(Formatting::TextShadows), 1),
+            (Warning::Formatting(Formatting::ParagraphBackgrounds), 1),
+            (Warning::Formatting(Formatting::ParagraphBorders), 1),
+        ]
+    );
+    // The text of the body is kept, without that of the footnote and the
+    // comment.
+    let text: Vec<String> = document.body().iter().map(|p| p.text()).collect();
+    assert!(
+        text.iter()
+            .any(|t| t.starts_with("Footnote on this paragraph"))
+    );
+    assert!(text.iter().any(|t| t == "Bulleted item one"));
+    assert!(
+        !text
+            .iter()
+            .any(|t| t.contains("Footnote text") || t.contains("Comment text"))
+    );
+}
