@@ -4,8 +4,9 @@
 
 # Validates the ODF files that Desk writes against the OASIS ODF 1.3
 # RelaxNG schemas, with Jing. The files come from the tests, which write
-# their documents to a directory when DESK_ODF_OUT names one, and from
-# converting the seed documents of the fuzzer.
+# their documents to a directory when DESK_ODF_OUT names one, from
+# converting the seed documents of the fuzzer, and from converting the
+# documents of Pages in the fixtures.
 #
 # The schemas come from the ODF Toolkit validator on Maven Central, at a
 # pinned version and checksum, since the OASIS site rate limits and
@@ -46,6 +47,11 @@ DESK_ODF_OUT=$PWD/$out/files cargo test --locked --quiet \
 cargo build --locked --quiet --package desk-convert
 for seed in fuzz/seeds/odt_package/*.odt; do
     target/debug/desk-convert "$seed" "$out/files/converted-$(basename "$seed")"
+done
+# Every document that Pages saved in the fixtures, converted to ODT.
+for pages in corpus/fixtures/pages/*.pages corpus/fixtures/pages/*.template; do
+    name=$(basename "$pages")
+    target/debug/desk-convert "$pages" "$out/files/pages-${name%.*}.odt" 2>/dev/null
 done
 
 status=0
