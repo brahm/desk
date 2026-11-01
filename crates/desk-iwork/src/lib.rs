@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: MPL-2.0
 
-//! Reader for Apple iWork '09 and '08 documents.
+//! Reader for Apple iWork '09 documents.
 //!
 //! This crate reads the XML inside Pages, Numbers and Keynote documents
-//! saved by iWork '08 and '09 into a typed tree that follows the files
+//! saved by iWork '09 into a typed tree that follows the files
 //! closely. The mapping from that tree to the Desk document model lives in
 //! `desk-filters`.
 //!

@@ -25,12 +25,12 @@ INT-23		Ajuda	skipped	Only about the application, its dialogs or an action: a sa
 DOC-01		Criar a partir de modelo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-02		Preferência para documentos novos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-03		Abrir documentos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-04	fmt-01-02-emphasis-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of fmt-01-02-emphasis.pages.
+DOC-04		Abrir versões anteriores	skipped	Out of scope in the matrix: Desk reads only the format of Pages '09.
 DOC-05	doc-05-missing-fonts.pages	A document that names a font not installed	made	Copied from the case made for the corpus earlier (corpus/writer/doc-05-missing-fonts), not rebuilt in this run.
 DOC-06		Importar outros formatos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-07		Tela cheia	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-08		Senha para abrir	skipped	Not made: it needs a password typed into a dialog, which I did not do, even a throwaway one. Can be made by hand.
-DOC-09	fmt-01-02-emphasis-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of fmt-01-02-emphasis.pages.
+DOC-09		Salvar e Salvar Cópia Como	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-10	doc-10-linked-media.pages	Audio and movie linked rather than copied into the document (Copy audio and movies off)	made	Pages saves this choice as a single zip file, not a package.
 DOC-11		Salvamento automático e Versões	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-12		Desfazer, refazer e reverter	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
@@ -247,7 +247,7 @@ EXP-06		Exportar Word	skipped	Only about the application, its dialogs or an acti
 EXP-07		Exportar RTF e texto simples	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EXP-08		Senha na exportação	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EXP-09		Exportar ePub	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-10	fmt-01-02-emphasis-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of fmt-01-02-emphasis.pages.
+EXP-10		Salvar cópia como Word	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EXP-11		iWork.com (beta)	skipped	Out of scope in the matrix: the service has closed.
 EXP-12		Enviar por Mail	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EXP-13		Enviar ao iWeb	skipped	Out of scope in the matrix: iWeb.
@@ -273,7 +273,5 @@ IOP-07		Objetos e efeitos	skipped	Not a row of its own for Pages: see the OBJ do
 IOP-08		Equações	skipped	Needs MathType 6, which is not in the VM.
 IOP-09		Modelos e espaços reservados	skipped	Not a row of its own for Pages: see txt-01-mod-08-placeholder and obj-03-mod-09-media-placeholder.
 IOP-10		Exportar e compartilhar	skipped	Export and sharing are not held in a document.
-IOP-11	fmt-01-02-emphasis-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of fmt-01-02-emphasis.pages.
--	est-12-headers-footers-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of est-12-headers-footers.pages.
--	tab-01-basic-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of tab-01-basic.pages.
+IOP-11		Senha e versões	skipped	Not made: the password needs a dialog, as DOC-08; versions are not held in a document.
 -	lossy-import.pages	Content Desk does not import, to check the warning log	made	All the items asked for; not tied to one row.

@@ -89,7 +89,7 @@ The code is one Cargo workspace, with one crate per directory in
 | `desk-anim` | Slide transitions and builds |
 | `desk-contacts` | Contacts for merge fields |
 | `desk-odf` | OpenDocument package reader and writer, with the Desk extensions |
-| `desk-iwork` | Reader for iWork '09 and '08 documents |
+| `desk-iwork` | Reader for iWork '09 documents |
 | `desk-filters` | Import and export filters |
 | `desk-convert` | Command-line converter that runs without GTK |
 | `desk-testkit` | Reference corpus, visual comparison and parity reports for the tests |

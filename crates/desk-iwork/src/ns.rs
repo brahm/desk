@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: MPL-2.0
 
-//! The namespaces of iWork '09 and '08.
+//! The namespaces of iWork '09.
 
 /// The vocabulary shared by the three apps.
 pub const SF: &str = "http://developer.apple.com/namespaces/sf";
