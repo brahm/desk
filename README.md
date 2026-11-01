@@ -33,8 +33,9 @@ The project is in early development, starting with Desk Writer. The
 libraries can already read and write simple ODT text documents, read
 the text of Pages '09 documents, listing what they hold that Desk cannot
 show yet, lay them out into pages as Pages does
-and export them to PDF with `desk-convert`, while the apps still open an
-empty window. A first test version will come
+and export them to PDF with `desk-convert`. Desk Writer opens them and
+shows their pages, with zoom and a list of what an import left out, but
+cannot edit them yet. A first test version will come
 out as a nightly Flatpak once Desk Writer can open, edit and save
 formatted text, and more will follow as each phase of the plan is done.
 

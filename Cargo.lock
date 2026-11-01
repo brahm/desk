@@ -343,6 +343,7 @@ dependencies = [
  "desk-layout",
  "desk-model",
  "desk-render",
+ "desk-text",
  "glib-build-tools",
  "gtk4",
  "libadwaita",
