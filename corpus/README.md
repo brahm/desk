@@ -65,10 +65,17 @@ files.
 
 `fixtures/pages/` holds documents that Pages '09 saved on the reference
 machine, each with the PDF it exported, for what a case in `case.toml`
-cannot describe. `lossy-import.pages` has one of each thing that Desk
-does not import yet, such as headers, images, footnotes, comments and
-fields, and the tests of `desk-filters` check that the import lists each
-of them as left out.
+cannot describe. There is one for each row of the matrix that a saved
+document can hold; [`manifest.tsv`](fixtures/pages/manifest.tsv) says
+which document shows each row, and why the others have none, such as
+rows about the application alone or what the reference machine cannot
+do. Documents ending in `-pages08` were saved in the format of Pages '08
+(DOC-04).
+
+The tests of `desk-filters` open every one of them and check that the
+import names what it leaves out. `lossy-import.pages` has one of each
+thing that Desk does not import yet, such as headers, images, footnotes,
+comments and fields, and its log is checked entry by entry.
 
 ## Running it
 

@@ -305,3 +305,72 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
             .any(|t| t.contains("Footnote text") || t.contains("Comment text"))
     );
 }
+
+fn fixture(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages")
+        .join(name)
+}
+
+#[test]
+fn doc_22_every_document_saved_by_pages_opens_and_names_what_it_loses() {
+    let dir = fixture("");
+    let mut opened = 0;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        let extension = path.extension().and_then(|e| e.to_str());
+        if !matches!(extension, Some("pages" | "template")) {
+            continue;
+        }
+        let (_, log) = desk_filters::read_pages_at_logged(&path)
+            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        // Every kind of content that Pages saves has a name in the log.
+        for entry in log.entries() {
+            assert!(
+                !matches!(entry.warning, Warning::Content(Content::Other(_))),
+                "{}: {entry}",
+                path.display()
+            );
+        }
+        opened += 1;
+    }
+    assert!(opened > 100, "{opened}");
+}
+
+#[test]
+fn doc_22_tracked_changes_and_bookmarks_keep_their_text() {
+    let text = |name: &str| -> (Vec<String>, desk_filters::ImportLog) {
+        let (document, log) = desk_filters::read_pages_at_logged(&fixture(name)).unwrap();
+        (document.body().iter().map(|p| p.text()).collect(), log)
+    };
+    // Pages shows the inserted and the deleted text, with its markup.
+    let (body, log) = text("rev-01-04-tracked-changes.pages");
+    assert!(
+        body.contains(&"Original text  trackedwith an insertion here".to_owned()),
+        "{body:?}"
+    );
+    assert!(
+        body.contains(&"Text with a deletion here".to_owned()),
+        "{body:?}"
+    );
+    assert!(
+        log.entries()
+            .iter()
+            .any(|e| e.warning == Warning::Content(Content::TrackedChanges))
+    );
+    let (body, _) = text("est-25-26-links-bookmarks.pages");
+    assert!(
+        body.contains(&"Bookmarked text here".to_owned()),
+        "{body:?}"
+    );
+    // A section starts on a new page.
+    let (document, _) =
+        desk_filters::read_pages_at_logged(&fixture("est-16-18-sections.pages")).unwrap();
+    assert!(
+        document
+            .body()
+            .iter()
+            .skip(1)
+            .any(|p| p.attrs().page_break_before == Some(true))
+    );
+}

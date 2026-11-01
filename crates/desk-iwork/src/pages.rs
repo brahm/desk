@@ -102,7 +102,8 @@ pub struct PagesDocument {
     /// the order first met, with how many of each: what an import cannot
     /// show yet. Besides the elements of the body, `headers`, `footers`
     /// and `drawables` count the headers, footers and floating objects of
-    /// the document, which are outside the body.
+    /// the document, which are outside the body, and `columns` the layouts
+    /// of the body with more than one column.
     pub skipped: Vec<(String, usize)>,
 }
 
@@ -168,6 +169,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     if let Some(body) = storage.child(SF, "text-body") {
         let mut reader = BodyReader {
             ids: &ids,
+            columned: sheet.map(columned_layouts).unwrap_or_default(),
             document: &mut document,
         };
         reader.block(body);
@@ -289,19 +291,50 @@ const IGNORED: &[&str] = &[
     "stylesheet-ref",
     "crbr",
     "br",
+    // The hidden marks of the headings that a table of contents lists.
+    "toc-bookmark",
+    // The start of a layout, whose columns are recorded with it.
+    "layoutbr",
 ];
+
+/// Elements around text that the reader keeps, by recording the element
+/// and reading what it holds: tracked changes, whose text Pages shows with
+/// its markup, and bookmarks.
+const WRAPPERS: &[&str] = &["change-ref", "changed-ref", "changes-ref", "bookmark"];
+
+/// The identifiers and IDs of the layout styles of a stylesheet that set
+/// more than one column. A layout of the body names its style by either.
+fn columned_layouts(sheet: &Element) -> Vec<String> {
+    let mut out = Vec::new();
+    for style in sheet.descendants().filter(|e| e.name.is(SF, "layoutstyle")) {
+        let columns = style
+            .descendants()
+            .filter(|e| e.name.is(SF, "column"))
+            .count();
+        if columns > 1 {
+            out.extend(style.attr(SF, "ident").map(str::to_owned));
+            out.extend(style.attr(SFA, "ID").map(str::to_owned));
+        }
+    }
+    out
+}
 
 struct BodyReader<'a, 'b> {
     ids: &'a Ids<'a>,
+    /// The layout styles with more than one column.
+    columned: Vec<String>,
     document: &'b mut PagesDocument,
 }
 
 impl BodyReader<'_, '_> {
     fn skip(&mut self, element: &Element) {
-        let name = &element.name.local;
+        self.skip_named(&element.name.local.clone());
+    }
+
+    fn skip_named(&mut self, name: &str) {
         match self.document.skipped.iter_mut().find(|(n, _)| n == name) {
             Some((_, count)) => *count += 1,
-            None => self.document.skipped.push((name.clone(), 1)),
+            None => self.document.skipped.push((name.to_owned(), 1)),
         }
     }
 
@@ -313,7 +346,17 @@ impl BodyReader<'_, '_> {
             }
             match child.name.local.as_str() {
                 "p" => self.paragraph(child),
-                "section" | "layout" | "text-body" => self.block(child),
+                "layout" => {
+                    // Columns are not laid out yet: the text flows in one.
+                    if child
+                        .attr(SF, "style")
+                        .is_some_and(|s| self.columned.iter().any(|c| c == s))
+                    {
+                        self.skip_named("columns");
+                    }
+                    self.block(child);
+                }
+                "section" | "text-body" => self.block(child),
                 name if IGNORED.contains(&name) => {}
                 _ => self.skip(child),
             }
@@ -335,6 +378,14 @@ impl BodyReader<'_, '_> {
         for node in &element.children {
             match node {
                 Node::Text(text) => push(runs, style, text),
+                Node::Element(child)
+                    if child.name.ns == SF && WRAPPERS.contains(&child.name.local.as_str()) =>
+                {
+                    // A reference to a change holds the changed text, so it
+                    // is read, not replaced by what it refers to.
+                    self.skip(child);
+                    self.inline(child, style, runs);
+                }
                 Node::Element(child) if child.name.ns == SF => {
                     let child = self.ids.deref(child);
                     match child.name.local.as_str() {
@@ -348,6 +399,8 @@ impl BodyReader<'_, '_> {
                         "lnbr" => push(runs, style, &LINE_BREAK.to_string()),
                         "pgbr" => push(runs, style, &PAGE_BREAK.to_string()),
                         "contbr" => push(runs, style, &COLUMN_BREAK.to_string()),
+                        // A section starts on a new page.
+                        "sectbr" => push(runs, style, &PAGE_BREAK.to_string()),
                         "tab" => push(runs, style, "\t"),
                         name if IGNORED.contains(&name) => {}
                         _ => self.skip(child),
