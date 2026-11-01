@@ -54,18 +54,23 @@ pub fn read_pages_at_logged(path: &std::path::Path) -> Result<(Document, ImportL
     import_logged(&desk_iwork::read_pages_at(path)?)
 }
 
-/// The content that a skipped element of `desk-iwork` stands for.
-fn content(element: &str) -> Content {
-    match element {
+/// The warning that a skipped element of `desk-iwork` stands for.
+fn warning(element: &str) -> Warning {
+    let content = match element {
         "headers" => Content::Headers,
         "footers" => Content::Footers,
         "drawables" => Content::FloatingObjects,
         "attachment" | "attachment-ref" => Content::InlineObjects,
         "footnote" | "endnote" => Content::Footnotes,
         "annotation" | "annotation-field" => Content::Comments,
-        "page-number" | "page-count" | "date-time" | "filename" => Content::Fields,
+        "page-number" | "page-count" | "date-time" | "filename" | "merge-field" => Content::Fields,
+        "toc" => Content::TablesOfContents,
+        "change-ref" | "changed-ref" | "changes-ref" => Content::TrackedChanges,
+        "bookmark" => Content::Bookmarks,
+        "columns" => Content::ColumnLayouts,
         other => Content::Other(other.to_owned()),
-    }
+    };
+    Warning::Content(content)
 }
 
 /// Whether a property is set to something other than `neutral`, which is
@@ -548,7 +553,7 @@ fn paragraph_losses(sheet: &Stylesheet, paragraph: &iwork::Paragraph) -> BTreeSe
 pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportLog), FilterError> {
     let mut log = ImportLog::default();
     for (element, count) in &source.skipped {
-        log.add(Warning::Content(content(element)), *count);
+        log.add(warning(element), *count);
     }
     // Each paragraph counts once for each kind of formatting it loses.
     for paragraph in &source.body {

@@ -68,7 +68,8 @@ fn format_of(path: &Path) -> Option<Format> {
     let extension = path.extension()?.to_str()?.to_ascii_lowercase();
     match extension.as_str() {
         "odt" | "ott" => Some(Format::Odt),
-        "pages" => Some(Format::Pages),
+        // A template is a document that Pages opens as a copy.
+        "pages" | "template" => Some(Format::Pages),
         "pdf" => Some(Format::Pdf),
         _ => None,
     }

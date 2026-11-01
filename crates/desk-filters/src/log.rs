@@ -26,8 +26,16 @@ pub enum Content {
     Footnotes,
     /// Comments.
     Comments,
-    /// Fields, such as page numbers and dates.
+    /// Fields, such as page numbers, dates and merge fields.
     Fields,
+    /// Tables of contents.
+    TablesOfContents,
+    /// Tracked changes: their text is kept as plain text, deletions too.
+    TrackedChanges,
+    /// Bookmarks: their text is kept.
+    Bookmarks,
+    /// Layouts of more than one column, whose text flows in one.
+    ColumnLayouts,
     /// Content of another kind, by the name the source gives it.
     Other(String),
 }
@@ -120,6 +128,12 @@ impl fmt::Display for Content {
             Self::Footnotes => f.write_str("footnotes"),
             Self::Comments => f.write_str("comments"),
             Self::Fields => f.write_str("fields"),
+            Self::TablesOfContents => f.write_str("tables of contents"),
+            Self::TrackedChanges => {
+                f.write_str("tracked changes, whose text is kept as plain text")
+            }
+            Self::Bookmarks => f.write_str("bookmarks, whose text is kept"),
+            Self::ColumnLayouts => f.write_str("columns, whose text flows in one"),
             Self::Other(name) => write!(f, "content of the kind \u{201c}{name}\u{201d}"),
         }
     }
