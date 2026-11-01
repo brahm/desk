@@ -347,6 +347,7 @@ dependencies = [
  "glib-build-tools",
  "gtk4",
  "libadwaita",
+ "unicode-segmentation",
 ]
 
 [[package]]

@@ -255,3 +255,33 @@ proptest! {
         }
     }
 }
+
+#[test]
+fn doc_12_letters_typed_in_a_row_undo_together() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let first = editor.document().body().get(0).unwrap().id();
+    let start = editor.snapshot();
+    let mut at = Position::new(first, 0);
+    for letter in ["a", "b", "c"] {
+        let (next, _) = editor
+            .edit_continuing("Typing", |edit| edit.insert_text(at, letter))
+            .unwrap();
+        at = next;
+    }
+    let typed = editor.snapshot();
+    assert_eq!(typed.body().get(0).unwrap().text(), "abc");
+    // Another action starts a new step.
+    let (_, joined) = editor
+        .edit_continuing("Delete", |edit| {
+            edit.delete(Position::new(first, 2), Position::new(first, 3))
+        })
+        .unwrap();
+    assert!(!joined);
+    assert!(editor.undo().unwrap());
+    assert_eq!(editor.snapshot(), typed);
+    assert!(editor.undo().unwrap());
+    assert_eq!(editor.snapshot(), start);
+    assert!(!editor.undo().unwrap());
+    assert!(editor.redo().unwrap());
+    assert_eq!(editor.snapshot(), typed);
+}

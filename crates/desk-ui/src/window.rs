@@ -11,6 +11,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::{gio, glib};
 
+use crate::editing::TextEditor;
 use crate::geometry;
 use crate::view::DocumentView;
 use crate::{AppInfo, Opener};
@@ -26,6 +27,7 @@ pub struct DocumentWindow {
     warnings_button: gtk::Button,
     path: RefCell<Option<PathBuf>>,
     warnings: RefCell<Vec<String>>,
+    editor: RefCell<Option<TextEditor>>,
 }
 
 thread_local! {
@@ -151,6 +153,7 @@ impl DocumentWindow {
             warnings_button,
             path: RefCell::new(None),
             warnings: RefCell::new(Vec::new()),
+            editor: RefCell::new(None),
         });
         this.add_actions();
         {
@@ -199,7 +202,15 @@ impl DocumentWindow {
     pub fn load(&self, opener: &Opener, path: &Path) {
         match crate::open_document(opener, path) {
             Ok(shown) => {
-                self.view.set_pages(shown.pages);
+                let editor = TextEditor::new(&self.view, shown.document.clone());
+                let weak = self.window.downgrade();
+                editor.connect_changed(move || {
+                    if let Some(window) = weak.upgrade() {
+                        update_history_actions(&window);
+                    }
+                });
+                *self.editor.borrow_mut() = Some(editor);
+                update_history_actions(&self.window);
                 let name = display_name(path);
                 self.title.set_title(&name);
                 self.title.set_subtitle(&folder_of(path));
@@ -268,6 +279,42 @@ impl DocumentWindow {
         });
         self.window.add_action(&warnings);
         self.window.add_action(&zoom);
+        for (name, run) in [
+            ("undo", TextEditor::undo as fn(&TextEditor)),
+            ("redo", TextEditor::redo),
+            ("cut", TextEditor::cut),
+            ("copy", TextEditor::copy),
+            ("paste", TextEditor::paste),
+            ("select-all", TextEditor::select_all),
+        ] {
+            let weak = Rc::downgrade(self);
+            let action = gio::SimpleAction::new(name, None);
+            action.connect_activate(move |_, _| {
+                let editor = weak.upgrade().and_then(|this| this.editor.borrow().clone());
+                if let Some(editor) = editor {
+                    run(&editor);
+                }
+            });
+            self.window.add_action(&action);
+        }
+        update_history_actions(&self.window);
+    }
+}
+
+/// Turns Undo and Redo on and off as the history allows.
+fn update_history_actions(window: &adw::ApplicationWindow) {
+    let this = WINDOWS.with(|w| w.borrow().iter().find(|d| d.window() == window).cloned());
+    let editor = this.as_ref().and_then(|t| t.editor.borrow().clone());
+    for (name, enabled) in [
+        ("undo", editor.as_ref().is_some_and(TextEditor::can_undo)),
+        ("redo", editor.as_ref().is_some_and(TextEditor::can_redo)),
+    ] {
+        if let Some(action) = window
+            .lookup_action(name)
+            .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
+        {
+            action.set_enabled(enabled);
+        }
     }
 }
 

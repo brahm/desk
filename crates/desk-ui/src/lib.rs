@@ -14,7 +14,9 @@
 pub use adw;
 pub use gtk;
 
+mod editing;
 pub mod geometry;
+pub mod text_nav;
 mod view;
 mod warnings;
 mod window;
@@ -25,7 +27,6 @@ use std::sync::Once;
 
 use adw::prelude::*;
 use desk_model::Document;
-use desk_render::DisplayList;
 use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
@@ -68,7 +69,7 @@ pub struct Opener {
 
 /// A document laid out for a window.
 pub(crate) struct Shown {
-    pub pages: Vec<DisplayList>,
+    pub document: Document,
     pub warnings: Vec<String>,
     /// Whether something was left out, rather than only fonts replaced by
     /// others with the same metrics; then the Warnings window opens by
@@ -88,20 +89,25 @@ pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, Strin
         mut warnings,
     } = (opener.open)(&package_of(path))?;
     let mut lossy = !warnings.is_empty();
-    let pages = TEXT.with(|text| {
+    TEXT.with(|text| {
         let mut system = text.borrow_mut();
-        let layout = desk_layout::paginate(&document, &mut system);
+        system.forget_choices();
+        desk_layout::paginate(&document, &mut system);
         for choice in system.substitutions() {
             lossy |= choice.kind != FontMatch::Metric;
             warnings.push(substitution(&choice));
         }
-        DisplayList::pages(&layout)
     });
     Ok(Shown {
-        pages,
+        document,
         warnings,
         lossy,
     })
+}
+
+/// Lays out a document on pages, with the fonts of the system.
+pub(crate) fn lay_out(document: &Document) -> desk_layout::DocumentLayout {
+    TEXT.with(|text| desk_layout::paginate(document, &mut text.borrow_mut()))
 }
 
 /// The document a path names. A Pages document can be a package folder,
@@ -166,6 +172,12 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         app.set_accels_for_action("win.zoom('in')", &["<Control>plus", "<Control>equal"]);
         app.set_accels_for_action("win.zoom('out')", &["<Control>minus"]);
         app.set_accels_for_action("win.zoom('1')", &["<Control>0"]);
+        app.set_accels_for_action("win.undo", &["<Control>z"]);
+        app.set_accels_for_action("win.redo", &["<Control><Shift>z", "<Control>y"]);
+        app.set_accels_for_action("win.cut", &["<Control>x"]);
+        app.set_accels_for_action("win.copy", &["<Control>c"]);
+        app.set_accels_for_action("win.paste", &["<Control>v"]);
+        app.set_accels_for_action("win.select-all", &["<Control>a"]);
     });
     app.connect_activate(move |app| DocumentWindow::new(app, info, opener).window().present());
     // Files opened from outside: by double click, from the recent files or
