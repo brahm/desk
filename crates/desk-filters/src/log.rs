@@ -68,6 +68,15 @@ pub enum Formatting {
     HiddenText,
     /// Ligature and other typographic settings of fonts.
     FontFeatures,
+    /// Automatic hyphenation: the words break only at soft hyphens.
+    Hyphenation,
+}
+
+/// A setting of the whole document that an import left out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Setting {
+    /// Facing pages: left pages keep the margins of right pages.
+    FacingPages,
 }
 
 /// What a warning is about.
@@ -77,10 +86,12 @@ pub enum Warning {
     Content(Content),
     /// Formatting that was left out; the text is kept.
     Formatting(Formatting),
+    /// A setting of the document that was left out.
+    Setting(Setting),
 }
 
 /// A warning and how many times it applies: how many objects for content,
-/// how many paragraphs for formatting.
+/// how many paragraphs for formatting, and once for a setting.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     /// What was left out.
@@ -154,6 +165,15 @@ impl fmt::Display for Formatting {
             Self::DropCaps => "drop caps",
             Self::HiddenText => "hidden text, which is shown",
             Self::FontFeatures => "font features and ligature settings",
+            Self::Hyphenation => "automatic hyphenation",
+        })
+    }
+}
+
+impl fmt::Display for Setting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::FacingPages => "facing pages, so left pages have the margins of right pages",
         })
     }
 }
@@ -173,6 +193,7 @@ impl fmt::Display for Entry {
                 };
                 write!(f, "Left out {formatting}, in {count} {paragraphs}")
             }
+            Warning::Setting(setting) => write!(f, "Left out {setting}"),
         }
     }
 }
@@ -189,12 +210,14 @@ mod tests {
         log.add(Warning::Formatting(Formatting::Lists), 2);
         log.add(Warning::Content(Content::Headers), 2);
         log.add(Warning::Content(Content::Footers), 0);
+        log.add(Warning::Setting(Setting::FacingPages), 1);
         let lines: Vec<String> = log.entries().iter().map(ToString::to_string).collect();
         assert_eq!(
             lines,
             [
                 "Left out headers (3)",
-                "Left out list bullets and numbers, in 2 paragraphs"
+                "Left out list bullets and numbers, in 2 paragraphs",
+                "Left out facing pages, so left pages have the margins of right pages"
             ]
         );
     }

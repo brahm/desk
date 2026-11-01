@@ -53,7 +53,7 @@ TXT-05		Acentos, teclados e caracteres especiais	skipped	Only about the applicat
 TXT-06		Aspas inteligentes	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-07		Correção e substituição automáticas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-08	txt-08-est-06-breaks-spaces.pages	A non-breaking space and a manual line break	made	
-TXT-09	txt-09-hyphenation.pages	A paragraph with hyphenation removed	made	
+TXT-09	txt-09-hyphenation.pages	A paragraph with hyphenation removed	made	Automatic hyphenation of the document is off here, as in every document of the fixtures, so neither paragraph is hyphenated; the import logs the setting when it is on.
 TXT-10		Verificação ortográfica	skipped	Spell checking is interface; the language it uses is in fmt-22-language.
 TXT-11		Revisor gramatical (Proofreader)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-12		Localizar e substituir	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
