@@ -15,7 +15,7 @@ const USAGE: &str = "\
 Usage: desk-convert <INPUT> <OUTPUT>
 
 Converts INPUT to the format that the file name extension of OUTPUT names.
-Reads OpenDocument text (.odt) and Pages '09 and '08 documents (.pages,
+Reads OpenDocument text (.odt) and Pages '09 documents (.pages,
 a package folder or a flat file), and writes PDF (.pdf) or OpenDocument
 text (.odt).
 

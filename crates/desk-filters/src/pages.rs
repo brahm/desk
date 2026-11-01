@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Pages '09 and '08 documents to the model, through `desk-iwork`
+//! Pages '09 documents to the model, through `desk-iwork`
 //! (DOC-22).
 //!
 //! Named styles become styles of the model, and anonymous styles, which

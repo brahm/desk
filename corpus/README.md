@@ -69,8 +69,8 @@ cannot describe. There is one for each row of the matrix that a saved
 document can hold; [`manifest.tsv`](fixtures/pages/manifest.tsv) says
 which document shows each row, and why the others have none, such as
 rows about the application alone or what the reference machine cannot
-do. Documents ending in `-pages08` were saved in the format of Pages '08
-(DOC-04).
+do. Desk reads only the format of Pages '09, so there are no documents
+saved in the format of Pages '08.
 
 The tests of `desk-filters` open every one of them and check that the
 import names what it leaves out. `lossy-import.pages` has one of each

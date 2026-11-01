@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: MPL-2.0
 
-//! A Pages '09 or '08 document: its body text, styles, page and
+//! A Pages '09 document: its body text, styles, page and
 //! information.
 //!
 //! The body is the text storage of kind `body` that is not part of a
