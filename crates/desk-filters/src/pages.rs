@@ -25,7 +25,7 @@ use desk_model::{
 };
 
 use crate::FilterError;
-use crate::log::{Content, Formatting, ImportLog, Warning};
+use crate::log::{Content, Formatting, ImportLog, Setting, Warning};
 
 /// The identifier of Body in the templates of Pages.
 const BODY_IDENT: &str = "paragraph-style-32";
@@ -549,16 +549,38 @@ fn paragraph_losses(sheet: &Stylesheet, paragraph: &iwork::Paragraph) -> BTreeSe
     lost
 }
 
+/// Whether a paragraph of Pages allows automatic hyphenation: its style
+/// nearest to it that sets `hyphenate` sets it on, or none does.
+fn hyphenates(sheet: &Stylesheet, paragraph: &iwork::Paragraph) -> bool {
+    let Some(style) = paragraph.style.as_deref().and_then(|s| sheet.find(s)) else {
+        return true;
+    };
+    sheet
+        .ancestry(style)
+        .iter()
+        .find_map(|s| match s.properties.get("hyphenate")? {
+            Value::Number(n) => Some(*n != 0.0),
+            _ => None,
+        })
+        .unwrap_or(true)
+}
+
 /// Maps a Pages document to the model, with what was left out.
 pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportLog), FilterError> {
     let mut log = ImportLog::default();
     for (element, count) in &source.skipped {
         log.add(warning(element), *count);
     }
+    if source.page.facing {
+        log.add(Warning::Setting(Setting::FacingPages), 1);
+    }
     // Each paragraph counts once for each kind of formatting it loses.
     for paragraph in &source.body {
         for formatting in paragraph_losses(&source.stylesheet, paragraph) {
             log.add(Warning::Formatting(formatting), 1);
+        }
+        if source.auto_hyphenation && hyphenates(&source.stylesheet, paragraph) {
+            log.add(Warning::Formatting(Formatting::Hyphenation), 1);
         }
     }
 

@@ -52,6 +52,10 @@ pub struct PageGeometry {
     pub left: f64,
     /// The right margin.
     pub right: f64,
+    /// Whether the pages face each other, as in a book: the left and
+    /// right margins are then the inside and outside ones, swapped on left
+    /// pages.
+    pub facing: bool,
 }
 
 impl Default for PageGeometry {
@@ -64,6 +68,7 @@ impl Default for PageGeometry {
             bottom: 72.0,
             left: 72.0,
             right: 72.0,
+            facing: false,
         }
     }
 }
@@ -105,6 +110,9 @@ pub struct PagesDocument {
     /// the document, which are outside the body, and `columns` the layouts
     /// of the body with more than one column.
     pub skipped: Vec<(String, usize)>,
+    /// Whether Pages hyphenates words at the ends of lines by itself
+    /// (Document Inspector), in the paragraphs that allow it.
+    pub auto_hyphenation: bool,
 }
 
 /// Reads a Pages document from the text of its index.
@@ -150,6 +158,12 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             .child(SL, "slprint-info")
             .map(page_geometry)
             .unwrap_or_default(),
+        auto_hyphenation: root
+            .child(SL, "publication-info")
+            .and_then(|info| info.child(SL, "kSFWPAutoHyphenationProperty"))
+            .and_then(|p| p.child(SL, "number"))
+            .and_then(|n| n.attr(SFA, "number"))
+            .is_some_and(|n| n.trim() != "0"),
         ..PagesDocument::default()
     };
     let Some(storage) = root
@@ -238,6 +252,7 @@ fn page_geometry(info: &Element) -> PageGeometry {
                 *field = value;
             }
         }
+        page.facing = margins.attr(SF, "facing-pages") == Some("true");
     }
     page
 }

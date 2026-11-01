@@ -5,7 +5,7 @@
 //! form that Pages 4.3 saves (DOC-22). The corpus checks whole documents
 //! saved by Pages itself, in desk-testkit.
 
-use desk_filters::log::{Content, Formatting, Warning};
+use desk_filters::log::{Content, Formatting, Setting, Warning};
 use desk_filters::{read_pages, read_pages_logged};
 use desk_model::{
     Alignment, Baseline, Capitalization, Document, LINE_BREAK, Length, LineSpacing, LineStyle,
@@ -303,6 +303,58 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
         !text
             .iter()
             .any(|t| t.contains("Footnote text") || t.contains("Comment text"))
+    );
+}
+
+#[test]
+fn est_11_txt_09_facing_pages_and_automatic_hyphenation_are_logged() {
+    let anon = format!(
+        r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-1"><sf:property-map>{}</sf:property-map></sf:paragraphstyle>"#,
+        number("hyphenate", "0", "c"),
+    );
+    let body = r#"<sf:p sf:style="paragraph-style-32">Hifenizado<sf:crbr/></sf:p>
+<sf:p sf:style="A-1">Sem hifenização<sf:crbr/></sf:p>
+<sf:p sf:style="paragraph-style-90">Hifenizado também</sf:p>"#;
+    let plain = index(STYLES, &anon, body);
+    let (_, log) = read_pages_logged(plain.as_bytes()).unwrap();
+    // Without automatic hyphenation, Pages breaks words only at soft
+    // hyphens, as Desk does.
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let setting = |on: &str| {
+        format!(
+            r#"<sl:publication-info>{}</sl:publication-info><sl:slprint-info"#,
+            number("kSFWPAutoHyphenationProperty", on, "c").replace("sf:", "sl:")
+        )
+    };
+    let hyphenated = plain.replace("<sl:slprint-info", &setting("1")).replace(
+        r#"sf:right="54"/>"#,
+        r#"sf:right="54" sf:facing-pages="true"/>"#,
+    );
+    let (_, log) = read_pages_logged(hyphenated.as_bytes()).unwrap();
+    let entries: Vec<(Warning, usize)> = log
+        .entries()
+        .iter()
+        .map(|e| (e.warning.clone(), e.count))
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            (Warning::Setting(Setting::FacingPages), 1),
+            (Warning::Formatting(Formatting::Hyphenation), 2),
+        ]
+    );
+    let off = plain.replace("<sl:slprint-info", &setting("0"));
+    assert!(read_pages_logged(off.as_bytes()).unwrap().1.is_empty());
+}
+
+#[test]
+fn est_11_facing_pages_saved_by_pages_are_logged() {
+    let (_, log) =
+        desk_filters::read_pages_at_logged(&fixture("est-11-facing-pages.pages")).unwrap();
+    assert!(
+        log.entries()
+            .iter()
+            .any(|e| e.warning == Warning::Setting(Setting::FacingPages))
     );
 }
 
