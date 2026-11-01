@@ -9,7 +9,7 @@
 use std::path::Path;
 
 use desk_ui::gtk::glib;
-use desk_ui::{AppInfo, Opened, Opener};
+use desk_ui::{AppInfo, Document, Opened, Opener};
 
 const APP: AppInfo = AppInfo {
     id: "br.com.brahm.Desk.Writer",
@@ -24,7 +24,14 @@ const OPENER: Opener = Opener {
         ("Pages Documents", &["pages", "template"]),
     ],
     open,
+    saves: ("OpenDocument Text", "odt"),
+    save,
 };
+
+/// Writes a document as an OpenDocument text, with its preview.
+fn save(document: &Document, thumbnail: Option<&[u8]>) -> Result<Vec<u8>, String> {
+    desk_filters::write_odt_with_thumbnail(document, thumbnail).map_err(|e| e.to_string())
+}
 
 /// Reads an OpenDocument text or a Pages '09 document.
 fn open(path: &Path) -> Result<Opened, String> {
@@ -68,6 +75,10 @@ mod tests {
         let dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/pages");
         let opened = super::open(&dir.join("lossy-import.pages")).unwrap();
+        // What it opens, it saves as ODT, which opens again.
+        let bytes = super::save(&opened.document, None).unwrap();
+        let saved = desk_filters::read_odt(&bytes).unwrap();
+        assert_eq!(saved.statistics().words, opened.document.statistics().words);
         assert!(!opened.warnings.is_empty());
         assert!(opened.warnings[0].starts_with("Left out headers"));
         assert!(super::open(&dir.join("manifest.tsv")).is_err());

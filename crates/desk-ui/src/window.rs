@@ -2,32 +2,51 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! A document window: the header bar, the document area, and the zoom
-//! menu and page count at the bottom, as in Pages.
+//! menu and counts at the bottom, as in Pages. It saves the document, asks
+//! to save it before it closes, and shows it full screen.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use adw::prelude::*;
-use gtk::{gio, glib};
+use desk_model::Document;
+use gtk::{gdk, gio, glib};
 
 use crate::editing::TextEditor;
 use crate::geometry;
 use crate::view::DocumentView;
 use crate::{AppInfo, Opener};
 
+/// How far from the top of the screen the pointer brings the header bar
+/// back in full screen, in pixels.
+const REVEAL_EDGE: f64 = 4.0;
+
+/// What an action of the window does.
+type WindowAction = fn(&Rc<DocumentWindow>);
+
 /// A window and the document it shows, if any.
 pub struct DocumentWindow {
     window: adw::ApplicationWindow,
+    info: AppInfo,
+    opener: Option<&'static Opener>,
     title: adw::WindowTitle,
+    toolbar_view: adw::ToolbarView,
+    header: adw::HeaderBar,
     stack: gtk::Stack,
     view: DocumentView,
     zoom_button: gtk::MenuButton,
-    pages_label: gtk::Label,
+    counts_label: gtk::Label,
     warnings_button: gtk::Button,
+    /// The file of the document; none for an untitled one.
     path: RefCell<Option<PathBuf>>,
+    /// The name of the document, which is its file's unless untitled.
+    name: RefCell<String>,
     warnings: RefCell<Vec<String>>,
     editor: RefCell<Option<TextEditor>>,
+    /// Whether closing was asked for and answered, so that the window
+    /// closes without asking again.
+    closing: Cell<bool>,
 }
 
 thread_local! {
@@ -36,23 +55,22 @@ thread_local! {
     static WINDOWS: RefCell<Vec<Rc<DocumentWindow>>> = const { RefCell::new(Vec::new()) };
 }
 
+/// The actions that need a document.
+const DOCUMENT_ACTIONS: [&str; 6] = [
+    "save",
+    "save-as",
+    "save-copy",
+    "duplicate",
+    "fullscreen",
+    "select-all",
+];
+
 impl DocumentWindow {
     /// A new, empty window.
     pub fn new(app: &adw::Application, info: AppInfo, opener: Option<&'static Opener>) -> Rc<Self> {
-        let menu = gio::Menu::new();
-        let file = gio::Menu::new();
-        if opener.is_some() {
-            file.append(Some("_Open…"), Some("app.open"));
-        }
-        file.append(Some("_New Window"), Some("app.new-window"));
-        menu.append_section(None, &file);
-        let help = gio::Menu::new();
-        help.append(Some(&format!("_About {}", info.name)), Some("app.about"));
-        menu.append_section(None, &help);
-
         let menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
-            .menu_model(&menu)
+            .menu_model(&main_menu(info, opener.is_some()))
             .primary(true)
             .tooltip_text("Main Menu")
             .build();
@@ -69,6 +87,13 @@ impl DocumentWindow {
             header.pack_start(&open);
         }
         header.pack_end(&menu_button);
+        let leave_fullscreen = gtk::Button::builder()
+            .icon_name("view-restore-symbolic")
+            .tooltip_text("Leave Fullscreen")
+            .action_name("win.fullscreen")
+            .visible(false)
+            .build();
+        header.pack_end(&leave_fullscreen);
         let warnings_button = gtk::Button::builder()
             .icon_name("dialog-warning-symbolic")
             .tooltip_text("Document Warnings")
@@ -83,7 +108,7 @@ impl DocumentWindow {
             .build();
         if opener.is_some() {
             status.set_description(Some(
-                "Open an OpenDocument text or a Pages document to read it.",
+                "Open an OpenDocument text or a Pages document to edit it.",
             ));
             let open = gtk::Button::builder()
                 .label("_Open a Document…")
@@ -111,8 +136,8 @@ impl DocumentWindow {
             .tooltip_text("Zoom")
             .css_classes(["flat"])
             .build();
-        let pages_label = gtk::Label::builder()
-            .css_classes(["dim-label", "caption"])
+        let counts_label = gtk::Label::builder()
+            .css_classes(["dim-label", "caption", "numeric"])
             .hexpand(true)
             .xalign(1.0)
             .build();
@@ -124,9 +149,8 @@ impl DocumentWindow {
             .margin_bottom(3)
             .build();
         bottom.append(&zoom_button);
-        bottom.append(&pages_label);
+        bottom.append(&counts_label);
         let bottom_bar = gtk::ActionBar::new();
-        bottom_bar.set_center_widget(None::<&gtk::Widget>);
         bottom_bar.pack_start(&bottom);
         bottom_bar.set_revealed(false);
 
@@ -145,15 +169,21 @@ impl DocumentWindow {
 
         let this = Rc::new(Self {
             window,
+            info,
+            opener,
             title,
+            toolbar_view,
+            header,
             stack,
             view,
             zoom_button,
-            pages_label,
+            counts_label,
             warnings_button,
             path: RefCell::new(None),
+            name: RefCell::new(String::new()),
             warnings: RefCell::new(Vec::new()),
             editor: RefCell::new(None),
+            closing: Cell::new(false),
         });
         this.add_actions();
         {
@@ -170,6 +200,14 @@ impl DocumentWindow {
                 if let Some(bar) = bar.upgrade() {
                     bar.set_revealed(stack.visible_child_name().as_deref() == Some("document"));
                 }
+            });
+        }
+        this.connect_fullscreen(&leave_fullscreen);
+        {
+            let weak = Rc::downgrade(&this);
+            this.window.connect_close_request(move |_| {
+                weak.upgrade()
+                    .map_or(glib::Propagation::Proceed, |this| this.close_request())
             });
         }
         WINDOWS.with(|w| w.borrow_mut().push(this.clone()));
@@ -190,7 +228,7 @@ impl DocumentWindow {
 
     /// Whether the window shows no document.
     pub fn is_empty(&self) -> bool {
-        self.path.borrow().is_none()
+        self.editor.borrow().is_none()
     }
 
     /// An open window that shows no document, if any.
@@ -198,67 +236,415 @@ impl DocumentWindow {
         WINDOWS.with(|w| w.borrow().iter().find(|w| w.is_empty()).cloned())
     }
 
+    fn editor(&self) -> Option<TextEditor> {
+        self.editor.borrow().clone()
+    }
+
+    /// Whether closing would lose something: changes since the document
+    /// was saved, or a document that has never been saved.
+    fn needs_saving(&self) -> bool {
+        self.editor()
+            .is_some_and(|e| e.is_modified() || self.path.borrow().is_none())
+    }
+
     /// Opens a document in this window, or says why it cannot.
-    pub fn load(&self, opener: &Opener, path: &Path) {
+    pub fn load(self: &Rc<Self>, opener: &Opener, path: &Path) {
         match crate::open_document(opener, path) {
             Ok(shown) => {
-                let editor = TextEditor::new(&self.view, shown.document.clone());
-                let weak = self.window.downgrade();
-                editor.connect_changed(move || {
-                    if let Some(window) = weak.upgrade() {
-                        update_history_actions(&window);
-                    }
-                });
-                *self.editor.borrow_mut() = Some(editor);
-                update_history_actions(&self.window);
-                let name = display_name(path);
-                self.title.set_title(&name);
-                self.title.set_subtitle(&folder_of(path));
-                self.window.set_title(Some(&name));
-                let count = self.view.page_count();
-                self.pages_label.set_label(&if count == 1 {
-                    "1 page".to_owned()
-                } else {
-                    format!("{count} pages")
-                });
-                self.warnings_button.set_visible(!shown.warnings.is_empty());
-                *self.warnings.borrow_mut() = shown.warnings.clone();
                 *self.path.borrow_mut() = Some(path.to_owned());
-                self.stack.set_visible_child_name("document");
+                *self.name.borrow_mut() = display_name(path);
+                self.show_document(shown.document);
+                self.warnings_button.set_visible(!shown.warnings.is_empty());
+                *self.warnings.borrow_mut() = shown.warnings;
                 remember_recent(path);
                 if shown.lossy {
                     self.show_warnings();
                 }
             }
             Err(message) => {
-                let dialog = adw::AlertDialog::new(
-                    Some(&format!("Cannot open {}", display_name(path))),
-                    Some(&message),
-                );
-                dialog.add_response("close", "_Close");
-                dialog.present(Some(&self.window));
+                self.alert(&format!("Cannot open {}", display_name(path)), &message);
             }
         }
     }
 
+    /// Shows a document that has no file yet, such as a duplicate.
+    fn load_untitled(self: &Rc<Self>, document: Document, name: String) {
+        *self.path.borrow_mut() = None;
+        *self.name.borrow_mut() = name;
+        self.show_document(document);
+    }
+
+    fn show_document(self: &Rc<Self>, document: Document) {
+        let editor = TextEditor::new(&self.view, document);
+        let weak = Rc::downgrade(self);
+        editor.connect_changed(move || {
+            if let Some(this) = weak.upgrade() {
+                this.refresh();
+            }
+        });
+        *self.editor.borrow_mut() = Some(editor);
+        self.stack.set_visible_child_name("document");
+        self.refresh();
+    }
+
+    /// Shows the name, whether the document has changes, the counts at the
+    /// bottom, and which actions apply now.
+    fn refresh(&self) {
+        let editor = self.editor();
+        let path = self.path.borrow().clone();
+        let name = self.name.borrow().clone();
+        if let Some(editor) = &editor {
+            let edited = if self.needs_saving() { "• " } else { "" };
+            self.title.set_title(&format!("{edited}{name}"));
+            self.title
+                .set_subtitle(&path.as_deref().map(folder_of).unwrap_or_default());
+            self.window.set_title(Some(&format!("{edited}{name}")));
+            self.counts_label
+                .set_label(&counts(editor.word_count(), self.view.page_count()));
+        }
+        let has_document = editor.is_some();
+        let modified = editor.as_ref().is_some_and(TextEditor::is_modified);
+        for (action, enabled) in [
+            ("undo", editor.as_ref().is_some_and(TextEditor::can_undo)),
+            ("redo", editor.as_ref().is_some_and(TextEditor::can_redo)),
+            ("revert", path.is_some() && modified),
+            ("properties", path.is_some()),
+        ] {
+            self.enable(action, enabled);
+        }
+        for action in DOCUMENT_ACTIONS {
+            self.enable(action, has_document);
+        }
+        for action in ["cut", "copy", "paste"] {
+            self.enable(action, has_document);
+        }
+    }
+
+    fn enable(&self, name: &str, enabled: bool) {
+        if let Some(action) = self
+            .window
+            .lookup_action(name)
+            .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
+        {
+            action.set_enabled(enabled);
+        }
+    }
+
     fn show_warnings(&self) {
-        let name = self
+        crate::warnings::show(&self.window, &self.name.borrow(), &self.warnings.borrow());
+    }
+
+    fn alert(&self, heading: &str, body: &str) {
+        let dialog = adw::AlertDialog::new(Some(heading), Some(body));
+        dialog.add_response("close", "_Close");
+        dialog.present(Some(&self.window));
+    }
+
+    /// Whether a file can be saved over as it is: one of the kind the app
+    /// saves. Another, such as a Pages document, is saved as a new file.
+    fn saves_in_place(&self, path: &Path) -> bool {
+        self.opener.is_some_and(|opener| {
+            path.extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case(opener.saves.1))
+        })
+    }
+
+    /// Writes the document to a file, and says why when it cannot.
+    fn write_to(&self, path: &Path) -> bool {
+        let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
+            return false;
+        };
+        let pages = editor.pages();
+        match crate::save_document(opener, &editor.document(), pages.first(), path) {
+            Ok(()) => true,
+            Err(message) => {
+                self.alert(&format!("Cannot save {}", display_name(path)), &message);
+                false
+            }
+        }
+    }
+
+    /// Saves the document to its file, or asks where when it has none
+    /// that it can save over (DOC-09). Then runs `done` with whether it
+    /// was saved.
+    fn save(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
+        let path = self.path.borrow().clone();
+        match path {
+            Some(path) if self.saves_in_place(&path) => {
+                let saved = self.write_to(&path);
+                if saved {
+                    self.saved_as(&path);
+                }
+                done(saved);
+            }
+            _ => self.save_as(done),
+        }
+    }
+
+    /// Asks where to save the document, saves it there, and keeps editing
+    /// that file.
+    fn save_as(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
+        let weak = Rc::downgrade(self);
+        self.ask_file("Save", move |path| {
+            let Some(this) = weak.upgrade() else { return };
+            match path {
+                Some(path) if this.write_to(&path) => {
+                    this.saved_as(&path);
+                    done(true);
+                }
+                _ => done(false),
+            }
+        });
+    }
+
+    /// Asks where to save a copy of the document, and saves it there,
+    /// still editing the same file.
+    fn save_copy(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        self.ask_file("Save a Copy", move |path| {
+            if let (Some(this), Some(path)) = (weak.upgrade(), path)
+                && this.write_to(&path)
+            {
+                remember_recent(&path);
+            }
+        });
+    }
+
+    fn saved_as(&self, path: &Path) {
+        *self.path.borrow_mut() = Some(path.to_owned());
+        *self.name.borrow_mut() = display_name(path);
+        if let Some(editor) = self.editor() {
+            editor.mark_saved();
+        }
+        remember_recent(path);
+        self.refresh();
+    }
+
+    /// The Save dialog, through the file chooser portal in Flatpak. It
+    /// offers the name of the document with the extension of the kind the
+    /// app saves, in its folder.
+    fn ask_file(&self, title: &str, chosen: impl FnOnce(Option<PathBuf>) + 'static) {
+        let Some(opener) = self.opener else { return };
+        let (kind, extension) = opener.saves;
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(kind));
+        filter.add_suffix(extension);
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let path = self.path.borrow().clone();
+        let stem = path.as_deref().and_then(Path::file_stem).map_or_else(
+            || self.name.borrow().clone(),
+            |s| s.to_string_lossy().into_owned(),
+        );
+        let dialog = gtk::FileDialog::builder()
+            .title(title)
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .initial_name(format!("{stem}.{extension}"))
+            .build();
+        if let Some(folder) = path.as_deref().and_then(Path::parent) {
+            dialog.set_initial_folder(Some(&gio::File::for_path(folder)));
+        }
+        dialog.save(Some(&self.window), gio::Cancellable::NONE, move |result| {
+            chosen(
+                result
+                    .ok()
+                    .and_then(|file| file.path())
+                    .map(|path| with_extension(path, extension)),
+            );
+        });
+    }
+
+    /// Opens a copy of the document, untitled, in a new window (DOC-14).
+    fn duplicate(&self) {
+        let (Some(editor), Some(app)) = (
+            self.editor(),
+            self.window
+                .application()
+                .and_then(|a| a.downcast::<adw::Application>().ok()),
+        ) else {
+            return;
+        };
+        let stem = self
             .path
             .borrow()
             .as_deref()
-            .map(display_name)
-            .unwrap_or_default();
-        crate::warnings::show(&self.window, &name, &self.warnings.borrow());
+            .and_then(Path::file_stem)
+            .map_or_else(
+                || self.name.borrow().clone(),
+                |s| s.to_string_lossy().into_owned(),
+            );
+        let copy = DocumentWindow::new(&app, self.info, self.opener);
+        copy.load_untitled(editor.document(), format!("{stem} copy"));
+        copy.view.set_zoom(self.view.zoom());
+        copy.window.present();
+    }
+
+    /// Goes back to the document as it was last saved, after asking
+    /// (DOC-12).
+    fn revert(self: &Rc<Self>) {
+        let (Some(opener), Some(path)) = (self.opener, self.path.borrow().clone()) else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(
+            Some("Revert to Saved?"),
+            Some(&format!(
+                "The changes made to “{}” since it was last saved will be lost.",
+                self.name.borrow()
+            )),
+        );
+        dialog.add_response("cancel", "_Cancel");
+        dialog.add_response("revert", "_Revert");
+        dialog.set_response_appearance("revert", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.choose(
+            Some(&self.window),
+            gio::Cancellable::NONE,
+            move |response| {
+                if let (Some(this), "revert") = (weak.upgrade(), response.as_str()) {
+                    this.load(opener, &path);
+                }
+            },
+        );
+    }
+
+    /// Asks to save the changes before the window closes (DOC-18).
+    fn close_request(self: &Rc<Self>) -> glib::Propagation {
+        if self.closing.get() || !self.needs_saving() {
+            return glib::Propagation::Proceed;
+        }
+        let dialog = adw::AlertDialog::new(
+            Some("Save Changes?"),
+            Some(&format!(
+                "“{}” has changes that are not saved. If you close it without saving, they are lost.",
+                self.name.borrow()
+            )),
+        );
+        dialog.add_response("cancel", "_Cancel");
+        dialog.add_response("discard", "_Don’t Save");
+        dialog.add_response("save", "_Save");
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("save"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.choose(
+            Some(&self.window),
+            gio::Cancellable::NONE,
+            move |response| {
+                let Some(this) = weak.upgrade() else { return };
+                match response.as_str() {
+                    "discard" => this.close_now(),
+                    "save" => {
+                        let weak = Rc::downgrade(&this);
+                        this.save(move |saved| {
+                            if let (true, Some(this)) = (saved, weak.upgrade()) {
+                                this.close_now();
+                            }
+                        });
+                    }
+                    _ => {}
+                }
+            },
+        );
+        glib::Propagation::Stop
+    }
+
+    fn close_now(&self) {
+        self.closing.set(true);
+        self.window.close();
+    }
+
+    /// Full screen hides the header bar until the pointer reaches the top
+    /// of the screen; the counts stay at the bottom, and Esc leaves it
+    /// (DOC-07). A window always opens in the normal mode.
+    fn connect_fullscreen(self: &Rc<Self>, leave: &gtk::Button) {
+        let weak = Rc::downgrade(self);
+        let leave = leave.downgrade();
+        self.window.connect_fullscreened_notify(move |window| {
+            let Some(this) = weak.upgrade() else { return };
+            let fullscreen = window.is_fullscreen();
+            this.toolbar_view.set_reveal_top_bars(!fullscreen);
+            if let Some(leave) = leave.upgrade() {
+                leave.set_visible(fullscreen);
+            }
+        });
+
+        let motion = gtk::EventControllerMotion::new();
+        let weak: Weak<Self> = Rc::downgrade(self);
+        motion.connect_motion(move |_, _, y| {
+            let Some(this) = weak.upgrade() else { return };
+            if !this.window.is_fullscreen() {
+                return;
+            }
+            let revealed = this.toolbar_view.reveals_top_bars();
+            if !revealed && y <= REVEAL_EDGE {
+                this.toolbar_view.set_reveal_top_bars(true);
+            } else if revealed && y > f64::from(this.header.height()) + REVEAL_EDGE * 4.0 {
+                this.toolbar_view.set_reveal_top_bars(false);
+            }
+        });
+        self.window.add_controller(motion);
+
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let window = self.window.downgrade();
+        keys.connect_key_pressed(move |_, key, _, modifiers| {
+            let Some(window) = window.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+            if key == gdk::Key::Escape
+                && modifiers.is_empty()
+                && window.is_fullscreen()
+                && window.visible_dialog().is_none()
+            {
+                window.unfullscreen();
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        self.window.add_controller(keys);
     }
 
     fn add_actions(self: &Rc<Self>) {
-        let weak = Rc::downgrade(self);
-        let warnings = gio::SimpleAction::new("warnings", None);
-        warnings.connect_activate(move |_, _| {
-            if let Some(this) = weak.upgrade() {
-                this.show_warnings();
-            }
-        });
+        let simple: [(&str, WindowAction); 9] = [
+            ("warnings", |this| this.show_warnings()),
+            ("save", |this| this.save(|_| {})),
+            ("save-as", |this| this.save_as(|_| {})),
+            ("save-copy", Self::save_copy),
+            ("duplicate", |this| this.duplicate()),
+            ("revert", Self::revert),
+            ("properties", |this| {
+                if let Some(path) = this.path.borrow().as_deref() {
+                    crate::properties::show(&this.window, path);
+                }
+            }),
+            ("fullscreen", |this| {
+                if this.window.is_fullscreen() {
+                    this.window.unfullscreen();
+                } else {
+                    this.window.fullscreen();
+                }
+            }),
+            ("close", |this| {
+                this.window.close();
+            }),
+        ];
+        for (name, run) in simple {
+            let weak = Rc::downgrade(self);
+            let action = gio::SimpleAction::new(name, None);
+            action.connect_activate(move |_, _| {
+                if let Some(this) = weak.upgrade() {
+                    run(&this);
+                }
+            });
+            self.window.add_action(&action);
+        }
+
         let weak = Rc::downgrade(self);
         let zoom = gio::SimpleAction::new("zoom", Some(glib::VariantTy::STRING));
         zoom.connect_activate(move |_, parameter| {
@@ -277,8 +663,8 @@ impl DocumentWindow {
             };
             view.set_zoom(zoom);
         });
-        self.window.add_action(&warnings);
         self.window.add_action(&zoom);
+
         for (name, run) in [
             ("undo", TextEditor::undo as fn(&TextEditor)),
             ("redo", TextEditor::redo),
@@ -290,31 +676,76 @@ impl DocumentWindow {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
             action.connect_activate(move |_, _| {
-                let editor = weak.upgrade().and_then(|this| this.editor.borrow().clone());
-                if let Some(editor) = editor {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
                     run(&editor);
                 }
             });
             self.window.add_action(&action);
         }
-        update_history_actions(&self.window);
+        self.refresh();
     }
 }
 
-/// Turns Undo and Redo on and off as the history allows.
-fn update_history_actions(window: &adw::ApplicationWindow) {
-    let this = WINDOWS.with(|w| w.borrow().iter().find(|d| d.window() == window).cloned());
-    let editor = this.as_ref().and_then(|t| t.editor.borrow().clone());
-    for (name, enabled) in [
-        ("undo", editor.as_ref().is_some_and(TextEditor::can_undo)),
-        ("redo", editor.as_ref().is_some_and(TextEditor::can_redo)),
-    ] {
-        if let Some(action) = window
-            .lookup_action(name)
-            .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
-        {
-            action.set_enabled(enabled);
-        }
+/// The main menu of the header bar.
+fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
+    let menu = gio::Menu::new();
+    let file = gio::Menu::new();
+    file.append(Some("_New Window"), Some("app.new-window"));
+    if opens {
+        file.append(Some("_Open…"), Some("app.open"));
+    }
+    menu.append_section(None, &file);
+    if opens {
+        let save = gio::Menu::new();
+        save.append(Some("_Save"), Some("win.save"));
+        save.append(Some("Save _As…"), Some("win.save-as"));
+        save.append(Some("Save a _Copy…"), Some("win.save-copy"));
+        save.append(Some("_Duplicate"), Some("win.duplicate"));
+        save.append(Some("_Revert to Saved"), Some("win.revert"));
+        menu.append_section(None, &save);
+        let document = gio::Menu::new();
+        document.append(Some("_Fullscreen"), Some("win.fullscreen"));
+        document.append(Some("Document _Info"), Some("win.properties"));
+        menu.append_section(None, &document);
+    }
+    let close = gio::Menu::new();
+    close.append(Some("C_lose"), Some("win.close"));
+    close.append(Some("Close _All Windows"), Some("app.close-all"));
+    menu.append_section(None, &close);
+    let help = gio::Menu::new();
+    help.append(Some(&format!("_About {}", info.name)), Some("app.about"));
+    menu.append_section(None, &help);
+    menu
+}
+
+/// The counts at the bottom of the window.
+fn counts(words: usize, pages: usize) -> String {
+    let words = if words == 1 {
+        "1 word".to_owned()
+    } else {
+        format!("{words} words")
+    };
+    let pages = if pages == 1 {
+        "1 page".to_owned()
+    } else {
+        format!("{pages} pages")
+    };
+    format!("{words} · {pages}")
+}
+
+/// A path with the extension of the kind of file saved, unless it has it.
+fn with_extension(path: PathBuf, extension: &str) -> PathBuf {
+    let has = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case(extension));
+    if has {
+        path
+    } else {
+        let mut name = path.file_name().unwrap_or_default().to_owned();
+        name.push(".");
+        name.push(extension);
+        path.with_file_name(name)
     }
 }
 
@@ -363,4 +794,32 @@ fn folder_of(path: &Path) -> String {
 fn remember_recent(path: &Path) {
     let file = gio::File::for_path(path);
     gtk::RecentManager::default().add_item(&file.uri());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn doc_09_a_saved_file_gets_the_extension_of_its_kind() {
+        assert_eq!(
+            with_extension(PathBuf::from("/d/Letter"), "odt"),
+            PathBuf::from("/d/Letter.odt")
+        );
+        assert_eq!(
+            with_extension(PathBuf::from("/d/Letter.ODT"), "odt"),
+            PathBuf::from("/d/Letter.ODT")
+        );
+        // A Pages document saved again becomes a new ODT next to it.
+        assert_eq!(
+            with_extension(PathBuf::from("/d/Report.pages"), "odt"),
+            PathBuf::from("/d/Report.pages.odt")
+        );
+    }
+
+    #[test]
+    fn doc_07_the_counts_name_words_and_pages() {
+        assert_eq!(counts(1, 1), "1 word · 1 page");
+        assert_eq!(counts(0, 3), "0 words · 3 pages");
+    }
 }

@@ -188,3 +188,17 @@ fn painting_puts_the_color_on_the_pixels() {
         .count();
     assert!(red_pixels > 300, "{red_pixels}");
 }
+
+#[test]
+fn doc_09_a_thumbnail_is_a_png_that_fits_its_square() {
+    let layout = layout(&[("Preview", sans())], PageSetup::a4());
+    let pages = DisplayList::pages(&layout);
+    let png = Painter::new()
+        .unwrap()
+        .thumbnail_png(&pages[0], 256)
+        .unwrap();
+    let image = cairo::ImageSurface::create_from_png(&mut &png[..]).unwrap();
+    // A4 is taller than wide.
+    assert_eq!(image.height(), 256);
+    assert_eq!(image.width(), 181);
+}

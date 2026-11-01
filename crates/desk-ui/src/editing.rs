@@ -36,9 +36,13 @@ struct State {
     /// The distance from the left of the page that Up and Down keep.
     goal: Option<f64>,
     /// The selection before and after each action of the history, so that
-    /// Undo and Redo put it back.
-    undo: Vec<(Selection, Selection)>,
-    redo: Vec<(Selection, Selection)>,
+    /// Undo and Redo put it back, and a number that names the action.
+    undo: Vec<(Selection, Selection, u64)>,
+    redo: Vec<(Selection, Selection, u64)>,
+    /// The number of the next action.
+    next_action: u64,
+    /// The last action done when the document was saved, or opened.
+    saved: Option<u64>,
     on_change: Vec<Rc<dyn Fn()>>,
     /// The text of a word or paragraph that a double or triple click
     /// selected, which a drag then extends by whole words or paragraphs.
@@ -106,6 +110,8 @@ impl TextEditor {
                 goal: None,
                 undo: Vec::new(),
                 redo: Vec::new(),
+                next_action: 0,
+                saved: None,
                 on_change: Vec::new(),
                 unit: Unit::Character,
                 drag_from: None,
@@ -122,9 +128,35 @@ impl TextEditor {
     }
 
     /// The document as it is now.
-    #[allow(dead_code, reason = "saving, which comes next, writes it")]
     pub fn document(&self) -> Document {
         self.state.borrow().editor.snapshot()
+    }
+
+    /// The pages as they are now.
+    pub fn pages(&self) -> Vec<DisplayList> {
+        DisplayList::pages(&self.state.borrow().layout)
+    }
+
+    /// The number of words of the document.
+    pub fn word_count(&self) -> usize {
+        self.state.borrow().editor.document().statistics().words
+    }
+
+    /// Whether the document has changed since it was saved or opened.
+    pub fn is_modified(&self) -> bool {
+        let state = self.state.borrow();
+        state.undo.last().map(|a| a.2) != state.saved
+    }
+
+    /// Notes that the document as it is now was saved. The next letter
+    /// typed starts a new action, so that Undo goes back to what was saved.
+    pub fn mark_saved(&self) {
+        {
+            let mut state = self.state.borrow_mut();
+            state.saved = state.undo.last().map(|a| a.2);
+            state.typing = false;
+        }
+        self.changed();
     }
 
     /// Whether Undo has something to take back.
@@ -364,7 +396,9 @@ impl TextEditor {
                 let after = Selection::cursor(spot);
                 {
                     let mut state = self.state.borrow_mut();
-                    state.undo.push((before, after));
+                    let action = state.next_action;
+                    state.next_action += 1;
+                    state.undo.push((before, after, action));
                     state.redo.clear();
                 }
                 self.after_change(after);
@@ -383,6 +417,10 @@ impl TextEditor {
         self.show_pages();
         self.state.borrow_mut().goal = None;
         self.select(selection);
+        self.changed();
+    }
+
+    fn changed(&self) {
         let callbacks = self.state.borrow().on_change.clone();
         for callback in callbacks {
             callback();

@@ -60,6 +60,18 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
 
 /// Writes a text document as the bytes of an ODT package.
 pub fn write_odt(document: &TextDocument) -> Result<Vec<u8>, OdfError> {
+    write_odt_with_thumbnail(document, None)
+}
+
+/// The path of the preview of a package, which file managers show.
+pub const THUMBNAIL: &str = "Thumbnails/thumbnail.png";
+
+/// Writes a text document (ODT) with a preview of its first page, a PNG
+/// image at most 256 pixels wide or high, as ODF recommends.
+pub fn write_odt_with_thumbnail(
+    document: &TextDocument,
+    thumbnail: Option<&[u8]>,
+) -> Result<Vec<u8>, OdfError> {
     let streams = write_streams(document);
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     // The media type comes first and uncompressed, so that it can be read
@@ -72,15 +84,20 @@ pub fn write_odt(document: &TextDocument) -> Result<Vec<u8>, OdfError> {
         ("content.xml", &streams.content),
         ("styles.xml", &streams.styles),
         ("meta.xml", &streams.meta),
-        ("META-INF/manifest.xml", &manifest()),
+        ("META-INF/manifest.xml", &manifest(thumbnail.is_some())),
     ] {
         zip.start_file(name, deflated)?;
         zip.write_all(text.as_bytes())?;
     }
+    if let Some(png) = thumbnail {
+        // PNG is compressed already.
+        zip.start_file(THUMBNAIL, stored)?;
+        zip.write_all(png)?;
+    }
     Ok(zip.finish()?.into_inner())
 }
 
-fn manifest() -> String {
+fn manifest(thumbnail: bool) -> String {
     let mut w = crate::xml::Writer::new();
     w.start("manifest:manifest")
         .attr("xmlns:manifest", crate::ns::MANIFEST)
@@ -94,6 +111,12 @@ fn manifest() -> String {
         w.start("manifest:file-entry")
             .attr("manifest:full-path", path)
             .attr("manifest:media-type", "text/xml")
+            .end();
+    }
+    if thumbnail {
+        w.start("manifest:file-entry")
+            .attr("manifest:full-path", THUMBNAIL)
+            .attr("manifest:media-type", "image/png")
             .end();
     }
     w.end();
