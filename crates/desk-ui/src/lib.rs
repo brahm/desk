@@ -14,7 +14,10 @@
 pub use adw;
 pub use gtk;
 
+mod editing;
 pub mod geometry;
+mod properties;
+pub mod text_nav;
 mod view;
 mod warnings;
 mod window;
@@ -24,11 +27,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Once;
 
 use adw::prelude::*;
-use desk_model::Document;
-use desk_render::DisplayList;
 use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
+pub use desk_model::Document;
 pub use view::DocumentView;
 use window::DocumentWindow;
 
@@ -64,11 +66,57 @@ pub struct Opener {
     pub filters: &'static [(&'static str, &'static [&'static str])],
     /// Reads a document.
     pub open: fn(&Path) -> Result<Opened, String>,
+    /// The kind of file it saves: a name, and the extension of the file.
+    pub saves: (&'static str, &'static str),
+    /// Writes a document as the bytes of a file of that kind, with a
+    /// preview of its first page as a PNG image when there is one.
+    pub save: SaveFn,
+}
+
+/// Writes a document as the bytes of a file, with a preview of its first
+/// page as a PNG image when there is one.
+pub type SaveFn = fn(&Document, Option<&[u8]>) -> Result<Vec<u8>, String>;
+
+/// The largest side of the preview saved in a document, in pixels.
+const THUMBNAIL_SIZE: u32 = 256;
+
+/// Writes a document to a file. It goes to a new file next to the old one,
+/// which then takes its place, so that a failed save leaves the old file
+/// as it was.
+pub(crate) fn save_document(
+    opener: &Opener,
+    document: &Document,
+    first_page: Option<&desk_render::DisplayList>,
+    path: &Path,
+) -> Result<(), String> {
+    let thumbnail = first_page.and_then(|page| {
+        desk_render::Painter::new()
+            .and_then(|mut painter| painter.thumbnail_png(page, THUMBNAIL_SIZE))
+            .ok()
+    });
+    let bytes = (opener.save)(document, thumbnail.as_deref())?;
+    write_replacing(path, &bytes).map_err(|e| e.to_string())
+}
+
+fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let temporary = path.with_file_name(format!(".{name}.desk-{}", std::process::id()));
+    let result = std::fs::write(&temporary, bytes).and_then(|()| {
+        // Keep the permissions of the file it replaces.
+        if let Ok(old) = std::fs::metadata(path) {
+            std::fs::set_permissions(&temporary, old.permissions())?;
+        }
+        std::fs::rename(&temporary, path)
+    });
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
 }
 
 /// A document laid out for a window.
 pub(crate) struct Shown {
-    pub pages: Vec<DisplayList>,
+    pub document: Document,
     pub warnings: Vec<String>,
     /// Whether something was left out, rather than only fonts replaced by
     /// others with the same metrics; then the Warnings window opens by
@@ -88,20 +136,25 @@ pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, Strin
         mut warnings,
     } = (opener.open)(&package_of(path))?;
     let mut lossy = !warnings.is_empty();
-    let pages = TEXT.with(|text| {
+    TEXT.with(|text| {
         let mut system = text.borrow_mut();
-        let layout = desk_layout::paginate(&document, &mut system);
+        system.forget_choices();
+        desk_layout::paginate(&document, &mut system);
         for choice in system.substitutions() {
             lossy |= choice.kind != FontMatch::Metric;
             warnings.push(substitution(&choice));
         }
-        DisplayList::pages(&layout)
     });
     Ok(Shown {
-        pages,
+        document,
         warnings,
         lossy,
     })
+}
+
+/// Lays out a document on pages, with the fonts of the system.
+pub(crate) fn lay_out(document: &Document) -> desk_layout::DocumentLayout {
+    TEXT.with(|text| desk_layout::paginate(document, &mut text.borrow_mut()))
 }
 
 /// The document a path names. A Pages document can be a package folder,
@@ -160,12 +213,24 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         app.set_accels_for_action("app.quit", &["<Control>q"]);
         app.set_accels_for_action("app.new-window", &["<Control>n"]);
         app.set_accels_for_action("window.close", &["<Control>w"]);
+        app.set_accels_for_action("app.close-all", &["<Control><Alt>w"]);
         if opener.is_some() {
             app.set_accels_for_action("app.open", &["<Control>o"]);
+            app.set_accels_for_action("win.save", &["<Control>s"]);
+            app.set_accels_for_action("win.save-as", &["<Control><Shift>s"]);
+            app.set_accels_for_action("win.duplicate", &["<Control><Shift>d"]);
+            app.set_accels_for_action("win.properties", &["<Control>i"]);
         }
+        app.set_accels_for_action("win.fullscreen", &["F11", "<Control><Alt>f"]);
         app.set_accels_for_action("win.zoom('in')", &["<Control>plus", "<Control>equal"]);
         app.set_accels_for_action("win.zoom('out')", &["<Control>minus"]);
         app.set_accels_for_action("win.zoom('1')", &["<Control>0"]);
+        app.set_accels_for_action("win.undo", &["<Control>z"]);
+        app.set_accels_for_action("win.redo", &["<Control><Shift>z", "<Control>y"]);
+        app.set_accels_for_action("win.cut", &["<Control>x"]);
+        app.set_accels_for_action("win.copy", &["<Control>c"]);
+        app.set_accels_for_action("win.paste", &["<Control>v"]);
+        app.set_accels_for_action("win.select-all", &["<Control>a"]);
     });
     app.connect_activate(move |app| DocumentWindow::new(app, info, opener).window().present());
     // Files opened from outside: by double click, from the recent files or
@@ -229,15 +294,25 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
     let about = gio::ActionEntry::builder("about")
         .activate(move |app: &adw::Application, _, _| show_about(app, info))
         .build();
+    // Each window asks to save its changes as it closes, and the app ends
+    // with the last one (DOC-18).
+    let close_all = |app: &adw::Application| {
+        for window in app.windows() {
+            window.close();
+        }
+    };
     let quit = gio::ActionEntry::builder("quit")
-        .activate(|app: &adw::Application, _, _| app.quit())
+        .activate(move |app: &adw::Application, _, _| close_all(app))
+        .build();
+    let close_windows = gio::ActionEntry::builder("close-all")
+        .activate(move |app: &adw::Application, _, _| close_all(app))
         .build();
     let new_window = gio::ActionEntry::builder("new-window")
         .activate(move |app: &adw::Application, _, _| {
             DocumentWindow::new(app, info, opener).window().present();
         })
         .build();
-    app.add_action_entries([about, quit, new_window]);
+    app.add_action_entries([about, quit, close_windows, new_window]);
     if let Some(opener) = opener {
         let open = gio::ActionEntry::builder("open")
             .activate(move |app: &adw::Application, _, _| show_open_dialog(app, info, opener))
@@ -313,5 +388,23 @@ mod tests {
             package_of(Path::new("/d/other/index.xml.gz")),
             PathBuf::from("/d/other/index.xml.gz")
         );
+    }
+
+    #[test]
+    fn doc_09_saving_replaces_the_file_and_leaves_nothing_behind() {
+        let dir = std::env::temp_dir().join(format!("desk-ui-save-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Letter.odt");
+        std::fs::write(&path, b"old").unwrap();
+        write_replacing(&path, b"new").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"new");
+        let names: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["Letter.odt"]);
+        // A folder that does not exist fails, and the error says why.
+        assert!(write_replacing(&dir.join("missing/Letter.odt"), b"new").is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

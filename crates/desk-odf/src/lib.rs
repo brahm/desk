@@ -47,7 +47,9 @@ mod write;
 mod xml;
 
 pub use error::OdfError;
-pub use package::{MAX_STREAM, MEDIA_TYPE, read_odt, write_odt};
+pub use package::{
+    MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,
+};
 pub use read::read_streams;
 pub use text::{
     Break, Family, LINE_BREAK, Line, LineColor, LineHeight, Meta, PageLayout, Paragraph,

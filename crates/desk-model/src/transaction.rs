@@ -407,6 +407,34 @@ impl Editor {
         Ok(value)
     }
 
+    /// Runs a user action that continues the last one when that has the
+    /// same name and nothing was undone since, as each letter typed in a
+    /// row joins one Typing action. Undo then takes back all of it.
+    /// Returns the value of the edits and whether they joined the last
+    /// action.
+    pub fn edit_continuing<T>(
+        &mut self,
+        name: impl Into<String>,
+        edits: impl FnOnce(&mut Edit) -> Result<T, ModelError>,
+    ) -> Result<(T, bool), ModelError> {
+        let (value, transaction) = self.document.transact(name, edits)?;
+        if transaction.is_empty() {
+            return Ok((value, false));
+        }
+        self.redo.clear();
+        match self.undo.last_mut() {
+            Some(last) if last.name == transaction.name => {
+                last.ops.extend(transaction.ops);
+                last.inverse.extend(transaction.inverse);
+                Ok((value, true))
+            }
+            _ => {
+                self.undo.push(transaction);
+                Ok((value, false))
+            }
+        }
+    }
+
     /// Undoes the last action. Returns false when there was none.
     pub fn undo(&mut self) -> Result<bool, ModelError> {
         let Some(transaction) = self.undo.pop() else {

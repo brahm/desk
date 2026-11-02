@@ -548,3 +548,40 @@ fn doc_05_fonts_of_the_mac_keep_the_lines_and_ligatures_of_pages() {
         run.glyphs.len()
     );
 }
+
+#[test]
+fn txt_03_a_cursor_stops_at_every_character_of_a_line() {
+    let mut system = TextSystem::new();
+    let layout = plain(&mut system, ParaFormat::default(), TEXT);
+    for line in &layout.lines {
+        // From the start of the line to its end, left to right.
+        assert_eq!(line.carets.first().unwrap().0, line.range.start);
+        assert_eq!(line.carets.last().unwrap().0, line.range.end);
+        assert!(
+            line.carets
+                .windows(2)
+                .all(|w| w[0].0 < w[1].0 && w[0].1 <= w[1].1)
+        );
+        for &(offset, x) in &line.carets {
+            assert_eq!(line.caret_x(offset), x);
+            assert_eq!(line.offset_at(x + 0.1), offset);
+        }
+    }
+    // Ligatures and the capitals of small caps keep a stop per letter of
+    // the model.
+    let first = &layout.lines[0];
+    assert_eq!(
+        first.carets.len(),
+        TEXT[first.range.clone()].chars().count() + 1
+    );
+    // An empty paragraph has one place, at the left of a left aligned
+    // line and in the middle of a centred one.
+    let empty = plain(&mut system, ParaFormat::default(), "");
+    assert_eq!(empty.lines[0].carets, vec![(0, 0.0)]);
+    let centred = ParaFormat {
+        alignment: Alignment::Center,
+        ..ParaFormat::default()
+    };
+    let empty = plain(&mut system, centred, "");
+    assert_eq!(empty.lines[0].carets, vec![(0, 100.0)]);
+}

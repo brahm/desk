@@ -7,6 +7,7 @@ use desk_odf::{
     Break, Color, Family, LINE_BREAK, Length, Line, LineColor, LineHeight, Meta, OdfError,
     PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TextAlign, TextDocument,
     TextPosition, TextProperties, TextTransform, read_odt, read_streams, write_odt,
+    write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -208,6 +209,33 @@ fn a_document_comes_back_as_it_was_written() {
     keep("odf-full.odt", &bytes);
     let read = read_odt(&bytes).unwrap();
     assert_eq!(read, document);
+}
+
+#[test]
+fn doc_09_a_preview_goes_in_the_package_and_its_manifest() {
+    let png = b"\x89PNG\r\n\x1a\n not really";
+    let bytes = write_odt_with_thumbnail(&full_document(), Some(png)).unwrap();
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut stored = Vec::new();
+    std::io::Read::read_to_end(
+        &mut archive.by_name(desk_odf::THUMBNAIL).unwrap(),
+        &mut stored,
+    )
+    .unwrap();
+    assert_eq!(stored, png);
+    let mut manifest = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("META-INF/manifest.xml").unwrap(),
+        &mut manifest,
+    )
+    .unwrap();
+    assert!(
+        manifest.contains(
+            r#"manifest:full-path="Thumbnails/thumbnail.png" manifest:media-type="image/png""#
+        ),
+        "{manifest}"
+    );
+    assert_eq!(read_odt(&bytes).unwrap(), full_document());
 }
 
 #[test]

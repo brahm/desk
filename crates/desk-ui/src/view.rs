@@ -15,12 +15,18 @@ use gtk::prelude::*;
 use gtk::{gdk, glib};
 
 use crate::geometry::{self, PIXELS_PER_POINT, PageRect};
+use crate::text_nav::{CaretRect, SpanRect};
 
 struct State {
     pages: Vec<DisplayList>,
     zoom: f64,
     painter: Option<Painter>,
     on_zoom: Vec<Box<dyn Fn(f64)>>,
+    /// The selection and the cursor, drawn over the pages.
+    selection: Vec<SpanRect>,
+    caret: Option<CaretRect>,
+    /// Whether the cursor shows now: it blinks, and hides without focus.
+    caret_on: bool,
 }
 
 /// The document area of a window.
@@ -28,16 +34,29 @@ struct State {
 pub struct DocumentView {
     scrolled: gtk::ScrolledWindow,
     area: gtk::DrawingArea,
+    /// Holds the text being composed with an input method, over the area.
+    fixed: gtk::Fixed,
+    preedit: gtk::Label,
     state: Rc<RefCell<State>>,
 }
 
 impl DocumentView {
     /// An empty document area.
     pub fn new() -> Self {
-        let area = gtk::DrawingArea::new();
+        let area = gtk::DrawingArea::builder()
+            .focusable(true)
+            .can_focus(true)
+            .build();
         area.add_css_class("desk-document");
+        area.set_cursor_from_name(Some("text"));
+        let fixed = gtk::Fixed::builder().can_target(false).build();
+        let preedit = gtk::Label::builder().visible(false).build();
+        preedit.add_css_class("desk-preedit");
+        fixed.put(&preedit, 0.0, 0.0);
+        let overlay = gtk::Overlay::builder().child(&area).build();
+        overlay.add_overlay(&fixed);
         let scrolled = gtk::ScrolledWindow::builder()
-            .child(&area)
+            .child(&overlay)
             .hexpand(true)
             .vexpand(true)
             .build();
@@ -46,10 +65,15 @@ impl DocumentView {
             zoom: geometry::DEFAULT_ZOOM,
             painter: Painter::new().ok(),
             on_zoom: Vec::new(),
+            selection: Vec::new(),
+            caret: None,
+            caret_on: true,
         }));
         let view = Self {
             scrolled,
             area,
+            fixed,
+            preedit,
             state,
         };
         view.connect_drawing();
@@ -66,6 +90,101 @@ impl DocumentView {
     pub fn set_pages(&self, pages: Vec<DisplayList>) {
         self.state.borrow_mut().pages = pages;
         self.resize();
+    }
+
+    /// The widget that takes the keyboard and the pointer.
+    pub fn area(&self) -> &gtk::DrawingArea {
+        &self.area
+    }
+
+    /// Sets the selection and the cursor drawn over the pages.
+    pub fn set_marks(&self, selection: Vec<SpanRect>, caret: Option<CaretRect>) {
+        {
+            let mut state = self.state.borrow_mut();
+            state.selection = selection;
+            state.caret = caret;
+            state.caret_on = true;
+        }
+        self.area.queue_draw();
+    }
+
+    /// Shows or hides the cursor, for blinking.
+    pub fn set_caret_on(&self, on: bool) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let changed = state.caret_on != on;
+            state.caret_on = on;
+            changed
+        };
+        if changed {
+            self.area.queue_draw();
+        }
+    }
+
+    /// The page under a point of the area and the point on it, in points.
+    /// Between pages, the nearest page.
+    pub fn page_at(&self, x: f64, y: f64) -> Option<(usize, f64, f64)> {
+        let (rects, _, _) = self.layout(f64::from(self.area.width()));
+        let scale = self.zoom() * PIXELS_PER_POINT;
+        let index = rects
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                let d = |r: &&PageRect| {
+                    if y < r.y {
+                        r.y - y
+                    } else if y > r.y + r.height {
+                        y - r.y - r.height
+                    } else {
+                        0.0
+                    }
+                };
+                d(a).total_cmp(&d(b))
+            })?
+            .0;
+        let rect = rects[index];
+        Some((index, (x - rect.x) / scale, (y - rect.y) / scale))
+    }
+
+    /// Where a point of a page falls in the area.
+    pub fn to_area(&self, page: usize, x: f64, y: f64) -> Option<(f64, f64)> {
+        let (rects, _, _) = self.layout(f64::from(self.area.width()));
+        let rect = rects.get(page)?;
+        let scale = self.zoom() * PIXELS_PER_POINT;
+        Some((rect.x + x * scale, rect.y + y * scale))
+    }
+
+    /// Scrolls so that a cursor is in sight.
+    pub fn scroll_to(&self, caret: &CaretRect) {
+        let Some((_, top)) = self.to_area(caret.page, caret.x, caret.top) else {
+            return;
+        };
+        let Some((_, bottom)) = self.to_area(caret.page, caret.x, caret.bottom) else {
+            return;
+        };
+        let vadj = self.scrolled.vadjustment();
+        let margin = 24.0;
+        if top - margin < vadj.value() {
+            vadj.set_value(top - margin);
+        } else if bottom + margin > vadj.value() + vadj.page_size() {
+            vadj.set_value(bottom + margin - vadj.page_size());
+        }
+    }
+
+    /// Shows the text being composed with an input method at the cursor,
+    /// or hides it when `text` is empty.
+    pub fn set_preedit(&self, text: &str) {
+        let caret = self.state.borrow().caret;
+        let place = caret.and_then(|c| self.to_area(c.page, c.x, c.top));
+        match place {
+            Some((x, y)) if !text.is_empty() => {
+                let escaped = glib::markup_escape_text(text);
+                self.preedit.set_markup(&format!("<u>{escaped}</u>"));
+                self.fixed.move_(&self.preedit, x, y);
+                self.preedit.set_visible(true);
+            }
+            _ => self.preedit.set_visible(false),
+        }
     }
 
     /// How many pages it shows.
@@ -191,6 +310,7 @@ impl DocumentView {
                     }
                     cr.restore().ok();
                 }
+                draw_marks(cr, &state, index, rect, scale, area.has_focus());
             }
         });
         // Only the pages in sight are drawn, so scrolling draws again.
@@ -245,7 +365,7 @@ impl DocumentView {
         self.scrolled.add_controller(pinch);
     }
 
-    fn downgrade(&self) -> WeakView {
+    pub(crate) fn downgrade(&self) -> WeakView {
         WeakView {
             scrolled: self.scrolled.downgrade(),
             area: self.area.downgrade(),
@@ -260,17 +380,23 @@ impl Default for DocumentView {
     }
 }
 
-struct WeakView {
+pub(crate) struct WeakView {
     scrolled: glib::WeakRef<gtk::ScrolledWindow>,
     area: glib::WeakRef<gtk::DrawingArea>,
     state: std::rc::Weak<RefCell<State>>,
 }
 
 impl WeakView {
-    fn upgrade(&self) -> Option<DocumentView> {
+    pub(crate) fn upgrade(&self) -> Option<DocumentView> {
+        let area = self.area.upgrade()?;
+        let overlay = area.parent()?;
+        let fixed = overlay.last_child()?.downcast::<gtk::Fixed>().ok()?;
+        let preedit = fixed.first_child()?.downcast::<gtk::Label>().ok()?;
         Some(DocumentView {
             scrolled: self.scrolled.upgrade()?,
-            area: self.area.upgrade()?,
+            area,
+            fixed,
+            preedit,
             state: self.state.upgrade()?,
         })
     }
@@ -290,6 +416,41 @@ impl Clone for WeakView {
 /// around the pages but never the pages themselves.
 fn adw_is_dark(_widget: &gtk::DrawingArea) -> bool {
     adw::StyleManager::default().is_dark()
+}
+
+/// The selection and the cursor on a page.
+fn draw_marks(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+    focused: bool,
+) {
+    // The accent color of GNOME, lighter without focus.
+    let alpha = if focused { 0.3 } else { 0.15 };
+    cr.set_source_rgba(0.21, 0.52, 0.89, alpha);
+    for span in state.selection.iter().filter(|s| s.page == page) {
+        cr.rectangle(
+            rect.x + span.x0 * scale,
+            rect.y + span.y0 * scale,
+            (span.x1 - span.x0) * scale,
+            (span.y1 - span.y0) * scale,
+        );
+    }
+    cr.fill().ok();
+    let Some(caret) = state.caret.filter(|c| c.page == page) else {
+        return;
+    };
+    if !focused || !state.caret_on || !state.selection.is_empty() {
+        return;
+    }
+    cr.set_source_rgb(0.0, 0.0, 0.0);
+    let x = (rect.x + caret.x * scale).round() + 0.5;
+    cr.set_line_width(1.0);
+    cr.move_to(x, rect.y + caret.top * scale);
+    cr.line_to(x, rect.y + caret.bottom * scale);
+    cr.stroke().ok();
 }
 
 /// The shadow and white sheet of a page.

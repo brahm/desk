@@ -33,7 +33,7 @@ impl fmt::Display for RenderError {
         match self {
             Self::Cairo(error) => write!(f, "Cairo failed: {error}"),
             Self::Font(error) => write!(f, "a font could not be opened: {error}"),
-            Self::Io(error) => write!(f, "the PDF could not be written: {error}"),
+            Self::Io(error) => write!(f, "the file could not be written: {error}"),
         }
     }
 }
@@ -190,6 +190,32 @@ impl Painter {
         Ok(*stream
             .downcast::<Vec<u8>>()
             .expect("the stream is the vector given above"))
+    }
+
+    /// A preview of a page, as a PNG image that fits in a square of
+    /// `size` pixels, on white (DOC-09).
+    pub fn thumbnail_png(&mut self, page: &DisplayList, size: u32) -> Result<Vec<u8>, RenderError> {
+        let (width, height) = (
+            f64::from(page.width.max(1.0)),
+            f64::from(page.height.max(1.0)),
+        );
+        let scale = f64::from(size) / width.max(height);
+        let pixels = |points: f64| ((points * scale).round() as i32).max(1);
+        let surface =
+            cairo::ImageSurface::create(cairo::Format::Rgb24, pixels(width), pixels(height))?;
+        {
+            let cr = Context::new(&surface)?;
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.paint()?;
+            cr.scale(scale, scale);
+            self.paint(&cr, page)?;
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).map_err(|e| match e {
+            cairo::IoError::Io(error) => RenderError::Io(error),
+            cairo::IoError::Cairo(error) => RenderError::Cairo(error),
+        })?;
+        Ok(png)
     }
 
     fn render_pdf(

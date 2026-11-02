@@ -125,6 +125,30 @@ pub struct Line {
     pub decorations: Vec<Decoration>,
     /// Whether the line ends at a soft hyphen, with a hyphen drawn.
     pub hyphenated: bool,
+    /// Where a text cursor stands at each place it can stop on the line:
+    /// a model offset in the paragraph and the distance from the left of
+    /// the paragraph, ordered by offset. The end of the line is the last.
+    pub carets: Vec<(usize, f32)>,
+}
+
+impl Line {
+    /// Where a cursor before `offset` stands on the line: the nearest
+    /// place it can stop at or before the offset.
+    pub fn caret_x(&self, offset: usize) -> f32 {
+        let at = self.carets.partition_point(|&(o, _)| o <= offset);
+        match at {
+            0 => self.carets.first().map_or(self.x, |c| c.1),
+            i => self.carets[i - 1].1,
+        }
+    }
+
+    /// The offset of the place on the line nearest to `x`.
+    pub fn offset_at(&self, x: f32) -> usize {
+        self.carets
+            .iter()
+            .min_by(|a, b| (a.1 - x).abs().total_cmp(&(b.1 - x).abs()))
+            .map_or(self.range.start, |c| c.0)
+    }
 }
 
 /// A laid out paragraph.
@@ -216,6 +240,13 @@ impl TextSystem {
         let choice = choose(family, |name| collection.family_id(name).is_some());
         self.choices.insert(family.into(), choice.clone());
         choice
+    }
+
+    /// Forgets the fonts chosen so far, so that [`TextSystem::substitutions`]
+    /// lists only those of the documents laid out from now on. The system
+    /// fonts stay loaded.
+    pub fn forget_choices(&mut self) {
+        self.choices.clear();
     }
 
     /// The families laid out so far with another font, by name: what the
@@ -478,6 +509,7 @@ impl TextSystem {
             let mut decorations = Vec::new();
             let mut end_x = place.x;
             let mut descent = None::<f32>;
+            let mut carets: Vec<(usize, f32)> = Vec::new();
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
@@ -497,6 +529,27 @@ impl TextSystem {
                 let x0 = glyph_run.offset();
                 let x1 = x0 + glyph_run.advance();
                 end_x = end_x.max(x1);
+                // A cursor stops before each cluster, at its first glyph;
+                // in right to left text the start of a cluster is on its
+                // right.
+                let mut next_glyph = 0;
+                let mut visual: Vec<(usize, usize, f32)> = Vec::new();
+                for cluster in run.visual_clusters() {
+                    let x = glyphs.get(next_glyph).map_or(x1, |g| g.x);
+                    let range = cluster.text_range();
+                    visual.push((range.start, range.end, x));
+                    next_glyph += cluster.glyphs().count();
+                }
+                for (i, &(start, end, x)) in visual.iter().enumerate() {
+                    let right = visual.get(i + 1).map_or(x1, |v| v.2);
+                    if run.is_rtl() {
+                        carets.push((text.to_model(start), right));
+                        carets.push((text.to_model(end), x));
+                    } else {
+                        carets.push((text.to_model(start), x));
+                        carets.push((text.to_model(end), right));
+                    }
+                }
                 let baseline = glyphs.first().map_or(glyph_run.baseline() - shift, |g| g.y);
                 let m = run.font_metrics();
                 let run_descent = run_box(format, run.font_size(), m).descent;
@@ -563,6 +616,20 @@ impl TextSystem {
             // An empty paragraph has a line over a placeholder past its end.
             let range = line.text_range();
             let range = range.start.min(source.len())..range.end.min(source.len());
+            let model_range = text.to_model(range.start)..text.to_model(range.end);
+            // Each offset once: where two clusters meet, the start of the
+            // later one, and a line without text has its start only.
+            carets.retain(|c| model_range.contains(&c.0) || c.0 == model_range.end);
+            carets.sort_by_key(|c| c.0);
+            carets.dedup_by_key(|c| c.0);
+            if carets.is_empty() {
+                let x = match format.alignment {
+                    Alignment::Center => place.x + place.width / 2.0,
+                    Alignment::Right => place.x + place.width,
+                    _ => place.x,
+                };
+                carets.push((model_range.start, x));
+            }
             lines.push(Line {
                 range: text.to_model(range.start)..text.to_model(range.end),
                 x: place.x,
@@ -575,6 +642,7 @@ impl TextSystem {
                 runs: glyph_runs,
                 decorations,
                 hyphenated: place.hyphenated,
+                carets,
             });
         }
         let bottom = lines.last().map_or(top, |l| l.top + l.height);

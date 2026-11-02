@@ -81,6 +81,15 @@ pub fn write_odt(document: &Document) -> Result<Vec<u8>, FilterError> {
     Ok(odf::write_odt(&export(document))?)
 }
 
+/// Writes a document as ODT with a preview of its first page, a PNG image
+/// (DOC-09).
+pub fn write_odt_with_thumbnail(
+    document: &Document,
+    thumbnail: Option<&[u8]>,
+) -> Result<Vec<u8>, FilterError> {
+    Ok(odf::write_odt_with_thumbnail(&export(document), thumbnail)?)
+}
+
 fn length(value: odf::Length) -> Length {
     Length::from_pt(value.0)
 }
