@@ -290,13 +290,30 @@ impl FormatBar {
         });
     }
 
-    /// Shows the paragraph styles of a document.
-    pub fn set_styles(&self, styles: &[(StyleId, String)]) {
+    /// Shows the paragraph styles of a document. Returns whether they
+    /// changed.
+    pub fn set_styles(&self, styles: &[(StyleId, String)]) -> bool {
+        let ids: Vec<StyleId> = styles.iter().map(|(id, _)| *id).collect();
+        let model = self
+            .styles
+            .model()
+            .and_then(|m| m.downcast::<gtk::StringList>().ok());
+        let same_names = model.is_some_and(|m| {
+            m.n_items() as usize == styles.len()
+                && styles
+                    .iter()
+                    .enumerate()
+                    .all(|(i, (_, n))| m.string(i as u32).as_deref() == Some(n.as_str()))
+        });
+        if same_names && *self.style_ids.borrow() == ids {
+            return false;
+        }
         self.updating.set(true);
         let names: Vec<&str> = styles.iter().map(|(_, n)| n.as_str()).collect();
         self.styles.set_model(Some(&gtk::StringList::new(&names)));
-        *self.style_ids.borrow_mut() = styles.iter().map(|(id, _)| *id).collect();
+        *self.style_ids.borrow_mut() = ids;
         self.updating.set(false);
+        true
     }
 
     /// Shows the formatting at the selection.

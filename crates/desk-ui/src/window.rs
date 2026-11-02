@@ -20,6 +20,7 @@ use crate::geometry;
 use crate::i18n::{tr, trn};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
+use crate::styles_drawer::StylesDrawer;
 use crate::view::DocumentView;
 use crate::{AppInfo, Opener};
 
@@ -51,6 +52,9 @@ pub struct DocumentWindow {
     editor: Rc<RefCell<Option<TextEditor>>>,
     format_bar: Rc<FormatBar>,
     inspector: Rc<Inspector>,
+    /// The Styles drawer (INT-18).
+    drawer: Rc<StylesDrawer>,
+    drawer_split: adw::OverlaySplitView,
     /// The Fonts window (INT-15), made when first shown.
     fonts: FontsSlot,
     split: adw::OverlaySplitView,
@@ -71,7 +75,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 16] = [
+const DOCUMENT_ACTIONS: [&str; 20] = [
     "save",
     "save-as",
     "save-copy",
@@ -88,7 +92,17 @@ const DOCUMENT_ACTIONS: [&str; 16] = [
     "align",
     "inspector",
     "fonts",
+    "styles-drawer",
+    "copy-style",
+    "paste-style",
+    "import-styles",
 ];
+
+thread_local! {
+    /// The style that Copy Style took, which Paste Style puts on text of
+    /// any window (STY-08).
+    static COPIED_STYLE: RefCell<Option<desk_model::CopiedStyle>> = const { RefCell::new(None) };
+}
 
 /// The character toggles of the format bar: an action and what it sets.
 const TOGGLES: [(&str, &str); 4] = [
@@ -196,6 +210,7 @@ impl DocumentWindow {
         };
         let format_bar = FormatBar::new(editor_of());
         let inspector = Inspector::new(editor_of());
+        let drawer = StylesDrawer::new(editor_of());
         // The rulers over and beside the pages (INT-17).
         let ruler = Ruler::new(&view, editor_of(), false);
         let vertical_ruler = Ruler::new(&view, editor_of(), true);
@@ -220,11 +235,17 @@ impl DocumentWindow {
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
+        let drawer_split = adw::OverlaySplitView::builder()
+            .content(&split)
+            .sidebar(drawer.widget())
+            .sidebar_position(gtk::PackType::Start)
+            .show_sidebar(false)
+            .build();
 
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
         toolbar_view.add_top_bar(&format_revealer);
-        toolbar_view.set_content(Some(&split));
+        toolbar_view.set_content(Some(&drawer_split));
         toolbar_view.add_bottom_bar(&bottom_bar);
 
         let window = adw::ApplicationWindow::builder()
@@ -253,6 +274,8 @@ impl DocumentWindow {
             editor,
             format_bar,
             inspector,
+            drawer,
+            drawer_split,
             fonts: FontsSlot::default(),
             split,
             format_revealer,
@@ -294,6 +317,18 @@ impl DocumentWindow {
             this.window.connect_close_request(move |_| {
                 weak.upgrade()
                     .map_or(glib::Propagation::Proceed, |this| this.close_request())
+            });
+        }
+        {
+            let weak = Rc::downgrade(&this);
+            this.window.connect_visible_dialog_notify(move |_| {
+                // Once the dialog has gone.
+                let weak = weak.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(this) = weak.upgrade() {
+                        this.refresh();
+                    }
+                });
             });
         }
         WINDOWS.with(|w| w.borrow_mut().push(this.clone()));
@@ -378,7 +413,6 @@ impl DocumentWindow {
             }
         });
         editor.set_show_invisibles(self.action_state("invisibles"));
-        self.format_bar.set_styles(&editor.paragraph_styles());
         *self.editor.borrow_mut() = Some(editor);
         self.stack.set_visible_child_name("document");
         self.format_revealer.set_reveal_child(true);
@@ -393,6 +427,9 @@ impl DocumentWindow {
         let format = editor.format();
         self.format_bar.show(&format);
         self.inspector.show(&format);
+        if self.drawer_split.shows_sidebar() {
+            self.drawer.show(&editor);
+        }
         if let Some(fonts) = self.fonts.visible() {
             fonts.show(&format.character, &format.paragraph);
         }
@@ -438,6 +475,9 @@ impl DocumentWindow {
         let path = self.path.borrow().clone();
         let name = self.name.borrow().clone();
         if let Some(editor) = &editor {
+            if self.format_bar.set_styles(&editor.paragraph_styles()) {
+                self.show_format();
+            }
             let edited = if self.needs_saving() { "• " } else { "" };
             self.title.set_title(&format!("{edited}{name}"));
             self.title
@@ -449,11 +489,20 @@ impl DocumentWindow {
             self.counts_label
                 .set_label(&counts(editor.word_count(), self.view.page_count()));
         }
-        let has_document = editor.is_some();
+        // A dialog over the window keeps the keys of editing, such as
+        // Ctrl+A in a field, from reaching the document.
+        let free = self.window.visible_dialog().is_none();
+        let has_document = editor.is_some() && free;
         let modified = editor.as_ref().is_some_and(TextEditor::is_modified);
         for (action, enabled) in [
-            ("undo", editor.as_ref().is_some_and(TextEditor::can_undo)),
-            ("redo", editor.as_ref().is_some_and(TextEditor::can_redo)),
+            (
+                "undo",
+                free && editor.as_ref().is_some_and(TextEditor::can_undo),
+            ),
+            (
+                "redo",
+                free && editor.as_ref().is_some_and(TextEditor::can_redo),
+            ),
             ("revert", path.is_some() && modified),
             ("properties", path.is_some()),
         ] {
@@ -602,6 +651,126 @@ impl DocumentWindow {
                     .map(|path| with_extension(path, extension)),
             );
         });
+    }
+
+    /// Asks for a document, then for which of its styles to bring into
+    /// this one, and whether they replace the styles with their names
+    /// (STY-10).
+    fn import_styles(self: &Rc<Self>) {
+        let Some(opener) = self.opener else { return };
+        let (filters, all) = crate::document_filters(opener);
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Import Styles"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&all)
+            .build();
+        let weak = Rc::downgrade(self);
+        dialog.open(Some(&self.window), gio::Cancellable::NONE, move |result| {
+            let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
+                return;
+            };
+            let Some(path) = file.path() else { return };
+            match (opener.open)(&crate::package_of(&path)) {
+                Ok(opened) => this.choose_styles(opened.document, &display_name(&path)),
+                Err(message) => this.alert(
+                    &tr("Cannot open {name}").replace("{name}", &display_name(&path)),
+                    &message,
+                ),
+            }
+        });
+    }
+
+    /// Asks which styles of a document to import.
+    fn choose_styles(self: &Rc<Self>, source: Document, name: &str) {
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Import Styles")),
+            Some(&tr("Choose the styles of “{name}” to import.").replace("{name}", name)),
+        );
+        let list = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .css_classes(["boxed-list"])
+            .build();
+        let mut checks = Vec::new();
+        let own = self.editor().map(|e| e.styles());
+        for family in [
+            desk_model::StyleFamily::Paragraph,
+            desk_model::StyleFamily::Character,
+        ] {
+            for style in crate::styles_drawer::sorted(source.styles(), family) {
+                // The styles that the document lacks are chosen at first.
+                let new = own
+                    .as_ref()
+                    .is_none_or(|own| own.by_name(family, style.name()).is_none());
+                let check = gtk::CheckButton::builder().active(new).build();
+                let row = adw::ActionRow::builder()
+                    .title(glib::markup_escape_text(style.name()))
+                    .subtitle(match family {
+                        desk_model::StyleFamily::Paragraph => tr("Paragraph Style"),
+                        desk_model::StyleFamily::Character => tr("Character Style"),
+                    })
+                    .activatable_widget(&check)
+                    .build();
+                row.add_prefix(&check);
+                list.append(&row);
+                checks.push((style.id(), check));
+            }
+        }
+        let scrolled = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .propagate_natural_height(true)
+            .max_content_height(320)
+            .child(&list)
+            .build();
+        let replace = adw::SwitchRow::builder()
+            .title(tr("Replace Duplicates"))
+            .subtitle(tr("Styles with the same names take the imported ones"))
+            .build();
+        let options = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .css_classes(["boxed-list"])
+            .margin_top(12)
+            .build();
+        options.append(&replace);
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .build();
+        content.append(&scrolled);
+        content.append(&options);
+        dialog.set_extra_child(Some(&content));
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("import", &tr("_Import"));
+        dialog.set_response_appearance("import", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("import"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(None, move |_, response| {
+            let (Some(this), "import") = (weak.upgrade(), response) else {
+                return;
+            };
+            let Some(editor) = this.editor() else { return };
+            let ids: Vec<_> = checks
+                .iter()
+                .filter(|(_, check)| check.is_active())
+                .map(|(id, _)| *id)
+                .collect();
+            if ids.is_empty() {
+                return;
+            }
+            let replace = replace.is_active();
+            if let Err(error) = editor.style_edit(&tr("Import Styles"), |edit, _, _| {
+                edit.import_styles(&source, &ids, replace)
+            }) {
+                this.alert(&tr("Cannot Import the Styles"), &error.to_string());
+            }
+        });
+        let weak = Rc::downgrade(self);
+        dialog.connect_closed(move |_| {
+            if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                editor.focus();
+            }
+        });
+        dialog.present(Some(&self.window));
     }
 
     /// Opens a copy of the document, untitled, in a new window (DOC-14).
@@ -955,6 +1124,58 @@ impl DocumentWindow {
             window.show(&format.character, &format.paragraph);
         });
         self.window.add_action(&fonts);
+
+        let drawer = gio::SimpleAction::new_stateful("styles-drawer", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        drawer.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            this.drawer_split.set_show_sidebar(on);
+            this.show_format();
+        });
+        self.window.add_action(&drawer);
+        let window = self.window.downgrade();
+        self.drawer_split.connect_show_sidebar_notify(move |split| {
+            if let Some(window) = window.upgrade() {
+                formatting::set_state(&window, "styles-drawer", split.shows_sidebar().to_variant());
+            }
+        });
+
+        let copy_style = gio::SimpleAction::new("copy-style", None);
+        let weak = Rc::downgrade(self);
+        copy_style.connect_activate(move |_, _| {
+            if let Some(copied) = weak
+                .upgrade()
+                .and_then(|this| this.editor())
+                .and_then(|editor| editor.copy_style())
+            {
+                COPIED_STYLE.with(|c| *c.borrow_mut() = Some(copied));
+            }
+        });
+        self.window.add_action(&copy_style);
+        let paste_style = gio::SimpleAction::new("paste-style", None);
+        let weak = Rc::downgrade(self);
+        paste_style.connect_activate(move |_, _| {
+            let Some(editor) = weak.upgrade().and_then(|this| this.editor()) else {
+                return;
+            };
+            if let Some(copied) = COPIED_STYLE.with(|c| c.borrow().clone()) {
+                editor.paste_style(&copied);
+            }
+        });
+        self.window.add_action(&paste_style);
+
+        let import = gio::SimpleAction::new("import-styles", None);
+        let weak = Rc::downgrade(self);
+        import.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.import_styles();
+            }
+        });
+        self.window.add_action(&import);
         // The sidebar also closes by itself on a narrow window.
         let window = self.window.downgrade();
         self.split.connect_show_sidebar_notify(move |split| {
@@ -979,6 +1200,10 @@ impl DocumentWindow {
         format.append(Some(&tr("_Italic")), Some("win.italic"));
         format.append(Some(&tr("_Underline")), Some("win.underline"));
         menu.append_section(None, &format);
+        let style = gio::Menu::new();
+        style.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
+        style.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
+        menu.append_section(None, &style);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(self.view.area());
         popover.set_has_arrow(false);
@@ -1000,7 +1225,19 @@ impl DocumentWindow {
         let keys = gtk::EventControllerKey::new();
         let menu_popover = popover.downgrade();
         let area = self.view.area().downgrade();
+        let editor = self.editor.clone();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
+            // The shortcuts of styles: F1 to F8, with Alt to drop the
+            // formatting set over the style (STY-04).
+            let alt = gdk::ModifierType::ALT_MASK;
+            if let Some(n) = function_key(key)
+                && (modifiers.is_empty() || modifiers == alt)
+                && let Some(editor) = editor.borrow().clone()
+                && let Some(style) = editor.styles().by_shortcut(n).map(desk_model::Style::id)
+            {
+                editor.apply_style(style, modifiers == alt);
+                return glib::Propagation::Stop;
+            }
             let menu_key = key == gdk::Key::Menu
                 || (key == gdk::Key::F10 && modifiers == gdk::ModifierType::SHIFT_MASK);
             if let (true, Some(popover), Some(area)) =
@@ -1016,6 +1253,23 @@ impl DocumentWindow {
         });
         self.view.area().add_controller(keys);
     }
+}
+
+/// The number of a function key from F1 to F8.
+fn function_key(key: gdk::Key) -> Option<u8> {
+    [
+        gdk::Key::F1,
+        gdk::Key::F2,
+        gdk::Key::F3,
+        gdk::Key::F4,
+        gdk::Key::F5,
+        gdk::Key::F6,
+        gdk::Key::F7,
+        gdk::Key::F8,
+    ]
+    .iter()
+    .position(|k| *k == key)
+    .map(|i| i as u8 + 1)
 }
 
 /// The main menu of the header bar.
@@ -1037,10 +1291,16 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         menu.append_section(None, &save);
         let document = gio::Menu::new();
         document.append(Some(&tr("Show _Fonts")), Some("win.fonts"));
+        document.append(Some(&tr("Show _Styles Drawer")), Some("win.styles-drawer"));
         document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append_section(None, &document);
+        let styles = gio::Menu::new();
+        styles.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
+        styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
+        styles.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
+        menu.append_section(None, &styles);
     }
     let close = gio::Menu::new();
     close.append(Some(&tr("C_lose")), Some("win.close"));

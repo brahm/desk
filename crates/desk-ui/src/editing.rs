@@ -63,6 +63,9 @@ struct State {
     /// Whether the last action was typing at the cursor, which the next
     /// letter typed continues as one step of the history.
     typing: bool,
+    /// More selected ranges, which Select All Uses adds (STY-09). Changes
+    /// of formatting apply to them too; moving the cursor drops them.
+    others: Vec<Selection>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -143,6 +146,7 @@ impl TextEditor {
                 on_select: Vec::new(),
                 invisibles: false,
                 access: AccessText::default(),
+                others: Vec::new(),
             })),
         };
         this.show_pages();
@@ -561,35 +565,198 @@ impl TextEditor {
             self.selection_changed();
             return;
         }
-        let (start, end) = selection.ordered();
-        self.format_edit(name, move |edit| {
-            let document = edit.document();
-            let from = at_spot(document, start)?;
-            let to = at_spot(document, end)?;
+        self.format_ranges(name, |edit, from, to| {
             edit.set_character_attrs(from, to, attrs)
         });
     }
 
     /// Sets paragraph formatting on the paragraphs of the selection.
     pub fn set_paragraph_attrs(&self, name: &str, attrs: &ParaAttrs) {
-        let (start, end) = self.selection().ordered();
-        self.format_edit(name, move |edit| {
-            let document = edit.document();
-            let from = at_spot(document, start)?;
-            let to = at_spot(document, end)?;
+        self.format_ranges(name, |edit, from, to| {
             edit.set_paragraph_attrs(from, to, attrs)
         });
     }
 
     /// Gives the paragraphs of the selection a paragraph style.
     pub fn set_paragraph_style(&self, style: StyleId) {
+        self.format_ranges("Paragraph Style", |edit, from, to| {
+            edit.set_paragraph_style(from, to, style)
+        });
+    }
+
+    /// Gives the paragraphs of the selection a paragraph style and drops
+    /// the formatting set over it, as a style shortcut with Alt does
+    /// (STY-04).
+    pub fn set_paragraph_style_clean(&self, style: StyleId) {
+        self.format_ranges("Paragraph Style", |edit, from, to| {
+            edit.set_paragraph_style_clean(from, to, style)
+        });
+    }
+
+    /// Gives the selected text a character style, or none.
+    pub fn set_character_style(&self, style: Option<StyleId>) {
+        self.format_ranges("Character Style", |edit, from, to| {
+            edit.set_character_style(from, to, style)
+        });
+    }
+
+    /// Gives the selection a style of either family; with `clean`, the
+    /// formatting set over it goes too.
+    pub fn apply_style(&self, style: StyleId, clean: bool) {
+        let family = self.styles().get(style).map(desk_model::Style::family);
+        match family {
+            Some(StyleFamily::Paragraph) if clean => self.set_paragraph_style_clean(style),
+            Some(StyleFamily::Paragraph) => self.set_paragraph_style(style),
+            Some(StyleFamily::Character) => {
+                if clean {
+                    self.format_ranges("Character Style", |edit, from, to| {
+                        edit.set_character_style(from, to, Some(style))?;
+                        edit.clear_character_attrs(from, to)
+                    });
+                } else {
+                    self.set_character_style(Some(style));
+                }
+            }
+            None => {}
+        }
+    }
+
+    /// The styles of the document.
+    pub fn styles(&self) -> desk_model::Styles {
+        self.state.borrow().editor.document().styles().clone()
+    }
+
+    /// The selected ranges: the selection, then those that Select All
+    /// Uses added.
+    fn ranges(&self) -> Vec<(Spot, Spot)> {
+        let state = self.state.borrow();
+        std::iter::once(&state.selection)
+            .chain(&state.others)
+            .map(Selection::ordered)
+            .collect()
+    }
+
+    /// Changes each selected range as one action of the history.
+    fn format_ranges(
+        &self,
+        name: &str,
+        change: impl Fn(
+            &mut desk_model::Edit,
+            desk_model::Position,
+            desk_model::Position,
+        ) -> Result<(), ModelError>,
+    ) {
+        let ranges = self.ranges();
+        self.format_edit(name, move |edit| {
+            for (start, end) in ranges {
+                let document = edit.document();
+                let from = at_spot(document, start)?;
+                let to = at_spot(document, end)?;
+                change(edit, from, to)?;
+            }
+            Ok(())
+        });
+    }
+
+    /// Runs a change of the styles on the selection, as one action of
+    /// the history, and gives back its value. A change that the model
+    /// refuses, such as a name that another style has, gives the error.
+    pub fn style_edit<T>(
+        &self,
+        name: &str,
+        change: impl FnOnce(
+            &mut desk_model::Edit,
+            desk_model::Position,
+            desk_model::Position,
+        ) -> Result<T, ModelError>,
+    ) -> Result<T, ModelError> {
         let (start, end) = self.selection().ordered();
-        self.format_edit("Paragraph Style", move |edit| {
+        let mut value = None;
+        self.format_edit_quiet(name, |edit| {
             let document = edit.document();
             let from = at_spot(document, start)?;
             let to = at_spot(document, end)?;
-            edit.set_paragraph_style(from, to, style)
+            value = Some(change(edit, from, to)?);
+            Ok(())
+        })?;
+        value.ok_or(ModelError::InvalidText)
+    }
+
+    /// The positions of the selection in the model.
+    pub fn selected_positions(&self) -> Option<(desk_model::Position, desk_model::Position)> {
+        let (start, end) = self.selection().ordered();
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        Some((start.position(document)?, end.position(document)?))
+    }
+
+    /// Where the formatting at the selection differs from its styles.
+    pub fn overrides(&self) -> desk_model::Overrides {
+        let Some((start, end)) = self.selected_positions() else {
+            return desk_model::Overrides::default();
+        };
+        self.state
+            .borrow()
+            .editor
+            .document()
+            .overrides(start, end)
+            .unwrap_or_default()
+    }
+
+    /// The character style at the selection.
+    pub fn character_style(&self) -> Option<StyleId> {
+        let (start, end) = self.selection().ordered();
+        let state = self.state.borrow();
+        let paragraph = state.editor.document().body().get(start.paragraph)?;
+        let at = if start == end || start.offset >= paragraph.len() {
+            start.offset
+        } else {
+            start.offset + 1
+        };
+        paragraph.format_at(at).0
+    }
+
+    /// Takes the style of the text at the selection (STY-08).
+    pub fn copy_style(&self) -> Option<desk_model::CopiedStyle> {
+        let (start, _) = self.selected_positions()?;
+        self.state.borrow().editor.document().copy_style(start).ok()
+    }
+
+    /// Pastes a copied style over the selection.
+    pub fn paste_style(&self, copied: &desk_model::CopiedStyle) {
+        self.format_ranges("Paste Style", |edit, from, to| {
+            edit.paste_style(from, to, copied)
         });
+    }
+
+    /// Selects every use of a style in the body (STY-09). Returns false
+    /// when nothing uses it.
+    pub fn select_uses(&self, style: StyleId) -> bool {
+        let selections: Vec<Selection> = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            document
+                .style_uses(style)
+                .into_iter()
+                .filter_map(|(paragraph, range)| {
+                    let start =
+                        Spot::of(document, desk_model::Position::new(paragraph, range.start))?;
+                    let end = Spot::of(document, desk_model::Position::new(paragraph, range.end))?;
+                    Some(Selection {
+                        anchor: start,
+                        focus: end,
+                    })
+                })
+                .collect()
+        };
+        let Some((first, rest)) = selections.split_first() else {
+            return false;
+        };
+        self.state.borrow_mut().typing = false;
+        self.select(*first);
+        self.state.borrow_mut().others = rest.to_vec();
+        self.select(*first);
+        true
     }
 
     /// Changes formatting as one action of the history, keeping the
@@ -599,6 +766,18 @@ impl TextEditor {
         name: &str,
         change: impl FnOnce(&mut desk_model::Edit) -> Result<(), ModelError>,
     ) {
+        if let Err(error) = self.format_edit_quiet(name, change) {
+            glib::g_warning!("desk", "cannot format: {error}");
+        }
+    }
+
+    /// Changes formatting as one action of the history, keeping the
+    /// selection, and gives back the error of a refused change.
+    fn format_edit_quiet(
+        &self,
+        name: &str,
+        change: impl FnOnce(&mut desk_model::Edit) -> Result<(), ModelError>,
+    ) -> Result<(), ModelError> {
         let selection = self.selection();
         let depth = self.state.borrow().editor.undo_depth();
         let result = self.state.borrow_mut().editor.edit(name, change);
@@ -616,8 +795,9 @@ impl TextEditor {
                 }
                 self.after_change(selection);
             }
-            Err(error) => glib::g_warning!("desk", "cannot format: {error}"),
+            Err(error) => return Err(error),
         }
+        Ok(())
     }
 
     /// Sets the selection and shows it.
@@ -631,12 +811,14 @@ impl TextEditor {
             };
             if state.selection != selection {
                 state.pending = None;
+                state.others.clear();
             }
             state.selection = selection;
-            (
-                text_nav::selection_rects(&state.layout, &selection),
-                text_nav::caret(&state.layout, selection.focus),
-            )
+            let mut rects = text_nav::selection_rects(&state.layout, &selection);
+            for other in &state.others {
+                rects.extend(text_nav::selection_rects(&state.layout, other));
+            }
+            (rects, text_nav::caret(&state.layout, selection.focus))
         };
         self.view.set_marks(rects, caret);
         let (focus, range) = {

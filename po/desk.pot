@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-02 02:47+0000\n"
+"POT-Creation-Date: 2026-11-02 12:11+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -35,7 +35,10 @@ msgid "Use All"
 msgstr ""
 
 #: crates/desk-ui/src/effects.rs:51 crates/desk-ui/src/fonts.rs:90
-#: crates/desk-ui/src/tab_stops.rs:49
+#: crates/desk-ui/src/styles_drawer.rs:584
+#: crates/desk-ui/src/styles_drawer.rs:714
+#: crates/desk-ui/src/styles_drawer.rs:719
+#: crates/desk-ui/src/styles_drawer.rs:787 crates/desk-ui/src/tab_stops.rs:49
 msgid "None"
 msgstr ""
 
@@ -112,8 +115,8 @@ msgid "Line Width"
 msgstr ""
 
 #: crates/desk-ui/src/effects.rs:178 crates/desk-ui/src/fonts.rs:263
-#: crates/desk-ui/src/fonts.rs:264 crates/desk-ui/src/formatting.rs:405
-#: crates/desk-ui/src/formatting.rs:406 crates/desk-ui/src/preferences.rs:64
+#: crates/desk-ui/src/fonts.rs:264 crates/desk-ui/src/formatting.rs:422
+#: crates/desk-ui/src/formatting.rs:423 crates/desk-ui/src/preferences.rs:64
 msgid "Points"
 msgstr ""
 
@@ -311,6 +314,7 @@ msgid "Fonts"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:103 crates/desk-ui/src/formatting.rs:106
+#: crates/desk-ui/src/styles_drawer.rs:462 crates/desk-ui/src/window.rs:700
 msgid "Paragraph Style"
 msgstr ""
 
@@ -340,66 +344,66 @@ msgstr ""
 msgid "Inspector"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:404
+#: crates/desk-ui/src/formatting.rs:421
 msgid "Line Spacing"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:404
+#: crates/desk-ui/src/formatting.rs:421
 msgid "Lines"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:405
+#: crates/desk-ui/src/formatting.rs:422
 msgid "Before Paragraph"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:406
+#: crates/desk-ui/src/formatting.rs:423
 msgid "After Paragraph"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:408
+#: crates/desk-ui/src/formatting.rs:425
 msgid "First Line"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:409 crates/desk-ui/src/tab_stops.rs:40
+#: crates/desk-ui/src/formatting.rs:426 crates/desk-ui/src/tab_stops.rs:40
 msgid "Left"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:410 crates/desk-ui/src/tab_stops.rs:42
+#: crates/desk-ui/src/formatting.rs:427 crates/desk-ui/src/tab_stops.rs:42
 msgid "Right"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:415
+#: crates/desk-ui/src/formatting.rs:432
 msgid "Spacing"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:421
+#: crates/desk-ui/src/formatting.rs:438
 msgid "Indents"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:195
+#: crates/desk-ui/src/lib.rs:196
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:198
+#: crates/desk-ui/src/lib.rs:199
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:201
+#: crates/desk-ui/src/lib.rs:202
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:372
-msgid "All Documents"
+#: crates/desk-ui/src/lib.rs:376 crates/desk-ui/src/window.rs:132
+msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:386 crates/desk-ui/src/window.rs:118
-msgid "Open a Document"
+#: crates/desk-ui/src/lib.rs:398
+msgid "All Documents"
 msgstr ""
 
 #: crates/desk-ui/src/preferences.rs:62
@@ -478,7 +482,8 @@ msgstr ""
 msgid "Unknown"
 msgstr ""
 
-#: crates/desk-ui/src/properties.rs:47
+#: crates/desk-ui/src/properties.rs:47 crates/desk-ui/src/styles_drawer.rs:475
+#: crates/desk-ui/src/styles_drawer.rs:536
 msgid "Name"
 msgstr ""
 
@@ -524,7 +529,7 @@ msgstr ""
 msgid "Open a document"
 msgstr ""
 
-#: crates/desk-ui/src/shortcuts.rs:20 crates/desk-ui/src/window.rs:536
+#: crates/desk-ui/src/shortcuts.rs:20 crates/desk-ui/src/window.rs:579
 msgid "Save"
 msgstr ""
 
@@ -653,23 +658,219 @@ msgid "Show fonts"
 msgstr ""
 
 #: crates/desk-ui/src/shortcuts.rs:81
-msgid "Show ruler"
+msgid "Show the Styles drawer"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:82
+msgid "Copy style"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:83
+msgid "Paste style"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:84
+msgid "Apply the style of the key"
 msgstr ""
 
 #: crates/desk-ui/src/shortcuts.rs:85
-msgid "View"
+msgid "Apply a style and drop the formatting over it"
 msgstr ""
 
-#: crates/desk-ui/src/shortcuts.rs:88
-msgid "Zoom in"
-msgstr ""
-
-#: crates/desk-ui/src/shortcuts.rs:89
-msgid "Zoom out"
+#: crates/desk-ui/src/shortcuts.rs:86
+msgid "Show ruler"
 msgstr ""
 
 #: crates/desk-ui/src/shortcuts.rs:90
+msgid "View"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:93
+msgid "Zoom in"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:94
+msgid "Zoom out"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:95
 msgid "Actual size"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:122
+msgid "Styles"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:124
+#: crates/desk-ui/src/styles_drawer.rs:135
+msgid "Paragraph Styles"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:137
+#: crates/desk-ui/src/styles_drawer.rs:148
+msgid "Character Styles"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:171
+msgid "New _Paragraph Style from Selection…"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:175
+msgid "New _Character Style from Selection…"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:179 crates/desk-ui/src/window.rs:1293
+msgid "_Import Styles…"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:185
+#: crates/desk-ui/src/styles_drawer.rs:188
+#: crates/desk-ui/src/styles_drawer.rs:509
+msgid "New Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:192
+#: crates/desk-ui/src/styles_drawer.rs:195
+msgid "Show Character Styles"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:349
+msgid "Redefine Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:352
+msgid "Cannot Redefine the Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:355
+msgid "Revert to Defined Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:358
+msgid "Cannot Revert to the Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:399
+msgid "Style Shortcut"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:402
+msgid "Cannot Set the Shortcut"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:439
+msgid "A style needs a name."
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:442
+msgid "Another style is already named “{name}”."
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:447 crates/desk-ui/src/window.rs:526
+msgid "_Close"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:463 crates/desk-ui/src/window.rs:701
+msgid "Character Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:466
+msgid "New Paragraph Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:467
+msgid "New Character Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:482
+msgid "Only Formatting That Differs from the Paragraph"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:489
+msgid "Apply This New Style on Creation"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:494
+#: crates/desk-ui/src/styles_drawer.rs:539
+#: crates/desk-ui/src/styles_drawer.rs:611 crates/desk-ui/src/window.rs:732
+#: crates/desk-ui/src/window.rs:805 crates/desk-ui/src/window.rs:834
+msgid "_Cancel"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:495
+msgid "C_reate"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:521
+msgid "Cannot Make the Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:531
+#: crates/desk-ui/src/styles_drawer.rs:553
+msgid "Rename Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:540
+msgid "_Rename"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:554
+msgid "Cannot Rename the Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:569
+#: crates/desk-ui/src/styles_drawer.rs:577
+#: crates/desk-ui/src/styles_drawer.rs:630
+msgid "Cannot Delete the Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:574
+#: crates/desk-ui/src/styles_drawer.rs:627
+msgid "Delete Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:601
+msgid "Delete “{name}”?"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:602
+msgid "The style is in use. Choose a style to replace it."
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:609
+msgid "Replace With"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:612
+msgid "_Delete"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:742
+msgid "The formatting differs from the style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:777
+msgid "Re_define Style from Selection"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:781
+msgid "Re_vert to Defined Style"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:784
+msgid "_Select All Uses"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:799
+msgid "_Shortcut"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:802
+msgid "_Rename Style…"
+msgstr ""
+
+#: crates/desk-ui/src/styles_drawer.rs:803
+msgid "_Delete Style…"
 msgstr ""
 
 #: crates/desk-ui/src/tab_stops.rs:43
@@ -724,7 +925,7 @@ msgstr ""
 msgid "Remove Tab Stop"
 msgstr ""
 
-#: crates/desk-ui/src/warnings.rs:27 crates/desk-ui/src/window.rs:973
+#: crates/desk-ui/src/warnings.rs:27 crates/desk-ui/src/window.rs:1185
 msgid "_Copy"
 msgstr ""
 
@@ -736,191 +937,220 @@ msgstr ""
 msgid "{document} opened with these changes. Saving it keeps them."
 msgstr ""
 
-#: crates/desk-ui/src/warnings.rs:69 crates/desk-ui/src/window.rs:134
-#: crates/desk-ui/src/window.rs:138
+#: crates/desk-ui/src/warnings.rs:69 crates/desk-ui/src/window.rs:148
+#: crates/desk-ui/src/window.rs:152
 msgid "Document Warnings"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:108 crates/desk-ui/src/window.rs:122
+#: crates/desk-ui/src/window.rs:122 crates/desk-ui/src/window.rs:136
 msgid "Main Menu"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:115
+#: crates/desk-ui/src/window.rs:129
 msgid "_Open"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:126 crates/desk-ui/src/window.rs:130
+#: crates/desk-ui/src/window.rs:140 crates/desk-ui/src/window.rs:144
 msgid "Leave Fullscreen"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:147
+#: crates/desk-ui/src/window.rs:161
 msgid "Open an OpenDocument text or a Pages document to edit it."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:150
+#: crates/desk-ui/src/window.rs:164
 msgid "_Open a Document…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:159
+#: crates/desk-ui/src/window.rs:173
 msgid ""
 "This app is at an early stage of development and cannot open documents yet."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:171
+#: crates/desk-ui/src/window.rs:185
 msgid "Zoom"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:352
+#: crates/desk-ui/src/window.rs:387 crates/desk-ui/src/window.rs:671
 msgid "Cannot open {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:483
-msgid "_Close"
-msgstr ""
-
-#: crates/desk-ui/src/window.rs:507
+#: crates/desk-ui/src/window.rs:550
 msgid "Cannot save {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:552
+#: crates/desk-ui/src/window.rs:595
 msgid "Save a Copy"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:639
+#: crates/desk-ui/src/window.rs:657 crates/desk-ui/src/window.rs:681
+#: crates/desk-ui/src/window.rs:752
+msgid "Import Styles"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:682
+msgid "Choose the styles of “{name}” to import."
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:717
+msgid "Replace Duplicates"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:718
+msgid "Styles with the same names take the imported ones"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:733
+msgid "_Import"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:755
+msgid "Cannot Import the Styles"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:799
 msgid "Revert to Saved?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:641
+#: crates/desk-ui/src/window.rs:801
 msgid "The changes made to “{name}” since it was last saved will be lost."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:645 crates/desk-ui/src/window.rs:674
-msgid "_Cancel"
-msgstr ""
-
-#: crates/desk-ui/src/window.rs:646
+#: crates/desk-ui/src/window.rs:806
 msgid "_Revert"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:668
+#: crates/desk-ui/src/window.rs:828
 msgid "Save Changes?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:670
+#: crates/desk-ui/src/window.rs:830
 msgid ""
 "“{name}” has changes that are not saved. If you close it without saving, "
 "they are lost."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:675
+#: crates/desk-ui/src/window.rs:835
 msgid "_Don’t Save"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:676 crates/desk-ui/src/window.rs:1032
+#: crates/desk-ui/src/window.rs:836 crates/desk-ui/src/window.rs:1277
 msgid "_Save"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:972
+#: crates/desk-ui/src/window.rs:1184
 msgid "Cu_t"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:974
+#: crates/desk-ui/src/window.rs:1186
 msgid "_Paste"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:975
+#: crates/desk-ui/src/window.rs:1187
 msgid "Select _All"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:978
+#: crates/desk-ui/src/window.rs:1190
 msgid "_Bold"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:979
+#: crates/desk-ui/src/window.rs:1191
 msgid "_Italic"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:980
+#: crates/desk-ui/src/window.rs:1192
 msgid "_Underline"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1025
+#: crates/desk-ui/src/window.rs:1195 crates/desk-ui/src/window.rs:1291
+msgid "Copy St_yle"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:1196 crates/desk-ui/src/window.rs:1292
+msgid "Paste Sty_le"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:1270
 msgid "_New Window"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1027
+#: crates/desk-ui/src/window.rs:1272
 msgid "_Open…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1033
+#: crates/desk-ui/src/window.rs:1278
 msgid "Save _As…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1034
+#: crates/desk-ui/src/window.rs:1279
 msgid "Save a _Copy…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1035
+#: crates/desk-ui/src/window.rs:1280
 msgid "_Duplicate"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1036
+#: crates/desk-ui/src/window.rs:1281
 msgid "_Revert to Saved"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1039
+#: crates/desk-ui/src/window.rs:1284
 msgid "Show _Fonts"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1040
+#: crates/desk-ui/src/window.rs:1285
+msgid "Show _Styles Drawer"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:1286
 msgid "Show _Ruler"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1041
+#: crates/desk-ui/src/window.rs:1287
 msgid "_Fullscreen"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1042
+#: crates/desk-ui/src/window.rs:1288
 msgid "Document _Info"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1046
+#: crates/desk-ui/src/window.rs:1297
 msgid "C_lose"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1047
+#: crates/desk-ui/src/window.rs:1298
 msgid "Close _All Windows"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1050
+#: crates/desk-ui/src/window.rs:1301
 msgid "_Preferences"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1052
+#: crates/desk-ui/src/window.rs:1303
 msgid "_Keyboard Shortcuts"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1056
+#: crates/desk-ui/src/window.rs:1307
 msgid "_About {app}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1065
+#: crates/desk-ui/src/window.rs:1316
 msgid "{n} word"
 msgid_plural "{n} words"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/window.rs:1066
+#: crates/desk-ui/src/window.rs:1317
 msgid "{n} page"
 msgid_plural "{n} pages"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/window.rs:1098
+#: crates/desk-ui/src/window.rs:1349
 msgid "Fit _Width"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1099
+#: crates/desk-ui/src/window.rs:1350
 msgid "Fit _Page"
 msgstr ""
 
