@@ -20,7 +20,10 @@ use desk_model::{
     ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style,
     StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
+use desk_model::{Layout, Section, Start};
 use desk_odf as odf;
+
+use crate::sections;
 
 /// The ODF name of the default paragraph style.
 const DEFAULT_STYLE: &str = "Standard";
@@ -413,7 +416,16 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         first_line_indent: p.text_indent.map(length),
         left_indent: p.margin_left.map(length),
         right_indent: p.margin_right.map(length),
-        page_break_before: p.break_before.map(|b| b == odf::Break::Page),
+        page_break_before: p.break_before.and_then(|b| match b {
+            odf::Break::Page => Some(true),
+            odf::Break::Column => None,
+            _ => Some(false),
+        }),
+        column_break_before: p
+            .break_before
+            .and_then(|b| (b == odf::Break::Column).then_some(true)),
+        // Sections and layouts come from the section elements.
+        start: None,
         keep_with_next: p.keep_with_next,
         keep_lines_together: p.keep_together,
         widow_control,
@@ -586,13 +598,12 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
         margin_left: a.left_indent.map(odf_length),
         margin_right: a.right_indent.map(odf_length),
         text_indent: a.first_line_indent.map(odf_length),
-        break_before: a.page_break_before.map(|b| {
-            if b {
-                odf::Break::Page
-            } else {
-                odf::Break::Auto
-            }
-        }),
+        break_before: match (a.page_break_before, a.column_break_before) {
+            (Some(true), _) => Some(odf::Break::Page),
+            (_, Some(true)) => Some(odf::Break::Column),
+            (Some(false), _) | (_, Some(false)) => Some(odf::Break::Auto),
+            (None, None) => None,
+        },
         keep_with_next: a.keep_with_next,
         keep_together: a.keep_lines_together,
         widows: a.widow_control.map(|w| if w { 2 } else { 0 }),
@@ -607,6 +618,14 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
     };
     if let Some(border) = &a.border {
         odf_border(&mut p, border);
+    }
+    // A section starts a page, numbered from its first number or on from
+    // the page before, for other programs.
+    if let Some(Some(start)) = &a.start
+        && let Start::Section(section, _) = &**start
+    {
+        p.break_before = Some(odf::Break::Page);
+        p.page_number = Some(section.first_number);
     }
     match a.line_spacing {
         Some(LineSpacing::Multiple { percent }) => {
@@ -1065,9 +1084,97 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // The list styles that a list was met with, for lists that start
     // again rather than going on from the one before.
     let mut listed: HashSet<StyleId> = HashSet::new();
+
+    let page = &source.page_layout;
+    let mut setup = PageSetup::default();
+    let set = |field: &mut Length, value: Option<odf::Length>| {
+        if let Some(value) = value.filter(|v| v.0 >= 0.0) {
+            *field = length(value);
+        }
+    };
+    set(&mut setup.width, page.width);
+    set(&mut setup.height, page.height);
+    set(&mut setup.margin_top, page.margin_top);
+    set(&mut setup.margin_bottom, page.margin_bottom);
+    set(&mut setup.margin_left, page.margin_left);
+    set(&mut setup.margin_right, page.margin_right);
+    setup.facing_pages = page.mirrored == Some(true);
+    // The columns of the pages are the layout outside any section.
+    let page_layout = Layout {
+        columns: page.columns.as_ref().map_or(desk_model::Columns::ONE, |c| {
+            sections::columns(
+                c,
+                (setup.width - setup.margin_left - setup.margin_right).to_pt(),
+            )
+        }),
+        ..Layout::default()
+    };
+    setup.layout = page_layout;
+    let mut current_layout = page_layout;
+
     for (index, paragraph) in source.body.iter().enumerate() {
         let mut built =
             import_paragraph(source, &mut document, &ids, default, paragraph, relative)?;
+        // The section or layout that starts here.
+        let own = paragraph.style.as_deref().and_then(|name| {
+            source
+                .automatic_styles
+                .iter()
+                .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+        });
+        let page_number = own.and_then(|s| s.properties.paragraph.page_number);
+        let breaks =
+            own.is_some_and(|s| s.properties.paragraph.break_before == Some(odf::Break::Page));
+        let restart = |layout: Layout| {
+            page_number.flatten().map(|n| {
+                Start::Section(
+                    Section {
+                        first_number: Some(n),
+                        ..Section::default()
+                    },
+                    layout,
+                )
+            })
+        };
+        let start = match paragraph.section.as_deref() {
+            Some("") => Some(restart(page_layout).unwrap_or(Start::Layout(page_layout))),
+            Some(name) => source
+                .section_styles
+                .iter()
+                .find(|s| s.name == name)
+                .map(|style| {
+                    let layout = sections::layout(style, &setup);
+                    match sections::section(style, page_number.flatten()) {
+                        Some(section) => Start::Section(section, layout),
+                        None => restart(layout).unwrap_or(Start::Layout(layout)),
+                    }
+                }),
+            // A page that numbers its pages again starts a section.
+            None if breaks || index == 0 => restart(current_layout),
+            None => None,
+        };
+        if let Some(start) = start {
+            current_layout = *start.layout();
+            if index == 0 {
+                if let Start::Section(section, _) = start {
+                    setup.section = section;
+                }
+                setup.layout = current_layout;
+            } else {
+                let mut attrs = built.attrs().clone();
+                if matches!(start, Start::Section(..)) {
+                    // The break of a section is part of it.
+                    attrs.page_break_before = None;
+                }
+                attrs.start = Some(Some(std::sync::Arc::new(start)));
+                built = Paragraph::from_runs(
+                    built.id(),
+                    built.style(),
+                    attrs,
+                    built.runs().cloned().collect::<Vec<_>>(),
+                )?;
+            }
+        }
         // The list style that the automatic style of the paragraph sets.
         if let Some(automatic) = paragraph.style.as_deref().and_then(|name| {
             source
@@ -1159,19 +1266,6 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         }
     }
 
-    let page = &source.page_layout;
-    let mut setup = PageSetup::default();
-    let set = |field: &mut Length, value: Option<odf::Length>| {
-        if let Some(value) = value.filter(|v| v.0 >= 0.0) {
-            *field = length(value);
-        }
-    };
-    set(&mut setup.width, page.width);
-    set(&mut setup.height, page.height);
-    set(&mut setup.margin_top, page.margin_top);
-    set(&mut setup.margin_bottom, page.margin_bottom);
-    set(&mut setup.margin_left, page.margin_left);
-    set(&mut setup.margin_right, page.margin_right);
     document.apply(Op::SetPageSetup { page: setup })?;
 
     let text = &source.text_settings;
@@ -1470,7 +1564,38 @@ pub fn export(document: &Document) -> odf::TextDocument {
     let mut previous: Option<StyleId> = None;
     // The automatic list styles of the items with levels of their own.
     let mut overrides: HashMap<[ListLevel; LIST_LEVELS], String> = HashMap::new();
-    for (paragraph, item) in document.body().iter().zip(&items) {
+    // The layouts and sections, as section styles: the first one when it
+    // is not the plain one, and each one that starts at a paragraph.
+    let setup = *document.page_setup();
+    let mut section_styles: Vec<odf::SectionStyle> = Vec::new();
+    for (index, (paragraph, item)) in document.body().iter().zip(&items).enumerate() {
+        let start = paragraph
+            .attrs()
+            .start
+            .clone()
+            .flatten()
+            .map(|s| *s)
+            .or_else(|| {
+                (index == 0
+                    && (setup.section != Section::default() || setup.layout != Layout::default()))
+                .then_some(Start::Section(setup.section, setup.layout))
+            });
+        let section_name = start.map(|start| {
+            let name = format!("Sect{}", section_styles.len() + 1);
+            let section = match &start {
+                Start::Section(section, _) => Some(section),
+                Start::Layout(_) => None,
+            };
+            section_styles.push(sections::section_style(
+                name.clone(),
+                &setup,
+                start.layout(),
+                section,
+            ));
+            name
+        });
+        // The number of the first page, on the first paragraph.
+        let first_number = setup.section.first_number.filter(|_| index == 0);
         let style_name = names[&paragraph.style()].clone();
         // The level, the start and the level of its own of an item are
         // in the list elements.
@@ -1480,7 +1605,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             list_override: None,
             ..paragraph.attrs().clone()
         };
-        let style = if own.is_empty() {
+        let style = if own.is_empty() && first_number.is_none() {
             style_name
         } else {
             automatic_name(
@@ -1489,11 +1614,17 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 own.list_style
                     .map(|list| list.map_or_else(String::new, |id| names[&id].clone())),
                 odf::Properties {
-                    paragraph: odf_paragraph_properties(
-                        paragraph.attrs(),
-                        &styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
-                        false,
-                    ),
+                    paragraph: {
+                        let mut properties = odf_paragraph_properties(
+                            paragraph.attrs(),
+                            &styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+                            false,
+                        );
+                        if first_number.is_some() {
+                            properties.page_number = Some(first_number);
+                        }
+                        properties
+                    },
                     text: {
                         let (hyphenate, desk_hyphenate) =
                             odf_hyphenate(paragraph.attrs().hyphenate, settings.hyphenation);
@@ -1580,10 +1711,12 @@ pub fn export(document: &Document) -> odf::TextDocument {
             style: Some(style),
             outline_level: None,
             list,
+            section: section_name,
             spans,
         });
     }
     out.automatic_styles = automatic;
+    out.section_styles = section_styles;
     out.pictures = pictures;
 
     let page = document.page_setup();
@@ -1594,6 +1727,8 @@ pub fn export(document: &Document) -> odf::TextDocument {
         margin_bottom: Some(odf_length(page.margin_bottom)),
         margin_left: Some(odf_length(page.margin_left)),
         margin_right: Some(odf_length(page.margin_right)),
+        mirrored: page.facing_pages.then_some(true),
+        columns: None,
     };
     let meta = document.metadata();
     let some = |s: &str| (!s.is_empty()).then(|| s.to_owned());

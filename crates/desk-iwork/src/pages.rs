@@ -79,7 +79,8 @@ pub struct Run {
     /// The character style, by `sf:style`, for text inside a span.
     pub style: Option<String>,
     /// The text, with breaks as [`LINE_BREAK`], [`PAGE_BREAK`],
-    /// [`COLUMN_BREAK`] and tabs as `\t`.
+    /// [`COLUMN_BREAK`] and tabs as `\t`. A column break that ends a
+    /// paragraph is not kept: the next paragraph starts a new column.
     pub text: String,
 }
 
@@ -92,6 +93,15 @@ pub struct Paragraph {
     pub list_level: u8,
     /// Whether its list starts counting again here (`sf:restart-list`).
     pub restart_list: bool,
+    /// Whether it starts a new column, because the paragraph before ended
+    /// with a column break (`sf:contbr`).
+    pub column_break_before: bool,
+    /// The style of the section that starts at this paragraph, by
+    /// `sf:style`: the first paragraph of each `sf:section`.
+    pub section: Option<String>,
+    /// The style of the layout that starts at this paragraph, by
+    /// `sf:style`: the first paragraph of each `sf:layout`.
+    pub layout: Option<String>,
     /// The text, in runs.
     pub runs: Vec<Run>,
 }
@@ -111,8 +121,7 @@ pub struct PagesDocument {
     /// the order first met, with how many of each: what an import cannot
     /// show yet. Besides the elements of the body, `headers`, `footers`
     /// and `drawables` count the headers, footers and floating objects of
-    /// the document, which are outside the body, and `columns` the layouts
-    /// of the body with more than one column.
+    /// the document, which are outside the body.
     pub skipped: Vec<(String, usize)>,
     /// Whether Pages hyphenates words at the ends of lines by itself
     /// (Document Inspector), in the paragraphs that allow it.
@@ -228,8 +237,10 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     if let Some(body) = storage.child(SF, "text-body") {
         let mut reader = BodyReader {
             ids: &ids,
-            columned: sheet.map(columned_layouts).unwrap_or_default(),
             document: &mut document,
+            section: None,
+            layout: None,
+            column_break: false,
         };
         reader.block(body);
     }
@@ -353,8 +364,10 @@ const IGNORED: &[&str] = &[
     "br",
     // The hidden marks of the headings that a table of contents lists.
     "toc-bookmark",
-    // The start of a layout, whose columns are recorded with it.
+    // The ends of a layout and of a section, which the elements around
+    // the paragraphs record.
     "layoutbr",
+    "sectbr",
 ];
 
 /// Elements around text that the reader keeps, by recording the element
@@ -362,28 +375,14 @@ const IGNORED: &[&str] = &[
 /// its markup, and bookmarks.
 const WRAPPERS: &[&str] = &["change-ref", "changed-ref", "changes-ref", "bookmark"];
 
-/// The identifiers and IDs of the layout styles of a stylesheet that set
-/// more than one column. A layout of the body names its style by either.
-fn columned_layouts(sheet: &Element) -> Vec<String> {
-    let mut out = Vec::new();
-    for style in sheet.descendants().filter(|e| e.name.is(SF, "layoutstyle")) {
-        let columns = style
-            .descendants()
-            .filter(|e| e.name.is(SF, "column"))
-            .count();
-        if columns > 1 {
-            out.extend(style.attr(SF, "ident").map(str::to_owned));
-            out.extend(style.attr(SFA, "ID").map(str::to_owned));
-        }
-    }
-    out
-}
-
 struct BodyReader<'a, 'b> {
     ids: &'a Ids<'a>,
-    /// The layout styles with more than one column.
-    columned: Vec<String>,
     document: &'b mut PagesDocument,
+    /// The section and layout that start at the next paragraph.
+    section: Option<String>,
+    layout: Option<String>,
+    /// Whether the next paragraph starts a new column.
+    column_break: bool,
 }
 
 impl BodyReader<'_, '_> {
@@ -406,17 +405,15 @@ impl BodyReader<'_, '_> {
             }
             match child.name.local.as_str() {
                 "p" => self.paragraph(child),
-                "layout" => {
-                    // Columns are not laid out yet: the text flows in one.
-                    if child
-                        .attr(SF, "style")
-                        .is_some_and(|s| self.columned.iter().any(|c| c == s))
-                    {
-                        self.skip_named("columns");
-                    }
+                "section" => {
+                    self.section = child.attr(SF, "style").map(str::to_owned);
                     self.block(child);
                 }
-                "section" | "text-body" => self.block(child),
+                "layout" => {
+                    self.layout = child.attr(SF, "style").map(str::to_owned);
+                    self.block(child);
+                }
+                "text-body" => self.block(child),
                 name if IGNORED.contains(&name) => {}
                 _ => self.skip(child),
             }
@@ -432,9 +429,19 @@ impl BodyReader<'_, '_> {
                 .unwrap_or(0)
                 .min(8),
             restart_list: element.attr(SF, "restart-list") == Some("true"),
+            column_break_before: std::mem::take(&mut self.column_break),
+            section: self.section.take(),
+            layout: self.layout.take(),
             runs: Vec::new(),
         };
         self.inline(element, None, &mut paragraph.runs);
+        // A column break ends its paragraph, as a return does.
+        if let Some(last) = paragraph.runs.last_mut()
+            && last.text.ends_with(COLUMN_BREAK)
+        {
+            last.text.pop();
+            self.column_break = true;
+        }
         paragraph.runs.retain(|run| !run.text.is_empty());
         self.document.body.push(paragraph);
     }
@@ -465,8 +472,6 @@ impl BodyReader<'_, '_> {
                         "lnbr" => push(runs, style, &LINE_BREAK.to_string()),
                         "pgbr" => push(runs, style, &PAGE_BREAK.to_string()),
                         "contbr" => push(runs, style, &COLUMN_BREAK.to_string()),
-                        // A section starts on a new page.
-                        "sectbr" => push(runs, style, &PAGE_BREAK.to_string()),
                         "tab" => push(runs, style, "\t"),
                         name if IGNORED.contains(&name) => {}
                         _ => self.skip(child),

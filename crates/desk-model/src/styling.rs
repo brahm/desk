@@ -277,7 +277,7 @@ impl Document {
             overrides.list |= matches!(own.list_override, Some(Some(_)));
             overrides.paragraph |= !ParaAttrs {
                 list_override: None,
-                ..own.clone()
+                ..own.without_structure()
             }
             .is_empty();
             let mut look = |style: Option<StyleId>, attrs: &CharAttrs| {
@@ -358,7 +358,11 @@ impl Edit {
     }
 
     fn put(&mut self, style: impl Into<Style>) -> Result<(), ModelError> {
-        let style = style.into();
+        let mut style = style.into();
+        // Breaks belong to paragraphs, never to styles.
+        if let Style::Paragraph(p) = &mut style {
+            p.paragraph = p.paragraph.without_structure();
+        }
         if self.document().styles().get(style.id()).as_ref() != Some(&&style) {
             self.apply(Op::PutStyle { style })?;
         }
@@ -493,7 +497,8 @@ impl Edit {
     pub fn revert_to_style(&mut self, start: Position, end: Position) -> Result<(), ModelError> {
         let ranges = self.ranges_or_paragraph(start, end)?;
         for (id, _) in &ranges {
-            self.set_own_paragraph_attrs(*id, ParaAttrs::default())?;
+            let kept = self.document().paragraph(*id)?.attrs().structure();
+            self.set_own_paragraph_attrs(*id, kept)?;
         }
         self.map_ranges(&ranges, |run| run.attrs = CharAttrs::default())
     }
@@ -520,7 +525,7 @@ impl Edit {
                 let para_attrs = ParaAttrs {
                     list_start: None,
                     list_override: None,
-                    ..paragraph.attrs().clone()
+                    ..paragraph.attrs().without_structure()
                 };
                 let char_attrs = if run_style.is_none() {
                     run_attrs
@@ -861,7 +866,7 @@ impl Edit {
         };
         let mut paragraph = copied.paragraph.clone();
         relink(&mut paragraph.paragraph);
-        let mut paragraph_attrs = copied.paragraph_attrs.clone();
+        let mut paragraph_attrs = copied.paragraph_attrs.without_structure();
         relink(&mut paragraph_attrs);
         let paragraph_style = self.style_by_name_or_add(Style::Paragraph(paragraph))?;
         let character_style = match &copied.character {
@@ -872,7 +877,9 @@ impl Edit {
         for (id, _) in &ranges {
             let p = Position::new(*id, 0);
             self.set_paragraph_style(p, p, paragraph_style)?;
-            self.set_own_paragraph_attrs(*id, paragraph_attrs.clone())?;
+            let mut attrs = paragraph_attrs.clone();
+            attrs.merge(&self.document().paragraph(*id)?.attrs().structure());
+            self.set_own_paragraph_attrs(*id, attrs)?;
         }
         if start != end {
             let attrs = copied.character_attrs.clone();

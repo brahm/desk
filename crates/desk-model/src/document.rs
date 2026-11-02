@@ -8,6 +8,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::error::ModelError;
 use crate::id::{IdAllocator, NodeId};
 use crate::op::Op;
+use crate::section::{Columns, Layout, Section, SectionStart};
 use crate::style::{ParagraphStyle, Style, StyleFamily, StyleId, Styles};
 use crate::text::{Paragraph, Position, TextFlow};
 use crate::units::Length;
@@ -89,6 +90,13 @@ pub struct PageSetup {
     pub margin_left: Length,
     /// The right margin.
     pub margin_right: Length,
+    /// Whether pages face each other, as in a book: the left margin is
+    /// then the inside one, on the right of left pages (EST-11).
+    pub facing_pages: bool,
+    /// The first section of the body (EST-16).
+    pub section: Section,
+    /// The first layout of the body (EST-07, EST-10).
+    pub layout: Layout,
 }
 
 impl PageSetup {
@@ -104,6 +112,21 @@ impl PageSetup {
             margin_bottom: Self::DEFAULT_MARGIN,
             margin_left: Self::DEFAULT_MARGIN,
             margin_right: Self::DEFAULT_MARGIN,
+            facing_pages: false,
+            section: Section {
+                first_number: None,
+                first_page_different: false,
+                left_right_different: false,
+                start: SectionStart::AnyPage,
+            },
+            layout: Layout {
+                columns: Columns::ONE,
+                before: Length::ZERO,
+                after: Length::ZERO,
+                left: Length::ZERO,
+                right: Length::ZERO,
+                new_page: false,
+            },
         }
     }
 
@@ -134,6 +157,7 @@ impl PageSetup {
             margin_bottom: self.margin_right,
             margin_left: self.margin_bottom,
             margin_right: self.margin_top,
+            ..*self
         }
     }
 

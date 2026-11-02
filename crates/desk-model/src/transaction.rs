@@ -123,6 +123,9 @@ impl Edit {
             ParaAttrs::default()
         };
         attrs.page_break_before = None;
+        attrs.column_break_before = None;
+        // A section or layout starts at the first of the two.
+        attrs.start = None;
         // The new item counts on from the one it was split from.
         attrs.list_start = None;
         let id = self.new_id();

@@ -25,6 +25,7 @@ mod fonts;
 mod formatting;
 pub mod geometry;
 pub mod i18n;
+mod layout_pane;
 mod lists_pane;
 mod preferences;
 mod properties;

@@ -113,6 +113,7 @@ fn the_pdf_has_the_pages_text_fonts_and_metadata() {
         margin_bottom: Length::from_points(20),
         margin_left: Length::from_points(20),
         margin_right: Length::from_points(20),
+        ..PageSetup::default()
     };
     let text = ["Olá, Desk"; 12].join(&LINE_BREAK.to_string());
     let layout = layout(&[(&text, sans())], small);
@@ -165,6 +166,7 @@ fn painting_puts_the_color_on_the_pixels() {
         margin_bottom: Length::from_points(10),
         margin_left: Length::from_points(10),
         margin_right: Length::from_points(10),
+        ..PageSetup::default()
     };
     let layout = layout(&[("HH", red)], setup);
     let list = &DisplayList::pages(&layout)[0];

@@ -13,7 +13,7 @@ use adw::prelude::*;
 use desk_model::{CharAttrs, Document, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
-use crate::editing::TextEditor;
+use crate::editing::{BreakKind, TextEditor};
 use crate::find::{self, FindSlot, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
@@ -87,7 +87,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 39] = [
+const DOCUMENT_ACTIONS: [&str; 43] = [
     "save",
     "save-as",
     "save-copy",
@@ -109,6 +109,10 @@ const DOCUMENT_ACTIONS: [&str; 39] = [
     "copy-style",
     "paste-style",
     "import-styles",
+    "insert-page-break",
+    "insert-column-break",
+    "insert-layout-break",
+    "insert-section-break",
     "find",
     "find-next",
     "find-previous",
@@ -1270,6 +1274,22 @@ impl DocumentWindow {
         self.add_find_actions();
         self.add_spelling_actions();
 
+        for (name, kind) in [
+            ("insert-page-break", BreakKind::Page),
+            ("insert-column-break", BreakKind::Column),
+            ("insert-layout-break", BreakKind::Layout),
+            ("insert-section-break", BreakKind::Section),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                    editor.insert_break(kind);
+                }
+            });
+            self.window.add_action(&action);
+        }
+
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);
         import.connect_activate(move |_, _| {
@@ -1691,6 +1711,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         find.append(Some(&tr("_Search…")), Some("win.search"));
         find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
         find.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
+        find.append_submenu(Some(&tr("_Insert")), &insert_menu());
         menu.append_section(None, &find);
         let styles = gio::Menu::new();
         styles.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
@@ -1713,6 +1734,19 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         Some("app.about"),
     );
     menu.append_section(None, &help);
+    menu
+}
+
+/// The breaks of the Insert menu (EST-04, EST-08, EST-09, EST-16).
+fn insert_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
+    menu.append(Some(&tr("_Column Break")), Some("win.insert-column-break"));
+    menu.append(Some(&tr("_Layout Break")), Some("win.insert-layout-break"));
+    menu.append(
+        Some(&tr("_Section Break")),
+        Some("win.insert-section-break"),
+    );
     menu
 }
 

@@ -117,6 +117,26 @@ pub enum Value {
     /// A paragraph or character style, by its identifier, as the
     /// following paragraph style refers to one.
     StyleRef(String),
+    /// The columns of a layout (`sf:columns`): whether they are as wide
+    /// as each other, and the width of each and the space after it, as
+    /// parts of the width of the layout.
+    Columns {
+        /// `sf:equal-columns`.
+        equal: bool,
+        /// `sf:width` and `sf:spacing` of each `sf:column`, in order.
+        columns: Vec<(f64, f64)>,
+    },
+    /// Space around a layout (`sf:padding`), in points.
+    Padding {
+        /// `sf:top`.
+        top: f64,
+        /// `sf:left`.
+        left: f64,
+        /// `sf:bottom`.
+        bottom: f64,
+        /// `sf:right`.
+        right: f64,
+    },
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -280,6 +300,48 @@ impl Value {
                     },
                 })
             }
+            "columns" => {
+                let mut columns: Vec<(u32, f64, f64)> = element
+                    .children_named(SF, "column")
+                    .map(|column| {
+                        let get = |name| {
+                            column
+                                .attr(SF, name)
+                                .and_then(|v| v.trim().parse::<f64>().ok())
+                                .filter(|v| v.is_finite() && *v >= 0.0)
+                        };
+                        let index = column
+                            .attr(SF, "index")
+                            .and_then(|v| v.trim().parse().ok())
+                            .unwrap_or(u32::MAX);
+                        (
+                            index,
+                            get("width").unwrap_or(0.0),
+                            get("spacing").unwrap_or(0.0),
+                        )
+                    })
+                    .collect();
+                columns.sort_by_key(|c| c.0);
+                Self::Columns {
+                    equal: element.attr(SF, "equal-columns") != Some("false"),
+                    columns: columns.into_iter().map(|(_, w, s)| (w, s)).collect(),
+                }
+            }
+            "padding" => {
+                let get = |name| {
+                    element
+                        .attr(SF, name)
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite())
+                        .unwrap_or(0.0)
+                };
+                Self::Padding {
+                    top: get("top"),
+                    left: get("left"),
+                    bottom: get("bottom"),
+                    right: get("right"),
+                }
+            }
             "paragraphstyle" | "characterstyle" => element
                 .attr(SF, "ident")
                 .map_or_else(|| Self::Other("style".into()), |i| Self::StyleRef(i.into())),
@@ -379,9 +441,14 @@ pub enum Family {
     Paragraph,
     /// A character style.
     Character,
+    /// A layout style: the columns and margins of a layout of the body.
+    Layout,
+    /// A section style: how a section starts and numbers its pages.
+    Section,
 }
 
-/// A paragraph or character style.
+/// A style of the stylesheet: of paragraphs, characters, layouts or
+/// sections.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Style {
     /// The kind.
@@ -405,6 +472,8 @@ impl Style {
         let family = match element.name.local.as_str() {
             "paragraphstyle" => Family::Paragraph,
             "characterstyle" => Family::Character,
+            "layoutstyle" => Family::Layout,
+            "sectionstyle" => Family::Section,
             _ => return None,
         };
         let attr = |name| element.attr(SF, name).map(str::to_owned);

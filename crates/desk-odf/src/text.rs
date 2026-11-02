@@ -48,6 +48,76 @@ pub struct TextDocument {
     /// The pictures of the package that the document links to, by path,
     /// as `Pictures/bullet1.png`, with their bytes.
     pub pictures: Vec<(String, Vec<u8>)>,
+    /// The section styles, common and automatic, which the sections of
+    /// the body name.
+    pub section_styles: Vec<SectionStyle>,
+}
+
+/// The columns of a section or of the pages (`style:columns`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Columns {
+    /// `fo:column-count`.
+    pub count: u8,
+    /// `fo:column-gap`, between columns as wide as each other, when the
+    /// columns are not given one by one.
+    pub gap: Option<Length>,
+    /// The columns one by one (`style:column`), when given.
+    pub columns: Vec<Column>,
+}
+
+/// One column (`style:column`): its part of the width, with the space on
+/// either side of it, which is half of the gap to its neighbor.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Column {
+    /// `style:rel-width`: its part of the width, out of the sum of the
+    /// parts of every column, gaps included.
+    pub rel_width: u32,
+    /// `fo:start-indent`.
+    pub start_indent: Length,
+    /// `fo:end-indent`.
+    pub end_indent: Length,
+}
+
+/// The page a section starts on (`desk:section-start`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SectionStart {
+    /// `any`: the next page.
+    Any,
+    /// `left`: the next left page.
+    Left,
+    /// `right`: the next right page.
+    Right,
+}
+
+/// A section style (`style:family="section"`), which sets the columns
+/// and margins of the text of a section.
+///
+/// A section of Pages, which starts on a new page and numbers its pages,
+/// has the `desk:` attributes of one; the first paragraph of it also
+/// breaks the page and sets its number, for other programs.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SectionStyle {
+    /// `style:name`.
+    pub name: String,
+    /// `fo:margin-left`.
+    pub margin_left: Option<Length>,
+    /// `fo:margin-right`.
+    pub margin_right: Option<Length>,
+    /// `style:columns`.
+    pub columns: Option<Columns>,
+    /// `desk:space-before`: the space above the section.
+    pub space_before: Option<Length>,
+    /// `desk:space-after`: the space below the section.
+    pub space_after: Option<Length>,
+    /// `desk:new-page`: whether the section starts on a new page.
+    pub new_page: Option<bool>,
+    /// `desk:section-start`: the page that a section of Pages starts on,
+    /// when the section is one.
+    pub section_start: Option<SectionStart>,
+    /// `desk:first-page-different`.
+    pub first_page_different: Option<bool>,
+    /// `desk:left-right-different`.
+    pub left_right_different: Option<bool>,
 }
 
 /// The settings of the text of a document, which ODF has no place for and
@@ -450,6 +520,9 @@ pub struct ParagraphProperties {
     pub text_indent: Option<Length>,
     /// `fo:break-before`.
     pub break_before: Option<Break>,
+    /// `style:page-number`: the number of the page that a paragraph
+    /// starting a page has, or `Some(None)` for `auto`, which counts on.
+    pub page_number: Option<Option<u32>>,
     /// `fo:keep-with-next`: true for `always`.
     pub keep_with_next: Option<bool>,
     /// `fo:keep-together`: true for `always`.
@@ -529,7 +602,7 @@ pub struct TabStop {
 }
 
 /// The size and margins of the pages.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PageLayout {
     /// `fo:page-width`.
     pub width: Option<Length>,
@@ -543,6 +616,11 @@ pub struct PageLayout {
     pub margin_left: Option<Length>,
     /// `fo:margin-right`.
     pub margin_right: Option<Length>,
+    /// `style:page-usage="mirrored"`: whether left and right pages swap
+    /// their margins, as pages facing each other.
+    pub mirrored: Option<bool>,
+    /// `style:columns`: the columns of every page.
+    pub columns: Option<Columns>,
 }
 
 /// A paragraph or heading of the body.
@@ -554,6 +632,11 @@ pub struct Paragraph {
     pub outline_level: Option<u8>,
     /// The list the paragraph is an item of, when it is in a `text:list`.
     pub list: Option<ListMember>,
+    /// The section style of the `text:section` that starts at the
+    /// paragraph, which goes on to the next one that starts. An empty
+    /// name, when read, is the end of a section, after which the text
+    /// takes the columns of the pages again.
+    pub section: Option<String>,
     /// The text, in spans of one style each.
     pub spans: Vec<Span>,
 }

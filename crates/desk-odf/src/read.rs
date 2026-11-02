@@ -8,10 +8,11 @@ use std::collections::HashMap;
 use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLINK};
 use crate::text::{
-    Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout, Paragraph,
-    ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign,
-    TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform,
+    Background, Border, BorderLine, Break, Column, Columns, Family, LINE_BREAK, LeaderStyle, Line,
+    LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout,
+    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
+    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    TextSettings, TextShadow, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -61,6 +62,8 @@ pub fn read_streams(
                     document.styles.push(style);
                 } else if let Some(list) = reader.list_style(element) {
                     document.list_styles.push(list);
+                } else if let Some(section) = section_style(element) {
+                    document.section_styles.push(section);
                 }
             }
         }
@@ -73,12 +76,15 @@ pub fn read_streams(
         document
             .automatic_list_styles
             .extend(automatic.elements().filter_map(|e| reader.list_style(e)));
+        document
+            .section_styles
+            .extend(automatic.elements().filter_map(section_style));
     }
     if let Some(text) = content
         .child(OFFICE, "body")
         .and_then(|body| body.child(OFFICE, "text"))
     {
-        collect_paragraphs(text, None, &mut document.body);
+        collect_paragraphs(text, None, None, &mut document.body);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
         document.meta = read_meta(meta);
@@ -454,6 +460,10 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
             "column" => Some(Break::Column),
             _ => None,
         }),
+        page_number: e.attr(STYLE, "page-number").and_then(|n| match n.trim() {
+            "auto" => Some(None),
+            n => n.parse().ok().map(Some),
+        }),
         keep_with_next: always("keep-with-next"),
         keep_together: always("keep-together"),
         widows: e.attr(FO, "widows").and_then(|v| v.parse().ok()),
@@ -616,7 +626,68 @@ fn page_layout(styles: &Element) -> Option<PageLayout> {
         margin_bottom: length(p, FO, "margin-bottom"),
         margin_left: length(p, FO, "margin-left"),
         margin_right: length(p, FO, "margin-right"),
+        mirrored: layout.attr(STYLE, "page-usage").map(|u| u == "mirrored"),
+        columns: p.child(STYLE, "columns").and_then(columns),
     })
+}
+
+/// The columns of a section or of the pages, when there are more than
+/// one.
+fn columns(e: &Element) -> Option<Columns> {
+    let count = e
+        .attr(FO, "column-count")
+        .and_then(|c| c.trim().parse::<u32>().ok())
+        .unwrap_or(1)
+        .min(u32::from(u8::MAX)) as u8;
+    let columns: Vec<Column> = e
+        .children_named(STYLE, "column")
+        .filter_map(|c| {
+            Some(Column {
+                rel_width: c
+                    .attr(STYLE, "rel-width")?
+                    .trim()
+                    .trim_end_matches('*')
+                    .parse()
+                    .ok()?,
+                start_indent: length(c, FO, "start-indent").unwrap_or_default(),
+                end_indent: length(c, FO, "end-indent").unwrap_or_default(),
+            })
+        })
+        .collect();
+    (count > 1).then(|| Columns {
+        count,
+        gap: length(e, FO, "column-gap"),
+        columns,
+    })
+}
+
+/// A section style.
+fn section_style(e: &Element) -> Option<SectionStyle> {
+    if !e.name.is(STYLE, "style") || e.attr(STYLE, "family") != Some("section") {
+        return None;
+    }
+    let mut style = SectionStyle {
+        name: e.attr(STYLE, "name")?.to_owned(),
+        ..SectionStyle::default()
+    };
+    if let Some(p) = e.child(STYLE, "section-properties") {
+        let flag = |name: &str| p.attr(DESK, name).map(|v| v == "true");
+        style.margin_left = length(p, FO, "margin-left");
+        style.margin_right = length(p, FO, "margin-right");
+        style.columns = p.child(STYLE, "columns").and_then(columns);
+        style.space_before = length(p, DESK, "space-before");
+        style.space_after = length(p, DESK, "space-after");
+        style.new_page = flag("new-page");
+        style.section_start = p.attr(DESK, "section-start").and_then(|v| match v {
+            "any" => Some(SectionStart::Any),
+            "left" => Some(SectionStart::Left),
+            "right" => Some(SectionStart::Right),
+            _ => None,
+        });
+        style.first_page_different = flag("first-page-different");
+        style.left_right_different = flag("left-right-different");
+    }
+    Some(style)
 }
 
 fn read_meta(meta: &Element) -> Meta {
@@ -656,10 +727,33 @@ struct InList {
 }
 
 /// Collects the paragraphs inside an element, looking into lists,
-/// sections and tables for theirs.
-fn collect_paragraphs(element: &Element, list: Option<&InList>, out: &mut Vec<Paragraph>) {
+/// sections and tables for theirs. `section` is the style of the section
+/// the element is in, or an empty name outside any.
+fn collect_paragraphs(
+    element: &Element,
+    list: Option<&InList>,
+    section: Option<&str>,
+    out: &mut Vec<Paragraph>,
+) {
+    // After a section inside this element, the next paragraph goes back
+    // to the section of the element.
+    let mut resume = false;
     for child in element.elements() {
         let name = &child.name;
+        if name.is(TEXT, "section") {
+            let style = child.attr(TEXT, "style-name").unwrap_or_default();
+            let first = out.len();
+            collect_paragraphs(child, list, Some(style), out);
+            // The innermost section that starts at a paragraph names it.
+            if let Some(p) = out.get_mut(first)
+                && p.section.is_none()
+            {
+                p.section = Some(style.to_owned());
+            }
+            resume |= out.len() > first;
+            continue;
+        }
+        let first = out.len();
         if name.is(TEXT, "p") || name.is(TEXT, "h") {
             let mut paragraph = paragraph(child);
             if let Some(list) = list.filter(|l| !l.header)
@@ -705,12 +799,18 @@ fn collect_paragraphs(element: &Element, list: Option<&InList>, out: &mut Vec<Pa
                     header: item.name.is(TEXT, "list-header"),
                     ..inner.clone()
                 };
-                collect_paragraphs(item, Some(&item_list), out);
+                collect_paragraphs(item, Some(&item_list), section, out);
             }
         } else if name.ns == DRAW || name.is(OFFICE, "annotation") {
             // Frames and comments are not part of the text flow.
         } else {
-            collect_paragraphs(child, list, out);
+            collect_paragraphs(child, list, section, out);
+        }
+        if resume && let Some(p) = out.get_mut(first) {
+            if p.section.is_none() {
+                p.section = Some(section.unwrap_or_default().to_owned());
+            }
+            resume = false;
         }
     }
 }
@@ -820,6 +920,7 @@ fn paragraph(e: &Element) -> Paragraph {
                 .unwrap_or(1)
         }),
         list: None,
+        section: None,
         spans: builder.spans,
     }
 }

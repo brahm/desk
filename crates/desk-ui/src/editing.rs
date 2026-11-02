@@ -10,12 +10,13 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use desk_layout::DocumentLayout;
 use desk_model::{
-    CharAttrs, CharFormat, Document, Editor, LINE_BREAK, Length, ModelError, ParaAttrs, ParaFormat,
-    StyleFamily, StyleId,
+    CharAttrs, CharFormat, Document, Editor, LINE_BREAK, Layout, Length, ModelError, PageSetup,
+    ParaAttrs, ParaFormat, Section, Start, StyleFamily, StyleId,
 };
 use desk_render::DisplayList;
 use gtk::prelude::*;
@@ -24,6 +25,21 @@ use gtk::{gdk, glib};
 use crate::access::AccessText;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
+
+/// A break that Insert puts at the cursor (EST-04, EST-08, EST-09,
+/// EST-16).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BreakKind {
+    /// The text after it starts a new page.
+    Page,
+    /// The text after it starts the next column.
+    Column,
+    /// The text after it starts a new layout, with the columns of the one
+    /// it is in.
+    Layout,
+    /// The text after it starts a new section on a new page.
+    Section,
+}
 
 /// Whether a paragraph is an item of a list: its list style has a label at
 /// its level.
@@ -178,6 +194,12 @@ pub struct Format {
     pub list: Option<desk_model::ListStyle>,
     /// The settings of the text of the document.
     pub text_settings: desk_model::TextSettings,
+    /// The size and margins of the pages.
+    pub setup: PageSetup,
+    /// The layout that the selection starts in.
+    pub layout: Layout,
+    /// The section that the selection starts in.
+    pub section: Section,
 }
 
 /// Edits the document of a window.
@@ -638,6 +660,124 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
+    /// Puts a break at the cursor, or in place of the selection: the
+    /// paragraph splits there, and the text after the break starts a
+    /// page, a column, a layout or a section.
+    pub fn insert_break(&self, kind: BreakKind) {
+        let before = self.selection();
+        let (start, end) = before.ordered();
+        let result = {
+            let mut state = self.state.borrow_mut();
+            state.editor.edit("Insert Break", |edit| {
+                let document = edit.document();
+                let from = at_spot(document, start)?;
+                let to = at_spot(document, end)?;
+                let at = edit.delete(from, to)?;
+                let index = edit.document().body().index_of(at.paragraph).unwrap_or(0);
+                let (_, layout) = edit.document().layout_at(index);
+                let after = edit.split_paragraph(at)?;
+                let attrs = match kind {
+                    BreakKind::Page => ParaAttrs {
+                        page_break_before: Some(true),
+                        ..ParaAttrs::default()
+                    },
+                    BreakKind::Column => ParaAttrs {
+                        column_break_before: Some(true),
+                        ..ParaAttrs::default()
+                    },
+                    BreakKind::Layout => ParaAttrs {
+                        start: Some(Some(Arc::new(Start::Layout(layout)))),
+                        ..ParaAttrs::default()
+                    },
+                    BreakKind::Section => ParaAttrs {
+                        start: Some(Some(Arc::new(Start::Section(Section::default(), layout)))),
+                        ..ParaAttrs::default()
+                    },
+                };
+                edit.set_paragraph_attrs(after, after, &attrs)?;
+                Ok(Spot::of(edit.document(), after))
+            })
+        };
+        self.finish_edit(before, result);
+    }
+
+    /// Changes the layout that the cursor is in, as one action of the
+    /// history.
+    pub fn set_layout(&self, name: &str, layout: Layout) {
+        let (start, _) = self.selection().ordered();
+        self.format_edit(name, move |edit| {
+            let document = edit.document();
+            match document.layout_at(start.paragraph) {
+                (None, _) => {
+                    let setup = PageSetup {
+                        layout,
+                        ..*document.page_setup()
+                    };
+                    edit.set_page_setup(setup)
+                }
+                (Some(index), _) => {
+                    let paragraph = document.body().get(index).expect("the paragraph is there");
+                    let held = paragraph.attrs().start.clone().flatten();
+                    let start = match held.as_deref() {
+                        Some(Start::Section(section, _)) => Start::Section(*section, layout),
+                        _ => Start::Layout(layout),
+                    };
+                    let at = desk_model::Position::new(paragraph.id(), 0);
+                    edit.set_paragraph_attrs(
+                        at,
+                        at,
+                        &ParaAttrs {
+                            start: Some(Some(Arc::new(start))),
+                            ..ParaAttrs::default()
+                        },
+                    )
+                }
+            }
+        });
+    }
+
+    /// Changes the section that the cursor is in, as one action of the
+    /// history.
+    pub fn set_section(&self, name: &str, section: Section) {
+        let (start, _) = self.selection().ordered();
+        self.format_edit(name, move |edit| {
+            let document = edit.document();
+            match document.section_at(start.paragraph) {
+                (None, _) => {
+                    let setup = PageSetup {
+                        section,
+                        ..*document.page_setup()
+                    };
+                    edit.set_page_setup(setup)
+                }
+                (Some(index), _) => {
+                    let paragraph = document.body().get(index).expect("the paragraph is there");
+                    let layout = *paragraph
+                        .attrs()
+                        .start
+                        .clone()
+                        .flatten()
+                        .expect("a section starts there")
+                        .layout();
+                    let at = desk_model::Position::new(paragraph.id(), 0);
+                    edit.set_paragraph_attrs(
+                        at,
+                        at,
+                        &ParaAttrs {
+                            start: Some(Some(Arc::new(Start::Section(section, layout)))),
+                            ..ParaAttrs::default()
+                        },
+                    )
+                }
+            }
+        });
+    }
+
+    /// Changes the page setup, as one action of the history.
+    pub fn set_page_setup(&self, name: &str, setup: PageSetup) {
+        self.format_edit(name, move |edit| edit.set_page_setup(setup));
+    }
+
     /// Moves the selected items of lists `by` levels, with the items
     /// under them when `children` is true (LST-02). Returns false when
     /// the selection is not in a list, for Tab to insert a tab.
@@ -940,6 +1080,9 @@ impl TextEditor {
             paragraph: format,
             style: Some(paragraph.style()),
             text_settings: document.text_settings().clone(),
+            setup: *document.page_setup(),
+            layout: document.layout_at(start.paragraph).1,
+            section: document.section_at(start.paragraph).1,
         }
     }
 

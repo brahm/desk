@@ -4,7 +4,7 @@
 //! What an import of Pages left out, in the language of the interface, as
 //! the Warnings window lists it (INT-22).
 
-use desk_filters::log::{Content, Entry, Formatting, Setting, Warning};
+use desk_filters::log::{Content, Entry, Formatting, Warning};
 use desk_ui::i18n::{tr, trn};
 
 /// A warning of an import, as a sentence.
@@ -24,7 +24,6 @@ pub fn describe(entry: &Entry) -> String {
                 Content::TablesOfContents => tr("tables of contents"),
                 Content::TrackedChanges => tr("tracked changes, whose text is kept as plain text"),
                 Content::Bookmarks => tr("bookmarks, whose text is kept"),
-                Content::ColumnLayouts => tr("columns, whose text flows in one"),
                 Content::Other(name) => tr("content of the kind “{name}”").replace("{name}", name),
             };
             n(tr("Left out {what} ({n}).")).replace("{what}", &what)
@@ -46,11 +45,6 @@ pub fn describe(entry: &Entry) -> String {
             ))
             .replace("{what}", &what)
         }
-        Warning::Setting(setting) => match setting {
-            Setting::FacingPages => {
-                tr("Left out facing pages, so left pages have the margins of right pages.")
-            }
-        },
     }
 }
 
@@ -65,7 +59,6 @@ mod tests {
             Warning::Content(Content::Headers),
             Warning::Content(Content::Other("sf:thing".into())),
             Warning::Formatting(Formatting::DropCaps),
-            Warning::Setting(Setting::FacingPages),
         ] {
             for count in [1, 3] {
                 let entry = Entry {

@@ -34,8 +34,6 @@ pub enum Content {
     TrackedChanges,
     /// Bookmarks: their text is kept.
     Bookmarks,
-    /// Layouts of more than one column, whose text flows in one.
-    ColumnLayouts,
     /// Content of another kind, by the name the source gives it.
     Other(String),
 }
@@ -57,13 +55,6 @@ pub enum Formatting {
     FontFeatures,
 }
 
-/// A setting of the whole document that an import left out.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Setting {
-    /// Facing pages: left pages keep the margins of right pages.
-    FacingPages,
-}
-
 /// What a warning is about.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Warning {
@@ -71,12 +62,10 @@ pub enum Warning {
     Content(Content),
     /// Formatting that was left out; the text is kept.
     Formatting(Formatting),
-    /// A setting of the document that was left out.
-    Setting(Setting),
 }
 
 /// A warning and how many times it applies: how many objects for content,
-/// how many paragraphs for formatting, and once for a setting.
+/// and how many paragraphs for formatting.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     /// What was left out.
@@ -129,7 +118,6 @@ impl fmt::Display for Content {
                 f.write_str("tracked changes, whose text is kept as plain text")
             }
             Self::Bookmarks => f.write_str("bookmarks, whose text is kept"),
-            Self::ColumnLayouts => f.write_str("columns, whose text flows in one"),
             Self::Other(name) => write!(f, "content of the kind \u{201c}{name}\u{201d}"),
         }
     }
@@ -143,14 +131,6 @@ impl fmt::Display for Formatting {
             Self::DropCaps => "drop caps",
             Self::HiddenText => "hidden text, which is shown",
             Self::FontFeatures => "font features",
-        })
-    }
-}
-
-impl fmt::Display for Setting {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::FacingPages => "facing pages, so left pages have the margins of right pages",
         })
     }
 }
@@ -170,7 +150,6 @@ impl fmt::Display for Entry {
                 };
                 write!(f, "Left out {formatting}, in {count} {paragraphs}")
             }
-            Warning::Setting(setting) => write!(f, "Left out {setting}"),
         }
     }
 }
@@ -187,14 +166,12 @@ mod tests {
         log.add(Warning::Formatting(Formatting::ImageBullets), 2);
         log.add(Warning::Content(Content::Headers), 2);
         log.add(Warning::Content(Content::Footers), 0);
-        log.add(Warning::Setting(Setting::FacingPages), 1);
         let lines: Vec<String> = log.entries().iter().map(ToString::to_string).collect();
         assert_eq!(
             lines,
             [
                 "Left out headers (3)",
-                "Left out image bullets, which are drawn as text bullets, in 2 paragraphs",
-                "Left out facing pages, so left pages have the margins of right pages"
+                "Left out image bullets, which are drawn as text bullets, in 2 paragraphs"
             ]
         );
     }

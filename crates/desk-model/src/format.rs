@@ -12,6 +12,7 @@
 use std::sync::Arc;
 
 use crate::list::ListLevel;
+use crate::section::Start;
 use crate::style::StyleId;
 use crate::units::{Length, Rgba};
 
@@ -689,6 +690,13 @@ formatting! {
         right_indent: Length = Length::ZERO,
         /// Start the paragraph on a new page (EST-04, EST-05).
         page_break_before: bool = false,
+        /// Start the paragraph in the next column, or on the next page in
+        /// the last column (EST-08).
+        column_break_before: bool = false,
+        /// The section or layout that starts at the paragraph, which then
+        /// starts the text of it (EST-09, EST-16). It belongs to the
+        /// paragraph, never to its style.
+        start: Option<Arc<Start>> = None,
         /// Keep the paragraph on the same page as the next one (EST-05).
         keep_with_next: bool = false,
         /// Keep the lines of the paragraph on one page (EST-05).
@@ -721,6 +729,29 @@ formatting! {
         /// Whether words break with a hyphen at the ends of lines, by the
         /// patterns of their language (TXT-09).
         hyphenate: bool = false,
+    }
+}
+
+impl ParaAttrs {
+    /// The breaks of the paragraph that are part of the text rather than
+    /// of its formatting: its column break and the section or layout that
+    /// starts at it. Styles never hold them, and reverting or copying a
+    /// style keeps them where they are.
+    pub fn structure(&self) -> Self {
+        Self {
+            column_break_before: self.column_break_before,
+            start: self.start.clone(),
+            ..Self::default()
+        }
+    }
+
+    /// The attributes without [`ParaAttrs::structure`].
+    pub fn without_structure(&self) -> Self {
+        Self {
+            column_break_before: None,
+            start: None,
+            ..self.clone()
+        }
     }
 }
 
