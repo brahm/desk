@@ -91,7 +91,7 @@ fn scaled(rgba: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {
             }
             let alpha = sum[3];
             for s in &sum[..3] {
-                out.push(if alpha == 0 { 0 } else { (s / alpha) as u8 });
+                out.push(s.checked_div(alpha).unwrap_or(0) as u8);
             }
             out.push((alpha / count.max(1)) as u8);
         }

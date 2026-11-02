@@ -28,17 +28,22 @@ enum Shape {
     Arrow,
 }
 
+/// How many pictures come with Desk.
+const SHAPES: usize = 8;
+
 /// The pictures that come with Desk, with their names.
-const SHAPES: [(&str, Shape); 8] = [
-    ("Blue Ball", Shape::Ball(0.2, 0.45, 0.9)),
-    ("Red Ball", Shape::Ball(0.85, 0.2, 0.2)),
-    ("Green Ball", Shape::Ball(0.25, 0.65, 0.3)),
-    ("Orange Ball", Shape::Ball(0.95, 0.55, 0.15)),
-    ("Gray Ball", Shape::Ball(0.5, 0.5, 0.52)),
-    ("Check Mark", Shape::Check),
-    ("Blue Square", Shape::Square(0.2, 0.45, 0.9)),
-    ("Arrow", Shape::Arrow),
-];
+fn shapes() -> [(String, Shape); SHAPES] {
+    [
+        (tr("Blue Ball"), Shape::Ball(0.2, 0.45, 0.9)),
+        (tr("Red Ball"), Shape::Ball(0.85, 0.2, 0.2)),
+        (tr("Green Ball"), Shape::Ball(0.25, 0.65, 0.3)),
+        (tr("Orange Ball"), Shape::Ball(0.95, 0.55, 0.15)),
+        (tr("Gray Ball"), Shape::Ball(0.5, 0.5, 0.52)),
+        (tr("Check Mark"), Shape::Check),
+        (tr("Blue Square"), Shape::Square(0.2, 0.45, 0.9)),
+        (tr("Arrow"), Shape::Arrow),
+    ]
+}
 
 fn draw(cr: &cairo::Context, shape: Shape) -> Result<(), cairo::Error> {
     let side = f64::from(SIDE);
@@ -111,9 +116,9 @@ fn picture_of(shape: Shape) -> Option<Picture> {
 }
 
 thread_local! {
-    static PICTURES: Vec<(String, Picture)> = SHAPES
-        .iter()
-        .filter_map(|(name, shape)| Some((tr(name), picture_of(*shape)?)))
+    static PICTURES: Vec<(String, Picture)> = shapes()
+        .into_iter()
+        .filter_map(|(name, shape)| Some((name, picture_of(shape)?)))
         .collect();
 }
 
@@ -146,7 +151,7 @@ mod tests {
     #[test]
     fn lst_03_desk_has_pictures_for_image_bullets() {
         let pictures = pictures();
-        assert_eq!(pictures.len(), SHAPES.len());
+        assert_eq!(pictures.len(), SHAPES);
         for (_, picture) in &pictures {
             assert_eq!((picture.width(), picture.height()), (64, 64));
         }

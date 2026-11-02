@@ -613,7 +613,7 @@ impl Edit {
                 index += 1;
             }
         }
-        let levels: Vec<(NodeId, u8, Option<Option<Arc<ListLevel>>>)> = ids
+        let levels: Vec<(NodeId, u8, Option<Arc<ListLevel>>)> = ids
             .iter()
             .map(|&id| {
                 let f = format(document.paragraph(id).expect("found above"));
@@ -629,14 +629,14 @@ impl Edit {
                         ..(**own).clone()
                     }))
                 });
-                (id, new, moved.map(Some))
+                (id, new, moved)
             })
             .collect();
         for (id, level, moved) in levels {
             self.set_list_attrs(id, |attrs| {
                 attrs.list_level = Some(level);
-                if moved.is_some() {
-                    attrs.list_override = moved;
+                if let Some(moved) = moved {
+                    attrs.list_override = Some(Some(moved));
                 }
             })?;
         }
