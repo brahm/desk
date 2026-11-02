@@ -20,6 +20,7 @@ use gtk::{gdk, glib};
 use crate::editing::{Format, TextEditor};
 use crate::effects::Effects;
 use crate::i18n::{n_, tr};
+use crate::layout_pane::LayoutGroups;
 use crate::lists_pane::ListsGroup;
 use crate::preferences::{self, Units};
 use crate::tab_stops::{self, TabStopsGroup};
@@ -357,7 +358,10 @@ pub struct Inspector {
     /// Whether the document is hyphenated and has ligatures at all.
     document_hyphenation: adw::SwitchRow,
     document_ligatures: adw::SwitchRow,
+    /// Whether pages face each other (EST-11).
+    facing_pages: adw::SwitchRow,
     tabs: Rc<TabStopsGroup>,
+    layouts: Rc<LayoutGroups>,
     lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
     /// The units of the indents, those of the rulers.
@@ -438,6 +442,7 @@ impl Inspector {
         let tabs = TabStopsGroup::new(editor.clone(), units);
         let lists = ListsGroup::new(editor.clone(), units);
         let effects = Effects::new(editor.clone());
+        let layouts = LayoutGroups::new(editor.clone(), units);
 
         let spacing = adw::PreferencesGroup::builder()
             .title(tr("Spacing"))
@@ -467,11 +472,16 @@ impl Inspector {
             .title(tr("Use Ligatures"))
             .subtitle(tr("In the whole document"))
             .build();
+        let facing_pages = adw::SwitchRow::builder()
+            .title(tr("Facing Pages"))
+            .subtitle(tr("Left and right pages swap their margins, as in a book"))
+            .build();
         let document = adw::PreferencesGroup::builder()
             .title(tr("Document"))
             .build();
         document.add(&document_hyphenation);
         document.add(&document_ligatures);
+        document.add(&facing_pages);
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(18)
@@ -486,6 +496,9 @@ impl Inspector {
         content.append(tabs.widget());
         content.append(lists.widget());
         for group in effects.groups() {
+            content.append(group);
+        }
+        for group in layouts.groups() {
             content.append(group);
         }
         content.append(&document);
@@ -506,7 +519,9 @@ impl Inspector {
             hyphenate,
             document_hyphenation,
             document_ligatures,
+            facing_pages,
             tabs,
+            layouts,
             lists,
             effects,
             units: Cell::new(units),
@@ -557,6 +572,21 @@ impl Inspector {
                 }
             });
         }
+        let weak = Rc::downgrade(&this);
+        let facing_editor = editor.clone();
+        this.facing_pages.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            if let Some(editor) = facing_editor() {
+                let setup = desk_model::PageSetup {
+                    facing_pages: row.is_active(),
+                    ..editor.format().setup
+                };
+                editor.set_page_setup("Facing Pages", setup);
+            }
+        });
         for (row, field) in [
             (&this.line_spacing, Field::LineSpacing),
             (&this.before, Field::Before),
@@ -596,6 +626,7 @@ impl Inspector {
         self.updating.set(false);
         self.tabs.set_units(units);
         self.lists.set_units(units);
+        self.layouts.set_units(units);
         let shown = self.shown.borrow().clone();
         if let Some(format) = shown {
             self.show(&format);
@@ -646,9 +677,13 @@ impl Inspector {
         if self.document_ligatures.is_active() != settings.ligatures {
             self.document_ligatures.set_active(settings.ligatures);
         }
+        if self.facing_pages.is_active() != format.setup.facing_pages {
+            self.facing_pages.set_active(format.setup.facing_pages);
+        }
         self.updating.set(false);
         self.tabs.show(paragraph);
         self.lists.show(format);
+        self.layouts.show(format);
         self.effects.show(&format.character, paragraph);
     }
 }

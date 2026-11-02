@@ -11,6 +11,7 @@
 //! body are in the page setup; each later one starts at a paragraph,
 //! which holds it.
 
+use crate::document::Document;
 use crate::units::Length;
 
 /// The most columns a layout has, as in Pages.
@@ -161,6 +162,36 @@ impl Start {
     }
 }
 
+impl Document {
+    /// The start held by paragraph `index` of the body, if any.
+    fn start_at(&self, index: usize) -> Option<&Start> {
+        self.body().get(index)?.attrs().start.as_ref()?.as_deref()
+    }
+
+    /// The layout that paragraph `index` of the body is in, with the index
+    /// of the paragraph that starts it, or `None` for the first layout,
+    /// which the page setup holds.
+    pub fn layout_at(&self, index: usize) -> (Option<usize>, Layout) {
+        (1..=index.min(self.body().len().saturating_sub(1)))
+            .rev()
+            .find_map(|i| self.start_at(i).map(|s| (Some(i), *s.layout())))
+            .unwrap_or((None, self.page_setup().layout))
+    }
+
+    /// The section that paragraph `index` of the body is in, with the
+    /// index of the paragraph that starts it, or `None` for the first
+    /// section, which the page setup holds.
+    pub fn section_at(&self, index: usize) -> (Option<usize>, Section) {
+        (1..=index.min(self.body().len().saturating_sub(1)))
+            .rev()
+            .find_map(|i| match self.start_at(i) {
+                Some(Start::Section(section, _)) => Some((Some(i), *section)),
+                _ => None,
+            })
+            .unwrap_or((None, self.page_setup().section))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +212,54 @@ mod tests {
         uneven.widths[1] = PARTS * 13 / 20;
         let spans = uneven.spans(100.0);
         assert!((spans[1].0 - 35.0).abs() < 1e-6 && (spans[1].1 - 65.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn est_09_est_16_the_cursor_is_in_the_layout_and_section_before_it() {
+        use crate::{ParaAttrs, Position};
+        use std::sync::Arc;
+        let mut document = Document::new_word_processing();
+        let two = Layout {
+            columns: Columns::equal(2, Columns::DEFAULT_GAP),
+            ..Layout::default()
+        };
+        let numbered = Section {
+            first_number: Some(4),
+            ..Section::default()
+        };
+        document
+            .transact("Breaks", |edit| {
+                let first = edit.document().body().get(0).unwrap().id();
+                let mut at = edit.insert_text(Position::new(first, 0), "one")?;
+                for start in [
+                    Start::Layout(two),
+                    Start::Section(numbered, Layout::default()),
+                ] {
+                    at = edit.split_paragraph(at)?;
+                    edit.set_paragraph_attrs(
+                        at,
+                        at,
+                        &ParaAttrs {
+                            start: Some(Some(Arc::new(start))),
+                            column_break_before: Some(true),
+                            ..ParaAttrs::default()
+                        },
+                    )?;
+                    at = edit.insert_text(at, "more")?;
+                }
+                // Reverting to the style keeps the breaks.
+                let last = Position::new(at.paragraph, 0);
+                edit.revert_to_style(last, last)?;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(document.layout_at(0), (None, Layout::default()));
+        assert_eq!(document.layout_at(1), (Some(1), two));
+        assert_eq!(document.section_at(1), (None, Section::default()));
+        assert_eq!(document.section_at(2), (Some(2), numbered));
+        assert_eq!(document.layout_at(2), (Some(2), Layout::default()));
+        let last = document.body().get(2).unwrap().attrs();
+        assert_eq!(last.column_break_before, Some(true));
+        assert!(last.start.is_some());
     }
 }

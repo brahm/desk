@@ -732,6 +732,29 @@ formatting! {
     }
 }
 
+impl ParaAttrs {
+    /// The breaks of the paragraph that are part of the text rather than
+    /// of its formatting: its column break and the section or layout that
+    /// starts at it. Styles never hold them, and reverting or copying a
+    /// style keeps them where they are.
+    pub fn structure(&self) -> Self {
+        Self {
+            column_break_before: self.column_break_before,
+            start: self.start.clone(),
+            ..Self::default()
+        }
+    }
+
+    /// The attributes without [`ParaAttrs::structure`].
+    pub fn without_structure(&self) -> Self {
+        Self {
+            column_break_before: None,
+            start: None,
+            ..self.clone()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
