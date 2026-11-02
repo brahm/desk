@@ -23,10 +23,10 @@ use desk_iwork::sf::{
 };
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, Document, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor,
-    LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, NumberFormat, Op, PageSetup,
-    ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow, StyleId,
-    TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
+    CharacterStyle, Document, FontWeight, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures,
+    LineColor, LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, NumberFormat, Op,
+    PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow,
+    StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 
 use crate::FilterError;
@@ -118,10 +118,34 @@ fn pages_paragraph_defaults() -> ParaFormat {
     }
 }
 
+/// The weights that the names of faces say, the longer names first, so
+/// that `UltraLight` is not read as `Light`, nor `SemiBold` as `Bold`.
+const WEIGHTS: [(&str, u16); 18] = [
+    ("ultralight", 100),
+    ("extralight", 200),
+    ("hairline", 100),
+    ("thin", 100),
+    ("light", 300),
+    ("book", 400),
+    ("regular", 400),
+    ("roman", 400),
+    ("medium", 500),
+    ("semibold", 600),
+    ("demibold", 600),
+    ("demi", 600),
+    ("extrabold", 800),
+    ("ultrabold", 800),
+    ("heavy", 800),
+    ("black", 900),
+    ("ultra", 900),
+    ("bold", 700),
+];
+
 /// The family, weight and slant of a font from its PostScript name, which
 /// is how Pages names fonts: `LiberationSerif-BoldItalic` is Liberation
-/// Serif, bold and italic.
-pub fn font_face(postscript: &str) -> (String, bool, bool) {
+/// Serif, bold and italic, and `HelveticaNeue-UltraLight` is Helvetica
+/// Neue at weight 100.
+pub fn font_face(postscript: &str) -> (String, FontWeight, bool) {
     let (base, style) = postscript.split_once('-').unwrap_or((postscript, ""));
     let base = base
         .strip_suffix("PSMT")
@@ -129,7 +153,10 @@ pub fn font_face(postscript: &str) -> (String, bool, bool) {
         .or_else(|| base.strip_suffix("PS"))
         .unwrap_or(base);
     let style = style.to_ascii_lowercase();
-    let bold = ["bold", "black", "heavy"].iter().any(|w| style.contains(w));
+    let weight = WEIGHTS
+        .iter()
+        .find(|(name, _)| style.contains(name))
+        .map_or(FontWeight::NORMAL, |&(_, w)| FontWeight::new(w));
     let italic = ["italic", "oblique"].iter().any(|w| style.contains(w));
     // Spaces where a lower case letter or a digit meets a capital, or a
     // lower case letter a digit.
@@ -150,7 +177,7 @@ pub fn font_face(postscript: &str) -> (String, bool, bool) {
         family.push(c);
         previous = Some(c);
     }
-    (family, bold, italic)
+    (family, weight, italic)
 }
 
 fn flag(properties: &Properties, name: &str) -> Option<bool> {
@@ -183,7 +210,6 @@ fn rgba(color: desk_iwork::sf::Color) -> Rgba {
 fn char_attrs(properties: &Properties) -> CharAttrs {
     let mut attrs = CharAttrs {
         font_size: points(properties, "fontSize").filter(|s| s.to_pt() > 0.0),
-        bold: flag(properties, "bold"),
         italic: flag(properties, "italic"),
         underline: line(properties, "underline"),
         strikethrough: line(properties, "strikethru"),
@@ -191,14 +217,16 @@ fn char_attrs(properties: &Properties) -> CharAttrs {
         ..CharAttrs::default()
     };
     if let Some(name) = properties.string("fontName").filter(|n| !n.is_empty()) {
-        let (family, bold, italic) = font_face(name);
+        let (family, weight, italic) = font_face(name);
         attrs.font_family = Some(family.as_str().into());
-        if bold {
-            attrs.bold = Some(true);
-        }
+        attrs.weight = Some(weight);
         if italic {
             attrs.italic = Some(true);
         }
+    }
+    // Bold turns the face bold, or takes the bold off it.
+    if let Some(bold) = flag(properties, "bold") {
+        attrs.weight = Some(attrs.weight.unwrap_or_default().with_bold(bold));
     }
     attrs.color = match properties.get("fontColor") {
         Some(Value::Color(color)) => Some(rgba(*color)),
@@ -992,28 +1020,44 @@ mod tests {
     fn font_faces_come_from_postscript_names() {
         assert_eq!(
             font_face("LiberationSerif"),
-            ("Liberation Serif".into(), false, false)
+            ("Liberation Serif".into(), FontWeight::NORMAL, false)
         );
         assert_eq!(
             font_face("LiberationSans-BoldItalic"),
-            ("Liberation Sans".into(), true, true)
+            ("Liberation Sans".into(), FontWeight::BOLD, true)
         );
         assert_eq!(
             font_face("TimesNewRomanPSMT"),
-            ("Times New Roman".into(), false, false)
+            ("Times New Roman".into(), FontWeight::NORMAL, false)
         );
         assert_eq!(
             font_face("Helvetica-Oblique"),
-            ("Helvetica".into(), false, true)
+            ("Helvetica".into(), FontWeight::NORMAL, true)
         );
-        assert_eq!(font_face("ArialMT"), ("Arial".into(), false, false));
+        assert_eq!(
+            font_face("ArialMT"),
+            ("Arial".into(), FontWeight::NORMAL, false)
+        );
         assert_eq!(
             font_face("Bodoni72-Book"),
-            ("Bodoni 72".into(), false, false)
+            ("Bodoni 72".into(), FontWeight::NORMAL, false)
         );
         assert_eq!(
             font_face("HelveticaNeue-Bold"),
-            ("Helvetica Neue".into(), true, false)
+            ("Helvetica Neue".into(), FontWeight::BOLD, false)
         );
+        // Pages '09 documents use the light faces of Helvetica Neue.
+        for (name, weight, italic) in [
+            ("HelveticaNeue-UltraLight", 100, false),
+            ("HelveticaNeue-LightItalic", 300, true),
+            ("HelveticaNeue-Medium", 500, false),
+            ("Futura-CondensedExtraBold", 800, false),
+            ("Avenir-Black", 900, false),
+            ("Optima-ExtraBlack", 900, false),
+            ("Baskerville-SemiBold", 600, false),
+        ] {
+            assert_eq!(font_face(name).1, FontWeight::new(weight), "{name}");
+            assert_eq!(font_face(name).2, italic, "{name}");
+        }
     }
 }

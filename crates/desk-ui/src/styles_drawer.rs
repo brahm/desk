@@ -74,7 +74,7 @@ fn preview(format: &CharFormat) -> pango::AttrList {
     attrs.insert(pango::AttrSize::new(
         (size * f64::from(pango::SCALE)) as i32,
     ));
-    if format.bold {
+    if format.weight.is_bold() {
         attrs.insert(pango::AttrInt::new_weight(pango::Weight::Bold));
     }
     if format.italic {

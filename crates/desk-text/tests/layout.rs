@@ -5,6 +5,7 @@
 //! Liberation Sans, which CI installs, so the widths are the same
 //! everywhere.
 
+use desk_model::FontWeight;
 use std::sync::Arc;
 
 use desk_model::{
@@ -86,7 +87,7 @@ fn empty_paragraph_has_one_line() {
 fn fmt_01_bold_and_italic_pick_their_faces() {
     let mut system = TextSystem::new();
     let bold = CharFormat {
-        bold: true,
+        weight: FontWeight::BOLD,
         ..sans()
     };
     let italic = CharFormat {
@@ -107,6 +108,33 @@ fn fmt_01_bold_and_italic_pick_their_faces() {
     assert_ne!(fonts[0], fonts[1]);
     assert_ne!(fonts[0], fonts[2]);
     assert_ne!(fonts[1], fonts[2]);
+
+    // Weights other than bold pick their own faces, where the family has
+    // them (INT-15).
+    if &*system.font_choice("Inter").used == "Inter" {
+        let inter = |weight| CharFormat {
+            font_family: Arc::from("Inter"),
+            weight,
+            ..CharFormat::default()
+        };
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[
+                ("thin ", inter(FontWeight::THIN)),
+                ("light ", inter(FontWeight::LIGHT)),
+                ("regular", inter(FontWeight::NORMAL)),
+            ],
+        );
+        let fonts: Vec<_> = layout.lines[0]
+            .runs
+            .iter()
+            .map(|r| (r.font.data.id(), r.font.index))
+            .collect();
+        assert_eq!(fonts.len(), 3);
+        assert_ne!(fonts[0], fonts[1]);
+        assert_ne!(fonts[1], fonts[2]);
+    }
 }
 
 #[test]

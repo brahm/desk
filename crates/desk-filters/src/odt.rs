@@ -14,11 +14,11 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, LINE_BREAK,
-    LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, ListLabel,
-    ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder,
-    ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId,
-    TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, FontWeight,
+    LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle,
+    ListLabel, ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs,
+    ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style,
+    StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_odf as odf;
 
@@ -260,7 +260,7 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
     CharAttrs {
         font_family: t.font_family.as_ref().map(|_| family.into()),
         font_size: t.font_size.map(length),
-        bold: t.font_weight.map(|w| w >= 600),
+        weight: t.font_weight.map(FontWeight::new),
         italic: t.italic,
         underline: t.underline.map(line_style),
         strikethrough: t.line_through.map(line_style),
@@ -336,7 +336,7 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         font_family,
         font_size: a.font_size.map(odf_length),
         font_size_percent: None,
-        font_weight: a.bold.map(|b| if b { 700 } else { 400 }),
+        font_weight: a.weight.map(FontWeight::value),
         italic: a.italic,
         underline: a.underline.map(line),
         line_through: a.strikethrough.map(line),

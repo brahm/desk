@@ -182,6 +182,59 @@ impl Language {
     }
 }
 
+/// The weight of a font, from 100 (thin) to 900 (black), as in ODF and
+/// CSS (FMT-01, INT-15). Bold is 700, and the weights from 600 up read as
+/// bold.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FontWeight(u16);
+
+impl FontWeight {
+    /// The thinnest weight.
+    pub const THIN: Self = Self(100);
+    /// Light.
+    pub const LIGHT: Self = Self(300);
+    /// The regular weight.
+    pub const NORMAL: Self = Self(400);
+    /// Medium.
+    pub const MEDIUM: Self = Self(500);
+    /// Bold.
+    pub const BOLD: Self = Self(700);
+    /// The heaviest weight.
+    pub const BLACK: Self = Self(900);
+
+    /// A weight, kept between 100 and 900.
+    pub fn new(weight: u16) -> Self {
+        Self(weight.clamp(100, 900))
+    }
+
+    /// The weight as a number.
+    pub fn value(self) -> u16 {
+        self.0
+    }
+
+    /// Whether the weight reads as bold.
+    pub fn is_bold(self) -> bool {
+        self.0 >= 600
+    }
+
+    /// This weight made bold, or no longer bold: a light face turned
+    /// bold is bold, a black face stays black, and a bold face no longer
+    /// bold is regular.
+    pub fn with_bold(self, bold: bool) -> Self {
+        match (bold, self.is_bold()) {
+            (true, false) => Self::BOLD,
+            (false, true) => Self::NORMAL,
+            _ => self,
+        }
+    }
+}
+
+impl Default for FontWeight {
+    fn default() -> Self {
+        Self::NORMAL
+    }
+}
+
 /// Which ligatures join letters (FMT-09).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Ligatures {
@@ -314,8 +367,8 @@ formatting! {
         font_family: Arc<str> = "Helvetica".into(),
         /// The font size (FMT-05).
         font_size: Length = Length::from_points(12),
-        /// Bold (FMT-01).
-        bold: bool = false,
+        /// The weight of the face, bold among them (FMT-01, INT-15).
+        weight: FontWeight = FontWeight::NORMAL,
         /// Italic (FMT-01).
         italic: bool = false,
         /// Underline (FMT-01).
@@ -672,7 +725,7 @@ mod tests {
     #[test]
     fn merge_overrides_only_what_is_set() {
         let mut attrs = CharAttrs {
-            bold: Some(true),
+            weight: Some(FontWeight::BOLD),
             italic: Some(true),
             ..CharAttrs::default()
         };
@@ -681,11 +734,21 @@ mod tests {
             font_size: Some(Length::from_points(14)),
             ..CharAttrs::default()
         });
-        assert_eq!(attrs.bold, Some(true));
+        assert_eq!(attrs.weight, Some(FontWeight::BOLD));
         assert_eq!(attrs.italic, Some(false));
         assert_eq!(attrs.font_size, Some(Length::from_points(14)));
         assert!(!attrs.is_empty());
         assert!(CharAttrs::default().is_empty());
+    }
+
+    #[test]
+    fn weights_turn_bold_and_back() {
+        assert_eq!(FontWeight::LIGHT.with_bold(true), FontWeight::BOLD);
+        assert_eq!(FontWeight::BLACK.with_bold(true), FontWeight::BLACK);
+        assert_eq!(FontWeight::BLACK.with_bold(false), FontWeight::NORMAL);
+        assert_eq!(FontWeight::LIGHT.with_bold(false), FontWeight::LIGHT);
+        assert_eq!(FontWeight::new(1000), FontWeight::BLACK);
+        assert!(FontWeight::new(600).is_bold());
     }
 
     #[test]

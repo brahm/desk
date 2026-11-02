@@ -7,6 +7,7 @@
 
 use desk_filters::odt::{export, import};
 use desk_filters::{read_odt, write_odt};
+use desk_model::FontWeight;
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharacterStyle,
     Document, FontFeature, FontFeatures, LINE_BREAK, Language, Length, Ligatures, LineColor,
@@ -141,7 +142,7 @@ fn sample() -> Document {
             character: CharAttrs {
                 font_family: Some("Liberation Sans".into()),
                 font_size: Some(Length::from_points(18)),
-                bold: Some(true),
+                weight: Some(FontWeight::BOLD),
                 capitalization: Some(Capitalization::SmallCaps),
                 ligatures: Some(Ligatures::None),
                 font_features: Some(FontFeatures::new(FontFeature::new("onum", 1))),
@@ -191,7 +192,7 @@ fn sample() -> Document {
             shortcut: None,
             parent: Some(emphasis),
             character: CharAttrs {
-                bold: Some(true),
+                weight: Some(FontWeight::BOLD),
                 ..CharAttrs::default()
             },
         })
@@ -214,6 +215,15 @@ fn sample() -> Document {
                         strikethrough: Some(LineStyle::Double),
                         strikethrough_color: Some(LineColor::Custom(Rgba::rgb(255, 0, 0))),
                         underline: Some(LineStyle::Single),
+                        ..CharAttrs::default()
+                    },
+                ),
+                Run::new(" "),
+                Run::with_attrs(
+                    "ultralight",
+                    None,
+                    CharAttrs {
+                        weight: Some(FontWeight::THIN),
                         ..CharAttrs::default()
                     },
                 ),
@@ -525,7 +535,7 @@ fn fmt_files_from_other_programs_map_to_styles_and_direct_formatting() {
     assert_eq!(runs.len(), 3);
     let resolve = |run: &Run| styles.resolve_character(paragraph.style(), run.style, &run.attrs);
     // FMT-01 from the paragraph's automatic style, on every run.
-    assert!(runs.iter().all(|r| resolve(r).bold));
+    assert!(runs.iter().all(|r| resolve(r).weight.is_bold()));
     assert_eq!(&*resolve(runs[0]).font_family, "Liberation Serif");
     // FMT-06 and FMT-11.
     assert_eq!(resolve(runs[1]).baseline, Baseline::Superscript);

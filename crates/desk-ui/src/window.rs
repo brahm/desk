@@ -495,7 +495,7 @@ impl DocumentWindow {
         self.vertical_ruler.show(setup, &format.paragraph);
         let character = &format.character;
         for (name, on) in [
-            ("bold", character.bold),
+            ("bold", character.weight.is_bold()),
             ("italic", character.italic),
             ("underline", character.underline != LineStyle::None),
             ("strikethrough", character.strikethrough != LineStyle::None),
@@ -1080,8 +1080,10 @@ impl DocumentWindow {
                     LineStyle::None
                 });
                 let attrs = match name {
+                    // A light face turned bold is bold, and a black face
+                    // stays as it is.
                     "bold" => CharAttrs {
-                        bold: Some(on),
+                        weight: Some(editor.format().character.weight.with_bold(on)),
                         ..CharAttrs::default()
                     },
                     "italic" => CharAttrs {

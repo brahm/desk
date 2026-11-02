@@ -42,9 +42,9 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use desk_model::{
-    Alignment, Baseline, Capitalization, CharAttrs, Document, LINE_BREAK, Length, LineSpacing,
-    LineStyle, Metadata, ModelError, Op, PageSetup, ParaAttrs, Paragraph, ParagraphStyle, Rgba,
-    Run,
+    Alignment, Baseline, Capitalization, CharAttrs, Document, FontWeight, LINE_BREAK, Length,
+    LineSpacing, LineStyle, Metadata, ModelError, Op, PageSetup, ParaAttrs, Paragraph,
+    ParagraphStyle, Rgba, Run,
 };
 use serde::Deserialize;
 
@@ -267,6 +267,8 @@ pub struct ParagraphSpec {
     pub size: Option<f64>,
     /// Bold.
     pub bold: Option<bool>,
+    /// The weight of the face, from 100 to 900, over `bold`.
+    pub weight: Option<u16>,
     /// Italic.
     pub italic: Option<bool>,
     /// `single` or `double`.
@@ -293,6 +295,8 @@ pub struct RunSpec {
     pub size: Option<f64>,
     /// Bold.
     pub bold: Option<bool>,
+    /// The weight of the face, from 100 to 900, over `bold`.
+    pub weight: Option<u16>,
     /// Italic.
     pub italic: Option<bool>,
     /// `single` or `double`.
@@ -313,6 +317,7 @@ pub struct CharSpec<'a> {
     font: Option<&'a str>,
     size: Option<f64>,
     bold: Option<bool>,
+    weight: Option<u16>,
     italic: Option<bool>,
     underline: Option<LineSpec>,
     strikethrough: Option<LineSpec>,
@@ -330,6 +335,7 @@ macro_rules! char_spec {
                     font: self.font.as_deref(),
                     size: self.size,
                     bold: self.bold,
+                    weight: self.weight,
                     italic: self.italic,
                     underline: self.underline,
                     strikethrough: self.strikethrough,
@@ -581,7 +587,13 @@ fn char_attrs(c: CharSpec<'_>) -> CharAttrs {
     CharAttrs {
         font_family: c.font.map(Into::into),
         font_size: c.size.map(Length::from_pt),
-        bold: c.bold,
+        weight: c.weight.map(FontWeight::new).or(c.bold.map(|b| {
+            if b {
+                FontWeight::BOLD
+            } else {
+                FontWeight::NORMAL
+            }
+        })),
         italic: c.italic,
         underline: line(c.underline),
         strikethrough: line(c.strikethrough),
@@ -731,7 +743,7 @@ mod tests {
             Some(LineSpacing::AtLeast(Length::from_points(14)))
         );
         let bold = &last.runs().nth(1).unwrap().attrs;
-        assert_eq!(bold.bold, Some(true));
+        assert_eq!(bold.weight, Some(FontWeight::BOLD));
         assert_eq!(bold.color, Some(Rgba::rgb(255, 0, 0)));
         let styles = document.styles();
         let body = styles.get(styles.default_paragraph()).unwrap();

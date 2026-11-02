@@ -4,6 +4,7 @@
 //! Model tests for working with styles (STY-02 to STY-10). Each test name
 //! starts with the row ID.
 
+use desk_model::FontWeight;
 use desk_model::{
     Alignment, CharAttrs, CharacterStyle, Document, Editor, Length, ModelError, ParaAttrs,
     ParagraphStyle, Position, Style, StyleFamily, StyleId,
@@ -20,7 +21,7 @@ fn editor() -> (Editor, StyleId) {
             let id = edit.new_id();
             let mut style = ParagraphStyle::new(id, "Heading");
             style.paragraph.alignment = Some(Alignment::Center);
-            style.character.bold = Some(true);
+            style.character.weight = Some(FontWeight::BOLD);
             style.character.font_size = Some(Length::from_points(18));
             edit.apply(desk_model::Op::PutStyle {
                 style: style.into(),
@@ -119,7 +120,7 @@ fn sty_03_character_style_from_selection_takes_the_chosen_attributes() {
                 b,
                 &CharAttrs {
                     italic: Some(true),
-                    bold: Some(true),
+                    weight: Some(FontWeight::BOLD),
                     ..CharAttrs::default()
                 },
             )
@@ -131,7 +132,7 @@ fn sty_03_character_style_from_selection_takes_the_chosen_attributes() {
         attrs,
         CharAttrs {
             italic: Some(true),
-            bold: Some(true),
+            weight: Some(FontWeight::BOLD),
             ..CharAttrs::default()
         }
     );
@@ -173,7 +174,7 @@ fn sty_02_character_styles_survive_a_new_paragraph_style() {
     let p = paragraph(&editor, 0);
     assert_eq!(p.style(), heading);
     assert!(p.runs().any(|run| run.style == Some(id)));
-    assert!(look(&editor, 0, 4).italic && look(&editor, 0, 4).bold);
+    assert!(look(&editor, 0, 4).italic && look(&editor, 0, 4).weight.is_bold());
 }
 
 #[test]
@@ -336,7 +337,7 @@ fn sty_06_overrides_redefine_and_revert() {
                 a,
                 end,
                 &CharAttrs {
-                    bold: Some(false),
+                    weight: Some(FontWeight::NORMAL),
                     ..CharAttrs::default()
                 },
             )
@@ -347,7 +348,7 @@ fn sty_06_overrides_redefine_and_revert() {
         .edit("Revert to Defined Style", |edit| edit.revert_to_style(a, a))
         .unwrap();
     assert!(!editor.document().overrides(a, a).unwrap().paragraph);
-    assert!(look(&editor, 0, 0).bold);
+    assert!(look(&editor, 0, 0).weight.is_bold());
 }
 
 #[test]
@@ -362,7 +363,7 @@ fn sty_06_redefining_a_paragraph_style_keeps_character_styles() {
                 a,
                 b,
                 &CharAttrs {
-                    bold: Some(false),
+                    weight: Some(FontWeight::NORMAL),
                     ..CharAttrs::default()
                 },
             )?;
@@ -384,7 +385,7 @@ fn sty_06_redefining_a_paragraph_style_keeps_character_styles() {
         .unwrap()
         .clone();
     assert_eq!(style.character.italic, None);
-    assert_eq!(style.character.bold, Some(true));
+    assert_eq!(style.character.weight, Some(FontWeight::BOLD));
     assert!(editor.document().overrides(a, b).unwrap().character);
     // Redefining the character style takes the bold off into it.
     editor
@@ -396,7 +397,7 @@ fn sty_06_redefining_a_paragraph_style_keeps_character_styles() {
         .character(slanted)
         .unwrap()
         .clone();
-    assert_eq!(style.character.bold, Some(false));
+    assert_eq!(style.character.weight, Some(FontWeight::NORMAL));
     assert!(!editor.document().overrides(a, b).unwrap().character);
 }
 
@@ -460,7 +461,7 @@ fn sty_08_paste_style_brings_the_style_into_another_document() {
         .id();
     assert_eq!(paragraph(&target, 0).style(), pasted);
     let format = look(&target, 0, 0);
-    assert!(format.bold && format.italic);
+    assert!(format.weight.is_bold() && format.italic);
     assert_eq!(format.font_size, Length::from_points(18));
     // The text after the selection only takes the paragraph style.
     assert!(!look(&target, 0, 7).italic);
@@ -513,7 +514,7 @@ fn sty_10_import_replaces_or_renames_duplicates() {
     assert_ne!(ids[0], body);
     assert_eq!(styles.get(ids[1]).unwrap().name(), "Heading");
     let look = styles.resolve_character(ids[1], None, &CharAttrs::default());
-    assert!(look.bold);
+    assert!(look.weight.is_bold());
     assert_eq!(look.font_size, Length::from_points(18));
     assert!(styles.character(ids[2]).unwrap().character.italic == Some(true));
     // Again, replacing: the styles keep their identifiers.

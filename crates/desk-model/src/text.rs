@@ -422,6 +422,7 @@ impl TextFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::FontWeight;
 
     fn id(n: u64) -> NodeId {
         NodeId::new(n).unwrap()
@@ -429,7 +430,7 @@ mod tests {
 
     fn bold() -> CharAttrs {
         CharAttrs {
-            bold: Some(true),
+            weight: Some(FontWeight::BOLD),
             ..CharAttrs::default()
         }
     }

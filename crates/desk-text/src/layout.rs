@@ -937,11 +937,7 @@ fn properties<'a>(
     let mut properties = vec![
         StyleProperty::FontFamily(FontFamily::named(family)),
         StyleProperty::FontSize(size),
-        StyleProperty::FontWeight(if format.bold {
-            FontWeight::BOLD
-        } else {
-            FontWeight::NORMAL
-        }),
+        StyleProperty::FontWeight(FontWeight::new(f32::from(format.weight.value()))),
         StyleProperty::FontStyle(if format.italic {
             FontStyle::Italic
         } else {
