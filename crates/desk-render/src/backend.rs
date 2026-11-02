@@ -62,6 +62,8 @@ impl From<std::io::Error> for RenderError {
 pub struct Painter {
     library: freetype::Library,
     faces: HashMap<(u64, u32), FontFace>,
+    /// The pictures decoded so far.
+    pictures: Vec<(desk_model::Picture, cairo::ImageSurface)>,
 }
 
 impl Painter {
@@ -70,7 +72,27 @@ impl Painter {
         Ok(Self {
             library: freetype::Library::init()?,
             faces: HashMap::new(),
+            pictures: Vec::new(),
         })
+    }
+
+    /// The picture decoded, or `None` when Cairo cannot read it.
+    fn picture(&mut self, picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
+        if let Some((_, surface)) = self
+            .pictures
+            .iter()
+            .find(|(p, _)| p.same_data(picture) || p == picture)
+        {
+            return Some(surface.clone());
+        }
+        let surface =
+            cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.png())).ok()?;
+        // A bound on the memory of long sessions.
+        if self.pictures.len() > 64 {
+            self.pictures.clear();
+        }
+        self.pictures.push((picture.clone(), surface.clone()));
+        Some(surface)
     }
 
     fn face(&mut self, font: &FontData) -> Result<FontFace, RenderError> {
@@ -182,6 +204,27 @@ impl Painter {
                     }
                     cr.stroke()?;
                     cr.set_dash(&[], 0.0);
+                }
+                Item::Image {
+                    picture,
+                    x,
+                    y,
+                    width,
+                    height,
+                } => {
+                    let Some(surface) = self.picture(picture) else {
+                        continue;
+                    };
+                    cr.save()?;
+                    cr.translate(f64::from(*x), f64::from(*y));
+                    cr.scale(
+                        f64::from(*width) / f64::from(surface.width().max(1)),
+                        f64::from(*height) / f64::from(surface.height().max(1)),
+                    );
+                    cr.set_source_surface(&surface, 0.0, 0.0)?;
+                    cr.source().set_filter(cairo::Filter::Good);
+                    cr.paint()?;
+                    cr.restore()?;
                 }
                 Item::Rect {
                     x,

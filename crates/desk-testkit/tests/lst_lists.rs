@@ -76,9 +76,8 @@ fn lst_02_levels_match_pages() {
 fn lst_03_bullets_match_pages() {
     let name = "lst-03-bullets";
     let (document, reference, desk) = render(name);
-    // The image bullet is drawn as a text bullet: the line with the
-    // custom bullet matches, and the other has its words in place after
-    // the bullet that Desk adds.
+    // The words of both lines are where Pages put them, after the image
+    // bullet in the second.
     let line = |words: &[Vec<Word>], text: &str| -> Vec<Word> {
         words[0]
             .iter()
@@ -91,18 +90,39 @@ fn lst_03_bullets_match_pages() {
         &[line(&reference, "Custom")],
         &[line(&desk, "Custom")],
     );
-    let image = |words: &[Vec<Word>]| -> Vec<Word> {
-        line(words, "Image")
-            .into_iter()
-            .filter(|w| w.text != "\u{2022}")
-            .collect()
-    };
+    let image = |words: &[Vec<Word>]| line(words, "Image");
     check(name, &[image(&reference)], &[image(&desk)]);
-    assert_eq!(labels(&document), ["+", "\u{2022}"]);
+    assert_eq!(labels(&document), ["+", ""]);
     let items = document.styles().list_items(document.body().iter());
     let custom = &items[0].as_ref().unwrap().definition;
     assert_eq!(custom.size, 150);
     assert_eq!(custom.label, ListLabel::bullet("+"));
+    let picture = &items[1].as_ref().unwrap().definition;
+    assert!(matches!(picture.label, ListLabel::Image(_)));
+    // The picture is a 12 point square where Pages drew it, a third of it
+    // below the baseline.
+    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let page = DisplayList::pages(&layout).remove(0);
+    let drawn = page
+        .items
+        .iter()
+        .find_map(|item| match item {
+            desk_render::Item::Image {
+                x,
+                y,
+                width,
+                height,
+                ..
+            } => Some((*x, *y, *width, *height)),
+            _ => None,
+        })
+        .expect("the picture is drawn");
+    for (desk, pages) in [drawn.0, drawn.1, drawn.2, drawn.3]
+        .into_iter()
+        .zip([57.0, 74.0, 12.0, 12.0])
+    {
+        assert!((desk - pages).abs() < 1.0, "{drawn:?}");
+    }
 }
 
 #[test]

@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use crate::ns;
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, ListLabel, ListStyle, Meta, PageLayout, Paragraph, ParagraphProperties, Properties,
-    Style, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow,
+    LineHeight, ListLabel, ListMember, ListStyle, Meta, PageLayout, Paragraph, ParagraphProperties,
+    Properties, Style, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow,
     TextTransform,
 };
 use crate::units::{Length, decimal};
@@ -40,6 +40,7 @@ fn root(w: &mut Writer, name: &'static str) {
         .attr("xmlns:svg", ns::SVG)
         .attr("xmlns:meta", ns::META)
         .attr("xmlns:dc", ns::DC)
+        .attr("xmlns:xlink", ns::XLINK)
         .attr("xmlns:desk", ns::DESK)
         .attr("office:version", VERSION);
 }
@@ -239,6 +240,18 @@ fn write_list_style(w: &mut Writer, style: &ListStyle) {
                     w.attr("text:bullet-relative-size", &format!("{}%", decimal(size)));
                 }
             }
+            ListLabel::Image { href, raise, .. } => {
+                w.start("text:list-level-style-image")
+                    .attr("text:level", &level.level.to_string())
+                    .attr("xlink:type", "simple")
+                    .attr("xlink:href", href)
+                    .attr("xlink:show", "embed")
+                    .attr("xlink:actuate", "onLoad");
+                if let Some(size) = level.relative_size {
+                    w.attr("desk:relative-size", &format!("{}%", decimal(size)));
+                }
+                len(w, "desk:raise", *raise);
+            }
             ListLabel::Number {
                 format,
                 prefix,
@@ -263,11 +276,17 @@ fn write_list_style(w: &mut Writer, style: &ListStyle) {
                 }
             }
         }
+        let image = matches!(level.label, ListLabel::Image { .. });
         w.start("style:list-level-properties");
         len(w, "text:space-before", level.space_before);
         len(w, "text:min-label-width", level.min_label_width);
+        if let ListLabel::Image { width, height, .. } = &level.label {
+            len(w, "fo:width", *width);
+            len(w, "fo:height", *height);
+        }
         w.end();
-        if level.text != TextProperties::default() {
+        // A picture has no text properties.
+        if !image && level.text != TextProperties::default() {
             w.start("style:text-properties");
             text_attrs(w, &level.text);
             w.end();
@@ -308,17 +327,20 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
         }
         let depth = usize::from(member.level) + 1;
         close_to(w, &mut open, depth);
-        let start_item = |w: &mut Writer, start: Option<u32>| {
+        let start_item = |w: &mut Writer, item: Option<&ListMember>| {
             w.start("text:list-item");
-            if let Some(start) = start {
+            if let Some(start) = item.and_then(|m| m.start) {
                 w.attr("text:start-value", &start.to_string());
+            }
+            if let Some(style) = item.and_then(|m| m.style_override.as_deref()) {
+                w.attr("text:style-override", style);
             }
         };
         if open.len() == depth {
             if open[depth - 1] {
                 w.end();
             }
-            start_item(w, member.start);
+            start_item(w, Some(member));
             open[depth - 1] = true;
         }
         while open.len() < depth {
@@ -330,7 +352,7 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
             w.start("text:list");
             open.push(false);
             if open.len() == depth {
-                start_item(w, member.start);
+                start_item(w, Some(member));
                 open[depth - 1] = true;
             }
         }

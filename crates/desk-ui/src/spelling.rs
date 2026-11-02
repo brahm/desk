@@ -70,6 +70,9 @@ pub fn issue_description(kind: IssueKind) -> String {
         IssueKind::SpaceBeforePunctuation => tr("Space before punctuation"),
         IssueKind::MissingSpace => tr("Missing space after punctuation"),
         IssueKind::Capitalization => tr("A sentence starts with a small letter"),
+        IssueKind::Wordy => tr("Wordy phrase"),
+        IssueKind::Jargon => tr("Jargon"),
+        IssueKind::Gendered => tr("Gendered term"),
     }
 }
 
@@ -242,7 +245,27 @@ pub fn mistakes(
         }
     }
     if proofreading {
-        for issue in desk_lang::proofread(&text) {
+        let mut issues = desk_lang::proofread(&text);
+        // The rules of style of each language, in the runs of that
+        // language.
+        let mut seen: Vec<&str> = Vec::new();
+        for (_, language) in &languages {
+            if seen.contains(&language.as_str()) {
+                continue;
+            }
+            seen.push(language);
+            issues.extend(
+                desk_lang::style_issues(&text, language)
+                    .into_iter()
+                    .filter(|issue| {
+                        languages
+                            .iter()
+                            .find(|(r, _)| r.contains(&issue.range.start))
+                            .is_some_and(|(_, l)| l == language)
+                    }),
+            );
+        }
+        for issue in issues {
             if out
                 .iter()
                 .any(|m| m.range.start < issue.range.end && issue.range.start < m.range.end)
@@ -294,6 +317,46 @@ mod tests {
         );
         assert_eq!(found[0].suggestions(&paragraph.text()), ["is"]);
         assert!(mistakes(document.styles(), paragraph, false, false).is_empty());
+    }
+
+    #[test]
+    fn txt_11_english_runs_have_rules_of_style() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        let end = editor
+            .edit("Typing", |edit| {
+                edit.insert_text(start, "Utilize it in order to win")
+            })
+            .unwrap();
+        let language = |tag: &str| CharAttrs {
+            language: Some(Language::new(tag)),
+            ..CharAttrs::default()
+        };
+        editor
+            .edit("Language", |edit| {
+                edit.set_character_attrs(start, end, &language("en-US"))
+            })
+            .unwrap();
+        let document = editor.document();
+        let paragraph = document.body().get(0).unwrap();
+        let found = mistakes(document.styles(), paragraph, false, true);
+        let kinds: Vec<_> = found
+            .iter()
+            .filter_map(|m| match &m.kind {
+                MistakeKind::Proofreading(issue) => Some(issue.kind),
+                MistakeKind::Spelling { .. } => None,
+            })
+            .collect();
+        assert_eq!(kinds, [IssueKind::Jargon, IssueKind::Wordy]);
+        assert_eq!(found[0].suggestions(&paragraph.text()), ["Use"]);
+        editor
+            .edit("Language", |edit| {
+                edit.set_character_attrs(start, end, &language("pt-BR"))
+            })
+            .unwrap();
+        let document = editor.document();
+        let paragraph = document.body().get(0).unwrap();
+        assert!(mistakes(document.styles(), paragraph, false, true).is_empty());
     }
 
     #[test]

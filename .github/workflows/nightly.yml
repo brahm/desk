@@ -51,6 +51,14 @@ jobs:
           flatpak install --user --noninteractive --assumeyes desk-writer-nightly.flatpak
           flatpak info --user br.com.brahm.Desk.Writer
           flatpak run --user --command=sh br.com.brahm.Desk.Writer -c 'test -x /app/bin/desk-writer && ls /app/share/applications /app/share/metainfo'
+          # The substitute fonts and the dictionaries come with the app.
+          flatpak run --user --command=sh br.com.brahm.Desk.Writer -c '
+            for family in "Liberation Sans" Carlito Caladea "TeX Gyre Heros" "Nimbus Sans" P052 "DejaVu Sans Mono"; do
+              fc-list : family | tr "," "\n" | grep -qx "$family" || { echo "missing font: $family"; exit 1; }
+            done
+            for file in hunspell/en_US.dic hunspell/en_GB.dic hunspell/pt_BR.dic hyphen/hyph_en_US.dic hyphen/hyph_pt_BR.dic; do
+              test -s "/app/share/$file" || { echo "missing: $file"; exit 1; }
+            done'
       - name: Keep the bundle
         uses: actions/upload-artifact@v4
         with:

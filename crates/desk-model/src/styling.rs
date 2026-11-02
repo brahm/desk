@@ -90,6 +90,8 @@ pub struct Overrides {
     pub paragraph: bool,
     /// Whether text with a character style sets attributes over it.
     pub character: bool,
+    /// Whether a list item has a level of its own over its list style.
+    pub list: bool,
 }
 
 impl Document {
@@ -271,7 +273,13 @@ impl Document {
         let ranges = self.paragraph_ranges(start, end)?;
         for (id, range) in ranges {
             let paragraph = self.paragraph(id)?;
-            overrides.paragraph |= !paragraph.attrs().is_empty();
+            let own = paragraph.attrs();
+            overrides.list |= matches!(own.list_override, Some(Some(_)));
+            overrides.paragraph |= !ParaAttrs {
+                list_override: None,
+                ..own.clone()
+            }
+            .is_empty();
             let mut look = |style: Option<StyleId>, attrs: &CharAttrs| {
                 if !attrs.is_empty() {
                     if style.is_some() {
@@ -511,6 +519,7 @@ impl Edit {
                 let paragraph = document.paragraph(start.paragraph)?;
                 let para_attrs = ParaAttrs {
                     list_start: None,
+                    list_override: None,
                     ..paragraph.attrs().clone()
                 };
                 let char_attrs = if run_style.is_none() {
@@ -538,9 +547,8 @@ impl Edit {
                 }
                 Ok(())
             }
-            // A list style has nothing set over it: the levels are only
-            // set on the style.
-            Some(Style::List(_)) => Ok(()),
+            // A list style takes the level of its own of the item.
+            Some(Style::List(_)) => self.redefine_list_style(start, end),
             Some(Style::Character(mut style)) => {
                 let attrs = if run_style == Some(id) {
                     run_attrs

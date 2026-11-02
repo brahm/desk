@@ -894,13 +894,16 @@ fn lst_02_05_lists_are_kept() {
             let mut level = edit.document().styles().list(bullet).unwrap().levels[1].clone();
             level.size = 150;
             level.scale_with_text = false;
-            edit.set_list_level(bullet, 1, level)
+            edit.set_list_level(bullet, 1, level)?;
+            // An item with a bullet of its own over its list style.
+            let f = at(edit, 6);
+            edit.change_list_items(f, f, |level| level.label = ListLabel::bullet("*"))
         })
         .unwrap();
     let document = editor.document().clone();
     assert_eq!(
         labels(&document),
-        ["1.", "1.1.", "1.1.1.", "2.", "", "->", "->", "3.", "5."]
+        ["1.", "1.1.", "1.1.1.", "2.", "", "->", "*", "3.", "5."]
     );
     let bytes = write_odt(&document).unwrap();
     keep("filters-lists.odt", &bytes);

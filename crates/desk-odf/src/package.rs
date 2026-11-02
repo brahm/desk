@@ -68,6 +68,31 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
         .as_deref()
         .map(crate::read::text_settings)
         .unwrap_or_default();
+    // The pictures that the lists link to inside the package.
+    let mut hrefs: Vec<String> = document
+        .list_styles
+        .iter()
+        .chain(&document.automatic_list_styles)
+        .flat_map(|s| &s.levels)
+        .filter_map(|l| match &l.label {
+            crate::text::ListLabel::Image { href, .. } => Some(href.clone()),
+            _ => None,
+        })
+        .filter(|href| !href.contains("://") && !href.starts_with('/'))
+        .collect();
+    hrefs.sort();
+    hrefs.dedup();
+    for href in hrefs {
+        let path = href.strip_prefix("./").unwrap_or(&href);
+        let Ok(file) = archive.by_name(path) else {
+            continue;
+        };
+        let mut bytes = Vec::new();
+        file.take(MAX_STREAM + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 <= MAX_STREAM {
+            document.pictures.push((href, bytes));
+        }
+    }
     Ok(document)
 }
 
@@ -99,7 +124,11 @@ pub fn write_odt_with_thumbnail(
         ("meta.xml", &streams.meta),
         (
             "META-INF/manifest.xml",
-            &manifest(thumbnail.is_some(), streams.settings.is_some()),
+            &manifest(
+                thumbnail.is_some(),
+                streams.settings.is_some(),
+                &document.pictures,
+            ),
         ),
     ] {
         zip.start_file(name, deflated)?;
@@ -109,6 +138,11 @@ pub fn write_odt_with_thumbnail(
         zip.start_file("settings.xml", deflated)?;
         zip.write_all(settings.as_bytes())?;
     }
+    for (path, bytes) in &document.pictures {
+        // Pictures are compressed already.
+        zip.start_file(path.as_str(), stored)?;
+        zip.write_all(bytes)?;
+    }
     if let Some(png) = thumbnail {
         // PNG is compressed already.
         zip.start_file(THUMBNAIL, stored)?;
@@ -117,7 +151,24 @@ pub fn write_odt_with_thumbnail(
     Ok(zip.finish()?.into_inner())
 }
 
-fn manifest(thumbnail: bool, settings: bool) -> String {
+/// The media type of a picture, by the extension of its path.
+fn picture_type(path: &str) -> &'static str {
+    match path
+        .rsplit('.')
+        .next()
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("svg") => "image/svg+xml",
+        Some("tif" | "tiff") => "image/tiff",
+        _ => "application/octet-stream",
+    }
+}
+
+fn manifest(thumbnail: bool, settings: bool, pictures: &[(String, Vec<u8>)]) -> String {
     let mut w = crate::xml::Writer::new();
     w.start("manifest:manifest")
         .attr("xmlns:manifest", crate::ns::MANIFEST)
@@ -138,6 +189,12 @@ fn manifest(thumbnail: bool, settings: bool) -> String {
         w.start("manifest:file-entry")
             .attr("manifest:full-path", THUMBNAIL)
             .attr("manifest:media-type", "image/png")
+            .end();
+    }
+    for (path, _) in pictures {
+        w.start("manifest:file-entry")
+            .attr("manifest:full-path", path)
+            .attr("manifest:media-type", picture_type(path))
             .end();
     }
     w.end();

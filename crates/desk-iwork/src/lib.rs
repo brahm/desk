@@ -33,12 +33,29 @@ pub use error::IworkError;
 pub use package::{INDEX, INDEX_GZ, MAX_INDEX, read_index, read_index_at};
 pub use pages::{PagesDocument, parse_pages};
 
-/// Reads a Pages document from the bytes of a flat file or of its index.
+/// Reads a Pages document from the bytes of a flat file or of its index,
+/// with the files of the package that it uses.
 pub fn read_pages(bytes: &[u8]) -> Result<PagesDocument, IworkError> {
-    parse_pages(&read_index(bytes)?)
+    let mut document = parse_pages(&read_index(bytes)?)?;
+    for name in document.file_paths() {
+        if let Some(file) = package::read_file(bytes, &name) {
+            document.files.push((name, file));
+        }
+    }
+    Ok(document)
 }
 
-/// Reads a Pages document on disk, a package folder or a flat file.
+/// Reads a Pages document on disk, a package folder or a flat file, with
+/// the files of the package that it uses.
 pub fn read_pages_at(path: &Path) -> Result<PagesDocument, IworkError> {
-    parse_pages(&read_index_at(path)?)
+    if !path.is_dir() {
+        return read_pages(&package::limited(std::fs::File::open(path)?)?);
+    }
+    let mut document = parse_pages(&read_index_at(path)?)?;
+    for name in document.file_paths() {
+        if let Some(file) = package::read_file_at(path, &name) {
+            document.files.push((name, file));
+        }
+    }
+    Ok(document)
 }

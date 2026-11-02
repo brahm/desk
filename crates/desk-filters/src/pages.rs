@@ -414,6 +414,7 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
         list_style: None,
         list_level: None,
         list_start: None,
+        list_override: None,
     }
 }
 
@@ -484,6 +485,8 @@ fn is_named(style: &IworkStyle) -> bool {
 
 struct Importer<'a> {
     sheet: &'a Stylesheet,
+    /// The pictures of the package, by path.
+    pictures: &'a [(String, desk_model::Picture)],
     document: Document,
     /// The model style of each named style, by identifier.
     ids: HashMap<(Family, String), StyleId>,
@@ -494,7 +497,11 @@ struct Importer<'a> {
 }
 
 /// The levels of a list style of Pages, through its parents.
-fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LEVELS] {
+fn list_levels(
+    sheet: &Stylesheet,
+    style: &sf::ListStyle,
+    pictures: &[(String, desk_model::Picture)],
+) -> [ListLevel; LIST_LEVELS] {
     let chain = sheet.list_ancestry(style);
     fn get<'a, T>(
         chain: &[&'a sf::ListStyle],
@@ -507,7 +514,16 @@ fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LE
         let label = get(&chain, |s| s.labels.as_ref(), level);
         let (label, start) = match label {
             None | Some(sf::ListLabel::None) => (ListLabel::None, 1),
-            Some(sf::ListLabel::Image) => (ListLabel::bullet("\u{2022}"), 1),
+            // The picture, or a bullet in its place when it cannot be read.
+            Some(sf::ListLabel::Image(path)) => (
+                path.as_deref()
+                    .and_then(|path| pictures.iter().find(|(p, _)| p == path))
+                    .map_or_else(
+                        || ListLabel::bullet("\u{2022}"),
+                        |(_, picture)| ListLabel::Image(picture.clone()),
+                    ),
+                1,
+            ),
             Some(sf::ListLabel::Text {
                 kind,
                 format,
@@ -548,7 +564,7 @@ fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LE
         let mut text_indent = indent(|s| s.text_indents.as_ref());
         if matches!(
             get(&chain, |s| s.labels.as_ref(), level),
-            Some(sf::ListLabel::Image)
+            Some(sf::ListLabel::Image(_))
         ) {
             // The picture is a square as tall as 12 point text, scaled,
             // and the text starts after it, as after a text bullet that
@@ -570,11 +586,15 @@ fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LE
 }
 
 impl<'a> Importer<'a> {
-    fn new(sheet: &'a Stylesheet) -> Result<Self, FilterError> {
+    fn new(
+        sheet: &'a Stylesheet,
+        pictures: &'a [(String, desk_model::Picture)],
+    ) -> Result<Self, FilterError> {
         let document = Document::new_word_processing();
         let body = document.styles().default_paragraph();
         let mut importer = Self {
             sheet,
+            pictures,
             document,
             ids: HashMap::new(),
             lists: HashMap::new(),
@@ -771,7 +791,7 @@ impl<'a> Importer<'a> {
             return Ok(*found);
         }
         let sheet = self.sheet;
-        let levels = list_levels(sheet, style);
+        let levels = list_levels(sheet, style, self.pictures);
         let found = if levels.iter().all(|l| !l.label.is_some()) {
             None
         } else {
@@ -950,14 +970,27 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     if source.page.facing {
         log.add(Warning::Setting(Setting::FacingPages), 1);
     }
+    // Image bullets are kept when their pictures can be read.
+    let pictures: Vec<(String, desk_model::Picture)> = source
+        .files
+        .iter()
+        .filter_map(|(path, bytes)| Some((path.clone(), crate::picture::picture(bytes)?)))
+        .collect();
+    let images_kept = source
+        .file_paths()
+        .iter()
+        .all(|path| pictures.iter().any(|(p, _)| p == path));
     // Each paragraph counts once for each kind of formatting it loses.
     for paragraph in &source.body {
         for formatting in paragraph_losses(&source.stylesheet, paragraph) {
+            if formatting == Formatting::ImageBullets && images_kept {
+                continue;
+            }
             log.add(Warning::Formatting(formatting), 1);
         }
     }
 
-    let mut importer = Importer::new(&source.stylesheet)?;
+    let mut importer = Importer::new(&source.stylesheet, &pictures)?;
     let first = importer
         .document
         .body()

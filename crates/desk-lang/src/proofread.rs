@@ -4,7 +4,8 @@
 //! The proofreader (TXT-11): mistakes of writing that are not spelling,
 //! in any language. It finds repeated words, extra spaces, spaces before
 //! punctuation, missing spaces after it, and sentences that start with a
-//! small letter, each with the change that fixes it.
+//! small letter, each with the change that fixes it. In English it also
+//! finds wordy phrases, jargon and gendered terms ([`style_issues`]).
 
 use std::ops::Range;
 
@@ -23,6 +24,13 @@ pub enum IssueKind {
     MissingSpace,
     /// A sentence that starts with a small letter.
     Capitalization,
+    /// A phrase that says in many words what fewer say, as "in order to".
+    Wordy,
+    /// A word of jargon, as "utilize".
+    Jargon,
+    /// A term that names a man or a woman where it means anyone, as
+    /// "chairman".
+    Gendered,
 }
 
 /// A mistake of a text.
@@ -165,6 +173,80 @@ fn capitals(text: &str, out: &mut Vec<Issue>) {
     }
 }
 
+/// The rules of style of a language: the kind, the phrase and its
+/// replacement.
+fn rules(language: &str) -> &'static [(IssueKind, &'static str, &'static str)] {
+    use std::sync::OnceLock;
+    static ENGLISH: OnceLock<Vec<(IssueKind, &str, &str)>> = OnceLock::new();
+    let primary = language.split(['-', '_']).next().unwrap_or("");
+    if !primary.eq_ignore_ascii_case("en") {
+        return &[];
+    }
+    ENGLISH.get_or_init(|| {
+        let mut rules: Vec<_> = include_str!("en_style.tsv")
+            .lines()
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .filter_map(|line| {
+                let mut fields = line.split('\t');
+                let kind = match fields.next()? {
+                    "wordy" => IssueKind::Wordy,
+                    "jargon" => IssueKind::Jargon,
+                    "gendered" => IssueKind::Gendered,
+                    _ => return None,
+                };
+                Some((kind, fields.next()?, fields.next()?))
+            })
+            .collect();
+        // The longest phrase first, so that it wins where two start at
+        // the same word.
+        rules.sort_by_key(|(_, phrase, _)| std::cmp::Reverse(phrase.len()));
+        rules
+    })
+}
+
+/// The mistakes of style of a text in a language, in order: wordy
+/// phrases, jargon and gendered terms. Only English has these rules; a
+/// text in another language has none.
+pub fn style_issues(text: &str, language: &str) -> Vec<Issue> {
+    let rules = rules(language);
+    let mut out: Vec<Issue> = Vec::new();
+    if rules.is_empty() {
+        return out;
+    }
+    let bound = |c: Option<char>| !c.is_some_and(|c| c.is_alphanumeric() || c == '-' || c == '\'');
+    for (at, _) in text.unicode_word_indices() {
+        if out.last().is_some_and(|last| last.range.end > at) {
+            continue;
+        }
+        if !bound(text[..at].chars().next_back()) {
+            continue;
+        }
+        let rest = &text[at..];
+        let found = rules.iter().find(|(_, phrase, _)| {
+            rest.get(..phrase.len())
+                .is_some_and(|head| head.eq_ignore_ascii_case(phrase))
+                && bound(rest[phrase.len()..].chars().next())
+        });
+        if let Some((kind, phrase, replacement)) = found {
+            let capital = rest.starts_with(|c: char| c.is_uppercase());
+            let replacement = if capital {
+                let mut chars = replacement.chars();
+                chars.next().map_or_else(String::new, |first| {
+                    first.to_uppercase().chain(chars).collect()
+                })
+            } else {
+                (*replacement).to_owned()
+            };
+            out.push(Issue {
+                kind: *kind,
+                range: at..at + phrase.len(),
+                replacement,
+            });
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +278,42 @@ mod tests {
         assert_eq!(fixed("one. two! three"), "One. Two! Three");
         assert_eq!(fixed("Mr J. smith"), "Mr J. smith");
         assert_eq!(fixed("as in e.g. this"), "As in e.g. this");
+    }
+
+    fn styled(text: &str) -> String {
+        let mut out = text.to_owned();
+        for issue in style_issues(text, "en-US").iter().rev() {
+            out.replace_range(issue.range.clone(), &issue.replacement);
+        }
+        out
+    }
+
+    #[test]
+    fn txt_11_english_style_rules() {
+        assert_eq!(
+            styled("In order to utilize the room, ask the chairman."),
+            "To use the room, ask the chair."
+        );
+        assert_eq!(
+            style_issues("We met prior to lunch", "en-GB")[0].kind,
+            IssueKind::Wordy
+        );
+        assert_eq!(
+            style_issues("A man-made lake", "en")[0].kind,
+            IssueKind::Gendered
+        );
+        assert_eq!(
+            style_issues("Facilitate it", "en")[0].kind,
+            IssueKind::Jargon
+        );
+        // The longest phrase wins, and only whole words match.
+        assert_eq!(styled("in spite of the fact that"), "although");
+        assert_eq!(
+            styled("chairmanship and reutilize"),
+            "chairmanship and reutilize"
+        );
+        // No rules in other languages.
+        assert!(style_issues("in order to", "pt-BR").is_empty());
     }
 
     #[test]

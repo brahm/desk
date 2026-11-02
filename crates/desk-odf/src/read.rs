@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use crate::error::OdfError;
-use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
+use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLINK};
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
     LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout, Paragraph,
@@ -142,6 +142,14 @@ impl Reader {
                             .and_then(|l| l.trim().parse().ok())
                             .unwrap_or(1),
                     }
+                } else if e.name.is(TEXT, "list-level-style-image") {
+                    let properties = e.child(STYLE, "list-level-properties");
+                    ListLabel::Image {
+                        href: e.attr(XLINK, "href")?.to_owned(),
+                        width: properties.and_then(|p| length(p, FO, "width")),
+                        height: properties.and_then(|p| length(p, FO, "height")),
+                        raise: length(e, DESK, "raise"),
+                    }
                 } else {
                     return None;
                 };
@@ -164,7 +172,10 @@ impl Reader {
                     label,
                     space_before,
                     min_label_width,
-                    relative_size: e.attr(TEXT, "bullet-relative-size").and_then(parse_percent),
+                    relative_size: e
+                        .attr(TEXT, "bullet-relative-size")
+                        .or_else(|| e.attr(DESK, "relative-size"))
+                        .and_then(parse_percent),
                     text: e
                         .child(STYLE, "text-properties")
                         .map(|t| self.text_properties(t))
@@ -633,6 +644,8 @@ struct InList {
     level: u8,
     /// `text:start-value` of the item.
     start: Option<u32>,
+    /// `text:style-override` of the item.
+    style_override: Option<String>,
     /// `text:continue-numbering` of the outermost list.
     continues: bool,
     /// Whether no paragraph of the outermost list was met yet; shared by
@@ -656,6 +669,7 @@ fn collect_paragraphs(element: &Element, list: Option<&InList>, out: &mut Vec<Pa
                     style: style.clone(),
                     level: list.level,
                     start: list.start,
+                    style_override: list.style_override.clone(),
                     first: list.first.replace(false),
                     continues: list.continues,
                 });
@@ -668,12 +682,14 @@ fn collect_paragraphs(element: &Element, list: Option<&InList>, out: &mut Vec<Pa
                     style: style.or_else(|| outer.style.clone()),
                     level: (outer.level + 1).min(9),
                     start: None,
+                    style_override: None,
                     ..outer.clone()
                 },
                 None => InList {
                     style,
                     level: 0,
                     start: None,
+                    style_override: None,
                     continues: child.attr(TEXT, "continue-numbering") == Some("true")
                         || child.attr(TEXT, "continue-list").is_some(),
                     first: std::rc::Rc::new(std::cell::Cell::new(true)),
@@ -685,6 +701,7 @@ fn collect_paragraphs(element: &Element, list: Option<&InList>, out: &mut Vec<Pa
                     start: item
                         .attr(TEXT, "start-value")
                         .and_then(|v| v.trim().parse().ok()),
+                    style_override: item.attr(TEXT, "style-override").map(str::to_owned),
                     header: item.name.is(TEXT, "list-header"),
                     ..inner.clone()
                 };

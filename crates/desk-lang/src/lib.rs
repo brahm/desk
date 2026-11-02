@@ -24,7 +24,7 @@ mod spell;
 
 pub use dictionaries::{Kind, find, search_folders};
 pub use hyphen::Patterns;
-pub use proofread::{Issue, IssueKind, proofread};
+pub use proofread::{Issue, IssueKind, proofread, style_issues};
 pub use spell::{Speller, misspelled_words, words};
 
 use std::collections::HashMap;

@@ -431,6 +431,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         list_style: None,
         list_level: None,
         list_start: None,
+        list_override: None,
     }
 }
 
@@ -658,7 +659,7 @@ const LABEL_FIXED_BASE: f64 = 12.0;
 
 /// The levels of a list style of ODF; the levels it does not set have no
 /// label.
-fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
+fn list_levels(style: &odf::ListStyle, pictures: &[(String, Vec<u8>)]) -> [ListLevel; LIST_LEVELS] {
     std::array::from_fn(|index| {
         let Some(level) = style
             .levels
@@ -669,6 +670,44 @@ fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
         };
         let (label, start) = match &level.label {
             odf::ListLabel::Bullet(c) => (ListLabel::bullet(&c.to_string()), 1),
+            odf::ListLabel::Image {
+                href,
+                height,
+                raise,
+                ..
+            } => {
+                let picture = pictures
+                    .iter()
+                    .find(|(path, _)| path == href)
+                    .and_then(|(_, bytes)| crate::picture::picture(bytes));
+                // A picture of its own height does not scale with the
+                // text; without the picture, a bullet takes its place.
+                let level = match picture {
+                    Some(picture) => {
+                        let (size, scale) = match (level.relative_size, height) {
+                            (Some(percent), _) => (percent, true),
+                            (None, Some(height)) => (height.0 / LABEL_FIXED_BASE * 100.0, false),
+                            (None, None) => (100.0, true),
+                        };
+                        ListLevel {
+                            label: ListLabel::Image(picture),
+                            label_indent: level.space_before.map_or(Length::ZERO, length),
+                            text_indent: level.min_label_width.map_or(Length::ZERO, length),
+                            size: size.round().clamp(1.0, 1000.0) as u16,
+                            scale_with_text: scale,
+                            raise: raise.map_or(Length::ZERO, length),
+                            ..ListLevel::new(ListLabel::None, index, Length::ZERO)
+                        }
+                    }
+                    None => ListLevel {
+                        label: ListLabel::bullet("\u{2022}"),
+                        label_indent: level.space_before.map_or(Length::ZERO, length),
+                        text_indent: level.min_label_width.map_or(Length::ZERO, length),
+                        ..ListLevel::new(ListLabel::None, index, Length::ZERO)
+                    },
+                };
+                return level;
+            }
             odf::ListLabel::Number {
                 format,
                 prefix,
@@ -732,7 +771,11 @@ fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
 }
 
 /// A list style of the model as one of ODF.
-fn odf_list_style(style: &ListStyle, name: String) -> odf::ListStyle {
+fn odf_list_style(
+    style: &ListStyle,
+    name: String,
+    pictures: &mut Vec<(String, Vec<u8>)>,
+) -> odf::ListStyle {
     let display_name = (name != *style.name).then(|| style.name.to_string());
     let levels = style
         .levels
@@ -749,6 +792,23 @@ fn odf_list_style(style: &ListStyle, name: String) -> odf::ListStyle {
                 };
             let label = match &level.label {
                 ListLabel::None => number("", "", "", false),
+                ListLabel::Image(picture) => {
+                    let href = match pictures.iter().find(|(_, b)| b == picture.png()) {
+                        Some((href, _)) => href.clone(),
+                        None => {
+                            let href = format!("Pictures/bullet{}.png", pictures.len() + 1);
+                            pictures.push((href.clone(), picture.png().to_vec()));
+                            href
+                        }
+                    };
+                    let height = f64::from(level.size) / 100.0 * LABEL_FIXED_BASE;
+                    odf::ListLabel::Image {
+                        href,
+                        width: Some(odf::Length(height * picture.aspect())),
+                        height: Some(odf::Length(height)),
+                        raise: (level.raise != Length::ZERO).then(|| odf_length(level.raise)),
+                    }
+                }
                 ListLabel::Bullet(text) => {
                     let mut chars = text.chars();
                     match (chars.next(), chars.next()) {
@@ -777,8 +837,13 @@ fn odf_list_style(style: &ListStyle, name: String) -> odf::ListStyle {
             let sized = level.size != 100 && level.scale_with_text;
             odf::ListLevelStyle {
                 level: index as u8 + 1,
-                relative_size: (sized && matches!(label, odf::ListLabel::Bullet(_)))
-                    .then_some(f64::from(level.size)),
+                relative_size: match label {
+                    odf::ListLabel::Bullet(_) => sized.then_some(f64::from(level.size)),
+                    odf::ListLabel::Image { .. } => {
+                        level.scale_with_text.then_some(f64::from(level.size))
+                    }
+                    odf::ListLabel::Number { .. } => None,
+                },
                 label,
                 space_before: Some(odf_length(level.label_indent)),
                 min_label_width: Some(odf_length(level.text_indent)),
@@ -839,13 +904,21 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // List styles, which paragraph styles name. Automatic ones take the
     // style with the same levels, or come in as new styles.
     let mut lists: HashMap<&str, StyleId> = HashMap::new();
-    for (automatic, style) in source
-        .list_styles
+    // The automatic list styles that only items override their list
+    // with: their levels go on the items.
+    let overriding: HashSet<&str> = source
+        .body
         .iter()
-        .map(|s| (false, s))
-        .chain(source.automatic_list_styles.iter().map(|s| (true, s)))
-    {
-        let levels = list_levels(style);
+        .filter_map(|p| p.list.as_ref()?.style_override.as_deref())
+        .collect();
+    for (automatic, style) in source.list_styles.iter().map(|s| (false, s)).chain(
+        source
+            .automatic_list_styles
+            .iter()
+            .filter(|s| !overriding.contains(s.name.as_str()))
+            .map(|s| (true, s)),
+    ) {
+        let levels = list_levels(style, &source.pictures);
         if levels.iter().all(|l| !l.label.is_some()) {
             continue;
         }
@@ -1031,6 +1104,20 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 attrs.list_start = Some(Some(start));
             } else if restart && let Some(style) = styles.list(list) {
                 attrs.list_start = Some(Some(style.level(member.level).start));
+            }
+            if let Some(own) = member.style_override.as_deref().and_then(|name| {
+                source
+                    .automatic_list_styles
+                    .iter()
+                    .chain(&source.list_styles)
+                    .find(|s| s.name == name)
+            }) && let Some(style) = styles.list(list)
+            {
+                let level = usize::from(member.level).min(LIST_LEVELS - 1);
+                let own = list_levels(own, &source.pictures)[level].clone();
+                if own.label.is_some() && &own != style.level(member.level) {
+                    attrs.list_override = Some(Some(std::sync::Arc::new(own)));
+                }
             }
             listed.insert(list);
             built = Paragraph::from_runs(
@@ -1264,6 +1351,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         names.insert(style.id(), name);
     }
 
+    let mut pictures: Vec<(String, Vec<u8>)> = Vec::new();
     let mut out = odf::TextDocument {
         text_settings: odf::TextSettings {
             hyphenation: (!settings.hyphenation).then_some(false),
@@ -1294,7 +1382,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let display_name = (name != style.name()).then(|| style.name().to_owned());
         out.styles.push(match style {
             Style::List(l) => {
-                out.list_styles.push(odf_list_style(l, name));
+                out.list_styles.push(odf_list_style(l, name, &mut pictures));
                 continue;
             }
             Style::Paragraph(p) => odf::Style {
@@ -1380,12 +1468,16 @@ pub fn export(document: &Document) -> odf::TextDocument {
     let items = styles.list_items(document.body().iter());
     let mut listed: HashSet<StyleId> = HashSet::new();
     let mut previous: Option<StyleId> = None;
+    // The automatic list styles of the items with levels of their own.
+    let mut overrides: HashMap<[ListLevel; LIST_LEVELS], String> = HashMap::new();
     for (paragraph, item) in document.body().iter().zip(&items) {
         let style_name = names[&paragraph.style()].clone();
-        // The level and the start of an item are in the list elements.
+        // The level, the start and the level of its own of an item are
+        // in the list elements.
         let own = ParaAttrs {
             list_level: None,
             list_start: None,
+            list_override: None,
             ..paragraph.attrs().clone()
         };
         let style = if own.is_empty() {
@@ -1443,10 +1535,40 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let list = item.as_ref().map(|item| {
             let first = previous != Some(item.style);
             let start = paragraph.attrs().list_start.flatten();
+            let style_override =
+                paragraph
+                    .attrs()
+                    .list_override
+                    .clone()
+                    .flatten()
+                    .and_then(|own| {
+                        let style = styles.list(item.style)?;
+                        let mut levels = (*style.levels).clone();
+                        levels[usize::from(item.level)] = (*own).clone();
+                        let key = levels.clone();
+                        let count = overrides.len();
+                        let name = overrides
+                            .entry(key)
+                            .or_insert_with(|| {
+                                let name = format!("LO{}", count + 1);
+                                out.automatic_list_styles.push(odf_list_style(
+                                    &ListStyle {
+                                        levels: levels.into(),
+                                        ..style.clone()
+                                    },
+                                    name.clone(),
+                                    &mut pictures,
+                                ));
+                                name
+                            })
+                            .clone();
+                        Some(name)
+                    });
             let member = odf::ListMember {
                 style: names[&item.style].clone(),
                 level: item.level,
                 start,
+                style_override,
                 first,
                 continues: first && start.is_none() && listed.contains(&item.style),
             };
@@ -1462,6 +1584,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         });
     }
     out.automatic_styles = automatic;
+    out.pictures = pictures;
 
     let page = document.page_setup();
     out.page_layout = odf::PageLayout {

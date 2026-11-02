@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-02 18:58+0000\n"
+"POT-Creation-Date: 2026-11-02 19:45+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -22,6 +22,38 @@ msgstr ""
 msgid "Document"
 msgstr "Documento"
 
+#: crates/desk-ui/src/bullet_pictures.rs:37
+msgid "Blue Ball"
+msgstr "Bola azul"
+
+#: crates/desk-ui/src/bullet_pictures.rs:38
+msgid "Red Ball"
+msgstr "Bola vermelha"
+
+#: crates/desk-ui/src/bullet_pictures.rs:39
+msgid "Green Ball"
+msgstr "Bola verde"
+
+#: crates/desk-ui/src/bullet_pictures.rs:40
+msgid "Orange Ball"
+msgstr "Bola laranja"
+
+#: crates/desk-ui/src/bullet_pictures.rs:41
+msgid "Gray Ball"
+msgstr "Bola cinza"
+
+#: crates/desk-ui/src/bullet_pictures.rs:42
+msgid "Check Mark"
+msgstr "Visto"
+
+#: crates/desk-ui/src/bullet_pictures.rs:43
+msgid "Blue Square"
+msgstr "Quadrado azul"
+
+#: crates/desk-ui/src/bullet_pictures.rs:44
+msgid "Arrow"
+msgstr "Seta"
+
 #: crates/desk-ui/src/effects.rs:43
 msgid "Use Default"
 msgstr "Usar padrão"
@@ -35,10 +67,10 @@ msgid "Use All"
 msgstr "Usar todas"
 
 #: crates/desk-ui/src/effects.rs:51 crates/desk-ui/src/fonts.rs:168
-#: crates/desk-ui/src/lists_pane.rs:48 crates/desk-ui/src/styles_drawer.rs:667
-#: crates/desk-ui/src/styles_drawer.rs:817
-#: crates/desk-ui/src/styles_drawer.rs:822
-#: crates/desk-ui/src/styles_drawer.rs:893 crates/desk-ui/src/tab_stops.rs:49
+#: crates/desk-ui/src/lists_pane.rs:58 crates/desk-ui/src/styles_drawer.rs:676
+#: crates/desk-ui/src/styles_drawer.rs:828
+#: crates/desk-ui/src/styles_drawer.rs:833
+#: crates/desk-ui/src/styles_drawer.rs:904 crates/desk-ui/src/tab_stops.rs:49
 msgid "None"
 msgstr "Nenhum"
 
@@ -79,7 +111,7 @@ msgid "Character Spacing"
 msgstr "Espaçamento entre caracteres"
 
 #: crates/desk-ui/src/effects.rs:160 crates/desk-ui/src/fonts.rs:353
-#: crates/desk-ui/src/lists_pane.rs:184
+#: crates/desk-ui/src/lists_pane.rs:213
 msgid "Percent"
 msgstr "Porcentagem"
 
@@ -376,7 +408,7 @@ msgid "Typeface"
 msgstr "Tipo"
 
 #: crates/desk-ui/src/fonts.rs:277 crates/desk-ui/src/fonts.rs:309
-#: crates/desk-ui/src/lists_pane.rs:183 crates/desk-ui/src/properties.rs:50
+#: crates/desk-ui/src/lists_pane.rs:212 crates/desk-ui/src/properties.rs:50
 msgid "Size"
 msgstr "Tamanho"
 
@@ -455,7 +487,7 @@ msgid "Fonts"
 msgstr "Fontes"
 
 #: crates/desk-ui/src/formatting.rs:104 crates/desk-ui/src/formatting.rs:107
-#: crates/desk-ui/src/styles_drawer.rs:519 crates/desk-ui/src/window.rs:804
+#: crates/desk-ui/src/styles_drawer.rs:528 crates/desk-ui/src/window.rs:804
 msgid "Paragraph Style"
 msgstr "Estilo de parágrafo"
 
@@ -549,23 +581,23 @@ msgstr "Usar ligaduras"
 msgid "In the whole document"
 msgstr "No documento inteiro"
 
-#: crates/desk-ui/src/lib.rs:216
+#: crates/desk-ui/src/lib.rs:217
 msgid ""
-"The font {requested} is not installed, so {used} is used, which has the same "
-"metrics."
+"The font {requested} is not installed, so {used} is used, which has the same"
+" metrics."
 msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}, que tem as "
 "mesmas métricas."
 
-#: crates/desk-ui/src/lib.rs:219
+#: crates/desk-ui/src/lib.rs:220
 msgid ""
-"The font {requested} is not installed, so {used} is used, which looks alike; "
-"lines may break elsewhere."
+"The font {requested} is not installed, so {used} is used, which looks alike;"
+" lines may break elsewhere."
 msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}, que é "
 "parecida; as linhas podem quebrar em outros pontos."
 
-#: crates/desk-ui/src/lib.rs:222
+#: crates/desk-ui/src/lib.rs:223
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
@@ -573,77 +605,101 @@ msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}; as linhas "
 "podem quebrar em outros pontos."
 
-#: crates/desk-ui/src/lib.rs:405 crates/desk-ui/src/window.rs:163
+#: crates/desk-ui/src/lib.rs:406 crates/desk-ui/src/window.rs:163
 msgid "Open a Document"
 msgstr "Abrir um documento"
 
-#: crates/desk-ui/src/lib.rs:427
+#: crates/desk-ui/src/lib.rs:428
 msgid "All Documents"
 msgstr "Todos os documentos"
 
-#: crates/desk-ui/src/lists_pane.rs:49
+#: crates/desk-ui/src/lists_pane.rs:59
 msgid "Text Bullets"
 msgstr "Marcadores de texto"
 
-#: crates/desk-ui/src/lists_pane.rs:50
+#: crates/desk-ui/src/lists_pane.rs:60
+msgid "Image Bullets"
+msgstr "Marcadores de imagem"
+
+#: crates/desk-ui/src/lists_pane.rs:61
 msgid "Numbers"
 msgstr "Números"
 
-#: crates/desk-ui/src/lists_pane.rs:51
+#: crates/desk-ui/src/lists_pane.rs:62
 msgid "Tiered Numbers"
 msgstr "Números em níveis"
 
-#: crates/desk-ui/src/lists_pane.rs:157
+#: crates/desk-ui/src/lists_pane.rs:177
 msgid "Bullets & Numbering"
 msgstr "Marcadores e numeração"
 
-#: crates/desk-ui/src/lists_pane.rs:160
+#: crates/desk-ui/src/lists_pane.rs:180
 msgid "List"
 msgstr "Lista"
 
-#: crates/desk-ui/src/lists_pane.rs:164
+#: crates/desk-ui/src/lists_pane.rs:184
 msgid "Indent Level"
 msgstr "Nível de recuo"
 
-#: crates/desk-ui/src/lists_pane.rs:166
+#: crates/desk-ui/src/lists_pane.rs:186
 msgid "Bullet"
 msgstr "Marcador"
 
-#: crates/desk-ui/src/lists_pane.rs:170
+#: crates/desk-ui/src/lists_pane.rs:193
+msgid "Choose the Picture of the Bullets"
+msgstr "Escolher a imagem dos marcadores"
+
+#: crates/desk-ui/src/lists_pane.rs:195
+msgid "Image"
+msgstr "Imagem"
+
+#: crates/desk-ui/src/lists_pane.rs:199
 msgid "Number Format"
 msgstr "Formato do número"
 
-#: crates/desk-ui/src/lists_pane.rs:174
+#: crates/desk-ui/src/lists_pane.rs:203
 msgid "Continue from Previous"
 msgstr "Continuar do anterior"
 
-#: crates/desk-ui/src/lists_pane.rs:177
+#: crates/desk-ui/src/lists_pane.rs:206
 msgid "Start At"
 msgstr "Começar em"
 
-#: crates/desk-ui/src/lists_pane.rs:179
+#: crates/desk-ui/src/lists_pane.rs:208
 msgid "Bullet Indent"
 msgstr "Recuo do marcador"
 
-#: crates/desk-ui/src/lists_pane.rs:181
+#: crates/desk-ui/src/lists_pane.rs:210
 msgid "Text Indent"
 msgstr "Recuo do texto"
 
-#: crates/desk-ui/src/lists_pane.rs:186
+#: crates/desk-ui/src/lists_pane.rs:215
 msgid "Scale with Text"
 msgstr "Acompanhar o texto"
 
-#: crates/desk-ui/src/lists_pane.rs:189
+#: crates/desk-ui/src/lists_pane.rs:218
 msgid "Align"
 msgstr "Alinhar"
 
-#: crates/desk-ui/src/lists_pane.rs:190
+#: crates/desk-ui/src/lists_pane.rs:219
 msgid "Points above the baseline"
 msgstr "Pontos acima da linha de base"
 
-#: crates/desk-ui/src/lists_pane.rs:192
+#: crates/desk-ui/src/lists_pane.rs:221
 msgid "Label Color"
 msgstr "Cor do marcador"
+
+#: crates/desk-ui/src/lists_pane.rs:457
+msgid "Choose Image…"
+msgstr "Escolher imagem…"
+
+#: crates/desk-ui/src/lists_pane.rs:467
+msgid "Images"
+msgstr "Imagens"
+
+#: crates/desk-ui/src/lists_pane.rs:472
+msgid "Choose an Image for the Bullets"
+msgstr "Escolha uma imagem para os marcadores"
 
 #: crates/desk-ui/src/preferences.rs:65
 msgid "Centimeters"
@@ -728,8 +784,8 @@ msgstr "Detectar listas automaticamente"
 #: crates/desk-ui/src/preferences.rs:497
 msgid "“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return"
 msgstr ""
-"“1.”, “a.”, “I.”, “•”, “-” ou “*” e um espaço começam uma lista ao pressionar"
-" Return"
+"“1.”, “a.”, “I.”, “•”, “-” ou “*” e um espaço começam uma lista ao "
+"pressionar Return"
 
 #: crates/desk-ui/src/preferences.rs:502
 msgid "Auto-Correction"
@@ -819,8 +875,8 @@ msgstr "Adicionar: texto, um espaço e o substituto"
 msgid "Unknown"
 msgstr "Desconhecido"
 
-#: crates/desk-ui/src/properties.rs:47 crates/desk-ui/src/styles_drawer.rs:537
-#: crates/desk-ui/src/styles_drawer.rs:615
+#: crates/desk-ui/src/properties.rs:47 crates/desk-ui/src/styles_drawer.rs:546
+#: crates/desk-ui/src/styles_drawer.rs:624
 msgid "Name"
 msgstr "Nome"
 
@@ -1050,7 +1106,8 @@ msgstr "Barra lateral de pesquisa"
 msgid "Find the next misspelled word"
 msgstr "Buscar a próxima palavra com erro de ortografia"
 
-#: crates/desk-ui/src/shortcuts.rs:104 crates/desk-ui/src/spelling_window.rs:97
+#: crates/desk-ui/src/shortcuts.rs:104
+#: crates/desk-ui/src/spelling_window.rs:97
 msgid "Spelling and Grammar"
 msgstr "Ortografia e gramática"
 
@@ -1093,6 +1150,18 @@ msgstr "Falta um espaço depois da pontuação"
 #: crates/desk-ui/src/spelling.rs:72
 msgid "A sentence starts with a small letter"
 msgstr "Uma frase começa com letra minúscula"
+
+#: crates/desk-ui/src/spelling.rs:73
+msgid "Wordy phrase"
+msgstr "Frase prolixa"
+
+#: crates/desk-ui/src/spelling.rs:74
+msgid "Jargon"
+msgstr "Jargão"
+
+#: crates/desk-ui/src/spelling.rs:75
+msgid "Gendered term"
+msgstr "Termo com gênero"
 
 #: crates/desk-ui/src/spelling_window.rs:48
 msgid "Correction"
@@ -1175,7 +1244,7 @@ msgstr "_Importar estilos…"
 
 #: crates/desk-ui/src/styles_drawer.rs:221
 #: crates/desk-ui/src/styles_drawer.rs:224
-#: crates/desk-ui/src/styles_drawer.rs:571
+#: crates/desk-ui/src/styles_drawer.rs:580
 msgid "New Style"
 msgstr "Novo estilo"
 
@@ -1201,138 +1270,138 @@ msgstr "Não é possível redefinir o estilo"
 msgid "Revert to Defined Style"
 msgstr "Reverter para estilo definido"
 
-#: crates/desk-ui/src/styles_drawer.rs:414
+#: crates/desk-ui/src/styles_drawer.rs:423
 msgid "Cannot Revert to the Style"
 msgstr "Não é possível reverter para o estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:455
+#: crates/desk-ui/src/styles_drawer.rs:464
 msgid "Style Shortcut"
 msgstr "Atalho do estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:458
+#: crates/desk-ui/src/styles_drawer.rs:467
 msgid "Cannot Set the Shortcut"
 msgstr "Não é possível definir o atalho"
 
-#: crates/desk-ui/src/styles_drawer.rs:496
+#: crates/desk-ui/src/styles_drawer.rs:505
 msgid "A style needs a name."
 msgstr "Um estilo precisa de um nome."
 
-#: crates/desk-ui/src/styles_drawer.rs:499
+#: crates/desk-ui/src/styles_drawer.rs:508
 msgid "Another style is already named “{name}”."
 msgstr "Outro estilo já se chama “{name}”."
 
-#: crates/desk-ui/src/styles_drawer.rs:504 crates/desk-ui/src/window.rs:626
+#: crates/desk-ui/src/styles_drawer.rs:513 crates/desk-ui/src/window.rs:626
 msgid "_Close"
 msgstr "_Fechar"
 
-#: crates/desk-ui/src/styles_drawer.rs:520 crates/desk-ui/src/window.rs:805
+#: crates/desk-ui/src/styles_drawer.rs:529 crates/desk-ui/src/window.rs:805
 msgid "Character Style"
 msgstr "Estilo de caractere"
 
-#: crates/desk-ui/src/styles_drawer.rs:524 crates/desk-ui/src/window.rs:806
+#: crates/desk-ui/src/styles_drawer.rs:533 crates/desk-ui/src/window.rs:806
 msgid "List Style"
 msgstr "Estilo de lista"
 
-#: crates/desk-ui/src/styles_drawer.rs:527
+#: crates/desk-ui/src/styles_drawer.rs:536
 msgid "New Paragraph Style"
 msgstr "Novo estilo de parágrafo"
 
-#: crates/desk-ui/src/styles_drawer.rs:528
+#: crates/desk-ui/src/styles_drawer.rs:537
 msgid "New Character Style"
 msgstr "Novo estilo de caractere"
 
-#: crates/desk-ui/src/styles_drawer.rs:529
+#: crates/desk-ui/src/styles_drawer.rs:538
 msgid "New List Style"
 msgstr "Novo estilo de lista"
 
-#: crates/desk-ui/src/styles_drawer.rs:544
+#: crates/desk-ui/src/styles_drawer.rs:553
 msgid "Only Formatting That Differs from the Paragraph"
 msgstr "Só a formatação que difere do parágrafo"
 
-#: crates/desk-ui/src/styles_drawer.rs:551
+#: crates/desk-ui/src/styles_drawer.rs:560
 msgid "Apply This New Style on Creation"
 msgstr "Aplicar este novo estilo ao criar"
 
-#: crates/desk-ui/src/styles_drawer.rs:556
-#: crates/desk-ui/src/styles_drawer.rs:618
-#: crates/desk-ui/src/styles_drawer.rs:694 crates/desk-ui/src/window.rs:837
+#: crates/desk-ui/src/styles_drawer.rs:565
+#: crates/desk-ui/src/styles_drawer.rs:627
+#: crates/desk-ui/src/styles_drawer.rs:703 crates/desk-ui/src/window.rs:837
 #: crates/desk-ui/src/window.rs:910 crates/desk-ui/src/window.rs:939
 msgid "_Cancel"
 msgstr "_Cancelar"
 
-#: crates/desk-ui/src/styles_drawer.rs:557
+#: crates/desk-ui/src/styles_drawer.rs:566
 msgid "C_reate"
 msgstr "C_riar"
 
-#: crates/desk-ui/src/styles_drawer.rs:600
+#: crates/desk-ui/src/styles_drawer.rs:609
 msgid "Cannot Make the Style"
 msgstr "Não é possível criar o estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:610
-#: crates/desk-ui/src/styles_drawer.rs:631
+#: crates/desk-ui/src/styles_drawer.rs:619
+#: crates/desk-ui/src/styles_drawer.rs:640
 msgid "Rename Style"
 msgstr "Renomear estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:619
+#: crates/desk-ui/src/styles_drawer.rs:628
 msgid "_Rename"
 msgstr "_Renomear"
 
-#: crates/desk-ui/src/styles_drawer.rs:634
+#: crates/desk-ui/src/styles_drawer.rs:643
 msgid "Cannot Rename the Style"
 msgstr "Não é possível renomear o estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:650
-#: crates/desk-ui/src/styles_drawer.rs:660
-#: crates/desk-ui/src/styles_drawer.rs:713
+#: crates/desk-ui/src/styles_drawer.rs:659
+#: crates/desk-ui/src/styles_drawer.rs:669
+#: crates/desk-ui/src/styles_drawer.rs:722
 msgid "Cannot Delete the Style"
 msgstr "Não é possível apagar o estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:657
-#: crates/desk-ui/src/styles_drawer.rs:710
+#: crates/desk-ui/src/styles_drawer.rs:666
+#: crates/desk-ui/src/styles_drawer.rs:719
 msgid "Delete Style"
 msgstr "Apagar estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:684
+#: crates/desk-ui/src/styles_drawer.rs:693
 msgid "Delete “{name}”?"
 msgstr "Apagar “{name}”?"
 
-#: crates/desk-ui/src/styles_drawer.rs:685
+#: crates/desk-ui/src/styles_drawer.rs:694
 msgid "The style is in use. Choose a style to replace it."
 msgstr "O estilo está em uso. Escolha um estilo para substituí-lo."
 
-#: crates/desk-ui/src/styles_drawer.rs:692
+#: crates/desk-ui/src/styles_drawer.rs:701
 msgid "Replace With"
 msgstr "Substituir por"
 
-#: crates/desk-ui/src/styles_drawer.rs:695
+#: crates/desk-ui/src/styles_drawer.rs:704
 msgid "_Delete"
 msgstr "_Apagar"
 
-#: crates/desk-ui/src/styles_drawer.rs:850
+#: crates/desk-ui/src/styles_drawer.rs:861
 msgid "The formatting differs from the style"
 msgstr "A formatação difere do estilo"
 
-#: crates/desk-ui/src/styles_drawer.rs:886
+#: crates/desk-ui/src/styles_drawer.rs:897
 msgid "Re_define Style from Selection"
 msgstr "Re_definir estilo a partir da seleção"
 
-#: crates/desk-ui/src/styles_drawer.rs:889
+#: crates/desk-ui/src/styles_drawer.rs:900
 msgid "Re_vert to Defined Style"
 msgstr "Re_verter para estilo definido"
 
-#: crates/desk-ui/src/styles_drawer.rs:890
+#: crates/desk-ui/src/styles_drawer.rs:901
 msgid "_Select All Uses"
 msgstr "_Selecionar todos os usos"
 
-#: crates/desk-ui/src/styles_drawer.rs:905
+#: crates/desk-ui/src/styles_drawer.rs:916
 msgid "_Shortcut"
 msgstr "_Atalho"
 
-#: crates/desk-ui/src/styles_drawer.rs:908
+#: crates/desk-ui/src/styles_drawer.rs:919
 msgid "_Rename Style…"
 msgstr "_Renomear estilo…"
 
-#: crates/desk-ui/src/styles_drawer.rs:909
+#: crates/desk-ui/src/styles_drawer.rs:920
 msgid "_Delete Style…"
 msgstr "_Apagar estilo…"
 
@@ -1388,31 +1457,31 @@ msgstr "Preenchimento"
 msgid "Remove Tab Stop"
 msgstr "Remover tabulação"
 
-#: crates/desk-ui/src/warnings.rs:35
+#: crates/desk-ui/src/warnings.rs:39
 msgid "_Replace…"
 msgstr "_Substituir…"
 
-#: crates/desk-ui/src/warnings.rs:38
+#: crates/desk-ui/src/warnings.rs:42
 msgid "Use another font in its place"
 msgstr "Usar outra fonte no lugar dela"
 
-#: crates/desk-ui/src/warnings.rs:49
+#: crates/desk-ui/src/warnings.rs:53
 msgid "Replace {font}"
 msgstr "Substituir {font}"
 
-#: crates/desk-ui/src/warnings.rs:77 crates/desk-ui/src/window.rs:1504
+#: crates/desk-ui/src/warnings.rs:81 crates/desk-ui/src/window.rs:1504
 msgid "_Copy"
 msgstr "_Copiar"
 
-#: crates/desk-ui/src/warnings.rs:79
+#: crates/desk-ui/src/warnings.rs:83
 msgid "Copy the warnings as text"
 msgstr "Copiar os avisos como texto"
 
-#: crates/desk-ui/src/warnings.rs:90
+#: crates/desk-ui/src/warnings.rs:94
 msgid "{document} opened with these changes. Saving it keeps them."
 msgstr "{document} foi aberto com estas mudanças. Ao salvar, elas ficam."
 
-#: crates/desk-ui/src/warnings.rs:119 crates/desk-ui/src/window.rs:179
+#: crates/desk-ui/src/warnings.rs:123 crates/desk-ui/src/window.rs:179
 #: crates/desk-ui/src/window.rs:183
 msgid "Document Warnings"
 msgstr "Avisos do documento"
@@ -1505,8 +1574,8 @@ msgstr "Salvar as mudanças?"
 
 #: crates/desk-ui/src/window.rs:935
 msgid ""
-"“{name}” has changes that are not saved. If you close it without saving, they"
-" are lost."
+"“{name}” has changes that are not saved. If you close it without saving, "
+"they are lost."
 msgstr ""
 "“{name}” tem mudanças que não foram salvas. Se você fechar sem salvar, elas "
 "serão perdidas."
@@ -1747,7 +1816,8 @@ msgstr "Documentos do Pages"
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""
-"O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages (.pages)."
+"O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages "
+"(.pages)."
 
 #: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:76
 msgid "headers"

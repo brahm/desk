@@ -1,0 +1,72 @@
+# The rules of style of the English proofreader (TXT-11): the kind of
+# mistake, the phrase, and the words that replace it, separated by tabs.
+# Phrases match whole words, in any case.
+wordy	in order to	to
+wordy	due to the fact that	because
+wordy	in light of the fact that	because
+wordy	owing to the fact that	because
+wordy	despite the fact that	although
+wordy	at this point in time	now
+wordy	at the present time	now
+wordy	in the event that	if
+wordy	for the purpose of	for
+wordy	with regard to	about
+wordy	with respect to	about
+wordy	a large number of	many
+wordy	a majority of	most
+wordy	has the ability to	can
+wordy	have the ability to	can
+wordy	is able to	can
+wordy	are able to	can
+wordy	in the near future	soon
+wordy	prior to	before
+wordy	subsequent to	after
+wordy	in close proximity to	near
+wordy	on a daily basis	daily
+wordy	on a regular basis	regularly
+wordy	each and every	every
+wordy	first and foremost	first
+wordy	until such time as	until
+wordy	in spite of the fact that	although
+wordy	make a decision	decide
+wordy	give consideration to	consider
+jargon	utilize	use
+jargon	utilizes	uses
+jargon	utilized	used
+jargon	utilizing	using
+jargon	utilization	use
+jargon	facilitate	help
+jargon	facilitates	helps
+jargon	synergy	cooperation
+jargon	going forward	from now on
+jargon	touch base	talk
+jargon	circle back	return
+jargon	paradigm shift	change
+jargon	ideate	think
+jargon	actionable	practical
+jargon	incentivize	encourage
+jargon	operationalize	carry out
+jargon	leverage	use
+gendered	chairman	chair
+gendered	chairmen	chairs
+gendered	mankind	humankind
+gendered	manpower	workforce
+gendered	man-made	artificial
+gendered	fireman	firefighter
+gendered	firemen	firefighters
+gendered	policeman	police officer
+gendered	policemen	police officers
+gendered	mailman	mail carrier
+gendered	mailmen	mail carriers
+gendered	stewardess	flight attendant
+gendered	stewardesses	flight attendants
+gendered	salesman	salesperson
+gendered	salesmen	salespeople
+gendered	businessman	businessperson
+gendered	businessmen	businesspeople
+gendered	spokesman	spokesperson
+gendered	spokesmen	spokespeople
+gendered	congressman	member of Congress
+gendered	foreman	supervisor
+gendered	cameraman	camera operator
+gendered	workmanlike	skillful

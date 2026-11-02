@@ -307,3 +307,64 @@ fn sty_08_10_list_styles_travel_with_the_styles_that_name_them() {
         .unwrap();
     assert_eq!(labels(&target)[2], "\u{2022}");
 }
+
+#[test]
+fn lst_03_items_change_over_their_list_style() {
+    let mut editor = editor();
+    let bullet = add(&mut editor, ListStyle::bullet, "Bullet");
+    let (a, c) = (at(&editor, 0), at(&editor, 2));
+    editor
+        .edit("List", |edit| edit.set_list_style(a, c, Some(bullet)))
+        .unwrap();
+    // The second item gets a bullet of its own; the style stays.
+    let b = at(&editor, 1);
+    editor
+        .edit("Bullet", |edit| {
+            edit.change_list_items(b, b, |level| level.label = ListLabel::bullet("+"))
+        })
+        .unwrap();
+    assert_eq!(&labels(&editor)[..3], ["\u{2022}", "+", "\u{2022}"]);
+    let style = editor.document().styles().list(bullet).unwrap().clone();
+    assert_eq!(style.levels[0].label, ListLabel::bullet("\u{2022}"));
+    let overrides = |editor: &Editor, at: Position| editor.document().overrides(at, at).unwrap();
+    assert!(overrides(&editor, b).list);
+    assert!(!overrides(&editor, a).list);
+    // Tab keeps its bullet, at the indents of the deeper level.
+    editor
+        .edit("Tab", |edit| edit.change_list_level(b, b, 1, false))
+        .unwrap();
+    let items = editor
+        .document()
+        .styles()
+        .list_items(editor.document().body().iter());
+    let item = items[1].as_ref().unwrap();
+    assert_eq!(item.label, "+");
+    assert_eq!(item.definition.label_indent, style.levels[1].label_indent);
+    editor
+        .edit("Tab", |edit| edit.change_list_level(b, b, -1, false))
+        .unwrap();
+    // Redefining the style from the item gives every item its bullet.
+    editor
+        .edit("Redefine", |edit| edit.redefine_style(bullet, b, b))
+        .unwrap();
+    assert_eq!(&labels(&editor)[..3], ["+", "+", "+"]);
+    assert!(!overrides(&editor, b).list);
+    // An item changed back to its style has nothing of its own.
+    editor
+        .edit("Bullet", |edit| {
+            edit.change_list_items(a, a, |level| level.size = 150)
+        })
+        .unwrap();
+    assert!(overrides(&editor, a).list);
+    editor
+        .edit("Revert", |edit| edit.revert_to_list_style(a, a))
+        .unwrap();
+    assert!(!overrides(&editor, a).list);
+    editor
+        .edit("Bullet", |edit| {
+            edit.change_list_items(a, a, |level| level.size = 150)?;
+            edit.change_list_items(a, a, |level| level.size = 100)
+        })
+        .unwrap();
+    assert!(!overrides(&editor, a).list);
+}

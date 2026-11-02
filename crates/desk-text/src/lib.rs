@@ -41,8 +41,8 @@ mod tabs;
 pub use fonts::{FontChoice, FontMatch, PagesFont};
 pub use input::{ParagraphText, SMALL_CAPS_SCALE};
 pub use layout::{
-    Decoration, Glyph, GlyphRun, Line, MIN_SEGMENT_WIDTH, ParagraphLayout, SCRIPT_SCALE,
-    SOFT_HYPHEN, TextSystem,
+    Decoration, Glyph, GlyphRun, LabelImage, Line, MIN_SEGMENT_WIDTH, ParagraphLayout,
+    SCRIPT_SCALE, SOFT_HYPHEN, TextSystem,
 };
 pub use parley::FontData;
 pub use space::{Column, LineSpace};
