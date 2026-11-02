@@ -251,6 +251,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "desk-lang"
+version = "0.1.0"
+dependencies = [
+ "spellbook",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "desk-layout"
 version = "0.1.0"
 dependencies = [
@@ -330,6 +338,7 @@ dependencies = [
 name = "desk-text"
 version = "0.1.0"
 dependencies = [
+ "desk-lang",
  "desk-model",
  "icu_segmenter",
  "parley",
@@ -340,6 +349,7 @@ dependencies = [
 name = "desk-ui"
 version = "0.1.0"
 dependencies = [
+ "desk-lang",
  "desk-layout",
  "desk-model",
  "desk-render",
@@ -1569,6 +1579,16 @@ name = "smallvec"
 version = "1.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
+
+[[package]]
+name = "spellbook"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d204abcbdf8e88729306a8d0ca01a79d8a49969fe1f84696909d6dbc4321c1a"
+dependencies = [
+ "foldhash",
+ "hashbrown",
+]
 
 [[package]]
 name = "stable_deref_trait"

@@ -396,6 +396,46 @@ fn soft_hyphen_draws_a_hyphen_only_at_a_break() {
     assert!(!narrow.lines[1].hyphenated);
 }
 
+#[test]
+fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
+    let mut system = TextSystem::new();
+    let text = "The hyphenation of representative words";
+    let english = CharFormat {
+        language: desk_model::Language::new("en-US"),
+        ..sans()
+    };
+    let column = Column::new(70.0);
+    let whole = lay_in(
+        &mut system,
+        ParaFormat::default(),
+        &[(text, english.clone())],
+        &column,
+    );
+    assert!(whole.lines.iter().all(|l| !l.hyphenated));
+    let hyphenating = ParaFormat {
+        hyphenate: true,
+        ..ParaFormat::default()
+    };
+    // Text in the undetermined language is not hyphenated.
+    let undetermined = lay_in(&mut system, hyphenating.clone(), &[(text, sans())], &column);
+    assert!(undetermined.lines.iter().all(|l| !l.hyphenated));
+    if desk_lang::patterns("en-US").is_none() {
+        return;
+    }
+    let broken = lay_in(&mut system, hyphenating, &[(text, english)], &column);
+    let first = broken
+        .lines
+        .iter()
+        .find(|l| l.hyphenated)
+        .expect("a hyphen");
+    // The lines keep the offsets of the model, without the hyphens.
+    let lines = line_texts(&broken, text);
+    assert_eq!(lines.concat().replace(' ', ""), text.replace(' ', ""));
+    assert!(
+        text[first.range.clone()].ends_with("hy") || lines.iter().any(|l| l.ends_with("hyphen"))
+    );
+}
+
 /// A column with an object on its right half, from 15pt to 45pt down.
 struct Wrapped;
 

@@ -534,6 +534,9 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
             if small { "small-caps" } else { "normal" },
         );
     }
+    if let Some(hyphenate) = t.hyphenate {
+        w.attr("fo:hyphenate", if hyphenate { "true" } else { "false" });
+    }
     w.attr_opt("fo:language", t.language.as_deref())
         .attr_opt("fo:country", t.country.as_deref())
         .attr_opt("fo:script", t.script.as_deref());

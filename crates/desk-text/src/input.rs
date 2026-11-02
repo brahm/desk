@@ -16,6 +16,29 @@ use desk_model::{
 };
 
 use crate::fonts::pages_font;
+use crate::layout::SOFT_HYPHEN;
+
+/// The byte offsets in a text where its words may break with a hyphen,
+/// in order: none for the undetermined language or a language without
+/// patterns, nor in words that have soft hyphens of their own.
+fn hyphen_points(text: &str, language: &str) -> Vec<usize> {
+    if language == "und" {
+        return Vec::new();
+    }
+    let Some(patterns) = desk_lang::patterns(language) else {
+        return Vec::new();
+    };
+    desk_lang::words(text)
+        .into_iter()
+        .filter(|range| !text[range.clone()].contains(SOFT_HYPHEN))
+        .flat_map(|range| {
+            patterns
+                .hyphenate(&text[range.clone()])
+                .into_iter()
+                .map(move |point| range.start + point)
+        })
+        .collect()
+}
 
 /// U+FB01 LATIN SMALL LIGATURE FI.
 pub(crate) const FI: char = '\u{fb01}';
@@ -154,7 +177,16 @@ impl ParagraphText {
         let mut model_offset = 0;
         let mut transformed = false;
         let mut previous: Option<char> = None;
+        let hyphenate = out.paragraph.hyphenate;
         for (text, format) in runs {
+            // Where words may break with a hyphen, by the patterns of
+            // their language (TXT-09).
+            let hyphens = if hyphenate {
+                hyphen_points(text, format.language.tag())
+            } else {
+                Vec::new()
+            };
+            let run_start = model_offset;
             let index = match out.formats.iter().position(|f| f == &format) {
                 Some(index) => index,
                 None => {
@@ -169,6 +201,13 @@ impl ParagraphText {
                 && pages_font(&format.font_family).is_some_and(|f| f.ligatures);
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
+                if hyphens.binary_search(&(model_offset - run_start)).is_ok() {
+                    let start = out.text.len();
+                    out.text.push(SOFT_HYPHEN);
+                    out.offsets.push((start, model_offset));
+                    out.push_range(start..out.text.len(), index, false);
+                    transformed = true;
+                }
                 let start = out.text.len();
                 let ligature = match (c, chars.peek()) {
                     ('f', Some('i')) if ligatures => Some(FI),

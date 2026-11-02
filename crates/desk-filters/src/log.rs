@@ -55,8 +55,6 @@ pub enum Formatting {
     /// Typographic settings of fonts other than ligatures, which Pages
     /// saves as features of Apple Type Services.
     FontFeatures,
-    /// Automatic hyphenation: the words break only at soft hyphens.
-    Hyphenation,
 }
 
 /// A setting of the whole document that an import left out.
@@ -145,7 +143,6 @@ impl fmt::Display for Formatting {
             Self::DropCaps => "drop caps",
             Self::HiddenText => "hidden text, which is shown",
             Self::FontFeatures => "font features",
-            Self::Hyphenation => "automatic hyphenation",
         })
     }
 }

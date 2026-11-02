@@ -1,0 +1,16 @@
+[package]
+name = "desk-lang"
+description = "Spelling, proofreading and hyphenation with the dictionaries of the system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+spellbook.workspace = true
+unicode-segmentation.workspace = true
+
+[lints]
+workspace = true

@@ -250,6 +250,7 @@ impl Reader {
             outline: e.attr(STYLE, "text-outline").map(|v| v == "true"),
             shadow: e.attr(FO, "text-shadow").and_then(text_shadow),
             background: e.attr(FO, "background-color").and_then(background),
+            hyphenate: e.attr(FO, "hyphenate").map(|v| v == "true"),
         }
     }
 }

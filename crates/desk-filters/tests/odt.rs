@@ -951,3 +951,62 @@ fn lst_lists_from_other_programs_are_read() {
     assert_eq!(items[1].as_ref().unwrap().level, 1);
     let _ = export(&document);
 }
+
+#[test]
+fn txt_09_hyphenation_of_styles_and_paragraphs_is_kept() {
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let hyphenated = document.new_id();
+    let mut style = ParagraphStyle::new(hyphenated, "Hyphenated");
+    style.parent = Some(body);
+    style.paragraph.hyphenate = Some(true);
+    document.put_style(style).unwrap();
+    let first = document.body().get(0).unwrap().id();
+    for (index, (style, attrs)) in [
+        (hyphenated, ParaAttrs::default()),
+        (
+            hyphenated,
+            ParaAttrs {
+                hyphenate: Some(false),
+                ..ParaAttrs::default()
+            },
+        ),
+        (
+            body,
+            ParaAttrs {
+                hyphenate: Some(true),
+                ..ParaAttrs::default()
+            },
+        ),
+        (body, ParaAttrs::default()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let paragraph =
+            Paragraph::from_runs(document.new_id(), style, attrs, vec![Run::new("Text")]).unwrap();
+        document
+            .apply(Op::InsertParagraph {
+                index: index + 1,
+                paragraph,
+            })
+            .unwrap();
+    }
+    document
+        .apply(Op::RemoveParagraph { paragraph: first })
+        .unwrap();
+
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-hyphenation.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let hyphenate: Vec<bool> = read
+        .body()
+        .iter()
+        .map(|p| {
+            read.styles()
+                .resolve_paragraph(p.style(), p.attrs())
+                .hyphenate
+        })
+        .collect();
+    assert_eq!(hyphenate, [true, false, true, false]);
+}

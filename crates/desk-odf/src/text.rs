@@ -268,6 +268,9 @@ pub struct TextProperties {
     pub shadow: Option<TextShadow>,
     /// `fo:background-color`.
     pub background: Option<Background>,
+    /// `fo:hyphenate`: whether words break with hyphens at the ends of
+    /// lines.
+    pub hyphenate: Option<bool>,
 }
 
 /// `fo:text-shadow`.

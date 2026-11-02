@@ -24,7 +24,7 @@ jobs:
       - name: Install GTK, Libadwaita, the test fonts and Poppler
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils
+          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -96,7 +96,7 @@ jobs:
       - name: Install GTK, Libadwaita, a display and AT-SPI
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation xvfb xauth xdotool dbus at-spi2-core python3-gi gir1.2-atspi-2.0
+          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev fonts-liberation xvfb xauth xdotool dbus at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Drive Desk Writer as a screen reader sees it

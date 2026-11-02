@@ -314,6 +314,9 @@ fn para_border(chain: &[&IworkStyle], own: usize) -> Option<ParaBorder> {
 /// line indent, which depends on the left indent.
 fn para_attrs(properties: &Properties) -> ParaAttrs {
     ParaAttrs {
+        // Set from the document and the styles together, for each
+        // paragraph.
+        hyphenate: None,
         alignment: properties.number("alignment").map(|n| match n as i64 {
             1 => Alignment::Right,
             2 => Alignment::Center,
@@ -939,9 +942,6 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         for formatting in paragraph_losses(&source.stylesheet, paragraph) {
             log.add(Warning::Formatting(formatting), 1);
         }
-        if source.auto_hyphenation && hyphenates(&source.stylesheet, paragraph) {
-            log.add(Warning::Formatting(Formatting::Hyphenation), 1);
-        }
     }
 
     let mut importer = Importer::new(&source.stylesheet)?;
@@ -953,11 +953,24 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .id();
     let mut index = 1;
     for paragraph in &source.body {
+        // Automatic hyphenation, where the document and the paragraph
+        // allow it (TXT-09).
+        let hyphenate = source.auto_hyphenation && hyphenates(&source.stylesheet, paragraph);
         for built in importer.paragraph(paragraph)? {
+            let (id, style) = (built.id(), built.style());
+            let mut attrs = built.attrs().clone();
             importer.document.apply(Op::InsertParagraph {
                 index,
                 paragraph: built,
             })?;
+            if hyphenate {
+                attrs.hyphenate = Some(true);
+                importer.document.apply(Op::SetParagraphFormat {
+                    paragraph: id,
+                    style,
+                    attrs,
+                })?;
+            }
             index += 1;
         }
     }
