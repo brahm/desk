@@ -188,6 +188,19 @@ pub fn hit(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Spot>
     ))
 }
 
+/// The paragraph whose list label is at a point of a page, a few points
+/// around it included (LST-02).
+pub fn label_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<usize> {
+    const SLACK: f32 = 3.0;
+    let (x, y) = (x as f32, y as f32);
+    layout.pages.get(page)?.lines.iter().find_map(|line| {
+        let label = line.line.label.as_ref()?;
+        let x = x - line.origin.0;
+        (y >= line.top() && y < line.bottom() && x >= label.start - SLACK && x <= label.end + SLACK)
+            .then_some(line.paragraph)
+    })
+}
+
 /// The rectangles that show a selection, line by line.
 pub fn selection_rects(layout: &DocumentLayout, selection: &Selection) -> Vec<SpanRect> {
     let (start, end) = selection.ordered();
@@ -657,5 +670,30 @@ mod tests {
         assert!(marks[0].ascent > 0.0);
         // The empty paragraph ends at its start, on the next line.
         assert!(marks[3].baseline > marks[2].baseline);
+    }
+
+    #[test]
+    fn lst_02_the_label_of_an_item_is_found_under_the_pointer() {
+        let mut editor = Editor::new(document(&["Item", "Text"]));
+        editor
+            .edit("List", |edit| {
+                let first = Position::new(edit.document().body().get(0).unwrap().id(), 0);
+                let style = edit.list_style_or_add("Bullet", desk_model::ListStyle::bullet)?;
+                edit.set_list_style(first, first, Some(style))
+            })
+            .unwrap();
+        let layout = laid_out(editor.document());
+        let line = &layout.pages[0].lines[0];
+        let label = line.line.label.clone().expect("a bullet");
+        let (x, y) = (
+            f64::from(line.origin.0 + (label.start + label.end) / 2.0),
+            f64::from(line.top() + 1.0),
+        );
+        assert_eq!(label_at(&layout, 0, x, y), Some(0));
+        // Not on the text of the item, nor on a paragraph outside a list.
+        let text = caret(&layout, Spot::new(0, 2)).unwrap();
+        assert_eq!(label_at(&layout, 0, text.x, y), None);
+        let second = &layout.pages[0].lines[1];
+        assert!(second.line.label.is_none());
     }
 }

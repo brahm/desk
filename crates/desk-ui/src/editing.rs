@@ -141,6 +141,9 @@ struct State {
     /// selected, which a drag then extends by whole words or paragraphs.
     unit: Unit,
     drag_from: Option<Selection>,
+    /// A drag of the label of a list item (LST-02): where it started on
+    /// its page, and how many levels it has moved the item.
+    label_drag: Option<(f64, i32)>,
     /// Whether the last action was typing at the cursor, which the next
     /// letter typed continues as one step of the history.
     typing: bool,
@@ -232,6 +235,7 @@ impl TextEditor {
                 on_change: Vec::new(),
                 unit: Unit::Character,
                 drag_from: None,
+                label_drag: None,
                 typing: false,
                 pending: None,
                 on_select: Vec::new(),
@@ -1740,6 +1744,26 @@ impl TextEditor {
                     }
                 }
             }
+            // A press on the label of a list item selects the item, and a
+            // drag of it moves the item to another level (LST-02).
+            if presses == 1
+                && !shift
+                && !control
+                && let Some((page, px, py)) = this.view.page_at(x, y)
+                && let Some(paragraph) =
+                    text_nav::label_at(&this.state.borrow().layout, page, px, py)
+            {
+                let selection = text_nav::paragraph_at(
+                    &this.state.borrow().editor.snapshot(),
+                    Spot::new(paragraph, 0),
+                );
+                this.select(selection);
+                let mut state = this.state.borrow_mut();
+                state.typing = false;
+                state.drag_from = None;
+                state.label_drag = Some((px, 0));
+                return;
+            }
             let unit = match presses {
                 1 => Unit::Character,
                 2 => Unit::Word,
@@ -1780,6 +1804,19 @@ impl TextEditor {
             let Some((x, y)) = gesture.start_point() else {
                 return;
             };
+            let label_drag = this.state.borrow().label_drag;
+            if let Some((from, moved)) = label_drag {
+                // A level for each step of the indent of a level.
+                const STEP: f64 = 18.0;
+                if let Some((_, px, _)) = this.view.page_at(x + dx, y) {
+                    let levels = ((px - from) / STEP).trunc() as i32;
+                    if levels != moved {
+                        this.change_list_level(levels - moved, true);
+                        this.state.borrow_mut().label_drag = Some((from, levels));
+                    }
+                }
+                return;
+            }
             let Some(from) = this.state.borrow().drag_from else {
                 return;
             };
@@ -1794,6 +1831,7 @@ impl TextEditor {
             };
             let mut state = this.state.borrow_mut();
             state.drag_from = None;
+            state.label_drag = None;
             state.adding = false;
         });
         self.view.area().add_controller(drag);

@@ -141,6 +141,10 @@ pub struct Line {
     /// a model offset in the paragraph and the distance from the left of
     /// the paragraph, ordered by offset. The end of the line is the last.
     pub carets: Vec<(usize, f32)>,
+    /// From the left of the paragraph, where the label of a list item is,
+    /// on the first line of the item: what a drag moves to another level
+    /// (LST-02).
+    pub label: Option<Range<f32>>,
 }
 
 impl Line {
@@ -753,10 +757,13 @@ impl TextSystem {
                 decorations,
                 hyphenated: place.hyphenated,
                 carets,
+                label: None,
             });
         }
         if let (Some((laid, x, format, raise)), Some(first)) = (label, lines.first_mut()) {
             let baseline = first.baseline - raise;
+            let width = laid.lines.first().map_or(0.0, |l| l.advance);
+            first.label = Some(x..x + width);
             let runs = laid.lines.into_iter().take(1).flat_map(|line| {
                 let shift = baseline - line.baseline;
                 line.runs.into_iter().map(move |mut run| {
