@@ -3,7 +3,9 @@
     "runtime": "org.gnome.Platform",
     "runtime-version": "50",
     "sdk": "org.gnome.Sdk",
-    "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+    "sdk-extensions": [
+        "org.freedesktop.Sdk.Extension.rust-stable"
+    ],
     "command": "desk-writer",
     "finish-args": [
         "--share=ipc",
@@ -13,14 +15,106 @@
     ],
     "build-options": {
         "append-path": "/usr/lib/sdk/rust-stable/bin",
-        "build-args": ["--share=network"],
+        "build-args": [
+            "--share=network"
+        ],
         "env": {
             "CARGO_HOME": "/run/build/desk/cargo",
             "CARGO_TARGET_DIR": "/run/build/desk/target"
         }
     },
-    "cleanup": ["/share/doc"],
+    "cleanup": [
+        "/share/doc"
+    ],
     "modules": [
+        {
+            "name": "substitute-fonts",
+            "buildsystem": "simple",
+            "build-commands": [
+                "for deb in *.deb; do bsdtar -xOf \"$deb\" 'data.tar.*' | bsdtar -xf -; done",
+                "install -Dm644 -t /app/share/fonts/liberation usr/share/fonts/truetype/liberation/*.ttf",
+                "install -Dm644 -t /app/share/fonts/crosextra usr/share/fonts/truetype/crosextra/*.ttf",
+                "install -Dm644 -t /app/share/fonts/tex-gyre usr/share/texmf/fonts/opentype/public/tex-gyre/*.otf",
+                "install -Dm644 -t /app/share/fonts/urw-base35 usr/share/fonts/opentype/urw-base35/*.otf",
+                "install -Dm644 -t /app/share/fonts/dejavu usr/share/fonts/truetype/dejavu/*.ttf",
+                "for doc in usr/share/doc/*/copyright; do install -Dm644 \"$doc\" /app/share/licenses/br.com.brahm.Desk.Writer/$(basename $(dirname \"$doc\")); done"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-liberation/fonts-liberation_2.1.5-3_all.deb",
+                    "sha256": "065c2ab1abc9108b17d401016dc594b79750904390f095845c93bb06e1153acc"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/fonts-crosextra-carlito/fonts-crosextra-carlito_20230309-2_all.deb",
+                    "sha256": "c238087a909a4f1d1c5c1a5e1ed42ab9cb522f09ea2715e8deab6ee2751b9a01"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/fonts-crosextra-caladea/fonts-crosextra-caladea_20200211-2_all.deb",
+                    "sha256": "1a85651d71331a0e07dafa5d54e9aa54b445c29ae0dacb8c7cd224b1b7baaf82"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/t/tex-gyre/fonts-texgyre_20180621-6_all.deb",
+                    "sha256": "dc743718ece939f4a868e15012e383aa9bf6501ed6857c895835911053ef250a"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-urw-base35/fonts-urw-base35_20200910-8_all.deb",
+                    "sha256": "46e75490faa7fd6fddbc8df234d14e0f7b60ea5e98563227a24d6bf5e5008647"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-dejavu/fonts-dejavu-core_2.37-8_all.deb",
+                    "sha256": "40049660c194f3b8a2541fc7369efebb10e9f94bdac836a2f38fafedd10fa73a"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-dejavu/fonts-dejavu-mono_2.37-8_all.deb",
+                    "sha256": "8a599d6553307db7ecb795d2f0e5a301e03234afc75c7358b0ba43466454c89a"
+                }
+            ]
+        },
+        {
+            "name": "dictionaries",
+            "buildsystem": "simple",
+            "build-commands": [
+                "for deb in *.deb; do bsdtar -xOf \"$deb\" 'data.tar.*' | bsdtar -xf -; done",
+                "install -Dm644 -t /app/share/hunspell usr/share/hunspell/*.aff usr/share/hunspell/*.dic",
+                "mkdir -p /app/share/hyphen",
+                "cp -P usr/share/hyphen/*.dic /app/share/hyphen/",
+                "for doc in usr/share/doc/*/copyright; do install -Dm644 \"$doc\" /app/share/licenses/br.com.brahm.Desk.Writer/$(basename $(dirname \"$doc\")); done"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/scowl/hunspell-en-us_2020.12.07-2_all.deb",
+                    "sha256": "d231c94b54792215038a4f719c562deafe8efe0a7710c0c7218974cab513330c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-en-gb_24.2.1-1_all.deb",
+                    "sha256": "b616d49d392b23a13df4f98b8e387b1ca71410c510acee55f81ab541cde026df"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-pt-br_24.2.1-1_all.deb",
+                    "sha256": "69a66b415faa240c5ec64a151562800b6e820a3c2e50dafb391246f98af36485"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hyphen/hyphen-en-us_2.8.8-7build3_all.deb",
+                    "sha256": "15f9abe20c1a3d67b4102a47a3872ff4308275c4cb70b2ea00e98a884691e699"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-pt-br_24.2.1-1_all.deb",
+                    "sha256": "8dd169aa223bc789b733f06c1b5ced358de57b02ceffd0e2acbb49a2c876e218"
+                }
+            ]
+        },
         {
             "name": "desk",
             "buildsystem": "simple",
@@ -36,7 +130,13 @@
                 {
                     "type": "dir",
                     "path": "../..",
-                    "skip": ["target", "fuzz", "corpus", "site", "experiments"]
+                    "skip": [
+                        "target",
+                        "fuzz",
+                        "corpus",
+                        "site",
+                        "experiments"
+                    ]
                 }
             ]
         }
