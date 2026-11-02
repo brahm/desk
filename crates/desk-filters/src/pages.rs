@@ -28,9 +28,10 @@ use desk_model::{
     PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow,
     StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
+use desk_model::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 
 use crate::FilterError;
-use crate::log::{Content, Formatting, ImportLog, Setting, Warning};
+use crate::log::{Content, Formatting, ImportLog, Warning};
 
 /// The identifier of Body in the templates of Pages.
 const BODY_IDENT: &str = "paragraph-style-32";
@@ -72,7 +73,6 @@ fn warning(element: &str) -> Warning {
         "toc" => Content::TablesOfContents,
         "change-ref" | "changed-ref" | "changes-ref" => Content::TrackedChanges,
         "bookmark" => Content::Bookmarks,
-        "columns" => Content::ColumnLayouts,
         other => Content::Other(other.to_owned()),
     };
     Warning::Content(content)
@@ -369,6 +369,9 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
         right_indent: points(properties, "rightIndent"),
         first_line_indent: None,
         page_break_before: flag(properties, "pageBreakBefore"),
+        // Column breaks, sections and layouts come from the body.
+        column_break_before: None,
+        start: None,
         keep_with_next: flag(properties, "keepWithNext"),
         keep_lines_together: flag(properties, "keepLinesTogether"),
         widow_control: flag(properties, "widowControl"),
@@ -618,7 +621,13 @@ impl<'a> Importer<'a> {
                 }
             }
         }
-        let named: Vec<&IworkStyle> = sheet.styles.iter().filter(|s| is_named(s)).collect();
+        // Layouts and sections are not styles of the model: each layout and
+        // section of the body takes their properties.
+        let named: Vec<&IworkStyle> = sheet
+            .styles
+            .iter()
+            .filter(|s| matches!(s.family, Family::Paragraph | Family::Character) && is_named(s))
+            .collect();
         let body_style = named
             .iter()
             .find(|s| s.family == Family::Paragraph && s.ident.as_deref() == Some(BODY_IDENT))
@@ -707,6 +716,7 @@ impl<'a> Importer<'a> {
                             character,
                         })?;
                     }
+                    Family::Layout | Family::Section => {}
                     Family::Character => {
                         self.document.put_style(CharacterStyle {
                             id: *id,
@@ -865,7 +875,11 @@ impl<'a> Importer<'a> {
 
     /// The paragraphs of the model for a paragraph of Pages: more than one
     /// when it holds page breaks.
-    fn paragraph(&mut self, source: &iwork::Paragraph) -> Result<Vec<Paragraph>, FilterError> {
+    fn paragraph(
+        &mut self,
+        source: &iwork::Paragraph,
+        start: Option<std::sync::Arc<Start>>,
+    ) -> Result<Vec<Paragraph>, FilterError> {
         let sheet = self.sheet;
         let mut style = self.body;
         let mut attrs = ParaAttrs::default();
@@ -933,12 +947,97 @@ impl<'a> Importer<'a> {
             let mut attrs = attrs.clone();
             if i > 0 {
                 attrs.page_break_before = Some(true);
+            } else {
+                if source.column_break_before {
+                    attrs.column_break_before = Some(true);
+                }
+                attrs.start = start.clone().map(Some);
             }
             let id = self.document.new_id();
             out.push(Paragraph::from_runs(id, style, attrs, runs)?);
         }
         Ok(out)
     }
+}
+
+/// The value of a property of a layout or section style, or of the
+/// nearest ancestor that sets it.
+fn style_value<'a>(
+    sheet: &'a Stylesheet,
+    style: &str,
+    family: Family,
+    name: &str,
+) -> Option<&'a Value> {
+    let found = sheet.find(style).filter(|s| s.family == family)?;
+    sheet
+        .ancestry(found)
+        .into_iter()
+        .find_map(|s| s.properties.get(name))
+}
+
+/// A layout of Pages: its columns and margins (EST-07, EST-10).
+fn layout(sheet: &Stylesheet, style: Option<&str>) -> Layout {
+    let mut out = Layout::default();
+    let Some(style) = style else { return out };
+    let get = |name| style_value(sheet, style, Family::Layout, name);
+    if let Some(Value::Columns { equal, columns }) = get("columns")
+        && !columns.is_empty()
+    {
+        let count = columns.len().min(MAX_COLUMNS);
+        let part = |v: f64| (v.clamp(0.0, 1.0) * f64::from(PARTS)).round() as u32;
+        let mut set = Columns::equal(count as u8, part(columns[0].1));
+        if !*equal {
+            set.equal = false;
+            for (i, (width, spacing)) in columns.iter().take(count).enumerate() {
+                set.widths[i] = part(*width);
+                set.gaps[i] = if i + 1 < count { part(*spacing) } else { 0 };
+            }
+        }
+        out.columns = set;
+    }
+    if let Some(Value::Padding {
+        top,
+        left,
+        bottom,
+        right,
+    }) = get("layoutMargins")
+    {
+        let length = |v: f64| Length::from_pt(v.max(0.0));
+        out.before = length(*top);
+        out.after = length(*bottom);
+        out.left = length(*left);
+        out.right = length(*right);
+    }
+    // A layout that is not continuous starts on a new page.
+    if let Some(Value::Number(n)) = get("layoutContinuous") {
+        out.new_page = *n == 0.0;
+    }
+    out
+}
+
+/// A section of Pages: how it starts and numbers its pages (EST-16,
+/// EST-18, EST-19).
+fn section(sheet: &Stylesheet, style: Option<&str>) -> Section {
+    let mut out = Section::default();
+    let Some(style) = style else { return out };
+    let number = |name| match style_value(sheet, style, Family::Section, name) {
+        Some(Value::Number(n)) => Some(*n),
+        _ => None,
+    };
+    // Kind 1 starts the numbers again at the start number; 0 counts on.
+    if number("sectionPageNumberKind") == Some(1.0) {
+        out.first_number = Some(number("sectionPageNumberStart").unwrap_or(1.0).max(0.0) as u32);
+    }
+    out.first_page_different = number("pageMasterFirstPageDifferent").is_some_and(|n| n != 0.0);
+    out.left_right_different =
+        number("pageMasterLeftRightPagesDifferent").is_some_and(|n| n != 0.0);
+    // In the order of the menu of Pages: any page, left page, right page.
+    out.start = match number("startKind") {
+        Some(1.0) => SectionStart::LeftPage,
+        Some(2.0) => SectionStart::RightPage,
+        _ => SectionStart::AnyPage,
+    };
+    out
 }
 
 /// Maps a Pages document to the model.
@@ -967,9 +1066,6 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     for (element, count) in &source.skipped {
         log.add(warning(element), *count);
     }
-    if source.page.facing {
-        log.add(Warning::Setting(Setting::FacingPages), 1);
-    }
     // Image bullets are kept when their pictures can be read.
     let pictures: Vec<(String, desk_model::Picture)> = source
         .files
@@ -997,9 +1093,29 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .get(0)
         .expect("a new document has a paragraph")
         .id();
+    // The first section and layout are those of the page setup; each
+    // later one starts at its first paragraph.
+    let sheet = &source.stylesheet;
+    let first_section = source
+        .body
+        .first()
+        .map_or_else(Section::default, |p| section(sheet, p.section.as_deref()));
+    let first_layout = source
+        .body
+        .first()
+        .map_or_else(Layout::default, |p| layout(sheet, p.layout.as_deref()));
     let mut index = 1;
-    for paragraph in &source.body {
-        for built in importer.paragraph(paragraph)? {
+    for (i, paragraph) in source.body.iter().enumerate() {
+        let start = match (&paragraph.section, &paragraph.layout) {
+            _ if i == 0 => None,
+            (Some(s), l) => Some(Start::Section(
+                section(sheet, Some(s)),
+                layout(sheet, l.as_deref()),
+            )),
+            (None, Some(l)) => Some(Start::Layout(layout(sheet, Some(l)))),
+            (None, None) => None,
+        };
+        for built in importer.paragraph(paragraph, start.map(std::sync::Arc::new))? {
             importer.document.apply(Op::InsertParagraph {
                 index,
                 paragraph: built,
@@ -1022,6 +1138,9 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             margin_bottom: length(page.bottom),
             margin_left: length(page.left),
             margin_right: length(page.right),
+            facing_pages: page.facing,
+            section: first_section,
+            layout: first_layout,
         },
     })?;
     // Whether Pages hyphenates and forms ligatures at all, from the

@@ -8,7 +8,10 @@
 use std::sync::Arc;
 
 use desk_layout::{DocumentLayout, paginate, paginate_texts, paginate_texts_spaced};
-use desk_model::{CharFormat, Document, LINE_BREAK, Length, PageSetup, ParaFormat};
+use desk_model::{
+    CharFormat, Columns, Document, LINE_BREAK, Layout, Length, PageSetup, ParaFormat, Section,
+    SectionStart, Start,
+};
 use desk_text::{ParagraphText, TextSystem};
 
 /// A page with a body 200pt wide and `body_height` tall, with margins of
@@ -21,6 +24,7 @@ fn setup(body_height: f32) -> PageSetup {
         margin_bottom: Length::from_points(40),
         margin_left: Length::from_points(50),
         margin_right: Length::from_points(40),
+        ..PageSetup::default()
     }
 }
 
@@ -309,4 +313,162 @@ fn doc_20_lines_count_in_the_document_and_the_selection() {
     assert_eq!(layout.lines_between((1, 0), (2, 1)), 2);
     // A selection inside one line.
     assert_eq!(layout.lines_between((0, 1), (0, 2)), 1);
+}
+
+fn starting(start: Start) -> ParaFormat {
+    ParaFormat {
+        start: Some(Arc::new(start)),
+        ..ParaFormat::default()
+    }
+}
+
+fn columns(count: u8) -> Layout {
+    Layout {
+        columns: Columns::equal(count, Columns::DEFAULT_GAP),
+        ..Layout::default()
+    }
+}
+
+#[test]
+fn est_07_text_fills_the_columns_one_after_the_other() {
+    let mut system = TextSystem::new();
+    let h = line_height(&mut system);
+    let mut page = setup(h * 3.0 + 1.0);
+    page.layout = columns(2);
+    let layout = paginate_texts(page, &[para(8, ParaFormat::default())], &mut system);
+    assert_eq!(counts(&layout), [vec![(0, 6)], vec![(0, 2)]]);
+    let lines = &layout.pages[0].lines;
+    // The body is 200pt wide: two columns of 95pt with a gap of 10pt.
+    assert_eq!(lines[0].origin.0, 50.0);
+    assert_eq!(lines[3].origin.0, 155.0);
+    assert_eq!(lines[3].top(), lines[0].top());
+    assert_eq!(lines[3].line.width, lines[0].line.width);
+}
+
+#[test]
+fn est_08_a_column_break_starts_the_next_column() {
+    let mut system = TextSystem::new();
+    let mut page = setup(500.0);
+    page.layout = columns(2);
+    let broken = ParaFormat {
+        column_break_before: true,
+        ..ParaFormat::default()
+    };
+    let texts = [
+        para(1, ParaFormat::default()),
+        para(1, broken.clone()),
+        para(1, broken),
+    ];
+    let layout = paginate_texts(page, &texts, &mut system);
+    assert_eq!(counts(&layout), [vec![(0, 1), (1, 1)], vec![(2, 1)]]);
+    let lines = &layout.pages[0].lines;
+    assert_eq!(lines[1].origin.0, 155.0);
+    assert_eq!(lines[1].top(), lines[0].top());
+}
+
+#[test]
+fn est_09_est_10_a_layout_starts_below_the_one_before() {
+    let mut system = TextSystem::new();
+    let h = line_height(&mut system);
+    let mut page = setup(500.0);
+    page.layout = Layout {
+        after: Length::from_points(10),
+        ..columns(2)
+    };
+    let next = Layout {
+        before: Length::from_points(6),
+        left: Length::from_points(20),
+        right: Length::from_points(30),
+        ..Layout::default()
+    };
+    let texts = [
+        para(3, ParaFormat::default()),
+        para(1, starting(Start::Layout(next))),
+    ];
+    let layout = paginate_texts(page, &texts, &mut system);
+    assert_eq!(layout.pages.len(), 1);
+    let lines = &layout.pages[0].lines;
+    // The three lines fill the first column; the next layout starts
+    // below it, after the space after and before.
+    let below = lines[2].bottom();
+    assert!((lines[3].top() - (below + 16.0)).abs() < 0.01, "{h}");
+    assert_eq!(lines[3].origin.0, 70.0);
+    let new_page = Layout {
+        new_page: true,
+        ..next
+    };
+    let texts = [
+        para(1, ParaFormat::default()),
+        para(1, starting(Start::Layout(new_page))),
+    ];
+    let layout = paginate_texts(setup(500.0), &texts, &mut system);
+    assert_eq!(counts(&layout), [vec![(0, 1)], vec![(1, 1)]]);
+    assert!((layout.pages[1].lines[0].top() - 26.0).abs() < 0.01);
+}
+
+#[test]
+fn est_11_facing_pages_mirror_the_margins() {
+    let mut system = TextSystem::new();
+    let h = line_height(&mut system);
+    let mut page = setup(h + 1.0);
+    page.facing_pages = true;
+    let layout = paginate_texts(page, &[para(3, ParaFormat::default())], &mut system);
+    let x: Vec<f32> = layout.pages.iter().map(|p| p.lines[0].origin.0).collect();
+    assert_eq!(x, [50.0, 40.0, 50.0]);
+    let left: Vec<bool> = layout.pages.iter().map(|p| p.left).collect();
+    assert_eq!(left, [false, true, false]);
+    assert_eq!(layout.pages[1].margins, (40.0, 50.0));
+}
+
+#[test]
+fn est_16_est_18_sections_start_pages_and_number_them() {
+    let mut system = TextSystem::new();
+    let restart = Section {
+        first_number: Some(10),
+        ..Section::default()
+    };
+    // The third page is a right page: a section that starts on a left one
+    // leaves it blank.
+    let left = Section {
+        start: SectionStart::LeftPage,
+        ..Section::default()
+    };
+    let texts = [
+        para(1, ParaFormat::default()),
+        para(1, starting(Start::Section(restart, Layout::default()))),
+        para(1, ParaFormat::default()),
+        para(1, starting(Start::Section(left, columns(2)))),
+    ];
+    let layout = paginate_texts(setup(500.0), &texts, &mut system);
+    assert_eq!(
+        counts(&layout),
+        [vec![(0, 1)], vec![(1, 1), (2, 1)], vec![], vec![(3, 1)]]
+    );
+    let numbers: Vec<u32> = layout.pages.iter().map(|p| p.number).collect();
+    assert_eq!(numbers, [1, 10, 11, 12]);
+    let sections: Vec<usize> = layout.pages.iter().map(|p| p.section).collect();
+    assert_eq!(sections, [0, 1, 1, 2]);
+    let firsts: Vec<bool> = layout.pages.iter().map(|p| p.first_of_section).collect();
+    assert_eq!(firsts, [true, true, false, true]);
+}
+
+#[test]
+fn est_05_keep_with_next_moves_to_the_next_column() {
+    let mut system = TextSystem::new();
+    let h = line_height(&mut system);
+    let mut page = setup(h * 3.0 + 1.0);
+    page.layout = columns(2);
+    let kept = ParaFormat {
+        keep_with_next: true,
+        ..ParaFormat::default()
+    };
+    let texts = [
+        para(2, ParaFormat::default()),
+        para(1, kept),
+        para(2, ParaFormat::default()),
+    ];
+    let layout = paginate_texts(page, &texts, &mut system);
+    assert_eq!(counts(&layout), [vec![(0, 2), (1, 1), (2, 2)]]);
+    let lines = &layout.pages[0].lines;
+    assert_eq!(lines[2].origin.0, 155.0);
 }

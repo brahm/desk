@@ -491,6 +491,7 @@ fn foreign() -> odf::TextDocument {
                 style: Some("P1".into()),
                 outline_level: None,
                 list: None,
+                section: None,
                 spans: vec![
                     odf::Span {
                         style: None,
@@ -510,6 +511,7 @@ fn foreign() -> odf::TextDocument {
                 style: Some("A".into()),
                 outline_level: Some(1),
                 list: None,
+                section: None,
                 spans: vec![],
             },
         ],
@@ -1135,4 +1137,124 @@ fn fmt_15_documents_of_other_programs_add_the_spaces_between_paragraphs() {
     let mine = Document::new_word_processing();
     let read = read_odt(&write_odt(&mine).unwrap()).unwrap();
     assert_eq!(read.text_settings().spacing, ParagraphSpacing::Larger);
+}
+
+/// The page setup and, for each paragraph, its column break and the
+/// section or layout it starts.
+fn structure(document: &Document) -> (PageSetup, Vec<(bool, Option<desk_model::Start>, bool)>) {
+    let styles = document.styles();
+    let paragraphs = document
+        .body()
+        .iter()
+        .map(|p| {
+            let format = styles.resolve_paragraph(p.style(), p.attrs());
+            (
+                format.column_break_before,
+                format.start.as_deref().copied(),
+                format.page_break_before,
+            )
+        })
+        .collect();
+    (*document.page_setup(), paragraphs)
+}
+
+/// Whether columns are the same, within a ten-thousandth of their width.
+fn same_columns(a: &desk_model::Columns, b: &desk_model::Columns, name: &str) {
+    assert_eq!((a.count, a.equal), (b.count, b.equal), "{name}");
+    for (s, t) in a.spans(1000.0).iter().zip(b.spans(1000.0)) {
+        assert!(
+            (s.0 - t.0).abs() < 0.1 && (s.1 - t.1).abs() < 0.1,
+            "{name}: {a:?} {b:?}"
+        );
+    }
+}
+
+#[test]
+fn est_07_to_est_18_layouts_sections_and_facing_pages_are_kept() {
+    let fixtures =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/pages");
+    for name in [
+        "est-07-08-columns.pages",
+        "est-09-10-layouts.pages",
+        "est-11-facing-pages.pages",
+        "est-16-18-sections.pages",
+    ] {
+        let document = desk_filters::read_pages_at(&fixtures.join(name)).unwrap();
+        let bytes = write_odt(&document).unwrap();
+        keep(&name.replace(".pages", ".odt"), &bytes);
+        let read = read_odt(&bytes).unwrap();
+        let (setup, paragraphs) = structure(&document);
+        let (read_setup, read_paragraphs) = structure(&read);
+        assert_eq!(
+            PageSetup {
+                layout: setup.layout,
+                ..read_setup
+            },
+            setup,
+            "{name}"
+        );
+        same_columns(&read_setup.layout.columns, &setup.layout.columns, name);
+        // Columns come back within a millionth of the width.
+        for (a, b) in read_paragraphs.iter().zip(&paragraphs) {
+            assert_eq!((a.0, a.2), (b.0, b.2), "{name}");
+            match (a.1, b.1) {
+                (Some(x), Some(y)) => {
+                    let (lx, ly) = (x.layout(), y.layout());
+                    same_columns(&lx.columns, &ly.columns, name);
+                    assert_eq!(
+                        (lx.before, lx.after, lx.left, lx.right, lx.new_page),
+                        (ly.before, ly.after, ly.left, ly.right, ly.new_page),
+                        "{name}"
+                    );
+                    assert_eq!(
+                        matches!(x, desk_model::Start::Section(..)),
+                        matches!(y, desk_model::Start::Section(..)),
+                        "{name}"
+                    );
+                    if let (desk_model::Start::Section(s, _), desk_model::Start::Section(t, _)) =
+                        (x, y)
+                    {
+                        assert_eq!(s, t, "{name}");
+                    }
+                }
+                (x, y) => assert_eq!(x, y, "{name}"),
+            }
+        }
+        assert_eq!(read_paragraphs.len(), paragraphs.len(), "{name}");
+    }
+}
+
+#[test]
+fn est_07_est_18_columns_and_page_numbers_of_other_programs_are_read() {
+    let content = r#"<office:document-content
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">
+<office:automatic-styles>
+<style:style style:name="P1" style:family="paragraph"><style:paragraph-properties fo:break-before="page" style:page-number="7"/></style:style>
+<style:style style:name="S1" style:family="section"><style:section-properties><style:columns fo:column-count="2" fo:column-gap="0.5in"/></style:section-properties></style:style>
+</office:automatic-styles>
+<office:body><office:text>
+<text:p>One</text:p>
+<text:section text:name="A" text:style-name="S1"><text:p>Two</text:p></text:section>
+<text:p>Three</text:p>
+<text:p text:style-name="P1">Four</text:p>
+</office:text></office:body></office:document-content>"#;
+    let document = import(&odf::read_streams(content, None, None).unwrap()).unwrap();
+    let (_, paragraphs) = structure(&document);
+    let starts: Vec<Option<desk_model::Start>> = paragraphs.iter().map(|p| p.1).collect();
+    assert_eq!(starts[0], None);
+    let Some(desk_model::Start::Layout(two)) = starts[1] else {
+        panic!("{starts:?}");
+    };
+    assert_eq!(two.columns.count, 2);
+    assert_eq!(
+        starts[2],
+        Some(desk_model::Start::Layout(desk_model::Layout::default()))
+    );
+    let Some(desk_model::Start::Section(section, _)) = starts[3] else {
+        panic!("{starts:?}");
+    };
+    assert_eq!(section.first_number, Some(7));
 }

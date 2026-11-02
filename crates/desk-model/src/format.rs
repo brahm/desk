@@ -12,6 +12,7 @@
 use std::sync::Arc;
 
 use crate::list::ListLevel;
+use crate::section::Start;
 use crate::style::StyleId;
 use crate::units::{Length, Rgba};
 
@@ -689,6 +690,13 @@ formatting! {
         right_indent: Length = Length::ZERO,
         /// Start the paragraph on a new page (EST-04, EST-05).
         page_break_before: bool = false,
+        /// Start the paragraph in the next column, or on the next page in
+        /// the last column (EST-08).
+        column_break_before: bool = false,
+        /// The section or layout that starts at the paragraph, which then
+        /// starts the text of it (EST-09, EST-16). It belongs to the
+        /// paragraph, never to its style.
+        start: Option<Arc<Start>> = None,
         /// Keep the paragraph on the same page as the next one (EST-05).
         keep_with_next: bool = false,
         /// Keep the lines of the paragraph on one page (EST-05).

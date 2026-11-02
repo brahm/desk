@@ -7,10 +7,10 @@ use std::collections::BTreeSet;
 
 use crate::ns;
 use crate::text::{
-    Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, ListLabel, ListMember, ListStyle, Meta, PageLayout, Paragraph, ParagraphProperties,
-    Properties, Style, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow,
-    TextTransform,
+    Background, Border, BorderLine, Break, Columns, Family, LINE_BREAK, LeaderStyle, Line,
+    LineColor, LineHeight, ListLabel, ListMember, ListStyle, Meta, PageLayout, Paragraph,
+    ParagraphProperties, Properties, SectionStart, SectionStyle, Style, TabType, TextAlign,
+    TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
@@ -67,6 +67,9 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     for style in &document.automatic_list_styles {
         write_list_style(&mut w, style);
+    }
+    for style in &document.section_styles {
+        write_section_style(&mut w, style);
     }
     w.end();
     w.start("office:body").start("office:text");
@@ -298,6 +301,53 @@ fn write_list_style(w: &mut Writer, style: &ListStyle) {
 
 /// Writes the paragraphs of the body, with neighbors in the same list in
 /// one `text:list` and deeper levels in lists nested in its items.
+fn write_columns(w: &mut Writer, columns: &Columns) {
+    w.start("style:columns")
+        .attr("fo:column-count", &columns.count.to_string());
+    len(w, "fo:column-gap", columns.gap);
+    for column in &columns.columns {
+        w.start("style:column")
+            .attr("style:rel-width", &format!("{}*", column.rel_width))
+            .attr("fo:start-indent", &column.start_indent.to_string())
+            .attr("fo:end-indent", &column.end_indent.to_string())
+            .end();
+    }
+    w.end();
+}
+
+fn write_section_style(w: &mut Writer, style: &SectionStyle) {
+    w.start("style:style")
+        .attr("style:name", &style.name)
+        .attr("style:family", "section")
+        .start("style:section-properties");
+    len(w, "fo:margin-left", style.margin_left);
+    len(w, "fo:margin-right", style.margin_right);
+    len(w, "desk:space-before", style.space_before);
+    len(w, "desk:space-after", style.space_after);
+    let flag = |w: &mut Writer, name: &str, value: Option<bool>| {
+        if let Some(value) = value {
+            w.attr(name, if value { "true" } else { "false" });
+        }
+    };
+    flag(w, "desk:new-page", style.new_page);
+    if let Some(start) = style.section_start {
+        w.attr(
+            "desk:section-start",
+            match start {
+                SectionStart::Any => "any",
+                SectionStart::Left => "left",
+                SectionStart::Right => "right",
+            },
+        );
+    }
+    flag(w, "desk:first-page-different", style.first_page_different);
+    flag(w, "desk:left-right-different", style.left_right_different);
+    if let Some(columns) = &style.columns {
+        write_columns(w, columns);
+    }
+    w.end().end();
+}
+
 fn write_body(w: &mut Writer, body: &[Paragraph]) {
     // For each open list, from the outermost, whether an item is open.
     let mut open: Vec<bool> = Vec::new();
@@ -310,7 +360,24 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
             w.end();
         }
     };
+    // Whether a section is open, and how many were.
+    let mut in_section = false;
+    let mut sections = 0;
     for paragraph in body {
+        if let Some(name) = &paragraph.section {
+            close_to(w, &mut open, 0);
+            if in_section {
+                w.end();
+                in_section = false;
+            }
+            if !name.is_empty() {
+                sections += 1;
+                w.start("text:section")
+                    .attr("text:style-name", name)
+                    .attr("text:name", &format!("Section{sections}"));
+                in_section = true;
+            }
+        }
         let Some(member) = &paragraph.list else {
             close_to(w, &mut open, 0);
             write_paragraph(w, paragraph);
@@ -359,6 +426,9 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
         write_paragraph(w, paragraph);
     }
     close_to(w, &mut open, 0);
+    if in_section {
+        w.end();
+    }
 }
 
 fn write_properties(w: &mut Writer, properties: &Properties) {
@@ -423,6 +493,15 @@ fn paragraph_attrs(w: &mut Writer, p: &ParagraphProperties) {
                 Break::Column => "column",
             },
         );
+    }
+    match p.page_number {
+        Some(Some(n)) => {
+            w.attr("style:page-number", &n.to_string());
+        }
+        Some(None) => {
+            w.attr("style:page-number", "auto");
+        }
+        None => {}
     }
     let always = |v: bool| if v { "always" } else { "auto" };
     if let Some(v) = p.keep_with_next {
@@ -666,6 +745,12 @@ fn write_page_layout(w: &mut Writer, page: &PageLayout) {
     len(w, "fo:margin-bottom", page.margin_bottom);
     len(w, "fo:margin-left", page.margin_left);
     len(w, "fo:margin-right", page.margin_right);
+    if page.mirrored == Some(true) {
+        w.attr("style:page-usage", "mirrored");
+    }
+    if let Some(columns) = &page.columns {
+        write_columns(w, columns);
+    }
     w.end().end();
 }
 

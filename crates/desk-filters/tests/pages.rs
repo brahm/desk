@@ -5,11 +5,12 @@
 //! form that Pages 4.3 saves (DOC-22). The corpus checks whole documents
 //! saved by Pages itself, in desk-testkit.
 
-use desk_filters::log::{Content, Formatting, Setting, Warning};
+use desk_filters::log::{Content, Formatting, Warning};
 use desk_filters::{read_pages, read_pages_logged};
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharFormat, Document,
-    LINE_BREAK, Length, Ligatures, LineSpacing, LineStyle, ParaFormat, Rgba, StyleFamily,
+    LINE_BREAK, Length, Ligatures, LineSpacing, LineStyle, ParaFormat, Rgba, Section, SectionStart,
+    Start, StyleFamily,
 };
 
 /// An index with a stylesheet and a body, in the namespaces of Pages.
@@ -300,7 +301,7 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
 }
 
 #[test]
-fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
+fn est_11_txt_09_facing_pages_and_hyphenation_are_kept() {
     let anon = format!(
         r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-1"><sf:property-map>{}</sf:property-map></sf:paragraphstyle>"#,
         number("hyphenate", "0", "c"),
@@ -343,25 +344,70 @@ fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
     // A style that turns it off keeps its paragraphs whole.
     assert!(document.text_settings().hyphenation);
     assert_eq!(hyphenated_paragraphs(&document), [true, false, true]);
-    let entries: Vec<(Warning, usize)> = log
-        .entries()
-        .iter()
-        .map(|e| (e.warning.clone(), e.count))
-        .collect();
-    assert_eq!(entries, [(Warning::Setting(Setting::FacingPages), 1)]);
+    assert!(document.page_setup().facing_pages);
+    assert!(log.is_empty(), "{:?}", log.entries());
     let off = plain.replace("<sl:slprint-info", &setting("0"));
     assert!(read_pages_logged(off.as_bytes()).unwrap().1.is_empty());
 }
 
 #[test]
-fn est_11_facing_pages_saved_by_pages_are_logged() {
-    let (_, log) =
-        desk_filters::read_pages_at_logged(&fixture("est-11-facing-pages.pages")).unwrap();
-    assert!(
-        log.entries()
-            .iter()
-            .any(|e| e.warning == Warning::Setting(Setting::FacingPages))
-    );
+fn est_11_facing_pages_saved_by_pages_are_kept() {
+    let document = desk_filters::read_pages_at(&fixture("est-11-facing-pages.pages")).unwrap();
+    let setup = document.page_setup();
+    assert!(setup.facing_pages);
+    assert_eq!(setup.margin_left, Length::from_points(100));
+    assert_eq!(setup.margin_right, Length::from_points(40));
+}
+
+#[test]
+fn est_07_est_08_columns_and_column_breaks_saved_by_pages_are_read() {
+    let document = desk_filters::read_pages_at(&fixture("est-07-08-columns.pages")).unwrap();
+    let columns = document.page_setup().layout.columns;
+    assert!(columns.count > 1, "{columns:?}");
+    let formats = fixture_formats("est-07-08-columns.pages");
+    // The paragraph after the one that ends with the column break starts
+    // the next column.
+    let broken: Vec<bool> = formats.iter().map(|f| f.1.column_break_before).collect();
+    assert_eq!(broken, [false, false, true, false]);
+    assert!(formats.iter().all(|f| f.1.start.is_none()));
+}
+
+#[test]
+fn est_09_est_10_layouts_saved_by_pages_are_read() {
+    let formats = fixture_formats("est-09-10-layouts.pages");
+    let starts: Vec<Option<Start>> = formats
+        .iter()
+        .map(|f| f.1.start.as_deref().copied())
+        .collect();
+    assert_eq!(starts[0], None);
+    let Some(Start::Layout(layout)) = starts[1] else {
+        panic!("{starts:?}");
+    };
+    assert_eq!(layout.columns.count, 3);
+    assert!(layout.columns.equal);
+    let spans = layout.columns.spans(100.0);
+    assert!((spans[1].0 - 35.0).abs() < 0.01, "{spans:?}");
+    assert_eq!(layout.before, Length::from_points(12));
+    assert_eq!(layout.after, Length::from_points(24));
+    assert_eq!(layout.left, Length::from_points(20));
+    assert_eq!(layout.right, Length::from_points(30));
+    assert!(!layout.new_page);
+    assert_eq!(starts[2], None);
+}
+
+#[test]
+fn est_16_est_18_sections_saved_by_pages_are_read() {
+    let document = desk_filters::read_pages_at(&fixture("est-16-18-sections.pages")).unwrap();
+    assert_eq!(document.page_setup().section, Section::default());
+    let formats = fixture_formats("est-16-18-sections.pages");
+    assert_eq!(formats[0].0, "First section.");
+    let Some(Start::Section(section, _)) = formats[1].1.start.as_deref().copied() else {
+        panic!("{:?}", formats[1].1.start);
+    };
+    assert_eq!(section.first_number, Some(5));
+    assert_eq!(section.start, SectionStart::AnyPage);
+    // The break of the section is not a paragraph of its own.
+    assert!(formats.iter().all(|f| !f.1.page_break_before));
 }
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -420,16 +466,6 @@ fn doc_22_tracked_changes_and_bookmarks_keep_their_text() {
     assert!(
         body.contains(&"Bookmarked text here".to_owned()),
         "{body:?}"
-    );
-    // A section starts on a new page.
-    let (document, _) =
-        desk_filters::read_pages_at_logged(&fixture("est-16-18-sections.pages")).unwrap();
-    assert!(
-        document
-            .body()
-            .iter()
-            .skip(1)
-            .any(|p| p.attrs().page_break_before == Some(true))
     );
 }
 

@@ -57,6 +57,7 @@ fn item(level: u8, start: Option<u32>, first: bool, continues: bool) -> Paragrap
             first,
             continues,
         }),
+        section: None,
         spans: vec![span(None, &format!("item at level {level}"))],
     }
 }
@@ -250,18 +251,21 @@ fn full_document() -> TextDocument {
             margin_bottom: Some(Length(54.0)),
             margin_left: Some(Length(90.0)),
             margin_right: Some(Length(36.0)),
+            ..PageLayout::default()
         },
         body: vec![
             Paragraph {
                 style: Some("Heading_20_1".into()),
                 outline_level: Some(1),
                 list: None,
+                section: None,
                 spans: vec![span(None, "Título")],
             },
             Paragraph {
                 style: Some("P1".into()),
                 outline_level: None,
                 list: None,
+                section: None,
                 spans: vec![
                     span(None, "  two leading spaces, a\ttab, "),
                     span(Some("T1"), "styled   three"),
@@ -325,6 +329,7 @@ fn full_document() -> TextDocument {
         }],
         automatic_list_styles: Vec::new(),
         pictures: vec![("Pictures/bullet1.png".into(), b"\x89PNG picture".to_vec())],
+        section_styles: Vec::new(),
         tabs_relative_to_indent: None,
         text_settings: TextSettings {
             hyphenation: Some(false),
@@ -666,4 +671,98 @@ fn a_text_position_that_does_not_parse_is_dropped_whole() {
     .unwrap();
     let text = &document.style(Family::Text, "T1").unwrap().properties.text;
     assert_eq!((text.position, text.position_scale), (None, None));
+}
+
+#[test]
+fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
+    let mut document = TextDocument::default();
+    document.page_layout = PageLayout {
+        mirrored: Some(true),
+        ..PageLayout::default()
+    };
+    let columns = desk_odf::Columns {
+        count: 2,
+        gap: Some(Length(12.0)),
+        columns: vec![
+            desk_odf::Column {
+                rel_width: 600,
+                start_indent: Length(0.0),
+                end_indent: Length(6.0),
+            },
+            desk_odf::Column {
+                rel_width: 400,
+                start_indent: Length(6.0),
+                end_indent: Length(0.0),
+            },
+        ],
+    };
+    document.section_styles = vec![
+        desk_odf::SectionStyle {
+            name: "Sect1".into(),
+            margin_left: Some(Length(20.0)),
+            columns: Some(columns),
+            space_before: Some(Length(12.0)),
+            new_page: Some(false),
+            ..desk_odf::SectionStyle::default()
+        },
+        desk_odf::SectionStyle {
+            name: "Sect2".into(),
+            section_start: Some(desk_odf::SectionStart::Right),
+            first_page_different: Some(true),
+            ..desk_odf::SectionStyle::default()
+        },
+    ];
+    let text = |t: &str, section: Option<&str>| Paragraph {
+        section: section.map(str::to_owned),
+        spans: vec![Span {
+            style: None,
+            text: t.into(),
+        }],
+        ..Paragraph::default()
+    };
+    document.body = vec![
+        text("Before", None),
+        text("Columns", Some("Sect1")),
+        text("More", None),
+        text("Chapter", Some("Sect2")),
+    ];
+    document.automatic_styles.push(Style {
+        name: "P1".into(),
+        display_name: None,
+        family: Family::Paragraph,
+        parent: None,
+        next: None,
+        list_style: None,
+        properties: Properties {
+            paragraph: ParagraphProperties {
+                break_before: Some(Break::Page),
+                page_number: Some(Some(5)),
+                ..ParagraphProperties::default()
+            },
+            ..Properties::default()
+        },
+    });
+    let read = read_odt(&write_odt(&document).unwrap()).unwrap();
+    assert_eq!(read.page_layout.mirrored, Some(true));
+    assert_eq!(read.section_styles, document.section_styles);
+    let sections: Vec<Option<&str>> = read.body.iter().map(|p| p.section.as_deref()).collect();
+    assert_eq!(sections, [None, Some("Sect1"), None, Some("Sect2")]);
+    assert_eq!(
+        read.automatic_styles[0].properties.paragraph.page_number,
+        Some(Some(5))
+    );
+}
+
+#[test]
+fn est_16_a_paragraph_after_a_section_goes_back_to_the_pages() {
+    let content = format!(
+        r#"{CONTENT_START}<office:body><office:text>
+<text:section text:name="A" text:style-name="S1"><text:p>In</text:p>
+<text:section text:name="B" text:style-name="S2"><text:p>Inner</text:p></text:section>
+<text:p>Outer again</text:p></text:section><text:p>Out</text:p>
+</office:text></office:body></office:document-content>"#
+    );
+    let read = read_streams(&content, None, None).unwrap();
+    let sections: Vec<Option<&str>> = read.body.iter().map(|p| p.section.as_deref()).collect();
+    assert_eq!(sections, [Some("S1"), Some("S2"), Some("S1"), Some("")]);
 }

@@ -3,7 +3,12 @@
 
 //! The pages of a word processing document.
 
-use desk_model::{Document, PageSetup, ParaBorder, ParaFormat, ParagraphSpacing, Rgba};
+use std::collections::HashMap;
+
+use desk_model::{
+    Document, Layout, PageSetup, ParaBorder, ParaFormat, ParagraphSpacing, Rgba, Section,
+    SectionStart, Start,
+};
 use desk_text::{Column, Line, ParagraphText, TextSystem};
 
 /// How much a line may stick out of the bottom of the body and still
@@ -82,7 +87,20 @@ impl PlacedBlock {
 /// One page.
 #[derive(Clone, Debug, Default)]
 pub struct Page {
-    /// The lines on the page, from top to bottom.
+    /// The number that the page shows, by the numbering of its section
+    /// (EST-18).
+    pub number: u32,
+    /// The index of its section in the body, from 0.
+    pub section: usize,
+    /// Whether it is the first page of its section.
+    pub first_of_section: bool,
+    /// Whether it is a left page, when pages face each other (EST-11).
+    /// The first page is a right page.
+    pub left: bool,
+    /// The left and right margins of the page, which swap on left pages
+    /// when pages face each other.
+    pub margins: (f32, f32),
+    /// The lines on the page, from top to bottom and column by column.
     pub lines: Vec<PlacedLine>,
     /// The parts of paragraphs on the page that have a background or a
     /// border, from top to bottom.
@@ -147,7 +165,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     )
 }
 
-/// A paragraph laid out once, at the top of an endless column.
+/// A paragraph laid out at the top of an endless column of one width.
 struct Block {
     format: ParaFormat,
     lines: Vec<Line>,
@@ -192,21 +210,47 @@ impl Block {
     }
 }
 
+/// The part of a page that a layout takes: its columns, from a top to
+/// the bottom of the body.
+#[derive(Clone, Copy)]
+struct Region {
+    layout: Layout,
+    /// Where its columns start, from the top of the body.
+    top: f32,
+}
+
 /// Where the next line goes.
 #[derive(Clone, Copy)]
 struct Cursor {
     /// The page, as an index.
     page: usize,
+    /// The layout on the page.
+    region: Region,
+    /// The column of the layout.
+    column: usize,
     /// The distance from the top of the body.
     y: f32,
+    /// The bottom of the lowest column of the layout on the page so far.
+    lowest: f32,
     /// The space below the last paragraph placed, which collapses with
     /// the space above the next one.
     after: f32,
+    /// Whether nothing was placed in the column yet.
+    empty: bool,
 }
 
 impl Cursor {
-    fn at_top(&self, pages: &[Page]) -> bool {
-        pages[self.page].lines.is_empty()
+    /// A cursor at the top of the columns of a region.
+    fn at(page: usize, region: Region) -> Self {
+        Self {
+            page,
+            region,
+            column: 0,
+            y: region.top,
+            lowest: region.top,
+            after: 0.0,
+            empty: true,
+        }
     }
 }
 
@@ -215,22 +259,31 @@ impl Cursor {
 /// The rules, to be checked against the PDFs of Pages in the reference VM:
 ///
 /// - Between two paragraphs, the larger of the space after the first and
-///   the space before the second applies (FMT-15). At the top of a page
+///   the space before the second applies (FMT-15). At the top of a column
 ///   the space before is dropped, and the space after the last paragraph
-///   of a page is never carried over.
+///   of a column is never carried over.
 /// - A paragraph that starts on a new page does so unless it is already at
-///   the top of one (EST-04).
+///   the top of one (EST-04); one that starts in a new column goes to the
+///   next column, or the next page from the last (EST-08).
 /// - Keeping lines together moves a paragraph that does not fit to the
-///   next page, unless it is taller than a page (EST-05).
+///   next column, unless it is taller than a column (EST-05).
 /// - Widow control leaves at least two lines of a paragraph at the bottom
-///   of a page and at the top of the next (EST-05).
+///   of a column and at the top of the next (EST-05).
 /// - A rule above a paragraph takes its offset and width between the
 ///   space above and the text, and a rule below as much under the text,
 ///   as in Pages (FMT-21). A border takes both.
 /// - Keeping a paragraph with the next one moves the paragraph, and any
-///   paragraphs kept with it before, to the next page when the next one
-///   would start on another page (EST-05). A chain that starts at the top
-///   of a page breaks normally, since moving it would not help.
+///   paragraphs kept with it before, to the next column when the next one
+///   would start in another (EST-05). A chain that starts at the top of a
+///   column breaks normally, since moving it would not help.
+/// - Text fills the columns of a layout one after the other, without
+///   balancing them. A layout starts below the lowest column of the one
+///   before it on the page, after the space after that one and the space
+///   before its own, or on a new page when it says so (EST-09, EST-10).
+/// - A section starts on a new page, the next right or left one when it
+///   says so, with a blank page before it when needed, and numbers its
+///   pages from its first number or on from the section before (EST-16,
+///   EST-18).
 pub fn paginate_texts(
     setup: PageSetup,
     texts: &[ParagraphText],
@@ -249,53 +302,275 @@ pub fn paginate_texts_spaced(
     system: &mut TextSystem,
     sum: bool,
 ) -> DocumentLayout {
-    let column = Column::new(setup.body_width().to_pt() as f32);
-    let blocks: Vec<Block> = texts
-        .iter()
-        .map(|text| Block {
-            format: text.paragraph().clone(),
-            lines: system.layout(text, &column, 0.0).lines,
-        })
-        .collect();
-    let body = setup.body_height().to_pt() as f32;
-    let left = setup.margin_left.to_pt() as f32;
-    let top = setup.margin_top.to_pt() as f32;
+    Paginator {
+        setup,
+        texts,
+        system,
+        sum,
+        blocks: HashMap::new(),
+        pages: Vec::new(),
+        sections: Vec::new(),
+    }
+    .run()
+}
 
-    let mut pages = vec![Page::default()];
-    let mut cursor = Cursor {
-        page: 0,
-        y: 0.0,
-        after: 0.0,
-    };
-    // Paragraphs that start a new page because a chain kept with the next
-    // paragraph did not fit.
-    let mut forced = vec![false; blocks.len()];
-    // Where the current chain of paragraphs kept with the next one started.
-    let mut chain: Option<(usize, Cursor, usize, usize)> = None;
-    let mut i = 0;
-    while i < blocks.len() {
-        if i == 0 || !blocks[i - 1].format.keep_with_next {
-            chain = Some((i, cursor, pages.len(), pages[cursor.page].lines.len()));
+struct Paginator<'a> {
+    setup: PageSetup,
+    texts: &'a [ParagraphText],
+    system: &'a mut TextSystem,
+    sum: bool,
+    /// The paragraphs laid out so far, by index and column width.
+    blocks: HashMap<(usize, u32), Block>,
+    pages: Vec<Page>,
+    /// The sections that have pages, in order.
+    sections: Vec<Section>,
+}
+
+impl Paginator<'_> {
+    fn body(&self) -> f32 {
+        self.setup.body_height().to_pt() as f32
+    }
+
+    fn top(&self) -> f32 {
+        self.setup.margin_top.to_pt() as f32
+    }
+
+    /// The left and right margins of a page, by its index: they swap on
+    /// left pages when pages face each other.
+    fn margins(&self, page: usize) -> (f32, f32) {
+        let (left, right) = (
+            self.setup.margin_left.to_pt() as f32,
+            self.setup.margin_right.to_pt() as f32,
+        );
+        if self.setup.facing_pages && page % 2 == 1 {
+            (right, left)
+        } else {
+            (left, right)
         }
-        let block = &blocks[i];
-        let format = &block.format;
-        let new_page = |pages: &mut Vec<Page>, cursor: &mut Cursor| {
-            pages.push(Page::default());
-            *cursor = Cursor {
-                page: pages.len() - 1,
-                y: 0.0,
-                after: 0.0,
-            };
+    }
+
+    /// The left edge and width of a column of a region on a page.
+    fn column(&self, page: usize, region: &Region, column: usize) -> (f32, f32) {
+        let (left, right) = self.margins(page);
+        let layout = &region.layout;
+        let inner_left = layout.left.to_pt() as f32;
+        let width = self.setup.width.to_pt() as f32
+            - left
+            - right
+            - inner_left
+            - layout.right.to_pt() as f32;
+        let spans = layout.columns.spans(f64::from(width.max(1.0)));
+        let (cx, cw) = spans[column.min(spans.len() - 1)];
+        (left + inner_left + cx as f32, cw as f32)
+    }
+
+    /// The paragraph laid out in a column of a width.
+    fn block(&mut self, index: usize, width: f32) -> &Block {
+        let key = (index, width.to_bits());
+        if !self.blocks.contains_key(&key) {
+            let text = &self.texts[index];
+            let lines = self.system.layout(text, &Column::new(width), 0.0).lines;
+            self.blocks.insert(
+                key,
+                Block {
+                    format: text.paragraph().clone(),
+                    lines,
+                },
+            );
+        }
+        &self.blocks[&key]
+    }
+
+    /// Adds a page of the last section, numbered after the page before or
+    /// from the first number of the section, and returns its index.
+    fn add_page(&mut self, first_of_section: bool) -> usize {
+        let index = self.pages.len();
+        let next = self.pages.last().map_or(1, |p| p.number + 1);
+        let number = if first_of_section {
+            self.sections
+                .last()
+                .and_then(|s| s.first_number)
+                .unwrap_or(next)
+        } else {
+            next
         };
-        if (forced[i] || format.page_break_before) && !cursor.at_top(&pages) {
-            new_page(&mut pages, &mut cursor);
+        self.pages.push(Page {
+            number,
+            section: self.sections.len().saturating_sub(1),
+            first_of_section,
+            left: self.setup.facing_pages && index % 2 == 1,
+            margins: self.margins(index),
+            ..Page::default()
+        });
+        index
+    }
+
+    /// A cursor at the top of a new page, in a layout that starts there
+    /// when `starts`, after the space before it, or goes on from the page
+    /// before.
+    fn new_page(&mut self, layout: Layout, first_of_section: bool, starts: bool) -> Cursor {
+        let page = self.add_page(first_of_section);
+        let top = if starts {
+            layout.before.to_pt() as f32
+        } else {
+            0.0
+        };
+        Cursor::at(page, Region { layout, top })
+    }
+
+    /// The next column of the layout, or the first of a new page.
+    fn next_column(&mut self, cursor: Cursor) -> Cursor {
+        if cursor.column + 1 < usize::from(cursor.region.layout.columns.count.max(1)) {
+            return Cursor {
+                column: cursor.column + 1,
+                y: cursor.region.top,
+                after: 0.0,
+                empty: true,
+                ..cursor
+            };
         }
-        let mut first_page = cursor.page;
-        let before = format.space_before.to_pt() as f32;
-        let n = block.lines.len();
+        self.new_page(cursor.region.layout, false, false)
+    }
+
+    /// The cursor where a layout that starts after a cursor begins: below
+    /// the lowest column of the layout before, or on a new page.
+    fn start_layout(&mut self, cursor: Cursor, layout: Layout) -> Cursor {
+        let empty = self.pages[cursor.page].lines.is_empty();
+        if layout.new_page && !empty {
+            return self.new_page(layout, false, true);
+        }
+        let top = if empty {
+            0.0
+        } else {
+            cursor.lowest + cursor.region.layout.after.to_pt() as f32
+        };
+        Cursor::at(
+            cursor.page,
+            Region {
+                layout,
+                top: top + layout.before.to_pt() as f32,
+            },
+        )
+    }
+
+    /// The cursor at the start of a section, on the page it starts on.
+    fn start_section(&mut self, section: Section, layout: Layout) -> Cursor {
+        // A page left empty takes the section instead; when it was the
+        // first of its section, that section has nothing else.
+        if self.pages.last().is_some_and(|p| p.lines.is_empty())
+            && let Some(page) = self.pages.pop()
+            && page.first_of_section
+        {
+            self.sections.pop();
+        }
+        let left = match section.start {
+            SectionStart::AnyPage => None,
+            SectionStart::RightPage => Some(false),
+            SectionStart::LeftPage => Some(true),
+        };
+        // A blank page of the section before, so that the section starts
+        // on the side it asks for. Without facing pages, the odd pages
+        // count as right pages too.
+        if let Some(left) = left
+            && !self.pages.is_empty()
+            && (self.pages.len() % 2 == 1) != left
+        {
+            self.add_page(false);
+        }
+        self.sections.push(section);
+        self.new_page(layout, true, true)
+    }
+
+    fn run(mut self) -> DocumentLayout {
+        let n = self.texts.len();
+        self.sections.push(self.setup.section);
+        let mut cursor = self.new_page(self.setup.layout, true, true);
+        // Paragraphs that start a new column because a chain kept with the
+        // next paragraph did not fit.
+        let mut forced = vec![false; n];
+        // The page and column where each paragraph ends.
+        let mut ends = vec![(0, 0); n];
+        // Where the current chain of paragraphs kept with the next one started.
+        let mut chain: Option<(usize, Cursor, usize, usize)> = None;
+        let mut i = 0;
+        while i < n {
+            let format = self.texts[i].paragraph().clone();
+            // A section or a layout that starts here, once: a chain laid
+            // out again starts after it.
+            if !forced[i] {
+                match format.start.as_deref() {
+                    Some(Start::Section(section, layout)) => {
+                        cursor = self.start_section(*section, *layout);
+                    }
+                    Some(Start::Layout(layout)) => {
+                        cursor = self.start_layout(cursor, *layout);
+                    }
+                    None => {}
+                }
+            }
+            if i == 0 || !self.texts[i - 1].paragraph().keep_with_next || format.start.is_some() {
+                chain = Some((
+                    i,
+                    cursor,
+                    self.pages.len(),
+                    self.pages[cursor.page].lines.len(),
+                ));
+            }
+            if format.page_break_before && !self.pages[cursor.page].lines.is_empty() {
+                cursor = self.new_page(cursor.region.layout, false, false);
+            } else if (forced[i] || format.column_break_before) && !cursor.empty {
+                cursor = self.next_column(cursor);
+            }
+            let (start, end) = self.place(i, &mut cursor);
+            ends[i] = end;
+
+            // A paragraph kept with this one ended in another column: start
+            // the chain in the next column and lay it out again.
+            if i > 0
+                && self.texts[i - 1].paragraph().keep_with_next
+                && !format.page_break_before
+                && format.start.is_none()
+                && ends[i - 1] != start
+                && let Some((first, saved, page_count, line_count)) = chain
+                && line_count > 0
+                && !forced[first]
+            {
+                forced[first] = true;
+                self.pages.truncate(page_count);
+                let page = &mut self.pages[saved.page];
+                page.lines.truncate(line_count);
+                page.blocks.retain(|b| b.paragraph < first);
+                cursor = saved;
+                i = first;
+                continue;
+            }
+            i += 1;
+        }
+        DocumentLayout {
+            setup: self.setup,
+            pages: self.pages,
+        }
+    }
+
+    /// Places paragraph `i` from a cursor, and returns the page and column
+    /// where it starts and where it ends.
+    fn place(&mut self, i: usize, cursor: &mut Cursor) -> ((usize, usize), (usize, usize)) {
+        let body = self.body();
+        let top = self.top();
+        let sum = self.sum;
+        let mut start = (cursor.page, cursor.column);
         let mut a = 0;
-        while a < n {
-            let at_top = cursor.at_top(&pages);
+        loop {
+            let (x, width) = self.column(cursor.page, &cursor.region, cursor.column);
+            let column_height = body - cursor.region.top;
+            let block = self.block(i, width);
+            let n = block.lines.len();
+            if a >= n {
+                break;
+            }
+            let format = &block.format;
+            let at_top = cursor.empty;
+            let before = format.space_before.to_pt() as f32;
             let collapsed = if a > 0 || at_top {
                 0.0
             } else if sum {
@@ -309,88 +584,79 @@ pub fn paginate_texts_spaced(
             let rest = n - a;
             let mut k = block.fitting(a, room);
             if k < rest {
-                if a == 0 && !at_top && format.keep_lines_together && block.height(0, n) <= body {
+                if a == 0
+                    && !at_top
+                    && format.keep_lines_together
+                    && block.height(0, n) <= column_height
+                {
                     k = 0;
                 } else if format.widow_control {
                     if a == 0 && k == 1 && rest > 1 {
-                        // The first line alone at the bottom of a page.
+                        // The first line alone at the bottom of a column.
                         k = 0;
                     } else if rest - k == 1 && k > 0 {
-                        // The last line alone at the top of the next page:
-                        // send one more, unless that leaves the first one
-                        // alone.
+                        // The last line alone at the top of the next
+                        // column: send one more, unless that leaves the
+                        // first one alone.
                         k = if a == 0 && k == 2 { 0 } else { k - 1 };
                     }
                 }
                 if at_top {
-                    // Nothing better is possible: overflow the page.
+                    // Nothing better is possible: overflow the column.
                     k = k.max(1);
                 }
             }
             if k == 0 {
-                new_page(&mut pages, &mut cursor);
+                *cursor = self.next_column(*cursor);
                 continue;
             }
             let k = k.min(rest);
             if a == 0 {
-                first_page = cursor.page;
+                start = (cursor.page, cursor.column);
             }
             let dy = top + cursor.y + space - block.lines[a].top;
-            for (index, line) in block.lines[a..a + k].iter().enumerate() {
-                pages[cursor.page].lines.push(PlacedLine {
+            let lines: Vec<PlacedLine> = block.lines[a..a + k]
+                .iter()
+                .enumerate()
+                .map(|(index, line)| PlacedLine {
                     paragraph: i,
                     index: a + index,
                     line: line.clone(),
-                    origin: (left, dy),
-                });
-            }
+                    origin: (x, dy),
+                })
+                .collect();
             let last = a + k == n;
             let below = if last { block.below() } else { 0.0 };
+            let height = block.height(a, a + k);
             let placed = PlacedBlock {
                 paragraph: i,
                 top: top + cursor.y + collapsed,
                 text_top: top + cursor.y + space,
-                text_bottom: top + cursor.y + space + block.height(a, a + k),
-                bottom: top + cursor.y + space + block.height(a, a + k) + below,
-                left,
-                right: left + column.width,
+                text_bottom: top + cursor.y + space + height,
+                bottom: top + cursor.y + space + height + below,
+                left: x,
+                right: x + width,
                 first: a == 0,
                 last,
                 background: format.background,
                 border: format.border,
             };
+            let space_after = format.space_after.to_pt() as f32;
+            let page = &mut self.pages[cursor.page];
+            page.lines.extend(lines);
             if placed.is_visible() {
-                pages[cursor.page].blocks.push(placed);
+                page.blocks.push(placed);
             }
-            cursor.y += space + block.height(a, a + k) + below;
+            cursor.y += space + height + below;
+            cursor.lowest = cursor.lowest.max(cursor.y);
+            cursor.empty = false;
             a += k;
             if a < n {
-                new_page(&mut pages, &mut cursor);
+                *cursor = self.next_column(*cursor);
+            } else {
+                cursor.after = space_after;
             }
         }
-        cursor.after = format.space_after.to_pt() as f32;
-
-        // A paragraph kept with this one ended on another page: start the
-        // chain on a new page and lay it out again.
-        if i > 0 && blocks[i - 1].format.keep_with_next && !format.page_break_before {
-            let previous_page = pages
-                .iter()
-                .rposition(|p| p.lines.iter().any(|l| l.paragraph == i - 1));
-            if previous_page != Some(first_page)
-                && let Some((start, saved, page_count, line_count)) = chain
-                && line_count > 0
-                && !forced[start]
-            {
-                forced[start] = true;
-                pages.truncate(page_count);
-                pages[saved.page].lines.truncate(line_count);
-                pages[saved.page].blocks.retain(|b| b.paragraph < start);
-                cursor = saved;
-                i = start;
-                continue;
-            }
-        }
-        i += 1;
+        (start, (cursor.page, cursor.column))
     }
-    DocumentLayout { setup, pages }
 }

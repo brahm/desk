@@ -52,6 +52,7 @@ mod id;
 mod list;
 mod op;
 mod picture;
+mod section;
 mod style;
 mod styling;
 mod text;
@@ -77,6 +78,7 @@ pub use list::{
 };
 pub use op::Op;
 pub use picture::Picture;
+pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
 pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
