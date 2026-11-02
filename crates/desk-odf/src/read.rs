@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
 use crate::text::{
-    Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, Meta, PageLayout,
-    Paragraph, ParagraphProperties, Properties, Span, Style, TabStop, TabType, TextAlign,
-    TextDocument, TextPosition, TextProperties, TextTransform,
+    Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
+    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TabStop,
+    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -166,8 +166,99 @@ impl Reader {
             language: e.attr(FO, "language").map(str::to_owned),
             country: e.attr(FO, "country").map(str::to_owned),
             script: e.attr(FO, "script").map(str::to_owned),
+            letter_spacing: e.attr(FO, "letter-spacing").and_then(|v| {
+                if v == "normal" {
+                    Some(Length(0.0))
+                } else {
+                    Length::parse(v)
+                }
+            }),
+            outline: e.attr(STYLE, "text-outline").map(|v| v == "true"),
+            shadow: e.attr(FO, "text-shadow").and_then(text_shadow),
+            background: e.attr(FO, "background-color").and_then(background),
         }
     }
+}
+
+/// `fo:text-shadow`: `none`, or the first shadow of a CSS list, whose
+/// color may come first or last.
+fn text_shadow(value: &str) -> Option<TextShadow> {
+    let value = value.trim();
+    if value == "none" {
+        return Some(TextShadow::None);
+    }
+    let first = value.split(',').next()?;
+    let mut lengths = Vec::new();
+    let mut color = None;
+    for part in first.split_whitespace() {
+        if let Some(c) = Color::parse(part) {
+            color = Some(c);
+        } else {
+            lengths.push(Length::parse(part)?);
+        }
+    }
+    match lengths[..] {
+        [dx, dy] => Some(TextShadow::Shadow {
+            dx,
+            dy,
+            blur: None,
+            color,
+        }),
+        [dx, dy, blur, ..] => Some(TextShadow::Shadow {
+            dx,
+            dy,
+            blur: Some(blur),
+            color,
+        }),
+        _ => None,
+    }
+}
+
+/// `fo:background-color`.
+fn background(value: &str) -> Option<Background> {
+    if value.trim() == "transparent" {
+        Some(Background::Transparent)
+    } else {
+        Color::parse(value).map(Background::Color)
+    }
+}
+
+/// A side of `fo:border`: a width, a style and a color, in any order, or
+/// `none`.
+fn border(value: &str) -> Option<Border> {
+    let mut width = None;
+    let mut style = None;
+    let mut color = None;
+    for part in value.split_whitespace() {
+        match part {
+            "none" | "hidden" => return Some(Border::None),
+            "solid" | "double" | "groove" | "ridge" | "inset" | "outset" => {
+                style = Some(BorderLine::Solid)
+            }
+            "dashed" => style = Some(BorderLine::Dashed),
+            "dotted" => style = Some(BorderLine::Dotted),
+            "thin" => width = Some(Length(0.75)),
+            "medium" => width = Some(Length(1.5)),
+            "thick" => width = Some(Length(3.0)),
+            _ => {
+                if let Some(c) = Color::parse(part) {
+                    color = Some(c);
+                } else if let Some(l) = Length::parse(part) {
+                    width = Some(l);
+                }
+            }
+        }
+    }
+    let style = style?;
+    let width = width.unwrap_or(Length(1.5));
+    if width.0 <= 0.0 {
+        return Some(Border::None);
+    }
+    Some(Border::Line {
+        width,
+        style,
+        color: color.unwrap_or(Color { r: 0, g: 0, b: 0 }),
+    })
 }
 
 /// The first family of a CSS font family list, as `svg:font-family` and
@@ -230,6 +321,12 @@ fn length(e: &Element, ns: &str, name: &str) -> Option<Length> {
 
 fn paragraph_properties(e: &Element) -> ParagraphProperties {
     let always = |name: &str| e.attr(FO, name).map(|v| v == "always");
+    // A side of a property with sides, such as `fo:border-top`, which
+    // takes the place of the property for all sides.
+    let side = |name: &str, which: &str| {
+        e.attr(FO, &format!("{name}-{which}"))
+            .or_else(|| e.attr(FO, name))
+    };
     ParagraphProperties {
         align: e.attr(FO, "text-align").and_then(|a| match a {
             "start" => Some(TextAlign::Start),
@@ -273,6 +370,15 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
                 .collect()
         }),
         tab_stop_distance: length(e, STYLE, "tab-stop-distance"),
+        background: e.attr(FO, "background-color").and_then(background),
+        border_top: side("border", "top").and_then(border),
+        border_bottom: side("border", "bottom").and_then(border),
+        border_left: side("border", "left").and_then(border),
+        border_right: side("border", "right").and_then(border),
+        padding_top: side("padding", "top").and_then(Length::parse),
+        padding_bottom: side("padding", "bottom").and_then(Length::parse),
+        padding_left: side("padding", "left").and_then(Length::parse),
+        padding_right: side("padding", "right").and_then(Length::parse),
     }
 }
 

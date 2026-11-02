@@ -17,12 +17,14 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use desk_iwork::pages::{self as iwork, PAGE_BREAK};
-use desk_iwork::sf::{Family, LineSpacingMode, Properties, Style as IworkStyle, Stylesheet, Value};
+use desk_iwork::sf::{
+    Family, LineSpacingMode, Properties, StrokePattern, Style as IworkStyle, Stylesheet, Value,
+};
 use desk_model::{
-    Alignment, Baseline, Capitalization, CharAttrs, CharFormat, CharacterStyle, Document,
-    LINE_BREAK, Language, Length, LineColor, LineSpacing, LineStyle, Metadata, Op, PageSetup,
-    ParaAttrs, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, StyleId, TabAlignment, TabLeader,
-    TabStop, TabStops,
+    Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
+    CharacterStyle, Document, LINE_BREAK, Language, Length, Ligatures, LineColor, LineSpacing,
+    LineStyle, Metadata, Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph,
+    ParagraphStyle, Rgba, Run, Shadow, StyleId, TabAlignment, TabLeader, TabStop, TabStops,
 };
 
 use crate::FilterError;
@@ -92,21 +94,11 @@ fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
             "listStyle" => {
                 matches!(value, Value::ListStyle { labels: true, .. }).then_some(Formatting::Lists)
             }
-            "tracking" => differs(value, 0.0).then_some(Formatting::CharacterSpacing),
-            "textShadow" => differs(value, 0.0).then_some(Formatting::TextShadows),
-            "outline" => differs(value, 0.0).then_some(Formatting::OutlinedText),
             "underlineColor" | "word_underline" | "word_strikethrough" => {
                 differs(value, 0.0).then_some(Formatting::LineDetails)
             }
-            "textBackground" => differs(value, 0.0).then_some(Formatting::TextHighlights),
-            "paragraphFill" => differs(value, 0.0).then_some(Formatting::ParagraphBackgrounds),
-            "paragraphStroke" | "paragraphBorderType" => {
-                differs(value, 0.0).then_some(Formatting::ParagraphBorders)
-            }
             "dropCap" => differs(value, 0.0).then_some(Formatting::DropCaps),
             "hidden" => differs(value, 0.0).then_some(Formatting::HiddenText),
-            // 1 is the default ligatures of the font.
-            "ligatures" => differs(value, 1.0).then_some(Formatting::FontFeatures),
             "atsuFontFeatures" => differs(value, 0.0).then_some(Formatting::FontFeatures),
             _ => None,
         };
@@ -230,7 +222,91 @@ fn char_attrs(properties: &Properties) -> CharAttrs {
         Some(Value::Null) => Some(Language::undetermined()),
         _ => None,
     };
+    // Pages saves the tracking as a part of the font size.
+    attrs.tracking = properties
+        .number("tracking")
+        .map(|t| (t * 1000.0).round() as i32);
+    attrs.outline = flag(properties, "outline");
+    attrs.shadow = match properties.get("textShadow") {
+        Some(Value::Shadow(shadow)) => Some(Some(Shadow {
+            angle: (shadow.angle.round() as i32).rem_euclid(360),
+            offset: Length::from_pt(shadow.offset),
+            blur: Length::from_pt(shadow.radius),
+            opacity: (shadow.opacity * 100.0).round() as u8,
+            color: rgba(shadow.color),
+        })),
+        Some(Value::Null) => Some(None),
+        _ => None,
+    };
+    attrs.ligatures = properties.number("ligatures").map(|n| match n as i64 {
+        0 => Ligatures::None,
+        2 => Ligatures::All,
+        _ => Ligatures::Default,
+    });
+    attrs.background = color_or_none(properties, "textBackground");
     attrs
+}
+
+/// A color property, or none when it is set to nothing.
+fn color_or_none(properties: &Properties, name: &str) -> Option<Option<Rgba>> {
+    match properties.get(name) {
+        Some(Value::Color(color)) => Some(Some(rgba(*color))),
+        Some(Value::Null) => Some(None),
+        _ => None,
+    }
+}
+
+/// The rules or border of a paragraph, which Pages saves as three
+/// properties that styles may set apart: the line, which sides have it and
+/// its distance from the text. When the nearest styles in `chain` up to
+/// `own` set any, the border is set from the three, as they resolve.
+fn para_border(chain: &[&IworkStyle], own: usize) -> Option<ParaBorder> {
+    const NAMES: [&str; 3] = [
+        "paragraphStroke",
+        "paragraphBorderType",
+        "paragraphRuleOffset",
+    ];
+    let sets = chain[..own]
+        .iter()
+        .any(|s| NAMES.iter().any(|n| s.properties.get(n).is_some()));
+    if !sets {
+        return None;
+    }
+    let stroke = chain
+        .iter()
+        .find_map(|s| match s.properties.get(NAMES[0])? {
+            Value::Stroke(stroke) => Some(Some(stroke)),
+            Value::Null => Some(None),
+            _ => None,
+        });
+    let mut border = ParaBorder {
+        offset: Length::from_pt(chain_number(chain, NAMES[2]).unwrap_or(6.0)),
+        ..ParaBorder::default()
+    };
+    let Some(Some(stroke)) = stroke else {
+        return Some(border);
+    };
+    border.sides = match chain_number(chain, NAMES[1]).map(|n| n as i64) {
+        Some(1) => BorderSides::Above,
+        Some(2) => BorderSides::Below,
+        Some(3) => BorderSides::AboveAndBelow,
+        Some(4) => BorderSides::Box,
+        _ => BorderSides::None,
+    };
+    border.width = Length::from_pt(stroke.width);
+    border.color = rgba(stroke.color);
+    border.style = match &stroke.pattern {
+        StrokePattern::Solid => BorderStyle::Solid,
+        StrokePattern::Empty => {
+            border.sides = BorderSides::None;
+            BorderStyle::Solid
+        }
+        StrokePattern::Dashes(dashes) if dashes.first().is_some_and(|d| *d <= 1.0) => {
+            BorderStyle::Dotted
+        }
+        StrokePattern::Dashes(_) => BorderStyle::Dashed,
+    };
+    Some(border)
 }
 
 /// The paragraph attributes that a property map sets, without the first
@@ -298,6 +374,9 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
             .number("defaultTabStops")
             .filter(|n| *n > 0.0)
             .map(Length::from_pt),
+        background: color_or_none(properties, "paragraphFill"),
+        // Set from the chain of styles, by `para_border`.
+        border: None,
     }
 }
 
@@ -357,6 +436,7 @@ fn merged(chain: &[&IworkStyle], count: usize) -> (ParaAttrs, CharAttrs) {
         character.merge(&char_attrs(&style.properties));
     }
     para.first_line_indent = first_line_indent(chain, count);
+    para.border = para_border(chain, count);
     (para, character)
 }
 
@@ -460,6 +540,7 @@ impl<'a> Importer<'a> {
                 }
                 paragraph.first_line_indent =
                     first_line_indent(&chain, 1).or(paragraph.first_line_indent);
+                paragraph.border = para_border(&chain, 1).or(paragraph.border);
                 match style.family {
                     Family::Paragraph => {
                         let parent = if *id == self.body {

@@ -45,26 +45,15 @@ pub enum Content {
 pub enum Formatting {
     /// Bullets and numbers of lists.
     Lists,
-    /// The spacing of characters (tracking).
-    CharacterSpacing,
-    /// Shadows of text.
-    TextShadows,
-    /// Outlined text.
-    OutlinedText,
     /// The color and width of underlines and strikethroughs, and lines
     /// under words only.
     LineDetails,
-    /// The background color of text.
-    TextHighlights,
-    /// The background color of paragraphs.
-    ParagraphBackgrounds,
-    /// Borders and rules of paragraphs.
-    ParagraphBorders,
     /// Drop caps.
     DropCaps,
     /// Hidden text, which is shown.
     HiddenText,
-    /// Ligature and other typographic settings of fonts.
+    /// Typographic settings of fonts other than ligatures, which Pages
+    /// saves as features of Apple Type Services.
     FontFeatures,
     /// Automatic hyphenation: the words break only at soft hyphens.
     Hyphenation,
@@ -152,16 +141,10 @@ impl fmt::Display for Formatting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Lists => "list bullets and numbers",
-            Self::CharacterSpacing => "character spacing",
-            Self::TextShadows => "text shadows",
-            Self::OutlinedText => "outlined text",
             Self::LineDetails => "the color and width of lines through and under text",
-            Self::TextHighlights => "text highlights",
-            Self::ParagraphBackgrounds => "paragraph backgrounds",
-            Self::ParagraphBorders => "paragraph borders and rules",
             Self::DropCaps => "drop caps",
             Self::HiddenText => "hidden text, which is shown",
-            Self::FontFeatures => "font features and ligature settings",
+            Self::FontFeatures => "font features",
             Self::Hyphenation => "automatic hyphenation",
         })
     }
