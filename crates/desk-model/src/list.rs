@@ -23,6 +23,7 @@ use crate::error::ModelError;
 use crate::format::{ParaAttrs, ParaFormat};
 use crate::id::NodeId;
 use crate::op::Op;
+use crate::picture::Picture;
 use crate::style::{Style, StyleFamily, StyleId, Styles};
 use crate::text::{Paragraph, Position};
 use crate::transaction::Edit;
@@ -111,6 +112,9 @@ pub enum ListLabel {
     None,
     /// A bullet: any text, such as "•" or "+" (LST-03).
     Bullet(Arc<str>),
+    /// An image bullet (LST-03), as high as the text at the size of the
+    /// level.
+    Image(Picture),
     /// A number (LST-04), between a prefix and a suffix, as "(" and ")".
     /// A tiered number starts with the label of the item above it, as
     /// 1.1 under 1. does in Legal (LST-05).
@@ -347,6 +351,7 @@ impl Numbering {
         let label = match &definition.label {
             ListLabel::None => String::new(),
             ListLabel::Bullet(text) => text.to_string(),
+            ListLabel::Image(_) => String::new(),
             ListLabel::Number {
                 format,
                 prefix,

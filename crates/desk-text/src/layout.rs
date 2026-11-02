@@ -145,6 +145,25 @@ pub struct Line {
     /// on the first line of the item: what a drag moves to another level
     /// (LST-02).
     pub label: Option<Range<f32>>,
+    /// The picture of an image bullet on the first line of an item
+    /// (LST-03).
+    pub label_image: Option<LabelImage>,
+}
+
+/// The picture of an image bullet, where it is drawn: from the left and
+/// the top of the paragraph, as glyphs are placed.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LabelImage {
+    /// The picture.
+    pub picture: desk_model::Picture,
+    /// The left edge.
+    pub x: f32,
+    /// The top edge.
+    pub y: f32,
+    /// The width.
+    pub width: f32,
+    /// The height.
+    pub height: f32,
 }
 
 impl Line {
@@ -334,12 +353,15 @@ impl TextSystem {
                 [(label.text.as_str(), label_format)],
             );
             let laid = self.layout(&label_text, &crate::space::Column::new(LABEL_ROOM), 0.0);
-            let width = laid.lines.first().map_or(0.0, |l| l.advance);
+            let width = match &label.image {
+                Some((picture, height)) => *height * picture.aspect() as f32,
+                None => laid.lines.first().map_or(0.0, |l| l.advance),
+            };
             let x = format.left_indent.to_pt() as f32 + label.indent;
             format.left_indent =
                 desk_model::Length::from_pt(f64::from(x + label.text_indent.max(width)));
             format.first_line_indent = desk_model::Length::ZERO;
-            (laid, x, label.format, label.raise)
+            (laid, x, label.format, label.raise, label.image.clone())
         });
         let mut layout = self.build(text);
         let source = text.text();
@@ -758,10 +780,26 @@ impl TextSystem {
                 hyphenated: place.hyphenated,
                 carets,
                 label: None,
+                label_image: None,
             });
         }
-        if let (Some((laid, x, format, raise)), Some(first)) = (label, lines.first_mut()) {
+        if let (Some((laid, x, format, raise, image)), Some(first)) = (label, lines.first_mut()) {
             let baseline = first.baseline - raise;
+            if let Some((picture, height)) = image {
+                // As Pages draws it: a third of the picture below the
+                // baseline.
+                let width = height * picture.aspect() as f32;
+                first.label = Some(x..x + width);
+                first.label_image = Some(LabelImage {
+                    picture,
+                    x,
+                    y: baseline - height * 2.0 / 3.0,
+                    width,
+                    height,
+                });
+                let bottom = lines.last().map_or(top, |l| l.top + l.height);
+                return ParagraphLayout { lines, top, bottom };
+            }
             let width = laid.lines.first().map_or(0.0, |l| l.advance);
             first.label = Some(x..x + width);
             let runs = laid.lines.into_iter().take(1).flat_map(|line| {

@@ -438,8 +438,9 @@ pub enum ListLabel {
         /// `sf:first`, the number of the first item.
         first: u32,
     },
-    /// `image`: a picture, as the bullet of the application.
-    Image,
+    /// `image`: a picture, as the bullet of the application, with the
+    /// path of its file in the package (`sf:data sf:path`).
+    Image(Option<String>),
 }
 
 /// Where the label of a level goes (`sf:list-label-geometry`).
@@ -507,7 +508,12 @@ impl ListStyle {
                 items
                     .iter()
                     .map(|e| match e.attr(SF, "type") {
-                        Some("image") => ListLabel::Image,
+                        Some("image") => ListLabel::Image(
+                            e.descendants()
+                                .find(|d| d.name.is(SF, "data"))
+                                .and_then(|d| d.attr(SF, "path"))
+                                .map(str::to_owned),
+                        ),
                         Some("text") => match e.child(SF, "text-label") {
                             Some(label) => ListLabel::Text {
                                 kind: label.attr(SF, "type").unwrap_or("bullet").to_owned(),

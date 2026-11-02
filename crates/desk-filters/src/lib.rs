@@ -14,6 +14,7 @@
 pub mod log;
 pub mod odt;
 pub mod pages;
+pub mod picture;
 
 pub use log::ImportLog;
 pub use odt::{FilterError, read_odt, write_odt, write_odt_with_thumbnail};

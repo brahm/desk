@@ -27,7 +27,7 @@ const ZIP_MAGIC: &[u8] = b"PK\x03\x04";
 const GZIP_MAGIC: &[u8] = &[0x1f, 0x8b];
 
 /// Reads at most [`MAX_INDEX`] bytes.
-fn limited(reader: impl Read) -> Result<Vec<u8>, IworkError> {
+pub(crate) fn limited(reader: impl Read) -> Result<Vec<u8>, IworkError> {
     let mut bytes = Vec::new();
     reader.take(MAX_INDEX + 1).read_to_end(&mut bytes)?;
     if bytes.len() as u64 > MAX_INDEX {
@@ -85,6 +85,39 @@ pub fn read_index_at(path: &Path) -> Result<String, IworkError> {
         }
     }
     Err(IworkError::Missing(INDEX))
+}
+
+/// Whether a path names a file inside the package: relative, without
+/// going up.
+fn inside(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('/')
+        && !name.contains('\\')
+        && name.split('/').all(|part| part != ".." && !part.is_empty())
+}
+
+/// A file of a flat file, by its path in the package, at most
+/// [`MAX_INDEX`] bytes; `None` when there is none.
+pub fn read_file(bytes: &[u8], name: &str) -> Option<Vec<u8>> {
+    if !bytes.starts_with(ZIP_MAGIC) || !inside(name) {
+        return None;
+    }
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).ok()?;
+    // At the root, or in the one folder that the package was zipped from.
+    let path = archive
+        .file_names()
+        .filter_map(|path| path.ok().map(|path| path.into_owned()))
+        .filter(|path| path == name || path.split_once('/').is_some_and(|(_, rest)| rest == name))
+        .min_by_key(String::len)?;
+    limited(archive.by_name(&path).ok()?).ok()
+}
+
+/// A file of a package folder, by its path in the package.
+pub fn read_file_at(package: &Path, name: &str) -> Option<Vec<u8>> {
+    if !inside(name) {
+        return None;
+    }
+    limited(fs::File::open(package.join(name)).ok()?).ok()
 }
 
 #[cfg(test)]

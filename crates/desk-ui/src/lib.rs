@@ -16,6 +16,7 @@ pub use gtk;
 
 mod access;
 mod area;
+mod bullet_pictures;
 mod editing;
 mod effects;
 mod eyedropper;

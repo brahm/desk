@@ -45,6 +45,9 @@ pub struct TextDocument {
     pub automatic_list_styles: Vec<ListStyle>,
     /// The settings of the text that Desk keeps in `settings.xml`.
     pub text_settings: TextSettings,
+    /// The pictures of the package that the document links to, by path,
+    /// as `Pictures/bullet1.png`, with their bytes.
+    pub pictures: Vec<(String, Vec<u8>)>,
 }
 
 /// The settings of the text of a document, which ODF has no place for and
@@ -82,7 +85,7 @@ impl ListStyle {
 }
 
 /// What starts the items of a level.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ListLabel {
     /// `text:list-level-style-bullet`, with its `text:bullet-char`.
     Bullet(char),
@@ -101,6 +104,19 @@ pub enum ListLabel {
         /// `text:start-value`.
         start: u32,
     },
+    /// `text:list-level-style-image`: a picture of the package.
+    Image {
+        /// `xlink:href`: the path of the picture in the package, as
+        /// `Pictures/bullet1.png`.
+        href: String,
+        /// `fo:width` of `style:list-level-properties`.
+        width: Option<Length>,
+        /// `fo:height` of `style:list-level-properties`.
+        height: Option<Length>,
+        /// `desk:raise`: how far the picture is raised from where it
+        /// stands, lowered when negative, which ODF has no attribute for.
+        raise: Option<Length>,
+    },
 }
 
 /// A level of a list style.
@@ -117,7 +133,9 @@ pub struct ListLevelStyle {
     /// `text:min-label-width`: from the label to the text, or the width
     /// of the label when it is wider.
     pub min_label_width: Option<Length>,
-    /// `text:bullet-relative-size`, in percent.
+    /// `text:bullet-relative-size`, in percent; for a picture,
+    /// `desk:relative-size`, its height in percent of the size of the text,
+    /// which ODF has no attribute for.
     pub relative_size: Option<f64>,
     /// `style:text-properties` of the label.
     pub text: TextProperties,

@@ -40,6 +40,7 @@ fn root(w: &mut Writer, name: &'static str) {
         .attr("xmlns:svg", ns::SVG)
         .attr("xmlns:meta", ns::META)
         .attr("xmlns:dc", ns::DC)
+        .attr("xmlns:xlink", ns::XLINK)
         .attr("xmlns:desk", ns::DESK)
         .attr("office:version", VERSION);
 }
@@ -239,6 +240,18 @@ fn write_list_style(w: &mut Writer, style: &ListStyle) {
                     w.attr("text:bullet-relative-size", &format!("{}%", decimal(size)));
                 }
             }
+            ListLabel::Image { href, raise, .. } => {
+                w.start("text:list-level-style-image")
+                    .attr("text:level", &level.level.to_string())
+                    .attr("xlink:type", "simple")
+                    .attr("xlink:href", href)
+                    .attr("xlink:show", "embed")
+                    .attr("xlink:actuate", "onLoad");
+                if let Some(size) = level.relative_size {
+                    w.attr("desk:relative-size", &format!("{}%", decimal(size)));
+                }
+                len(w, "desk:raise", *raise);
+            }
             ListLabel::Number {
                 format,
                 prefix,
@@ -263,11 +276,17 @@ fn write_list_style(w: &mut Writer, style: &ListStyle) {
                 }
             }
         }
+        let image = matches!(level.label, ListLabel::Image { .. });
         w.start("style:list-level-properties");
         len(w, "text:space-before", level.space_before);
         len(w, "text:min-label-width", level.min_label_width);
+        if let ListLabel::Image { width, height, .. } = &level.label {
+            len(w, "fo:width", *width);
+            len(w, "fo:height", *height);
+        }
         w.end();
-        if level.text != TextProperties::default() {
+        // A picture has no text properties.
+        if !image && level.text != TextProperties::default() {
             w.start("style:text-properties");
             text_attrs(w, &level.text);
             w.end();

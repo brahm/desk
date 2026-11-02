@@ -120,6 +120,38 @@ pub struct PagesDocument {
     /// Whether the text uses ligatures (Document Inspector, "Use
     /// ligatures"), true when the document does not say.
     pub use_ligatures: bool,
+    /// The files of the package that the document uses, by path, with
+    /// their bytes: the pictures of image bullets. Only reading a package
+    /// fills them, not parsing an index.
+    pub files: Vec<(String, Vec<u8>)>,
+}
+
+impl PagesDocument {
+    /// The paths of the files of the package that the document uses.
+    pub fn file_paths(&self) -> Vec<String> {
+        let mut paths: Vec<String> = self
+            .stylesheet
+            .list_styles
+            .iter()
+            .flat_map(|s| s.labels.iter().flatten())
+            .filter_map(|l| match l {
+                crate::sf::ListLabel::Image(path) => path.clone(),
+                _ => None,
+            })
+            .collect();
+        paths.sort();
+        paths.dedup();
+        paths
+    }
+
+    /// The bytes of a file of the package, as [`PagesDocument::files`]
+    /// holds them.
+    pub fn file(&self, path: &str) -> Option<&[u8]> {
+        self.files
+            .iter()
+            .find(|(p, _)| p == path)
+            .map(|(_, b)| b.as_slice())
+    }
 }
 
 /// A flag of the publication info of a document, as the settings of the

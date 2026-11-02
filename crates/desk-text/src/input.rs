@@ -11,8 +11,8 @@
 use std::ops::Range;
 
 use desk_model::{
-    Capitalization, CharFormat, Length, Ligatures, LineStyle, ListItem, ParaFormat, Paragraph,
-    Styles, TextSettings,
+    Capitalization, CharFormat, Length, Ligatures, LineStyle, ListItem, ListLabel, ParaFormat,
+    Paragraph, Picture, Styles, TextSettings,
 };
 
 use crate::fonts::pages_font;
@@ -79,6 +79,9 @@ pub struct Label {
     pub text_indent: f32,
     /// How far the label is raised above the baseline.
     pub raise: f32,
+    /// The picture of an image bullet and its height, in points, drawn
+    /// instead of the text (LST-03).
+    pub image: Option<(Picture, f32)>,
 }
 
 /// A paragraph ready for layout: its text with capitalization applied, its
@@ -158,6 +161,7 @@ impl ParagraphText {
         format.strikethrough = LineStyle::None;
         format.background = None;
         format.capitalization = Capitalization::None;
+        let size = format.font_size.to_pt() as f32;
         let index = match self.formats.iter().position(|f| f == &format) {
             Some(index) => index,
             None => {
@@ -165,7 +169,12 @@ impl ParagraphText {
                 self.formats.len() - 1
             }
         } as u32;
+        let image = match &level.label {
+            ListLabel::Image(picture) => Some((picture.clone(), size)),
+            _ => None,
+        };
         self.label = Some(Label {
+            image,
             text: item.label.clone(),
             format: index,
             indent: level.label_indent.to_pt() as f32,

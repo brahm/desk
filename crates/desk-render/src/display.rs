@@ -69,6 +69,19 @@ pub enum Item {
         /// a solid line.
         dashes: Vec<f32>,
     },
+    /// A picture, as an image bullet (LST-03), scaled into a rectangle.
+    Image {
+        /// The picture.
+        picture: desk_model::Picture,
+        /// The left edge.
+        x: f32,
+        /// The top edge.
+        y: f32,
+        /// The width.
+        width: f32,
+        /// The height.
+        height: f32,
+    },
     /// A filled rectangle, as for underlines and strikethroughs.
     Rect {
         /// The left edge.
@@ -161,6 +174,15 @@ impl DisplayList {
                     // As Pages strokes outlined text, at a hundredth of
                     // its size.
                     outline: run.outline.then_some(run.size / 100.0),
+                });
+            }
+            if let Some(image) = &placed.line.label_image {
+                list.items.push(Item::Image {
+                    picture: image.picture.clone(),
+                    x: image.x + dx,
+                    y: image.y + dy,
+                    width: image.width,
+                    height: image.height,
                 });
             }
             for decoration in &placed.line.decorations {
