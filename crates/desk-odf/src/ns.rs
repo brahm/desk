@@ -28,3 +28,5 @@ pub const DC: &str = "http://purl.org/dc/elements/1.1/";
 pub const MANIFEST: &str = "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 /// `draw:`.
 pub const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+/// `config:`, in `settings.xml`.
+pub const CONFIG: &str = "urn:oasis:names:tc:opendocument:xmlns:config:1.0";

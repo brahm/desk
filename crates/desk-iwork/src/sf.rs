@@ -100,9 +100,22 @@ pub enum Value {
         /// Whether a level has a label.
         labels: bool,
     },
+    /// Tab stops, in the order saved.
+    Tabs(Vec<Tab>),
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
+}
+
+/// A tab stop (`sf:tabstop`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Tab {
+    /// `sf:pos`, in points from the left edge of the text.
+    pub position: f64,
+    /// `sf:align`: `left`, `center`, `right` or `decimal`.
+    pub align: String,
+    /// `sf:leader`, the text that fills the space before the stop.
+    pub leader: Option<String>,
 }
 
 impl Value {
@@ -138,6 +151,21 @@ impl Value {
                         && e.attr(SF, "type").is_some_and(|t| t != "none")
                 }),
             },
+            "tabs" => Self::Tabs(
+                element
+                    .children_named(SF, "tabstop")
+                    .filter_map(|tab| {
+                        Some(Tab {
+                            position: tab.attr(SF, "pos")?.trim().parse().ok()?,
+                            align: tab.attr(SF, "align").unwrap_or("left").to_owned(),
+                            leader: tab
+                                .attr(SF, "leader")
+                                .filter(|l| !l.trim().is_empty())
+                                .map(str::to_owned),
+                        })
+                    })
+                    .collect(),
+            ),
             other => Self::Other(other.to_owned()),
         }
     }

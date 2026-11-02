@@ -31,6 +31,10 @@ pub struct TextDocument {
     pub page_layout: PageLayout,
     /// The paragraphs of the body.
     pub body: Vec<Paragraph>,
+    /// The `TabsRelativeToIndent` setting of `settings.xml`: whether the
+    /// positions of tab stops are measured from the indent of the
+    /// paragraph. LibreOffice takes it as set when it is missing.
+    pub tabs_relative_to_indent: Option<bool>,
 }
 
 impl TextDocument {
@@ -258,6 +262,55 @@ pub struct ParagraphProperties {
     pub widows: Option<u32>,
     /// `fo:orphans`.
     pub orphans: Option<u32>,
+    /// `style:tab-stops`: the stops, empty when the element is there with
+    /// none, which takes away those of the parent style.
+    pub tab_stops: Option<Vec<TabStop>>,
+    /// `style:tab-stop-distance`, the distance between default stops.
+    pub tab_stop_distance: Option<Length>,
+}
+
+/// `style:type` of a tab stop.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TabType {
+    /// `left`.
+    #[default]
+    Left,
+    /// `center`.
+    Center,
+    /// `right`.
+    Right,
+    /// `char`: aligned on `style:char`.
+    Char,
+}
+
+/// `style:leader-style` of a tab stop.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LeaderStyle {
+    /// `none`.
+    #[default]
+    None,
+    /// `solid`.
+    Solid,
+    /// `dotted`.
+    Dotted,
+    /// `dash`, and the other dashed styles.
+    Dash,
+}
+
+/// `style:tab-stop`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TabStop {
+    /// `style:position`, from the left margin of the paragraph, or from
+    /// its indent when [`TextDocument::tabs_relative_to_indent`] is set.
+    pub position: Length,
+    /// `style:type`.
+    pub kind: TabType,
+    /// `style:char`, for a `char` stop.
+    pub char: Option<char>,
+    /// `style:leader-style`.
+    pub leader_style: LeaderStyle,
+    /// `style:leader-text`.
+    pub leader_text: Option<char>,
 }
 
 /// The size and margins of the pages.

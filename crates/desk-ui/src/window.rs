@@ -17,6 +17,8 @@ use crate::editing::TextEditor;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
 use crate::i18n::{tr, trn};
+use crate::preferences;
+use crate::ruler::{self, Ruler};
 use crate::view::DocumentView;
 use crate::{AppInfo, Opener};
 
@@ -50,6 +52,10 @@ pub struct DocumentWindow {
     inspector: Rc<Inspector>,
     split: adw::OverlaySplitView,
     format_revealer: gtk::Revealer,
+    ruler: Ruler,
+    vertical_ruler: Ruler,
+    /// The corner where the rulers meet.
+    ruler_corner: gtk::Box,
     /// Whether closing was asked for and answered, so that the window
     /// closes without asking again.
     closing: Cell<bool>,
@@ -153,7 +159,6 @@ impl DocumentWindow {
         let view = DocumentView::new();
         let stack = gtk::Stack::new();
         stack.add_named(&status, Some("empty"));
-        stack.add_named(view.widget(), Some("document"));
 
         let zoom_button = gtk::MenuButton::builder()
             .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
@@ -187,6 +192,20 @@ impl DocumentWindow {
         };
         let format_bar = FormatBar::new(editor_of());
         let inspector = Inspector::new(editor_of());
+        // The rulers over and beside the pages (INT-17).
+        let ruler = Ruler::new(&view, editor_of(), false);
+        let vertical_ruler = Ruler::new(&view, editor_of(), true);
+        let ruler_corner = gtk::Box::builder()
+            .width_request(ruler::THICKNESS)
+            .height_request(ruler::THICKNESS)
+            .css_classes(["desk-ruler"])
+            .build();
+        let pages = gtk::Grid::new();
+        pages.attach(&ruler_corner, 0, 0, 1, 1);
+        pages.attach(ruler.widget(), 1, 0, 1, 1);
+        pages.attach(vertical_ruler.widget(), 0, 1, 1, 1);
+        pages.attach(view.widget(), 1, 1, 1, 1);
+        stack.add_named(&pages, Some("document"));
         let format_revealer = gtk::Revealer::builder()
             .child(format_bar.widget())
             .reveal_child(false)
@@ -232,9 +251,19 @@ impl DocumentWindow {
             inspector,
             split,
             format_revealer,
+            ruler,
+            vertical_ruler,
+            ruler_corner,
             closing: Cell::new(false),
         });
         this.add_actions();
+        this.show_rulers();
+        let weak = Rc::downgrade(&this);
+        preferences::connect_changed(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.show_rulers();
+            }
+        });
         {
             let label = this.zoom_button.downgrade();
             this.view.connect_zoom_changed(move |zoom| {
@@ -359,6 +388,9 @@ impl DocumentWindow {
         let format = editor.format();
         self.format_bar.show(&format);
         self.inspector.show(&format);
+        let setup = *editor.document().page_setup();
+        self.ruler.show(setup, &format.paragraph);
+        self.vertical_ruler.show(setup, &format.paragraph);
         let character = &format.character;
         for (name, on) in [
             ("bold", character.bold),
@@ -373,6 +405,15 @@ impl DocumentWindow {
             "align",
             formatting::alignment_name(format.paragraph.alignment).to_variant(),
         );
+    }
+
+    /// Shows the rulers that Show Ruler and the preferences ask for.
+    fn show_rulers(&self) {
+        let on = self.action_state("ruler");
+        let vertical = on && preferences::get().vertical_ruler;
+        self.ruler.widget().set_visible(on);
+        self.vertical_ruler.widget().set_visible(vertical);
+        self.ruler_corner.set_visible(vertical);
     }
 
     fn action_state(&self, name: &str) -> bool {
@@ -868,6 +909,19 @@ impl DocumentWindow {
         });
         self.window.add_action(&invisibles);
 
+        // The rulers show in a word processing document (INT-02).
+        let ruler = gio::SimpleAction::new_stateful("ruler", None, &true.to_variant());
+        let weak = Rc::downgrade(self);
+        ruler.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            this.show_rulers();
+        });
+        self.window.add_action(&ruler);
+
         let inspector = gio::SimpleAction::new_stateful("inspector", None, &false.to_variant());
         let split = self.split.downgrade();
         inspector.connect_change_state(move |action, value| {
@@ -960,6 +1014,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         save.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
         menu.append_section(None, &save);
         let document = gio::Menu::new();
+        document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append_section(None, &document);
@@ -969,6 +1024,11 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     close.append(Some(&tr("Close _All Windows")), Some("app.close-all"));
     menu.append_section(None, &close);
     let help = gio::Menu::new();
+    help.append(Some(&tr("_Preferences")), Some("app.preferences"));
+    help.append(
+        Some(&tr("_Keyboard Shortcuts")),
+        Some("win.show-help-overlay"),
+    );
     help.append(
         Some(&tr("_About {app}").replace("{app}", info.name)),
         Some("app.about"),

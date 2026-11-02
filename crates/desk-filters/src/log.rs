@@ -45,8 +45,6 @@ pub enum Content {
 pub enum Formatting {
     /// Bullets and numbers of lists.
     Lists,
-    /// Tab stops other than the default ones.
-    TabStops,
     /// The spacing of characters (tracking).
     CharacterSpacing,
     /// Shadows of text.
@@ -154,7 +152,6 @@ impl fmt::Display for Formatting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Lists => "list bullets and numbers",
-            Self::TabStops => "tab stops",
             Self::CharacterSpacing => "character spacing",
             Self::TextShadows => "text shadows",
             Self::OutlinedText => "outlined text",

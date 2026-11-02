@@ -570,3 +570,124 @@ fn fmt_22_languages_of_styles_and_runs_are_kept() {
     assert_eq!(serbian.script.as_deref(), Some("Latn"));
     assert_eq!(serbian.country.as_deref(), Some("RS"));
 }
+
+#[test]
+fn fmt_16_tab_stops_move_between_the_indent_and_the_edge_of_the_text() {
+    let stop = |position| odf::TabStop {
+        position: odf::Length(position),
+        ..odf::TabStop::default()
+    };
+    let body = odf::Style {
+        name: "Standard".into(),
+        properties: odf::Properties {
+            paragraph: odf::ParagraphProperties {
+                margin_left: Some(odf::Length(36.0)),
+                tab_stops: Some(vec![stop(72.0)]),
+                ..odf::ParagraphProperties::default()
+            },
+            ..odf::Properties::default()
+        },
+        ..odf::Style::default()
+    };
+    let indented = odf::Style {
+        name: "P1".into(),
+        parent: Some("Standard".into()),
+        properties: odf::Properties {
+            paragraph: odf::ParagraphProperties {
+                margin_left: Some(odf::Length(72.0)),
+                ..odf::ParagraphProperties::default()
+            },
+            ..odf::Properties::default()
+        },
+        ..odf::Style::default()
+    };
+    let paragraph = |style: &str| odf::Paragraph {
+        style: Some(style.into()),
+        ..odf::Paragraph::default()
+    };
+    let source = odf::TextDocument {
+        styles: vec![body],
+        automatic_styles: vec![indented],
+        body: vec![paragraph("Standard"), paragraph("P1")],
+        ..odf::TextDocument::default()
+    };
+    let positions = |document: &Document| -> Vec<Vec<f64>> {
+        let styles = document.styles();
+        document
+            .body()
+            .iter()
+            .map(|p| {
+                let format = styles.resolve_paragraph(p.style(), p.attrs());
+                format
+                    .tab_stops
+                    .stops()
+                    .iter()
+                    .map(|s| s.position.to_pt())
+                    .collect()
+            })
+            .collect()
+    };
+    // LibreOffice measures from the indent, the model from the edge.
+    let document = import(&source).unwrap();
+    assert_eq!(positions(&document), [vec![108.0], vec![144.0]]);
+    // Unless the settings say otherwise.
+    let absolute = import(&odf::TextDocument {
+        tabs_relative_to_indent: Some(false),
+        ..source.clone()
+    })
+    .unwrap();
+    assert_eq!(positions(&absolute), [vec![72.0], vec![72.0]]);
+
+    // Written from the indent again, with the stops of the indented
+    // paragraph said where its indent changes.
+    let written = export(&document);
+    let stops = |style: &odf::Style| {
+        style
+            .properties
+            .paragraph
+            .tab_stops
+            .as_ref()
+            .map(|s| s.iter().map(|s| s.position.0).collect::<Vec<_>>())
+    };
+    assert_eq!(stops(&written.styles[0]), Some(vec![72.0]));
+    assert_eq!(stops(&written.automatic_styles[0]), Some(vec![72.0]));
+    let again = import(&written).unwrap();
+    assert_eq!(describe(&again), describe(&document));
+}
+
+#[test]
+fn fmt_16_tab_stops_keep_their_alignment_leader_and_separator() {
+    use desk_model::{TabAlignment, TabLeader, TabStop, TabStops};
+    let mut document = Document::new_word_processing();
+    let default = document.styles().default_paragraph();
+    let mut body = ParagraphStyle::new(default, "Body");
+    body.paragraph.tab_stops = Some(TabStops::new([
+        TabStop::left(Length::from_points(36)),
+        TabStop {
+            alignment: TabAlignment::Center,
+            leader: TabLeader::Dots,
+            ..TabStop::left(Length::from_points(100))
+        },
+        TabStop {
+            alignment: TabAlignment::Right,
+            leader: TabLeader::Line,
+            ..TabStop::left(Length::from_points(200))
+        },
+        TabStop {
+            alignment: TabAlignment::Decimal,
+            leader: TabLeader::Dashes,
+            decimal: ',',
+            ..TabStop::left(Length::from_points(300))
+        },
+        TabStop {
+            leader: TabLeader::Arrows,
+            ..TabStop::left(Length::from_points(400))
+        },
+    ]));
+    body.paragraph.default_tab_interval = Some(Length::from_pt(35.43307));
+    document.put_style(body).unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("tabs.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(describe(&read), describe(&document));
+}

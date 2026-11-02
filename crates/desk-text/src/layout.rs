@@ -25,6 +25,7 @@ use parley::{
 use crate::fonts::{FontChoice, PagesFont, choose, pages_font};
 use crate::input::{FI, FL, ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
+use crate::tabs::{Piece, TabPlace, TabRuler};
 
 /// U+00AD SOFT HYPHEN: a place where a word may break, with a hyphen drawn
 /// at the end of the line when it does.
@@ -351,9 +352,33 @@ impl TextSystem {
             let (id, advance) = hyphen_glyph(&font, size)?;
             Some((font, size, id, advance))
         };
-        let natural = |a: usize, b: usize| {
-            let width: f32 = span(a, trim(a, b)).iter().map(|c| c.advance).sum();
-            width + hyphen_at(b).map_or(0.0, |h| h.3)
+        let ruler = TabRuler::new(&format);
+        let has_tabs = source.contains('\t');
+        // The width of the text from `a` to `b` on a line from `x` to
+        // `limit`, and how much wider its tabs are than as shaped.
+        let natural = |a: usize, b: usize, x: f32, limit: f32| -> (f32, f32) {
+            let clusters = span(a, trim(a, b));
+            let hyphen = hyphen_at(b).map_or(0.0, |h| h.3);
+            if !has_tabs {
+                return (
+                    clusters.iter().map(|c| c.advance).sum::<f32>() + hyphen,
+                    0.0,
+                );
+            }
+            let first = |c: &Cluster| source[c.start..].chars().next().unwrap_or(' ');
+            let pieces = clusters.iter().map(|c| Piece {
+                tab: first(c) == '\t',
+                advance: c.advance,
+                first: first(c),
+            });
+            let (tabs, end) = ruler.lay(pieces, x, limit);
+            let shaped: f32 = clusters
+                .iter()
+                .filter(|c| first(c) == '\t')
+                .map(|c| c.advance)
+                .sum();
+            let wider = tabs.iter().map(|t| t.width).sum::<f32>() - shaped;
+            (end - x + hyphen, wider)
         };
         let mandatory = |b: usize| source[..b].ends_with(LINE_BREAK);
 
@@ -403,7 +428,7 @@ impl TextSystem {
                 let mut end = None;
                 let mut i = next_break;
                 while i < breaks.len() {
-                    if natural(pos, breaks[i]) > width + 0.001 {
+                    if natural(pos, breaks[i], x, x + width).0 > width + 0.001 {
                         break;
                     }
                     end = Some(i);
@@ -419,13 +444,18 @@ impl TextSystem {
                     };
                 let hyphen = hyphen_at(line_end);
                 let chars = source[pos..line_end].chars().count() as u32;
+                // Parley aligns the line as shaped, with narrow tabs, in
+                // the width that the tabs leave; they widen afterwards.
+                let tabs_wider = natural(pos, line_end, x, x + width).1;
 
                 let commit = |breaker: &mut parley::layout::BreakLines<'_, u32>, line_y: f32| {
                     let state = breaker.state_mut();
                     state.set_line_y(f64::from(line_y));
                     state.set_line_x(x);
                     // Justify to the width less the hyphen, drawn after it.
-                    state.set_line_max_advance(width - hyphen.as_ref().map_or(0.0, |h| h.3));
+                    state.set_line_max_advance(
+                        width - hyphen.as_ref().map_or(0.0, |h| h.3) - tabs_wider,
+                    );
                     breaker.break_next_with_length(chars);
                     (breaker.committed_y() as f32) - line_y
                 };
@@ -510,6 +540,18 @@ impl TextSystem {
             let mut end_x = place.x;
             let mut descent = None::<f32>;
             let mut carets: Vec<(usize, f32)> = Vec::new();
+            // Where the tabs of the line go, from where Parley put the
+            // text, and how far each moves what comes after it.
+            let tabs = if has_tabs {
+                line_tabs(&line, source, &ruler, place.x + place.width)
+            } else {
+                Vec::new()
+            };
+            let moved = |offset: usize| -> f32 {
+                let i = tabs.partition_point(|t| t.offset < offset);
+                if i == 0 { 0.0 } else { tabs[i - 1].moved }
+            };
+            let mut leaders = Vec::new();
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
@@ -518,36 +560,48 @@ impl TextSystem {
                 let format_index = glyph_run.style().brush;
                 let format = &text.formats()[format_index as usize];
                 let shift = script_shift(format, run.font_size(), run.font_metrics()) - delta;
-                let glyphs: Vec<Glyph> = glyph_run
-                    .positioned_glyphs()
-                    .map(|g| Glyph {
-                        id: g.id,
-                        x: g.x,
-                        y: g.y - shift,
-                    })
-                    .collect();
-                let x0 = glyph_run.offset();
-                let x1 = x0 + glyph_run.advance();
+                let spans = cluster_spans(&glyph_run);
+                let positioned: Vec<_> = glyph_run.positioned_glyphs().collect();
+                let mut glyphs: Vec<Glyph> = Vec::with_capacity(positioned.len());
+                let mut next_glyph = 0;
+                for span in &spans {
+                    let dx = moved(span.range.start);
+                    let count = span.glyphs.min(positioned.len() - next_glyph);
+                    // A tab draws no glyph of its own, only its leader.
+                    if !source[span.range.start..].starts_with('\t') {
+                        glyphs.extend(positioned[next_glyph..next_glyph + count].iter().map(|g| {
+                            Glyph {
+                                id: g.id,
+                                x: g.x + dx,
+                                y: g.y - shift,
+                            }
+                        }));
+                    } else if let Some(tab) = tabs.iter().find(|t| t.offset == span.range.start) {
+                        leaders.push((
+                            tab.place,
+                            run.font().clone(),
+                            run.font_size(),
+                            format_index,
+                        ));
+                    }
+                    next_glyph += count;
+                }
+                let range = run.text_range();
+                let x0 = glyph_run.offset() + moved(range.start);
+                let x1 = glyph_run.offset() + glyph_run.advance() + moved(range.end);
                 end_x = end_x.max(x1);
                 // A cursor stops before each cluster, at its first glyph;
                 // in right to left text the start of a cluster is on its
                 // right.
-                let mut next_glyph = 0;
-                let mut visual: Vec<(usize, usize, f32)> = Vec::new();
-                for cluster in run.visual_clusters() {
-                    let x = glyphs.get(next_glyph).map_or(x1, |g| g.x);
-                    let range = cluster.text_range();
-                    visual.push((range.start, range.end, x));
-                    next_glyph += cluster.glyphs().count();
-                }
-                for (i, &(start, end, x)) in visual.iter().enumerate() {
-                    let right = visual.get(i + 1).map_or(x1, |v| v.2);
+                for span in &spans {
+                    let left = span.x + moved(span.range.start);
+                    let right = span.right + moved(span.range.end);
                     if run.is_rtl() {
-                        carets.push((text.to_model(start), right));
-                        carets.push((text.to_model(end), x));
+                        carets.push((text.to_model(span.range.start), span.right));
+                        carets.push((text.to_model(span.range.end), span.x));
                     } else {
-                        carets.push((text.to_model(start), x));
-                        carets.push((text.to_model(end), right));
+                        carets.push((text.to_model(span.range.start), left));
+                        carets.push((text.to_model(span.range.end), right));
                     }
                 }
                 let baseline = glyphs.first().map_or(glyph_run.baseline() - shift, |g| g.y);
@@ -587,11 +641,24 @@ impl TextSystem {
                     clusters,
                     glyphs,
                     x: x0,
-                    advance: glyph_run.advance(),
+                    advance: x1 - x0,
                     baseline,
                 });
             }
-            let mut advance = metrics.advance - metrics.hanging_advance;
+            for (place, font, size, format_index) in leaders {
+                let format = &text.formats()[format_index as usize];
+                let baseline = glyph_runs
+                    .iter()
+                    .find(|r| r.format == format_index)
+                    .map_or(metrics.baseline + delta, |r| r.baseline);
+                if let Some(run) =
+                    leader_run(place, &font, size, format_index, format.color, baseline)
+                {
+                    glyph_runs.push(run);
+                }
+            }
+            let mut advance =
+                metrics.advance - metrics.hanging_advance + tabs.last().map_or(0.0, |t| t.moved);
             if let Some((font, size, id, hyphen_advance)) = &place.hyphen {
                 glyph_runs.push(GlyphRun {
                     font: font.clone(),
@@ -648,6 +715,131 @@ impl TextSystem {
         let bottom = lines.last().map_or(top, |l| l.top + l.height);
         ParagraphLayout { lines, top, bottom }
     }
+}
+
+/// A cluster of a glyph run, in visual order: its text, where it starts
+/// and ends, and how many glyphs draw it.
+struct ClusterSpan {
+    range: Range<usize>,
+    x: f32,
+    right: f32,
+    glyphs: usize,
+}
+
+fn cluster_spans(glyph_run: &parley::GlyphRun<'_, u32>) -> Vec<ClusterSpan> {
+    let xs: Vec<f32> = glyph_run.positioned_glyphs().map(|g| g.x).collect();
+    let end = glyph_run.offset() + glyph_run.advance();
+    let mut spans: Vec<ClusterSpan> = Vec::new();
+    let mut next = 0;
+    for cluster in glyph_run.run().visual_clusters() {
+        let glyphs = cluster.glyphs().count();
+        spans.push(ClusterSpan {
+            range: cluster.text_range(),
+            x: xs.get(next).copied().unwrap_or(end),
+            right: end,
+            glyphs,
+        });
+        next += glyphs;
+    }
+    for i in 1..spans.len() {
+        spans[i - 1].right = spans[i].x;
+    }
+    spans
+}
+
+/// A tab of a line: where it is in the text, where it went, and how far
+/// it moves the text after it, the moves of the tabs before it included.
+#[derive(Clone, Copy)]
+struct LineTab {
+    offset: usize,
+    place: TabPlace,
+    moved: f32,
+}
+
+/// Where the tabs of a laid out line go, given the right edge of the line.
+/// Lines of right to left text are left as Parley laid them out.
+fn line_tabs(
+    line: &parley::Line<'_, u32>,
+    source: &str,
+    ruler: &TabRuler,
+    limit: f32,
+) -> Vec<LineTab> {
+    let mut spans = Vec::new();
+    for item in line.items() {
+        if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
+            if glyph_run.run().is_rtl() {
+                return Vec::new();
+            }
+            spans.extend(cluster_spans(&glyph_run));
+        }
+    }
+    let first = |s: &ClusterSpan| source[s.range.start..].chars().next().unwrap_or(' ');
+    if !spans.iter().any(|s| first(s) == '\t') {
+        return Vec::new();
+    }
+    let pieces = spans.iter().map(|s| Piece {
+        tab: first(s) == '\t',
+        advance: s.right - s.x,
+        first: first(s),
+    });
+    let (places, _) = ruler.lay(pieces, spans[0].x, limit);
+    let mut moved = 0.0;
+    spans
+        .iter()
+        .filter(|s| first(s) == '\t')
+        .zip(places)
+        .map(|(span, place)| {
+            // Where the tab starts once the tabs before it have moved.
+            let place = TabPlace {
+                start: place.start,
+                ..place
+            };
+            moved += place.width - (span.right - span.x);
+            LineTab {
+                offset: span.range.start,
+                place,
+                moved,
+            }
+        })
+        .collect()
+}
+
+/// The leader of a tab: its character repeated across the space of the
+/// tab, ending where the tab does.
+fn leader_run(
+    place: TabPlace,
+    font: &FontData,
+    size: f32,
+    format: u32,
+    color: Rgba,
+    baseline: f32,
+) -> Option<GlyphRun> {
+    let c = place.stop.leader.character()?;
+    let (id, advance) = char_glyph(font, size, c)?;
+    if advance <= 0.0 || place.width < advance {
+        return None;
+    }
+    let count = ((place.width + 0.01) / advance).floor() as usize;
+    let end = place.start + place.width;
+    let x = end - count as f32 * advance;
+    Some(GlyphRun {
+        font: font.clone(),
+        size,
+        format,
+        color,
+        text: std::iter::repeat_n(c, count).collect(),
+        clusters: vec![(c.len_utf8() as u32, 1); count],
+        glyphs: (0..count)
+            .map(|i| Glyph {
+                id,
+                x: x + i as f32 * advance,
+                y: baseline,
+            })
+            .collect(),
+        x,
+        advance: count as f32 * advance,
+        baseline,
+    })
 }
 
 fn alignment(alignment: Alignment) -> parley::Alignment {
@@ -761,12 +953,17 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
 }
 
 /// The text that a run draws and its clusters, as [`GlyphRun::text`] and
-/// [`GlyphRun::clusters`] describe them, given how many glyphs it has.
+/// [`GlyphRun::clusters`] describe them, given how many glyphs it has,
+/// tabs left out.
 fn run_text(source: &str, run: &parley::Run<'_, u32>, glyphs: usize) -> (String, Vec<(u32, u32)>) {
     let mut text = String::new();
     let mut clusters = Vec::new();
     let mut count = 0;
     for cluster in run.visual_clusters() {
+        // A tab draws no glyph, and its leader is a run of its own.
+        if source[cluster.text_range()].starts_with('\t') {
+            continue;
+        }
         let start = text.len();
         for c in source[cluster.text_range()].chars() {
             match c {
@@ -787,10 +984,15 @@ fn run_text(source: &str, run: &parley::Run<'_, u32>, glyphs: usize) -> (String,
 
 /// The hyphen glyph of a font and its advance at a size.
 fn hyphen_glyph(font: &FontData, size: f32) -> Option<(u32, f32)> {
+    char_glyph(font, size, '-')
+}
+
+/// The glyph of a character in a font and its advance at a size.
+fn char_glyph(font: &FontData, size: f32, c: char) -> Option<(u32, f32)> {
     use skrifa::MetadataProvider;
     use skrifa::instance::{LocationRef, Size};
     let font = skrifa::FontRef::from_index(font.data.as_ref(), font.index).ok()?;
-    let id = font.charmap().map('-')?;
+    let id = font.charmap().map(c)?;
     let advance = font
         .glyph_metrics(Size::new(size), LocationRef::default())
         .advance_width(id)?;

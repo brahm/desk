@@ -19,6 +19,8 @@ use gtk::{gdk, glib};
 
 use crate::editing::{Format, TextEditor};
 use crate::i18n::{n_, tr};
+use crate::preferences::{self, Units};
+use crate::tab_stops::{self, TabStopsGroup};
 
 /// Finds the editor of the window, if it shows a document.
 pub type EditorOf = Rc<dyn Fn() -> Option<TextEditor>>;
@@ -328,6 +330,11 @@ pub struct Inspector {
     first_line: adw::SpinRow,
     left: adw::SpinRow,
     right: adw::SpinRow,
+    tabs: Rc<TabStopsGroup>,
+    /// The units of the indents, those of the rulers.
+    units: Cell<Units>,
+    /// The paragraph format shown, to show again in other units.
+    shown: RefCell<Option<Format>>,
     updating: Cell<bool>,
 }
 
@@ -352,8 +359,19 @@ impl Field {
         }
     }
 
-    fn attrs(self, value: f64) -> ParaAttrs {
-        let length = Some(Length::from_pt(value));
+    /// Whether the field is a length in the units of the rulers; the
+    /// others are in lines or points, as in Pages.
+    fn in_units(self) -> bool {
+        matches!(self, Self::FirstLine | Self::Left | Self::Right)
+    }
+
+    /// The attributes for a value of the field, in its units.
+    fn attrs(self, value: f64, units: Units) -> ParaAttrs {
+        let length = Some(if self.in_units() {
+            tab_stops::from_units(value, units)
+        } else {
+            Length::from_pt(value)
+        });
         let mut attrs = ParaAttrs::default();
         match self {
             Self::LineSpacing => {
@@ -384,9 +402,11 @@ impl Inspector {
         let line_spacing = row(&tr("Line Spacing"), &tr("Lines"), 0.5, 10.0, 0.1, 1);
         let before = row(&tr("Before Paragraph"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
         let after = row(&tr("After Paragraph"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
-        let first_line = row(&tr("First Line"), &tr("Points"), -1584.0, 1584.0, 1.0, 0);
-        let left = row(&tr("Left"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
-        let right = row(&tr("Right"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
+        let units = preferences::get().units;
+        let first_line = row(&tr("First Line"), "", 0.0, 1.0, 1.0, 0);
+        let left = row(&tr("Left"), "", 0.0, 1.0, 1.0, 0);
+        let right = row(&tr("Right"), "", 0.0, 1.0, 1.0, 0);
+        let tabs = TabStopsGroup::new(editor.clone(), units);
 
         let spacing = adw::PreferencesGroup::builder()
             .title(tr("Spacing"))
@@ -410,6 +430,7 @@ impl Inspector {
             .build();
         content.append(&spacing);
         content.append(&indents);
+        content.append(tabs.widget());
         let root = gtk::ScrolledWindow::builder()
             .child(&content)
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -424,7 +445,17 @@ impl Inspector {
             first_line,
             left,
             right,
+            tabs,
+            units: Cell::new(units),
+            shown: RefCell::new(None),
             updating: Cell::new(false),
+        });
+        this.set_units(units);
+        let weak = Rc::downgrade(&this);
+        preferences::connect_changed(move |p| {
+            if let Some(this) = weak.upgrade() {
+                this.set_units(p.units);
+            }
         });
         for (row, field) in [
             (&this.line_spacing, Field::LineSpacing),
@@ -442,7 +473,8 @@ impl Inspector {
                     return;
                 }
                 if let Some(editor) = editor() {
-                    editor.set_paragraph_attrs(field.name(), &field.attrs(row.value()));
+                    let attrs = field.attrs(row.value(), this.units.get());
+                    editor.set_paragraph_attrs(field.name(), &attrs);
                 }
             });
         }
@@ -454,8 +486,24 @@ impl Inspector {
         &self.root
     }
 
+    /// Measures the indents in other units.
+    fn set_units(&self, units: Units) {
+        self.updating.set(true);
+        self.units.set(units);
+        tab_stops::set_units(&self.first_line, units, -1584.0, 1584.0);
+        tab_stops::set_units(&self.left, units, 0.0, 1584.0);
+        tab_stops::set_units(&self.right, units, 0.0, 1584.0);
+        self.updating.set(false);
+        self.tabs.set_units(units);
+        let shown = self.shown.borrow().clone();
+        if let Some(format) = shown {
+            self.show(&format);
+        }
+    }
+
     /// Shows the formatting at the selection.
     pub fn show(&self, format: &Format) {
+        *self.shown.borrow_mut() = Some(format.clone());
         self.updating.set(true);
         let paragraph = &format.paragraph;
         let set = |row: &adw::SpinRow, value: f64| {
@@ -474,10 +522,21 @@ impl Inspector {
         }
         set(&self.before, paragraph.space_before.to_pt());
         set(&self.after, paragraph.space_after.to_pt());
-        set(&self.first_line, paragraph.first_line_indent.to_pt());
-        set(&self.left, paragraph.left_indent.to_pt());
-        set(&self.right, paragraph.right_indent.to_pt());
+        let units = self.units.get();
+        set(
+            &self.first_line,
+            tab_stops::in_units(paragraph.first_line_indent, units),
+        );
+        set(
+            &self.left,
+            tab_stops::in_units(paragraph.left_indent, units),
+        );
+        set(
+            &self.right,
+            tab_stops::in_units(paragraph.right_indent, units),
+        );
         self.updating.set(false);
+        self.tabs.show(paragraph);
     }
 }
 
@@ -539,15 +598,27 @@ mod tests {
 
     #[test]
     fn inspector_rows_set_one_attribute() {
-        let attrs = Field::LineSpacing.attrs(1.5);
+        let attrs = Field::LineSpacing.attrs(1.5, Units::Inches);
         assert_eq!(
             attrs.line_spacing,
             Some(LineSpacing::Multiple { percent: 150 })
         );
+        // Indents are in the units of the rulers, and spacing in points.
         assert_eq!(
-            Field::FirstLine.attrs(18.0).first_line_indent,
+            Field::FirstLine
+                .attrs(0.25, Units::Inches)
+                .first_line_indent,
             Some(Length::from_pt(18.0))
         );
-        assert!(Field::Before.attrs(6.0).left_indent.is_none());
+        assert_eq!(
+            Field::Before.attrs(6.0, Units::Inches).space_before,
+            Some(Length::from_pt(6.0))
+        );
+        assert!(
+            Field::Before
+                .attrs(6.0, Units::Points)
+                .left_indent
+                .is_none()
+        );
     }
 }

@@ -284,7 +284,6 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
             (Warning::Content(Content::Comments), 1),
             (Warning::Content(Content::Fields), 2),
             (Warning::Formatting(Formatting::Lists), 2),
-            (Warning::Formatting(Formatting::TabStops), 1),
             (Warning::Formatting(Formatting::CharacterSpacing), 1),
             (Warning::Formatting(Formatting::TextShadows), 1),
             (Warning::Formatting(Formatting::ParagraphBackgrounds), 1),

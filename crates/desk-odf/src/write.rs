@@ -7,9 +7,9 @@ use std::collections::BTreeSet;
 
 use crate::ns;
 use crate::text::{
-    Break, Family, LINE_BREAK, Line, LineColor, LineHeight, Meta, PageLayout, Paragraph,
-    ParagraphProperties, Properties, Style, TextAlign, TextDocument, TextPosition, TextProperties,
-    TextTransform,
+    Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, Meta, PageLayout,
+    Paragraph, ParagraphProperties, Properties, Style, TabType, TextAlign, TextDocument,
+    TextPosition, TextProperties, TextTransform,
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
@@ -144,6 +144,7 @@ fn write_properties(w: &mut Writer, properties: &Properties) {
     if properties.paragraph != ParagraphProperties::default() {
         w.start("style:paragraph-properties");
         paragraph_attrs(w, &properties.paragraph);
+        paragraph_children(w, &properties.paragraph);
         w.end();
     }
     if properties.text != TextProperties::default() {
@@ -215,6 +216,44 @@ fn paragraph_attrs(w: &mut Writer, p: &ParagraphProperties) {
     if let Some(v) = p.orphans {
         w.attr("fo:orphans", &v.to_string());
     }
+    len(w, "style:tab-stop-distance", p.tab_stop_distance);
+}
+
+/// The children of `style:paragraph-properties`, after its attributes.
+fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
+    let Some(stops) = &p.tab_stops else { return };
+    w.start("style:tab-stops");
+    for stop in stops {
+        w.start("style:tab-stop")
+            .attr("style:position", &stop.position.to_string());
+        match stop.kind {
+            TabType::Left => {}
+            TabType::Center => {
+                w.attr("style:type", "center");
+            }
+            TabType::Right => {
+                w.attr("style:type", "right");
+            }
+            TabType::Char => {
+                w.attr("style:type", "char")
+                    .attr("style:char", &stop.char.unwrap_or('.').to_string());
+            }
+        }
+        let style = match stop.leader_style {
+            LeaderStyle::None => None,
+            LeaderStyle::Solid => Some("solid"),
+            LeaderStyle::Dotted => Some("dotted"),
+            LeaderStyle::Dash => Some("dash"),
+        };
+        if let Some(style) = style {
+            w.attr("style:leader-style", style);
+        }
+        if let Some(text) = stop.leader_text {
+            w.attr("style:leader-text", &text.to_string());
+        }
+        w.end();
+    }
+    w.end();
 }
 
 fn write_line(w: &mut Writer, which: &str, line: Option<Line>) {

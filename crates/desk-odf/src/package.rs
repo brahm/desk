@@ -55,7 +55,12 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
     let content = stream(&mut archive, "content.xml")?.ok_or(OdfError::Missing("content.xml"))?;
     let styles = stream(&mut archive, "styles.xml")?;
     let meta = stream(&mut archive, "meta.xml")?;
-    read_streams(&content, styles.as_deref(), meta.as_deref())
+    let settings = stream(&mut archive, "settings.xml")?;
+    let mut document = read_streams(&content, styles.as_deref(), meta.as_deref())?;
+    document.tabs_relative_to_indent = settings
+        .as_deref()
+        .and_then(crate::read::tabs_relative_to_indent);
+    Ok(document)
 }
 
 /// Writes a text document as the bytes of an ODT package.

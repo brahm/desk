@@ -20,8 +20,11 @@ mod editing;
 mod formatting;
 pub mod geometry;
 pub mod i18n;
+mod preferences;
 mod properties;
+mod ruler;
 mod shortcuts;
+mod tab_stops;
 pub mod text_nav;
 mod view;
 mod warnings;
@@ -223,6 +226,8 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         add_actions(app, info, opener);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
         app.set_accels_for_action("app.new-window", &["<Control>n"]);
+        app.set_accels_for_action("app.preferences", &["<Control>comma"]);
+        app.set_accels_for_action("win.ruler", &["<Control>r"]);
         app.set_accels_for_action("window.close", &["<Control>w"]);
         app.set_accels_for_action("app.close-all", &["<Control><Alt>w"]);
         if opener.is_some() {
@@ -272,13 +277,18 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
 }
 
 /// The style of the document area: the pages stand out on a darker
-/// backdrop, in the light and the dark style.
+/// backdrop, in the light and the dark style, under rulers that look like
+/// the bars of the window.
 fn load_css() {
     let Some(display) = gtk::gdk::Display::default() else {
         return;
     };
     let provider = gtk::CssProvider::new();
-    provider.load_from_string(".desk-document { background-color: alpha(@window_fg_color, 0.1); }");
+    provider.load_from_string(
+        ".desk-document { background-color: alpha(@window_fg_color, 0.1); }\n\
+         .desk-ruler { background-color: @headerbar_bg_color; \
+         box-shadow: inset 0 -1px alpha(@window_fg_color, 0.15); }",
+    );
     gtk::style_context_add_provider_for_display(
         &display,
         &provider,
@@ -336,7 +346,14 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
             DocumentWindow::new(app, info, opener).window().present();
         })
         .build();
-    app.add_action_entries([about, quit, close_windows, new_window]);
+    let preferences = gio::ActionEntry::builder("preferences")
+        .activate(move |app: &adw::Application, _, _| {
+            if let Some(window) = app.active_window() {
+                preferences::show(&window);
+            }
+        })
+        .build();
+    app.add_action_entries([about, quit, close_windows, new_window, preferences]);
     if let Some(opener) = opener {
         let open = gio::ActionEntry::builder("open")
             .activate(move |app: &adw::Application, _, _| show_open_dialog(app, info, opener))

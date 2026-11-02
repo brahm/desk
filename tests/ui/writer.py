@@ -71,6 +71,17 @@ def find(app, role, name=None):
     return None
 
 
+def find_named(app, name):
+    for node in walk(app):
+        if node.get_name() == name:
+            return node
+    return None
+
+
+def showing(node):
+    return node is not None and node.get_state_set().contains(Atspi.StateType.SHOWING)
+
+
 def text_of(node):
     return Atspi.Text.get_text(node, 0, Atspi.Text.get_character_count(node))
 
@@ -172,6 +183,25 @@ def main():
             check("the file has a preview", "Thumbnails/thumbnail.png" in package.namelist())
         frame = find(app, Atspi.Role.FRAME)
         check("the title no longer marks changes", frame and frame.get_name() == "Letter.odt")
+
+        # The ruler shows in a word processing document, and Ctrl+R hides
+        # it (INT-17).
+        check("the ruler shows", showing(find_named(app, "Ruler")))
+        press("ctrl+r")
+        wait_for("the ruler to hide", lambda: not showing(find_named(app, "Ruler")))
+        check("Ctrl+R hides the ruler", True)
+        press("ctrl+r")
+        wait_for("the ruler to show again", lambda: showing(find_named(app, "Ruler")))
+        check("Ctrl+R shows it again", True)
+
+        # Tab types a tab, which goes to the next stop (FMT-16).
+        press("ctrl+End", "Tab")
+        type_text("x")
+        wait_for(
+            "the tab in the accessibility tree",
+            lambda: text_of(document) == "US Letter, landscape ação\tx\n",
+        )
+        check("Tab types a tab", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
