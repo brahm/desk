@@ -13,6 +13,7 @@ adw.workspace = true
 desk-layout.workspace = true
 desk-model.workspace = true
 desk-render.workspace = true
+desk-text.workspace = true
 gtk.workspace = true
 
 [build-dependencies]
