@@ -675,11 +675,6 @@ fn a_text_position_that_does_not_parse_is_dropped_whole() {
 
 #[test]
 fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
-    let mut document = TextDocument::default();
-    document.page_layout = PageLayout {
-        mirrored: Some(true),
-        ..PageLayout::default()
-    };
     let columns = desk_odf::Columns {
         count: 2,
         gap: Some(Length(12.0)),
@@ -696,7 +691,7 @@ fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
             },
         ],
     };
-    document.section_styles = vec![
+    let section_styles = vec![
         desk_odf::SectionStyle {
             name: "Sect1".into(),
             margin_left: Some(Length(20.0)),
@@ -720,13 +715,13 @@ fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
         }],
         ..Paragraph::default()
     };
-    document.body = vec![
+    let body = vec![
         text("Before", None),
         text("Columns", Some("Sect1")),
         text("More", None),
         text("Chapter", Some("Sect2")),
     ];
-    document.automatic_styles.push(Style {
+    let automatic = Style {
         name: "P1".into(),
         display_name: None,
         family: Family::Paragraph,
@@ -741,7 +736,17 @@ fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
             },
             ..Properties::default()
         },
-    });
+    };
+    let document = TextDocument {
+        page_layout: PageLayout {
+            mirrored: Some(true),
+            ..PageLayout::default()
+        },
+        section_styles,
+        body,
+        automatic_styles: vec![automatic],
+        ..TextDocument::default()
+    };
     let read = read_odt(&write_odt(&document).unwrap()).unwrap();
     assert_eq!(read.page_layout.mirrored, Some(true));
     assert_eq!(read.section_styles, document.section_styles);
