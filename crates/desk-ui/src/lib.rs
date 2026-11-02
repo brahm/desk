@@ -18,6 +18,7 @@ mod access;
 mod area;
 mod editing;
 mod effects;
+mod eyedropper;
 mod find;
 mod fonts;
 mod formatting;
@@ -131,10 +132,20 @@ fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     result
 }
 
+/// A warning of the Warnings window (INT-22).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Warning {
+    /// What it says.
+    pub text: String,
+    /// The family of a missing font that it is about, which can be
+    /// replaced.
+    pub font: Option<String>,
+}
+
 /// A document laid out for a window.
 pub(crate) struct Shown {
     pub document: Document,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
     /// Whether something was left out, rather than only fonts replaced by
     /// others with the same metrics; then the Warnings window opens by
     /// itself, as in Pages.
@@ -148,18 +159,22 @@ thread_local! {
 
 /// Reads and lays out a document.
 pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, String> {
-    let Opened {
-        document,
-        mut warnings,
-    } = (opener.open)(&package_of(path))?;
+    let Opened { document, warnings } = (opener.open)(&package_of(path))?;
     let mut lossy = !warnings.is_empty();
+    let mut warnings: Vec<Warning> = warnings
+        .into_iter()
+        .map(|text| Warning { text, font: None })
+        .collect();
     TEXT.with(|text| {
         let mut system = text.borrow_mut();
         system.forget_choices();
         desk_layout::paginate(&document, &mut system);
         for choice in system.substitutions() {
             lossy |= choice.kind != FontMatch::Metric;
-            warnings.push(substitution(&choice));
+            warnings.push(Warning {
+                text: substitution(&choice),
+                font: Some(choice.requested.to_string()),
+            });
         }
     });
     Ok(Shown {
@@ -257,6 +272,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.styles-drawer", &["<Control><Shift>t"]),
             ("win.copy-style", &["<Control><Alt>c"]),
             ("win.paste-style", &["<Control><Alt>v"]),
+            ("win.paste-match-style", &["<Control><Shift><Alt>v"]),
             ("win.inspector", &["<Control><Alt>i"]),
             ("win.fonts", &["<Control>t"]),
             ("win.find", &["<Control>f"]),
