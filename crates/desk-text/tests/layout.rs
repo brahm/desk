@@ -434,6 +434,33 @@ fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
     assert!(
         text[first.range.clone()].ends_with("hy") || lines.iter().any(|l| l.ends_with("hyphen"))
     );
+    // Where a word may break, tracking adds no space.
+    let tracked = CharFormat {
+        tracking: 200,
+        ..english_format()
+    };
+    let wide = Column::new(400.0);
+    let width = |system: &mut TextSystem, hyphenate: bool| {
+        let paragraph = ParaFormat {
+            hyphenate,
+            ..ParaFormat::default()
+        };
+        lay_in(
+            system,
+            paragraph,
+            &[("representative", tracked.clone())],
+            &wide,
+        )
+        .lines[0]
+            .advance
+    };
+    assert_eq!(width(&mut system, true), width(&mut system, false));
+    // The text that a PDF keeps to copy has no marks where words may break.
+    for line in &broken.lines {
+        for run in &line.runs {
+            assert!(!run.text.contains('\u{ad}'), "{:?}", run.text);
+        }
+    }
 
     // A document that is not hyphenated has no hyphens, and words never
     // hyphenated are kept whole.
