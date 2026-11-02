@@ -51,6 +51,49 @@ pub struct TextDocument {
     /// The section styles, common and automatic, which the sections of
     /// the body name.
     pub section_styles: Vec<SectionStyle>,
+    /// The headers and footers of the master page.
+    pub master: MasterPage,
+    /// The automatic styles of `styles.xml`, which the paragraphs of the
+    /// headers and footers name.
+    pub master_styles: Vec<Style>,
+}
+
+/// The headers and footers of a master page (`style:master-page`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MasterPage {
+    /// `style:header`: the header of every page that has no other.
+    pub header: Option<HeaderFooter>,
+    /// `style:header-first`: the header of the first page.
+    pub header_first: Option<HeaderFooter>,
+    /// `style:header-left`: the header of left pages.
+    pub header_left: Option<HeaderFooter>,
+    /// `style:footer`.
+    pub footer: Option<HeaderFooter>,
+    /// `style:footer-first`.
+    pub footer_first: Option<HeaderFooter>,
+    /// `style:footer-left`.
+    pub footer_left: Option<HeaderFooter>,
+}
+
+/// A header or a footer.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HeaderFooter {
+    /// `style:display`: whether pages show it; false keeps its text
+    /// hidden.
+    pub display: bool,
+    /// Its paragraphs.
+    pub paragraphs: Vec<Paragraph>,
+}
+
+/// The size of the header or the footer of a page layout
+/// (`style:header-footer-properties`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct HeaderFooterStyle {
+    /// `fo:min-height`: the height it takes at least.
+    pub min_height: Option<Length>,
+    /// The space between it and the body: `fo:margin-bottom` of a
+    /// header, `fo:margin-top` of a footer.
+    pub spacing: Option<Length>,
 }
 
 /// The columns of a section or of the pages (`style:columns`).
@@ -621,6 +664,10 @@ pub struct PageLayout {
     pub mirrored: Option<bool>,
     /// `style:columns`: the columns of every page.
     pub columns: Option<Columns>,
+    /// `style:header-style`, when the pages have a header.
+    pub header: Option<HeaderFooterStyle>,
+    /// `style:footer-style`, when the pages have a footer.
+    pub footer: Option<HeaderFooterStyle>,
 }
 
 /// A paragraph or heading of the body.
@@ -676,6 +723,25 @@ pub struct Span {
     /// `text:style-name` of the span, a text style.
     pub style: Option<String>,
     /// The text, with spaces as they are shown, tabs as U+0009 and line
-    /// breaks as [`LINE_BREAK`].
+    /// breaks as [`LINE_BREAK`]. For a field, the text it shows.
     pub text: String,
+    /// The field that the span is, when it is one.
+    pub field: Option<Field>,
+}
+
+/// A field of the text, which shows a value that the program fills in.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Field {
+    /// `text:page-number`, of the current page.
+    PageNumber,
+    /// `text:page-count`.
+    PageCount,
+    /// `text:date`, fixed at the date it shows. `desk:pattern` keeps the
+    /// pattern of the date in the symbols of Unicode.
+    Date {
+        /// The pattern, as `EEEE, d MMMM y`.
+        pattern: Option<String>,
+    },
+    /// `text:file-name`, fixed at the name it shows.
+    FileName,
 }

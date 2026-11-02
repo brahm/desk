@@ -6,6 +6,7 @@
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::error::ModelError;
+use crate::header::HeadersFooters;
 use crate::id::{IdAllocator, NodeId};
 use crate::op::Op;
 use crate::section::{Columns, Layout, Section, SectionStart};
@@ -97,11 +98,23 @@ pub struct PageSetup {
     pub section: Section,
     /// The first layout of the body (EST-07, EST-10).
     pub layout: Layout,
+    /// Whether pages show their header (EST-01, EST-12).
+    pub headers: bool,
+    /// Whether pages show their footer (EST-01, EST-12).
+    pub footers: bool,
+    /// How far the top of the header is from the top of the paper.
+    pub header_margin: Length,
+    /// How far the bottom of the footer is from the bottom of the paper.
+    pub footer_margin: Length,
 }
 
 impl PageSetup {
     /// The margin of the blank templates of Pages: one inch on each side.
     pub const DEFAULT_MARGIN: Length = Length::from_points(72);
+
+    /// The default distance of the header and of the footer from the edge
+    /// of the paper: half an inch.
+    pub const DEFAULT_HEADER_MARGIN: Length = Length::from_points(36);
 
     /// A page of the given size with the default margins.
     pub const fn with_size(width: Length, height: Length) -> Self {
@@ -127,6 +140,10 @@ impl PageSetup {
                 right: Length::ZERO,
                 new_page: false,
             },
+            headers: true,
+            footers: true,
+            header_margin: Self::DEFAULT_HEADER_MARGIN,
+            footer_margin: Self::DEFAULT_HEADER_MARGIN,
         }
     }
 
@@ -186,6 +203,8 @@ pub struct PagedFlow {
     pub page: PageSetup,
     /// The body text.
     pub body: TextFlow,
+    /// The headers and footers (EST-12, EST-19).
+    pub margins: HeadersFooters,
 }
 
 /// Where the content of a document lives. Each app has its own container
@@ -274,6 +293,7 @@ impl Document {
             container: Container::Pages(PagedFlow {
                 page: PageSetup::default(),
                 body: TextFlow::new(Paragraph::new(first, body_style)),
+                margins: HeadersFooters::default(),
             }),
         }
     }
@@ -320,6 +340,13 @@ impl Document {
     pub fn page_setup(&self) -> &PageSetup {
         match &self.container {
             Container::Pages(flow) => &flow.page,
+        }
+    }
+
+    /// The headers and footers.
+    pub fn headers_footers(&self) -> &HeadersFooters {
+        match &self.container {
+            Container::Pages(flow) => &flow.margins,
         }
     }
 
@@ -498,6 +525,10 @@ impl Document {
                 }
                 if self.styles.is_referenced(style)
                     || self.body().iter().any(|p| p.uses_style(style))
+                    || self
+                        .headers_footers()
+                        .paragraphs()
+                        .any(|p| p.uses_style(style))
                 {
                     return Err(ModelError::StyleInUse(style));
                 }
@@ -508,6 +539,23 @@ impl Document {
                 let Container::Pages(flow) = &mut self.container;
                 let old = std::mem::replace(&mut flow.page, page);
                 Ok(Op::SetPageSetup { page: old })
+            }
+            Op::SetHeaderFooter { place, paragraphs } => {
+                for paragraph in &paragraphs {
+                    self.styles
+                        .check_family(paragraph.style(), StyleFamily::Paragraph)?;
+                    self.check_list_style(paragraph.attrs())?;
+                    self.check_runs_styles(paragraph.runs())?;
+                }
+                for paragraph in &paragraphs {
+                    self.ids.observe(paragraph.id());
+                }
+                let Container::Pages(flow) = &mut self.container;
+                let old = flow.margins.replace(place, paragraphs);
+                Ok(Op::SetHeaderFooter {
+                    place,
+                    paragraphs: old,
+                })
             }
             Op::SetMetadata { metadata } => {
                 let old = std::mem::replace(&mut self.metadata, metadata);

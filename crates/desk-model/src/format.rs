@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::header::Field;
 use crate::list::ListLevel;
 use crate::section::Start;
 use crate::style::StyleId;
@@ -404,6 +405,12 @@ formatting! {
         font_features: FontFeatures = FontFeatures::none(),
         /// A color behind the text (FMT-20).
         background: Option<Rgba> = None,
+        /// The field that the text is, one [`FIELD_CHARACTER`] for each
+        /// (EST-27). Fields belong to the text: styles never hold them,
+        /// and typed text never takes them.
+        ///
+        /// [`FIELD_CHARACTER`]: crate::FIELD_CHARACTER
+        field: Option<Field> = None,
     }
 }
 
@@ -729,6 +736,16 @@ formatting! {
         /// Whether words break with a hyphen at the ends of lines, by the
         /// patterns of their language (TXT-09).
         hyphenate: bool = false,
+    }
+}
+
+impl CharAttrs {
+    /// The attributes without the field.
+    pub fn without_field(&self) -> Self {
+        Self {
+            field: None,
+            ..self.clone()
+        }
     }
 }
 

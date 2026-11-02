@@ -48,6 +48,7 @@ mod document;
 mod error;
 mod find;
 mod format;
+mod header;
 mod id;
 mod list;
 mod op;
@@ -71,6 +72,7 @@ pub use format::{
     LineSpacing, LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow, TabAlignment, TabLeader,
     TabStop, TabStops,
 };
+pub use header::{FIELD_CHARACTER, Field, HeadersFooters, MarginKind, MarginPages, MarginPlace};
 pub use id::NodeId;
 pub use list::{
     LIST_LEVELS, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind, NumberFormat,

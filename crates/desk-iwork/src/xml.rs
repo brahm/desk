@@ -79,6 +79,19 @@ impl Element {
         out.into_iter()
     }
 
+    /// The text inside the element and the elements in it, in order.
+    pub fn text(&self) -> String {
+        let mut out = String::new();
+        let mut stack: Vec<&Node> = self.children.iter().rev().collect();
+        while let Some(node) = stack.pop() {
+            match node {
+                Node::Text(text) => out.push_str(text),
+                Node::Element(element) => stack.extend(element.children.iter().rev()),
+            }
+        }
+        out
+    }
+
     /// The first child element with a name.
     pub fn child(&self, ns: &str, local: &str) -> Option<&Element> {
         self.elements().find(|e| e.name.is(ns, local))

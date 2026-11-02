@@ -8,11 +8,12 @@ use std::collections::HashMap;
 use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLINK};
 use crate::text::{
-    Background, Border, BorderLine, Break, Column, Columns, Family, LINE_BREAK, LeaderStyle, Line,
-    LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout,
-    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
-    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
-    TextSettings, TextShadow, TextTransform,
+    Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
+    HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
+    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, PageLayout, Paragraph,
+    ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
+    TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
+    TextShadow, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -68,6 +69,14 @@ pub fn read_streams(
             }
         }
         document.page_layout = page_layout(styles).unwrap_or_default();
+        if let Some(automatic) = styles.child(OFFICE, "automatic-styles") {
+            document
+                .master_styles
+                .extend(automatic.elements().filter_map(|e| reader.style(e)));
+        }
+        if let Some(master) = master_page(styles) {
+            document.master = read_master(master);
+        }
     }
     if let Some(automatic) = content.child(OFFICE, "automatic-styles") {
         document
@@ -606,13 +615,51 @@ fn visit(e: &Element, f: &mut impl FnMut(&Element)) {
     }
 }
 
-/// The page layout of the master page "Standard", or of the first one.
-fn page_layout(styles: &Element) -> Option<PageLayout> {
+/// The master page "Standard", or the first one.
+fn master_page(styles: &Element) -> Option<&Element> {
     let masters = styles.child(OFFICE, "master-styles")?;
-    let master = masters
+    masters
         .children_named(STYLE, "master-page")
         .find(|m| m.attr(STYLE, "name") == Some("Standard"))
-        .or_else(|| masters.child(STYLE, "master-page"))?;
+        .or_else(|| masters.child(STYLE, "master-page"))
+}
+
+/// The headers and footers of a master page.
+fn read_master(master: &Element) -> MasterPage {
+    let part = |name: &str| {
+        master.child(STYLE, name).map(|e| {
+            let mut paragraphs = Vec::new();
+            collect_paragraphs(e, None, None, &mut paragraphs);
+            HeaderFooter {
+                display: e.attr(STYLE, "display") != Some("false"),
+                paragraphs,
+            }
+        })
+    };
+    MasterPage {
+        header: part("header"),
+        header_first: part("header-first"),
+        header_left: part("header-left"),
+        footer: part("footer"),
+        footer_first: part("footer-first"),
+        footer_left: part("footer-left"),
+    }
+}
+
+/// The size of the header or footer of a page layout.
+fn header_footer_style(layout: &Element, name: &str, spacing: &str) -> Option<HeaderFooterStyle> {
+    let p = layout
+        .child(STYLE, name)?
+        .child(STYLE, "header-footer-properties")?;
+    Some(HeaderFooterStyle {
+        min_height: length(p, FO, "min-height").or_else(|| length(p, SVG, "height")),
+        spacing: length(p, FO, spacing),
+    })
+}
+
+/// The page layout of the master page "Standard", or of the first one.
+fn page_layout(styles: &Element) -> Option<PageLayout> {
+    let master = master_page(styles)?;
     let name = master.attr(STYLE, "page-layout-name")?;
     let layout = styles
         .child(OFFICE, "automatic-styles")?
@@ -628,6 +675,8 @@ fn page_layout(styles: &Element) -> Option<PageLayout> {
         margin_right: length(p, FO, "margin-right"),
         mirrored: layout.attr(STYLE, "page-usage").map(|u| u == "mirrored"),
         columns: p.child(STYLE, "columns").and_then(columns),
+        header: header_footer_style(layout, "header-style", "margin-bottom"),
+        footer: header_footer_style(layout, "footer-style", "margin-top"),
     })
 }
 
@@ -829,12 +878,25 @@ impl SpanBuilder {
             return;
         }
         match self.spans.last_mut() {
-            Some(last) if last.style.as_deref() == style => last.text.push_str(text),
+            Some(last) if last.style.as_deref() == style && last.field.is_none() => {
+                last.text.push_str(text);
+            }
             _ => self.spans.push(Span {
                 style: style.map(str::to_owned),
                 text: text.to_owned(),
+                field: None,
             }),
         }
+    }
+
+    /// Adds a field with the text it shows.
+    fn field(&mut self, style: Option<&str>, e: &Element, field: Field) {
+        self.spans.push(Span {
+            style: style.map(str::to_owned),
+            text: e.text(),
+            field: Some(field),
+        });
+        self.collapse = false;
     }
 
     fn xml_text(&mut self, style: Option<&str>, text: &str) {
@@ -882,6 +944,16 @@ impl SpanBuilder {
                 }
                 "tab" => return self.literal(style, "\t"),
                 "line-break" => return self.literal(style, &LINE_BREAK.to_string()),
+                // The page number of another page is only its text.
+                "page-number" if e.attr(TEXT, "select-page").is_none_or(|p| p == "current") => {
+                    return self.field(style, e, Field::PageNumber);
+                }
+                "page-count" => return self.field(style, e, Field::PageCount),
+                "date" => {
+                    let pattern = e.attr(DESK, "pattern").map(str::to_owned);
+                    return self.field(style, e, Field::Date { pattern });
+                }
+                "file-name" => return self.field(style, e, Field::FileName),
                 // Notes, bookmarks and the like add no text of their own.
                 "note"
                 | "bookmark"

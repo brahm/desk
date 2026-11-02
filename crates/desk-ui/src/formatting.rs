@@ -362,6 +362,7 @@ pub struct Inspector {
     facing_pages: adw::SwitchRow,
     tabs: Rc<TabStopsGroup>,
     layouts: Rc<LayoutGroups>,
+    headers: Rc<crate::headers_pane::HeadersGroup>,
     lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
     /// The units of the indents, those of the rulers.
@@ -443,6 +444,7 @@ impl Inspector {
         let lists = ListsGroup::new(editor.clone(), units);
         let effects = Effects::new(editor.clone());
         let layouts = LayoutGroups::new(editor.clone(), units);
+        let headers = crate::headers_pane::HeadersGroup::new(editor.clone(), units);
 
         let spacing = adw::PreferencesGroup::builder()
             .title(tr("Spacing"))
@@ -501,6 +503,7 @@ impl Inspector {
         for group in layouts.groups() {
             content.append(group);
         }
+        content.append(headers.widget());
         content.append(&document);
         let root = gtk::ScrolledWindow::builder()
             .child(&content)
@@ -522,6 +525,7 @@ impl Inspector {
             facing_pages,
             tabs,
             layouts,
+            headers,
             lists,
             effects,
             units: Cell::new(units),
@@ -627,6 +631,7 @@ impl Inspector {
         self.tabs.set_units(units);
         self.lists.set_units(units);
         self.layouts.set_units(units);
+        self.headers.set_units(units);
         let shown = self.shown.borrow().clone();
         if let Some(format) = shown {
             self.show(&format);
@@ -684,6 +689,7 @@ impl Inspector {
         self.tabs.show(paragraph);
         self.lists.show(format);
         self.layouts.show(format);
+        self.headers.show(format);
         self.effects.show(&format.character, paragraph);
     }
 }

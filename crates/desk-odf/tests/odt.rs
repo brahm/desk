@@ -4,11 +4,12 @@
 //! Reading and writing text documents.
 
 use desk_odf::{
-    Background, Border, BorderLine, Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line,
-    LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, OdfError,
-    PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop,
-    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings, TextShadow,
-    TextTransform, read_odt, read_streams, write_odt, write_odt_with_thumbnail,
+    Background, Border, BorderLine, Break, Color, Family, Field, HeaderFooter, HeaderFooterStyle,
+    LINE_BREAK, LeaderStyle, Length, Line, LineColor, LineHeight, ListLabel, ListLevelStyle,
+    ListMember, ListStyle, MasterPage, Meta, OdfError, PageLayout, Paragraph, ParagraphProperties,
+    Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument,
+    TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, read_odt, read_streams,
+    write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -41,6 +42,14 @@ fn span(style: Option<&str>, text: &str) -> Span {
     Span {
         style: style.map(str::to_owned),
         text: text.to_owned(),
+        field: None,
+    }
+}
+
+fn field(field: Field, text: &str) -> Span {
+    Span {
+        field: Some(field),
+        ..span(None, text)
     }
 }
 
@@ -251,6 +260,14 @@ fn full_document() -> TextDocument {
             margin_bottom: Some(Length(54.0)),
             margin_left: Some(Length(90.0)),
             margin_right: Some(Length(36.0)),
+            header: Some(HeaderFooterStyle {
+                min_height: Some(Length(24.0)),
+                spacing: Some(Length(6.0)),
+            }),
+            footer: Some(HeaderFooterStyle {
+                min_height: Some(Length(18.0)),
+                spacing: None,
+            }),
             ..PageLayout::default()
         },
         body: vec![
@@ -330,6 +347,55 @@ fn full_document() -> TextDocument {
         automatic_list_styles: Vec::new(),
         pictures: vec![("Pictures/bullet1.png".into(), b"\x89PNG picture".to_vec())],
         section_styles: Vec::new(),
+        master: MasterPage {
+            header: Some(HeaderFooter {
+                display: true,
+                paragraphs: vec![Paragraph {
+                    style: Some("MP1".into()),
+                    spans: vec![span(None, "Página "), field(Field::PageNumber, "1")],
+                    ..Paragraph::default()
+                }],
+            }),
+            header_left: Some(HeaderFooter {
+                display: true,
+                paragraphs: vec![Paragraph {
+                    style: Some("Body".into()),
+                    spans: vec![field(Field::FileName, "notas.odt")],
+                    ..Paragraph::default()
+                }],
+            }),
+            footer: Some(HeaderFooter {
+                display: false,
+                paragraphs: vec![Paragraph {
+                    style: Some("Body".into()),
+                    spans: vec![
+                        field(Field::PageCount, "3"),
+                        span(None, " "),
+                        field(
+                            Field::Date {
+                                pattern: Some("d/M/y".into()),
+                            },
+                            "1/11/2026",
+                        ),
+                    ],
+                    ..Paragraph::default()
+                }],
+            }),
+            ..MasterPage::default()
+        },
+        master_styles: vec![Style {
+            name: "MP1".into(),
+            family: Family::Paragraph,
+            parent: Some("Body".into()),
+            properties: Properties {
+                paragraph: ParagraphProperties {
+                    align: Some(TextAlign::Center),
+                    ..ParagraphProperties::default()
+                },
+                ..Properties::default()
+            },
+            ..Style::default()
+        }],
         tabs_relative_to_indent: None,
         text_settings: TextSettings {
             hyphenation: Some(false),
@@ -709,10 +775,7 @@ fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
     ];
     let text = |t: &str, section: Option<&str>| Paragraph {
         section: section.map(str::to_owned),
-        spans: vec![Span {
-            style: None,
-            text: t.into(),
-        }],
+        spans: vec![span(None, t)],
         ..Paragraph::default()
     };
     let body = vec![

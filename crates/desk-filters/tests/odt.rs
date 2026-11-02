@@ -496,14 +496,17 @@ fn foreign() -> odf::TextDocument {
                     odf::Span {
                         style: None,
                         text: "bold, right".into(),
+                        field: None,
                     },
                     odf::Span {
                         style: Some("T1".into()),
                         text: "raised".into(),
+                        field: None,
                     },
                     odf::Span {
                         style: Some("missing".into()),
                         text: " unknown style".into(),
+                        field: None,
                     },
                 ],
             },
@@ -560,7 +563,15 @@ fn fmt_files_from_other_programs_map_to_styles_and_direct_formatting() {
 fn an_empty_file_gives_one_empty_paragraph() {
     let document = import(&odf::TextDocument::default()).unwrap();
     assert_eq!(document.body().len(), 1);
-    assert_eq!(document.page_setup(), &PageSetup::a4());
+    // A file without a header or a footer has none to show.
+    assert_eq!(
+        document.page_setup(),
+        &PageSetup {
+            headers: false,
+            footers: false,
+            ..PageSetup::a4()
+        }
+    );
 }
 
 /// Found by the fuzzer: without a `Standard` style, a style named like the

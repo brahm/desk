@@ -312,6 +312,18 @@ impl Edit {
         Ok(())
     }
 
+    /// Sets the text of a header or a footer.
+    pub fn set_header_footer(
+        &mut self,
+        place: crate::MarginPlace,
+        paragraphs: Vec<crate::Paragraph>,
+    ) -> Result<(), ModelError> {
+        if self.doc.headers_footers().get(place) != paragraphs.as_slice() {
+            self.apply(Op::SetHeaderFooter { place, paragraphs })?;
+        }
+        Ok(())
+    }
+
     /// Sets the settings of the text of the whole document.
     pub fn set_text_settings(&mut self, settings: TextSettings) -> Result<(), ModelError> {
         if &settings != self.doc.text_settings() {

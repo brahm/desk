@@ -7,6 +7,7 @@ use std::ops::Range;
 
 use crate::document::{Metadata, PageSetup, TextSettings};
 use crate::format::ParaAttrs;
+use crate::header::MarginPlace;
 use crate::id::NodeId;
 use crate::style::{Style, StyleId};
 use crate::text::{Paragraph, Run};
@@ -72,6 +73,13 @@ pub enum Op {
     SetPageSetup {
         /// The page setup.
         page: PageSetup,
+    },
+    /// Sets the text of a header or a footer (EST-12, EST-19).
+    SetHeaderFooter {
+        /// The header or footer.
+        place: MarginPlace,
+        /// Its paragraphs; none to empty it.
+        paragraphs: Vec<Paragraph>,
     },
     /// Sets the information about the document.
     SetMetadata {
