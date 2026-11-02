@@ -407,9 +407,18 @@ impl StylesDrawer {
                 });
                 this.report(&tr("Cannot Redefine the Style"), result);
             }),
-            ("revert", |this, editor, _| {
+            ("revert", |this, editor, id| {
                 let result = editor.style_edit(&tr("Revert to Defined Style"), |edit, from, to| {
-                    edit.revert_to_style(from, to)
+                    let list = edit
+                        .document()
+                        .styles()
+                        .get(id)
+                        .is_some_and(|s| s.family() == desk_model::StyleFamily::List);
+                    if list {
+                        edit.revert_to_list_style(from, to)
+                    } else {
+                        edit.revert_to_style(from, to)
+                    }
                 });
                 this.report(&tr("Cannot Revert to the Style"), result);
             }),
@@ -759,7 +768,9 @@ impl StylesDrawer {
                 list_row = Some(row.row.clone());
             }
             row.arrow.set_visible(
-                (is_paragraph && overrides.paragraph) || (is_character && overrides.character),
+                (is_paragraph && overrides.paragraph)
+                    || (is_character && overrides.character)
+                    || (Some(row.id) == list && overrides.list),
             );
         }
         self.paragraphs.select_row(paragraph_row.as_ref());

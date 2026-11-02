@@ -431,6 +431,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         list_style: None,
         list_level: None,
         list_start: None,
+        list_override: None,
     }
 }
 
@@ -839,12 +840,20 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // List styles, which paragraph styles name. Automatic ones take the
     // style with the same levels, or come in as new styles.
     let mut lists: HashMap<&str, StyleId> = HashMap::new();
-    for (automatic, style) in source
-        .list_styles
+    // The automatic list styles that only items override their list
+    // with: their levels go on the items.
+    let overriding: HashSet<&str> = source
+        .body
         .iter()
-        .map(|s| (false, s))
-        .chain(source.automatic_list_styles.iter().map(|s| (true, s)))
-    {
+        .filter_map(|p| p.list.as_ref()?.style_override.as_deref())
+        .collect();
+    for (automatic, style) in source.list_styles.iter().map(|s| (false, s)).chain(
+        source
+            .automatic_list_styles
+            .iter()
+            .filter(|s| !overriding.contains(s.name.as_str()))
+            .map(|s| (true, s)),
+    ) {
         let levels = list_levels(style);
         if levels.iter().all(|l| !l.label.is_some()) {
             continue;
@@ -1031,6 +1040,20 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 attrs.list_start = Some(Some(start));
             } else if restart && let Some(style) = styles.list(list) {
                 attrs.list_start = Some(Some(style.level(member.level).start));
+            }
+            if let Some(own) = member.style_override.as_deref().and_then(|name| {
+                source
+                    .automatic_list_styles
+                    .iter()
+                    .chain(&source.list_styles)
+                    .find(|s| s.name == name)
+            }) && let Some(style) = styles.list(list)
+            {
+                let level = usize::from(member.level).min(LIST_LEVELS - 1);
+                let own = list_levels(own)[level].clone();
+                if own.label.is_some() && &own != style.level(member.level) {
+                    attrs.list_override = Some(Some(std::sync::Arc::new(own)));
+                }
             }
             listed.insert(list);
             built = Paragraph::from_runs(
@@ -1380,12 +1403,16 @@ pub fn export(document: &Document) -> odf::TextDocument {
     let items = styles.list_items(document.body().iter());
     let mut listed: HashSet<StyleId> = HashSet::new();
     let mut previous: Option<StyleId> = None;
+    // The automatic list styles of the items with levels of their own.
+    let mut overrides: HashMap<[ListLevel; LIST_LEVELS], String> = HashMap::new();
     for (paragraph, item) in document.body().iter().zip(&items) {
         let style_name = names[&paragraph.style()].clone();
-        // The level and the start of an item are in the list elements.
+        // The level, the start and the level of its own of an item are
+        // in the list elements.
         let own = ParaAttrs {
             list_level: None,
             list_start: None,
+            list_override: None,
             ..paragraph.attrs().clone()
         };
         let style = if own.is_empty() {
@@ -1443,10 +1470,39 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let list = item.as_ref().map(|item| {
             let first = previous != Some(item.style);
             let start = paragraph.attrs().list_start.flatten();
+            let style_override =
+                paragraph
+                    .attrs()
+                    .list_override
+                    .clone()
+                    .flatten()
+                    .and_then(|own| {
+                        let style = styles.list(item.style)?;
+                        let mut levels = (*style.levels).clone();
+                        levels[usize::from(item.level)] = (*own).clone();
+                        let key = levels.clone();
+                        let count = overrides.len();
+                        let name = overrides
+                            .entry(key)
+                            .or_insert_with(|| {
+                                let name = format!("LO{}", count + 1);
+                                out.automatic_list_styles.push(odf_list_style(
+                                    &ListStyle {
+                                        levels: levels.into(),
+                                        ..style.clone()
+                                    },
+                                    name.clone(),
+                                ));
+                                name
+                            })
+                            .clone();
+                        Some(name)
+                    });
             let member = odf::ListMember {
                 style: names[&item.style].clone(),
                 level: item.level,
                 start,
+                style_override,
                 first,
                 continues: first && start.is_none() && listed.contains(&item.style),
             };

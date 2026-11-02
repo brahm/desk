@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::list::ListLevel;
 use crate::style::StyleId;
 use crate::units::{Length, Rgba};
 
@@ -712,6 +713,11 @@ formatting! {
         /// The number that the item takes, where its list starts again,
         /// instead of the one after the item before it (LST-04).
         list_start: Option<u32> = None,
+        /// The level of the list that the item has instead of the one of
+        /// its list style (LST-03): what the bullets and numbering of the
+        /// Inspector change for the selected items, until the list style
+        /// is redefined from them.
+        list_override: Option<Arc<ListLevel>> = None,
         /// Whether words break with a hyphen at the ends of lines, by the
         /// patterns of their language (TXT-09).
         hyphenate: bool = false,

@@ -331,7 +331,11 @@ impl Numbering {
         let id = format.list_style?;
         let style = styles.list(id)?;
         let level = usize::from(format.list_level).min(LIST_LEVELS - 1);
-        let definition = style.levels[level].clone();
+        let definition = format
+            .list_override
+            .as_deref()
+            .unwrap_or(&style.levels[level])
+            .clone();
         if !definition.label.is_some() {
             return None;
         }
@@ -604,16 +608,32 @@ impl Edit {
                 index += 1;
             }
         }
-        let levels: Vec<(NodeId, u8)> = ids
+        let levels: Vec<(NodeId, u8, Option<Option<Arc<ListLevel>>>)> = ids
             .iter()
             .map(|&id| {
-                let level = format(document.paragraph(id).expect("found above")).list_level;
-                let new = (i32::from(level) + by).clamp(0, LIST_LEVELS as i32 - 1) as u8;
-                (id, new)
+                let f = format(document.paragraph(id).expect("found above"));
+                let new = (i32::from(f.list_level) + by).clamp(0, LIST_LEVELS as i32 - 1) as u8;
+                // An item with a level of its own keeps its label, at the
+                // indents of the level it goes to.
+                let moved = f.list_override.as_ref().and_then(|own| {
+                    let style = styles.list(f.list_style?)?;
+                    let to = style.level(new);
+                    Some(Arc::new(ListLevel {
+                        label_indent: to.label_indent,
+                        text_indent: to.text_indent,
+                        ..(**own).clone()
+                    }))
+                });
+                (id, new, moved.map(Some))
             })
             .collect();
-        for (id, level) in levels {
-            self.set_list_attrs(id, |attrs| attrs.list_level = Some(level))?;
+        for (id, level, moved) in levels {
+            self.set_list_attrs(id, |attrs| {
+                attrs.list_level = Some(level);
+                if moved.is_some() {
+                    attrs.list_override = moved;
+                }
+            })?;
         }
         Ok(())
     }
@@ -626,6 +646,80 @@ impl Edit {
         start: Option<u32>,
     ) -> Result<(), ModelError> {
         self.set_list_attrs(paragraph, |attrs| attrs.list_start = start.map(Some))
+    }
+
+    /// Changes the levels of the items between two positions, each from the
+    /// level it has, as the bullets and numbering of the Inspector do
+    /// (LST-03 to LST-05): the items get levels of their own over their
+    /// list style, which [`Edit::redefine_list_style`] takes into it. An
+    /// item whose level comes back to the one of its style loses its own.
+    pub fn change_list_items(
+        &mut self,
+        start: Position,
+        end: Position,
+        change: impl Fn(&mut ListLevel),
+    ) -> Result<(), ModelError> {
+        for id in self.paragraph_ids(start, end)? {
+            let document = self.document();
+            let styles = document.styles();
+            let p = document.paragraph(id)?;
+            let format = styles.resolve_paragraph(p.style(), p.attrs());
+            let Some(style) = format.list_style.and_then(|id| styles.list(id)) else {
+                continue;
+            };
+            let defined = style.level(format.list_level).clone();
+            if !defined.label.is_some() {
+                continue;
+            }
+            let mut level = format.list_override.as_deref().unwrap_or(&defined).clone();
+            change(&mut level);
+            let own = (level != defined).then(|| Arc::new(level));
+            self.set_list_attrs(id, |attrs| {
+                attrs.list_override = own.map(Some);
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Takes the level of its own of the item at a position into its list
+    /// style: Redefine List Style from Selection (STY-06). The items
+    /// between the positions with that style and level lose their own.
+    pub fn redefine_list_style(
+        &mut self,
+        start: Position,
+        end: Position,
+    ) -> Result<(), ModelError> {
+        let document = self.document();
+        let styles = document.styles();
+        let p = document.paragraph(start.paragraph)?;
+        let format = styles.resolve_paragraph(p.style(), p.attrs());
+        let (Some(style), Some(own)) = (format.list_style, format.list_override.clone()) else {
+            return Ok(());
+        };
+        let level = format.list_level;
+        self.set_list_level(style, usize::from(level), (*own).clone())?;
+        for id in self.paragraph_ids(start, end)? {
+            let document = self.document();
+            let p = document.paragraph(id)?;
+            let f = document.styles().resolve_paragraph(p.style(), p.attrs());
+            if f.list_style == Some(style) && f.list_level == level {
+                self.set_list_attrs(id, |attrs| attrs.list_override = None)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Takes the levels of their own from the items between two positions:
+    /// Revert to Defined Style for a list style (STY-06).
+    pub fn revert_to_list_style(
+        &mut self,
+        start: Position,
+        end: Position,
+    ) -> Result<(), ModelError> {
+        for id in self.paragraph_ids(start, end)? {
+            self.set_list_attrs(id, |attrs| attrs.list_override = None)?;
+        }
+        Ok(())
     }
 
     /// Changes a level of a list style, for every list with the style

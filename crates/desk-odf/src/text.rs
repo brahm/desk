@@ -552,6 +552,9 @@ pub struct ListMember {
     pub level: u8,
     /// `text:start-value` of the list item.
     pub start: Option<u32>,
+    /// `text:style-override` of the list item: a list style whose level
+    /// the item has instead of the one of its list.
+    pub style_override: Option<String>,
     /// Whether it is the first item of its outermost `text:list`.
     pub first: bool,
     /// `text:continue-numbering` of its outermost `text:list`: whether

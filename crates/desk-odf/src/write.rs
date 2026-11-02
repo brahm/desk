@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use crate::ns;
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, ListLabel, ListStyle, Meta, PageLayout, Paragraph, ParagraphProperties, Properties,
-    Style, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow,
+    LineHeight, ListLabel, ListMember, ListStyle, Meta, PageLayout, Paragraph, ParagraphProperties,
+    Properties, Style, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow,
     TextTransform,
 };
 use crate::units::{Length, decimal};
@@ -308,17 +308,20 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
         }
         let depth = usize::from(member.level) + 1;
         close_to(w, &mut open, depth);
-        let start_item = |w: &mut Writer, start: Option<u32>| {
+        let start_item = |w: &mut Writer, item: Option<&ListMember>| {
             w.start("text:list-item");
-            if let Some(start) = start {
+            if let Some(start) = item.and_then(|m| m.start) {
                 w.attr("text:start-value", &start.to_string());
+            }
+            if let Some(style) = item.and_then(|m| m.style_override.as_deref()) {
+                w.attr("text:style-override", style);
             }
         };
         if open.len() == depth {
             if open[depth - 1] {
                 w.end();
             }
-            start_item(w, member.start);
+            start_item(w, Some(member));
             open[depth - 1] = true;
         }
         while open.len() < depth {
@@ -330,7 +333,7 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
             w.start("text:list");
             open.push(false);
             if open.len() == depth {
-                start_item(w, member.start);
+                start_item(w, Some(member));
                 open[depth - 1] = true;
             }
         }

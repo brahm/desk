@@ -53,6 +53,7 @@ fn item(level: u8, start: Option<u32>, first: bool, continues: bool) -> Paragrap
             style: "Bullets".into(),
             level,
             start,
+            style_override: None,
             first,
             continues,
         }),

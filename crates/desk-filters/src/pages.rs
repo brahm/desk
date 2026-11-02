@@ -414,6 +414,7 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
         list_style: None,
         list_level: None,
         list_start: None,
+        list_override: None,
     }
 }
 

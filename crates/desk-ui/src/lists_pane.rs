@@ -7,8 +7,9 @@
 //! the indents, size, position and color of the labels.
 //!
 //! The kind of list chooses a list style of Pages for the selection. The
-//! other rows change the level of its list style, and so every list with
-//! that style.
+//! other rows change the level of the selected items over their list
+//! style, as Pages does, which shows the style with a red arrow in the
+//! Styles drawer until it is redefined from the selection.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -143,8 +144,9 @@ pub struct ListsGroup {
     scale: adw::SwitchRow,
     raise: adw::SpinRow,
     color: ColorRow,
-    /// The list style and the level shown, which the rows change.
-    shown: RefCell<Option<(ListStyle, u8)>>,
+    /// The list style and the level shown, which the rows change, and
+    /// the definition of the level that the item has.
+    shown: RefCell<Option<(ListStyle, u8, ListLevel)>>,
     units: Cell<Units>,
     editor: EditorOf,
     updating: Cell<bool>,
@@ -245,7 +247,7 @@ impl ListsGroup {
         let weak = Rc::downgrade(self);
         self.level.connect_value_notify(move |row| {
             let Some(this) = weak.upgrade() else { return };
-            let shown = this.shown.borrow().as_ref().map(|(_, level)| *level);
+            let shown = this.shown.borrow().as_ref().map(|(_, level, _)| *level);
             if let Some(level) = shown
                 && !this.updating.get()
                 && let Some(editor) = (this.editor)()
@@ -346,7 +348,7 @@ impl ListsGroup {
             return;
         };
         let shown = self.shown.borrow().clone();
-        if let Some((list, level)) = &shown
+        if let Some((list, level, _)) = &shown
             && Kind::of(list, *level) == kind
         {
             return;
@@ -365,25 +367,24 @@ impl ListsGroup {
         }
     }
 
-    /// Changes the level shown of the list style shown, for every list
-    /// with the style.
-    fn edit_level(&self, name: &str, change: impl FnOnce(&mut ListLevel)) {
+    /// Changes the levels of the selected items over their list style.
+    fn edit_level(&self, name: &str, change: impl Fn(&mut ListLevel)) {
         if self.updating.get() {
             return;
         }
-        let Some((list, level)) = self.shown.borrow().clone() else {
+        let Some((_, _, definition)) = self.shown.borrow().clone() else {
             return;
         };
         let Some(editor) = (self.editor)() else {
             return;
         };
-        let mut definition = list.level(level).clone();
-        change(&mut definition);
-        if &definition == list.level(level) {
+        let mut changed = definition.clone();
+        change(&mut changed);
+        if changed == definition {
             return;
         }
-        let result = editor.style_edit(name, |edit, _, _| {
-            edit.set_list_level(list.id, usize::from(level), definition)
+        let result = editor.style_edit(name, |edit, from, to| {
+            edit.change_list_items(from, to, &change)
         });
         if let Err(error) = result {
             glib::g_warning!("desk", "cannot change the list: {error}");
@@ -420,8 +421,8 @@ impl ListsGroup {
         tab_stops::set_units(&self.text_indent, units, 0.0, 1584.0);
         self.updating.set(false);
         let shown = self.shown.borrow().clone();
-        if let Some((list, level)) = shown {
-            self.show_level(&list, level);
+        if let Some((_, level, definition)) = shown {
+            self.show_level(&definition, level);
         }
     }
 
@@ -448,8 +449,14 @@ impl ListsGroup {
         self.updating.set(false);
         match list {
             Some(list) => {
-                *self.shown.borrow_mut() = Some((list.clone(), paragraph.list_level));
-                self.show_level(&list, paragraph.list_level);
+                let level = paragraph.list_level;
+                let definition = paragraph
+                    .list_override
+                    .as_deref()
+                    .unwrap_or(list.level(level))
+                    .clone();
+                self.show_level(&definition, level);
+                *self.shown.borrow_mut() = Some((list, level, definition));
                 if let Some(start) = paragraph.list_start {
                     self.updating.set(true);
                     self.start.set_value(f64::from(start));
@@ -482,12 +489,11 @@ impl ListsGroup {
         ]
     }
 
-    fn show_level(&self, list: &ListStyle, level: u8) {
+    fn show_level(&self, definition: &ListLevel, level: u8) {
         self.updating.set(true);
         for row in self.rows() {
             row.set_visible(true);
         }
-        let definition = list.level(level);
         let set = |row: &adw::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
