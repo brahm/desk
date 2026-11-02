@@ -226,7 +226,8 @@ def main():
             "the effects in the Inspector",
             lambda: showing(find_named(app, "Character Spacing"))
             and showing(find_named(app, "Borders and Rules"))
-            and showing(find_named(app, "Hyphenate Words")),
+            and showing(find_named(app, "Hyphenate Words"))
+            and showing(find_named(app, "Hyphenate the Document")),
         )
         check("the Inspector shows spacing, hyphenation, borders and rules", True)
         press("ctrl+alt+i")

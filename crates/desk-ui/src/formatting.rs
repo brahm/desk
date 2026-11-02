@@ -351,6 +351,9 @@ pub struct Inspector {
     right: adw::SpinRow,
     /// Whether words break with hyphens (TXT-09).
     hyphenate: adw::SwitchRow,
+    /// Whether the document is hyphenated and has ligatures at all.
+    document_hyphenation: adw::SwitchRow,
+    document_ligatures: adw::SwitchRow,
     tabs: Rc<TabStopsGroup>,
     lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
@@ -453,6 +456,19 @@ impl Inspector {
             .title(tr("Hyphenation"))
             .build();
         hyphenation.add(&hyphenate);
+        let document_hyphenation = adw::SwitchRow::builder()
+            .title(tr("Hyphenate the Document"))
+            .subtitle(tr("In every paragraph that allows it"))
+            .build();
+        let document_ligatures = adw::SwitchRow::builder()
+            .title(tr("Use Ligatures"))
+            .subtitle(tr("In the whole document"))
+            .build();
+        let document = adw::PreferencesGroup::builder()
+            .title(tr("Document"))
+            .build();
+        document.add(&document_hyphenation);
+        document.add(&document_ligatures);
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(18)
@@ -469,6 +485,7 @@ impl Inspector {
         for group in effects.groups() {
             content.append(group);
         }
+        content.append(&document);
         let root = gtk::ScrolledWindow::builder()
             .child(&content)
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -484,6 +501,8 @@ impl Inspector {
             left,
             right,
             hyphenate,
+            document_hyphenation,
+            document_ligatures,
             tabs,
             lists,
             effects,
@@ -515,6 +534,26 @@ impl Inspector {
                 );
             }
         });
+        for (row, hyphenation) in [
+            (&this.document_hyphenation, true),
+            (&this.document_ligatures, false),
+        ] {
+            let weak = Rc::downgrade(&this);
+            let editor = editor.clone();
+            row.connect_active_notify(move |row| {
+                let Some(this) = weak.upgrade() else { return };
+                if this.updating.get() {
+                    return;
+                }
+                let Some(editor) = editor() else { return };
+                let on = row.is_active();
+                if hyphenation {
+                    editor.change_text_settings("Hyphenation", |s| s.hyphenation = on);
+                } else {
+                    editor.change_text_settings("Ligatures", |s| s.ligatures = on);
+                }
+            });
+        }
         for (row, field) in [
             (&this.line_spacing, Field::LineSpacing),
             (&this.before, Field::Before),
@@ -596,6 +635,13 @@ impl Inspector {
         );
         if self.hyphenate.is_active() != paragraph.hyphenate {
             self.hyphenate.set_active(paragraph.hyphenate);
+        }
+        let settings = &format.text_settings;
+        if self.document_hyphenation.is_active() != settings.hyphenation {
+            self.document_hyphenation.set_active(settings.hyphenation);
+        }
+        if self.document_ligatures.is_active() != settings.ligatures {
+            self.document_ligatures.set_active(settings.ligatures);
         }
         self.updating.set(false);
         self.tabs.show(paragraph);

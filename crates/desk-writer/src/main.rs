@@ -6,6 +6,8 @@
 //! Desk Writer aims at feature parity and document compatibility with Pages
 //! '09, and saves documents as ODF text documents.
 
+mod warnings;
+
 use std::path::Path;
 
 use desk_ui::gtk::glib;
@@ -54,7 +56,7 @@ fn open(path: &Path) -> Result<Opened, String> {
                 desk_filters::read_pages_at_logged(path).map_err(|e| e.to_string())?;
             Ok(Opened {
                 document,
-                warnings: log.entries().iter().map(|e| format!("{e}.")).collect(),
+                warnings: log.entries().iter().map(warnings::describe).collect(),
             })
         }
         _ => Err(tr(
