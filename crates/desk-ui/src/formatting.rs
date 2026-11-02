@@ -18,6 +18,7 @@ use desk_model::{Alignment, CharAttrs, Length, LineSpacing, ParaAttrs, Rgba, Sty
 use gtk::{gdk, glib};
 
 use crate::editing::{Format, TextEditor};
+use crate::effects::Effects;
 use crate::i18n::{n_, tr};
 use crate::preferences::{self, Units};
 use crate::tab_stops::{self, TabStopsGroup};
@@ -331,6 +332,7 @@ pub struct Inspector {
     left: adw::SpinRow,
     right: adw::SpinRow,
     tabs: Rc<TabStopsGroup>,
+    effects: Rc<Effects>,
     /// The units of the indents, those of the rulers.
     units: Cell<Units>,
     /// The paragraph format shown, to show again in other units.
@@ -407,6 +409,7 @@ impl Inspector {
         let left = row(&tr("Left"), "", 0.0, 1.0, 1.0, 0);
         let right = row(&tr("Right"), "", 0.0, 1.0, 1.0, 0);
         let tabs = TabStopsGroup::new(editor.clone(), units);
+        let effects = Effects::new(editor.clone());
 
         let spacing = adw::PreferencesGroup::builder()
             .title(tr("Spacing"))
@@ -431,6 +434,9 @@ impl Inspector {
         content.append(&spacing);
         content.append(&indents);
         content.append(tabs.widget());
+        for group in effects.groups() {
+            content.append(group);
+        }
         let root = gtk::ScrolledWindow::builder()
             .child(&content)
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -446,6 +452,7 @@ impl Inspector {
             left,
             right,
             tabs,
+            effects,
             units: Cell::new(units),
             shown: RefCell::new(None),
             updating: Cell::new(false),
@@ -537,6 +544,7 @@ impl Inspector {
         );
         self.updating.set(false);
         self.tabs.show(paragraph);
+        self.effects.show(&format.character, paragraph);
     }
 }
 

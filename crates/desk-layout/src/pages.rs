@@ -3,7 +3,7 @@
 
 //! The pages of a word processing document.
 
-use desk_model::{Document, PageSetup, ParaFormat};
+use desk_model::{Document, PageSetup, ParaBorder, ParaFormat, Rgba};
 use desk_text::{Column, Line, ParagraphText, TextSystem};
 
 /// How much a line may stick out of the bottom of the body and still
@@ -42,11 +42,51 @@ impl PlacedLine {
     }
 }
 
+/// The part of a paragraph on a page, for what is drawn behind and around
+/// its text: its background and its rules or border (FMT-20, FMT-21).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlacedBlock {
+    /// The index of the paragraph in the body.
+    pub paragraph: usize,
+    /// The top of the part, above the space of a rule above.
+    pub top: f32,
+    /// The top of the first line.
+    pub text_top: f32,
+    /// The bottom of the last line.
+    pub text_bottom: f32,
+    /// The bottom of the part, below the space of a rule below.
+    pub bottom: f32,
+    /// The left edge of the text column.
+    pub left: f32,
+    /// The right edge of the text column.
+    pub right: f32,
+    /// Whether the paragraph starts in this part, which then has the rule
+    /// above.
+    pub first: bool,
+    /// Whether the paragraph ends in this part, which then has the rule
+    /// below.
+    pub last: bool,
+    /// The color behind the paragraph.
+    pub background: Option<Rgba>,
+    /// The rules or border.
+    pub border: ParaBorder,
+}
+
+impl PlacedBlock {
+    /// Whether anything is drawn for it.
+    pub fn is_visible(&self) -> bool {
+        self.background.is_some() || self.border.sides != desk_model::BorderSides::None
+    }
+}
+
 /// One page.
 #[derive(Clone, Debug, Default)]
 pub struct Page {
     /// The lines on the page, from top to bottom.
     pub lines: Vec<PlacedLine>,
+    /// The parts of paragraphs on the page that have a background or a
+    /// border, from top to bottom.
+    pub blocks: Vec<PlacedBlock>,
 }
 
 /// A word processing document laid out on pages.
@@ -84,6 +124,26 @@ struct Block {
 }
 
 impl Block {
+    /// The space that the rule above takes, if there is one.
+    fn above(&self) -> f32 {
+        let border = &self.format.border;
+        if border.sides.above() {
+            border.space().to_pt() as f32
+        } else {
+            0.0
+        }
+    }
+
+    /// The space that the rule below takes, if there is one.
+    fn below(&self) -> f32 {
+        let border = &self.format.border;
+        if border.sides.below() {
+            border.space().to_pt() as f32
+        } else {
+            0.0
+        }
+    }
+
     /// The height of lines `a..b`.
     fn height(&self, a: usize, b: usize) -> f32 {
         if a >= b {
@@ -134,6 +194,9 @@ impl Cursor {
 ///   next page, unless it is taller than a page (EST-05).
 /// - Widow control leaves at least two lines of a paragraph at the bottom
 ///   of a page and at the top of the next (EST-05).
+/// - A rule above a paragraph takes its offset and width between the
+///   space above and the text, and a rule below as much under the text,
+///   as in Pages (FMT-21). A border takes both.
 /// - Keeping a paragraph with the next one moves the paragraph, and any
 ///   paragraphs kept with it before, to the next page when the next one
 ///   would start on another page (EST-05). A chain that starts at the top
@@ -190,11 +253,13 @@ pub fn paginate_texts(
         let mut a = 0;
         while a < n {
             let at_top = cursor.at_top(&pages);
-            let space = if a > 0 || at_top {
+            let collapsed = if a > 0 || at_top {
                 0.0
             } else {
                 cursor.after.max(before)
             };
+            let above = if a == 0 { block.above() } else { 0.0 };
+            let space = collapsed + above;
             let room = body - cursor.y - space;
             let rest = n - a;
             let mut k = block.fitting(a, room);
@@ -234,7 +299,25 @@ pub fn paginate_texts(
                     origin: (left, dy),
                 });
             }
-            cursor.y += space + block.height(a, a + k);
+            let last = a + k == n;
+            let below = if last { block.below() } else { 0.0 };
+            let placed = PlacedBlock {
+                paragraph: i,
+                top: top + cursor.y + collapsed,
+                text_top: top + cursor.y + space,
+                text_bottom: top + cursor.y + space + block.height(a, a + k),
+                bottom: top + cursor.y + space + block.height(a, a + k) + below,
+                left,
+                right: left + column.width,
+                first: a == 0,
+                last,
+                background: format.background,
+                border: format.border,
+            };
+            if placed.is_visible() {
+                pages[cursor.page].blocks.push(placed);
+            }
+            cursor.y += space + block.height(a, a + k) + below;
             a += k;
             if a < n {
                 new_page(&mut pages, &mut cursor);
@@ -256,6 +339,7 @@ pub fn paginate_texts(
                 forced[start] = true;
                 pages.truncate(page_count);
                 pages[saved.page].lines.truncate(line_count);
+                pages[saved.page].blocks.retain(|b| b.paragraph < start);
                 cursor = saved;
                 i = start;
                 continue;

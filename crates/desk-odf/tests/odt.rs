@@ -4,10 +4,10 @@
 //! Reading and writing text documents.
 
 use desk_odf::{
-    Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line, LineColor, LineHeight, Meta,
-    OdfError, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TabStop,
-    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextTransform, read_odt,
-    read_streams, write_odt, write_odt_with_thumbnail,
+    Background, Border, BorderLine, Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line,
+    LineColor, LineHeight, Meta, OdfError, PageLayout, Paragraph, ParagraphProperties, Properties,
+    Span, Style, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    TextShadow, TextTransform, read_odt, read_streams, write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -153,6 +153,18 @@ fn full_document() -> TextDocument {
                     paragraph: ParagraphProperties {
                         line_height: Some(LineHeight::Exactly(Length(14.5))),
                         line_spacing: Some(Length(3.0)),
+                        background: Some(Background::Color(Color {
+                            r: 255,
+                            g: 255,
+                            b: 117,
+                        })),
+                        border_top: Some(Border::Line {
+                            width: Length(1.0),
+                            style: BorderLine::Dashed,
+                            color: Color { r: 0, g: 0, b: 0 },
+                        }),
+                        border_bottom: Some(Border::None),
+                        padding_top: Some(Length(6.0)),
                         ..ParagraphProperties::default()
                     },
                     ..Properties::default()
@@ -172,6 +184,19 @@ fn full_document() -> TextDocument {
                         position_scale: Some(66.0),
                         transform: Some(TextTransform::Uppercase),
                         small_caps: Some(true),
+                        letter_spacing: Some(Length(2.4)),
+                        outline: Some(true),
+                        shadow: Some(TextShadow::Shadow {
+                            dx: Length(2.0),
+                            dy: Length(3.464),
+                            blur: Some(Length(3.0)),
+                            color: Some(Color {
+                                r: 64,
+                                g: 64,
+                                b: 64,
+                            }),
+                        }),
+                        background: Some(Background::Transparent),
                         ..TextProperties::default()
                     },
                     ..Properties::default()
@@ -186,6 +211,8 @@ fn full_document() -> TextDocument {
                         position: Some(TextPosition::Percent(-15.0)),
                         line_through_color: Some(LineColor::FontColor),
                         font_size_percent: Some(80.0),
+                        letter_spacing: Some(Length(0.0)),
+                        shadow: Some(TextShadow::None),
                         ..TextProperties::default()
                     },
                     ..Properties::default()
@@ -414,6 +441,64 @@ fn font_families_are_css_lists() {
     });
     let read = read_odt(&write_odt(&written).unwrap()).unwrap();
     assert_eq!(read.automatic_styles, written.automatic_styles);
+}
+
+#[test]
+fn fmt_03_fmt_20_fmt_21_effects_read_as_other_programs_write_them() {
+    let document = read_streams(
+        &format!(
+            "{CONTENT_START}<office:automatic-styles>\
+             <style:style style:name=\"P1\" style:family=\"paragraph\">\
+             <style:paragraph-properties fo:border=\"0.06pt solid #000080\" fo:padding=\"0.2cm\" fo:border-left=\"none\" fo:background-color=\"transparent\"/>\
+             <style:text-properties fo:text-shadow=\"#808080 1pt 1pt\" fo:letter-spacing=\"-0.5pt\" style:text-outline=\"false\" fo:background-color=\"#ffff00\"/>\
+             </style:style>\
+             <style:style style:name=\"P2\" style:family=\"paragraph\">\
+             <style:paragraph-properties fo:border-bottom=\"thin dotted\"/>\
+             <style:text-properties fo:text-shadow=\"1pt\"/>\
+             </style:style>\
+             </office:automatic-styles><office:body><office:text/></office:body></office:document-content>"
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    let p1 = &document.style(Family::Paragraph, "P1").unwrap().properties;
+    let line = Border::Line {
+        width: Length(0.06),
+        style: BorderLine::Solid,
+        color: Color { r: 0, g: 0, b: 128 },
+    };
+    assert_eq!(p1.paragraph.border_top, Some(line));
+    assert_eq!(p1.paragraph.border_right, Some(line));
+    assert_eq!(p1.paragraph.border_left, Some(Border::None));
+    assert!((p1.paragraph.padding_bottom.unwrap().0 - 5.669).abs() < 0.01);
+    assert_eq!(p1.paragraph.background, Some(Background::Transparent));
+    assert_eq!(
+        p1.text.shadow,
+        Some(TextShadow::Shadow {
+            dx: Length(1.0),
+            dy: Length(1.0),
+            blur: None,
+            color: Some(Color {
+                r: 128,
+                g: 128,
+                b: 128
+            }),
+        })
+    );
+    assert_eq!(p1.text.letter_spacing, Some(Length(-0.5)));
+    assert_eq!(p1.text.outline, Some(false));
+    let p2 = &document.style(Family::Paragraph, "P2").unwrap().properties;
+    assert_eq!(
+        p2.paragraph.border_bottom,
+        Some(Border::Line {
+            width: Length(0.75),
+            style: BorderLine::Dotted,
+            color: Color { r: 0, g: 0, b: 0 },
+        })
+    );
+    // A shadow with one length does not parse.
+    assert_eq!(p2.text.shadow, None);
 }
 
 #[test]

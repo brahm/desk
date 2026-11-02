@@ -8,8 +8,8 @@
 use desk_filters::log::{Content, Formatting, Setting, Warning};
 use desk_filters::{read_pages, read_pages_logged};
 use desk_model::{
-    Alignment, Baseline, Capitalization, Document, LINE_BREAK, Length, LineSpacing, LineStyle,
-    Rgba, StyleFamily,
+    Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharFormat, Document,
+    LINE_BREAK, Length, Ligatures, LineSpacing, LineStyle, ParaFormat, Rgba, StyleFamily,
 };
 
 /// An index with a stylesheet and a body, in the namespaces of Pages.
@@ -220,10 +220,10 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
         r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-1"><sf:property-map><sf:listStyle><sf:liststyle-ref sfa:IDREF="L-1"/></sf:listStyle>{}</sf:property-map></sf:paragraphstyle>
 <sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-2"><sf:property-map><sf:listStyle><sf:liststyle-ref sfa:IDREF="L-0"/></sf:listStyle>{}{}<sf:textShadow><sf:null/></sf:textShadow></sf:property-map></sf:paragraphstyle>
 <sf:characterstyle sf:parent-ident="character-style-null" sfa:ID="A-3"><sf:property-map>{}</sf:property-map></sf:characterstyle>"#,
-        number("tracking", "0.1", "f"),
-        number("tracking", "0", "f"),
+        number("dropCap", "1", "i"),
+        number("dropCap", "0", "i"),
         number("ligatures", "1", "i"),
-        number("tracking", "0.2", "f"),
+        number("dropCap", "1", "i"),
     );
     let body = r#"<sf:p sf:style="A-1">Um item<sf:crbr/></sf:p>
 <sf:p sf:style="A-2">Nada perdido aqui<sf:crbr/></sf:p>
@@ -249,12 +249,12 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
             (Warning::Content(Content::FloatingObjects), 2),
             (Warning::Content(Content::InlineObjects), 2),
             (Warning::Formatting(Formatting::Lists), 1),
-            (Warning::Formatting(Formatting::CharacterSpacing), 2),
+            (Warning::Formatting(Formatting::DropCaps), 2),
         ]
     );
     assert_eq!(
         log.entries()[4].to_string(),
-        "Left out character spacing, in 2 paragraphs"
+        "Left out drop caps, in 2 paragraphs"
     );
     // The documents of the other tests lose nothing.
     let (_, log) = read_pages_logged(index(STYLES, "", BODY).as_bytes()).unwrap();
@@ -284,10 +284,6 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
             (Warning::Content(Content::Comments), 1),
             (Warning::Content(Content::Fields), 2),
             (Warning::Formatting(Formatting::Lists), 2),
-            (Warning::Formatting(Formatting::CharacterSpacing), 1),
-            (Warning::Formatting(Formatting::TextShadows), 1),
-            (Warning::Formatting(Formatting::ParagraphBackgrounds), 1),
-            (Warning::Formatting(Formatting::ParagraphBorders), 1),
         ]
     );
     // The text of the body is kept, without that of the footnote and the
@@ -424,4 +420,68 @@ fn doc_22_tracked_changes_and_bookmarks_keep_their_text() {
             .skip(1)
             .any(|p| p.attrs().page_break_before == Some(true))
     );
+}
+
+/// The formats of the paragraphs of a fixture saved by Pages, with those
+/// of their first runs.
+fn fixture_formats(name: &str) -> Vec<(String, ParaFormat, CharFormat)> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages")
+        .join(name);
+    let document = desk_filters::read_pages_at(&path).unwrap();
+    let styles = document.styles();
+    document
+        .body()
+        .iter()
+        .map(|p| {
+            let (style, attrs) = p.format_at(0);
+            (
+                p.text(),
+                styles.resolve_paragraph(p.style(), p.attrs()),
+                styles.resolve_character(p.style(), style, &attrs),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn fmt_03_fmt_04_fmt_09_fmt_10_effects_of_characters_are_read() {
+    let formats = fixture_formats("fmt-10-tracking.pages");
+    assert_eq!(formats[0].2.tracking, 200);
+    assert_eq!(formats[1].2.tracking, -50);
+    let formats = fixture_formats("fmt-09-ligatures.pages");
+    assert_eq!(formats[0].2.ligatures, Ligatures::All);
+    assert_eq!(formats[1].2.ligatures, Ligatures::None);
+    let formats = fixture_formats("fmt-03-04-shadow-outline.pages");
+    let shadow = formats[0].2.shadow.unwrap();
+    assert_eq!((shadow.angle, shadow.opacity), (300, 60));
+    assert_eq!(shadow.offset, Length::from_points(4));
+    assert_eq!(shadow.blur, Length::from_points(3));
+    assert!(!formats[0].2.outline);
+    assert!(formats[1].2.outline && formats[1].2.shadow.is_none());
+}
+
+#[test]
+fn fmt_20_fmt_21_backgrounds_and_borders_are_read() {
+    let formats = fixture_formats("fmt-20-backgrounds.pages");
+    let yellow = Rgba::rgb(255, 255, 117);
+    assert_eq!(formats[0].2.background, Some(yellow));
+    assert_eq!(formats[0].1.background, None);
+    assert_eq!(formats[1].1.background, Some(yellow));
+    let formats = fixture_formats("fmt-21-borders-rules.pages");
+    let sides: Vec<BorderSides> = formats.iter().map(|f| f.1.border.sides).collect();
+    assert_eq!(
+        sides,
+        [
+            BorderSides::Above,
+            BorderSides::Below,
+            BorderSides::AboveAndBelow,
+            BorderSides::Box,
+            BorderSides::Below,
+        ]
+    );
+    let dashed = formats[4].1.border;
+    assert_eq!(dashed.style, BorderStyle::Dashed);
+    assert_eq!(dashed.offset, Length::from_points(6));
+    assert_eq!(dashed.width, Length::from_points(1));
 }

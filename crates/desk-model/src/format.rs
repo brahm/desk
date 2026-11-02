@@ -164,6 +164,128 @@ impl Language {
     }
 }
 
+/// Which ligatures join letters (FMT-09).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Ligatures {
+    /// The ligatures the font makes by default, as fi and fl.
+    #[default]
+    Default,
+    /// No ligatures.
+    None,
+    /// Every ligature of the font, the rare ones included.
+    All,
+}
+
+/// A shadow under text (FMT-03).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Shadow {
+    /// The direction the shadow falls in, in degrees counterclockwise
+    /// from the right, as Pages measures it: 315 falls down and right.
+    pub angle: i32,
+    /// How far the shadow falls from the text.
+    pub offset: Length,
+    /// The radius of the blur.
+    pub blur: Length,
+    /// The opacity, in percent.
+    pub opacity: u8,
+    /// The color.
+    pub color: Rgba,
+}
+
+impl Shadow {
+    /// How far the shadow moves right and down, in points.
+    pub fn displacement(&self) -> (f64, f64) {
+        let angle = f64::from(self.angle).to_radians();
+        let offset = self.offset.to_pt();
+        (offset * angle.cos(), -offset * angle.sin())
+    }
+}
+
+impl Default for Shadow {
+    /// The shadow that the Fonts window turns on in Pages.
+    fn default() -> Self {
+        Self {
+            angle: 315,
+            offset: Length::from_points(4),
+            blur: Length::from_points(4),
+            opacity: 75,
+            color: Rgba::BLACK,
+        }
+    }
+}
+
+/// A feature of an OpenType font, such as old style figures or swashes
+/// (FMT-08).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FontFeature {
+    /// The tag, such as `onum`.
+    pub tag: [u8; 4],
+    /// The value: 0 turns the feature off, 1 on, and more chooses among
+    /// alternates.
+    pub value: u16,
+}
+
+impl FontFeature {
+    /// A feature from its tag, which must be four ASCII characters.
+    pub fn new(tag: &str, value: u16) -> Option<Self> {
+        let tag: [u8; 4] = tag.as_bytes().try_into().ok()?;
+        tag.iter()
+            .all(|b| b.is_ascii_graphic())
+            .then_some(Self { tag, value })
+    }
+
+    /// The tag, as text.
+    pub fn tag(&self) -> &str {
+        std::str::from_utf8(&self.tag).unwrap_or("????")
+    }
+}
+
+/// The features of a font that the text turns on or off, ordered by tag,
+/// one per tag (FMT-08).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct FontFeatures(Arc<[FontFeature]>);
+
+impl FontFeatures {
+    /// No features: the font as it is.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Features ordered by tag; of two with one tag, the last is kept.
+    pub fn new(features: impl IntoIterator<Item = FontFeature>) -> Self {
+        let mut features: Vec<FontFeature> = features.into_iter().collect();
+        features.reverse();
+        features.sort_by_key(|f| f.tag);
+        features.dedup_by_key(|f| f.tag);
+        Self(features.into())
+    }
+
+    /// The features, ordered by tag.
+    pub fn features(&self) -> &[FontFeature] {
+        &self.0
+    }
+
+    /// Whether there are none.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The value of a feature, if set.
+    pub fn get(&self, tag: &str) -> Option<u16> {
+        self.0.iter().find(|f| f.tag() == tag).map(|f| f.value)
+    }
+
+    /// These features with one set, in place of any with its tag.
+    pub fn with(&self, feature: FontFeature) -> Self {
+        Self::new(self.0.iter().copied().chain([feature]))
+    }
+
+    /// These features without one tag.
+    pub fn without(&self, tag: &str) -> Self {
+        Self::new(self.0.iter().copied().filter(|f| f.tag() != tag))
+    }
+}
+
 formatting! {
     /// Character attributes that a style or a run of text sets.
     attrs CharAttrs;
@@ -195,6 +317,20 @@ formatting! {
         capitalization: Capitalization = Capitalization::None,
         /// The language of the text (FMT-22).
         language: Language = Language::undetermined(),
+        /// The space added after each character, in thousandths of the
+        /// font size, as the tracking of Pages in percent times ten
+        /// (FMT-10). Negative values bring the letters closer.
+        tracking: i32 = 0,
+        /// Drawn as an outline, without a fill (FMT-04).
+        outline: bool = false,
+        /// A shadow under the text (FMT-03).
+        shadow: Option<Shadow> = None,
+        /// Which ligatures join letters (FMT-09).
+        ligatures: Ligatures = Ligatures::Default,
+        /// Features of the font turned on or off (FMT-08).
+        font_features: FontFeatures = FontFeatures::none(),
+        /// A color behind the text (FMT-20).
+        background: Option<Rgba> = None,
     }
 }
 
@@ -367,6 +503,95 @@ impl TabStops {
 /// The distance between the default tab stops of Pages, half an inch.
 pub const DEFAULT_TAB_INTERVAL: Length = Length::from_points(36);
 
+/// Which sides of a paragraph have a line (FMT-21).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum BorderSides {
+    /// None.
+    #[default]
+    None,
+    /// A rule above.
+    Above,
+    /// A rule below.
+    Below,
+    /// Rules above and below.
+    AboveAndBelow,
+    /// A border all around.
+    Box,
+}
+
+impl BorderSides {
+    /// Whether there is a line above.
+    pub fn above(self) -> bool {
+        matches!(self, Self::Above | Self::AboveAndBelow | Self::Box)
+    }
+
+    /// Whether there is a line below.
+    pub fn below(self) -> bool {
+        matches!(self, Self::Below | Self::AboveAndBelow | Self::Box)
+    }
+}
+
+/// How the line of a border is drawn (FMT-21).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum BorderStyle {
+    /// A solid line.
+    #[default]
+    Solid,
+    /// Dashes as long as twice the width, with gaps as long.
+    Dashed,
+    /// Dots as long as the width, with gaps as long.
+    Dotted,
+}
+
+impl BorderStyle {
+    /// The lengths of the dashes and gaps of a line `width` wide, empty
+    /// for a solid line.
+    pub fn dashes(self, width: f64) -> Vec<f64> {
+        match self {
+            Self::Solid => Vec::new(),
+            Self::Dashed => vec![2.0 * width, 2.0 * width],
+            Self::Dotted => vec![width, width],
+        }
+    }
+}
+
+/// The rules and border of a paragraph (FMT-21).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ParaBorder {
+    /// Which sides have a line.
+    pub sides: BorderSides,
+    /// The width of the line.
+    pub width: Length,
+    /// The color of the line.
+    pub color: Rgba,
+    /// How the line is drawn.
+    pub style: BorderStyle,
+    /// The distance between the line and the text.
+    pub offset: Length,
+}
+
+impl ParaBorder {
+    /// The space that a line takes on its side of the text: the offset
+    /// and the width.
+    pub fn space(&self) -> Length {
+        self.offset + self.width
+    }
+}
+
+impl Default for ParaBorder {
+    /// No lines; when one is turned on, a solid black line one point wide,
+    /// six points from the text, as in Pages.
+    fn default() -> Self {
+        Self {
+            sides: BorderSides::None,
+            width: Length::from_points(1),
+            color: Rgba::BLACK,
+            style: BorderStyle::Solid,
+            offset: Length::from_points(6),
+        }
+    }
+}
+
 formatting! {
     /// Paragraph attributes that a style or a paragraph sets.
     attrs ParaAttrs;
@@ -404,6 +629,10 @@ formatting! {
         /// The distance between the default tab stops, which tabs go to
         /// past the last stop (FMT-16).
         default_tab_interval: Length = DEFAULT_TAB_INTERVAL,
+        /// A color behind the paragraph, from margin to margin (FMT-20).
+        background: Option<Rgba> = None,
+        /// Rules above or below, or a border around (FMT-21).
+        border: ParaBorder = ParaBorder::default(),
     }
 }
 

@@ -8,9 +8,10 @@
 use desk_filters::odt::{export, import};
 use desk_filters::{read_odt, write_odt};
 use desk_model::{
-    Alignment, Baseline, Capitalization, CharAttrs, CharacterStyle, Document, LINE_BREAK, Language,
-    Length, LineColor, LineSpacing, LineStyle, Metadata, NO_BREAK_SPACE, Op, PageSetup, ParaAttrs,
-    Paragraph, ParagraphStyle, Rgba, Run, Style,
+    Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharacterStyle,
+    Document, FontFeature, FontFeatures, LINE_BREAK, Language, Length, Ligatures, LineColor,
+    LineSpacing, LineStyle, Metadata, NO_BREAK_SPACE, Op, PageSetup, ParaAttrs, ParaBorder,
+    Paragraph, ParagraphStyle, Rgba, Run, Shadow, Style,
 };
 use desk_odf as odf;
 
@@ -117,6 +118,9 @@ fn sample() -> Document {
                 font_size: Some(Length::from_points(18)),
                 bold: Some(true),
                 capitalization: Some(Capitalization::SmallCaps),
+                ligatures: Some(Ligatures::None),
+                font_features: Some(FontFeatures::new(FontFeature::new("onum", 1))),
+                tracking: Some(50),
                 ..CharAttrs::default()
             },
         })
@@ -231,9 +235,48 @@ fn sample() -> Document {
             ParaAttrs {
                 line_spacing: Some(LineSpacing::Between(Length::from_points(4))),
                 widow_control: Some(false),
+                background: Some(Some(Rgba::rgb(255, 255, 117))),
+                border: Some(ParaBorder {
+                    sides: BorderSides::Box,
+                    width: Length::from_points(2),
+                    color: Rgba::rgb(0, 0, 128),
+                    style: BorderStyle::Dashed,
+                    offset: Length::from_points(6),
+                }),
                 ..ParaAttrs::default()
             },
-            vec![Run::new("A quote.")],
+            vec![
+                Run::new("A quote, "),
+                Run::with_attrs(
+                    "shadowed and outlined",
+                    None,
+                    CharAttrs {
+                        outline: Some(true),
+                        shadow: Some(Some(Shadow {
+                            angle: 300,
+                            offset: Length::from_points(4),
+                            blur: Length::from_points(3),
+                            // ODF has no opacity.
+                            opacity: 100,
+                            color: Rgba::rgb(0x40, 0x40, 0x40),
+                        })),
+                        tracking: Some(-50),
+                        background: Some(Some(Rgba::rgb(0xc0, 0xff, 0xc0))),
+                        ..CharAttrs::default()
+                    },
+                ),
+                Run::with_attrs(
+                    " with rules",
+                    None,
+                    CharAttrs {
+                        ligatures: Some(Ligatures::All),
+                        font_family: Some("Liberation Serif".into()),
+                        background: Some(None),
+                        shadow: Some(None),
+                        ..CharAttrs::default()
+                    },
+                ),
+            ],
         ),
         (body, ParaAttrs::default(), vec![]),
     ];
@@ -690,4 +733,43 @@ fn fmt_16_tab_stops_keep_their_alignment_leader_and_separator() {
     keep("tabs.odt", &bytes);
     let read = read_odt(&bytes).unwrap();
     assert_eq!(describe(&read), describe(&document));
+}
+
+#[test]
+fn fmt_08_fmt_09_features_of_a_font_name_become_ligatures_and_features() {
+    let mut source = odf::TextDocument::default();
+    source.styles.push(odf::Style {
+        name: "Standard".into(),
+        family: odf::Family::Paragraph,
+        properties: odf::Properties {
+            text: odf::TextProperties {
+                font_family: Some("Linux Libertine G:liga=0&smcp&ss02=3".into()),
+                font_size: Some(odf::Length(10.0)),
+                letter_spacing: Some(odf::Length(1.0)),
+                ..odf::TextProperties::default()
+            },
+            ..odf::Properties::default()
+        },
+        ..odf::Style::default()
+    });
+    let document = import(&source).unwrap();
+    let styles = document.styles();
+    let format = styles.resolve_character(styles.default_paragraph(), None, &CharAttrs::default());
+    assert_eq!(&*format.font_family, "Linux Libertine G");
+    assert_eq!(format.ligatures, Ligatures::None);
+    assert_eq!(format.font_features.get("smcp"), Some(1));
+    assert_eq!(format.font_features.get("ss02"), Some(3));
+    // A point of spacing at 10 points is a tracking of 10%.
+    assert_eq!(format.tracking, 100);
+    // And back, as LibreOffice reads it.
+    let written = export(&document);
+    let standard = written
+        .styles
+        .iter()
+        .find(|s| s.name == "Standard")
+        .unwrap();
+    assert_eq!(
+        standard.properties.text.font_family.as_deref(),
+        Some("Linux Libertine G:liga=0&clig=0&smcp&ss02=3")
+    );
 }

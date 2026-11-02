@@ -17,6 +17,8 @@ pub use gtk;
 mod access;
 mod area;
 mod editing;
+mod effects;
+mod fonts;
 mod formatting;
 pub mod geometry;
 pub mod i18n;
@@ -247,6 +249,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.align('right')", &["<Control>braceright"]),
             ("win.invisibles", &["<Control><Shift>i"]),
             ("win.inspector", &["<Control><Alt>i"]),
+            ("win.fonts", &["<Control>t"]),
             ("win.show-help-overlay", &["<Control>question"]),
         ] {
             app.set_accels_for_action(action, keys);

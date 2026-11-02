@@ -12,7 +12,9 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use desk_model::{Alignment, Baseline, CharFormat, LINE_BREAK, LineSpacing, LineStyle, Rgba};
+use desk_model::{
+    Alignment, Baseline, CharFormat, LINE_BREAK, Ligatures, LineSpacing, LineStyle, Rgba, Shadow,
+};
 use icu_segmenter::LineSegmenter;
 use icu_segmenter::options::LineBreakOptions;
 use parley::layout::BreakerState;
@@ -96,6 +98,12 @@ pub struct GlyphRun {
     pub advance: f32,
     /// The baseline of the run, shifted for superscripts and subscripts.
     pub baseline: f32,
+    /// Drawn as an outline (FMT-04).
+    pub outline: bool,
+    /// The shadow under the run (FMT-03).
+    pub shadow: Option<Shadow>,
+    /// The color behind the run, over the height of the line (FMT-20).
+    pub background: Option<Rgba>,
 }
 
 /// One line of a paragraph, or one piece of a line beside a wrapped object.
@@ -643,6 +651,9 @@ impl TextSystem {
                     x: x0,
                     advance: x1 - x0,
                     baseline,
+                    outline: format.outline,
+                    shadow: format.shadow,
+                    background: format.background,
                 });
             }
             for (place, font, size, format_index) in leaders {
@@ -651,15 +662,16 @@ impl TextSystem {
                     .iter()
                     .find(|r| r.format == format_index)
                     .map_or(metrics.baseline + delta, |r| r.baseline);
-                if let Some(run) =
-                    leader_run(place, &font, size, format_index, format.color, baseline)
-                {
+                if let Some(run) = leader_run(place, &font, size, format_index, format, baseline) {
                     glyph_runs.push(run);
                 }
             }
             let mut advance =
                 metrics.advance - metrics.hanging_advance + tabs.last().map_or(0.0, |t| t.moved);
             if let Some((font, size, id, hyphen_advance)) = &place.hyphen {
+                let last = glyph_runs.last();
+                let (outline, shadow, background) =
+                    last.map_or((false, None, None), |r| (r.outline, r.shadow, r.background));
                 glyph_runs.push(GlyphRun {
                     font: font.clone(),
                     size: *size,
@@ -677,6 +689,9 @@ impl TextSystem {
                     x: end_x,
                     advance: *hyphen_advance,
                     baseline,
+                    outline,
+                    shadow,
+                    background,
                 });
                 advance += hyphen_advance;
             }
@@ -810,8 +825,8 @@ fn leader_run(
     place: TabPlace,
     font: &FontData,
     size: f32,
-    format: u32,
-    color: Rgba,
+    index: u32,
+    format: &CharFormat,
     baseline: f32,
 ) -> Option<GlyphRun> {
     let c = place.stop.leader.character()?;
@@ -825,8 +840,8 @@ fn leader_run(
     Some(GlyphRun {
         font: font.clone(),
         size,
-        format,
-        color,
+        format: index,
+        color: format.color,
         text: std::iter::repeat_n(c, count).collect(),
         clusters: vec![(c.len_utf8() as u32, 1); count],
         glyphs: (0..count)
@@ -839,6 +854,11 @@ fn leader_run(
         x,
         advance: count as f32 * advance,
         baseline,
+        outline: format.outline,
+        shadow: format.shadow,
+        // The background of the tab, which spans the whole of it, is drawn
+        // with the tab.
+        background: None,
     })
 }
 
@@ -884,16 +904,39 @@ fn properties<'a>(
         }),
         StyleProperty::VerticalAlign(VerticalAlign::length(raise)),
     ];
-    if pages_font(&format.font_family).is_some() {
-        // The ligatures are those of Pages, made with the text (DOC-05).
-        properties.push(StyleProperty::FontFeatures("\"liga\" 0, \"clig\" 0".into()));
+    if format.tracking != 0 {
+        properties.push(StyleProperty::LetterSpacing(
+            format.tracking as f32 / 1000.0 * size,
+        ));
     }
+    properties.push(StyleProperty::FontFeatures(parley::FontFeatures::Source(
+        font_features(format, pages_font(&format.font_family).is_some()).into(),
+    )));
     if format.language.tag() != "und"
         && let Ok(language) = Language::parse(format.language.tag())
     {
         properties.push(StyleProperty::Locale(Some(language)));
     }
     properties
+}
+
+/// The features of the font for a format, in the syntax of CSS
+/// `font-feature-settings` (FMT-08, FMT-09). In the fonts of Pages, the
+/// default ligatures are made with the text (DOC-05), and the font makes
+/// none of its own.
+fn font_features(format: &CharFormat, pages: bool) -> String {
+    let mut features: Vec<String> = Vec::new();
+    if pages || format.ligatures == Ligatures::None {
+        features.push("\"liga\" 0".into());
+        features.push("\"clig\" 0".into());
+    }
+    if format.ligatures == Ligatures::All {
+        features.push("\"dlig\" 1".into());
+    }
+    for feature in format.font_features.features() {
+        features.push(format!("\"{}\" {}", feature.tag(), feature.value));
+    }
+    features.join(", ")
 }
 
 /// How far a run is raised for a superscript, or lowered (negative) for a

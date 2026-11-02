@@ -202,6 +202,34 @@ def main():
             lambda: text_of(document) == "US Letter, landscape ação\tx\n",
         )
         check("Tab types a tab", True)
+
+        # The Inspector shows the effects of the text (FMT-10, FMT-21).
+        press("ctrl+alt+i")
+        wait_for(
+            "the effects in the Inspector",
+            lambda: showing(find_named(app, "Character Spacing"))
+            and showing(find_named(app, "Borders and Rules")),
+        )
+        check("the Inspector shows spacing, borders and rules", True)
+        press("ctrl+alt+i")
+
+        # Ctrl+T shows the Fonts window, with its effects and typography
+        # (INT-15, FMT-08).
+        press("ctrl+t")
+        fonts = wait_for(
+            "the Fonts window",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.FRAME and n.get_name() == "Fonts"
+                ),
+                None,
+            ),
+        )
+        check("Ctrl+T shows the Fonts window", showing(fonts))
+        check("it has the shadow", find_named(fonts, "Shadow") is not None)
+        check("it has the typography", find_named(fonts, "Ligatures") is not None)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

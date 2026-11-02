@@ -77,6 +77,7 @@ const SECTIONS: &[Section] = &[
             ("<Control>braceright", n_("Align right")),
             ("<Control><Shift>i", n_("Show invisibles")),
             ("<Control><Alt>i", n_("Inspector")),
+            ("<Control>t", n_("Show fonts")),
             ("<Control>r", n_("Show ruler")),
         ],
     ),

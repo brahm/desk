@@ -7,9 +7,9 @@ use std::collections::BTreeSet;
 
 use crate::ns;
 use crate::text::{
-    Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, Meta, PageLayout,
-    Paragraph, ParagraphProperties, Properties, Style, TabType, TextAlign, TextDocument,
-    TextPosition, TextProperties, TextTransform,
+    Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
+    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Style, TabType,
+    TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
@@ -217,6 +217,47 @@ fn paragraph_attrs(w: &mut Writer, p: &ParagraphProperties) {
         w.attr("fo:orphans", &v.to_string());
     }
     len(w, "style:tab-stop-distance", p.tab_stop_distance);
+    write_background(w, p.background);
+    for (which, border) in [
+        ("top", p.border_top),
+        ("bottom", p.border_bottom),
+        ("left", p.border_left),
+        ("right", p.border_right),
+    ] {
+        let Some(border) = border else { continue };
+        let value = match border {
+            Border::None => "none".to_owned(),
+            Border::Line {
+                width,
+                style,
+                color,
+            } => {
+                let style = match style {
+                    BorderLine::Solid => "solid",
+                    BorderLine::Dashed => "dashed",
+                    BorderLine::Dotted => "dotted",
+                };
+                format!("{width} {style} {color}")
+            }
+        };
+        w.attr(&format!("fo:border-{which}"), &value);
+    }
+    len(w, "fo:padding-top", p.padding_top);
+    len(w, "fo:padding-bottom", p.padding_bottom);
+    len(w, "fo:padding-left", p.padding_left);
+    len(w, "fo:padding-right", p.padding_right);
+}
+
+fn write_background(w: &mut Writer, background: Option<Background>) {
+    match background {
+        Some(Background::Transparent) => {
+            w.attr("fo:background-color", "transparent");
+        }
+        Some(Background::Color(color)) => {
+            w.attr("fo:background-color", &color.to_string());
+        }
+        None => {}
+    }
 }
 
 /// The children of `style:paragraph-properties`, after its attributes.
@@ -338,6 +379,38 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
     w.attr_opt("fo:language", t.language.as_deref())
         .attr_opt("fo:country", t.country.as_deref())
         .attr_opt("fo:script", t.script.as_deref());
+    if let Some(spacing) = t.letter_spacing {
+        if spacing.0 == 0.0 {
+            w.attr("fo:letter-spacing", "normal");
+        } else {
+            w.attr("fo:letter-spacing", &spacing.to_string());
+        }
+    }
+    if let Some(outline) = t.outline {
+        w.attr("style:text-outline", if outline { "true" } else { "false" });
+    }
+    match t.shadow {
+        Some(TextShadow::None) => {
+            w.attr("fo:text-shadow", "none");
+        }
+        Some(TextShadow::Shadow {
+            dx,
+            dy,
+            blur,
+            color,
+        }) => {
+            let mut value = format!("{dx} {dy}");
+            if let Some(blur) = blur {
+                value.push_str(&format!(" {blur}"));
+            }
+            if let Some(color) = color {
+                value.push_str(&format!(" {color}"));
+            }
+            w.attr("fo:text-shadow", &value);
+        }
+        None => {}
+    }
+    write_background(w, t.background);
 }
 
 fn write_page_layout(w: &mut Writer, page: &PageLayout) {

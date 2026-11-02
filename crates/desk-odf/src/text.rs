@@ -177,6 +177,69 @@ pub struct TextProperties {
     pub country: Option<String>,
     /// `fo:script`.
     pub script: Option<String>,
+    /// `fo:letter-spacing`, zero for `normal`.
+    pub letter_spacing: Option<Length>,
+    /// `style:text-outline`.
+    pub outline: Option<bool>,
+    /// `fo:text-shadow`.
+    pub shadow: Option<TextShadow>,
+    /// `fo:background-color`.
+    pub background: Option<Background>,
+}
+
+/// `fo:text-shadow`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TextShadow {
+    /// `none`.
+    None,
+    /// A shadow, written as in CSS: the offsets right and down, then the
+    /// blur and the color when there are.
+    Shadow {
+        /// The offset to the right.
+        dx: Length,
+        /// The offset down.
+        dy: Length,
+        /// The radius of the blur.
+        blur: Option<Length>,
+        /// The color, the color of the text when missing.
+        color: Option<Color>,
+    },
+}
+
+/// `fo:background-color`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Background {
+    /// `transparent`.
+    Transparent,
+    /// A color.
+    Color(Color),
+}
+
+/// The style of a border line, from `fo:border` and its sides.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BorderLine {
+    /// `solid`, and the styles Desk draws as solid, as `double`.
+    Solid,
+    /// `dashed`.
+    Dashed,
+    /// `dotted`.
+    Dotted,
+}
+
+/// A side of `fo:border`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Border {
+    /// `none`, or a hidden line.
+    None,
+    /// A line.
+    Line {
+        /// The width.
+        width: Length,
+        /// The style.
+        style: BorderLine,
+        /// The color.
+        color: Color,
+    },
 }
 
 /// `fo:text-transform`.
@@ -267,6 +330,25 @@ pub struct ParagraphProperties {
     pub tab_stops: Option<Vec<TabStop>>,
     /// `style:tab-stop-distance`, the distance between default stops.
     pub tab_stop_distance: Option<Length>,
+    /// `fo:background-color`.
+    pub background: Option<Background>,
+    /// `fo:border-top`, or `fo:border`.
+    pub border_top: Option<Border>,
+    /// `fo:border-bottom`, or `fo:border`.
+    pub border_bottom: Option<Border>,
+    /// `fo:border-left`, or `fo:border`.
+    pub border_left: Option<Border>,
+    /// `fo:border-right`, or `fo:border`.
+    pub border_right: Option<Border>,
+    /// `fo:padding-top`, or `fo:padding`: the distance between the text
+    /// and its top border.
+    pub padding_top: Option<Length>,
+    /// `fo:padding-bottom`, or `fo:padding`.
+    pub padding_bottom: Option<Length>,
+    /// `fo:padding-left`, or `fo:padding`.
+    pub padding_left: Option<Length>,
+    /// `fo:padding-right`, or `fo:padding`.
+    pub padding_right: Option<Length>,
 }
 
 /// `style:type` of a tab stop.
