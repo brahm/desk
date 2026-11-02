@@ -13,7 +13,10 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use desk_layout::DocumentLayout;
-use desk_model::{Document, Editor, LINE_BREAK, ModelError};
+use desk_model::{
+    CharAttrs, CharFormat, Document, Editor, LINE_BREAK, ModelError, ParaAttrs, ParaFormat,
+    StyleFamily, StyleId,
+};
 use desk_render::DisplayList;
 use gtk::prelude::*;
 use gtk::{gdk, glib};
@@ -43,6 +46,12 @@ struct State {
     next_action: u64,
     /// The last action done when the document was saved, or opened.
     saved: Option<u64>,
+    /// Formatting chosen with nothing selected, which the next text typed
+    /// at the cursor takes.
+    pending: Option<CharAttrs>,
+    on_select: Vec<Rc<dyn Fn()>>,
+    /// Whether the invisible characters show (INT-10).
+    invisibles: bool,
     on_change: Vec<Rc<dyn Fn()>>,
     /// The text of a word or paragraph that a double or triple click
     /// selected, which a drag then extends by whole words or paragraphs.
@@ -58,6 +67,17 @@ enum Unit {
     Character,
     Word,
     Paragraph,
+}
+
+/// The formatting at the selection, resolved through the styles.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Format {
+    /// The character formatting.
+    pub character: CharFormat,
+    /// The paragraph formatting.
+    pub paragraph: ParaFormat,
+    /// The paragraph style.
+    pub style: Option<StyleId>,
 }
 
 /// Edits the document of a window.
@@ -116,6 +136,9 @@ impl TextEditor {
                 unit: Unit::Character,
                 drag_from: None,
                 typing: false,
+                pending: None,
+                on_select: Vec::new(),
+                invisibles: false,
             })),
         };
         this.show_pages();
@@ -297,6 +320,11 @@ impl TextEditor {
         let result = {
             let mut state = self.state.borrow_mut();
             let continuing = typing && state.typing;
+            let pending = if start == end {
+                state.pending.take()
+            } else {
+                None
+            };
             let edits = |edit: &mut desk_model::Edit| {
                 let document = edit.document();
                 let from = at_spot(document, start)?;
@@ -307,6 +335,9 @@ impl TextEditor {
                     edit.delete(from, to)?
                 };
                 let after = edit.insert_text(at, text)?;
+                if let Some(pending) = &pending {
+                    edit.set_character_attrs(at, after, pending)?;
+                }
                 Ok(Spot::of(edit.document(), after))
             };
             if continuing {
@@ -428,8 +459,158 @@ impl TextEditor {
     }
 
     fn show_pages(&self) {
-        let pages = DisplayList::pages(&self.state.borrow().layout);
+        let (pages, invisibles) = {
+            let state = self.state.borrow();
+            let invisibles = if state.invisibles {
+                text_nav::invisibles(state.editor.document(), &state.layout)
+            } else {
+                Vec::new()
+            };
+            (DisplayList::pages(&state.layout), invisibles)
+        };
         self.view.set_pages(pages);
+        self.view.set_invisibles(invisibles);
+    }
+
+    /// Gives the keyboard back to the document.
+    pub fn focus(&self) {
+        self.view.area().grab_focus();
+    }
+
+    /// Shows or hides the invisible characters (INT-10).
+    pub fn set_show_invisibles(&self, show: bool) {
+        self.state.borrow_mut().invisibles = show;
+        self.show_pages();
+    }
+
+    /// Calls `f` whenever the selection moves, or the formatting that text
+    /// typed at the cursor takes changes.
+    pub fn connect_selection_changed(&self, f: impl Fn() + 'static) {
+        self.state.borrow_mut().on_select.push(Rc::new(f));
+    }
+
+    fn selection_changed(&self) {
+        let callbacks = self.state.borrow().on_select.clone();
+        for callback in callbacks {
+            callback();
+        }
+    }
+
+    /// The formatting at the selection: that of its first character, or
+    /// that which text typed at the cursor takes.
+    pub fn format(&self) -> Format {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        let (start, end) = state.selection.ordered();
+        let styles = document.styles();
+        let Some(paragraph) = document.body().get(start.paragraph) else {
+            return Format::default();
+        };
+        let at = if start == end || start.offset >= paragraph.len() {
+            start.offset
+        } else {
+            // The character after the start of the selection.
+            start.offset + 1
+        };
+        let (style, mut attrs) = paragraph.format_at(at);
+        if start == end
+            && let Some(pending) = &state.pending
+        {
+            attrs.merge(pending);
+        }
+        Format {
+            character: styles.resolve_character(paragraph.style(), style, &attrs),
+            paragraph: styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+            style: Some(paragraph.style()),
+        }
+    }
+
+    /// The paragraph styles of the document, by name.
+    pub fn paragraph_styles(&self) -> Vec<(StyleId, String)> {
+        let state = self.state.borrow();
+        let mut styles: Vec<_> = state
+            .editor
+            .document()
+            .styles()
+            .iter()
+            .filter(|s| s.family() == StyleFamily::Paragraph)
+            .map(|s| (s.id(), s.name().to_owned()))
+            .collect();
+        styles.sort_by_key(|s| s.1.to_lowercase());
+        styles
+    }
+
+    /// Sets character formatting on the selection, as one action of the
+    /// history. With nothing selected, the next text typed takes it.
+    pub fn set_character_attrs(&self, name: &str, attrs: &CharAttrs) {
+        let selection = self.selection();
+        if selection.is_empty() {
+            {
+                let mut state = self.state.borrow_mut();
+                let pending = state.pending.get_or_insert_with(CharAttrs::default);
+                pending.merge(attrs);
+                state.typing = false;
+            }
+            self.selection_changed();
+            return;
+        }
+        let (start, end) = selection.ordered();
+        self.format_edit(name, move |edit| {
+            let document = edit.document();
+            let from = at_spot(document, start)?;
+            let to = at_spot(document, end)?;
+            edit.set_character_attrs(from, to, attrs)
+        });
+    }
+
+    /// Sets paragraph formatting on the paragraphs of the selection.
+    pub fn set_paragraph_attrs(&self, name: &str, attrs: &ParaAttrs) {
+        let (start, end) = self.selection().ordered();
+        self.format_edit(name, move |edit| {
+            let document = edit.document();
+            let from = at_spot(document, start)?;
+            let to = at_spot(document, end)?;
+            edit.set_paragraph_attrs(from, to, attrs)
+        });
+    }
+
+    /// Gives the paragraphs of the selection a paragraph style.
+    pub fn set_paragraph_style(&self, style: StyleId) {
+        let (start, end) = self.selection().ordered();
+        self.format_edit("Paragraph Style", move |edit| {
+            let document = edit.document();
+            let from = at_spot(document, start)?;
+            let to = at_spot(document, end)?;
+            edit.set_paragraph_style(from, to, style)
+        });
+    }
+
+    /// Changes formatting as one action of the history, keeping the
+    /// selection.
+    fn format_edit(
+        &self,
+        name: &str,
+        change: impl FnOnce(&mut desk_model::Edit) -> Result<(), ModelError>,
+    ) {
+        let selection = self.selection();
+        let depth = self.state.borrow().editor.undo_depth();
+        let result = self.state.borrow_mut().editor.edit(name, change);
+        self.state.borrow_mut().typing = false;
+        match result {
+            // Formatting that was there already changes nothing.
+            Ok(()) if self.state.borrow().editor.undo_depth() == depth => {}
+            Ok(()) => {
+                {
+                    let mut state = self.state.borrow_mut();
+                    let action = state.next_action;
+                    state.next_action += 1;
+                    state.undo.push((selection, selection, action));
+                    state.redo.clear();
+                }
+                self.after_change(selection);
+            }
+            Err(error) => glib::g_warning!("desk", "cannot format: {error}"),
+        }
     }
 
     /// Sets the selection and shows it.
@@ -441,6 +622,9 @@ impl TextEditor {
                 anchor: text_nav::clamp(document, selection.anchor),
                 focus: text_nav::clamp(document, selection.focus),
             };
+            if state.selection != selection {
+                state.pending = None;
+            }
             state.selection = selection;
             (
                 text_nav::selection_rects(&state.layout, &selection),
@@ -448,6 +632,7 @@ impl TextEditor {
             )
         };
         self.view.set_marks(rects, caret);
+        self.selection_changed();
         if let Some(caret) = caret {
             self.view.scroll_to(&caret);
             if let Some((x, y)) = self.view.to_area(caret.page, caret.x, caret.top) {

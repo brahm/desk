@@ -15,8 +15,10 @@ pub use adw;
 pub use gtk;
 
 mod editing;
+mod formatting;
 pub mod geometry;
 mod properties;
+mod shortcuts;
 pub mod text_nav;
 mod view;
 mod warnings;
@@ -219,9 +221,22 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             app.set_accels_for_action("win.save", &["<Control>s"]);
             app.set_accels_for_action("win.save-as", &["<Control><Shift>s"]);
             app.set_accels_for_action("win.duplicate", &["<Control><Shift>d"]);
-            app.set_accels_for_action("win.properties", &["<Control>i"]);
+            app.set_accels_for_action("win.properties", &["<Alt>Return"]);
         }
         app.set_accels_for_action("win.fullscreen", &["F11", "<Control><Alt>f"]);
+        for (action, keys) in [
+            ("win.bold", &["<Control>b"][..]),
+            ("win.italic", &["<Control>i"]),
+            ("win.underline", &["<Control>u"]),
+            ("win.align('left')", &["<Control>braceleft"]),
+            ("win.align('center')", &["<Control>bar"]),
+            ("win.align('right')", &["<Control>braceright"]),
+            ("win.invisibles", &["<Control><Shift>i"]),
+            ("win.inspector", &["<Control><Alt>i"]),
+            ("win.show-help-overlay", &["<Control>question"]),
+        ] {
+            app.set_accels_for_action(action, keys);
+        }
         app.set_accels_for_action("win.zoom('in')", &["<Control>plus", "<Control>equal"]);
         app.set_accels_for_action("win.zoom('out')", &["<Control>minus"]);
         app.set_accels_for_action("win.zoom('1')", &["<Control>0"]);

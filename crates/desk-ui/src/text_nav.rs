@@ -420,6 +420,102 @@ pub fn move_line(layout: &DocumentLayout, spot: Spot, goal: f64, down: bool, lin
     Spot::new(line.paragraph, offset)
 }
 
+/// A character that prints nothing, which Show Invisibles marks (INT-10).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Invisible {
+    /// A space.
+    Space,
+    /// A space that does not break.
+    NoBreakSpace,
+    /// A tab.
+    Tab,
+    /// A line break.
+    LineBreak,
+    /// The end of a paragraph.
+    Paragraph,
+}
+
+impl Invisible {
+    /// The mark drawn for it, as in Pages.
+    pub fn mark(self) -> &'static str {
+        match self {
+            Self::Space => "·",
+            Self::NoBreakSpace => "°",
+            Self::Tab => "→",
+            Self::LineBreak => "↵",
+            Self::Paragraph => "¶",
+        }
+    }
+}
+
+/// Where an invisible character falls on a page, in points.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InvisibleMark {
+    /// The index of the page.
+    pub page: usize,
+    /// The character.
+    pub kind: Invisible,
+    /// The left edge of the character.
+    pub x0: f64,
+    /// The right edge of the character; the left edge for the end of a
+    /// paragraph, which takes no room.
+    pub x1: f64,
+    /// The baseline of its line.
+    pub baseline: f64,
+    /// The height of its line above the baseline.
+    pub ascent: f64,
+}
+
+/// The invisible characters of a document as laid out.
+pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<InvisibleMark> {
+    let mut marks = Vec::new();
+    for (page, p) in layout.pages.iter().enumerate() {
+        for line in &p.lines {
+            let Some(paragraph) = document.body().get(line.paragraph) else {
+                continue;
+            };
+            let text = paragraph.text();
+            let range = line.line.range.clone();
+            let x = |offset: usize| f64::from(line.origin.0 + line.line.caret_x(offset));
+            let baseline = f64::from(line.baseline());
+            let ascent = baseline - f64::from(line.top());
+            let Some(slice) = text.get(range.clone()) else {
+                continue;
+            };
+            for (at, c) in slice.char_indices() {
+                let kind = match c {
+                    ' ' => Invisible::Space,
+                    desk_model::NO_BREAK_SPACE => Invisible::NoBreakSpace,
+                    '\t' => Invisible::Tab,
+                    desk_model::LINE_BREAK => Invisible::LineBreak,
+                    _ => continue,
+                };
+                let offset = range.start + at;
+                marks.push(InvisibleMark {
+                    page,
+                    kind,
+                    x0: x(offset),
+                    x1: x(offset + c.len_utf8()),
+                    baseline,
+                    ascent,
+                });
+            }
+            if range.end == text.len() && !slice.ends_with(desk_model::LINE_BREAK) {
+                let end = x(text.len());
+                marks.push(InvisibleMark {
+                    page,
+                    kind: Invisible::Paragraph,
+                    x0: end,
+                    x1: end,
+                    baseline,
+                    ascent,
+                });
+            }
+        }
+    }
+    marks
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539,5 +635,27 @@ mod tests {
         assert_eq!(rects.len(), lines);
         assert!(rects.iter().all(|r| r.x1 > r.x0));
         assert!(selection_rects(&layout, &Selection::cursor(Spot::new(0, 2))).is_empty());
+    }
+
+    #[test]
+    fn int_10_invisibles_mark_spaces_tabs_breaks_and_paragraph_ends() {
+        let doc = document(&["a b\tc", ""]);
+        let layout = laid_out(&doc);
+        let kinds: Vec<_> = invisibles(&doc, &layout).iter().map(|m| m.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                Invisible::Space,
+                Invisible::Tab,
+                Invisible::Paragraph,
+                Invisible::Paragraph
+            ]
+        );
+        let marks = invisibles(&doc, &layout);
+        // The space lies between "a" and "b", and takes room.
+        assert!(marks[0].x1 > marks[0].x0);
+        assert!(marks[0].ascent > 0.0);
+        // The empty paragraph ends at its start, on the next line.
+        assert!(marks[3].baseline > marks[2].baseline);
     }
 }

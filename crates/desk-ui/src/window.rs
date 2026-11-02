@@ -10,10 +10,11 @@ use std::path::{Path, PathBuf};
 use std::rc::{Rc, Weak};
 
 use adw::prelude::*;
-use desk_model::Document;
+use desk_model::{CharAttrs, Document, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
 use crate::editing::TextEditor;
+use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
 use crate::view::DocumentView;
 use crate::{AppInfo, Opener};
@@ -43,7 +44,11 @@ pub struct DocumentWindow {
     /// The name of the document, which is its file's unless untitled.
     name: RefCell<String>,
     warnings: RefCell<Vec<String>>,
-    editor: RefCell<Option<TextEditor>>,
+    editor: Rc<RefCell<Option<TextEditor>>>,
+    format_bar: Rc<FormatBar>,
+    inspector: Rc<Inspector>,
+    split: adw::OverlaySplitView,
+    format_revealer: gtk::Revealer,
     /// Whether closing was asked for and answered, so that the window
     /// closes without asking again.
     closing: Cell<bool>,
@@ -56,13 +61,30 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 6] = [
+const DOCUMENT_ACTIONS: [&str; 15] = [
     "save",
     "save-as",
     "save-copy",
     "duplicate",
     "fullscreen",
     "select-all",
+    "cut",
+    "copy",
+    "paste",
+    "bold",
+    "italic",
+    "underline",
+    "strikethrough",
+    "align",
+    "inspector",
+];
+
+/// The character toggles of the format bar: an action and what it sets.
+const TOGGLES: [(&str, &str); 4] = [
+    ("bold", "Bold"),
+    ("italic", "Italic"),
+    ("underline", "Underline"),
+    ("strikethrough", "Strikethrough"),
 ];
 
 impl DocumentWindow {
@@ -154,9 +176,28 @@ impl DocumentWindow {
         bottom_bar.pack_start(&bottom);
         bottom_bar.set_revealed(false);
 
+        let editor: Rc<RefCell<Option<TextEditor>>> = Rc::new(RefCell::new(None));
+        let editor_of = || -> EditorOf {
+            let cell = editor.clone();
+            Rc::new(move || cell.borrow().clone())
+        };
+        let format_bar = FormatBar::new(editor_of());
+        let inspector = Inspector::new(editor_of());
+        let format_revealer = gtk::Revealer::builder()
+            .child(format_bar.widget())
+            .reveal_child(false)
+            .build();
+        let split = adw::OverlaySplitView::builder()
+            .content(&stack)
+            .sidebar(inspector.widget())
+            .sidebar_position(gtk::PackType::End)
+            .show_sidebar(false)
+            .build();
+
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
-        toolbar_view.set_content(Some(&stack));
+        toolbar_view.add_top_bar(&format_revealer);
+        toolbar_view.set_content(Some(&split));
         toolbar_view.add_bottom_bar(&bottom_bar);
 
         let window = adw::ApplicationWindow::builder()
@@ -182,7 +223,11 @@ impl DocumentWindow {
             path: RefCell::new(None),
             name: RefCell::new(String::new()),
             warnings: RefCell::new(Vec::new()),
-            editor: RefCell::new(None),
+            editor,
+            format_bar,
+            inspector,
+            split,
+            format_revealer,
             closing: Cell::new(false),
         });
         this.add_actions();
@@ -203,6 +248,9 @@ impl DocumentWindow {
             });
         }
         this.connect_fullscreen(&leave_fullscreen);
+        this.connect_context_menu();
+        this.window
+            .set_help_overlay(Some(&crate::shortcuts::window(opener.is_some())));
         {
             let weak = Rc::downgrade(&this);
             this.window.connect_close_request(move |_| {
@@ -282,9 +330,49 @@ impl DocumentWindow {
                 this.refresh();
             }
         });
+        let weak = Rc::downgrade(self);
+        editor.connect_selection_changed(move || {
+            if let Some(this) = weak.upgrade() {
+                this.show_format();
+            }
+        });
+        editor.set_show_invisibles(self.action_state("invisibles"));
+        self.format_bar.set_styles(&editor.paragraph_styles());
         *self.editor.borrow_mut() = Some(editor);
         self.stack.set_visible_child_name("document");
+        self.format_revealer.set_reveal_child(true);
         self.refresh();
+        self.show_format();
+    }
+
+    /// Shows the formatting at the selection in the format bar, the
+    /// Inspector and the states of the toggles.
+    fn show_format(&self) {
+        let Some(editor) = self.editor() else { return };
+        let format = editor.format();
+        self.format_bar.show(&format);
+        self.inspector.show(&format);
+        let character = &format.character;
+        for (name, on) in [
+            ("bold", character.bold),
+            ("italic", character.italic),
+            ("underline", character.underline != LineStyle::None),
+            ("strikethrough", character.strikethrough != LineStyle::None),
+        ] {
+            formatting::set_state(&self.window, name, on.to_variant());
+        }
+        formatting::set_state(
+            &self.window,
+            "align",
+            formatting::alignment_name(format.paragraph.alignment).to_variant(),
+        );
+    }
+
+    fn action_state(&self, name: &str) -> bool {
+        self.window
+            .lookup_action(name)
+            .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
+            .is_some_and(|a| formatting::state_of(&a))
     }
 
     /// Shows the name, whether the document has changes, the counts at the
@@ -313,9 +401,6 @@ impl DocumentWindow {
             self.enable(action, enabled);
         }
         for action in DOCUMENT_ACTIONS {
-            self.enable(action, has_document);
-        }
-        for action in ["cut", "copy", "paste"] {
             self.enable(action, has_document);
         }
     }
@@ -682,7 +767,165 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+        self.add_format_actions();
         self.refresh();
+    }
+
+    /// The toggles of the format bar, Show Invisibles and the Inspector,
+    /// whose states follow the selection.
+    fn add_format_actions(self: &Rc<Self>) {
+        for (name, label) in TOGGLES {
+            let action = gio::SimpleAction::new_stateful(name, None, &false.to_variant());
+            let weak = Rc::downgrade(self);
+            action.connect_change_state(move |action, value| {
+                let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+                else {
+                    return;
+                };
+                action.set_state(&on.to_variant());
+                let Some(editor) = this.editor() else { return };
+                let line = Some(if on {
+                    LineStyle::Single
+                } else {
+                    LineStyle::None
+                });
+                let attrs = match name {
+                    "bold" => CharAttrs {
+                        bold: Some(on),
+                        ..CharAttrs::default()
+                    },
+                    "italic" => CharAttrs {
+                        italic: Some(on),
+                        ..CharAttrs::default()
+                    },
+                    "underline" => CharAttrs {
+                        underline: line,
+                        ..CharAttrs::default()
+                    },
+                    _ => CharAttrs {
+                        strikethrough: line,
+                        ..CharAttrs::default()
+                    },
+                };
+                editor.set_character_attrs(label, &attrs);
+            });
+            self.window.add_action(&action);
+        }
+
+        let align = gio::SimpleAction::new_stateful(
+            "align",
+            Some(glib::VariantTy::STRING),
+            &"left".to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        align.connect_change_state(move |action, value| {
+            let (Some(this), Some(value)) = (weak.upgrade(), value) else {
+                return;
+            };
+            let Some(alignment) = value
+                .get::<String>()
+                .and_then(|v| formatting::alignment_of(&v))
+            else {
+                return;
+            };
+            action.set_state(value);
+            if let Some(editor) = this.editor() {
+                editor.set_paragraph_attrs(
+                    "Alignment",
+                    &ParaAttrs {
+                        alignment: Some(alignment),
+                        ..ParaAttrs::default()
+                    },
+                );
+            }
+        });
+        self.window.add_action(&align);
+
+        let invisibles = gio::SimpleAction::new_stateful("invisibles", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        invisibles.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            if let Some(editor) = this.editor() {
+                editor.set_show_invisibles(on);
+            }
+        });
+        self.window.add_action(&invisibles);
+
+        let inspector = gio::SimpleAction::new_stateful("inspector", None, &false.to_variant());
+        let split = self.split.downgrade();
+        inspector.connect_change_state(move |action, value| {
+            let (Some(split), Some(on)) = (split.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            split.set_show_sidebar(on);
+        });
+        self.window.add_action(&inspector);
+        // The sidebar also closes by itself on a narrow window.
+        let window = self.window.downgrade();
+        self.split.connect_show_sidebar_notify(move |split| {
+            if let Some(window) = window.upgrade() {
+                formatting::set_state(&window, "inspector", split.shows_sidebar().to_variant());
+            }
+        });
+    }
+
+    /// A menu of the document at the pointer, on a secondary click or the
+    /// Menu key (INT-21).
+    fn connect_context_menu(&self) {
+        let menu = gio::Menu::new();
+        let edit = gio::Menu::new();
+        edit.append(Some("Cu_t"), Some("win.cut"));
+        edit.append(Some("_Copy"), Some("win.copy"));
+        edit.append(Some("_Paste"), Some("win.paste"));
+        edit.append(Some("Select _All"), Some("win.select-all"));
+        menu.append_section(None, &edit);
+        let format = gio::Menu::new();
+        format.append(Some("_Bold"), Some("win.bold"));
+        format.append(Some("_Italic"), Some("win.italic"));
+        format.append(Some("_Underline"), Some("win.underline"));
+        menu.append_section(None, &format);
+        let popover = gtk::PopoverMenu::from_model(Some(&menu));
+        popover.set_parent(self.view.area());
+        popover.set_has_arrow(false);
+        popover.set_halign(gtk::Align::Start);
+
+        let click = gtk::GestureClick::builder()
+            .button(gdk::BUTTON_SECONDARY)
+            .build();
+        let menu_popover = popover.downgrade();
+        click.connect_pressed(move |gesture, _, x, y| {
+            if let Some(popover) = menu_popover.upgrade() {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+                popover.popup();
+            }
+        });
+        self.view.area().add_controller(click);
+
+        let keys = gtk::EventControllerKey::new();
+        let menu_popover = popover.downgrade();
+        let area = self.view.area().downgrade();
+        keys.connect_key_pressed(move |_, key, _, modifiers| {
+            let menu_key = key == gdk::Key::Menu
+                || (key == gdk::Key::F10 && modifiers == gdk::ModifierType::SHIFT_MASK);
+            if let (true, Some(popover), Some(area)) =
+                (menu_key, menu_popover.upgrade(), area.upgrade())
+            {
+                // At the middle of the visible area.
+                let (width, height) = (area.width() / 2, area.height() / 3);
+                popover.set_pointing_to(Some(&gdk::Rectangle::new(width, height, 1, 1)));
+                popover.popup();
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        self.view.area().add_controller(keys);
     }
 }
 
