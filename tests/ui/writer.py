@@ -210,7 +210,7 @@ def main():
         press("Return")
         wait_for(
             "the item of the list in the accessibility tree",
-            lambda: text_of(document) == "US Letter, landscape ação\tx\none\n\n",
+            lambda: text_of(document) == "US Letter, landscape ação\tx\nOne\n\n",
         )
         check("a marker starts a list", True)
 
@@ -277,6 +277,71 @@ def main():
         ]
         check("the style of the paragraph is chosen in the drawer", len(chosen) == 1)
         check("the character styles show", showing(find_named(app, "Character Styles")))
+        press("ctrl+shift+t")
+
+        # Smart quotes and the replacements of the table, as typed
+        # (TXT-06, TXT-07).
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+End")
+        type_text('"hi" (c) ')
+        wait_for(
+            "the corrected text in the accessibility tree",
+            lambda: text_of(document).endswith("\n\u201chi\u201d \u00a9 \n"),
+        )
+        check("quotes curl and (c) becomes a symbol", True)
+
+        # The Search sidebar lists the matches as they are typed (TXT-13).
+        press("ctrl+shift+f")
+        results = wait_for(
+            "the Search sidebar",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.LIST
+                    and n.get_name() == "Search Results"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
+        type_text("landscape")
+        wait_for(
+            "the match in the sidebar",
+            lambda: sum(1 for n in walk(results) if n.get_role() == Atspi.Role.LIST_ITEM) == 1,
+        )
+        check("the Search sidebar lists the match", True)
+
+        # Find & Replace replaces every match (TXT-12).
+        press("ctrl+f")
+        dialog = wait_for(
+            "the Find & Replace window",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.FRAME and n.get_name() == "Find & Replace"
+                ),
+                None,
+            ),
+        )
+        type_text("hi")
+        press("Tab")
+        type_text("hello")
+        replace_all = next(
+            n
+            for n in walk(dialog)
+            if n.get_role() == Atspi.Role.PUSH_BUTTON and n.get_name() == "Replace All"
+        )
+        Atspi.Action.do_action(replace_all, 0)
+        wait_for(
+            "the replaced text",
+            lambda: "\u201chello\u201d" in text_of(document),
+        )
+        check("Replace All replaces the matches", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

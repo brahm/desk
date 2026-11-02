@@ -117,7 +117,7 @@ impl Ruler {
         let weak = ruler.area.downgrade();
         preferences::connect_changed(move |p| {
             if let (Some(state), Some(area)) = (state.upgrade(), weak.upgrade()) {
-                state.borrow_mut().preferences = *p;
+                state.borrow_mut().preferences = p.clone();
                 area.queue_draw();
             }
         });
@@ -162,7 +162,7 @@ impl Ruler {
             let (width, height) = (f64::from(width), f64::from(height));
             let state = ruler.state.borrow();
             let setup = state.setup;
-            let preferences = state.preferences;
+            let preferences = state.preferences.clone();
             let fg = area.color();
             let ink = |cr: &gtk::cairo::Context, alpha: f64| {
                 cr.set_source_rgba(
@@ -484,7 +484,7 @@ impl Ruler {
     /// A position moved to the nearest small tick of the ruler.
     fn snap(&self, position: f64) -> f64 {
         let state = self.state.borrow();
-        let preferences = state.preferences;
+        let preferences = state.preferences.clone();
         let setup = state.setup;
         let width = setup.body_width().to_pt();
         let origin = if preferences.center_origin {
