@@ -90,6 +90,18 @@ const SECTIONS: &[Section] = &[
         ],
     ),
     (
+        n_("Finding"),
+        true,
+        &[
+            ("<Control>f", n_("Find & Replace")),
+            ("<Control>g", n_("Find next")),
+            ("<Control><Shift>g", n_("Find previous")),
+            ("<Control>e", n_("Use selection for Find")),
+            ("<Control>j", n_("Jump to the selection")),
+            ("<Control><Shift>f", n_("Search sidebar")),
+        ],
+    ),
+    (
         n_("View"),
         false,
         &[

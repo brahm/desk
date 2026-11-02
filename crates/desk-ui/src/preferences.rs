@@ -9,9 +9,12 @@
 
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use adw::prelude::*;
 use gtk::glib;
+
+use desk_model::{AutoCorrect, Replacement};
 
 use crate::i18n::tr;
 
@@ -117,7 +120,7 @@ impl Units {
 }
 
 /// The preferences.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Preferences {
     /// The units of the rulers (FMT-17).
     pub units: Units,
@@ -132,6 +135,11 @@ pub struct Preferences {
     /// Whether a paragraph that starts with "•", "-", "*", "1.", "a." or
     /// "I." and a space becomes a list on Return (LST-01).
     pub automatic_lists: bool,
+    /// Whether straight quotes become curly ones as they are typed
+    /// (TXT-06).
+    pub smart_quotes: bool,
+    /// The corrections made while typing (TXT-07).
+    pub autocorrect: AutoCorrect,
 }
 
 impl Default for Preferences {
@@ -153,6 +161,8 @@ impl Default for Preferences {
             center_origin: false,
             vertical_ruler: false,
             automatic_lists: true,
+            smart_quotes: true,
+            autocorrect: AutoCorrect::default(),
         }
     }
 }
@@ -175,9 +185,28 @@ impl Preferences {
         out.percent = flag("percent", out.percent);
         out.center_origin = flag("center-origin", out.center_origin);
         out.vertical_ruler = flag("vertical-ruler", out.vertical_ruler);
-        out.automatic_lists = file
-            .boolean(EDITING, "automatic-lists")
-            .unwrap_or(out.automatic_lists);
+        let editing = |key: &str, default: bool| file.boolean(EDITING, key).unwrap_or(default);
+        out.automatic_lists = editing("automatic-lists", out.automatic_lists);
+        out.smart_quotes = editing("smart-quotes", out.smart_quotes);
+        let correct = &mut out.autocorrect;
+        correct.capitalization = editing("fix-capitalization", correct.capitalization);
+        correct.ordinals = editing("superscript-ordinals", correct.ordinals);
+        correct.replace = editing("replace-text", correct.replace);
+        if let Ok(list) = file.string(EDITING, "replacements") {
+            correct.replacements = list
+                .lines()
+                .filter_map(|entry| {
+                    let mut parts = entry.splitn(3, '\t');
+                    let enabled = parts.next()? == "1";
+                    let from = parts.next()?;
+                    let to = parts.next()?;
+                    Some(Replacement {
+                        enabled,
+                        ..Replacement::new(from, to)
+                    })
+                })
+                .collect();
+        }
         out
     }
 
@@ -187,6 +216,18 @@ impl Preferences {
         file.set_boolean(RULERS, "center-origin", self.center_origin);
         file.set_boolean(RULERS, "vertical-ruler", self.vertical_ruler);
         file.set_boolean(EDITING, "automatic-lists", self.automatic_lists);
+        file.set_boolean(EDITING, "smart-quotes", self.smart_quotes);
+        let correct = &self.autocorrect;
+        file.set_boolean(EDITING, "fix-capitalization", correct.capitalization);
+        file.set_boolean(EDITING, "superscript-ordinals", correct.ordinals);
+        file.set_boolean(EDITING, "replace-text", correct.replace);
+        let list: Vec<String> = correct
+            .replacements
+            .iter()
+            .map(|r| format!("{}\t{}\t{}", u8::from(r.enabled), r.from, r.to))
+            .collect();
+        // One replacement on each line, which the key file escapes.
+        file.set_string(EDITING, "replacements", &list.join("\n"));
     }
 }
 
@@ -230,7 +271,7 @@ fn with_store<T>(f: impl FnOnce(&mut Store) -> T) -> T {
 
 /// The preferences as they are now.
 pub fn get() -> Preferences {
-    with_store(|s| s.preferences)
+    with_store(|s| s.preferences.clone())
 }
 
 /// Changes the preferences, saves them and tells every listener.
@@ -238,7 +279,7 @@ pub fn set(preferences: Preferences) {
     if get() == preferences {
         return;
     }
-    with_store(|s| s.preferences = preferences);
+    with_store(|s| s.preferences = preferences.clone());
     let file = glib::KeyFile::new();
     // Keep what other versions wrote.
     let _ = file.load_from_file(path(), glib::KeyFileFlags::KEEP_COMMENTS);
@@ -267,6 +308,34 @@ pub fn connect_changed(f: impl Fn(&Preferences) + 'static) {
     with_store(|s| s.listeners.push(Box::new(f)));
 }
 
+/// Changes the preferences with `f`.
+fn change(f: impl FnOnce(&mut Preferences)) {
+    let mut preferences = get();
+    f(&mut preferences);
+    set(preferences);
+}
+
+/// A switch of the preferences.
+fn switch(
+    title: &str,
+    subtitle: &str,
+    active: bool,
+    f: impl Fn(&mut Preferences, bool) + 'static,
+) -> adw::SwitchRow {
+    let row = adw::SwitchRow::builder()
+        .title(title)
+        .active(active)
+        .build();
+    if !subtitle.is_empty() {
+        row.set_subtitle(subtitle);
+    }
+    row.connect_active_notify(move |row| {
+        let active = row.is_active();
+        change(|p| f(p, active));
+    });
+    row
+}
+
 /// Shows the preferences over a window.
 pub fn show(parent: &impl IsA<gtk::Widget>) {
     let current = get();
@@ -286,88 +355,169 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
                 .unwrap_or(0) as u32,
         )
         .build();
-    let percent = adw::SwitchRow::builder()
-        .title(tr("Show Units as Percentage"))
-        .subtitle(tr("Rulers count in percentages of the width of the text"))
-        .active(current.percent)
-        .build();
-    let center = adw::SwitchRow::builder()
-        .title(tr("Place Origin at Center"))
-        .subtitle(tr("Rulers count from the middle of the text"))
-        .active(current.center_origin)
-        .build();
-    let vertical = adw::SwitchRow::builder()
-        .title(tr("Show Vertical Ruler"))
-        .subtitle(tr("Along with the horizontal ruler"))
-        .active(current.vertical_ruler)
-        .build();
+    units.connect_selected_notify(|row| {
+        let units = Units::ALL
+            .get(row.selected() as usize)
+            .copied()
+            .unwrap_or(Units::Centimeters);
+        change(|p| p.units = units);
+    });
     let rulers = adw::PreferencesGroup::builder()
         .title(tr("Rulers"))
         .description(tr("For every document"))
         .build();
     rulers.add(&units);
-    rulers.add(&percent);
-    rulers.add(&center);
-    rulers.add(&vertical);
-    let lists = adw::SwitchRow::builder()
-        .title(tr("Automatically Detect Lists"))
-        .subtitle(tr(
-            "“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return",
-        ))
-        .active(current.automatic_lists)
-        .build();
+    rulers.add(&switch(
+        &tr("Show Units as Percentage"),
+        &tr("Rulers count in percentages of the width of the text"),
+        current.percent,
+        |p, on| p.percent = on,
+    ));
+    rulers.add(&switch(
+        &tr("Place Origin at Center"),
+        &tr("Rulers count from the middle of the text"),
+        current.center_origin,
+        |p, on| p.center_origin = on,
+    ));
+    rulers.add(&switch(
+        &tr("Show Vertical Ruler"),
+        &tr("Along with the horizontal ruler"),
+        current.vertical_ruler,
+        |p, on| p.vertical_ruler = on,
+    ));
     let editing = adw::PreferencesGroup::builder()
         .title(tr("Editing"))
         .build();
-    editing.add(&lists);
+    editing.add(&switch(
+        &tr("Automatically Detect Lists"),
+        &tr("“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return"),
+        current.automatic_lists,
+        |p, on| p.automatic_lists = on,
+    ));
+    let correction = adw::PreferencesGroup::builder()
+        .title(tr("Auto-Correction"))
+        .description(tr("While typing, in every document"))
+        .build();
+    correction.add(&switch(
+        &tr("Use Smart Quotes"),
+        &tr("Straight quotes become curly quotes"),
+        current.smart_quotes,
+        |p, on| p.smart_quotes = on,
+    ));
+    correction.add(&switch(
+        &tr("Fix Capitalization"),
+        &tr("Sentences start with a capital, and words with one capital"),
+        current.autocorrect.capitalization,
+        |p, on| p.autocorrect.capitalization = on,
+    ));
+    correction.add(&switch(
+        &tr("Superscript Numerical Suffixes"),
+        &tr("As in 1st and 2nd"),
+        current.autocorrect.ordinals,
+        |p, on| p.autocorrect.ordinals = on,
+    ));
+    correction.add(&replacements_row(&current.autocorrect));
     let page = adw::PreferencesPage::builder()
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
         .build();
     page.add(&rulers);
     page.add(&editing);
+    page.add(&correction);
     let dialog = adw::PreferencesDialog::builder()
         .title(tr("Preferences"))
         .build();
     dialog.add(&page);
+    dialog.present(Some(parent));
+}
 
-    let update = {
-        let (units, percent, center, vertical, lists) = (
-            units.downgrade(),
-            percent.downgrade(),
-            center.downgrade(),
-            vertical.downgrade(),
-            lists.downgrade(),
-        );
+/// The table of replacements: a switch for the table, and each
+/// replacement with its own switch, which can be removed, and a row to
+/// add one (TXT-07).
+fn replacements_row(current: &AutoCorrect) -> adw::ExpanderRow {
+    let expander = adw::ExpanderRow::builder()
+        .title(tr("Symbol and Text Substitution"))
+        .subtitle(tr("Such as “(c)” for “©”, when typed as a word"))
+        .show_enable_switch(true)
+        .enable_expansion(current.replace)
+        .build();
+    expander.connect_enable_expansion_notify(|row| {
+        let on = row.enables_expansion();
+        change(|p| p.autocorrect.replace = on);
+    });
+    let rows = Rc::new(RefCell::new(Vec::new()));
+    fill_replacements(&expander, &rows);
+    expander
+}
+
+/// Shows the replacements as the table has them now, then the row that
+/// adds one.
+fn fill_replacements(expander: &adw::ExpanderRow, rows: &Rc<RefCell<Vec<gtk::Widget>>>) {
+    for row in rows.borrow_mut().drain(..) {
+        expander.remove(&row);
+    }
+    let again = |expander: &adw::ExpanderRow, rows: &Rc<RefCell<Vec<gtk::Widget>>>| {
+        let (expander, rows) = (expander.downgrade(), Rc::downgrade(rows));
         move || {
-            let (Some(units), Some(percent), Some(center), Some(vertical), Some(lists)) = (
-                units.upgrade(),
-                percent.upgrade(),
-                center.upgrade(),
-                vertical.upgrade(),
-                lists.upgrade(),
-            ) else {
-                return;
-            };
-            set(Preferences {
-                units: Units::ALL
-                    .get(units.selected() as usize)
-                    .copied()
-                    .unwrap_or(Units::Centimeters),
-                percent: percent.is_active(),
-                center_origin: center.is_active(),
-                vertical_ruler: vertical.is_active(),
-                automatic_lists: lists.is_active(),
+            let (expander, rows) = (expander.clone(), rows.clone());
+            glib::idle_add_local_once(move || {
+                if let (Some(expander), Some(rows)) = (expander.upgrade(), rows.upgrade()) {
+                    fill_replacements(&expander, &rows);
+                }
             });
         }
     };
-    let changed = update.clone();
-    units.connect_selected_notify(move |_| changed());
-    for row in [&percent, &center, &vertical, &lists] {
-        let changed = update.clone();
-        row.connect_active_notify(move |_| changed());
+    for (index, replacement) in get().autocorrect.replacements.iter().enumerate() {
+        let row = adw::SwitchRow::builder()
+            .title(format!("{} \u{2192} {}", replacement.from, replacement.to))
+            .use_markup(false)
+            .active(replacement.enabled)
+            .build();
+        row.connect_active_notify(move |row| {
+            let on = row.is_active();
+            change(|p| {
+                if let Some(r) = p.autocorrect.replacements.get_mut(index) {
+                    r.enabled = on;
+                }
+            });
+        });
+        let remove = gtk::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text(tr("Remove"))
+            .valign(gtk::Align::Center)
+            .css_classes(["flat"])
+            .build();
+        crate::formatting::labelled(&remove, &tr("Remove"));
+        let refill = again(expander, rows);
+        remove.connect_clicked(move |_| {
+            change(|p| {
+                if index < p.autocorrect.replacements.len() {
+                    p.autocorrect.replacements.remove(index);
+                }
+            });
+            refill();
+        });
+        row.add_prefix(&remove);
+        expander.add_row(&row);
+        rows.borrow_mut().push(row.upcast());
     }
-    dialog.present(Some(parent));
+    let add = adw::EntryRow::builder()
+        .title(tr("Add: text, a space and its replacement"))
+        .show_apply_button(true)
+        .build();
+    let refill = again(expander, rows);
+    add.connect_apply(move |entry| {
+        let text = entry.text();
+        if let Some((from, to)) = text.trim().split_once(char::is_whitespace)
+            && !to.trim().is_empty()
+        {
+            let replacement = Replacement::new(from, to.trim());
+            change(|p| p.autocorrect.replacements.push(replacement));
+            refill();
+        }
+    });
+    expander.add_row(&add);
+    rows.borrow_mut().push(add.upcast());
 }
 
 #[cfg(test)]
@@ -382,6 +532,18 @@ mod tests {
             center_origin: true,
             vertical_ruler: true,
             automatic_lists: false,
+            smart_quotes: false,
+            autocorrect: AutoCorrect {
+                ordinals: false,
+                replacements: vec![
+                    Replacement::new("(c)", "©"),
+                    Replacement {
+                        enabled: false,
+                        ..Replacement::new("a b", "tab\there")
+                    },
+                ],
+                ..AutoCorrect::default()
+            },
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -390,6 +552,10 @@ mod tests {
         let empty = glib::KeyFile::new();
         assert!(!Preferences::read(&empty).percent);
         assert!(Preferences::read(&empty).automatic_lists);
+        assert_eq!(
+            Preferences::read(&empty).autocorrect,
+            AutoCorrect::default()
+        );
     }
 
     #[test]

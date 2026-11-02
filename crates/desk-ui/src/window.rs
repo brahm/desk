@@ -14,6 +14,7 @@ use desk_model::{CharAttrs, Document, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
 use crate::editing::TextEditor;
+use crate::find::{self, FindSlot, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
@@ -22,6 +23,7 @@ use crate::preferences;
 use crate::ruler::{self, Ruler};
 use crate::styles_drawer::StylesDrawer;
 use crate::view::DocumentView;
+use crate::writing_tools::{self, Lookup};
 use crate::{AppInfo, Opener};
 
 /// How far from the top of the screen the pointer brings the header bar
@@ -58,6 +60,12 @@ pub struct DocumentWindow {
     /// The Fonts window (INT-15), made when first shown.
     fonts: FontsSlot,
     split: adw::OverlaySplitView,
+    /// The search of the window (TXT-12, TXT-13).
+    search: Rc<Search>,
+    /// The Find & Replace window, made when first shown.
+    find: FindSlot,
+    search_sidebar: Rc<SearchSidebar>,
+    search_split: adw::OverlaySplitView,
     format_revealer: gtk::Revealer,
     ruler: Ruler,
     vertical_ruler: Ruler,
@@ -75,7 +83,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 20] = [
+const DOCUMENT_ACTIONS: [&str; 31] = [
     "save",
     "save-as",
     "save-copy",
@@ -96,6 +104,17 @@ const DOCUMENT_ACTIONS: [&str; 20] = [
     "copy-style",
     "paste-style",
     "import-styles",
+    "find",
+    "find-next",
+    "find-previous",
+    "use-selection-for-find",
+    "jump-to-selection",
+    "search",
+    "recent-search",
+    "look-up-dictionary",
+    "look-up-web",
+    "look-up-wikipedia",
+    "statistics",
 ];
 
 thread_local! {
@@ -211,6 +230,8 @@ impl DocumentWindow {
         let format_bar = FormatBar::new(editor_of());
         let inspector = Inspector::new(editor_of());
         let drawer = StylesDrawer::new(editor_of());
+        let search = Rc::new(Search::default());
+        let search_sidebar = SearchSidebar::new(editor_of(), search.clone());
         // The rulers over and beside the pages (INT-17).
         let ruler = Ruler::new(&view, editor_of(), false);
         let vertical_ruler = Ruler::new(&view, editor_of(), true);
@@ -229,8 +250,14 @@ impl DocumentWindow {
             .child(format_bar.widget())
             .reveal_child(false)
             .build();
-        let split = adw::OverlaySplitView::builder()
+        let search_split = adw::OverlaySplitView::builder()
             .content(&stack)
+            .sidebar(search_sidebar.widget())
+            .sidebar_position(gtk::PackType::End)
+            .show_sidebar(false)
+            .build();
+        let split = adw::OverlaySplitView::builder()
+            .content(&search_split)
             .sidebar(inspector.widget())
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
@@ -278,6 +305,10 @@ impl DocumentWindow {
             drawer_split,
             fonts: FontsSlot::default(),
             split,
+            search,
+            find: FindSlot::default(),
+            search_sidebar,
+            search_split,
             format_revealer,
             ruler,
             vertical_ruler,
@@ -404,6 +435,7 @@ impl DocumentWindow {
         editor.connect_changed(move || {
             if let Some(this) = weak.upgrade() {
                 this.refresh();
+                this.search_sidebar.document_changed();
             }
         });
         let weak = Rc::downgrade(self);
@@ -1170,6 +1202,8 @@ impl DocumentWindow {
         });
         self.window.add_action(&paste_style);
 
+        self.add_find_actions();
+
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);
         import.connect_activate(move |_, _| {
@@ -1185,6 +1219,111 @@ impl DocumentWindow {
                 formatting::set_state(&window, "inspector", split.shows_sidebar().to_variant());
             }
         });
+    }
+
+    /// Find & Replace, the Search sidebar and the Writing Tools (TXT-12,
+    /// TXT-13, INT-20).
+    fn add_find_actions(self: &Rc<Self>) {
+        let simple: [(&str, WindowAction); 9] = [
+            ("find", |this| {
+                let cell = this.editor.clone();
+                this.find.present(
+                    &this.window,
+                    Rc::new(move || cell.borrow().clone()),
+                    this.search.clone(),
+                );
+            }),
+            ("find-next", |this| {
+                if let Some(editor) = this.editor() {
+                    find::find_next(&editor, &this.search, false);
+                }
+            }),
+            ("find-previous", |this| {
+                if let Some(editor) = this.editor() {
+                    find::find_next(&editor, &this.search, true);
+                }
+            }),
+            ("use-selection-for-find", |this| {
+                if let Some(editor) = this.editor() {
+                    let text = editor.selected_text();
+                    if !text.is_empty() && !text.contains('\n') {
+                        this.search.query.borrow_mut().text = text;
+                    }
+                }
+            }),
+            ("jump-to-selection", |this| {
+                if let Some(editor) = this.editor() {
+                    editor.show_selection();
+                }
+            }),
+            ("look-up-dictionary", |this| {
+                this.look_up(Lookup::Dictionary)
+            }),
+            ("look-up-web", |this| this.look_up(Lookup::Web)),
+            ("look-up-wikipedia", |this| this.look_up(Lookup::Wikipedia)),
+            ("statistics", |this| {
+                if let Some(editor) = this.editor() {
+                    let (all, selected) = editor.statistics();
+                    writing_tools::show_statistics(
+                        &this.window,
+                        &all,
+                        selected.as_ref(),
+                        this.view.page_count(),
+                    );
+                }
+            }),
+        ];
+        for (name, run) in simple {
+            let weak = Rc::downgrade(self);
+            let action = gio::SimpleAction::new(name, None);
+            action.connect_activate(move |_, _| {
+                if let Some(this) = weak.upgrade() {
+                    run(&this);
+                }
+            });
+            self.window.add_action(&action);
+        }
+
+        let search = gio::SimpleAction::new_stateful("search", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        search.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            this.search_split.set_show_sidebar(on);
+            this.search_sidebar.set_shown(on);
+            if !on && let Some(editor) = this.editor() {
+                editor.focus();
+            }
+        });
+        self.window.add_action(&search);
+        let weak = Rc::downgrade(self);
+        self.search_split.connect_show_sidebar_notify(move |split| {
+            if let Some(this) = weak.upgrade() {
+                let on = split.shows_sidebar();
+                formatting::set_state(&this.window, "search", on.to_variant());
+                this.search_sidebar.set_shown(on);
+            }
+        });
+        let recent = gio::SimpleAction::new("recent-search", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        recent.connect_activate(move |_, parameter| {
+            if let (Some(this), Some(text)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+            {
+                this.search_sidebar.search_for(&text);
+            }
+        });
+        self.window.add_action(&recent);
+    }
+
+    /// Looks the selection, or the word at the cursor, up (INT-20).
+    fn look_up(&self, lookup: Lookup) {
+        if let Some(editor) = self.editor() {
+            writing_tools::look_up(&self.window, lookup, &editor.lookup_text());
+        }
     }
 
     /// A menu of the document at the pointer, on a secondary click or the
@@ -1206,6 +1345,9 @@ impl DocumentWindow {
         style.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
         style.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
         menu.append_section(None, &style);
+        let tools = gio::Menu::new();
+        tools.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
+        menu.append_section(None, &tools);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(self.view.area());
         popover.set_has_arrow(false);
@@ -1298,6 +1440,11 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append_section(None, &document);
+        let find = gio::Menu::new();
+        find.append(Some(&tr("_Find & Replace…")), Some("win.find"));
+        find.append(Some(&tr("_Search…")), Some("win.search"));
+        find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
+        menu.append_section(None, &find);
         let styles = gio::Menu::new();
         styles.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
         styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
@@ -1319,6 +1466,22 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         Some("app.about"),
     );
     menu.append_section(None, &help);
+    menu
+}
+
+/// The Writing Tools of the main and context menus (INT-20).
+fn writing_tools_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(
+        Some(&tr("Look Up in _Dictionary and Thesaurus")),
+        Some("win.look-up-dictionary"),
+    );
+    menu.append(Some(&tr("Search the _Web")), Some("win.look-up-web"));
+    menu.append(
+        Some(&tr("Search in Wi_kipedia")),
+        Some("win.look-up-wikipedia"),
+    );
+    menu.append(Some(&tr("Show _Statistics")), Some("win.statistics"));
     menu
 }
 

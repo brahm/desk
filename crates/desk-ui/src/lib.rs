@@ -18,6 +18,7 @@ mod access;
 mod area;
 mod editing;
 mod effects;
+mod find;
 mod fonts;
 mod formatting;
 pub mod geometry;
@@ -33,6 +34,7 @@ pub mod text_nav;
 mod view;
 mod warnings;
 mod window;
+mod writing_tools;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -255,6 +257,12 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.paste-style", &["<Control><Alt>v"]),
             ("win.inspector", &["<Control><Alt>i"]),
             ("win.fonts", &["<Control>t"]),
+            ("win.find", &["<Control>f"]),
+            ("win.find-next", &["<Control>g"]),
+            ("win.find-previous", &["<Control><Shift>g"]),
+            ("win.use-selection-for-find", &["<Control>e"]),
+            ("win.jump-to-selection", &["<Control>j"]),
+            ("win.search", &["<Control><Shift>f"]),
             ("win.show-help-overlay", &["<Control>question"]),
         ] {
             app.set_accels_for_action(action, keys);

@@ -39,6 +39,41 @@ fn in_list(document: &Document, paragraph: desk_model::NodeId) -> bool {
         .is_some_and(|list| list.level(format.list_level).label.is_some())
 }
 
+/// Makes the corrections of the word that ends at a position, as typing
+/// a space or a punctuation mark after it does (TXT-07), and gives where
+/// the position is after them.
+fn autocorrect(
+    edit: &mut desk_model::Edit,
+    at: desk_model::Position,
+    options: &desk_model::AutoCorrect,
+) -> Result<desk_model::Position, ModelError> {
+    let text = edit.document().paragraph(at.paragraph)?.text();
+    let Some(correction) = options.correct(text.get(..at.offset).unwrap_or_default()) else {
+        return Ok(at);
+    };
+    let found = desk_model::Found {
+        paragraph: at.paragraph,
+        index: 0,
+        range: correction.range.clone(),
+    };
+    let end = edit.replace_found(&found, &correction.text)?;
+    if let Some(raised) = &correction.superscript {
+        let start = correction.range.start;
+        edit.set_character_attrs(
+            desk_model::Position::new(at.paragraph, start + raised.start),
+            desk_model::Position::new(at.paragraph, start + raised.end),
+            &CharAttrs {
+                baseline: Some(desk_model::Baseline::Superscript),
+                ..CharAttrs::default()
+            },
+        )?;
+    }
+    Ok(desk_model::Position::new(
+        at.paragraph,
+        at.offset + end.offset - correction.range.end,
+    ))
+}
+
 /// The position of the model at a spot.
 fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, ModelError> {
     spot.position(document).ok_or(ModelError::IndexOutOfBounds {
@@ -349,6 +384,7 @@ impl TextEditor {
             } else {
                 None
             };
+            let preferences = crate::preferences::get();
             let edits = |edit: &mut desk_model::Edit| {
                 let document = edit.document();
                 let from = at_spot(document, start)?;
@@ -358,9 +394,33 @@ impl TextEditor {
                 } else {
                     edit.delete(from, to)?
                 };
-                let after = edit.insert_text(at, text)?;
+                let mut chars = text.chars();
+                let typed = match (chars.next(), chars.next()) {
+                    (Some(c), None) if name == "Typing" => Some(c),
+                    _ => None,
+                };
+                let before = edit.document().paragraph(at.paragraph)?.text();
+                let before = before.get(..at.offset).unwrap_or_default();
+                // Smart quotes (TXT-06).
+                let quoted;
+                let text = match typed {
+                    Some(c @ ('"' | '\'')) if preferences.smart_quotes => {
+                        quoted = desk_model::smart_quote(before.chars().next_back(), c).to_string();
+                        quoted.as_str()
+                    }
+                    _ => text,
+                };
+                let mut after = edit.insert_text(at, text)?;
                 if let Some(pending) = &pending {
                     edit.set_character_attrs(at, after, pending)?;
+                }
+                // The corrections of the word that the character ends
+                // (TXT-07).
+                if let Some(c) = typed
+                    && desk_model::ends_word(c)
+                {
+                    let corrected = autocorrect(edit, at, &preferences.autocorrect)?;
+                    after.offset = after.offset + corrected.offset - at.offset;
                 }
                 Ok(Spot::of(edit.document(), after))
             };
@@ -429,7 +489,8 @@ impl TextEditor {
     fn split(&self) {
         let before = self.selection();
         let (start, end) = before.ordered();
-        let automatic = crate::preferences::get().automatic_lists;
+        let preferences = crate::preferences::get();
+        let automatic = preferences.automatic_lists;
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Typing", |edit| {
@@ -444,7 +505,7 @@ impl TextEditor {
                     }
                 }
                 let mut at = if start == end {
-                    from
+                    autocorrect(edit, from, &preferences.autocorrect)?
                 } else {
                     edit.delete(from, to)?
                 };
@@ -690,6 +751,107 @@ impl TextEditor {
         self.format_ranges("List Style", |edit, from, to| {
             edit.set_list_style(from, to, style)
         });
+    }
+
+    /// The text that the Writing Tools look up (INT-20): the selection,
+    /// or the word at the cursor.
+    pub fn lookup_text(&self) -> String {
+        let selection = self.selection();
+        if !selection.is_empty() {
+            return self.selected_text();
+        }
+        let word = self.unit_at(selection.focus, Unit::Word);
+        let (start, end) = word.ordered();
+        let state = self.state.borrow();
+        state
+            .editor
+            .document()
+            .body()
+            .get(start.paragraph)
+            .filter(|_| start.paragraph == end.paragraph)
+            .and_then(|p| p.text().get(start.offset..end.offset).map(str::to_owned))
+            .unwrap_or_default()
+            .trim()
+            .to_owned()
+    }
+
+    /// The counts of the document, and of the selection when there is
+    /// one (INT-20).
+    pub fn statistics(&self) -> (desk_model::Statistics, Option<desk_model::Statistics>) {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        let all = document.statistics();
+        let (start, end) = state.selection.ordered();
+        let selected = (start != end)
+            .then(|| {
+                document
+                    .statistics_between(start.position(document)?, end.position(document)?)
+                    .ok()
+            })
+            .flatten();
+        (all, selected)
+    }
+
+    /// Everything that a search finds in the document (TXT-12, TXT-13).
+    pub fn find(&self, query: &desk_model::Query) -> Vec<desk_model::Found> {
+        self.state.borrow().editor.document().find(query)
+    }
+
+    /// Selects a piece of text that a search found, and shows it.
+    pub fn select_found(&self, found: &desk_model::Found) {
+        self.state.borrow_mut().typing = false;
+        self.select(Selection {
+            anchor: Spot {
+                paragraph: found.index,
+                offset: found.range.start,
+            },
+            focus: Spot {
+                paragraph: found.index,
+                offset: found.range.end,
+            },
+        });
+    }
+
+    /// Scrolls to the selection (Jump to Selection).
+    pub fn show_selection(&self) {
+        let selection = self.selection();
+        self.select(selection);
+    }
+
+    /// The page, from 0, that a piece of text is on.
+    pub fn page_of(&self, found: &desk_model::Found) -> Option<usize> {
+        let state = self.state.borrow();
+        let spot = Spot {
+            paragraph: found.index,
+            offset: found.range.start,
+        };
+        text_nav::caret(&state.layout, spot).map(|c| c.page)
+    }
+
+    /// Replaces a piece of text that a search found, as one action of the
+    /// history, and puts the cursor after it.
+    pub fn replace_found(&self, found: &desk_model::Found, with: &str) {
+        let before = self.selection();
+        let result = self.state.borrow_mut().editor.edit("Replace", |edit| {
+            let after = edit.replace_found(found, with)?;
+            Ok(Spot::of(edit.document(), after))
+        });
+        self.finish_edit(before, result);
+    }
+
+    /// Replaces everything a search finds, as one action of the history,
+    /// and gives how many pieces were replaced.
+    pub fn replace_all(&self, query: &desk_model::Query, with: &str) -> usize {
+        let before = self.selection();
+        let mut count = 0;
+        let result = self.state.borrow_mut().editor.edit("Replace All", |edit| {
+            count = edit.replace_all(query, with)?;
+            Ok(Some(before.ordered().0))
+        });
+        if count > 0 {
+            self.finish_edit(before, result);
+        }
+        count
     }
 
     /// The styles of the document.
