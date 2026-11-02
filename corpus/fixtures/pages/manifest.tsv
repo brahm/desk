@@ -54,6 +54,7 @@ TXT-06		Aspas inteligentes	skipped	Only about the application, its dialogs or an
 TXT-07		Correção e substituição automáticas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-08	txt-08-est-06-breaks-spaces.pages	A non-breaking space and a manual line break	made	
 TXT-09	txt-09-hyphenation.pages	A paragraph with hyphenation removed	made	Automatic hyphenation of the document is off here, as in every document of the fixtures, so neither paragraph is hyphenated; the import logs the setting when it is on.
+TXT-09	txt-09-never-hyphenate.pages	Automatic hyphenation on, and Never Hyphenate chosen for one word	made	The document holds only kSFWPAutoHyphenationProperty: Pages keeps Never Hyphenate in the user's HyphenationExceptions.plist, for every document, not in the document. On the reference machine no word gets a hyphen, on screen or in the PDF.
 TXT-10		Verificação ortográfica	skipped	Spell checking is interface; the language it uses is in fmt-22-language.
 TXT-11		Revisor gramatical (Proofreader)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-12		Localizar e substituir	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
@@ -74,7 +75,7 @@ FMT-04	fmt-03-04-shadow-outline.pages	Text shadow with angle, offset, blur, opac
 FMT-05	fmt-05-06-size-baseline.pages	Font sizes, superscript, subscript and an exact baseline shift	made	
 FMT-06	fmt-05-06-size-baseline.pages	Font sizes, superscript, subscript and an exact baseline shift	made	
 FMT-07	fmt-07-capitalization.pages	All caps, small caps and title capitalization	made	
-FMT-08		Tipografia avançada	skipped	Not attempted: the Typography panel of the Fonts window.
+FMT-08		Tipografia avançada	skipped	The Typography panel of the Fonts window does not open in Pages '09 on the reference machine (-[NSTypographyPanel noAlternateGlyphsStaticString]: unrecognized selector, in macOS 10.14), and no iWork template or theme holds a font feature.
 FMT-09	fmt-09-ligatures.pages	Ligatures set to all and to none	made	
 FMT-10	fmt-10-tracking.pages	Character spacing positive and negative	made	
 FMT-11	fmt-11-color.pages	Text colors	made	
