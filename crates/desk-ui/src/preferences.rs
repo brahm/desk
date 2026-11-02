@@ -311,7 +311,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     rulers.add(&vertical);
     let lists = adw::SwitchRow::builder()
         .title(tr("Automatically Detect Lists"))
-        .subtitle(tr("“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return"))
+        .subtitle(tr(
+            "“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return",
+        ))
         .active(current.automatic_lists)
         .build();
     let editing = adw::PreferencesGroup::builder()

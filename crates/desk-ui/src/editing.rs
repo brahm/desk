@@ -25,7 +25,6 @@ use crate::access::AccessText;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
-/// The position of the model at a spot.
 /// Whether a paragraph is an item of a list: its list style has a label at
 /// its level.
 fn in_list(document: &Document, paragraph: desk_model::NodeId) -> bool {
@@ -40,6 +39,7 @@ fn in_list(document: &Document, paragraph: desk_model::NodeId) -> bool {
         .is_some_and(|list| list.level(format.list_level).label.is_some())
 }
 
+/// The position of the model at a spot.
 fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, ModelError> {
     spot.position(document).ok_or(ModelError::IndexOutOfBounds {
         index: spot.paragraph,
@@ -98,6 +98,8 @@ pub struct Format {
     pub paragraph: ParaFormat,
     /// The paragraph style.
     pub style: Option<StyleId>,
+    /// The list style of the paragraph, when it has one.
+    pub list: Option<desk_model::ListStyle>,
 }
 
 /// Edits the document of a window.
@@ -575,9 +577,11 @@ impl TextEditor {
         {
             attrs.merge(pending);
         }
+        let format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
         Format {
             character: styles.resolve_character(paragraph.style(), style, &attrs),
-            paragraph: styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+            list: format.list_style.and_then(|id| styles.list(id)).cloned(),
+            paragraph: format,
             style: Some(paragraph.style()),
         }
     }
