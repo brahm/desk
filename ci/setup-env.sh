@@ -25,7 +25,9 @@ $sudo apt-get install --yes --no-install-recommends \
     build-essential pkg-config curl ca-certificates git python3-pip \
     libgtk-4-dev libadwaita-1-dev libcairo2-dev libfontconfig-dev \
     fonts-liberation fonts-dejavu-core fonts-texgyre fonts-urw-base35 \
-    fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils jing unzip
+    fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils jing unzip \
+    xvfb xauth xdotool dbus at-spi2-core python3-gi gir1.2-atspi-2.0 gettext \
+    desktop-file-utils appstream
 
 if ! command -v rustup >/dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |

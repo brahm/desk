@@ -16,6 +16,7 @@ use gtk::{gdk, gio, glib};
 use crate::editing::TextEditor;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
+use crate::i18n::{tr, trn};
 use crate::view::DocumentView;
 use crate::{AppInfo, Opener};
 
@@ -94,34 +95,37 @@ impl DocumentWindow {
             .icon_name("open-menu-symbolic")
             .menu_model(&main_menu(info, opener.is_some()))
             .primary(true)
-            .tooltip_text("Main Menu")
+            .tooltip_text(tr("Main Menu"))
             .build();
 
         let title = adw::WindowTitle::new(info.name, "");
         let header = adw::HeaderBar::builder().title_widget(&title).build();
         if opener.is_some() {
             let open = gtk::Button::builder()
-                .label("_Open")
+                .label(tr("_Open"))
                 .use_underline(true)
                 .action_name("app.open")
-                .tooltip_text("Open a Document")
+                .tooltip_text(tr("Open a Document"))
                 .build();
             header.pack_start(&open);
         }
+        formatting::labelled(&menu_button, &tr("Main Menu"));
         header.pack_end(&menu_button);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
-            .tooltip_text("Leave Fullscreen")
+            .tooltip_text(tr("Leave Fullscreen"))
             .action_name("win.fullscreen")
             .visible(false)
             .build();
+        formatting::labelled(&leave_fullscreen, &tr("Leave Fullscreen"));
         header.pack_end(&leave_fullscreen);
         let warnings_button = gtk::Button::builder()
             .icon_name("dialog-warning-symbolic")
-            .tooltip_text("Document Warnings")
+            .tooltip_text(tr("Document Warnings"))
             .action_name("win.warnings")
             .visible(false)
             .build();
+        formatting::labelled(&warnings_button, &tr("Document Warnings"));
         header.pack_end(&warnings_button);
 
         let status = adw::StatusPage::builder()
@@ -129,11 +133,11 @@ impl DocumentWindow {
             .title(info.name)
             .build();
         if opener.is_some() {
-            status.set_description(Some(
+            status.set_description(Some(&tr(
                 "Open an OpenDocument text or a Pages document to edit it.",
-            ));
+            )));
             let open = gtk::Button::builder()
-                .label("_Open a Document…")
+                .label(tr("_Open a Document…"))
                 .use_underline(true)
                 .action_name("app.open")
                 .halign(gtk::Align::Center)
@@ -141,9 +145,9 @@ impl DocumentWindow {
                 .build();
             status.set_child(Some(&open));
         } else {
-            status.set_description(Some(
+            status.set_description(Some(&tr(
                 "This app is at an early stage of development and cannot open documents yet.",
-            ));
+            )));
         }
 
         let view = DocumentView::new();
@@ -155,7 +159,7 @@ impl DocumentWindow {
             .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
             .menu_model(&zoom_menu())
             .direction(gtk::ArrowType::Up)
-            .tooltip_text("Zoom")
+            .tooltip_text(tr("Zoom"))
             .css_classes(["flat"])
             .build();
         let counts_label = gtk::Label::builder()
@@ -310,7 +314,10 @@ impl DocumentWindow {
                 }
             }
             Err(message) => {
-                self.alert(&format!("Cannot open {}", display_name(path)), &message);
+                self.alert(
+                    &tr("Cannot open {name}").replace("{name}", &display_name(path)),
+                    &message,
+                );
             }
         }
     }
@@ -387,6 +394,9 @@ impl DocumentWindow {
             self.title
                 .set_subtitle(&path.as_deref().map(folder_of).unwrap_or_default());
             self.window.set_title(Some(&format!("{edited}{name}")));
+            self.view
+                .access()
+                .update_property(&[gtk::accessible::Property::Label(&name)]);
             self.counts_label
                 .set_label(&counts(editor.word_count(), self.view.page_count()));
         }
@@ -421,7 +431,7 @@ impl DocumentWindow {
 
     fn alert(&self, heading: &str, body: &str) {
         let dialog = adw::AlertDialog::new(Some(heading), Some(body));
-        dialog.add_response("close", "_Close");
+        dialog.add_response("close", &tr("_Close"));
         dialog.present(Some(&self.window));
     }
 
@@ -444,7 +454,10 @@ impl DocumentWindow {
         match crate::save_document(opener, &editor.document(), pages.first(), path) {
             Ok(()) => true,
             Err(message) => {
-                self.alert(&format!("Cannot save {}", display_name(path)), &message);
+                self.alert(
+                    &tr("Cannot save {name}").replace("{name}", &display_name(path)),
+                    &message,
+                );
                 false
             }
         }
@@ -471,7 +484,7 @@ impl DocumentWindow {
     /// that file.
     fn save_as(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
         let weak = Rc::downgrade(self);
-        self.ask_file("Save", move |path| {
+        self.ask_file(&tr("Save"), move |path| {
             let Some(this) = weak.upgrade() else { return };
             match path {
                 Some(path) if this.write_to(&path) => {
@@ -487,7 +500,7 @@ impl DocumentWindow {
     /// still editing the same file.
     fn save_copy(self: &Rc<Self>) {
         let weak = Rc::downgrade(self);
-        self.ask_file("Save a Copy", move |path| {
+        self.ask_file(&tr("Save a Copy"), move |path| {
             if let (Some(this), Some(path)) = (weak.upgrade(), path)
                 && this.write_to(&path)
             {
@@ -513,7 +526,7 @@ impl DocumentWindow {
         let Some(opener) = self.opener else { return };
         let (kind, extension) = opener.saves;
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some(kind));
+        filter.set_name(Some(&tr(kind)));
         filter.add_suffix(extension);
         let filters = gio::ListStore::new::<gtk::FileFilter>();
         filters.append(&filter);
@@ -574,14 +587,14 @@ impl DocumentWindow {
             return;
         };
         let dialog = adw::AlertDialog::new(
-            Some("Revert to Saved?"),
-            Some(&format!(
-                "The changes made to “{}” since it was last saved will be lost.",
-                self.name.borrow()
-            )),
+            Some(&tr("Revert to Saved?")),
+            Some(
+                &tr("The changes made to “{name}” since it was last saved will be lost.")
+                    .replace("{name}", &self.name.borrow()),
+            ),
         );
-        dialog.add_response("cancel", "_Cancel");
-        dialog.add_response("revert", "_Revert");
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("revert", &tr("_Revert"));
         dialog.set_response_appearance("revert", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -603,15 +616,15 @@ impl DocumentWindow {
             return glib::Propagation::Proceed;
         }
         let dialog = adw::AlertDialog::new(
-            Some("Save Changes?"),
-            Some(&format!(
-                "“{}” has changes that are not saved. If you close it without saving, they are lost.",
-                self.name.borrow()
-            )),
+            Some(&tr("Save Changes?")),
+            Some(
+                &tr("“{name}” has changes that are not saved. If you close it without saving, they are lost.")
+                    .replace("{name}", &self.name.borrow()),
+            ),
         );
-        dialog.add_response("cancel", "_Cancel");
-        dialog.add_response("discard", "_Don’t Save");
-        dialog.add_response("save", "_Save");
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("discard", &tr("_Don’t Save"));
+        dialog.add_response("save", &tr("_Save"));
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("save"));
@@ -880,15 +893,15 @@ impl DocumentWindow {
     fn connect_context_menu(&self) {
         let menu = gio::Menu::new();
         let edit = gio::Menu::new();
-        edit.append(Some("Cu_t"), Some("win.cut"));
-        edit.append(Some("_Copy"), Some("win.copy"));
-        edit.append(Some("_Paste"), Some("win.paste"));
-        edit.append(Some("Select _All"), Some("win.select-all"));
+        edit.append(Some(&tr("Cu_t")), Some("win.cut"));
+        edit.append(Some(&tr("_Copy")), Some("win.copy"));
+        edit.append(Some(&tr("_Paste")), Some("win.paste"));
+        edit.append(Some(&tr("Select _All")), Some("win.select-all"));
         menu.append_section(None, &edit);
         let format = gio::Menu::new();
-        format.append(Some("_Bold"), Some("win.bold"));
-        format.append(Some("_Italic"), Some("win.italic"));
-        format.append(Some("_Underline"), Some("win.underline"));
+        format.append(Some(&tr("_Bold")), Some("win.bold"));
+        format.append(Some(&tr("_Italic")), Some("win.italic"));
+        format.append(Some(&tr("_Underline")), Some("win.underline"));
         menu.append_section(None, &format);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(self.view.area());
@@ -933,46 +946,41 @@ impl DocumentWindow {
 fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     let file = gio::Menu::new();
-    file.append(Some("_New Window"), Some("app.new-window"));
+    file.append(Some(&tr("_New Window")), Some("app.new-window"));
     if opens {
-        file.append(Some("_Open…"), Some("app.open"));
+        file.append(Some(&tr("_Open…")), Some("app.open"));
     }
     menu.append_section(None, &file);
     if opens {
         let save = gio::Menu::new();
-        save.append(Some("_Save"), Some("win.save"));
-        save.append(Some("Save _As…"), Some("win.save-as"));
-        save.append(Some("Save a _Copy…"), Some("win.save-copy"));
-        save.append(Some("_Duplicate"), Some("win.duplicate"));
-        save.append(Some("_Revert to Saved"), Some("win.revert"));
+        save.append(Some(&tr("_Save")), Some("win.save"));
+        save.append(Some(&tr("Save _As…")), Some("win.save-as"));
+        save.append(Some(&tr("Save a _Copy…")), Some("win.save-copy"));
+        save.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
+        save.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
         menu.append_section(None, &save);
         let document = gio::Menu::new();
-        document.append(Some("_Fullscreen"), Some("win.fullscreen"));
-        document.append(Some("Document _Info"), Some("win.properties"));
+        document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
+        document.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append_section(None, &document);
     }
     let close = gio::Menu::new();
-    close.append(Some("C_lose"), Some("win.close"));
-    close.append(Some("Close _All Windows"), Some("app.close-all"));
+    close.append(Some(&tr("C_lose")), Some("win.close"));
+    close.append(Some(&tr("Close _All Windows")), Some("app.close-all"));
     menu.append_section(None, &close);
     let help = gio::Menu::new();
-    help.append(Some(&format!("_About {}", info.name)), Some("app.about"));
+    help.append(
+        Some(&tr("_About {app}").replace("{app}", info.name)),
+        Some("app.about"),
+    );
     menu.append_section(None, &help);
     menu
 }
 
 /// The counts at the bottom of the window.
 fn counts(words: usize, pages: usize) -> String {
-    let words = if words == 1 {
-        "1 word".to_owned()
-    } else {
-        format!("{words} words")
-    };
-    let pages = if pages == 1 {
-        "1 page".to_owned()
-    } else {
-        format!("{pages} pages")
-    };
+    let words = trn("{n} word", "{n} words", words as u64).replace("{n}", &words.to_string());
+    let pages = trn("{n} page", "{n} pages", pages as u64).replace("{n}", &pages.to_string());
     format!("{words} · {pages}")
 }
 
@@ -1003,8 +1011,11 @@ fn zoom_menu() -> gio::Menu {
     }
     menu.append_section(None, &levels);
     let fit = gio::Menu::new();
-    for (label, target) in [("Fit _Width", "fit-width"), ("Fit _Page", "fit-page")] {
-        let item = gio::MenuItem::new(Some(label), None);
+    for (label, target) in [
+        (tr("Fit _Width"), "fit-width"),
+        (tr("Fit _Page"), "fit-page"),
+    ] {
+        let item = gio::MenuItem::new(Some(&label), None);
         item.set_action_and_target_value(Some("win.zoom"), Some(&target.to_variant()));
         fit.append_item(&item);
     }

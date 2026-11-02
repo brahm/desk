@@ -1,0 +1,518 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Desk package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Desk\n"
+"Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
+"POT-Creation-Date: 2026-11-02 00:54+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: crates/desk-ui/src/area.rs:43
+msgid "Document"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:100 crates/desk-ui/src/formatting.rs:103
+msgid "Paragraph Style"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:107 crates/desk-ui/src/formatting.rs:230
+msgid "Font"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:114 crates/desk-ui/src/formatting.rs:115
+msgid "Font Size"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:120 crates/desk-ui/src/formatting.rs:125
+#: crates/desk-ui/src/formatting.rs:126
+msgid "Text Color"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:131 crates/desk-ui/src/shortcuts.rs:71
+msgid "Bold"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:132 crates/desk-ui/src/shortcuts.rs:72
+msgid "Italic"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:136 crates/desk-ui/src/shortcuts.rs:73
+msgid "Underline"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:141
+msgid "Strikethrough"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:156
+msgid "Align Left"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:157 crates/desk-ui/src/shortcuts.rs:75
+msgid "Center"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:158
+msgid "Align Right"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:159
+msgid "Justify"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:177 crates/desk-ui/src/formatting.rs:179
+#: crates/desk-ui/src/shortcuts.rs:78
+msgid "Inspector"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:384
+msgid "Line Spacing"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:384
+msgid "Lines"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:385
+msgid "Before Paragraph"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:385 crates/desk-ui/src/formatting.rs:386
+#: crates/desk-ui/src/formatting.rs:387 crates/desk-ui/src/formatting.rs:388
+#: crates/desk-ui/src/formatting.rs:389
+msgid "Points"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:386
+msgid "After Paragraph"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:387
+msgid "First Line"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:388
+msgid "Left"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:389
+msgid "Right"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:392
+msgid "Spacing"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:398
+msgid "Indents"
+msgstr ""
+
+#: crates/desk-ui/src/lib.rs:190
+msgid ""
+"The font {requested} is not installed, so {used} is used, which has the same "
+"metrics."
+msgstr ""
+
+#: crates/desk-ui/src/lib.rs:193
+msgid ""
+"The font {requested} is not installed, so {used} is used, which looks alike; "
+"lines may break elsewhere."
+msgstr ""
+
+#: crates/desk-ui/src/lib.rs:196
+msgid ""
+"The font {requested} is not installed, so {used} is used; lines may break "
+"elsewhere."
+msgstr ""
+
+#: crates/desk-ui/src/lib.rs:352
+msgid "All Documents"
+msgstr ""
+
+#: crates/desk-ui/src/lib.rs:366 crates/desk-ui/src/window.rs:108
+msgid "Open a Document"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:35
+msgid "Unknown"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:47
+msgid "Name"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:48
+msgid "Location"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:50
+msgid "Size"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:54
+msgid "Created"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:58
+msgid "Modified"
+msgstr ""
+
+#: crates/desk-ui/src/properties.rs:90
+msgid "Document Info"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:16
+msgid "Documents"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:19
+msgid "Open a document"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:20 crates/desk-ui/src/window.rs:487
+msgid "Save"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:21
+msgid "Save As"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:22
+msgid "Duplicate"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:23
+msgid "Document info"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:27
+msgid "Windows"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:30
+msgid "New window"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:31
+msgid "Close the window"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:32
+msgid "Close all windows"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:33
+msgid "Quit"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:34
+msgid "Fullscreen"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:35
+msgid "Keyboard shortcuts"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:39
+msgid "Editing"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:42
+msgid "Undo"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:43
+msgid "Redo"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:44
+msgid "Cut"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:45
+msgid "Copy"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:46
+msgid "Paste"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:47
+msgid "Select all"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:48
+msgid "Line break"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:49
+msgid "Delete the word before"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:53
+msgid "Moving and Selecting"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:56
+msgid "Move by word"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:57
+msgid "Move by paragraph"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:58
+msgid "Start or end of the line"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:61
+msgid "Start or end of the document"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:63
+msgid "Select while moving"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:64
+msgid "Context menu"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:68
+msgid "Formatting"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:74
+msgid "Align left"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:76
+msgid "Align right"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:77
+msgid "Show invisibles"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:82
+msgid "View"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:85
+msgid "Zoom in"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:86
+msgid "Zoom out"
+msgstr ""
+
+#: crates/desk-ui/src/shortcuts.rs:87
+msgid "Actual size"
+msgstr ""
+
+#: crates/desk-ui/src/warnings.rs:27 crates/desk-ui/src/window.rs:897
+msgid "_Copy"
+msgstr ""
+
+#: crates/desk-ui/src/warnings.rs:29
+msgid "Copy the warnings as text"
+msgstr ""
+
+#: crates/desk-ui/src/warnings.rs:40
+msgid "{document} opened with these changes. Saving it keeps them."
+msgstr ""
+
+#: crates/desk-ui/src/warnings.rs:69 crates/desk-ui/src/window.rs:124
+#: crates/desk-ui/src/window.rs:128
+msgid "Document Warnings"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:98 crates/desk-ui/src/window.rs:112
+msgid "Main Menu"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:105
+msgid "_Open"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:116 crates/desk-ui/src/window.rs:120
+msgid "Leave Fullscreen"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:137
+msgid "Open an OpenDocument text or a Pages document to edit it."
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:140
+msgid "_Open a Document…"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:149
+msgid ""
+"This app is at an early stage of development and cannot open documents yet."
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:162
+msgid "Zoom"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:318
+msgid "Cannot open {name}"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:434
+msgid "_Close"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:458
+msgid "Cannot save {name}"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:503
+msgid "Save a Copy"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:590
+msgid "Revert to Saved?"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:592
+msgid "The changes made to “{name}” since it was last saved will be lost."
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:596 crates/desk-ui/src/window.rs:625
+msgid "_Cancel"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:597
+msgid "_Revert"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:619
+msgid "Save Changes?"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:621
+msgid ""
+"“{name}” has changes that are not saved. If you close it without saving, "
+"they are lost."
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:626
+msgid "_Don’t Save"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:627 crates/desk-ui/src/window.rs:956
+msgid "_Save"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:896
+msgid "Cu_t"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:898
+msgid "_Paste"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:899
+msgid "Select _All"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:902
+msgid "_Bold"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:903
+msgid "_Italic"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:904
+msgid "_Underline"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:949
+msgid "_New Window"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:951
+msgid "_Open…"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:957
+msgid "Save _As…"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:958
+msgid "Save a _Copy…"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:959
+msgid "_Duplicate"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:960
+msgid "_Revert to Saved"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:963
+msgid "_Fullscreen"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:964
+msgid "Document _Info"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:968
+msgid "C_lose"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:969
+msgid "Close _All Windows"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:973
+msgid "_About {app}"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:982
+msgid "{n} word"
+msgid_plural "{n} words"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/desk-ui/src/window.rs:983
+msgid "{n} page"
+msgid_plural "{n} pages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/desk-ui/src/window.rs:1015
+msgid "Fit _Width"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:1016
+msgid "Fit _Page"
+msgstr ""
+
+#: crates/desk-writer/src/main.rs:24 crates/desk-writer/src/main.rs:28
+msgid "OpenDocument Text"
+msgstr ""
+
+#: crates/desk-writer/src/main.rs:25
+msgid "Pages Documents"
+msgstr ""
+
+#: crates/desk-writer/src/main.rs:61
+msgid ""
+"Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
+msgstr ""

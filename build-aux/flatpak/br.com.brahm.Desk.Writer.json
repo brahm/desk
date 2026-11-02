@@ -1,0 +1,44 @@
+{
+    "id": "br.com.brahm.Desk.Writer",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "50",
+    "sdk": "org.gnome.Sdk",
+    "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+    "command": "desk-writer",
+    "finish-args": [
+        "--share=ipc",
+        "--socket=fallback-x11",
+        "--socket=wayland",
+        "--device=dri"
+    ],
+    "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin",
+        "build-args": ["--share=network"],
+        "env": {
+            "CARGO_HOME": "/run/build/desk/cargo",
+            "CARGO_TARGET_DIR": "/run/build/desk/target"
+        }
+    },
+    "cleanup": ["/share/doc"],
+    "modules": [
+        {
+            "name": "desk",
+            "buildsystem": "simple",
+            "build-commands": [
+                "cargo build --release --locked --package desk-writer",
+                "install -Dm755 $CARGO_TARGET_DIR/release/desk-writer -t /app/bin",
+                "install -Dm644 data/br.com.brahm.Desk.Writer.desktop -t /app/share/applications",
+                "install -Dm644 data/br.com.brahm.Desk.Writer.metainfo.xml -t /app/share/metainfo",
+                "install -Dm644 data/icons/hicolor/scalable/apps/br.com.brahm.Desk.Writer.svg -t /app/share/icons/hicolor/scalable/apps",
+                "install -Dm644 data/icons/hicolor/symbolic/apps/br.com.brahm.Desk.Writer-symbolic.svg -t /app/share/icons/hicolor/symbolic/apps"
+            ],
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "../..",
+                    "skip": ["target", "fuzz", "corpus", "site", "experiments"]
+                }
+            ]
+        }
+    ]
+}

@@ -18,6 +18,7 @@ use desk_model::{Alignment, CharAttrs, Length, LineSpacing, ParaAttrs, Rgba, Sty
 use gtk::{gdk, glib};
 
 use crate::editing::{Format, TextEditor};
+use crate::i18n::{n_, tr};
 
 /// Finds the editor of the window, if it shows a document.
 pub type EditorOf = Rc<dyn Fn() -> Option<TextEditor>>;
@@ -96,70 +97,72 @@ impl FormatBar {
 
         let styles = gtk::DropDown::builder()
             .model(&gtk::StringList::new(&[]))
-            .tooltip_text("Paragraph Style")
+            .tooltip_text(tr("Paragraph Style"))
             .enable_search(true)
             .build();
-        styles.update_property(&[gtk::accessible::Property::Label("Paragraph Style")]);
+        styles.update_property(&[gtk::accessible::Property::Label(&tr("Paragraph Style"))]);
         root.append(&styles);
 
         let font = gtk::Button::builder()
-            .tooltip_text("Font")
+            .tooltip_text(tr("Font"))
             .width_request(140)
             .build();
         root.append(&font);
 
         let size = gtk::SpinButton::with_range(1.0, MAX_FONT_SIZE, 1.0);
         size.set_digits(0);
-        size.set_tooltip_text(Some("Font Size"));
-        size.update_property(&[gtk::accessible::Property::Label("Font Size")]);
+        size.set_tooltip_text(Some(&tr("Font Size")));
+        size.update_property(&[gtk::accessible::Property::Label(&tr("Font Size"))]);
         root.append(&size);
 
         let color = gtk::ColorDialogButton::new(Some(
             gtk::ColorDialog::builder()
-                .title("Text Color")
+                .title(tr("Text Color"))
                 .modal(true)
                 .with_alpha(true)
                 .build(),
         ));
-        color.set_tooltip_text(Some("Text Color"));
+        color.set_tooltip_text(Some(&tr("Text Color")));
+        labelled(&color, &tr("Text Color"));
         root.append(&color);
 
         let toggles = gtk::Box::builder().css_classes(["linked"]).build();
         for (icon, action, tooltip) in [
-            ("format-text-bold-symbolic", "win.bold", "Bold"),
-            ("format-text-italic-symbolic", "win.italic", "Italic"),
+            ("format-text-bold-symbolic", "win.bold", n_("Bold")),
+            ("format-text-italic-symbolic", "win.italic", n_("Italic")),
             (
                 "format-text-underline-symbolic",
                 "win.underline",
-                "Underline",
+                n_("Underline"),
             ),
             (
                 "format-text-strikethrough-symbolic",
                 "win.strikethrough",
-                "Strikethrough",
+                n_("Strikethrough"),
             ),
         ] {
-            toggles.append(
-                &gtk::ToggleButton::builder()
-                    .icon_name(icon)
-                    .action_name(action)
-                    .tooltip_text(tooltip)
-                    .build(),
-            );
+            let button = gtk::ToggleButton::builder()
+                .icon_name(icon)
+                .action_name(action)
+                .tooltip_text(tr(tooltip))
+                .build();
+            labelled(&button, &tr(tooltip));
+            toggles.append(&button);
         }
         root.append(&toggles);
 
         let alignments = gtk::Box::builder().css_classes(["linked"]).build();
         for (icon, target, tooltip) in [
-            ("format-justify-left-symbolic", "left", "Align Left"),
-            ("format-justify-center-symbolic", "center", "Center"),
-            ("format-justify-right-symbolic", "right", "Align Right"),
-            ("format-justify-fill-symbolic", "justify", "Justify"),
+            ("format-justify-left-symbolic", "left", n_("Align Left")),
+            ("format-justify-center-symbolic", "center", n_("Center")),
+            ("format-justify-right-symbolic", "right", n_("Align Right")),
+            ("format-justify-fill-symbolic", "justify", n_("Justify")),
         ] {
             let button = gtk::ToggleButton::builder()
                 .icon_name(icon)
-                .tooltip_text(tooltip)
+                .tooltip_text(tr(tooltip))
                 .build();
+            labelled(&button, &tr(tooltip));
             button.set_action_name(Some("win.align"));
             button.set_action_target_value(Some(&target.to_variant()));
             alignments.append(&button);
@@ -168,13 +171,13 @@ impl FormatBar {
 
         let spacer = gtk::Box::builder().hexpand(true).build();
         root.append(&spacer);
-        root.append(
-            &gtk::ToggleButton::builder()
-                .icon_name("sidebar-show-right-symbolic")
-                .action_name("win.inspector")
-                .tooltip_text("Inspector")
-                .build(),
-        );
+        let inspector = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-right-symbolic")
+            .action_name("win.inspector")
+            .tooltip_text(tr("Inspector"))
+            .build();
+        labelled(&inspector, &tr("Inspector"));
+        root.append(&inspector);
 
         let this = Rc::new(Self {
             root,
@@ -224,7 +227,7 @@ impl FormatBar {
             let window = button.root().and_downcast::<gtk::Window>();
             let of = of.clone();
             gtk::FontDialog::builder()
-                .title("Font")
+                .title(tr("Font"))
                 .modal(true)
                 .build()
                 .choose_family(
@@ -378,18 +381,22 @@ impl Inspector {
             row.set_digits(digits);
             row
         };
-        let line_spacing = row("Line Spacing", "Lines", 0.5, 10.0, 0.1, 1);
-        let before = row("Before Paragraph", "Points", 0.0, 1584.0, 1.0, 0);
-        let after = row("After Paragraph", "Points", 0.0, 1584.0, 1.0, 0);
-        let first_line = row("First Line", "Points", -1584.0, 1584.0, 1.0, 0);
-        let left = row("Left", "Points", 0.0, 1584.0, 1.0, 0);
-        let right = row("Right", "Points", 0.0, 1584.0, 1.0, 0);
+        let line_spacing = row(&tr("Line Spacing"), &tr("Lines"), 0.5, 10.0, 0.1, 1);
+        let before = row(&tr("Before Paragraph"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
+        let after = row(&tr("After Paragraph"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
+        let first_line = row(&tr("First Line"), &tr("Points"), -1584.0, 1584.0, 1.0, 0);
+        let left = row(&tr("Left"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
+        let right = row(&tr("Right"), &tr("Points"), 0.0, 1584.0, 1.0, 0);
 
-        let spacing = adw::PreferencesGroup::builder().title("Spacing").build();
+        let spacing = adw::PreferencesGroup::builder()
+            .title(tr("Spacing"))
+            .build();
         spacing.add(&line_spacing);
         spacing.add(&before);
         spacing.add(&after);
-        let indents = adw::PreferencesGroup::builder().title("Indents").build();
+        let indents = adw::PreferencesGroup::builder()
+            .title(tr("Indents"))
+            .build();
         indents.add(&first_line);
         indents.add(&left);
         indents.add(&right);
@@ -472,6 +479,11 @@ impl Inspector {
         set(&self.right, paragraph.right_indent.to_pt());
         self.updating.set(false);
     }
+}
+
+/// Names a button that shows only an icon, for screen readers.
+pub fn labelled(widget: &impl IsA<gtk::Accessible>, label: &str) {
+    widget.update_property(&[gtk::accessible::Property::Label(label)]);
 }
 
 /// The value of a boolean action's state.

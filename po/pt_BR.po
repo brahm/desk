@@ -1,0 +1,517 @@
+# Portuguese translations for Desk package.
+# Copyright (C) 2026 Desk contributors
+# This file is distributed under the same license as the Desk package.
+# Desk contributors, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Desk\n"
+"Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
+"POT-Creation-Date: 2026-11-02 00:54+0000\n"
+"PO-Revision-Date: 2026-11-02 00:54+0000\n"
+"Last-Translator: Desk contributors\n"
+"Language-Team: Brazilian Portuguese\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: crates/desk-ui/src/area.rs:43
+msgid "Document"
+msgstr "Documento"
+
+#: crates/desk-ui/src/formatting.rs:100 crates/desk-ui/src/formatting.rs:103
+msgid "Paragraph Style"
+msgstr "Estilo de parágrafo"
+
+#: crates/desk-ui/src/formatting.rs:107 crates/desk-ui/src/formatting.rs:230
+msgid "Font"
+msgstr "Fonte"
+
+#: crates/desk-ui/src/formatting.rs:114 crates/desk-ui/src/formatting.rs:115
+msgid "Font Size"
+msgstr "Tamanho da fonte"
+
+#: crates/desk-ui/src/formatting.rs:120 crates/desk-ui/src/formatting.rs:125
+#: crates/desk-ui/src/formatting.rs:126
+msgid "Text Color"
+msgstr "Cor do texto"
+
+#: crates/desk-ui/src/formatting.rs:131 crates/desk-ui/src/shortcuts.rs:71
+msgid "Bold"
+msgstr "Negrito"
+
+#: crates/desk-ui/src/formatting.rs:132 crates/desk-ui/src/shortcuts.rs:72
+msgid "Italic"
+msgstr "Itálico"
+
+#: crates/desk-ui/src/formatting.rs:136 crates/desk-ui/src/shortcuts.rs:73
+msgid "Underline"
+msgstr "Sublinhado"
+
+#: crates/desk-ui/src/formatting.rs:141
+msgid "Strikethrough"
+msgstr "Tachado"
+
+#: crates/desk-ui/src/formatting.rs:156
+msgid "Align Left"
+msgstr "Alinhar à esquerda"
+
+#: crates/desk-ui/src/formatting.rs:157 crates/desk-ui/src/shortcuts.rs:75
+msgid "Center"
+msgstr "Centralizar"
+
+#: crates/desk-ui/src/formatting.rs:158
+msgid "Align Right"
+msgstr "Alinhar à direita"
+
+#: crates/desk-ui/src/formatting.rs:159
+msgid "Justify"
+msgstr "Justificar"
+
+#: crates/desk-ui/src/formatting.rs:177 crates/desk-ui/src/formatting.rs:179
+#: crates/desk-ui/src/shortcuts.rs:78
+msgid "Inspector"
+msgstr "Inspetor"
+
+#: crates/desk-ui/src/formatting.rs:384
+msgid "Line Spacing"
+msgstr "Espaçamento entre linhas"
+
+#: crates/desk-ui/src/formatting.rs:384
+msgid "Lines"
+msgstr "Linhas"
+
+#: crates/desk-ui/src/formatting.rs:385
+msgid "Before Paragraph"
+msgstr "Antes do parágrafo"
+
+#: crates/desk-ui/src/formatting.rs:385 crates/desk-ui/src/formatting.rs:386
+#: crates/desk-ui/src/formatting.rs:387 crates/desk-ui/src/formatting.rs:388
+#: crates/desk-ui/src/formatting.rs:389
+msgid "Points"
+msgstr "Pontos"
+
+#: crates/desk-ui/src/formatting.rs:386
+msgid "After Paragraph"
+msgstr "Depois do parágrafo"
+
+#: crates/desk-ui/src/formatting.rs:387
+msgid "First Line"
+msgstr "Primeira linha"
+
+#: crates/desk-ui/src/formatting.rs:388
+msgid "Left"
+msgstr "Esquerda"
+
+#: crates/desk-ui/src/formatting.rs:389
+msgid "Right"
+msgstr "Direita"
+
+#: crates/desk-ui/src/formatting.rs:392
+msgid "Spacing"
+msgstr "Espaçamento"
+
+#: crates/desk-ui/src/formatting.rs:398
+msgid "Indents"
+msgstr "Recuos"
+
+#: crates/desk-ui/src/lib.rs:190
+msgid ""
+"The font {requested} is not installed, so {used} is used, which has the same "
+"metrics."
+msgstr "A fonte {requested} não está instalada, então é usada a {used}, que tem as mesmas métricas."
+
+#: crates/desk-ui/src/lib.rs:193
+msgid ""
+"The font {requested} is not installed, so {used} is used, which looks alike; "
+"lines may break elsewhere."
+msgstr "A fonte {requested} não está instalada, então é usada a {used}, que é parecida; as linhas podem quebrar em outros pontos."
+
+#: crates/desk-ui/src/lib.rs:196
+msgid ""
+"The font {requested} is not installed, so {used} is used; lines may break "
+"elsewhere."
+msgstr "A fonte {requested} não está instalada, então é usada a {used}; as linhas podem quebrar em outros pontos."
+
+#: crates/desk-ui/src/lib.rs:352
+msgid "All Documents"
+msgstr "Todos os documentos"
+
+#: crates/desk-ui/src/lib.rs:366 crates/desk-ui/src/window.rs:108
+msgid "Open a Document"
+msgstr "Abrir um documento"
+
+#: crates/desk-ui/src/properties.rs:35
+msgid "Unknown"
+msgstr "Desconhecido"
+
+#: crates/desk-ui/src/properties.rs:47
+msgid "Name"
+msgstr "Nome"
+
+#: crates/desk-ui/src/properties.rs:48
+msgid "Location"
+msgstr "Local"
+
+#: crates/desk-ui/src/properties.rs:50
+msgid "Size"
+msgstr "Tamanho"
+
+#: crates/desk-ui/src/properties.rs:54
+msgid "Created"
+msgstr "Criado"
+
+#: crates/desk-ui/src/properties.rs:58
+msgid "Modified"
+msgstr "Modificado"
+
+#: crates/desk-ui/src/properties.rs:90
+msgid "Document Info"
+msgstr "Informações do documento"
+
+#: crates/desk-ui/src/shortcuts.rs:16
+msgid "Documents"
+msgstr "Documentos"
+
+#: crates/desk-ui/src/shortcuts.rs:19
+msgid "Open a document"
+msgstr "Abrir um documento"
+
+#: crates/desk-ui/src/shortcuts.rs:20 crates/desk-ui/src/window.rs:487
+msgid "Save"
+msgstr "Salvar"
+
+#: crates/desk-ui/src/shortcuts.rs:21
+msgid "Save As"
+msgstr "Salvar como"
+
+#: crates/desk-ui/src/shortcuts.rs:22
+msgid "Duplicate"
+msgstr "Duplicar"
+
+#: crates/desk-ui/src/shortcuts.rs:23
+msgid "Document info"
+msgstr "Informações do documento"
+
+#: crates/desk-ui/src/shortcuts.rs:27
+msgid "Windows"
+msgstr "Janelas"
+
+#: crates/desk-ui/src/shortcuts.rs:30
+msgid "New window"
+msgstr "Nova janela"
+
+#: crates/desk-ui/src/shortcuts.rs:31
+msgid "Close the window"
+msgstr "Fechar a janela"
+
+#: crates/desk-ui/src/shortcuts.rs:32
+msgid "Close all windows"
+msgstr "Fechar todas as janelas"
+
+#: crates/desk-ui/src/shortcuts.rs:33
+msgid "Quit"
+msgstr "Sair"
+
+#: crates/desk-ui/src/shortcuts.rs:34
+msgid "Fullscreen"
+msgstr "Tela cheia"
+
+#: crates/desk-ui/src/shortcuts.rs:35
+msgid "Keyboard shortcuts"
+msgstr "Atalhos de teclado"
+
+#: crates/desk-ui/src/shortcuts.rs:39
+msgid "Editing"
+msgstr "Edição"
+
+#: crates/desk-ui/src/shortcuts.rs:42
+msgid "Undo"
+msgstr "Desfazer"
+
+#: crates/desk-ui/src/shortcuts.rs:43
+msgid "Redo"
+msgstr "Refazer"
+
+#: crates/desk-ui/src/shortcuts.rs:44
+msgid "Cut"
+msgstr "Recortar"
+
+#: crates/desk-ui/src/shortcuts.rs:45
+msgid "Copy"
+msgstr "Copiar"
+
+#: crates/desk-ui/src/shortcuts.rs:46
+msgid "Paste"
+msgstr "Colar"
+
+#: crates/desk-ui/src/shortcuts.rs:47
+msgid "Select all"
+msgstr "Selecionar tudo"
+
+#: crates/desk-ui/src/shortcuts.rs:48
+msgid "Line break"
+msgstr "Quebra de linha"
+
+#: crates/desk-ui/src/shortcuts.rs:49
+msgid "Delete the word before"
+msgstr "Apagar a palavra anterior"
+
+#: crates/desk-ui/src/shortcuts.rs:53
+msgid "Moving and Selecting"
+msgstr "Mover e selecionar"
+
+#: crates/desk-ui/src/shortcuts.rs:56
+msgid "Move by word"
+msgstr "Mover por palavra"
+
+#: crates/desk-ui/src/shortcuts.rs:57
+msgid "Move by paragraph"
+msgstr "Mover por parágrafo"
+
+#: crates/desk-ui/src/shortcuts.rs:58
+msgid "Start or end of the line"
+msgstr "Início ou fim da linha"
+
+#: crates/desk-ui/src/shortcuts.rs:61
+msgid "Start or end of the document"
+msgstr "Início ou fim do documento"
+
+#: crates/desk-ui/src/shortcuts.rs:63
+msgid "Select while moving"
+msgstr "Selecionar ao mover"
+
+#: crates/desk-ui/src/shortcuts.rs:64
+msgid "Context menu"
+msgstr "Menu de contexto"
+
+#: crates/desk-ui/src/shortcuts.rs:68
+msgid "Formatting"
+msgstr "Formatação"
+
+#: crates/desk-ui/src/shortcuts.rs:74
+msgid "Align left"
+msgstr "Alinhar à esquerda"
+
+#: crates/desk-ui/src/shortcuts.rs:76
+msgid "Align right"
+msgstr "Alinhar à direita"
+
+#: crates/desk-ui/src/shortcuts.rs:77
+msgid "Show invisibles"
+msgstr "Mostrar invisíveis"
+
+#: crates/desk-ui/src/shortcuts.rs:82
+msgid "View"
+msgstr "Visualização"
+
+#: crates/desk-ui/src/shortcuts.rs:85
+msgid "Zoom in"
+msgstr "Ampliar"
+
+#: crates/desk-ui/src/shortcuts.rs:86
+msgid "Zoom out"
+msgstr "Reduzir"
+
+#: crates/desk-ui/src/shortcuts.rs:87
+msgid "Actual size"
+msgstr "Tamanho real"
+
+#: crates/desk-ui/src/warnings.rs:27 crates/desk-ui/src/window.rs:897
+msgid "_Copy"
+msgstr "_Copiar"
+
+#: crates/desk-ui/src/warnings.rs:29
+msgid "Copy the warnings as text"
+msgstr "Copiar os avisos como texto"
+
+#: crates/desk-ui/src/warnings.rs:40
+msgid "{document} opened with these changes. Saving it keeps them."
+msgstr "{document} foi aberto com estas mudanças. Ao salvar, elas ficam."
+
+#: crates/desk-ui/src/warnings.rs:69 crates/desk-ui/src/window.rs:124
+#: crates/desk-ui/src/window.rs:128
+msgid "Document Warnings"
+msgstr "Avisos do documento"
+
+#: crates/desk-ui/src/window.rs:98 crates/desk-ui/src/window.rs:112
+msgid "Main Menu"
+msgstr "Menu principal"
+
+#: crates/desk-ui/src/window.rs:105
+msgid "_Open"
+msgstr "_Abrir"
+
+#: crates/desk-ui/src/window.rs:116 crates/desk-ui/src/window.rs:120
+msgid "Leave Fullscreen"
+msgstr "Sair da tela cheia"
+
+#: crates/desk-ui/src/window.rs:137
+msgid "Open an OpenDocument text or a Pages document to edit it."
+msgstr "Abra um texto OpenDocument ou um documento do Pages para editá-lo."
+
+#: crates/desk-ui/src/window.rs:140
+msgid "_Open a Document…"
+msgstr "_Abrir um documento…"
+
+#: crates/desk-ui/src/window.rs:149
+msgid ""
+"This app is at an early stage of development and cannot open documents yet."
+msgstr "Este aplicativo está no início do desenvolvimento e ainda não abre documentos."
+
+#: crates/desk-ui/src/window.rs:162
+msgid "Zoom"
+msgstr "Zoom"
+
+#: crates/desk-ui/src/window.rs:318
+msgid "Cannot open {name}"
+msgstr "Não foi possível abrir {name}"
+
+#: crates/desk-ui/src/window.rs:434
+msgid "_Close"
+msgstr "_Fechar"
+
+#: crates/desk-ui/src/window.rs:458
+msgid "Cannot save {name}"
+msgstr "Não foi possível salvar {name}"
+
+#: crates/desk-ui/src/window.rs:503
+msgid "Save a Copy"
+msgstr "Salvar uma cópia"
+
+#: crates/desk-ui/src/window.rs:590
+msgid "Revert to Saved?"
+msgstr "Reverter para o salvo?"
+
+#: crates/desk-ui/src/window.rs:592
+msgid "The changes made to “{name}” since it was last saved will be lost."
+msgstr "As mudanças feitas em “{name}” desde que foi salvo pela última vez serão perdidas."
+
+#: crates/desk-ui/src/window.rs:596 crates/desk-ui/src/window.rs:625
+msgid "_Cancel"
+msgstr "_Cancelar"
+
+#: crates/desk-ui/src/window.rs:597
+msgid "_Revert"
+msgstr "_Reverter"
+
+#: crates/desk-ui/src/window.rs:619
+msgid "Save Changes?"
+msgstr "Salvar as mudanças?"
+
+#: crates/desk-ui/src/window.rs:621
+msgid ""
+"“{name}” has changes that are not saved. If you close it without saving, "
+"they are lost."
+msgstr "“{name}” tem mudanças que não foram salvas. Se você fechar sem salvar, elas serão perdidas."
+
+#: crates/desk-ui/src/window.rs:626
+msgid "_Don’t Save"
+msgstr "_Não salvar"
+
+#: crates/desk-ui/src/window.rs:627 crates/desk-ui/src/window.rs:956
+msgid "_Save"
+msgstr "_Salvar"
+
+#: crates/desk-ui/src/window.rs:896
+msgid "Cu_t"
+msgstr "Recor_tar"
+
+#: crates/desk-ui/src/window.rs:898
+msgid "_Paste"
+msgstr "Co_lar"
+
+#: crates/desk-ui/src/window.rs:899
+msgid "Select _All"
+msgstr "Selecionar _tudo"
+
+#: crates/desk-ui/src/window.rs:902
+msgid "_Bold"
+msgstr "_Negrito"
+
+#: crates/desk-ui/src/window.rs:903
+msgid "_Italic"
+msgstr "_Itálico"
+
+#: crates/desk-ui/src/window.rs:904
+msgid "_Underline"
+msgstr "_Sublinhado"
+
+#: crates/desk-ui/src/window.rs:949
+msgid "_New Window"
+msgstr "_Nova janela"
+
+#: crates/desk-ui/src/window.rs:951
+msgid "_Open…"
+msgstr "_Abrir…"
+
+#: crates/desk-ui/src/window.rs:957
+msgid "Save _As…"
+msgstr "Salvar _como…"
+
+#: crates/desk-ui/src/window.rs:958
+msgid "Save a _Copy…"
+msgstr "Salvar uma _cópia…"
+
+#: crates/desk-ui/src/window.rs:959
+msgid "_Duplicate"
+msgstr "_Duplicar"
+
+#: crates/desk-ui/src/window.rs:960
+msgid "_Revert to Saved"
+msgstr "_Reverter para o salvo"
+
+#: crates/desk-ui/src/window.rs:963
+msgid "_Fullscreen"
+msgstr "_Tela cheia"
+
+#: crates/desk-ui/src/window.rs:964
+msgid "Document _Info"
+msgstr "_Informações do documento"
+
+#: crates/desk-ui/src/window.rs:968
+msgid "C_lose"
+msgstr "_Fechar"
+
+#: crates/desk-ui/src/window.rs:969
+msgid "Close _All Windows"
+msgstr "Fechar _todas as janelas"
+
+#: crates/desk-ui/src/window.rs:973
+msgid "_About {app}"
+msgstr "_Sobre o {app}"
+
+#: crates/desk-ui/src/window.rs:982
+msgid "{n} word"
+msgid_plural "{n} words"
+msgstr[0] "{n} palavra"
+msgstr[1] "{n} palavras"
+
+#: crates/desk-ui/src/window.rs:983
+msgid "{n} page"
+msgid_plural "{n} pages"
+msgstr[0] "{n} página"
+msgstr[1] "{n} páginas"
+
+#: crates/desk-ui/src/window.rs:1015
+msgid "Fit _Width"
+msgstr "Ajustar à _largura"
+
+#: crates/desk-ui/src/window.rs:1016
+msgid "Fit _Page"
+msgstr "Ajustar à _página"
+
+#: crates/desk-writer/src/main.rs:24 crates/desk-writer/src/main.rs:28
+msgid "OpenDocument Text"
+msgstr "Texto OpenDocument"
+
+#: crates/desk-writer/src/main.rs:25
+msgid "Pages Documents"
+msgstr "Documentos do Pages"
+
+#: crates/desk-writer/src/main.rs:61
+msgid ""
+"Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
+msgstr "O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages (.pages)."

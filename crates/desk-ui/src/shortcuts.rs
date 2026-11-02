@@ -3,6 +3,7 @@
 
 //! The Keyboard Shortcuts window, which Help lists in Pages (INT-21).
 
+use crate::i18n::{n_, tr};
 use std::fmt::Write;
 
 /// A section: its title, whether it needs a document, and each shortcut's
@@ -12,75 +13,78 @@ type Section = (&'static str, bool, &'static [(&'static str, &'static str)]);
 /// The shortcuts, by section.
 const SECTIONS: &[Section] = &[
     (
-        "Documents",
+        n_("Documents"),
         true,
         &[
-            ("<Control>o", "Open a document"),
-            ("<Control>s", "Save"),
-            ("<Control><Shift>s", "Save As"),
-            ("<Control><Shift>d", "Duplicate"),
-            ("<Alt>Return", "Document info"),
+            ("<Control>o", n_("Open a document")),
+            ("<Control>s", n_("Save")),
+            ("<Control><Shift>s", n_("Save As")),
+            ("<Control><Shift>d", n_("Duplicate")),
+            ("<Alt>Return", n_("Document info")),
         ],
     ),
     (
-        "Windows",
+        n_("Windows"),
         false,
         &[
-            ("<Control>n", "New window"),
-            ("<Control>w", "Close the window"),
-            ("<Control><Alt>w", "Close all windows"),
-            ("<Control>q", "Quit"),
-            ("F11", "Fullscreen"),
-            ("<Control>question", "Keyboard shortcuts"),
+            ("<Control>n", n_("New window")),
+            ("<Control>w", n_("Close the window")),
+            ("<Control><Alt>w", n_("Close all windows")),
+            ("<Control>q", n_("Quit")),
+            ("F11", n_("Fullscreen")),
+            ("<Control>question", n_("Keyboard shortcuts")),
         ],
     ),
     (
-        "Editing",
+        n_("Editing"),
         true,
         &[
-            ("<Control>z", "Undo"),
-            ("<Control><Shift>z", "Redo"),
-            ("<Control>x", "Cut"),
-            ("<Control>c", "Copy"),
-            ("<Control>v", "Paste"),
-            ("<Control>a", "Select all"),
-            ("<Shift>Return", "Line break"),
-            ("<Control>BackSpace", "Delete the word before"),
+            ("<Control>z", n_("Undo")),
+            ("<Control><Shift>z", n_("Redo")),
+            ("<Control>x", n_("Cut")),
+            ("<Control>c", n_("Copy")),
+            ("<Control>v", n_("Paste")),
+            ("<Control>a", n_("Select all")),
+            ("<Shift>Return", n_("Line break")),
+            ("<Control>BackSpace", n_("Delete the word before")),
         ],
     ),
     (
-        "Moving and Selecting",
+        n_("Moving and Selecting"),
         true,
         &[
-            ("<Control>Left <Control>Right", "Move by word"),
-            ("<Control>Up <Control>Down", "Move by paragraph"),
-            ("Home End", "Start or end of the line"),
-            ("<Control>Home <Control>End", "Start or end of the document"),
-            ("<Shift>Left <Shift>Right", "Select while moving"),
-            ("Menu <Shift>F10", "Context menu"),
+            ("<Control>Left <Control>Right", n_("Move by word")),
+            ("<Control>Up <Control>Down", n_("Move by paragraph")),
+            ("Home End", n_("Start or end of the line")),
+            (
+                "<Control>Home <Control>End",
+                n_("Start or end of the document"),
+            ),
+            ("<Shift>Left <Shift>Right", n_("Select while moving")),
+            ("Menu <Shift>F10", n_("Context menu")),
         ],
     ),
     (
-        "Formatting",
+        n_("Formatting"),
         true,
         &[
-            ("<Control>b", "Bold"),
-            ("<Control>i", "Italic"),
-            ("<Control>u", "Underline"),
-            ("<Control>braceleft", "Align left"),
-            ("<Control>bar", "Center"),
-            ("<Control>braceright", "Align right"),
-            ("<Control><Shift>i", "Show invisibles"),
-            ("<Control><Alt>i", "Inspector"),
+            ("<Control>b", n_("Bold")),
+            ("<Control>i", n_("Italic")),
+            ("<Control>u", n_("Underline")),
+            ("<Control>braceleft", n_("Align left")),
+            ("<Control>bar", n_("Center")),
+            ("<Control>braceright", n_("Align right")),
+            ("<Control><Shift>i", n_("Show invisibles")),
+            ("<Control><Alt>i", n_("Inspector")),
         ],
     ),
     (
-        "View",
+        n_("View"),
         false,
         &[
-            ("<Control>plus", "Zoom in"),
-            ("<Control>minus", "Zoom out"),
-            ("<Control>0", "Actual size"),
+            ("<Control>plus", n_("Zoom in")),
+            ("<Control>minus", n_("Zoom out")),
+            ("<Control>0", n_("Actual size")),
         ],
     ),
 ];
@@ -109,7 +113,7 @@ fn definition(opens: bool) -> String {
             ui,
             "<child><object class=\"GtkShortcutsGroup\">\
              <property name=\"title\">{}</property>",
-            escape(title)
+            escape(&tr(title))
         );
         for (keys, what) in *shortcuts {
             let _ = write!(
@@ -118,7 +122,7 @@ fn definition(opens: bool) -> String {
                  <property name=\"accelerator\">{}</property>\
                  <property name=\"title\">{}</property></object></child>",
                 escape(keys),
-                escape(what)
+                escape(&tr(what))
             );
         }
         ui.push_str("</object></child>");

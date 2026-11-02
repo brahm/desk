@@ -14,9 +14,12 @@
 pub use adw;
 pub use gtk;
 
+mod access;
+mod area;
 mod editing;
 mod formatting;
 pub mod geometry;
+pub mod i18n;
 mod properties;
 mod shortcuts;
 pub mod text_nav;
@@ -33,6 +36,7 @@ use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
 pub use desk_model::Document;
+use i18n::tr;
 pub use view::DocumentView;
 use window::DocumentWindow;
 
@@ -181,15 +185,20 @@ pub fn package_of(path: &Path) -> PathBuf {
 
 /// A font substitution, in one sentence (DOC-05).
 pub fn substitution(choice: &FontChoice) -> String {
-    let how = match choice.kind {
-        FontMatch::Metric => ", which has the same metrics",
-        FontMatch::Style => ", which looks alike; lines may break elsewhere",
-        FontMatch::Fallback | FontMatch::Installed => "; lines may break elsewhere",
+    let sentence = match choice.kind {
+        FontMatch::Metric => tr(
+            "The font {requested} is not installed, so {used} is used, which has the same metrics.",
+        ),
+        FontMatch::Style => tr(
+            "The font {requested} is not installed, so {used} is used, which looks alike; lines may break elsewhere.",
+        ),
+        FontMatch::Fallback | FontMatch::Installed => tr(
+            "The font {requested} is not installed, so {used} is used; lines may break elsewhere.",
+        ),
     };
-    format!(
-        "The font {} is not installed, so {} is used{how}.",
-        choice.requested, choice.used
-    )
+    sentence
+        .replace("{requested}", &choice.requested)
+        .replace("{used}", &choice.used)
 }
 
 /// Runs the app until its last window closes, and returns its exit code.
@@ -340,10 +349,10 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
 fn show_open_dialog(app: &adw::Application, info: AppInfo, opener: &'static Opener) {
     let filters = gio::ListStore::new::<gtk::FileFilter>();
     let all = gtk::FileFilter::new();
-    all.set_name(Some("All Documents"));
+    all.set_name(Some(&tr("All Documents")));
     for (name, patterns) in opener.filters {
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some(name));
+        filter.set_name(Some(&tr(name)));
         for pattern in *patterns {
             filter.add_suffix(pattern);
             all.add_suffix(pattern);
@@ -354,7 +363,7 @@ fn show_open_dialog(app: &adw::Application, info: AppInfo, opener: &'static Open
     all.add_pattern("index.xml.gz");
     filters.insert(0, &all);
     let dialog = gtk::FileDialog::builder()
-        .title("Open a Document")
+        .title(tr("Open a Document"))
         .modal(true)
         .filters(&filters)
         .default_filter(&all)

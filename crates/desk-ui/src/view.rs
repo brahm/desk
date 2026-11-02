@@ -14,6 +14,7 @@ use desk_render::{DisplayList, Painter};
 use gtk::prelude::*;
 use gtk::{gdk, glib};
 
+use crate::area::DocumentArea;
 use crate::geometry::{self, PIXELS_PER_POINT, PageRect};
 use crate::text_nav::{CaretRect, Invisible, InvisibleMark, SpanRect};
 
@@ -45,10 +46,9 @@ pub struct DocumentView {
 impl DocumentView {
     /// An empty document area.
     pub fn new() -> Self {
-        let area = gtk::DrawingArea::builder()
-            .focusable(true)
-            .can_focus(true)
-            .build();
+        let area: gtk::DrawingArea = DocumentArea::default().upcast();
+        area.set_focusable(true);
+        area.set_can_focus(true);
         area.add_css_class("desk-document");
         area.set_cursor_from_name(Some("text"));
         let fixed = gtk::Fixed::builder().can_target(false).build();
@@ -98,6 +98,14 @@ impl DocumentView {
     /// The widget that takes the keyboard and the pointer.
     pub fn area(&self) -> &gtk::DrawingArea {
         &self.area
+    }
+
+    /// The widget that gives screen readers the text.
+    pub fn access(&self) -> DocumentArea {
+        self.area
+            .clone()
+            .downcast()
+            .expect("the area is a document area")
     }
 
     /// Sets the selection and the cursor drawn over the pages.

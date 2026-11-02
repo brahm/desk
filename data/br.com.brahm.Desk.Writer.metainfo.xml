@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Desk contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<component type="desktop-application">
+  <id>br.com.brahm.Desk.Writer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Desk Writer</name>
+  <summary>Write documents laid out as in Pages</summary>
+  <summary xml:lang="pt-BR">Escreva documentos com a diagramação do Pages</summary>
+  <developer id="br.com.brahm">
+    <name>Desk contributors</name>
+  </developer>
+  <description>
+    <p>
+      Desk Writer is the word processor of Desk, an office suite for GNOME
+      that opens the documents of iWork ’09 and lays them out as Pages did,
+      and saves them as OpenDocument text.
+    </p>
+    <p xml:lang="pt-BR">
+      O Desk Writer é o processador de texto do Desk, uma suíte de escritório
+      para o GNOME que abre os documentos do iWork ’09, diagrama-os como o
+      Pages fazia e os salva como texto OpenDocument.
+    </p>
+    <p>
+      This is a nightly build of an early version: it opens, edits and saves
+      text, but much of Pages is still to come.
+    </p>
+    <p xml:lang="pt-BR">
+      Esta é uma versão noturna de uma fase inicial: ela abre, edita e salva
+      texto, mas muito do Pages ainda está por vir.
+    </p>
+  </description>
+  <launchable type="desktop-id">br.com.brahm.Desk.Writer.desktop</launchable>
+  <url type="homepage">https://github.com/brahm/desk</url>
+  <url type="bugtracker">https://github.com/brahm/desk/issues</url>
+  <url type="vcs-browser">https://github.com/brahm/desk</url>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <categories>
+    <category>Office</category>
+    <category>WordProcessor</category>
+  </categories>
+  <keywords>
+    <keyword>document</keyword>
+    <keyword>Pages</keyword>
+    <keyword>ODT</keyword>
+  </keywords>
+  <provides>
+    <binary>desk-writer</binary>
+    <mediatype>application/vnd.oasis.opendocument.text</mediatype>
+    <mediatype>application/vnd.apple.pages</mediatype>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2026-11-02" type="development">
+      <description>
+        <p>The first nightly build: open documents of Pages ’09 and OpenDocument text, edit and format their text, and save them as ODT.</p>
+      </description>
+    </release>
+  </releases>
+</component>

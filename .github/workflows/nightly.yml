@@ -1,0 +1,81 @@
+name: Nightly Flatpak
+
+# Builds Desk Writer as a Flatpak bundle every night and when its build
+# changes, checks that the bundle installs, and publishes it as the
+# "nightly" pre-release from main.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - build-aux/flatpak/**
+      - data/*.desktop
+      - data/*.metainfo.xml
+      - .github/workflows/nightly.yml
+  pull_request:
+    paths:
+      - build-aux/flatpak/**
+      - data/*.desktop
+      - data/*.metainfo.xml
+      - .github/workflows/nightly.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flatpak:
+    name: Build and install the Flatpak
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the bundle
+        uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: desk-writer-nightly.flatpak
+          manifest-path: build-aux/flatpak/br.com.brahm.Desk.Writer.json
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
+      - name: Install the bundle
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive --assumeyes desk-writer-nightly.flatpak
+          flatpak info --user br.com.brahm.Desk.Writer
+          flatpak run --user --command=sh br.com.brahm.Desk.Writer -c 'test -x /app/bin/desk-writer && ls /app/share/applications /app/share/metainfo'
+      - name: Keep the bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: desk-writer-nightly
+          path: desk-writer-nightly.flatpak
+
+  publish:
+    name: Publish the nightly pre-release
+    needs: flatpak
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: desk-writer-nightly
+      - name: Move the nightly tag and replace the bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag --force nightly
+          git push --force origin nightly
+          gh release view nightly >/dev/null 2>&1 ||
+            gh release create nightly --prerelease --title "Nightly" \
+              --notes "Desk Writer built from main every night. Install with: flatpak install --user desk-writer-nightly.flatpak"
+          gh release upload nightly desk-writer-nightly.flatpak --clobber
