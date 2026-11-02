@@ -38,6 +38,71 @@ pub struct TextDocument {
     /// The function keys that apply styles, which Desk keeps in
     /// `settings.xml` because ODF has no attribute for them.
     pub style_shortcuts: Vec<StyleShortcut>,
+    /// The common list styles (`text:list-style` in `office:styles`).
+    pub list_styles: Vec<ListStyle>,
+    /// The automatic list styles, which other programs write for lists
+    /// formatted directly.
+    pub automatic_list_styles: Vec<ListStyle>,
+}
+
+/// A list style (`text:list-style`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ListStyle {
+    /// `style:name`.
+    pub name: String,
+    /// `style:display-name`, the name shown, when it differs.
+    pub display_name: Option<String>,
+    /// The levels it sets, in any order.
+    pub levels: Vec<ListLevelStyle>,
+}
+
+impl ListStyle {
+    /// The name shown to the user.
+    pub fn shown_name(&self) -> &str {
+        self.display_name.as_deref().unwrap_or(&self.name)
+    }
+}
+
+/// What starts the items of a level.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ListLabel {
+    /// `text:list-level-style-bullet`, with its `text:bullet-char`.
+    Bullet(char),
+    /// `text:list-level-style-number`.
+    Number {
+        /// `style:num-format`: `1`, `I`, `i`, `A`, `a`, or empty for no
+        /// number, when only the prefix and the suffix show.
+        format: String,
+        /// `style:num-prefix`.
+        prefix: String,
+        /// `style:num-suffix`.
+        suffix: String,
+        /// `text:display-levels`: how many levels the label shows, as 3
+        /// for 1.1.1.
+        display_levels: u8,
+        /// `text:start-value`.
+        start: u32,
+    },
+}
+
+/// A level of a list style.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ListLevelStyle {
+    /// `text:level`, from 1.
+    pub level: u8,
+    /// The label.
+    pub label: ListLabel,
+    /// `text:space-before` of `style:list-level-properties`: from the
+    /// indent of the paragraph to the label. With the label alignment
+    /// mode of LibreOffice, from its margin and text indent.
+    pub space_before: Option<Length>,
+    /// `text:min-label-width`: from the label to the text, or the width
+    /// of the label when it is wider.
+    pub min_label_width: Option<Length>,
+    /// `text:bullet-relative-size`, in percent.
+    pub relative_size: Option<f64>,
+    /// `style:text-properties` of the label.
+    pub text: TextProperties,
 }
 
 /// A function key that applies a style.
@@ -105,6 +170,8 @@ pub struct Style {
     pub parent: Option<String>,
     /// `style:next-style-name`.
     pub next: Option<String>,
+    /// `style:list-style-name`, of a paragraph style: empty for no list.
+    pub list_style: Option<String>,
     /// Properties of the properties elements.
     pub properties: Properties,
 }
@@ -435,8 +502,29 @@ pub struct Paragraph {
     pub style: Option<String>,
     /// `text:outline-level`, for a heading (`text:h`).
     pub outline_level: Option<u8>,
+    /// The list the paragraph is an item of, when it is in a `text:list`.
+    pub list: Option<ListMember>,
     /// The text, in spans of one style each.
     pub spans: Vec<Span>,
+}
+
+/// Where a paragraph is in a list.
+///
+/// Neighbors with the same list style are written in one `text:list`, with
+/// the deeper levels nested in it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ListMember {
+    /// `text:style-name` of the list: its list style.
+    pub style: String,
+    /// The level, from 0 for the outermost list.
+    pub level: u8,
+    /// `text:start-value` of the list item.
+    pub start: Option<u32>,
+    /// Whether it is the first item of its outermost `text:list`.
+    pub first: bool,
+    /// `text:continue-numbering` of its outermost `text:list`: whether
+    /// the numbers go on from the list before it with the same style.
+    pub continues: bool,
 }
 
 impl Paragraph {

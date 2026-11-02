@@ -5,10 +5,10 @@
 
 use desk_odf::{
     Background, Border, BorderLine, Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line,
-    LineColor, LineHeight, Meta, OdfError, PageLayout, Paragraph, ParagraphProperties, Properties,
-    Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition,
-    TextProperties, TextShadow, TextTransform, read_odt, read_streams, write_odt,
-    write_odt_with_thumbnail,
+    LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, OdfError,
+    PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop,
+    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
+    read_odt, read_streams, write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -41,6 +41,22 @@ fn span(style: Option<&str>, text: &str) -> Span {
     Span {
         style: style.map(str::to_owned),
         text: text.to_owned(),
+    }
+}
+
+/// An item of the list style Bullets.
+fn item(level: u8, start: Option<u32>, first: bool, continues: bool) -> Paragraph {
+    Paragraph {
+        style: Some("Body".into()),
+        outline_level: None,
+        list: Some(ListMember {
+            style: "Bullets".into(),
+            level,
+            start,
+            first,
+            continues,
+        }),
+        spans: vec![span(None, &format!("item at level {level}"))],
     }
 }
 
@@ -114,6 +130,7 @@ fn full_document() -> TextDocument {
                 family: Family::Paragraph,
                 parent: Some("Body".into()),
                 next: Some("Body".into()),
+                list_style: None,
                 properties: Properties {
                     paragraph: ParagraphProperties {
                         break_before: Some(Break::Page),
@@ -233,11 +250,13 @@ fn full_document() -> TextDocument {
             Paragraph {
                 style: Some("Heading_20_1".into()),
                 outline_level: Some(1),
+                list: None,
                 spans: vec![span(None, "Título")],
             },
             Paragraph {
                 style: Some("P1".into()),
                 outline_level: None,
+                list: None,
                 spans: vec![
                     span(None, "  two leading spaces, a\ttab, "),
                     span(Some("T1"), "styled   three"),
@@ -247,7 +266,46 @@ fn full_document() -> TextDocument {
                 ],
             },
             Paragraph::default(),
+            item(0, None, true, false),
+            item(1, None, false, false),
+            item(1, Some(3), false, false),
+            item(0, None, false, false),
+            Paragraph::default(),
+            item(0, None, true, true),
         ],
+        list_styles: vec![ListStyle {
+            name: "Bullets".into(),
+            display_name: Some("My Bullets".into()),
+            levels: vec![
+                ListLevelStyle {
+                    level: 1,
+                    label: ListLabel::Bullet('\u{2022}'),
+                    space_before: Some(Length(0.0)),
+                    min_label_width: Some(Length(9.0)),
+                    relative_size: Some(150.0),
+                    text: TextProperties {
+                        font_size_percent: Some(150.0),
+                        position: Some(TextPosition::Percent(-8.333)),
+                        ..TextProperties::default()
+                    },
+                },
+                ListLevelStyle {
+                    level: 2,
+                    label: ListLabel::Number {
+                        format: "1".into(),
+                        prefix: "(".into(),
+                        suffix: ")".into(),
+                        display_levels: 2,
+                        start: 4,
+                    },
+                    space_before: Some(Length(18.0)),
+                    min_label_width: Some(Length(18.0)),
+                    relative_size: None,
+                    text: TextProperties::default(),
+                },
+            ],
+        }],
+        automatic_list_styles: Vec::new(),
         tabs_relative_to_indent: None,
         style_shortcuts: vec![
             StyleShortcut {
@@ -444,6 +502,7 @@ fn font_families_are_css_lists() {
         family: Family::Text,
         parent: None,
         next: None,
+        list_style: None,
         properties: Properties {
             text: TextProperties {
                 font_family: Some("O'Neil \\ Sans".into()),

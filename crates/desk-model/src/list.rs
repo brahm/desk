@@ -153,7 +153,8 @@ impl ListLabel {
 pub struct ListLevel {
     /// The label.
     pub label: ListLabel,
-    /// The number of the first item (LST-04).
+    /// The number of the first item (LST-04), 1 for a level without
+    /// numbers.
     pub start: u32,
     /// The distance from the left indent of the paragraph to the label.
     pub label_indent: Length,
@@ -177,10 +178,7 @@ impl ListLevel {
     /// the label 18 points further in at each level.
     pub fn new(label: ListLabel, level: usize, text_indent: Length) -> Self {
         Self {
-            start: match label {
-                ListLabel::Number { .. } => 1,
-                _ => 0,
-            },
+            start: 1,
             label,
             label_indent: Length::from_points(18 * level as i32),
             text_indent,
@@ -281,7 +279,8 @@ impl ListStyle {
                 format: NumberFormat::Decimal,
                 prefix: "".into(),
                 suffix: ".".into(),
-                tiered: true,
+                // The first level has no level above it.
+                tiered: level > 0,
             };
             ListLevel::new(label, level, Length::from_pt(INDENTS[level]))
         })

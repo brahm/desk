@@ -491,7 +491,7 @@ fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LE
                 };
                 match number {
                     Some(number) if format.contains("%L") => {
-                        let tiered = format.contains("%P");
+                        let tiered = format.contains("%P") && level > 0;
                         let format = format.replace("%P", "");
                         let (prefix, suffix) = format.split_once("%L").unwrap_or(("", ""));
                         (
@@ -505,7 +505,7 @@ fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LE
                         )
                     }
                     _ if format.is_empty() => (ListLabel::None, 1),
-                    _ => (ListLabel::bullet(format), *first),
+                    _ => (ListLabel::bullet(format), 1),
                 }
             }
         };
