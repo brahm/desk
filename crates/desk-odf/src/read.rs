@@ -440,6 +440,7 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
             let (family, style) = match text.split_once(':') {
                 Some(("paragraph", style)) => (Family::Paragraph, style),
                 Some(("text", style)) => (Family::Text, style),
+                Some(("list", style)) => (Family::List, style),
                 _ => continue,
             };
             if let Some(key) = key

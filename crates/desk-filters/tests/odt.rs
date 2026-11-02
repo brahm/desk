@@ -29,17 +29,38 @@ fn describe(document: &Document) -> String {
     let styles = document.styles();
     let name = |id| styles.get(id).map(|s: &Style| s.name().to_owned());
     let mut out = String::new();
+    // List styles by name, since their identifiers change.
+    let attrs = |attrs: &desk_model::ParaAttrs| {
+        let list = attrs.list_style.map(|l| l.and_then(name));
+        let attrs = desk_model::ParaAttrs {
+            list_style: None,
+            ..attrs.clone()
+        };
+        format!("{attrs:?} list {list:?}")
+    };
+    let resolved = |format: desk_model::ParaFormat| {
+        let list = format.list_style.and_then(name);
+        let format = desk_model::ParaFormat {
+            list_style: None,
+            ..format
+        };
+        format!("{format:?} list {list:?}")
+    };
     let mut all: Vec<String> = styles
         .iter()
         .map(|style| match style {
             Style::Paragraph(p) => format!(
-                "paragraph style {:?} parent {:?} next {:?} key {:?} {:?} {:?}",
+                "paragraph style {:?} parent {:?} next {:?} key {:?} {} {:?}",
                 p.name,
                 p.parent.and_then(name),
                 p.next.and_then(name),
                 p.shortcut,
-                p.paragraph,
+                attrs(&p.paragraph),
                 p.character
+            ),
+            Style::List(l) => format!(
+                "list style {:?} key {:?} {:?}",
+                l.name, l.shortcut, l.levels
             ),
             Style::Character(c) => format!(
                 "character style {:?} parent {:?} key {:?} {:?}",
@@ -58,9 +79,9 @@ fn describe(document: &Document) -> String {
     out.push_str(&format!("default {:?}\n", name(styles.default_paragraph())));
     for paragraph in document.body().iter() {
         out.push_str(&format!(
-            "paragraph {:?} {:?}\n",
+            "paragraph {:?} {}\n",
             name(paragraph.style()),
-            styles.resolve_paragraph(paragraph.style(), paragraph.attrs())
+            resolved(styles.resolve_paragraph(paragraph.style(), paragraph.attrs()))
         ));
         for run in paragraph.runs() {
             out.push_str(&format!(

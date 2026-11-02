@@ -88,6 +88,8 @@ pub enum Family {
     Paragraph,
     /// A text style, for spans.
     Text,
+    /// A list style (`text:list-style`), which is not a `style:style`.
+    List,
 }
 
 /// A style.

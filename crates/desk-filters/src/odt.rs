@@ -414,6 +414,10 @@ fn para_attrs(p: &odf::ParagraphProperties) -> ParaAttrs {
             .filter(|l| l.millipoints() > 0),
         background: p.background.map(background),
         border: para_border(p),
+        // Lists come from the list elements and list styles.
+        list_style: None,
+        list_level: None,
+        list_start: None,
     }
 }
 
@@ -709,6 +713,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .find(|s| s.family == style.family && s.style == style.name)
                 .map(|s| s.key);
             let built: Style = match style.family {
+                odf::Family::List => continue,
                 odf::Family::Paragraph => ParagraphStyle {
                     id,
                     name: names[&id].as_str().into(),
@@ -736,6 +741,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         p.next = None;
                     }
                     Style::Character(c) => c.parent = None,
+                    Style::List(_) => {}
                 }
                 document.put_style(plain)?;
             }
@@ -964,6 +970,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 family: match style.family() {
                     desk_model::StyleFamily::Paragraph => odf::Family::Paragraph,
                     desk_model::StyleFamily::Character => odf::Family::Text,
+                    desk_model::StyleFamily::List => odf::Family::List,
                 },
                 style: names[&style.id()].clone(),
             });
@@ -974,6 +981,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let name = names[&style.id()].clone();
         let display_name = (name != style.name()).then(|| style.name().to_owned());
         out.styles.push(match style {
+            Style::List(_) => continue,
             Style::Paragraph(p) => odf::Style {
                 name,
                 display_name,
@@ -1022,6 +1030,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             let prefix = match family {
                 odf::Family::Paragraph => "P",
                 odf::Family::Text => "T",
+                odf::Family::List => "L",
             };
             let count = automatic.iter().filter(|s| s.family == family).count();
             let name = format!("{prefix}{}", count + 1);

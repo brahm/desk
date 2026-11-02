@@ -322,7 +322,9 @@ impl Paragraph {
 
     /// Whether the paragraph or one of its runs uses a style.
     pub(crate) fn uses_style(&self, id: StyleId) -> bool {
-        self.style == id || self.runs.iter().any(|run| run.style == Some(id))
+        self.style == id
+            || self.attrs.list_style == Some(Some(id))
+            || self.runs.iter().any(|run| run.style == Some(id))
     }
 
     /// Checks that the runs are in normal form. Only for tests.

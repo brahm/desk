@@ -93,12 +93,20 @@ pub enum Value {
         amount: f64,
     },
     /// A list style: its name, and whether any level draws a label, a
-    /// bullet or a number. The style named None draws none.
+    /// bullet or a number. The style named None draws none. The style
+    /// itself is in [`Stylesheet::list_styles`], by its object ID or its
+    /// identifier.
     ListStyle {
         /// The name, as the Styles drawer shows it.
         name: Option<String>,
         /// Whether a level has a label.
         labels: bool,
+        /// Whether a level has a picture as its label.
+        images: bool,
+        /// The object ID.
+        id: Option<String>,
+        /// The identifier.
+        ident: Option<String>,
     },
     /// Tab stops, in the order saved.
     Tabs(Vec<Tab>),
@@ -194,6 +202,11 @@ impl Value {
                     e.name.is(SF, "list-label-typeinfo")
                         && e.attr(SF, "type").is_some_and(|t| t != "none")
                 }),
+                images: element.descendants().any(|e| {
+                    e.name.is(SF, "list-label-typeinfo") && e.attr(SF, "type") == Some("image")
+                }),
+                id: element.attr(SFA, "ID").map(str::to_owned),
+                ident: element.attr(SF, "ident").map(str::to_owned),
             },
             "tabs" => Self::Tabs(
                 element
@@ -409,12 +422,140 @@ impl Style {
     }
 }
 
+/// The label of a level of a list style (`sf:list-label-typeinfo`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ListLabel {
+    /// `none`: no label.
+    None,
+    /// A text label (`sf:text-label`): a bullet or a number.
+    Text {
+        /// `sf:type`: `bullet`, `decimal`, `upper-roman`, `lower-roman`,
+        /// `upper-alpha` or `lower-alpha`.
+        kind: String,
+        /// `sf:format`: the bullet, or the number with `%L` where it goes
+        /// and `%P` where the label of the level above goes, as `%P%L.`.
+        format: String,
+        /// `sf:first`, the number of the first item.
+        first: u32,
+    },
+    /// `image`: a picture, as the bullet of the application.
+    Image,
+}
+
+/// Where the label of a level goes (`sf:list-label-geometry`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ListLabelGeometry {
+    /// `sf:scale`, the size relative to the text.
+    pub scale: f64,
+    /// `sf:offset`, how far the label is raised, in points.
+    pub offset: f64,
+    /// `sf:scale-with-text`.
+    pub scale_with_text: bool,
+}
+
+/// A list style (`sf:liststyle`). Each property holds one entry for each
+/// of the nine levels, and a property it does not set comes from its
+/// parent.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ListStyle {
+    /// The object ID.
+    pub id: Option<String>,
+    /// The identifier.
+    pub ident: Option<String>,
+    /// The name shown in the Styles drawer, for named styles.
+    pub name: Option<String>,
+    /// The identifier of the parent style.
+    pub parent: Option<String>,
+    /// `listLabelTypes`.
+    pub labels: Option<Vec<ListLabel>>,
+    /// `listLabelGeometries`.
+    pub geometries: Option<Vec<ListLabelGeometry>>,
+    /// `listLabelIndents`, from the left indent to the label, in points.
+    pub label_indents: Option<Vec<f64>>,
+    /// `listTextIndents`, from the label to the text, in points.
+    pub text_indents: Option<Vec<f64>>,
+}
+
+impl ListStyle {
+    fn read(ids: &Ids<'_>, element: &Element) -> Self {
+        let attr = |name| element.attr(SF, name).map(str::to_owned);
+        let map = element.child(SF, "property-map");
+        let array = |name: &str| -> Option<Vec<&Element>> {
+            let property = map?.child(SF, name)?;
+            let array = ids.deref(property.elements().next()?);
+            Some(array.elements().map(|e| ids.deref(e)).collect())
+        };
+        let numbers = |name: &str| {
+            array(name).map(|items| {
+                items
+                    .iter()
+                    .map(|e| {
+                        e.attr(SFA, "number")
+                            .and_then(|v| v.trim().parse::<f64>().ok())
+                            .filter(|v| v.is_finite())
+                            .unwrap_or(0.0)
+                    })
+                    .collect()
+            })
+        };
+        Self {
+            id: element.attr(SFA, "ID").map(str::to_owned),
+            ident: attr("ident"),
+            name: attr("name"),
+            parent: attr("parent-ident"),
+            labels: array("listLabelTypes").map(|items| {
+                items
+                    .iter()
+                    .map(|e| match e.attr(SF, "type") {
+                        Some("image") => ListLabel::Image,
+                        Some("text") => match e.child(SF, "text-label") {
+                            Some(label) => ListLabel::Text {
+                                kind: label.attr(SF, "type").unwrap_or("bullet").to_owned(),
+                                format: label.attr(SF, "format").unwrap_or_default().to_owned(),
+                                first: label
+                                    .attr(SF, "first")
+                                    .and_then(|v| v.trim().parse().ok())
+                                    .unwrap_or(1),
+                            },
+                            None => ListLabel::None,
+                        },
+                        _ => ListLabel::None,
+                    })
+                    .collect()
+            }),
+            geometries: array("listLabelGeometries").map(|items| {
+                items
+                    .iter()
+                    .map(|e| {
+                        let number = |name, default: f64| {
+                            e.attr(SF, name)
+                                .and_then(|v| v.trim().parse::<f64>().ok())
+                                .filter(|v| v.is_finite())
+                                .unwrap_or(default)
+                        };
+                        ListLabelGeometry {
+                            scale: number("scale", 1.0),
+                            offset: number("offset", 0.0),
+                            scale_with_text: e.attr(SF, "scale-with-text") != Some("false"),
+                        }
+                    })
+                    .collect()
+            }),
+            label_indents: numbers("listLabelIndents"),
+            text_indents: numbers("listTextIndents"),
+        }
+    }
+}
+
 /// The styles of a document: the named ones and the anonymous ones that
 /// hold direct formatting.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stylesheet {
     /// The styles, the stylesheet's own before those of its parents.
     pub styles: Vec<Style>,
+    /// The list styles, named and anonymous, wherever they are: in the
+    /// stylesheet or inside the styles that name them.
+    pub list_styles: Vec<ListStyle>,
 }
 
 /// How many parent stylesheets are followed, so that a cycle ends.
@@ -423,9 +564,11 @@ const MAX_PARENTS: usize = 16;
 impl Stylesheet {
     pub(crate) fn read(ids: &Ids<'_>, element: &Element) -> Self {
         let mut styles = Vec::new();
+        let mut sheets = Vec::new();
         let mut sheet = Some(element);
         for _ in 0..MAX_PARENTS {
             let Some(current) = sheet else { break };
+            sheets.push(current);
             for group in ["styles", "anon-styles"] {
                 for group in current.children_named(SF, group) {
                     for style in group.elements() {
@@ -437,7 +580,64 @@ impl Stylesheet {
                 .child(SF, "parent-ref")
                 .and_then(|r| r.attr(SFA, "IDREF").and_then(|id| ids.get(id)));
         }
-        Self { styles }
+        // List styles are wherever a style names one, besides the groups
+        // of the stylesheet.
+        // In document order, the stylesheet's own before its parents'.
+        let mut list_styles: Vec<ListStyle> = Vec::new();
+        let mut stack: Vec<&Element> = sheets.into_iter().rev().collect();
+        while let Some(current) = stack.pop() {
+            if current.name.is(SF, "liststyle") {
+                let style = ListStyle::read(ids, current);
+                if !list_styles
+                    .iter()
+                    .any(|s| s.id.is_some() && s.id == style.id && s.ident == style.ident)
+                {
+                    list_styles.push(style);
+                }
+            }
+            let children: Vec<&Element> = current.elements().collect();
+            stack.extend(children.into_iter().rev());
+        }
+        Self {
+            styles,
+            list_styles,
+        }
+    }
+
+    /// A list style by object ID, or else by identifier.
+    pub fn list_style(&self, id: Option<&str>, ident: Option<&str>) -> Option<&ListStyle> {
+        id.and_then(|id| {
+            self.list_styles
+                .iter()
+                .find(|s| s.id.as_deref() == Some(id))
+        })
+        .or_else(|| {
+            let ident = ident?;
+            self.list_styles
+                .iter()
+                .find(|s| s.ident.as_deref() == Some(ident) && s.name.is_some())
+                .or_else(|| {
+                    self.list_styles
+                        .iter()
+                        .find(|s| s.ident.as_deref() == Some(ident))
+                })
+        })
+    }
+
+    /// A list style and its ancestors, nearest first.
+    pub fn list_ancestry<'a>(&'a self, style: &'a ListStyle) -> Vec<&'a ListStyle> {
+        let mut chain = vec![style];
+        while let Some(parent) = chain
+            .last()
+            .and_then(|s| s.parent.as_deref())
+            .and_then(|p| self.list_style(None, Some(p)))
+        {
+            if chain.iter().any(|s| std::ptr::eq(*s, parent)) || chain.len() > MAX_PARENTS {
+                break;
+            }
+            chain.push(parent);
+        }
+        chain
     }
 
     /// The style that text refers to by `sf:style`: by identifier, or

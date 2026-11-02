@@ -88,6 +88,10 @@ pub struct Run {
 pub struct Paragraph {
     /// The paragraph style, by `sf:style`.
     pub style: Option<String>,
+    /// The level in its list, from 0 (`sf:list-level`).
+    pub list_level: u8,
+    /// Whether its list starts counting again here (`sf:restart-list`).
+    pub restart_list: bool,
     /// The text, in runs.
     pub runs: Vec<Run>,
 }
@@ -381,6 +385,12 @@ impl BodyReader<'_, '_> {
     fn paragraph(&mut self, element: &Element) {
         let mut paragraph = Paragraph {
             style: element.attr(SF, "style").map(str::to_owned),
+            list_level: element
+                .attr(SF, "list-level")
+                .and_then(|v| v.trim().parse::<u8>().ok())
+                .unwrap_or(0)
+                .min(8),
+            restart_list: element.attr(SF, "restart-list") == Some("true"),
             runs: Vec::new(),
         };
         self.inline(element, None, &mut paragraph.runs);

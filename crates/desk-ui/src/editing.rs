@@ -617,8 +617,29 @@ impl TextEditor {
                     self.set_character_style(Some(style));
                 }
             }
+            Some(StyleFamily::List) => self.set_list_style(Some(style)),
             None => {}
         }
+    }
+
+    /// The list style of the paragraph at the selection, when it is in a
+    /// list.
+    pub fn list_style(&self) -> Option<StyleId> {
+        let format = self.format().paragraph;
+        let styles = self.styles();
+        format.list_style.filter(|id| {
+            styles
+                .list(*id)
+                .is_some_and(desk_model::ListStyle::has_labels)
+        })
+    }
+
+    /// Makes the selected paragraphs items of a list style, or takes them
+    /// out of their lists (LST-02).
+    pub fn set_list_style(&self, style: Option<StyleId>) {
+        self.format_ranges("List Style", |edit, from, to| {
+            edit.set_list_style(from, to, style)
+        });
     }
 
     /// The styles of the document.

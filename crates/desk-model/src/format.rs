@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::style::StyleId;
 use crate::units::{Length, Rgba};
 
 /// Declares an attribute set with optional fields and its resolved format,
@@ -650,6 +651,14 @@ formatting! {
         background: Option<Rgba> = None,
         /// Rules above or below, or a border around (FMT-21).
         border: ParaBorder = ParaBorder::default(),
+        /// The list style, which makes the paragraph an item of a list
+        /// when its level has a label (LST-02).
+        list_style: Option<StyleId> = None,
+        /// The level in the list, from 0 to 8 (LST-02).
+        list_level: u8 = 0,
+        /// The number that the item takes, where its list starts again,
+        /// instead of the one after the item before it (LST-04).
+        list_start: Option<u32> = None,
     }
 }
 

@@ -37,6 +37,9 @@ pub const SOFT_HYPHEN: char = '\u{ad}';
 /// measured in Pages (FMT-06).
 pub const SCRIPT_SCALE: f32 = 2.0 / 3.0;
 
+/// The width that a list label is laid out in, wider than any label.
+const LABEL_ROOM: f32 = 10_000.0;
+
 /// The narrowest piece of a line that is worth filling.
 pub const MIN_SEGMENT_WIDTH: f32 = 18.0;
 
@@ -308,9 +311,26 @@ impl TextSystem {
         space: &dyn LineSpace,
         top: f32,
     ) -> ParagraphLayout {
+        let mut format = text.paragraph().clone();
+        // The label of a list item, laid out on its own: the text of the
+        // item starts after it, on every line (LST-02).
+        let label = text.label().map(|label| {
+            let label_format = text.formats()[label.format as usize].clone();
+            let label_text = ParagraphText::from_runs(
+                desk_model::ParaFormat::default(),
+                label_format.clone(),
+                [(label.text.as_str(), label_format)],
+            );
+            let laid = self.layout(&label_text, &crate::space::Column::new(LABEL_ROOM), 0.0);
+            let width = laid.lines.first().map_or(0.0, |l| l.advance);
+            let x = format.left_indent.to_pt() as f32 + label.indent;
+            format.left_indent =
+                desk_model::Length::from_pt(f64::from(x + label.text_indent.max(width)));
+            format.first_line_indent = desk_model::Length::ZERO;
+            (laid, x, label.format, label.raise)
+        });
         let mut layout = self.build(text);
         let source = text.text();
-        let format = text.paragraph().clone();
 
         // Shaped widths, from the paragraph on one line (or one line per
         // manual line break).
@@ -726,6 +746,23 @@ impl TextSystem {
                 hyphenated: place.hyphenated,
                 carets,
             });
+        }
+        if let (Some((laid, x, format, raise)), Some(first)) = (label, lines.first_mut()) {
+            let baseline = first.baseline - raise;
+            let runs = laid.lines.into_iter().take(1).flat_map(|line| {
+                let shift = baseline - line.baseline;
+                line.runs.into_iter().map(move |mut run| {
+                    for glyph in &mut run.glyphs {
+                        glyph.x += x;
+                        glyph.y += shift;
+                    }
+                    run.x += x;
+                    run.baseline += shift;
+                    run.format = format;
+                    run
+                })
+            });
+            first.runs.splice(0..0, runs);
         }
         let bottom = lines.last().map_or(top, |l| l.top + l.height);
         ParagraphLayout { lines, top, bottom }

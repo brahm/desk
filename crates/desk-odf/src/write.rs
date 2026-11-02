@@ -124,6 +124,7 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         let family = match shortcut.family {
             Family::Paragraph => "paragraph",
             Family::Text => "text",
+            Family::List => "list",
         };
         w.start("config:config-item")
             .attr("config:name", &format!("F{}", shortcut.key))
@@ -167,7 +168,8 @@ fn write_style(w: &mut Writer, style: &Style) {
             "style:family",
             match style.family {
                 Family::Paragraph => "paragraph",
-                Family::Text => "text",
+                // List styles are written as `text:list-style`.
+                Family::Text | Family::List => "text",
             },
         )
         .attr_opt("style:parent-style-name", style.parent.as_deref())

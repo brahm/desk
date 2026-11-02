@@ -13,7 +13,9 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
-use desk_model::{CharAttrs, CharFormat, ModelError, Style, StyleFamily, StyleId, Styles};
+use desk_model::{
+    CharAttrs, CharFormat, ListStyle, ModelError, Style, StyleFamily, StyleId, Styles,
+};
 use gtk::{gdk, gio, glib, pango};
 
 use crate::editing::TextEditor;
@@ -42,6 +44,7 @@ pub struct StylesDrawer {
     root: gtk::Box,
     paragraphs: gtk::ListBox,
     characters: gtk::ListBox,
+    lists: gtk::ListBox,
     scrolled: gtk::ScrolledWindow,
     rows: RefCell<Vec<Row>>,
     /// What the lists show now, to build them again only on a change.
@@ -104,6 +107,9 @@ fn look(styles: &Styles, style: &Style) -> CharFormat {
             Some(c.id),
             &CharAttrs::default(),
         ),
+        Style::List(_) => {
+            styles.resolve_character(styles.default_paragraph(), None, &CharAttrs::default())
+        }
     }
 }
 
@@ -158,16 +164,35 @@ impl StylesDrawer {
             .build();
         character_section.append(&character_header);
         character_section.append(&holder(&characters));
-        let lists = gtk::Box::builder()
+        let list_header = gtk::Label::builder()
+            .label(tr("List Styles"))
+            .xalign(0.0)
+            .margin_start(12)
+            .margin_top(12)
+            .margin_bottom(6)
+            .css_classes(["heading"])
+            .build();
+        let lists = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::Single)
+            .css_classes(["navigation-sidebar"])
+            .build();
+        labelled(&lists, &tr("List Styles"));
+        let list_section = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .build();
-        lists.append(&header);
-        lists.append(&holder(&paragraphs));
-        lists.append(&character_section);
+        list_section.append(&list_header);
+        list_section.append(&holder(&lists));
+        let sections = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .build();
+        sections.append(&header);
+        sections.append(&holder(&paragraphs));
+        sections.append(&character_section);
+        sections.append(&list_section);
         let scrolled = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
-            .child(&lists)
+            .child(&sections)
             .build();
         root.append(&scrolled);
 
@@ -181,6 +206,10 @@ impl StylesDrawer {
         new_menu.append(
             Some(&tr("New _Character Style from Selection…")),
             Some("styles.new-character"),
+        );
+        new_menu.append(
+            Some(&tr("New _List Style from Selection…")),
+            Some("styles.new-list"),
         );
         let import = gio::Menu::new();
         import.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
@@ -200,12 +229,24 @@ impl StylesDrawer {
             .css_classes(["flat"])
             .build();
         labelled(&show_characters, &tr("Show Character Styles"));
+        let show_lists = gtk::ToggleButton::builder()
+            .icon_name("view-list-bullet-symbolic")
+            .active(true)
+            .tooltip_text(tr("Show List Styles"))
+            .css_classes(["flat"])
+            .build();
+        labelled(&show_lists, &tr("Show List Styles"));
         let bar = gtk::ActionBar::new();
         bar.pack_start(&add);
+        bar.pack_end(&show_lists);
         bar.pack_end(&show_characters);
         root.append(&bar);
         show_characters
             .bind_property("active", &character_section, "visible")
+            .sync_create()
+            .build();
+        show_lists
+            .bind_property("active", &list_section, "visible")
             .sync_create()
             .build();
 
@@ -215,6 +256,7 @@ impl StylesDrawer {
             root,
             paragraphs,
             characters,
+            lists,
             scrolled,
             rows: RefCell::new(Vec::new()),
             shown: RefCell::new(Vec::new()),
@@ -225,6 +267,7 @@ impl StylesDrawer {
         });
         this.connect_list(&this.paragraphs);
         this.connect_list(&this.characters);
+        this.connect_list(&this.lists);
         this.add_actions();
         this
     }
@@ -253,9 +296,12 @@ impl StylesDrawer {
                 return;
             }
             let character_none = row.widget_name() == "none";
+            let list_none = row.widget_name() == "none-list";
             if let Some(editor) = (this.editor)() {
                 if character_none {
                     editor.set_character_style(None);
+                } else if list_none {
+                    editor.set_list_style(None);
                 } else if let Some(id) = this.style_at(row) {
                     editor.apply_style(id, false);
                 }
@@ -416,6 +462,7 @@ impl StylesDrawer {
         for (name, family) in [
             ("new-paragraph", StyleFamily::Paragraph),
             ("new-character", StyleFamily::Character),
+            ("new-list", StyleFamily::List),
         ] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(self);
@@ -471,10 +518,15 @@ impl StylesDrawer {
                 .and_then(|id| styles.get(id).map(|s| s.name().to_owned()))
                 .unwrap_or_else(|| tr("Paragraph Style")),
             StyleFamily::Character => tr("Character Style"),
+            StyleFamily::List => editor
+                .list_style()
+                .and_then(|id| styles.get(id).map(|s| s.name().to_owned()))
+                .unwrap_or_else(|| tr("List Style")),
         };
         let heading = match family {
             StyleFamily::Paragraph => tr("New Paragraph Style"),
             StyleFamily::Character => tr("New Character Style"),
+            StyleFamily::List => tr("New List Style"),
         };
         let dialog = adw::AlertDialog::new(Some(&heading), None);
         let list = gtk::ListBox::builder()
@@ -526,6 +578,23 @@ impl StylesDrawer {
                         CharAttrs::from(format)
                     };
                     edit.new_character_style(&name, attrs, from, to, apply)
+                }
+                StyleFamily::List => {
+                    let paragraph = edit.document().paragraph(from.paragraph)?;
+                    let current = edit
+                        .document()
+                        .styles()
+                        .resolve_paragraph(paragraph.style(), paragraph.attrs())
+                        .list_style;
+                    let source = match current {
+                        Some(id) => id,
+                        None => edit.list_style_or_add("Bullet", ListStyle::bullet)?,
+                    };
+                    let id = edit.new_list_style(&name, source)?;
+                    if apply {
+                        edit.set_list_style(from, to, Some(id))?;
+                    }
+                    Ok(id)
                 }
             });
             this.report(&tr("Cannot Make the Style"), result);
@@ -650,7 +719,11 @@ impl StylesDrawer {
     pub fn show(&self, editor: &TextEditor) {
         let styles = editor.styles();
         let mut wanted = Vec::new();
-        for family in [StyleFamily::Paragraph, StyleFamily::Character] {
+        for family in [
+            StyleFamily::Paragraph,
+            StyleFamily::Character,
+            StyleFamily::List,
+        ] {
             for style in sorted(&styles, family) {
                 wanted.push((
                     style.id(),
@@ -667,10 +740,12 @@ impl StylesDrawer {
         self.updating.set(true);
         let paragraph = editor.format().style;
         let character = editor.character_style();
+        let list = editor.list_style();
         let overrides = editor.overrides();
         let rows = self.rows.borrow();
         let mut paragraph_row = None;
         let mut character_row = None;
+        let mut list_row = None;
         for row in rows.iter() {
             let is_paragraph = Some(row.id) == paragraph;
             let is_character = Some(row.id) == character;
@@ -679,6 +754,9 @@ impl StylesDrawer {
             }
             if is_character {
                 character_row = Some(row.row.clone());
+            }
+            if Some(row.id) == list {
+                list_row = Some(row.row.clone());
             }
             row.arrow.set_visible(
                 (is_paragraph && overrides.paragraph) || (is_character && overrides.character),
@@ -693,6 +771,10 @@ impl StylesDrawer {
             None => self
                 .characters
                 .select_row(self.characters.row_at_index(0).as_ref()),
+        }
+        match list_row {
+            Some(row) => self.lists.select_row(Some(&row)),
+            None => self.lists.select_row(self.lists.row_at_index(0).as_ref()),
         }
         self.updating.set(false);
     }
@@ -726,18 +808,25 @@ impl StylesDrawer {
         self.updating.set(true);
         self.paragraphs.remove_all();
         self.characters.remove_all();
+        self.lists.remove_all();
         let mut rows = Vec::new();
-        // No character style comes first.
-        let none = gtk::ListBoxRow::builder().name("none").build();
-        let label = gtk::Label::builder()
-            .label(tr("None"))
-            .xalign(0.0)
-            .css_classes(["dim-label"])
-            .build();
-        none.set_child(Some(&label));
-        labelled(&none, &tr("None"));
-        self.characters.append(&none);
-        for family in [StyleFamily::Paragraph, StyleFamily::Character] {
+        // No character style and no list come first.
+        for (list, name) in [(&self.characters, "none"), (&self.lists, "none-list")] {
+            let none = gtk::ListBoxRow::builder().name(name).build();
+            let label = gtk::Label::builder()
+                .label(tr("None"))
+                .xalign(0.0)
+                .css_classes(["dim-label"])
+                .build();
+            none.set_child(Some(&label));
+            labelled(&none, &tr("None"));
+            list.append(&none);
+        }
+        for family in [
+            StyleFamily::Paragraph,
+            StyleFamily::Character,
+            StyleFamily::List,
+        ] {
             for style in sorted(styles, family) {
                 let line = gtk::Box::builder().spacing(6).build();
                 let name = gtk::Label::builder()
@@ -767,6 +856,7 @@ impl StylesDrawer {
                 match family {
                     StyleFamily::Paragraph => self.paragraphs.append(&row),
                     StyleFamily::Character => self.characters.append(&row),
+                    StyleFamily::List => self.lists.append(&row),
                 }
                 rows.push(Row {
                     id: style.id(),

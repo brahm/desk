@@ -327,6 +327,13 @@ impl Document {
         Ok(ranges)
     }
 
+    fn check_list_style(&self, attrs: &crate::format::ParaAttrs) -> Result<(), ModelError> {
+        match attrs.list_style {
+            Some(Some(list)) => self.styles.check_family(list, StyleFamily::List),
+            _ => Ok(()),
+        }
+    }
+
     fn check_runs_styles<'a>(
         &self,
         runs: impl IntoIterator<Item = &'a crate::text::Run>,
@@ -364,6 +371,7 @@ impl Document {
             Op::InsertParagraph { index, paragraph } => {
                 self.styles
                     .check_family(paragraph.style(), StyleFamily::Paragraph)?;
+                self.check_list_style(paragraph.attrs())?;
                 self.check_runs_styles(paragraph.runs())?;
                 let id = paragraph.id();
                 self.body_mut().insert(index, paragraph)?;
@@ -380,6 +388,7 @@ impl Document {
                 attrs,
             } => {
                 self.styles.check_family(style, StyleFamily::Paragraph)?;
+                self.check_list_style(&attrs)?;
                 let (style, attrs) = self
                     .body_mut()
                     .paragraph_mut(paragraph)?
