@@ -14,11 +14,11 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, LINE_BREAK,
-    LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, ListLabel,
-    ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder,
-    ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId, TabAlignment,
-    TabLeader, TabStop, TabStops,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, FontWeight,
+    LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle,
+    ListLabel, ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs,
+    ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style,
+    StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_odf as odf;
 
@@ -173,8 +173,9 @@ fn odf_font_name(
     }
 }
 
-/// A shadow from `fo:text-shadow`, which has no opacity: it is opaque.
-fn shadow(shadow: odf::TextShadow) -> Option<Shadow> {
+/// A shadow from `fo:text-shadow`, with the opacity of
+/// `desk:shadow-opacity`, opaque when the file has none.
+fn shadow(shadow: odf::TextShadow, opacity: Option<f64>) -> Option<Shadow> {
     let odf::TextShadow::Shadow {
         dx,
         dy,
@@ -189,7 +190,7 @@ fn shadow(shadow: odf::TextShadow) -> Option<Shadow> {
         angle: angle.rem_euclid(360),
         offset: Length::from_pt(dx.0.hypot(dy.0)),
         blur: blur.map_or(Length::ZERO, length),
-        opacity: 100,
+        opacity: opacity.map_or(100, |o| o.round().clamp(0.0, 100.0) as u8),
         color: color.map_or(Rgba::BLACK, rgba),
     })
 }
@@ -259,7 +260,7 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
     CharAttrs {
         font_family: t.font_family.as_ref().map(|_| family.into()),
         font_size: t.font_size.map(length),
-        bold: t.font_weight.map(|w| w >= 600),
+        weight: t.font_weight.map(FontWeight::new),
         italic: t.italic,
         underline: t.underline.map(line_style),
         strikethrough: t.line_through.map(line_style),
@@ -279,12 +280,13 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
         capitalization,
         language,
         // The spacing of ODF is a length, the tracking of Pages a part of
-        // the font size.
-        tracking: t
-            .letter_spacing
-            .map(|l| (l.0 / size.max(1.0) * 1000.0).round() as i32),
+        // the font size, which Desk keeps beside it.
+        tracking: t.tracking.or_else(|| {
+            t.letter_spacing
+                .map(|l| (l.0 / size.max(1.0) * 1000.0).round() as i32)
+        }),
         outline: t.outline,
-        shadow: t.shadow.map(shadow),
+        shadow: t.shadow.map(|s| shadow(s, t.shadow_opacity)),
         ligatures,
         font_features,
         background: t.background.map(background),
@@ -334,7 +336,7 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         font_family,
         font_size: a.font_size.map(odf_length),
         font_size_percent: None,
-        font_weight: a.bold.map(|b| if b { 700 } else { 400 }),
+        font_weight: a.weight.map(FontWeight::value),
         italic: a.italic,
         underline: a.underline.map(line),
         line_through: a.strikethrough.map(line),
@@ -364,11 +366,18 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         letter_spacing: a
             .tracking
             .map(|t| odf::Length(f64::from(t) / 1000.0 * resolved.font_size.to_pt())),
+        tracking: a.tracking,
         outline: a.outline,
         shadow: a.shadow.map(odf_shadow),
+        shadow_opacity: a
+            .shadow
+            .flatten()
+            .filter(|s| s.opacity < 100)
+            .map(|s| f64::from(s.opacity)),
         background: a.background.map(odf_background),
         // A paragraph attribute, which the paragraph styles write.
         hyphenate: None,
+        desk_hyphenate: None,
     }
 }
 
@@ -391,7 +400,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         (widows, orphans) => Some(widows.unwrap_or(0) >= 2 || orphans.unwrap_or(0) >= 2),
     };
     ParaAttrs {
-        hyphenate: t.hyphenate,
+        hyphenate: t.desk_hyphenate.or(t.hyphenate),
         alignment: p.align.map(|a| match a {
             odf::TextAlign::Start | odf::TextAlign::Left => Alignment::Left,
             odf::TextAlign::Center => Alignment::Center,
@@ -643,6 +652,10 @@ fn odf_default_size(source: &odf::TextDocument) -> f64 {
 /// length: 12 points, the size of the text Pages measures labels for.
 const LABEL_RAISE_BASE: f64 = 12.0;
 
+/// The size that the size of a list label that does not scale with the
+/// text is a part of, as in the model: 12 points.
+const LABEL_FIXED_BASE: f64 = 12.0;
+
 /// The levels of a list style of ODF; the levels it does not set have no
 /// label.
 fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
@@ -686,10 +699,21 @@ fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
                 (label, *start)
             }
         };
-        let size = level
-            .relative_size
-            .or(level.text.font_size_percent)
-            .map_or(100, |p| p.round().clamp(1.0, 1000.0) as u16);
+        // A label of a size of its own, in points, does not scale with the
+        // text (LST-03); its size is a part of 12 points.
+        let fixed = level
+            .text
+            .font_size
+            .filter(|_| level.relative_size.is_none() && level.text.font_size_percent.is_none());
+        let size = match fixed {
+            Some(points) => (points.0 / LABEL_FIXED_BASE * 100.0)
+                .round()
+                .clamp(1.0, 1000.0) as u16,
+            None => level
+                .relative_size
+                .or(level.text.font_size_percent)
+                .map_or(100, |p| p.round().clamp(1.0, 1000.0) as u16),
+        };
         let raise = match level.text.position {
             Some(odf::TextPosition::Percent(p)) => Length::from_pt(p * LABEL_RAISE_BASE / 100.0),
             _ => Length::ZERO,
@@ -700,7 +724,7 @@ fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
             label_indent: level.space_before.map_or(Length::ZERO, length),
             text_indent: level.min_label_width.map_or(Length::ZERO, length),
             size,
-            scale_with_text: true,
+            scale_with_text: fixed.is_none(),
             raise,
             color: level.text.color.map(rgba),
         }
@@ -750,7 +774,7 @@ fn odf_list_style(style: &ListStyle, name: String) -> odf::ListStyle {
                     *tiered,
                 ),
             };
-            let sized = level.size != 100;
+            let sized = level.size != 100 && level.scale_with_text;
             odf::ListLevelStyle {
                 level: index as u8 + 1,
                 relative_size: (sized && matches!(label, odf::ListLabel::Bullet(_)))
@@ -760,6 +784,8 @@ fn odf_list_style(style: &ListStyle, name: String) -> odf::ListStyle {
                 min_label_width: Some(odf_length(level.text_indent)),
                 text: odf::TextProperties {
                     font_size_percent: sized.then_some(f64::from(level.size)),
+                    font_size: (!level.scale_with_text)
+                        .then(|| odf::Length(f64::from(level.size) / 100.0 * LABEL_FIXED_BASE)),
                     color: level.color.map(odf_color),
                     position: (level.raise != Length::ZERO).then(|| {
                         odf::TextPosition::Percent(level.raise.to_pt() / LABEL_RAISE_BASE * 100.0)
@@ -1061,6 +1087,24 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     set(&mut setup.margin_right, page.margin_right);
     document.apply(Op::SetPageSetup { page: setup })?;
 
+    let text = &source.text_settings;
+    document.apply(Op::SetTextSettings {
+        settings: TextSettings {
+            hyphenation: text.hyphenation.unwrap_or(true),
+            ligatures: text.ligatures.unwrap_or(true),
+            never_hyphenate: text
+                .never_hyphenate
+                .iter()
+                .map(|w| w.to_lowercase())
+                .collect(),
+            spacing: if text.larger_spacing.unwrap_or(false) {
+                ParagraphSpacing::Larger
+            } else {
+                ParagraphSpacing::Sum
+            },
+        },
+    })?;
+
     let meta = &source.meta;
     document.apply(Op::SetMetadata {
         metadata: Metadata {
@@ -1186,8 +1230,19 @@ fn odf_paragraph_properties(
     properties
 }
 
+/// `fo:hyphenate` and `desk:hyphenate` of a paragraph or a style that sets
+/// hyphenation. In a document that is not hyphenated, other programs read
+/// that no paragraph is, and Desk what the paragraph allows.
+fn odf_hyphenate(hyphenate: Option<bool>, document: bool) -> (Option<bool>, Option<bool>) {
+    match hyphenate {
+        Some(true) if !document => (Some(false), Some(true)),
+        other => (other, None),
+    }
+}
+
 /// Builds an ODF text document from a document.
 pub fn export(document: &Document) -> odf::TextDocument {
+    let settings = document.text_settings();
     let styles = document.styles();
     let default = styles.default_paragraph();
     let mut names: HashMap<StyleId, String> = HashMap::new();
@@ -1209,7 +1264,17 @@ pub fn export(document: &Document) -> odf::TextDocument {
         names.insert(style.id(), name);
     }
 
-    let mut out = odf::TextDocument::default();
+    let mut out = odf::TextDocument {
+        text_settings: odf::TextSettings {
+            hyphenation: (!settings.hyphenation).then_some(false),
+            ligatures: (!settings.ligatures).then_some(false),
+            never_hyphenate: settings.never_hyphenate.iter().cloned().collect(),
+            // Other programs add the two spaces between paragraphs, so a
+            // document that does not say takes the sum (FMT-15).
+            larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
+        },
+        ..odf::TextDocument::default()
+    };
     for style in styles.iter() {
         if let Some(key) = style.shortcut() {
             out.style_shortcuts.push(odf::StyleShortcut {
@@ -1249,7 +1314,9 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         p.id == default,
                     ),
                     text: odf::TextProperties {
-                        hyphenate: p.paragraph.hyphenate,
+                        hyphenate: odf_hyphenate(p.paragraph.hyphenate, settings.hyphenation).0,
+                        desk_hyphenate: odf_hyphenate(p.paragraph.hyphenate, settings.hyphenation)
+                            .1,
                         ..text_properties(
                             &p.character,
                             &styles.resolve_character(p.id, None, &CharAttrs::default()),
@@ -1335,9 +1402,14 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         &styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
                         false,
                     ),
-                    text: odf::TextProperties {
-                        hyphenate: paragraph.attrs().hyphenate,
-                        ..odf::TextProperties::default()
+                    text: {
+                        let (hyphenate, desk_hyphenate) =
+                            odf_hyphenate(paragraph.attrs().hyphenate, settings.hyphenation);
+                        odf::TextProperties {
+                            hyphenate,
+                            desk_hyphenate,
+                            ..odf::TextProperties::default()
+                        }
                     },
                 },
             )

@@ -138,6 +138,8 @@ pub struct Format {
     pub style: Option<StyleId>,
     /// The list style of the paragraph, when it has one.
     pub list: Option<desk_model::ListStyle>,
+    /// The settings of the text of the document.
+    pub text_settings: desk_model::TextSettings,
 }
 
 /// Edits the document of a window.
@@ -825,7 +827,39 @@ impl TextEditor {
             list: format.list_style.and_then(|id| styles.list(id)).cloned(),
             paragraph: format,
             style: Some(paragraph.style()),
+            text_settings: document.text_settings().clone(),
         }
+    }
+
+    /// Changes the settings of the text of the whole document, as one
+    /// action of the history.
+    pub fn change_text_settings(
+        &self,
+        name: &str,
+        change: impl FnOnce(&mut desk_model::TextSettings),
+    ) {
+        let mut settings = self
+            .state
+            .borrow()
+            .editor
+            .document()
+            .text_settings()
+            .clone();
+        change(&mut settings);
+        self.format_edit(name, move |edit| edit.set_text_settings(settings));
+    }
+
+    /// The word at the cursor or the start of the selection, when there is
+    /// one: what Never Hyphenate takes.
+    pub fn word_at_cursor(&self) -> Option<String> {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        let (start, _) = state.selection.ordered();
+        let text = document.body().get(start.paragraph)?.text();
+        desk_lang::words(&text)
+            .into_iter()
+            .find(|r| r.start <= start.offset && start.offset <= r.end)
+            .map(|r| text[r].to_owned())
     }
 
     /// The paragraph styles of the document, by name.

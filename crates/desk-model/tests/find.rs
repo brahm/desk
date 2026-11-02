@@ -4,6 +4,7 @@
 //! Model tests for finding and replacing (TXT-12, TXT-13). Each test name
 //! starts with the row ID.
 
+use desk_model::FontWeight;
 use desk_model::{CharAttrs, Document, Editor, Position, Query};
 
 fn editor(text: &str) -> Editor {
@@ -46,7 +47,7 @@ fn txt_12_replace_all_keeps_the_formatting_and_undoes() {
                 Position::new(first, 13),
                 Position::new(first, 16),
                 &CharAttrs {
-                    bold: Some(true),
+                    weight: Some(FontWeight::BOLD),
                     ..CharAttrs::default()
                 },
             )
@@ -61,7 +62,11 @@ fn txt_12_replace_all_keeps_the_formatting_and_undoes() {
     assert_eq!(texts(&editor), ["one dog, two dogs", "dog"]);
     let paragraph = editor.document().body().get(0).unwrap();
     let (_, attrs) = paragraph.format_at(14);
-    assert_eq!(attrs.bold, Some(true), "the replacement keeps the bold");
+    assert_eq!(
+        attrs.weight,
+        Some(FontWeight::BOLD),
+        "the replacement keeps the bold"
+    );
     editor.undo().unwrap();
     assert_eq!(texts(&editor), ["one cat, two cats", "cat"]);
 }

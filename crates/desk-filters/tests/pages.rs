@@ -140,7 +140,7 @@ fn doc_22_fmt_anonymous_styles_become_direct_formatting() {
     assert_eq!(sup.color, Rgba::rgb(255, 0, 0));
     assert_eq!(&*sup.font_family, "Liberation Sans");
     assert!(sup.italic);
-    assert!(character(3).bold);
+    assert!(character(3).weight.is_bold());
     assert!(runs[3].style.is_some());
 }
 
@@ -165,7 +165,7 @@ fn doc_22_est_04_page_breaks_split_paragraphs() {
     let riscado = styles.resolve_character(after.style(), runs[1].style, &runs[1].attrs);
     assert_eq!(riscado.strikethrough, LineStyle::Single);
     // The named style under the anonymous one.
-    assert!(riscado.bold);
+    assert!(riscado.weight.is_bold());
     assert!(riscado.italic);
 }
 
@@ -323,9 +323,12 @@ fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
     };
     let (document, log) = read_pages_logged(plain.as_bytes()).unwrap();
     // Without automatic hyphenation, Pages breaks words only at soft
-    // hyphens.
+    // hyphens: the document is not hyphenated, and its paragraphs keep
+    // what they allow.
     assert!(log.is_empty(), "{:?}", log.entries());
-    assert_eq!(hyphenated_paragraphs(&document), [false, false, false]);
+    assert!(!document.text_settings().hyphenation);
+    assert!(document.text_settings().ligatures);
+    assert_eq!(hyphenated_paragraphs(&document), [true, false, true]);
     let setting = |on: &str| {
         format!(
             r#"<sl:publication-info>{}</sl:publication-info><sl:slprint-info"#,
@@ -338,6 +341,7 @@ fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
     );
     let (document, log) = read_pages_logged(hyphenated.as_bytes()).unwrap();
     // A style that turns it off keeps its paragraphs whole.
+    assert!(document.text_settings().hyphenation);
     assert_eq!(hyphenated_paragraphs(&document), [true, false, true]);
     let entries: Vec<(Warning, usize)> = log
         .entries()
@@ -491,4 +495,37 @@ fn fmt_20_fmt_21_backgrounds_and_borders_are_read() {
     assert_eq!(dashed.style, BorderStyle::Dashed);
     assert_eq!(dashed.offset, Length::from_points(6));
     assert_eq!(dashed.width, Length::from_points(1));
+}
+
+#[test]
+fn int_15_faces_keep_their_weight() {
+    let face = |id: &str, name: &str, bold: Option<&str>| {
+        format!(
+            r#"<sf:characterstyle sf:parent-ident="character-style-null" sfa:ID="{id}"><sf:property-map><sf:fontName><sf:string sfa:string="{name}"/></sf:fontName>{}</sf:property-map></sf:characterstyle>"#,
+            bold.map(|b| number("bold", b, "c")).unwrap_or_default()
+        )
+    };
+    let anon = [
+        face("W-1", "HelveticaNeue-UltraLight", None),
+        face("W-2", "HelveticaNeue-Light", Some("1")),
+        face("W-3", "HelveticaNeue-Bold", Some("0")),
+        face("W-4", "HelveticaNeue-Medium", Some("0")),
+    ]
+    .concat();
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="W-1">a</sf:span><sf:span sf:style="W-2">b</sf:span><sf:span sf:style="W-3">c</sf:span><sf:span sf:style="W-4">d</sf:span></sf:p>"#;
+    let document = read_pages(index(STYLES, &anon, body).as_bytes()).unwrap();
+    let styles = document.styles();
+    let paragraph = document.body().get(0).unwrap();
+    let weights: Vec<u16> = paragraph
+        .runs()
+        .map(|r| {
+            styles
+                .resolve_character(paragraph.style(), r.style, &r.attrs)
+                .weight
+                .value()
+        })
+        .collect();
+    // Bold over a light face is bold, and a bold face without bold is
+    // regular.
+    assert_eq!(weights, [100, 700, 400, 500]);
 }

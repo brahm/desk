@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use desk_layout::{DocumentLayout, paginate, paginate_texts};
+use desk_layout::{DocumentLayout, paginate, paginate_texts, paginate_texts_spaced};
 use desk_model::{CharFormat, Document, LINE_BREAK, Length, PageSetup, ParaFormat};
 use desk_text::{ParagraphText, TextSystem};
 
@@ -128,6 +128,13 @@ fn fmt_15_the_larger_space_between_paragraphs_applies() {
     assert!((lines[0].top() - 20.0).abs() < 0.01);
     // max(10, 4) and then max(0, 12).
     assert!((lines[1].top() - lines[0].bottom() - 10.0).abs() < 0.01);
+    assert!((lines[2].top() - lines[1].bottom() - 12.0).abs() < 0.01);
+
+    // Documents of other programs add the two (FMT-15).
+    let layout = paginate_texts_spaced(setup(500.0), &texts, &mut system, true);
+    let lines = &layout.pages[0].lines;
+    assert!((lines[0].top() - 20.0).abs() < 0.01);
+    assert!((lines[1].top() - lines[0].bottom() - 14.0).abs() < 0.01);
     assert!((lines[2].top() - lines[1].bottom() - 12.0).abs() < 0.01);
 }
 

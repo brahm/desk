@@ -3,7 +3,7 @@
 
 //! The pages of a word processing document.
 
-use desk_model::{Document, PageSetup, ParaBorder, ParaFormat, Rgba};
+use desk_model::{Document, PageSetup, ParaBorder, ParaFormat, ParagraphSpacing, Rgba};
 use desk_text::{Column, Line, ParagraphText, TextSystem};
 
 /// How much a line may stick out of the bottom of the body and still
@@ -110,14 +110,22 @@ impl DocumentLayout {
 /// Lays out the body of a document on pages.
 pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout {
     let styles = document.styles();
+    let settings = document.text_settings();
     let items = styles.list_items(document.body().iter());
     let texts: Vec<ParagraphText> = document
         .body()
         .iter()
         .zip(&items)
-        .map(|(paragraph, item)| ParagraphText::new_in_list(styles, paragraph, item.as_ref()))
+        .map(|(paragraph, item)| {
+            ParagraphText::new_in_document(styles, settings, paragraph, item.as_ref())
+        })
         .collect();
-    paginate_texts(*document.page_setup(), &texts, system)
+    paginate_texts_spaced(
+        *document.page_setup(),
+        &texts,
+        system,
+        settings.spacing == ParagraphSpacing::Sum,
+    )
 }
 
 /// A paragraph laid out once, at the top of an endless column.
@@ -209,6 +217,19 @@ pub fn paginate_texts(
     texts: &[ParagraphText],
     system: &mut TextSystem,
 ) -> DocumentLayout {
+    paginate_texts_spaced(setup, texts, system, false)
+}
+
+/// Lays out prepared paragraphs on pages, as [`paginate_texts`] does, with
+/// the space between two paragraphs the sum of the space after the first
+/// and before the second when `sum` is true, as in documents of other
+/// programs.
+pub fn paginate_texts_spaced(
+    setup: PageSetup,
+    texts: &[ParagraphText],
+    system: &mut TextSystem,
+    sum: bool,
+) -> DocumentLayout {
     let column = Column::new(setup.body_width().to_pt() as f32);
     let blocks: Vec<Block> = texts
         .iter()
@@ -258,6 +279,8 @@ pub fn paginate_texts(
             let at_top = cursor.at_top(&pages);
             let collapsed = if a > 0 || at_top {
                 0.0
+            } else if sum {
+                cursor.after + before
             } else {
                 cursor.after.max(before)
             };

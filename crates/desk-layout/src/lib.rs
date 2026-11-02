@@ -23,4 +23,6 @@
 
 mod pages;
 
-pub use pages::{DocumentLayout, Page, PlacedBlock, PlacedLine, paginate, paginate_texts};
+pub use pages::{
+    DocumentLayout, Page, PlacedBlock, PlacedLine, paginate, paginate_texts, paginate_texts_spaced,
+};

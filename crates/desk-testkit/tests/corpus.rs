@@ -112,6 +112,9 @@ fn resolved(document: &desk_model::Document) -> Vec<String> {
             // Pages has widow control on by default, and the cases only
             // say where it matters.
             format.widow_control = false;
+            // A word breaks only where both the paragraph and the document
+            // allow it, and the cases say so on the paragraph.
+            format.hyphenate &= document.text_settings().hyphenation;
             let mut line = format!("{format:?}");
             for run in paragraph.runs() {
                 let character = styles.resolve_character(paragraph.style(), run.style, &run.attrs);

@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use adw::prelude::*;
 use desk_model::{
-    CharAttrs, CharFormat, FontFeature, FontFeatures, Length, LineStyle, ParaAttrs, ParaFormat,
-    Rgba, Shadow,
+    CharAttrs, CharFormat, FontFeature, FontFeatures, FontWeight, Length, LineStyle, ParaAttrs,
+    ParaFormat, Rgba, Shadow,
 };
 
 use crate::effects::{Change, ColorRow, LIGATURES, ligatures_name};
@@ -36,8 +36,72 @@ const MAX_SIZE: f64 = 1638.0;
 /// The styles of lines in the menus of underline and strikethrough.
 const LINES: [LineStyle; 3] = [LineStyle::None, LineStyle::Single, LineStyle::Double];
 
-/// The faces the model holds, as bold and italic.
-const FACES: [(bool, bool); 4] = [(false, false), (false, true), (true, false), (true, true)];
+/// A face of a family: its weight and whether it is italic (INT-15).
+type Face = (FontWeight, bool);
+
+/// The faces offered for a family that is not installed.
+const FACES: [Face; 4] = [
+    (FontWeight::NORMAL, false),
+    (FontWeight::NORMAL, true),
+    (FontWeight::BOLD, false),
+    (FontWeight::BOLD, true),
+];
+
+/// The faces of an installed family, lightest first, or the four basic
+/// faces when the family is not installed.
+fn family_faces(context: &gtk::pango::Context, family: &str) -> Vec<Face> {
+    let mut faces: Vec<Face> = context
+        .list_families()
+        .iter()
+        .filter(|f| f.name().eq_ignore_ascii_case(family))
+        .flat_map(|f| f.list_faces())
+        .map(|face| {
+            let description = face.describe();
+            let weight = FontWeight::new(weight_value(description.weight()));
+            let italic = description.style() != gtk::pango::Style::Normal;
+            (weight, italic)
+        })
+        .collect();
+    faces.sort();
+    faces.dedup();
+    if faces.is_empty() {
+        let mut basic = FACES.to_vec();
+        basic.sort();
+        return basic;
+    }
+    faces
+}
+
+/// The number of a Pango weight, from 100 to 900.
+fn weight_value(weight: gtk::pango::Weight) -> u16 {
+    use gtk::pango::Weight;
+    match weight {
+        Weight::Thin => 100,
+        Weight::Ultralight => 200,
+        Weight::Light | Weight::Semilight => 300,
+        Weight::Book | Weight::Normal => 400,
+        Weight::Medium => 500,
+        Weight::Semibold => 600,
+        Weight::Bold => 700,
+        Weight::Ultrabold => 800,
+        Weight::Heavy | Weight::Ultraheavy => 900,
+        _ => 400,
+    }
+}
+
+/// The face of a family nearest to a weight and slant.
+fn nearest_face(faces: &[Face], wanted: Face) -> usize {
+    faces
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, (weight, italic))| {
+            (
+                *italic != wanted.1,
+                weight.value().abs_diff(wanted.0.value()),
+            )
+        })
+        .map_or(0, |(i, _)| i)
+}
 
 /// The features of OpenType fonts that the Typography section offers,
 /// with their names (FMT-08).
@@ -76,12 +140,26 @@ fn collection_name(collection: Collection) -> String {
     }
 }
 
-fn face_name(face: (bool, bool)) -> String {
-    match face {
-        (false, false) => tr("Regular"),
-        (false, true) => tr("Italic"),
-        (true, false) => tr("Bold"),
-        (true, true) => tr("Bold Italic"),
+fn face_name((weight, italic): Face) -> String {
+    match (weight.value(), italic) {
+        (..=150, false) => tr("Thin"),
+        (..=150, true) => tr("Thin Italic"),
+        (151..=250, false) => tr("Extra Light"),
+        (151..=250, true) => tr("Extra Light Italic"),
+        (251..=350, false) => tr("Light"),
+        (251..=350, true) => tr("Light Italic"),
+        (351..=450, false) => tr("Regular"),
+        (351..=450, true) => tr("Italic"),
+        (451..=550, false) => tr("Medium"),
+        (451..=550, true) => tr("Medium Italic"),
+        (551..=650, false) => tr("Semibold"),
+        (551..=650, true) => tr("Semibold Italic"),
+        (651..=750, false) => tr("Bold"),
+        (651..=750, true) => tr("Bold Italic"),
+        (751..=850, false) => tr("Extra Bold"),
+        (751..=850, true) => tr("Extra Bold Italic"),
+        (_, false) => tr("Black"),
+        (_, true) => tr("Black Italic"),
     }
 }
 
@@ -151,6 +229,8 @@ pub struct FontsWindow {
     collections: gtk::ListBox,
     families: gtk::ListBox,
     faces: gtk::ListBox,
+    /// The faces that the list of faces shows, for the family shown.
+    face_list: RefCell<(String, Vec<Face>)>,
     sizes: gtk::ListBox,
     size: gtk::SpinButton,
     search: gtk::SearchEntry,
@@ -188,7 +268,12 @@ impl FontsWindow {
         fill(&collections, &COLLECTIONS.map(collection_name));
         let (families, families_view) = name_list(&tr("Family"));
         let (faces, faces_view) = name_list(&tr("Typeface"));
-        fill(&faces, &FACES.map(face_name));
+        let mut basic = FACES.to_vec();
+        basic.sort();
+        fill(
+            &faces,
+            &basic.iter().copied().map(face_name).collect::<Vec<_>>(),
+        );
         let (sizes, sizes_view) = name_list(&tr("Size"));
         fill(&sizes, &SIZES.map(|s| s.to_string()));
         let size = gtk::SpinButton::with_range(1.0, MAX_SIZE, 1.0);
@@ -330,6 +415,7 @@ impl FontsWindow {
             collections,
             families,
             faces,
+            face_list: RefCell::new((String::new(), basic)),
             sizes,
             size,
             search,
@@ -441,9 +527,9 @@ impl FontsWindow {
         });
         let face = character("Typeface", |this| {
             let row = this.faces.selected_row()?;
-            let (bold, italic) = FACES[(row.index().max(0) as usize).min(FACES.len() - 1)];
+            let (weight, italic) = *this.face_list.borrow().1.get(row.index().max(0) as usize)?;
             Some(CharAttrs {
-                bold: Some(bold),
+                weight: Some(weight),
                 italic: Some(italic),
                 ..CharAttrs::default()
             })
@@ -592,6 +678,20 @@ impl FontsWindow {
         self.window.is_visible()
     }
 
+    /// Fills the list of faces with those of a family, unless it shows
+    /// them already.
+    fn show_faces(&self, family: &str) {
+        if self.face_list.borrow().0 == family {
+            return;
+        }
+        let faces = family_faces(&self.window.pango_context(), family);
+        fill(
+            &self.faces,
+            &faces.iter().copied().map(face_name).collect::<Vec<_>>(),
+        );
+        *self.face_list.borrow_mut() = (family.to_owned(), faces);
+    }
+
     /// Shows the formatting at the selection.
     pub fn show(&self, character: &CharFormat, paragraph: &ParaFormat) {
         let shown = (character.clone(), paragraph.clone());
@@ -601,10 +701,11 @@ impl FontsWindow {
         *self.shown.borrow_mut() = Some(shown);
         self.updating.set(true);
         select_named(&self.families, &character.font_family);
-        let face = FACES
-            .iter()
-            .position(|f| *f == (character.bold, character.italic))
-            .unwrap_or(0);
+        self.show_faces(&character.font_family);
+        let face = nearest_face(
+            &self.face_list.borrow().1,
+            (character.weight, character.italic),
+        );
         self.faces
             .select_row(self.faces.row_at_index(face as i32).as_ref());
         let size = character.font_size.to_pt();

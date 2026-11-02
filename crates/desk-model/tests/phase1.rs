@@ -5,6 +5,7 @@
 //! name starts with the row ID. These cover only the model layer: a row is
 //! done when ODF, layout and drawing pass too.
 
+use desk_model::FontWeight;
 use desk_model::{
     Alignment, Baseline, Capitalization, CharAttrs, CharacterStyle, Document, Editor, LINE_BREAK,
     Language, Length, LineColor, LineSpacing, LineStyle, Metadata, ModelError, NO_BREAK_SPACE, Op,
@@ -43,7 +44,7 @@ fn fmt_01_bold_italic_and_underline_resolve() {
                 Position::new(id, 6),
                 Position::new(id, 10),
                 &CharAttrs {
-                    bold: Some(true),
+                    weight: Some(FontWeight::BOLD),
                     italic: Some(true),
                     underline: Some(LineStyle::Double),
                     ..CharAttrs::default()
@@ -58,12 +59,12 @@ fn fmt_01_bold_italic_and_underline_resolve() {
     let format = doc
         .styles()
         .resolve_character(paragraph.style(), runs[1].style, &runs[1].attrs);
-    assert!(format.bold && format.italic);
+    assert!(format.weight.is_bold() && format.italic);
     assert_eq!(format.underline, LineStyle::Double);
     let plain = doc
         .styles()
         .resolve_character(paragraph.style(), runs[0].style, &runs[0].attrs);
-    assert!(!plain.bold);
+    assert!(!plain.weight.is_bold());
 }
 
 #[test]

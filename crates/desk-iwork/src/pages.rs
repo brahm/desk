@@ -117,6 +117,19 @@ pub struct PagesDocument {
     /// Whether Pages hyphenates words at the ends of lines by itself
     /// (Document Inspector), in the paragraphs that allow it.
     pub auto_hyphenation: bool,
+    /// Whether the text uses ligatures (Document Inspector, "Use
+    /// ligatures"), true when the document does not say.
+    pub use_ligatures: bool,
+}
+
+/// A flag of the publication info of a document, as the settings of the
+/// Document Inspector are kept.
+fn publication_flag(root: &Element, name: &str) -> Option<bool> {
+    root.child(SL, "publication-info")
+        .and_then(|info| info.child(SL, name))
+        .and_then(|p| p.child(SL, "number"))
+        .and_then(|n| n.attr(SFA, "number"))
+        .map(|n| n.trim() != "0")
 }
 
 /// Reads a Pages document from the text of its index.
@@ -162,12 +175,8 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             .child(SL, "slprint-info")
             .map(page_geometry)
             .unwrap_or_default(),
-        auto_hyphenation: root
-            .child(SL, "publication-info")
-            .and_then(|info| info.child(SL, "kSFWPAutoHyphenationProperty"))
-            .and_then(|p| p.child(SL, "number"))
-            .and_then(|n| n.attr(SFA, "number"))
-            .is_some_and(|n| n.trim() != "0"),
+        auto_hyphenation: publication_flag(&root, "kSFWPAutoHyphenationProperty").unwrap_or(false),
+        use_ligatures: publication_flag(&root, "kSFWPUseLigaturesProperty").unwrap_or(true),
         ..PagesDocument::default()
     };
     let Some(storage) = root

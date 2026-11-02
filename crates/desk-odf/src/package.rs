@@ -64,6 +64,10 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
         .as_deref()
         .map(crate::read::style_shortcuts)
         .unwrap_or_default();
+    document.text_settings = settings
+        .as_deref()
+        .map(crate::read::text_settings)
+        .unwrap_or_default();
     Ok(document)
 }
 

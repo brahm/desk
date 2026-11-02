@@ -301,6 +301,14 @@ impl TextSystem {
             }
             builder.push(StyleProperty::Brush(range.format), range.range.clone());
         }
+        // A place where a word may break draws nothing, so tracking adds
+        // no space there.
+        for (at, _) in text.text().match_indices(SOFT_HYPHEN) {
+            builder.push(
+                StyleProperty::LetterSpacing(0.0),
+                at..at + SOFT_HYPHEN.len_utf8(),
+            );
+        }
         builder.build(text.text())
     }
 
@@ -929,11 +937,7 @@ fn properties<'a>(
     let mut properties = vec![
         StyleProperty::FontFamily(FontFamily::named(family)),
         StyleProperty::FontSize(size),
-        StyleProperty::FontWeight(if format.bold {
-            FontWeight::BOLD
-        } else {
-            FontWeight::NORMAL
-        }),
+        StyleProperty::FontWeight(FontWeight::new(f32::from(format.weight.value()))),
         StyleProperty::FontStyle(if format.italic {
             FontStyle::Italic
         } else {
@@ -1049,12 +1053,17 @@ fn run_text(source: &str, run: &parley::Run<'_, u32>, glyphs: usize) -> (String,
             match c {
                 FI => text.push_str("fi"),
                 FL => text.push_str("fl"),
+                // A place where the word may break is not text to copy.
+                SOFT_HYPHEN => {}
                 c => text.push(c),
             }
         }
         let n = cluster.glyphs().count();
         count += n;
-        clusters.push(((text.len() - start) as u32, n as u32));
+        let bytes = text.len() - start;
+        if bytes > 0 || n > 0 {
+            clusters.push((bytes as u32, n as u32));
+        }
     }
     if count != glyphs {
         clusters.clear();

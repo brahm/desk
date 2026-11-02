@@ -6,12 +6,12 @@
 use std::collections::HashMap;
 
 use crate::error::OdfError;
-use crate::ns::{CONFIG, DC, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
+use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
     LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout, Paragraph,
     ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign,
-    TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
+    TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -251,6 +251,15 @@ impl Reader {
             shadow: e.attr(FO, "text-shadow").and_then(text_shadow),
             background: e.attr(FO, "background-color").and_then(background),
             hyphenate: e.attr(FO, "hyphenate").map(|v| v == "true"),
+            desk_hyphenate: e.attr(DESK, "hyphenate").map(|v| v == "true"),
+            shadow_opacity: e
+                .attr(DESK, "shadow-opacity")
+                .and_then(parse_percent)
+                .map(|p| p.clamp(0.0, 100.0)),
+            tracking: e
+                .attr(DESK, "tracking")
+                .and_then(|v| v.trim().parse::<i32>().ok())
+                .map(|t| t.clamp(-1000, 10_000)),
         }
     }
 }
@@ -478,18 +487,56 @@ fn tab_stop(e: &Element) -> Option<TabStop> {
     })
 }
 
-/// Reads `TabsRelativeToIndent` from the settings stream, if it is there.
-pub(crate) fn tabs_relative_to_indent(settings: &str) -> Option<bool> {
+/// Reads a boolean configuration item from the settings stream, if it is
+/// there.
+fn config_bool(settings: &str, name: &str) -> Option<bool> {
     let root = xml::parse(settings).ok()?;
     let mut found = None;
     visit(&root, &mut |e| {
-        if e.name.is(CONFIG, "config-item")
-            && e.attr(CONFIG, "name") == Some("TabsRelativeToIndent")
-        {
+        if e.name.is(CONFIG, "config-item") && e.attr(CONFIG, "name") == Some(name) {
             found = Some(e.text().trim() == "true");
         }
     });
     found
+}
+
+/// Reads `TabsRelativeToIndent` from the settings stream, if it is there.
+pub(crate) fn tabs_relative_to_indent(settings: &str) -> Option<bool> {
+    config_bool(settings, "TabsRelativeToIndent")
+}
+
+/// Reads the settings of the text that Desk keeps in the settings stream.
+pub(crate) fn text_settings(settings: &str) -> TextSettings {
+    let Ok(root) = xml::parse(settings) else {
+        return TextSettings::default();
+    };
+    let mut out = TextSettings::default();
+    visit(&root, &mut |e| {
+        if !(e.name.is(CONFIG, "config-item-set")
+            && e.attr(CONFIG, "name") == Some(crate::write::TEXT_SETTINGS))
+        {
+            return;
+        }
+        for item in e.children_named(CONFIG, "config-item") {
+            let text = item.text();
+            match item.attr(CONFIG, "name") {
+                Some("Hyphenation") => out.hyphenation = Some(text.trim() == "true"),
+                Some("Ligatures") => out.ligatures = Some(text.trim() == "true"),
+                Some("LargerSpacing") => out.larger_spacing = Some(text.trim() == "true"),
+                Some("NeverHyphenate") => {
+                    out.never_hyphenate = text
+                        .lines()
+                        .map(str::trim)
+                        .filter(|w| !w.is_empty())
+                        .take(100_000)
+                        .map(str::to_owned)
+                        .collect();
+                }
+                _ => {}
+            }
+        }
+    });
+    out
 }
 
 /// Reads the shortcuts of styles from the settings stream.

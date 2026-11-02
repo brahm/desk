@@ -27,13 +27,13 @@
 //!   content lives in persistent structures.
 //!
 //! ```
-//! use desk_model::{CharAttrs, Document, Editor};
+//! use desk_model::{CharAttrs, Document, Editor, FontWeight};
 //!
 //! let mut editor = Editor::new(Document::new_word_processing());
 //! let start = editor.document().start();
 //! let end = editor.edit("Typing", |edit| edit.insert_text(start, "Hello"))?;
 //! editor.edit("Bold", |edit| {
-//!     edit.set_character_attrs(start, end, &CharAttrs { bold: Some(true), ..Default::default() })
+//!     edit.set_character_attrs(start, end, &CharAttrs { weight: Some(FontWeight::BOLD), ..Default::default() })
 //! })?;
 //! assert_eq!(editor.undo_name(), Some("Bold"));
 //!
@@ -58,14 +58,16 @@ mod transaction;
 mod units;
 
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
-pub use document::{Container, Document, Metadata, PageSetup, PagedFlow, Statistics};
+pub use document::{
+    Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics, TextSettings,
+};
 pub use error::ModelError;
 pub use find::{Found, Query};
 pub use format::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    DEFAULT_TAB_INTERVAL, FontFeature, FontFeatures, Language, Ligatures, LineColor, LineSpacing,
-    LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow, TabAlignment, TabLeader, TabStop,
-    TabStops,
+    DEFAULT_TAB_INTERVAL, FontFeature, FontFeatures, FontWeight, Language, Ligatures, LineColor,
+    LineSpacing, LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow, TabAlignment, TabLeader,
+    TabStop, TabStops,
 };
 pub use id::NodeId;
 pub use list::{

@@ -87,7 +87,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 36] = [
+const DOCUMENT_ACTIONS: [&str; 38] = [
     "save",
     "save-as",
     "save-copy",
@@ -124,6 +124,8 @@ const DOCUMENT_ACTIONS: [&str; 36] = [
     "correct-spelling",
     "ignore-spelling",
     "learn-spelling",
+    "never-hyphenate",
+    "allow-hyphenation",
 ];
 
 thread_local! {
@@ -493,7 +495,7 @@ impl DocumentWindow {
         self.vertical_ruler.show(setup, &format.paragraph);
         let character = &format.character;
         for (name, on) in [
-            ("bold", character.bold),
+            ("bold", character.weight.is_bold()),
             ("italic", character.italic),
             ("underline", character.underline != LineStyle::None),
             ("strikethrough", character.strikethrough != LineStyle::None),
@@ -1078,8 +1080,10 @@ impl DocumentWindow {
                     LineStyle::None
                 });
                 let attrs = match name {
+                    // A light face turned bold is bold, and a black face
+                    // stays as it is.
                     "bold" => CharAttrs {
-                        bold: Some(on),
+                        weight: Some(editor.format().character.weight.with_bold(on)),
                         ..CharAttrs::default()
                     },
                     "italic" => CharAttrs {
@@ -1381,6 +1385,28 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+        for (name, never) in [("never-hyphenate", true), ("allow-hyphenation", false)] {
+            let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, parameter| {
+                let (Some(this), Some(word)) =
+                    (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+                else {
+                    return;
+                };
+                if let Some(editor) = this.editor() {
+                    let word = word.to_lowercase();
+                    editor.change_text_settings("Hyphenation", |settings| {
+                        if never {
+                            settings.never_hyphenate.insert(word);
+                        } else {
+                            settings.never_hyphenate.remove(&word);
+                        }
+                    });
+                }
+            });
+            self.window.add_action(&action);
+        }
         let correct = gio::SimpleAction::new("correct-spelling", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
         correct.connect_activate(move |_, parameter| {
@@ -1431,6 +1457,9 @@ impl DocumentWindow {
         // menu opens on one (TXT-10, TXT-11).
         let guesses = gio::Menu::new();
         menu.append_section(None, &guesses);
+        // Never Hyphenate for the word at the cursor (TXT-09).
+        let hyphenation = gio::Menu::new();
+        menu.append_section(None, &hyphenation);
         let edit = gio::Menu::new();
         edit.append(Some(&tr("Cu_t")), Some("win.cut"));
         edit.append(Some(&tr("_Copy")), Some("win.copy"));
@@ -1460,11 +1489,16 @@ impl DocumentWindow {
         let menu_popover = popover.downgrade();
         let editor = self.editor.clone();
         let menu_guesses = guesses.clone();
+        let menu_hyphenation = hyphenation.clone();
         click.connect_pressed(move |gesture, _, x, y| {
             if let Some(popover) = menu_popover.upgrade() {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
                 let editor = editor.borrow().clone();
-                fill_guesses(&menu_guesses, editor.and_then(|e| e.mistake_at(x, y)));
+                fill_guesses(
+                    &menu_guesses,
+                    editor.as_ref().and_then(|e| e.mistake_at(x, y)),
+                );
+                fill_hyphenation(&menu_hyphenation, editor.as_ref());
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
                 popover.popup();
             }
@@ -1496,10 +1530,11 @@ impl DocumentWindow {
                 let preferences = preferences::get();
                 fill_guesses(
                     &guesses,
-                    current.and_then(|e| {
+                    current.as_ref().and_then(|e| {
                         e.selected_mistake(preferences.check_spelling, preferences.proofread)
                     }),
                 );
+                fill_hyphenation(&hyphenation, current.as_ref());
                 // At the middle of the visible area.
                 let (width, height) = (area.width() / 2, area.height() / 3);
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(width, height, 1, 1)));
@@ -1542,6 +1577,29 @@ fn fill_guesses(menu: &gio::Menu, found: Option<(crate::spelling::Mistake, Strin
         menu.append(Some(&tr("_Ignore Spelling")), Some("win.ignore-spelling"));
         menu.append(Some(&tr("_Learn Spelling")), Some("win.learn-spelling"));
     }
+}
+
+/// Fills the section of the context menu with Never Hyphenate, or Allow
+/// Hyphenation for a word that is never hyphenated, when the document is
+/// hyphenated and the cursor is in a word (TXT-09).
+fn fill_hyphenation(menu: &gio::Menu, editor: Option<&TextEditor>) {
+    menu.remove_all();
+    let Some(editor) = editor else { return };
+    let Some(word) = editor.word_at_cursor() else {
+        return;
+    };
+    let settings = editor.format().text_settings;
+    if !settings.hyphenation {
+        return;
+    }
+    let (label, action) = if settings.may_hyphenate(&word) {
+        (tr("Never _Hyphenate"), "win.never-hyphenate")
+    } else {
+        (tr("Allow _Hyphenation"), "win.allow-hyphenation")
+    };
+    let item = gio::MenuItem::new(Some(&label), None);
+    item.set_action_and_target_value(Some(action), Some(&word.to_variant()));
+    menu.append_item(&item);
 }
 
 /// The number of a function key from F1 to F8.

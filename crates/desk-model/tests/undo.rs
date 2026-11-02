@@ -4,6 +4,7 @@
 //! Property tests: any sequence of edits can be undone back to the start
 //! and redone to the end, passing through the same documents.
 
+use desk_model::FontWeight;
 use desk_model::{
     Alignment, CharAttrs, CharacterStyle, Document, Edit, Editor, LINE_BREAK, Length, ModelError,
     NO_BREAK_SPACE, ParaAttrs, ParagraphStyle, Position,
@@ -204,7 +205,7 @@ fn run(edit: &mut Edit, fixture: &Fixture, action: &Action) -> Result<(), ModelE
         Action::Bold { from, to, on } => {
             let (a, b) = ordered(&doc, *from, *to);
             let attrs = CharAttrs {
-                bold: Some(*on),
+                weight: Some(FontWeight::NORMAL.with_bold(*on)),
                 ..CharAttrs::default()
             };
             edit.set_character_attrs(a, b, &attrs)

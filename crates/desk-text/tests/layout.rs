@@ -5,11 +5,12 @@
 //! Liberation Sans, which CI installs, so the widths are the same
 //! everywhere.
 
+use desk_model::FontWeight;
 use std::sync::Arc;
 
 use desk_model::{
     Alignment, Baseline, Capitalization, CharFormat, LINE_BREAK, Length, LineColor, LineSpacing,
-    LineStyle, NO_BREAK_SPACE, ParaFormat, Rgba,
+    LineStyle, NO_BREAK_SPACE, ParaFormat, Rgba, TextSettings,
 };
 use desk_text::{
     Column, LineSpace, ParagraphLayout, ParagraphText, SCRIPT_SCALE, SOFT_HYPHEN, TextSystem,
@@ -86,7 +87,7 @@ fn empty_paragraph_has_one_line() {
 fn fmt_01_bold_and_italic_pick_their_faces() {
     let mut system = TextSystem::new();
     let bold = CharFormat {
-        bold: true,
+        weight: FontWeight::BOLD,
         ..sans()
     };
     let italic = CharFormat {
@@ -107,6 +108,33 @@ fn fmt_01_bold_and_italic_pick_their_faces() {
     assert_ne!(fonts[0], fonts[1]);
     assert_ne!(fonts[0], fonts[2]);
     assert_ne!(fonts[1], fonts[2]);
+
+    // Weights other than bold pick their own faces, where the family has
+    // them (INT-15).
+    if &*system.font_choice("Inter").used == "Inter" {
+        let inter = |weight| CharFormat {
+            font_family: Arc::from("Inter"),
+            weight,
+            ..CharFormat::default()
+        };
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[
+                ("thin ", inter(FontWeight::THIN)),
+                ("light ", inter(FontWeight::LIGHT)),
+                ("regular", inter(FontWeight::NORMAL)),
+            ],
+        );
+        let fonts: Vec<_> = layout.lines[0]
+            .runs
+            .iter()
+            .map(|r| (r.font.data.id(), r.font.index))
+            .collect();
+        assert_eq!(fonts.len(), 3);
+        assert_ne!(fonts[0], fonts[1]);
+        assert_ne!(fonts[1], fonts[2]);
+    }
 }
 
 #[test]
@@ -434,6 +462,107 @@ fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
     assert!(
         text[first.range.clone()].ends_with("hy") || lines.iter().any(|l| l.ends_with("hyphen"))
     );
+    // Where a word may break, tracking adds no space.
+    let tracked = CharFormat {
+        tracking: 200,
+        ..english_format()
+    };
+    let wide = Column::new(400.0);
+    let width = |system: &mut TextSystem, hyphenate: bool| {
+        let paragraph = ParaFormat {
+            hyphenate,
+            ..ParaFormat::default()
+        };
+        lay_in(
+            system,
+            paragraph,
+            &[("representative", tracked.clone())],
+            &wide,
+        )
+        .lines[0]
+            .advance
+    };
+    assert_eq!(width(&mut system, true), width(&mut system, false));
+    // The text that a PDF keeps to copy has no marks where words may break.
+    for line in &broken.lines {
+        for run in &line.runs {
+            assert!(!run.text.contains('\u{ad}'), "{:?}", run.text);
+        }
+    }
+
+    // A document that is not hyphenated has no hyphens, and words never
+    // hyphenated are kept whole.
+    let lay_with = |system: &mut TextSystem, settings: &TextSettings| {
+        let text = ParagraphText::from_runs_with(
+            settings,
+            ParaFormat {
+                hyphenate: true,
+                ..ParaFormat::default()
+            },
+            sans(),
+            [(text, english_format())],
+        );
+        system.layout(&text, &column, 0.0)
+    };
+    let off = TextSettings {
+        hyphenation: false,
+        ..TextSettings::default()
+    };
+    assert!(
+        lay_with(&mut system, &off)
+            .lines
+            .iter()
+            .all(|l| !l.hyphenated)
+    );
+    let never = TextSettings {
+        never_hyphenate: ["hyphenation", "representative"].map(str::to_owned).into(),
+        ..TextSettings::default()
+    };
+    let kept = lay_with(&mut system, &never);
+    for line in &kept.lines {
+        let words = &text[line.range.clone()];
+        assert!(
+            !line.hyphenated || !(words.ends_with("hy") || words.ends_with("repre")),
+            "{words}"
+        );
+    }
+}
+
+fn english_format() -> CharFormat {
+    CharFormat {
+        language: desk_model::Language::new("en-US"),
+        ..sans()
+    }
+}
+
+#[test]
+fn fmt_09_a_document_without_ligatures_has_none() {
+    let mut system = TextSystem::new();
+    let all = CharFormat {
+        ligatures: desk_model::Ligatures::All,
+        ..sans()
+    };
+    let glyphs = |system: &mut TextSystem, settings: &TextSettings| {
+        let text = ParagraphText::from_runs_with(
+            settings,
+            ParaFormat::default(),
+            sans(),
+            [("office", all.clone())],
+        );
+        let laid = system.layout(&text, &Column::new(300.0), 0.0);
+        laid.lines
+            .iter()
+            .flat_map(|l| &l.runs)
+            .map(|r| r.glyphs.len())
+            .sum::<usize>()
+    };
+    let off = TextSettings {
+        ligatures: false,
+        ..TextSettings::default()
+    };
+    // One glyph for each letter, and no more than that with ligatures.
+    assert_eq!(glyphs(&mut system, &off), "office".len());
+    assert!(glyphs(&mut system, &TextSettings::default()) <= "office".len());
 }
 
 /// A column with an object on its right half, from 15pt to 45pt down.

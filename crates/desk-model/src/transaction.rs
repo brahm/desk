@@ -8,7 +8,7 @@
 //! snapshot of the document, which replaces the document only when every
 //! operation succeeded. Snapshots are cheap, so this costs little.
 
-use crate::document::{Document, Metadata, PageSetup};
+use crate::document::{Document, Metadata, PageSetup, TextSettings};
 use crate::error::ModelError;
 use crate::format::{CharAttrs, ParaAttrs};
 use crate::id::NodeId;
@@ -305,6 +305,14 @@ impl Edit {
     pub fn set_page_setup(&mut self, page: PageSetup) -> Result<(), ModelError> {
         if &page != self.doc.page_setup() {
             self.apply(Op::SetPageSetup { page })?;
+        }
+        Ok(())
+    }
+
+    /// Sets the settings of the text of the whole document.
+    pub fn set_text_settings(&mut self, settings: TextSettings) -> Result<(), ModelError> {
+        if &settings != self.doc.text_settings() {
+            self.apply(Op::SetTextSettings { settings })?;
         }
         Ok(())
     }
