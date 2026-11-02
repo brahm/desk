@@ -152,6 +152,48 @@ thread_local! {
     static COPIED: RefCell<Option<(String, desk_model::Fragment)>> = const { RefCell::new(None) };
 }
 
+/// The marks of the notes in the body, by paragraph and offset, in order.
+fn note_marks(document: &Document) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (index, paragraph) in document.body().iter().enumerate() {
+        let mut offset = 0;
+        for run in paragraph.runs() {
+            if let Some(Some(Field::NoteMark { note })) = &run.attrs.field
+                && document.notes().get(*note).is_some()
+            {
+                out.push((index, offset));
+            }
+            offset += run.len();
+        }
+    }
+    out
+}
+
+/// The note whose mark is just before a spot in its paragraph, or else
+/// the nearest one in the paragraph.
+fn note_at(document: &Document, spot: Spot) -> Option<desk_model::Note> {
+    let paragraph = document.body().get(spot.paragraph)?;
+    let mut offset = 0;
+    let mut best: Option<(usize, desk_model::NodeId)> = None;
+    for run in paragraph.runs() {
+        if let Some(Some(Field::NoteMark { note })) = &run.attrs.field
+            && document.notes().get(*note).is_some()
+        {
+            let end = offset + run.len();
+            let distance = if end <= spot.offset {
+                spot.offset - end
+            } else {
+                offset.abs_diff(spot.offset) + 1
+            };
+            if best.is_none_or(|(d, _)| distance < d) {
+                best = Some((distance, *note));
+            }
+        }
+        offset += run.len();
+    }
+    best.and_then(|(_, note)| document.notes().get(note).cloned())
+}
+
 /// The position of the model at a spot.
 fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, ModelError> {
     spot.position(document).ok_or(ModelError::IndexOutOfBounds {
@@ -235,6 +277,9 @@ pub struct Format {
     pub section: Section,
     /// The headers and footers of the document.
     pub headers: desk_model::HeadersFooters,
+    /// The note whose mark is at the cursor, or nearest to it in its
+    /// paragraph (EST-13).
+    pub note: Option<desk_model::Note>,
 }
 
 /// Edits the document of a window.
@@ -782,6 +827,118 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
+    /// Puts the mark of a new note at the cursor, or in place of the
+    /// selection, with an empty note (EST-13). The note takes the Footnote
+    /// Text style when the document has one.
+    pub fn insert_note(&self) {
+        let before = self.selection();
+        let (start, end) = before.ordered();
+        let pending = self.state.borrow_mut().pending.take();
+        let result = {
+            let mut state = self.state.borrow_mut();
+            state.editor.edit("Insert Note", |edit| {
+                let document = edit.document();
+                let styles = document.styles();
+                let style = ["Footnote Text", "Footnote"]
+                    .iter()
+                    .find_map(|name| styles.by_name(StyleFamily::Paragraph, name))
+                    .map_or(styles.default_paragraph(), |s| s.id());
+                let from = at_spot(document, start)?;
+                let to = at_spot(document, end)?;
+                let at = edit.delete(from, to)?;
+                let note = edit.new_id();
+                let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+                let mark = CharAttrs {
+                    field: Some(Some(Field::NoteMark { note })),
+                    baseline: Some(desk_model::Baseline::Superscript),
+                    ..pending.unwrap_or_default().without_field()
+                };
+                edit.set_character_attrs(at, after, &mark)?;
+                let id = edit.new_id();
+                let paragraph = desk_model::Paragraph::from_runs(
+                    id,
+                    style,
+                    ParaAttrs::default(),
+                    [
+                        desk_model::Run::with_attrs(&FIELD_CHARACTER.to_string(), None, mark),
+                        desk_model::Run::new(" "),
+                    ],
+                )?;
+                edit.set_note(
+                    note,
+                    Some(desk_model::Note {
+                        id: note,
+                        mark: None,
+                        paragraphs: vec![paragraph].into(),
+                    }),
+                )?;
+                Ok(Spot::of(edit.document(), after))
+            })
+        };
+        self.finish_edit(before, result);
+    }
+
+    /// Sets the text of a note from the text of its row in the Inspector,
+    /// after its mark, keeping the formatting of its first paragraph.
+    pub fn set_note_text(&self, note: desk_model::NodeId, text: &str) {
+        let text = text.to_owned();
+        let file_name = self.file_name();
+        self.format_edit("Note Text", move |edit| {
+            let Some(old) = edit.document().notes().get(note).cloned() else {
+                return Ok(());
+            };
+            let paragraphs = crate::notes_pane::paragraphs(edit, &old, &text, &file_name)?;
+            edit.set_note(
+                note,
+                Some(desk_model::Note {
+                    paragraphs: paragraphs.into(),
+                    ..old
+                }),
+            )
+        });
+    }
+
+    /// Gives a note a mark of its own, or a number again when the mark is
+    /// empty (EST-14).
+    pub fn set_note_mark(&self, note: desk_model::NodeId, mark: &str) {
+        let mark = mark.trim();
+        let mark = (!mark.is_empty()).then(|| Arc::<str>::from(mark));
+        self.format_edit("Note Mark", move |edit| {
+            let Some(old) = edit.document().notes().get(note).cloned() else {
+                return Ok(());
+            };
+            edit.set_note(note, Some(desk_model::Note { mark, ..old }))
+        });
+    }
+
+    /// Moves the cursor after the mark of the next note in the body, or of
+    /// the one before (EST-15). The Inspector then shows that note.
+    pub fn go_to_note(&self, forward: bool) -> bool {
+        let (start, end) = self.selection().ordered();
+        let marks = {
+            let state = self.state.borrow();
+            note_marks(state.editor.document())
+        };
+        let mark = FIELD_CHARACTER.len_utf8();
+        let spot = if forward {
+            marks
+                .into_iter()
+                .find(|&(p, o)| (p, o) >= (end.paragraph, end.offset))
+        } else {
+            marks
+                .into_iter()
+                .rev()
+                .find(|&(p, o)| (p, o + mark) < (start.paragraph, start.offset))
+        };
+        match spot {
+            Some((paragraph, offset)) => {
+                self.move_to(Spot::new(paragraph, offset + mark), false, false);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Sets the text of a header or a footer from the text of its row in
     /// the Inspector, as [`crate::headers_pane`] writes it.
     pub fn set_header_footer_text(&self, place: MarginPlace, text: &str) {
@@ -1177,6 +1334,7 @@ impl TextEditor {
             layout: document.layout_at(start.paragraph).1,
             section: document.section_at(start.paragraph).1,
             headers: document.headers_footers().clone(),
+            note: note_at(document, start),
         }
     }
 

@@ -28,6 +28,7 @@ mod headers_pane;
 pub mod i18n;
 mod layout_pane;
 mod lists_pane;
+mod notes_pane;
 mod preferences;
 mod properties;
 mod ruler;

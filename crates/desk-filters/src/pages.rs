@@ -30,6 +30,7 @@ use desk_model::{
 };
 use desk_model::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 use desk_model::{Field, MarginKind, MarginPages, MarginPlace};
+use desk_model::{NodeId, Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings};
 
 use crate::FilterError;
 use crate::log::{Content, Formatting, ImportLog, Warning};
@@ -68,7 +69,6 @@ fn warning(element: &str) -> Warning {
         "footers" => Content::Footers,
         "drawables" => Content::FloatingObjects,
         "attachment" | "attachment-ref" => Content::InlineObjects,
-        "footnote" | "endnote" => Content::Footnotes,
         "annotation" | "annotation-field" => Content::Comments,
         "page-number" | "page-count" | "date-time" | "filename" | "merge-field" => Content::Fields,
         "toc" => Content::TablesOfContents,
@@ -498,6 +498,12 @@ struct Importer<'a> {
     /// identifier; `None` for those without labels.
     lists: HashMap<String, Option<StyleId>>,
     body: StyleId,
+    /// The ids of the notes, in the order the body refers to them, and
+    /// how many references have been read.
+    notes: Vec<NodeId>,
+    references: usize,
+    /// The note whose text is being read.
+    note: Option<NodeId>,
 }
 
 /// The levels of a list style of Pages, through its parents.
@@ -603,6 +609,9 @@ impl<'a> Importer<'a> {
             ids: HashMap::new(),
             lists: HashMap::new(),
             body,
+            notes: Vec::new(),
+            references: 0,
+            note: None,
         };
         importer.styles()?;
         Ok(importer)
@@ -922,7 +931,21 @@ impl<'a> Importer<'a> {
                 run_attrs.merge(&merged(&chain, anonymous).1);
             }
             if let Some(field) = &run.field {
-                run_attrs.field = Some(Some(model_field(field)));
+                let field = match field {
+                    iwork::Field::Note { .. } => {
+                        let note = self.notes.get(self.references).copied();
+                        self.references += 1;
+                        // A reference to no note is left out.
+                        let Some(note) = note else { continue };
+                        Field::NoteMark { note }
+                    }
+                    iwork::Field::NoteMark => {
+                        let Some(note) = self.note else { continue };
+                        Field::NoteMark { note }
+                    }
+                    field => model_field(field),
+                };
+                run_attrs.field = Some(Some(field));
             }
             for (i, piece) in run.text.split(PAGE_BREAK).enumerate() {
                 if i > 0 {
@@ -1056,6 +1079,34 @@ fn model_field(field: &iwork::Field) -> Field {
         iwork::Field::FileName { shown } => Field::FileName {
             shown: shown.as_str().into(),
         },
+        // The importer numbers the notes.
+        iwork::Field::Note { .. } | iwork::Field::NoteMark => Field::PageNumber,
+    }
+}
+
+/// How the notes of a document show, from those of Pages (EST-13,
+/// EST-15).
+fn note_settings(properties: iwork::NoteProperties) -> NoteSettings {
+    let defaults = NoteSettings::default();
+    NoteSettings {
+        kind: match properties.kind {
+            1 => NoteKind::DocumentEndnotes,
+            2 => NoteKind::SectionEndnotes,
+            _ => NoteKind::Footnotes,
+        },
+        format: match properties.format {
+            1 => NoteFormat::Roman,
+            2 => NoteFormat::Symbols,
+            _ => NoteFormat::Arabic,
+        },
+        numbering: match properties.numbering {
+            1 => NoteNumbering::Page,
+            2 => NoteNumbering::Section,
+            _ => NoteNumbering::Continuous,
+        },
+        gap: properties
+            .gap
+            .map_or(defaults.gap, |g| Length::from_pt(g.max(0.0))),
     }
 }
 
@@ -1121,6 +1172,11 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     }
 
     let mut importer = Importer::new(&source.stylesheet, &pictures)?;
+    importer.notes = source
+        .notes
+        .iter()
+        .map(|_| importer.document.new_id())
+        .collect();
     let first = importer
         .document
         .body()
@@ -1179,6 +1235,37 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             })?;
         }
     }
+    // The notes, with the styles of the body, and the marks of their own
+    // that the body gives them.
+    let marks: Vec<Option<&str>> = source
+        .body
+        .iter()
+        .flat_map(|p| &p.runs)
+        .filter_map(|r| match &r.field {
+            Some(iwork::Field::Note { mark }) => Some(mark.as_deref()),
+            _ => None,
+        })
+        .collect();
+    for (i, paragraphs) in source.notes.iter().enumerate() {
+        let id = importer.notes[i];
+        importer.note = Some(id);
+        let mut built = Vec::new();
+        for paragraph in paragraphs {
+            built.extend(importer.paragraph(paragraph, None)?);
+        }
+        importer.note = None;
+        if built.is_empty() {
+            built.push(Paragraph::new(importer.document.new_id(), importer.body));
+        }
+        importer.document.apply(Op::SetNote {
+            id,
+            note: Some(Note {
+                id,
+                mark: marks.get(i).copied().flatten().map(Into::into),
+                paragraphs: built.into(),
+            }),
+        })?;
+    }
     let mut document = importer.document;
     if index > 1 {
         document.apply(Op::RemoveParagraph { paragraph: first })?;
@@ -1209,6 +1296,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         settings: TextSettings {
             hyphenation: source.auto_hyphenation,
             ligatures: source.use_ligatures,
+            notes: note_settings(source.note_properties),
             ..TextSettings::default()
         },
     })?;

@@ -177,6 +177,16 @@ pub struct TextSettings {
     /// below the first and the space above the second, as in Pages, rather
     /// than their sum, as in other programs. Desk writes it as true.
     pub larger_spacing: Option<bool>,
+    /// Where the notes go: `footnotes`, `document` or `section` for
+    /// endnotes.
+    pub note_kind: Option<String>,
+    /// How notes are numbered: `arabic`, `roman` or `symbols`.
+    pub note_format: Option<String>,
+    /// Where their numbers start again: `continuous`, `page` or
+    /// `section`.
+    pub note_numbering: Option<String>,
+    /// The space between notes, as `10pt`.
+    pub note_gap: Option<String>,
 }
 
 /// A list style (`text:list-style`).
@@ -744,4 +754,21 @@ pub enum Field {
     },
     /// `text:file-name`, fixed at the name it shows.
     FileName,
+    /// `text:note`, a footnote or an endnote where the text refers to it.
+    /// The text of the span is that of its `text:note-citation`.
+    Note(Box<Note>),
+}
+
+/// A footnote or an endnote (`text:note`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Note {
+    /// `text:id`.
+    pub id: Option<String>,
+    /// Whether `text:note-class` is `endnote`, not `footnote`.
+    pub endnote: bool,
+    /// `text:label` of its citation: the mark of its own that it shows
+    /// instead of a number.
+    pub label: Option<String>,
+    /// The paragraphs of `text:note-body`.
+    pub body: Vec<Paragraph>,
 }

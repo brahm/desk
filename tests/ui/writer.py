@@ -228,10 +228,12 @@ def main():
             and showing(find_named(app, "Borders and Rules"))
             and showing(find_named(app, "Hyphenate Words"))
             and showing(find_named(app, "Hyphenate the Document"))
-            and showing(find_named(app, "Header Margin")),
+            and showing(find_named(app, "Header Margin"))
+            and showing(find_named(app, "Space Between Notes")),
         )
         check("the Inspector shows spacing, hyphenation, borders and rules", True)
         check("the Inspector shows the headers and footers (EST-01)", True)
+        check("the Inspector shows how notes show (EST-13)", True)
         press("ctrl+alt+i")
 
         # Ctrl+T shows the Fonts window, with its effects and typography

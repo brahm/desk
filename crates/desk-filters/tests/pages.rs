@@ -277,12 +277,11 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
         [
             (Warning::Content(Content::FloatingObjects), 1),
             (Warning::Content(Content::InlineObjects), 1),
-            (Warning::Content(Content::Footnotes), 1),
             (Warning::Content(Content::Comments), 1),
         ]
     );
-    // The text of the body is kept, without that of the footnote and the
-    // comment.
+    // The text of the body is kept, without that of the footnote, which
+    // is a note of its own (EST-13), and the comment.
     let text: Vec<String> = document.body().iter().map(|p| p.text()).collect();
     assert!(
         text.iter()
@@ -293,6 +292,11 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
         !text
             .iter()
             .any(|t| t.contains("Footnote text") || t.contains("Comment text"))
+    );
+    let notes: Vec<String> = document.notes().paragraphs().map(|p| p.text()).collect();
+    assert!(
+        notes.iter().any(|t| t.contains("Footnote text")),
+        "{notes:?}"
     );
 }
 

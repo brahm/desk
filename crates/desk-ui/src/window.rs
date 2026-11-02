@@ -87,7 +87,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 47] = [
+const DOCUMENT_ACTIONS: [&str; 50] = [
     "save",
     "save-as",
     "save-copy",
@@ -117,6 +117,9 @@ const DOCUMENT_ACTIONS: [&str; 47] = [
     "insert-page-count",
     "insert-date",
     "insert-file-name",
+    "insert-note",
+    "next-note",
+    "previous-note",
     "find",
     "find-next",
     "find-previous",
@@ -1312,6 +1315,26 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
 
+        let note = gio::SimpleAction::new("insert-note", None);
+        let weak = Rc::downgrade(self);
+        note.connect_activate(move |_, _| {
+            if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                editor.insert_note();
+            }
+        });
+        self.window.add_action(&note);
+        // From note to note, each of which the Inspector shows (EST-15).
+        for (name, forward) in [("next-note", true), ("previous-note", false)] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                    editor.go_to_note(forward);
+                }
+            });
+            self.window.add_action(&action);
+        }
+
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);
         import.connect_activate(move |_, _| {
@@ -1759,8 +1782,8 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     menu
 }
 
-/// The breaks and fields of the Insert menu (EST-04, EST-08, EST-09,
-/// EST-16, EST-27).
+/// The breaks, fields and notes of the Insert menu (EST-04, EST-08,
+/// EST-09, EST-13, EST-15, EST-16, EST-27).
 fn insert_menu() -> gio::Menu {
     let breaks = gio::Menu::new();
     breaks.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
@@ -1775,9 +1798,14 @@ fn insert_menu() -> gio::Menu {
     fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
     fields.append(Some(&tr("_Date")), Some("win.insert-date"));
     fields.append(Some(&tr("_File Name")), Some("win.insert-file-name"));
+    let notes = gio::Menu::new();
+    notes.append(Some(&tr("Foot_note")), Some("win.insert-note"));
+    notes.append(Some(&tr("Ne_xt Note")), Some("win.next-note"));
+    notes.append(Some(&tr("Pre_vious Note")), Some("win.previous-note"));
     let menu = gio::Menu::new();
     menu.append_section(None, &breaks);
     menu.append_section(None, &fields);
+    menu.append_section(None, &notes);
     menu
 }
 

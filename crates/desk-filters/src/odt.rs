@@ -21,7 +21,8 @@ use desk_model::{
     StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_model::{
-    FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, Section, Start,
+    FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
+    NoteKind, NoteNumbering, NoteSettings, Section, Start,
 };
 use desk_odf as odf;
 
@@ -1354,6 +1355,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             } else {
                 ParagraphSpacing::Sum
             },
+            notes: note_settings(text, &source.body),
         },
     })?;
 
@@ -1373,6 +1375,131 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     Ok(document)
 }
 
+/// How the notes of a document show, from the settings Desk keeps, or as
+/// the notes of other programs' files are: endnotes at the end of the
+/// document when they are endnotes.
+fn note_settings(text: &odf::TextSettings, body: &[odf::Paragraph]) -> NoteSettings {
+    let defaults = NoteSettings::default();
+    let endnotes = body
+        .iter()
+        .flat_map(|p| &p.spans)
+        .any(|s| matches!(&s.field, Some(odf::Field::Note(note)) if note.endnote));
+    NoteSettings {
+        kind: match text.note_kind.as_deref() {
+            Some("document") => NoteKind::DocumentEndnotes,
+            Some("section") => NoteKind::SectionEndnotes,
+            Some(_) => NoteKind::Footnotes,
+            None if endnotes => NoteKind::DocumentEndnotes,
+            None => NoteKind::Footnotes,
+        },
+        format: match text.note_format.as_deref() {
+            Some("roman") => NoteFormat::Roman,
+            Some("symbols") => NoteFormat::Symbols,
+            _ => NoteFormat::Arabic,
+        },
+        numbering: match text.note_numbering.as_deref() {
+            Some("page") => NoteNumbering::Page,
+            Some("section") => NoteNumbering::Section,
+            _ => NoteNumbering::Continuous,
+        },
+        gap: text
+            .note_gap
+            .as_deref()
+            .and_then(odf::Length::parse)
+            .map_or(defaults.gap, length),
+    }
+}
+
+/// The settings Desk keeps for the notes of a document, when they are not
+/// the defaults.
+fn odf_note_settings(settings: NoteSettings) -> odf::TextSettings {
+    let defaults = NoteSettings::default();
+    let given = |differs: bool, value: &str| differs.then(|| value.to_owned());
+    odf::TextSettings {
+        note_kind: given(
+            settings.kind != defaults.kind,
+            match settings.kind {
+                NoteKind::Footnotes => "footnotes",
+                NoteKind::DocumentEndnotes => "document",
+                NoteKind::SectionEndnotes => "section",
+            },
+        ),
+        note_format: given(
+            settings.format != defaults.format,
+            match settings.format {
+                NoteFormat::Arabic => "arabic",
+                NoteFormat::Roman => "roman",
+                NoteFormat::Symbols => "symbols",
+            },
+        ),
+        note_numbering: given(
+            settings.numbering != defaults.numbering,
+            match settings.numbering {
+                NoteNumbering::Continuous => "continuous",
+                NoteNumbering::Page => "page",
+                NoteNumbering::Section => "section",
+            },
+        ),
+        note_gap: given(
+            settings.gap != defaults.gap,
+            &odf_length(settings.gap).to_string(),
+        ),
+        ..odf::TextSettings::default()
+    }
+}
+
+/// Adds the note of the model for a note of ODF, whose text starts with
+/// its mark in the format of the citation in the body, and returns its
+/// id.
+#[allow(clippy::too_many_arguments)]
+fn import_note(
+    source: &odf::TextDocument,
+    document: &mut Document,
+    ids: &HashMap<(odf::Family, &str), StyleId>,
+    default: StyleId,
+    note: &odf::Note,
+    mark_attrs: &CharAttrs,
+    mark_style: Option<StyleId>,
+    relative: bool,
+) -> Result<NodeId, FilterError> {
+    let id = document.new_id();
+    let mut paragraphs = Vec::with_capacity(note.body.len().max(1));
+    for (i, paragraph) in note.body.iter().enumerate() {
+        let built = import_paragraph(source, document, ids, default, paragraph, relative)?;
+        if i > 0 {
+            paragraphs.push(built);
+            continue;
+        }
+        let mark = Run::with_attrs(
+            &FIELD_CHARACTER.to_string(),
+            mark_style,
+            CharAttrs {
+                field: Some(Some(Field::NoteMark { note: id })),
+                ..mark_attrs.clone()
+            },
+        );
+        let runs = std::iter::once(mark).chain(built.runs().cloned());
+        paragraphs.push(Paragraph::from_runs(
+            built.id(),
+            built.style(),
+            built.attrs().clone(),
+            runs,
+        )?);
+    }
+    if paragraphs.is_empty() {
+        paragraphs.push(Paragraph::new(document.new_id(), default));
+    }
+    document.apply(Op::SetNote {
+        id,
+        note: Some(Note {
+            id,
+            mark: note.label.as_deref().map(Into::into),
+            paragraphs: paragraphs.into(),
+        }),
+    })?;
+    Ok(id)
+}
+
 /// The field of the model for a field of ODF that shows a text.
 fn model_field(field: &odf::Field, shown: &str) -> Field {
     match field {
@@ -1383,6 +1510,10 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
             shown: shown.into(),
         },
         odf::Field::FileName => Field::FileName {
+            shown: shown.into(),
+        },
+        // Notes are read on their own.
+        odf::Field::Note(_) => Field::FileName {
             shown: shown.into(),
         },
     }
@@ -1400,6 +1531,8 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
             shown.to_string(),
         ),
         Field::FileName { shown } => (odf::Field::FileName, shown.to_string()),
+        // The body exports notes on their own.
+        Field::NoteMark { .. } => (odf::Field::FileName, String::new()),
     }
 }
 
@@ -1442,7 +1575,8 @@ fn import_paragraph(
             attrs.tab_stops = Some(shifted(&resolved.tab_stops, resolved.left_indent));
         }
     }
-    let runs = paragraph.spans.iter().map(|span| {
+    let mut runs = Vec::with_capacity(paragraph.spans.len());
+    for span in &paragraph.spans {
         let mut run_style = None;
         let mut run_attrs = base.clone();
         if let Some(name) = &span.style {
@@ -1462,9 +1596,26 @@ fn import_paragraph(
                 run_attrs.merge(&char_attrs(&automatic.properties.text, size));
             }
         }
+        if let Some(odf::Field::Note(note)) = &span.field {
+            let id = import_note(
+                source, document, ids, default, note, &run_attrs, run_style, relative,
+            )?;
+            run_attrs.field = Some(Some(Field::NoteMark { note: id }));
+            runs.push(Run::with_attrs(
+                &FIELD_CHARACTER.to_string(),
+                run_style,
+                run_attrs,
+            ));
+            continue;
+        }
         if let Some(field) = &span.field {
             run_attrs.field = Some(Some(model_field(field, &span.text)));
-            return Run::with_attrs(&FIELD_CHARACTER.to_string(), run_style, run_attrs);
+            runs.push(Run::with_attrs(
+                &FIELD_CHARACTER.to_string(),
+                run_style,
+                run_attrs,
+            ));
+            continue;
         }
         // The model keeps paragraph breaks out of runs.
         let text: String = span
@@ -1472,8 +1623,8 @@ fn import_paragraph(
             .chars()
             .map(|c| if matches!(c, '\n' | '\r') { ' ' } else { c })
             .collect();
-        Run::with_attrs(&text, run_style, run_attrs)
-    });
+        runs.push(Run::with_attrs(&text, run_style, run_attrs));
+    }
     let id = document.new_id();
     Ok(Paragraph::from_runs(id, style, attrs, runs)?)
 }
@@ -1526,17 +1677,74 @@ fn odf_hyphenate(hyphenate: Option<bool>, document: bool) -> (Option<bool>, Opti
     }
 }
 
+/// The notes that the body refers to, in order, as they are exported.
+struct NoteRefs<'a> {
+    document: &'a Document,
+    order: Vec<NodeId>,
+}
+
+impl NoteRefs<'_> {
+    /// The note of ODF that a mark in the body stands for, with the text
+    /// of its citation, its body left to fill.
+    fn note(&mut self, id: NodeId) -> Option<(odf::Field, String)> {
+        let note = self.document.notes().get(id)?;
+        let settings = self.document.text_settings().notes;
+        self.order.push(id);
+        let n = self.order.len();
+        let shown = match &note.mark {
+            Some(mark) => mark.to_string(),
+            None => {
+                let numbered = self
+                    .order
+                    .iter()
+                    .filter(|id| {
+                        self.document
+                            .notes()
+                            .get(**id)
+                            .is_some_and(|n| n.mark.is_none())
+                    })
+                    .count();
+                settings.format.label(numbered as u32)
+            }
+        };
+        let field = odf::Field::Note(Box::new(odf::Note {
+            id: Some(format!("ftn{n}")),
+            endnote: settings.kind != NoteKind::Footnotes,
+            label: note.mark.as_deref().map(str::to_owned),
+            body: Vec::new(),
+        }));
+        Some((field, shown))
+    }
+}
+
 /// The spans of ODF for the runs of a paragraph, with the text style that
 /// `style` gives each run. A field is a span of its own for each of its
-/// characters.
+/// characters. The marks of notes become notes of ODF when `notes` takes
+/// them, as in the body; elsewhere they are left out, since a note of ODF
+/// shows its own mark at the start of its text.
 fn export_spans(
     paragraph: &Paragraph,
+    mut notes: Option<&mut NoteRefs<'_>>,
     mut style: impl FnMut(&Run) -> Option<String>,
 ) -> Vec<odf::Span> {
     let mut spans = Vec::new();
     for run in paragraph.runs() {
         let name = style(run);
         match &run.attrs.field {
+            Some(Some(Field::NoteMark { note })) => {
+                let Some(notes) = notes.as_deref_mut() else {
+                    continue;
+                };
+                for _ in run.text().chars() {
+                    if let Some((field, shown)) = notes.note(*note) {
+                        spans.push(odf::Span {
+                            style: name.clone(),
+                            text: shown,
+                            field: Some(field),
+                        });
+                    }
+                }
+            }
             Some(Some(field)) => {
                 let (field, shown) = odf_field(field);
                 for _ in run.text().chars() {
@@ -1623,7 +1831,7 @@ fn export_margins(
                     },
                 )
             };
-            let spans = export_spans(paragraph, |run| {
+            let spans = export_spans(paragraph, None, |run| {
                 let attrs = run.attrs.without_field();
                 let named = run.style.map(|id| names[&id].clone());
                 if attrs.is_empty() {
@@ -1711,6 +1919,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             // Other programs add the two spaces between paragraphs, so a
             // document that does not say takes the sum (FMT-15).
             larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
+            ..odf_note_settings(settings.notes)
         },
         ..odf::TextDocument::default()
     };
@@ -1825,6 +2034,10 @@ pub fn export(document: &Document) -> odf::TextDocument {
     // is not the plain one, and each one that starts at a paragraph.
     let setup = *document.page_setup();
     let mut section_styles: Vec<odf::SectionStyle> = Vec::new();
+    let mut note_refs = NoteRefs {
+        document,
+        order: Vec::new(),
+    };
     for (index, (paragraph, item)) in document.body().iter().zip(&items).enumerate() {
         let start = paragraph
             .attrs()
@@ -1894,7 +2107,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 },
             )
         };
-        let spans = export_spans(paragraph, |run| {
+        let spans = export_spans(paragraph, Some(&mut note_refs), |run| {
             let named = run.style.map(|id| names[&id].clone());
             let attrs = run.attrs.without_field();
             if attrs.is_empty() {
@@ -1965,6 +2178,65 @@ pub fn export(document: &Document) -> odf::TextDocument {
             section: section_name,
             spans,
         });
+    }
+    // The text of each note, in the note that the body holds (EST-13).
+    let mut bodies: HashMap<String, Vec<odf::Paragraph>> = HashMap::new();
+    for (n, id) in note_refs.order.iter().enumerate() {
+        let note = document.notes().get(*id).expect("the body refers to it");
+        let mut paragraphs = Vec::new();
+        for paragraph in note.paragraphs.iter() {
+            let own = paragraph.attrs().without_structure();
+            let style_name = names[&paragraph.style()].clone();
+            let style = if own.is_empty() {
+                style_name
+            } else {
+                automatic_name(
+                    odf::Family::Paragraph,
+                    Some(style_name),
+                    None,
+                    odf::Properties {
+                        paragraph: odf_paragraph_properties(
+                            &own,
+                            &styles.resolve_paragraph(paragraph.style(), &own),
+                            false,
+                        ),
+                        text: odf::TextProperties::default(),
+                    },
+                )
+            };
+            let spans = export_spans(paragraph, None, |run| {
+                let named = run.style.map(|id| names[&id].clone());
+                let attrs = run.attrs.without_field();
+                if attrs.is_empty() {
+                    return named;
+                }
+                Some(automatic_name(
+                    odf::Family::Text,
+                    named,
+                    None,
+                    odf::Properties {
+                        paragraph: odf::ParagraphProperties::default(),
+                        text: text_properties(
+                            &attrs,
+                            &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                        ),
+                    },
+                ))
+            });
+            paragraphs.push(odf::Paragraph {
+                style: Some(style),
+                spans,
+                ..odf::Paragraph::default()
+            });
+        }
+        bodies.insert(format!("ftn{}", n + 1), paragraphs);
+    }
+    for span in out.body.iter_mut().flat_map(|p| p.spans.iter_mut()) {
+        if let Some(odf::Field::Note(note)) = &mut span.field
+            && let Some(body) = note.id.as_ref().and_then(|id| bodies.remove(id))
+        {
+            note.body = body;
+        }
     }
     out.automatic_styles = automatic;
     out.section_styles = section_styles;

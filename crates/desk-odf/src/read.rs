@@ -10,7 +10,7 @@ use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLIN
 use crate::text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, PageLayout, Paragraph,
+    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
     ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
     TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
     TextShadow, TextTransform,
@@ -553,6 +553,10 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("Hyphenation") => out.hyphenation = Some(text.trim() == "true"),
                 Some("Ligatures") => out.ligatures = Some(text.trim() == "true"),
                 Some("LargerSpacing") => out.larger_spacing = Some(text.trim() == "true"),
+                Some("NoteKind") => out.note_kind = Some(text.trim().to_owned()),
+                Some("NoteFormat") => out.note_format = Some(text.trim().to_owned()),
+                Some("NoteNumbering") => out.note_numbering = Some(text.trim().to_owned()),
+                Some("NoteGap") => out.note_gap = Some(text.trim().to_owned()),
                 Some("NeverHyphenate") => {
                     out.never_hyphenate = text
                         .lines()
@@ -899,6 +903,33 @@ impl SpanBuilder {
         self.collapse = false;
     }
 
+    /// Adds a note, with its citation as the text it shows.
+    fn note(&mut self, style: Option<&str>, e: &Element) {
+        let citation = e.child(TEXT, "note-citation");
+        let mut body = Vec::new();
+        if let Some(b) = e.child(TEXT, "note-body") {
+            for child in b.elements() {
+                if child.name.is(TEXT, "p") || child.name.is(TEXT, "h") {
+                    body.push(paragraph(child));
+                }
+            }
+        }
+        let note = Note {
+            id: e.attr(TEXT, "id").map(str::to_owned),
+            endnote: e.attr(TEXT, "note-class") == Some("endnote"),
+            label: citation
+                .and_then(|c| c.attr(TEXT, "label"))
+                .map(str::to_owned),
+            body,
+        };
+        self.spans.push(Span {
+            style: style.map(str::to_owned),
+            text: citation.map(Element::text).unwrap_or_default(),
+            field: Some(Field::Note(Box::new(note))),
+        });
+        self.collapse = false;
+    }
+
     fn xml_text(&mut self, style: Option<&str>, text: &str) {
         let mut out = String::with_capacity(text.len());
         for c in text.chars() {
@@ -954,9 +985,9 @@ impl SpanBuilder {
                     return self.field(style, e, Field::Date { pattern });
                 }
                 "file-name" => return self.field(style, e, Field::FileName),
-                // Notes, bookmarks and the like add no text of their own.
-                "note"
-                | "bookmark"
+                "note" => return self.note(style, e),
+                // Bookmarks and the like add no text of their own.
+                "bookmark"
                 | "bookmark-start"
                 | "bookmark-end"
                 | "reference-mark"

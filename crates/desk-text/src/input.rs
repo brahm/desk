@@ -86,17 +86,37 @@ pub struct Label {
 
 /// What the fields of a paragraph show: the number of its page and the
 /// number of pages (EST-27).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FieldValues {
     /// The number that the page of the paragraph shows.
     pub page: u32,
     /// The number of pages of the document.
     pub pages: u32,
+    /// The marks of the notes, by note (EST-13).
+    pub notes: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, String>>>,
 }
 
 impl Default for FieldValues {
     fn default() -> Self {
-        Self { page: 1, pages: 1 }
+        Self {
+            page: 1,
+            pages: 1,
+            notes: None,
+        }
+    }
+}
+
+impl FieldValues {
+    /// The text that a field shows.
+    pub fn text(&self, field: &desk_model::Field) -> String {
+        match field {
+            desk_model::Field::NoteMark { note } => self
+                .notes
+                .as_ref()
+                .and_then(|n| n.get(note).cloned())
+                .unwrap_or_default(),
+            other => other.text(self.page, self.pages),
+        }
     }
 }
 
@@ -302,7 +322,7 @@ impl ParagraphText {
             while let Some(c) = chars.next() {
                 if let Some(field) = &format.field {
                     let start = out.text.len();
-                    let shown = field.text(values.page, values.pages);
+                    let shown = values.text(field);
                     out.text.push_str(&shown);
                     out.offsets.push((start, model_offset));
                     if !shown.is_empty() {
@@ -391,6 +411,12 @@ impl ParagraphText {
         &self.paragraph
     }
 
+    /// The paragraph format, to change it for where the paragraph goes, as
+    /// the space above a note (EST-13).
+    pub fn paragraph_mut(&mut self) -> &mut ParaFormat {
+        &mut self.paragraph
+    }
+
     /// The character formats, by index. The first one is the base format
     /// of the paragraph.
     pub fn formats(&self) -> &[CharFormat] {
@@ -469,6 +495,7 @@ mod tests {
             FieldValues {
                 page: 12,
                 pages: 20,
+                notes: None,
             },
             ParaFormat::default(),
             CharFormat::default(),

@@ -120,8 +120,23 @@ impl DisplayList {
         for block in &page.blocks {
             list.block_background(block);
         }
+        // The short rule above the notes (EST-13).
+        if let Some((x, y)) = page.note_rule {
+            list.items.push(Item::Stroke {
+                points: vec![(x, y), (x + desk_layout::NOTE_RULE_LENGTH, y)],
+                closed: false,
+                width: desk_layout::NOTE_RULE_WIDTH,
+                color: Rgba::BLACK,
+                dashes: Vec::new(),
+            });
+        }
         // The header and footer are drawn as the body is (EST-12).
-        for placed in page.lines.iter().chain(&page.margin_lines) {
+        for placed in page
+            .lines
+            .iter()
+            .chain(&page.margin_lines)
+            .chain(&page.note_lines)
+        {
             let (dx, dy) = placed.origin;
             // The backgrounds of runs span the height of the line, with
             // edges on whole points, as Pages draws them (FMT-20).

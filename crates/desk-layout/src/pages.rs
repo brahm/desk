@@ -4,6 +4,7 @@
 //! The pages of a word processing document.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use desk_model::{
     Document, Layout, MarginKind, MarginPlace, PageSetup, ParaBorder, ParaFormat, Paragraph,
@@ -109,7 +110,27 @@ pub struct Page {
     /// bottom (EST-12). Their paragraphs are indexes in the header or
     /// footer they come from.
     pub margin_lines: Vec<PlacedLine>,
+    /// The notes on the page: its footnotes at its foot, or the endnotes
+    /// that end up on it (EST-13). Their paragraphs are the indexes of the
+    /// notes, in the order the body refers to them.
+    pub note_lines: Vec<PlacedLine>,
+    /// The footnotes that the lines of the page refer to, as the body
+    /// paragraph that refers to each and the index of the note.
+    pub footnotes: Vec<(usize, usize)>,
+    /// The left end of the short rule above the notes on the page, when
+    /// there is one (EST-13).
+    pub note_rule: Option<(f32, f32)>,
 }
+
+/// The length of the rule above notes, as Pages draws it.
+pub const NOTE_RULE_LENGTH: f32 = 100.0;
+/// The width of the rule above notes.
+pub const NOTE_RULE_WIDTH: f32 = 0.5;
+/// How far the rule above notes is from the first note below it.
+pub(crate) const NOTE_RULE_BELOW: f32 = 8.3;
+/// The room above the first note of a page or of a section, with its
+/// rule: as much below the text above it as above the note.
+pub(crate) const NOTE_SEPARATION: f32 = 16.3;
 
 /// A word processing document laid out on pages.
 #[derive(Clone, Debug)]
@@ -152,50 +173,40 @@ impl DocumentLayout {
 }
 
 /// Lays out the body of a document on pages, with the headers and
-/// footers of the pages.
+/// footers of the pages and its notes.
 ///
 /// A field in the body shows the number of its page and the number of
 /// pages: the body is laid out once to know them and again with them
-/// (EST-27).
+/// (EST-27). Notes numbered again on each page need the same.
 pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout {
-    let styles = document.styles();
     let settings = document.text_settings();
-    let items = styles.list_items(document.body().iter());
-    let prepare = |index: usize, paragraph: &Paragraph, values: FieldValues| {
-        ParagraphText::new_in_document_with(
-            styles,
-            settings,
-            paragraph,
-            items[index].as_ref(),
-            values,
-        )
-    };
-    let mut texts: Vec<ParagraphText> = document
-        .body()
-        .iter()
-        .enumerate()
-        .map(|(i, paragraph)| prepare(i, paragraph, FieldValues::default()))
-        .collect();
-    let sum = settings.spacing == ParagraphSpacing::Sum;
     let setup = *document.page_setup();
-    let mut layout = paginate_texts_spaced(setup, &texts, system, sum);
-    let with_fields: Vec<usize> = document
-        .body()
-        .iter()
-        .enumerate()
-        .filter(|(_, p)| has_fields(p))
-        .map(|(i, _)| i)
-        .collect();
-    if !with_fields.is_empty() {
+    let sum = settings.spacing == ParagraphSpacing::Sum;
+    let plan = crate::notes::NotePlan::new(document);
+    let labels = plan.labels(document, None);
+    let mut values: Vec<FieldValues> = vec![
+        FieldValues {
+            notes: Some(labels.clone()),
+            ..FieldValues::default()
+        };
+        document.body().len()
+    ];
+    let mut layout = plan.paginate(document, &values, &labels, system, setup, sum);
+    let with_fields = document.body().iter().any(has_fields);
+    if with_fields || plan.numbered_by_page(document) {
+        let labels = plan.labels(document, Some(&layout));
         let pages = layout.pages.len() as u32;
-        for &i in &with_fields {
+        for (i, value) in values.iter_mut().enumerate() {
             let page = layout
                 .page_of(i)
                 .map_or(1, |index| layout.pages[index].number);
-            let paragraph = document.body().get(i).expect("index is in the body");
-            texts[i] = prepare(i, paragraph, FieldValues { page, pages });
+            *value = FieldValues {
+                page,
+                pages,
+                notes: Some(labels.clone()),
+            };
         }
-        layout = paginate_texts_spaced(setup, &texts, system, sum);
+        layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     place_margins(document, &mut layout, system);
     layout
@@ -235,6 +246,7 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
         let values = FieldValues {
             page: page.number,
             pages,
+            notes: None,
         };
         let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
         for (kind, shown) in [
@@ -265,7 +277,7 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
                     settings,
                     paragraph,
                     items[i].as_ref(),
-                    values,
+                    values.clone(),
                 );
                 let format = text.paragraph().clone();
                 let laid = system.layout(&text, &Column::new(width), 0.0).lines;
@@ -443,16 +455,107 @@ pub fn paginate_texts_spaced(
     system: &mut TextSystem,
     sum: bool,
 ) -> DocumentLayout {
-    Paginator {
+    paginate_with_footnotes(setup, texts, system, sum, None)
+}
+
+/// Lays out prepared paragraphs on pages with their footnotes, which take
+/// room at the foot of the pages that refer to them.
+pub(crate) fn paginate_with_footnotes(
+    setup: PageSetup,
+    texts: &[ParagraphText],
+    system: &mut TextSystem,
+    sum: bool,
+    footnotes: Option<Rc<Footnotes>>,
+) -> DocumentLayout {
+    let mut layout = Paginator {
         setup,
         texts,
         system,
         sum,
+        footnotes: footnotes.clone(),
         blocks: HashMap::new(),
         pages: Vec::new(),
         sections: Vec::new(),
     }
-    .run()
+    .run();
+    if let Some(footnotes) = footnotes {
+        footnotes.place(&mut layout);
+    }
+    layout
+}
+
+/// The footnotes of a document, laid out at the width of the body.
+pub(crate) struct Footnotes {
+    /// For each paragraph of the body, the notes it refers to: the offset
+    /// of each mark and the index of its note.
+    pub refs: Vec<Vec<(usize, usize)>>,
+    /// The lines of each note, with the offset of each from the top of
+    /// the note, and its height.
+    pub notes: Vec<(Vec<(Line, f32)>, f32)>,
+    /// The space between two notes, and above the first.
+    pub gap: f32,
+}
+
+impl Footnotes {
+    /// The room that the notes a line refers to take, below notes already
+    /// on its page or as the first.
+    fn cost(&self, paragraph: usize, line: &Line, first: bool) -> f32 {
+        let mut first = first;
+        self.refs
+            .get(paragraph)
+            .into_iter()
+            .flatten()
+            .filter(|(offset, _)| line.range.contains(offset))
+            .map(|&(_, note)| {
+                let above = if std::mem::take(&mut first) {
+                    NOTE_SEPARATION
+                } else {
+                    self.gap
+                };
+                self.notes[note].1 + above
+            })
+            .sum()
+    }
+
+    /// The room that the notes of a page take, with the rule above them.
+    fn reserved(&self, page: &Page) -> f32 {
+        if page.footnotes.is_empty() {
+            return 0.0;
+        }
+        page.footnotes
+            .iter()
+            .map(|&(_, note)| self.notes[note].1 + self.gap)
+            .sum::<f32>()
+            - self.gap
+            + NOTE_SEPARATION
+    }
+
+    /// Puts the notes of each page at its foot, the last one on the bottom
+    /// margin, under a short rule.
+    fn place(&self, layout: &mut DocumentLayout) {
+        let setup = layout.setup;
+        let bottom = (setup.height - setup.margin_bottom).to_pt() as f32;
+        for page in &mut layout.pages {
+            if page.footnotes.is_empty() {
+                continue;
+            }
+            let mut y = bottom - self.reserved(page) + NOTE_SEPARATION;
+            page.note_rule = Some((page.margins.0, y - NOTE_RULE_BELOW));
+            let notes: Vec<usize> = page.footnotes.iter().map(|&(_, n)| n).collect();
+            for note in notes {
+                let (lines, height) = &self.notes[note];
+                for (index, (line, dy)) in lines.iter().enumerate() {
+                    page.note_lines.push(PlacedLine {
+                        paragraph: note,
+                        index,
+                        line: line.clone(),
+                        origin: (page.margins.0, y + dy),
+                    });
+                }
+                y += height + self.gap;
+            }
+        }
+    }
 }
 
 struct Paginator<'a> {
@@ -460,6 +563,7 @@ struct Paginator<'a> {
     texts: &'a [ParagraphText],
     system: &'a mut TextSystem,
     sum: bool,
+    footnotes: Option<Rc<Footnotes>>,
     /// The paragraphs laid out so far, by index and column width.
     blocks: HashMap<(usize, u32), Block>,
     pages: Vec<Page>,
@@ -681,6 +785,7 @@ impl Paginator<'_> {
                 let page = &mut self.pages[saved.page];
                 page.lines.truncate(line_count);
                 page.blocks.retain(|b| b.paragraph < first);
+                page.footnotes.retain(|&(p, _)| p < first);
                 cursor = saved;
                 i = first;
                 continue;
@@ -700,11 +805,15 @@ impl Paginator<'_> {
         let body = self.body();
         let top = self.top();
         let sum = self.sum;
+        let footnotes = self.footnotes.clone();
         let mut start = (cursor.page, cursor.column);
         let mut a = 0;
         loop {
             let (x, width) = self.column(cursor.page, &cursor.region, cursor.column);
             let column_height = body - cursor.region.top;
+            let reserved = footnotes
+                .as_ref()
+                .map_or(0.0, |n| n.reserved(&self.pages[cursor.page]));
             let block = self.block(i, width);
             let n = block.lines.len();
             if a >= n {
@@ -724,7 +833,26 @@ impl Paginator<'_> {
             let space = collapsed + above;
             let room = body - cursor.y - space;
             let rest = n - a;
-            let mut k = block.fitting(a, room);
+            let mut k = match &footnotes {
+                None => block.fitting(a, room),
+                Some(notes) => {
+                    // Each line takes the room of its notes too.
+                    let room = room - reserved;
+                    let mut taken = 0.0;
+                    (a..n)
+                        .take_while(|&b| {
+                            let line = &block.lines[b];
+                            let cost = notes.cost(i, line, reserved == 0.0 && taken == 0.0);
+                            let fits = line.text_bottom - block.lines[a].top
+                                <= room - taken - cost + TOLERANCE;
+                            if fits {
+                                taken += cost;
+                            }
+                            fits
+                        })
+                        .count()
+                }
+            };
             if k < rest {
                 if a == 0
                     && !at_top
@@ -785,6 +913,15 @@ impl Paginator<'_> {
             };
             let space_after = format.space_after.to_pt() as f32;
             let page = &mut self.pages[cursor.page];
+            if let Some(notes) = &footnotes {
+                for line in &lines {
+                    for &(offset, note) in notes.refs.get(i).into_iter().flatten() {
+                        if line.line.range.contains(&offset) {
+                            page.footnotes.push((i, note));
+                        }
+                    }
+                }
+            }
             page.lines.extend(lines);
             if placed.is_visible() {
                 page.blocks.push(placed);

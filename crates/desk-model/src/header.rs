@@ -14,6 +14,7 @@
 
 use std::sync::Arc;
 
+use crate::id::NodeId;
 use crate::text::Paragraph;
 
 /// The character that holds the place of a field in the text.
@@ -40,6 +41,13 @@ pub enum Field {
         /// The name as it shows.
         shown: Arc<str>,
     },
+    /// The mark of a note (EST-13, EST-14): where the body refers to it,
+    /// and at the start of its text. It shows the number of the note, or
+    /// the mark of its own.
+    NoteMark {
+        /// The note.
+        note: NodeId,
+    },
 }
 
 impl Field {
@@ -50,6 +58,8 @@ impl Field {
             Self::PageNumber => page.to_string(),
             Self::PageCount => pages.to_string(),
             Self::DateTime { shown, .. } | Self::FileName { shown } => shown.to_string(),
+            // Layout numbers the notes.
+            Self::NoteMark { .. } => String::new(),
         }
     }
 }
