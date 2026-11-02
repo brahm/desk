@@ -9,9 +9,9 @@ use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style,
-    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
-    TextShadow, TextTransform,
+    LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout, Paragraph,
+    ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign,
+    TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -59,6 +59,8 @@ pub fn read_streams(
                     document.default_style = reader.properties(element);
                 } else if let Some(style) = reader.style(element) {
                     document.styles.push(style);
+                } else if let Some(list) = reader.list_style(element) {
+                    document.list_styles.push(list);
                 }
             }
         }
@@ -68,12 +70,15 @@ pub fn read_streams(
         document
             .automatic_styles
             .extend(automatic.elements().filter_map(|e| reader.style(e)));
+        document
+            .automatic_list_styles
+            .extend(automatic.elements().filter_map(|e| reader.list_style(e)));
     }
     if let Some(text) = content
         .child(OFFICE, "body")
         .and_then(|body| body.child(OFFICE, "text"))
     {
-        collect_paragraphs(text, &mut document.body);
+        collect_paragraphs(text, None, &mut document.body);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
         document.meta = read_meta(meta);
@@ -102,7 +107,75 @@ impl Reader {
             family,
             parent: element.attr(STYLE, "parent-style-name").map(str::to_owned),
             next: element.attr(STYLE, "next-style-name").map(str::to_owned),
+            list_style: element.attr(STYLE, "list-style-name").map(str::to_owned),
             properties: self.properties(element),
+        })
+    }
+
+    /// A list style and its levels.
+    fn list_style(&self, element: &Element) -> Option<ListStyle> {
+        if !element.name.is(TEXT, "list-style") {
+            return None;
+        }
+        let levels = element
+            .elements()
+            .filter_map(|e| {
+                let level = e
+                    .attr(TEXT, "level")
+                    .and_then(|l| l.trim().parse::<u8>().ok())
+                    .filter(|l| (1..=10).contains(l))?;
+                let label = if e.name.is(TEXT, "list-level-style-bullet") {
+                    ListLabel::Bullet(e.attr(TEXT, "bullet-char")?.chars().next()?)
+                } else if e.name.is(TEXT, "list-level-style-number") {
+                    let text =
+                        |ns: &str, name: &str| e.attr(ns, name).unwrap_or_default().to_owned();
+                    ListLabel::Number {
+                        format: text(STYLE, "num-format"),
+                        prefix: text(STYLE, "num-prefix"),
+                        suffix: text(STYLE, "num-suffix"),
+                        display_levels: e
+                            .attr(TEXT, "display-levels")
+                            .and_then(|l| l.trim().parse().ok())
+                            .unwrap_or(1),
+                        start: e
+                            .attr(TEXT, "start-value")
+                            .and_then(|l| l.trim().parse().ok())
+                            .unwrap_or(1),
+                    }
+                } else {
+                    return None;
+                };
+                let properties = e.child(STYLE, "list-level-properties");
+                let get = |name: &str| properties.and_then(|p| length(p, TEXT, name));
+                let mut space_before = get("space-before");
+                let mut min_label_width = get("min-label-width");
+                // The label alignment mode of LibreOffice: the text at the
+                // margin, the label at the margin plus the text indent.
+                if let Some(alignment) =
+                    properties.and_then(|p| p.child(STYLE, "list-level-label-alignment"))
+                {
+                    let margin = length(alignment, FO, "margin-left").unwrap_or(Length(0.0));
+                    let indent = length(alignment, FO, "text-indent").unwrap_or(Length(0.0));
+                    space_before = Some(Length(margin.0 + indent.0));
+                    min_label_width = Some(Length(-indent.0));
+                }
+                Some(ListLevelStyle {
+                    level,
+                    label,
+                    space_before,
+                    min_label_width,
+                    relative_size: e.attr(TEXT, "bullet-relative-size").and_then(parse_percent),
+                    text: e
+                        .child(STYLE, "text-properties")
+                        .map(|t| self.text_properties(t))
+                        .unwrap_or_default(),
+                })
+            })
+            .collect();
+        Some(ListStyle {
+            name: element.attr(STYLE, "name")?.to_owned(),
+            display_name: element.attr(STYLE, "display-name").map(str::to_owned),
+            levels,
         })
     }
 
@@ -440,6 +513,7 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
             let (family, style) = match text.split_once(':') {
                 Some(("paragraph", style)) => (Family::Paragraph, style),
                 Some(("text", style)) => (Family::Text, style),
+                Some(("list", style)) => (Family::List, style),
                 _ => continue,
             };
             if let Some(key) = key
@@ -502,17 +576,76 @@ fn read_meta(meta: &Element) -> Meta {
     }
 }
 
+/// Where the paragraphs being collected are in a list.
+#[derive(Clone)]
+struct InList {
+    /// The list style, from the nearest list that names one.
+    style: Option<String>,
+    /// The level, from 0.
+    level: u8,
+    /// `text:start-value` of the item.
+    start: Option<u32>,
+    /// `text:continue-numbering` of the outermost list.
+    continues: bool,
+    /// Whether no paragraph of the outermost list was met yet; shared by
+    /// the nested lists.
+    first: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Whether this is a list header, whose paragraphs have no label.
+    header: bool,
+}
+
 /// Collects the paragraphs inside an element, looking into lists,
 /// sections and tables for theirs.
-fn collect_paragraphs(element: &Element, out: &mut Vec<Paragraph>) {
+fn collect_paragraphs(element: &Element, list: Option<&InList>, out: &mut Vec<Paragraph>) {
     for child in element.elements() {
         let name = &child.name;
         if name.is(TEXT, "p") || name.is(TEXT, "h") {
-            out.push(paragraph(child));
+            let mut paragraph = paragraph(child);
+            if let Some(list) = list.filter(|l| !l.header)
+                && let Some(style) = &list.style
+            {
+                paragraph.list = Some(ListMember {
+                    style: style.clone(),
+                    level: list.level,
+                    start: list.start,
+                    first: list.first.replace(false),
+                    continues: list.continues,
+                });
+            }
+            out.push(paragraph);
+        } else if name.is(TEXT, "list") {
+            let style = child.attr(TEXT, "style-name").map(str::to_owned);
+            let inner = match list {
+                Some(outer) => InList {
+                    style: style.or_else(|| outer.style.clone()),
+                    level: (outer.level + 1).min(9),
+                    start: None,
+                    ..outer.clone()
+                },
+                None => InList {
+                    style,
+                    level: 0,
+                    start: None,
+                    continues: child.attr(TEXT, "continue-numbering") == Some("true")
+                        || child.attr(TEXT, "continue-list").is_some(),
+                    first: std::rc::Rc::new(std::cell::Cell::new(true)),
+                    header: false,
+                },
+            };
+            for item in child.elements() {
+                let item_list = InList {
+                    start: item
+                        .attr(TEXT, "start-value")
+                        .and_then(|v| v.trim().parse().ok()),
+                    header: item.name.is(TEXT, "list-header"),
+                    ..inner.clone()
+                };
+                collect_paragraphs(item, Some(&item_list), out);
+            }
         } else if name.ns == DRAW || name.is(OFFICE, "annotation") {
             // Frames and comments are not part of the text flow.
         } else {
-            collect_paragraphs(child, out);
+            collect_paragraphs(child, list, out);
         }
     }
 }
@@ -621,6 +754,7 @@ fn paragraph(e: &Element) -> Paragraph {
                 .and_then(|l| l.parse().ok())
                 .unwrap_or(1)
         }),
+        list: None,
         spans: builder.spans,
     }
 }

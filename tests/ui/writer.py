@@ -203,8 +203,25 @@ def main():
         )
         check("Tab types a tab", True)
 
-        # The Inspector shows the effects of the text (FMT-10, FMT-21).
+        # "1. " at the start of a paragraph starts a numbered list, whose
+        # marker goes (LST-01), and Return on an empty item ends it.
+        press("Return")
+        type_text("1. one")
+        press("Return")
+        wait_for(
+            "the item of the list in the accessibility tree",
+            lambda: text_of(document) == "US Letter, landscape ação\tx\none\n\n",
+        )
+        check("a marker starts a list", True)
+
+        # The Inspector shows the list (LST-02) and the effects of the text
+        # (FMT-10, FMT-21).
         press("ctrl+alt+i")
+        wait_for("the list in the Inspector", lambda: showing(find_named(app, "Indent Level")))
+        check("the Inspector shows the level of the item", True)
+        press("Return")
+        wait_for("the list to end", lambda: not showing(find_named(app, "Indent Level")))
+        check("Return on an empty item ends the list", True)
         wait_for(
             "the effects in the Inspector",
             lambda: showing(find_named(app, "Character Spacing"))

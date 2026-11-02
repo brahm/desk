@@ -29,17 +29,38 @@ fn describe(document: &Document) -> String {
     let styles = document.styles();
     let name = |id| styles.get(id).map(|s: &Style| s.name().to_owned());
     let mut out = String::new();
+    // List styles by name, since their identifiers change.
+    let attrs = |attrs: &desk_model::ParaAttrs| {
+        let list = attrs.list_style.map(|l| l.and_then(name));
+        let attrs = desk_model::ParaAttrs {
+            list_style: None,
+            ..attrs.clone()
+        };
+        format!("{attrs:?} list {list:?}")
+    };
+    let resolved = |format: desk_model::ParaFormat| {
+        let list = format.list_style.and_then(name);
+        let format = desk_model::ParaFormat {
+            list_style: None,
+            ..format
+        };
+        format!("{format:?} list {list:?}")
+    };
     let mut all: Vec<String> = styles
         .iter()
         .map(|style| match style {
             Style::Paragraph(p) => format!(
-                "paragraph style {:?} parent {:?} next {:?} key {:?} {:?} {:?}",
+                "paragraph style {:?} parent {:?} next {:?} key {:?} {} {:?}",
                 p.name,
                 p.parent.and_then(name),
                 p.next.and_then(name),
                 p.shortcut,
-                p.paragraph,
+                attrs(&p.paragraph),
                 p.character
+            ),
+            Style::List(l) => format!(
+                "list style {:?} key {:?} {:?}",
+                l.name, l.shortcut, l.levels
             ),
             Style::Character(c) => format!(
                 "character style {:?} parent {:?} key {:?} {:?}",
@@ -58,9 +79,9 @@ fn describe(document: &Document) -> String {
     out.push_str(&format!("default {:?}\n", name(styles.default_paragraph())));
     for paragraph in document.body().iter() {
         out.push_str(&format!(
-            "paragraph {:?} {:?}\n",
+            "paragraph {:?} {}\n",
             name(paragraph.style()),
-            styles.resolve_paragraph(paragraph.style(), paragraph.attrs())
+            resolved(styles.resolve_paragraph(paragraph.style(), paragraph.attrs()))
         ));
         for run in paragraph.runs() {
             out.push_str(&format!(
@@ -448,6 +469,7 @@ fn foreign() -> odf::TextDocument {
             odf::Paragraph {
                 style: Some("P1".into()),
                 outline_level: None,
+                list: None,
                 spans: vec![
                     odf::Span {
                         style: None,
@@ -466,6 +488,7 @@ fn foreign() -> odf::TextDocument {
             odf::Paragraph {
                 style: Some("A".into()),
                 outline_level: Some(1),
+                list: None,
                 spans: vec![],
             },
         ],
@@ -528,6 +551,7 @@ fn a_style_named_like_the_default_keeps_one_name() {
             family: odf::Family::Paragraph,
             parent: None,
             next: None,
+            list_style: None,
             properties: odf::Properties::default(),
         }],
         ..odf::TextDocument::default()
@@ -555,6 +579,7 @@ fn control_characters_in_style_names_are_kept() {
             family: odf::Family::Paragraph,
             parent: None,
             next: None,
+            list_style: None,
             properties: odf::Properties::default(),
         }],
         ..odf::TextDocument::default()
@@ -778,4 +803,151 @@ fn fmt_08_fmt_09_features_of_a_font_name_become_ligatures_and_features() {
         standard.properties.text.font_family.as_deref(),
         Some("Linux Libertine G:liga=0&clig=0&smcp&ss02=3")
     );
+}
+
+/// The labels of the paragraphs, empty for those outside a list.
+fn labels(document: &Document) -> Vec<String> {
+    document
+        .styles()
+        .list_items(document.body().iter())
+        .into_iter()
+        .map(|item| item.map(|i| i.label).unwrap_or_default())
+        .collect()
+}
+
+#[test]
+fn lst_02_05_lists_are_kept() {
+    use desk_model::{Editor, ListLabel, ListStyle, NumberFormat, Position};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Lists", |edit| {
+            edit.insert_text(start, "a\nb\nc\nd\ntext\ne\nf\ng\nh")?;
+            let at = |edit: &desk_model::Edit, i: usize| {
+                Position::new(edit.document().body().get(i).unwrap().id(), 0)
+            };
+            let legal = edit.list_style_or_add("Legal", ListStyle::legal)?;
+            let bullet = edit.list_style_or_add("Bullet", ListStyle::bullet)?;
+            let (a, d) = (at(edit, 0), at(edit, 3));
+            edit.set_list_style(a, d, Some(legal))?;
+            let (b, c) = (at(edit, 1), at(edit, 2));
+            edit.change_list_level(b, c, 1, false)?;
+            edit.change_list_level(c, c, 1, false)?;
+            // Bullets of more than one character, in color, large and
+            // raised, after a list that goes on.
+            let mut level = edit.document().styles().list(bullet).unwrap().levels[0].clone();
+            level.label = ListLabel::bullet("->");
+            level.size = 150;
+            level.color = Some(Rgba::rgb(200, 0, 0));
+            level.raise = Length::from_points(2);
+            edit.set_list_level(bullet, 0, level)?;
+            let (e, f) = (at(edit, 5), at(edit, 6));
+            edit.set_list_style(e, f, Some(bullet))?;
+            // The legal list goes on after the bullets, then starts again.
+            let (g, h) = (at(edit, 7), at(edit, 8));
+            edit.set_list_style(g, h, Some(legal))?;
+            edit.set_list_start(h.paragraph, Some(5))?;
+            // A paragraph style with a list, and a paragraph with it out
+            // of the list.
+            let id = edit.new_id();
+            let mut style = ParagraphStyle::new(id, "Numbered");
+            style.parent = Some(edit.document().styles().default_paragraph());
+            style.paragraph.list_style = Some(Some(legal));
+            edit.apply(Op::PutStyle {
+                style: style.into(),
+            })?;
+            let text = at(edit, 4);
+            edit.set_paragraph_style(text, text, id)?;
+            edit.set_list_style(text, text, None)?;
+            // Roman numbers from 3.
+            let mut level = edit.document().styles().list(legal).unwrap().levels[3].clone();
+            level.label = ListLabel::Number {
+                format: NumberFormat::LowerRoman,
+                prefix: "(".into(),
+                suffix: ")".into(),
+                tiered: false,
+            };
+            level.start = 3;
+            edit.set_list_level(legal, 3, level)
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    assert_eq!(
+        labels(&document),
+        ["1.", "1.1.", "1.1.1.", "2.", "", "->", "->", "3.", "5."]
+    );
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-lists.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(labels(&read), labels(&document));
+    assert_eq!(describe(&read), describe(&document));
+    let again = read_odt(&write_odt(&read).unwrap()).unwrap();
+    assert_eq!(describe(&again), describe(&document));
+}
+
+#[test]
+fn lst_lists_of_pages_are_kept_in_odt() {
+    let fixtures =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/pages");
+    for name in [
+        "lst-02-levels",
+        "lst-03-bullets",
+        "lst-04-numbered",
+        "lst-05-tiered",
+    ] {
+        let document =
+            desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
+        let bytes = write_odt(&document).unwrap();
+        keep(&format!("filters-{name}.odt"), &bytes);
+        let read = read_odt(&bytes).unwrap();
+        assert_eq!(labels(&read), labels(&document), "{name}");
+        let items = |d: &Document| -> Vec<_> {
+            d.styles()
+                .list_items(d.body().iter())
+                .into_iter()
+                .map(|i| i.map(|i| (i.level, i.definition)))
+                .collect()
+        };
+        assert_eq!(items(&read), items(&document), "{name}");
+    }
+}
+
+#[test]
+fn lst_lists_from_other_programs_are_read() {
+    // As LibreOffice writes a list formatted directly: an automatic list
+    // style with the label alignment mode, nested lists and a header.
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3">
+<office:automatic-styles>
+<text:list-style style:name="L1">
+<text:list-level-style-number text:level="1" style:num-suffix="." style:num-format="1">
+<style:list-level-properties text:list-level-position-and-space-mode="label-alignment">
+<style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="0.5in" fo:text-indent="-0.25in" fo:margin-left="0.5in"/>
+</style:list-level-properties>
+</text:list-level-style-number>
+<text:list-level-style-bullet text:level="2" text:bullet-char="◦">
+<style:list-level-properties text:space-before="0.5in" text:min-label-width="0.25in"/>
+</text:list-level-style-bullet>
+</text:list-style>
+</office:automatic-styles>
+<office:body><office:text>
+<text:list text:style-name="L1">
+<text:list-item><text:p>one</text:p>
+<text:list><text:list-item><text:p>sub</text:p></text:list-item></text:list>
+</text:list-item>
+<text:list-header><text:p>header</text:p></text:list-header>
+<text:list-item><text:p>two</text:p></text:list-item>
+</text:list>
+<text:p>after</text:p>
+</office:text></office:body>
+</office:document-content>"#;
+    let source = odf::read_streams(content, None, None).unwrap();
+    let document = import(&source).unwrap();
+    assert_eq!(labels(&document), ["1.", "\u{25e6}", "", "2.", ""]);
+    let items = document.styles().list_items(document.body().iter());
+    let first = items[0].as_ref().unwrap();
+    assert_eq!(first.definition.label_indent, Length::from_points(18));
+    assert_eq!(first.definition.text_indent, Length::from_points(18));
+    assert_eq!(items[1].as_ref().unwrap().level, 1);
+    let _ = export(&document);
 }

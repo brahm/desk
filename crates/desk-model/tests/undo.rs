@@ -69,6 +69,20 @@ enum Action {
         to: (usize, usize),
     },
     DeleteStyle,
+    List {
+        from: (usize, usize),
+        to: (usize, usize),
+        on: bool,
+    },
+    Level {
+        from: (usize, usize),
+        to: (usize, usize),
+        deeper: bool,
+        children: bool,
+    },
+    Marker {
+        paragraph: usize,
+    },
 }
 
 fn text() -> impl Strategy<Value = String> {
@@ -81,6 +95,8 @@ fn text() -> impl Strategy<Value = String> {
         Just(LINE_BREAK.to_string()),
         Just("\n".to_string()),
         Just("🙂".to_string()),
+        Just("1. ".to_string()),
+        Just("- ".to_string()),
     ];
     prop::collection::vec(pieces, 1..4).prop_map(|parts| parts.concat())
 }
@@ -111,6 +127,12 @@ fn action() -> impl Strategy<Value = Action> {
         1 => (point(), any::<bool>()).prop_map(|(at, heading)| Action::Redefine { at, heading }),
         1 => (point(), point()).prop_map(|(from, to)| Action::Revert { from, to }),
         1 => Just(Action::DeleteStyle),
+        1 => (point(), point(), any::<bool>())
+            .prop_map(|(from, to, on)| Action::List { from, to, on }),
+        1 => (point(), point(), any::<bool>(), any::<bool>()).prop_map(
+            |(from, to, deeper, children)| Action::Level { from, to, deeper, children }
+        ),
+        1 => (0..8usize).prop_map(|paragraph| Action::Marker { paragraph }),
     ]
 }
 
@@ -141,6 +163,7 @@ fn ordered(doc: &Document, a: (usize, usize), b: (usize, usize)) -> (Position, P
 struct Fixture {
     emphasis: desk_model::StyleId,
     heading: desk_model::StyleId,
+    bullet: desk_model::StyleId,
 }
 
 fn setup() -> (Document, Fixture) {
@@ -154,7 +177,17 @@ fn setup() -> (Document, Fixture) {
     style.parent = Some(doc.styles().default_paragraph());
     style.next = Some(doc.styles().default_paragraph());
     doc.put_style(style).unwrap();
-    (doc, Fixture { emphasis, heading })
+    let bullet = doc.new_id();
+    doc.put_style(desk_model::ListStyle::bullet(bullet, "Bullet"))
+        .unwrap();
+    (
+        doc,
+        Fixture {
+            emphasis,
+            heading,
+            bullet,
+        },
+    )
 }
 
 fn run(edit: &mut Edit, fixture: &Fixture, action: &Action) -> Result<(), ModelError> {
@@ -239,12 +272,28 @@ fn run(edit: &mut Edit, fixture: &Fixture, action: &Action) -> Result<(), ModelE
                 *id != styles.default_paragraph()
                     && *id != fixture.heading
                     && *id != fixture.emphasis
+                    && *id != fixture.bullet
             });
             match made {
+                Some(id) if styles.list(id).is_some() => edit.delete_style(id, None),
                 Some(id) => edit.delete_style(id, Some(fixture.heading)),
                 None => Ok(()),
             }
         }
+        Action::List { from, to, on } => {
+            let (a, b) = ordered(&doc, *from, *to);
+            edit.set_list_style(a, b, on.then_some(fixture.bullet))
+        }
+        Action::Level {
+            from,
+            to,
+            deeper,
+            children,
+        } => {
+            let (a, b) = ordered(&doc, *from, *to);
+            edit.change_list_level(a, b, if *deeper { 1 } else { -1 }, *children)
+        }
+        Action::Marker { paragraph } => edit.list_from_marker(paragraph_id(*paragraph)).map(drop),
     }
 }
 

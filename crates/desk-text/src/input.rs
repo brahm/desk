@@ -10,7 +10,10 @@
 
 use std::ops::Range;
 
-use desk_model::{Capitalization, CharFormat, Ligatures, ParaFormat, Paragraph, Styles};
+use desk_model::{
+    Capitalization, CharFormat, Length, Ligatures, LineStyle, ListItem, ParaFormat, Paragraph,
+    Styles,
+};
 
 use crate::fonts::pages_font;
 
@@ -35,6 +38,23 @@ pub(crate) struct StyledRange {
     pub small_caps: bool,
 }
 
+/// The label of a list item: a bullet or a number, drawn before the
+/// first line of the paragraph (LST-02 to LST-05).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Label {
+    /// The text, as "•" or "1.1.".
+    pub text: String,
+    /// The index of its format in [`ParagraphText::formats`].
+    pub format: u32,
+    /// The distance from the left indent of the paragraph to the label.
+    pub indent: f32,
+    /// The distance from the label to the text, or the width of the label
+    /// when it is wider.
+    pub text_indent: f32,
+    /// How far the label is raised above the baseline.
+    pub raise: f32,
+}
+
 /// A paragraph ready for layout: its text with capitalization applied, its
 /// character formats and its paragraph format.
 #[derive(Clone, Debug)]
@@ -46,6 +66,7 @@ pub struct ParagraphText {
     formats: Vec<CharFormat>,
     pub(crate) ranges: Vec<StyledRange>,
     paragraph: ParaFormat,
+    label: Option<Label>,
 }
 
 impl ParagraphText {
@@ -58,6 +79,61 @@ impl ParagraphText {
             (run.text(), format)
         });
         Self::from_runs(format, base, runs)
+    }
+
+    /// Prepares a paragraph of a document that is an item of a list, as
+    /// [`Styles::list_items`] numbers them, or not in a list with `None`.
+    pub fn new_in_list(styles: &Styles, paragraph: &Paragraph, item: Option<&ListItem>) -> Self {
+        let text = Self::new(styles, paragraph);
+        match item {
+            Some(item) => text.with_label(item),
+            None => text,
+        }
+    }
+
+    /// The same paragraph as an item of a list, with the label of the
+    /// item. The label takes the font of the first character, at the size
+    /// and in the color of its level, without lines or a background.
+    pub fn with_label(mut self, item: &ListItem) -> Self {
+        let level = &item.definition;
+        let first = self
+            .ranges
+            .first()
+            .map_or(&self.formats[0], |r| &self.formats[r.format as usize]);
+        let mut format = first.clone();
+        let base = if level.scale_with_text {
+            first.font_size.to_pt()
+        } else {
+            12.0
+        };
+        format.font_size = Length::from_pt(base * f64::from(level.size) / 100.0);
+        if let Some(color) = level.color {
+            format.color = color;
+        }
+        format.underline = LineStyle::None;
+        format.strikethrough = LineStyle::None;
+        format.background = None;
+        format.capitalization = Capitalization::None;
+        let index = match self.formats.iter().position(|f| f == &format) {
+            Some(index) => index,
+            None => {
+                self.formats.push(format);
+                self.formats.len() - 1
+            }
+        } as u32;
+        self.label = Some(Label {
+            text: item.label.clone(),
+            format: index,
+            indent: level.label_indent.to_pt() as f32,
+            text_indent: level.text_indent.to_pt() as f32,
+            raise: level.raise.to_pt() as f32,
+        });
+        self
+    }
+
+    /// The label, for an item of a list.
+    pub fn label(&self) -> Option<&Label> {
+        self.label.as_ref()
     }
 
     /// Prepares text from pieces with resolved formats. `base` is the
@@ -73,6 +149,7 @@ impl ParagraphText {
             formats: vec![base],
             ranges: Vec::new(),
             paragraph,
+            label: None,
         };
         let mut model_offset = 0;
         let mut transformed = false;

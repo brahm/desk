@@ -25,6 +25,20 @@ use crate::access::AccessText;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
+/// Whether a paragraph is an item of a list: its list style has a label at
+/// its level.
+fn in_list(document: &Document, paragraph: desk_model::NodeId) -> bool {
+    let Ok(paragraph) = document.paragraph(paragraph) else {
+        return false;
+    };
+    let styles = document.styles();
+    let format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
+    format
+        .list_style
+        .and_then(|id| styles.list(id))
+        .is_some_and(|list| list.level(format.list_level).label.is_some())
+}
+
 /// The position of the model at a spot.
 fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, ModelError> {
     spot.position(document).ok_or(ModelError::IndexOutOfBounds {
@@ -84,6 +98,8 @@ pub struct Format {
     pub paragraph: ParaFormat,
     /// The paragraph style.
     pub style: Option<StyleId>,
+    /// The list style of the paragraph, when it has one.
+    pub list: Option<desk_model::ListStyle>,
 }
 
 /// Edits the document of a window.
@@ -406,26 +422,58 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
-    /// Splits the paragraph at the cursor, as Return does.
+    /// Splits the paragraph at the cursor, as Return does. A paragraph
+    /// that starts with a marker such as "1. " becomes an item of a list
+    /// first, when automatic lists are on (LST-01), and Return in an
+    /// empty item ends the list instead (LST-02).
     fn split(&self) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        let automatic = crate::preferences::get().automatic_lists;
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Typing", |edit| {
                 let document = edit.document();
                 let from = at_spot(document, start)?;
                 let to = at_spot(document, end)?;
-                let at = if start == end {
+                if start == end && in_list(document, from.paragraph) {
+                    let paragraph = document.paragraph(from.paragraph)?;
+                    if paragraph.is_empty() {
+                        edit.set_list_style(from, from, None)?;
+                        return Ok(Spot::of(edit.document(), from));
+                    }
+                }
+                let mut at = if start == end {
                     from
                 } else {
                     edit.delete(from, to)?
                 };
+                if automatic && let Some(len) = edit.list_from_marker(at.paragraph)? {
+                    at.offset = at.offset.saturating_sub(len);
+                }
                 let after = edit.split_paragraph(at)?;
                 Ok(Spot::of(edit.document(), after))
             })
         };
         self.finish_edit(before, result);
+    }
+
+    /// Moves the selected items of lists `by` levels, with the items
+    /// under them when `children` is true (LST-02). Returns false when
+    /// the selection is not in a list, for Tab to insert a tab.
+    pub fn change_list_level(&self, by: i32, children: bool) -> bool {
+        let (start, _) = self.selection().ordered();
+        let listed = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            at_spot(document, start).is_ok_and(|at| in_list(document, at.paragraph))
+        };
+        if listed {
+            self.format_ranges("List Level", |edit, from, to| {
+                edit.change_list_level(from, to, by, children)
+            });
+        }
+        listed
     }
 
     fn finish_edit(&self, before: Selection, result: Result<Option<Spot>, ModelError>) {
@@ -529,9 +577,11 @@ impl TextEditor {
         {
             attrs.merge(pending);
         }
+        let format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
         Format {
             character: styles.resolve_character(paragraph.style(), style, &attrs),
-            paragraph: styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+            list: format.list_style.and_then(|id| styles.list(id)).cloned(),
+            paragraph: format,
             style: Some(paragraph.style()),
         }
     }
@@ -617,8 +667,29 @@ impl TextEditor {
                     self.set_character_style(Some(style));
                 }
             }
+            Some(StyleFamily::List) => self.set_list_style(Some(style)),
             None => {}
         }
+    }
+
+    /// The list style of the paragraph at the selection, when it is in a
+    /// list.
+    pub fn list_style(&self) -> Option<StyleId> {
+        let format = self.format().paragraph;
+        let styles = self.styles();
+        format.list_style.filter(|id| {
+            styles
+                .list(*id)
+                .is_some_and(desk_model::ListStyle::has_labels)
+        })
+    }
+
+    /// Makes the selected paragraphs items of a list style, or takes them
+    /// out of their lists (LST-02).
+    pub fn set_list_style(&self, style: Option<StyleId>) {
+        self.format_ranges("List Style", |edit, from, to| {
+            edit.set_list_style(from, to, style)
+        });
     }
 
     /// The styles of the document.
@@ -972,7 +1043,14 @@ impl TextEditor {
                 }
             }
             gdk::Key::Tab | gdk::Key::ISO_Left_Tab if !control => {
-                self.replace_selection("Typing", "\t");
+                // In a list, Tab and Shift-Tab change the level of the
+                // item and the items under it, and with Alt only of the
+                // item (LST-02).
+                let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
+                let by = if shift { -1 } else { 1 };
+                if !self.change_list_level(by, !alt) {
+                    self.replace_selection("Typing", "\t");
+                }
             }
             gdk::Key::Insert if shift => self.paste(),
             gdk::Key::Insert if control => self.copy(),

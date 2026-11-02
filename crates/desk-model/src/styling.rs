@@ -13,6 +13,7 @@ use crate::document::Document;
 use crate::error::ModelError;
 use crate::format::{CharAttrs, CharFormat, ParaAttrs};
 use crate::id::NodeId;
+use crate::list::ListStyle;
 use crate::op::Op;
 use crate::style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId};
 use crate::text::Position;
@@ -35,6 +36,8 @@ pub struct CopiedStyle {
     pub character: Option<CharacterStyle>,
     /// The attributes set on the text itself.
     pub character_attrs: CharAttrs,
+    /// The list styles that the paragraph style and the paragraph name.
+    pub lists: Vec<ListStyle>,
 }
 
 /// Where the formatting of some text differs from its styles: the red
@@ -121,7 +124,21 @@ impl Document {
     pub fn copy_style(&self, at: Position) -> Result<CopiedStyle, ModelError> {
         let paragraph = self.paragraph(at.paragraph)?;
         let (style, attrs) = self.run_at(at)?;
+        let styles = self.styles();
+        let own = styles
+            .resolve_paragraph(paragraph.style(), &ParaAttrs::default())
+            .list_style;
+        let direct = paragraph.attrs().list_style.flatten();
+        let mut lists: Vec<ListStyle> = Vec::new();
+        for id in [own, direct].into_iter().flatten() {
+            if let Some(list) = styles.list(id)
+                && !lists.iter().any(|l| l.id == id)
+            {
+                lists.push(list.clone());
+            }
+        }
         Ok(CopiedStyle {
+            lists,
             paragraph: self
                 .flat_paragraph_style(paragraph.style())
                 .ok_or(ModelError::UnknownStyle(paragraph.style()))?,
@@ -135,8 +152,15 @@ impl Document {
     /// runs for a character style, in the order of the body (STY-09).
     pub fn style_uses(&self, id: StyleId) -> Vec<(NodeId, Range<usize>)> {
         let mut uses: Vec<(NodeId, Range<usize>)> = Vec::new();
+        let styles = self.styles();
+        let list = matches!(styles.get(id), Some(Style::List(_)));
         for paragraph in self.body().iter() {
-            if paragraph.style() == id {
+            let in_list = list
+                && styles
+                    .resolve_paragraph(paragraph.style(), paragraph.attrs())
+                    .list_style
+                    == Some(id);
+            if paragraph.style() == id || in_list {
                 uses.push((paragraph.id(), 0..paragraph.len()));
                 continue;
             }
@@ -293,6 +317,8 @@ impl Edit {
         let id = self.new_id();
         let mut style = ParagraphStyle::new(id, name);
         style.paragraph = format.into();
+        // Where a list starts again belongs to the paragraph.
+        style.paragraph.list_start = None;
         style.character = character.into();
         self.put(style)?;
         if apply {
@@ -401,7 +427,10 @@ impl Edit {
             None => Err(ModelError::UnknownStyle(id)),
             Some(Style::Paragraph(mut style)) => {
                 let paragraph = document.paragraph(start.paragraph)?;
-                let para_attrs = paragraph.attrs().clone();
+                let para_attrs = ParaAttrs {
+                    list_start: None,
+                    ..paragraph.attrs().clone()
+                };
                 let char_attrs = if run_style.is_none() {
                     run_attrs
                 } else {
@@ -427,6 +456,9 @@ impl Edit {
                 }
                 Ok(())
             }
+            // A list style has nothing set over it: the levels are only
+            // set on the style.
+            Some(Style::List(_)) => Ok(()),
             Some(Style::Character(mut style)) => {
                 let attrs = if run_style == Some(id) {
                     run_attrs
@@ -507,14 +539,16 @@ impl Edit {
                 Some(other)
             }
             (StyleFamily::Paragraph, None) => Some(styles.default_paragraph()),
-            (StyleFamily::Character, None) => None,
+            (StyleFamily::Character | StyleFamily::List, None) => None,
         };
         // Styles that refer to it.
         let referring: Vec<Style> = styles
             .iter()
             .filter(|s| s.id() != id)
             .filter(|s| {
-                s.parent() == Some(id) || matches!(s, Style::Paragraph(p) if p.next == Some(id))
+                s.parent() == Some(id)
+                    || matches!(s, Style::Paragraph(p)
+                        if p.next == Some(id) || p.paragraph.list_style == Some(Some(id)))
             })
             .cloned()
             .collect();
@@ -533,6 +567,10 @@ impl Edit {
                     if p.next == Some(id) {
                         p.next = replacement;
                     }
+                    Style::Paragraph(p)
+                }
+                (Style::Paragraph(mut p), Style::List(_)) => {
+                    p.paragraph.list_style = Some(replacement);
                     Style::Paragraph(p)
                 }
                 (Style::Character(mut c), Style::Character(deleted)) => {
@@ -563,6 +601,19 @@ impl Edit {
                     }
                 })?;
             }
+            StyleFamily::List => {
+                let direct: Vec<(NodeId, ParaAttrs)> = self
+                    .document()
+                    .body()
+                    .iter()
+                    .filter(|p| p.attrs().list_style == Some(Some(id)))
+                    .map(|p| (p.id(), p.attrs().clone()))
+                    .collect();
+                for (paragraph, mut attrs) in direct {
+                    attrs.list_style = Some(replacement);
+                    self.set_own_paragraph_attrs(paragraph, attrs)?;
+                }
+            }
         }
         self.apply(Op::RemoveStyle { style: id })
     }
@@ -578,8 +629,23 @@ impl Edit {
         end: Position,
         copied: &CopiedStyle,
     ) -> Result<(), ModelError> {
-        let paragraph_style =
-            self.style_by_name_or_add(Style::Paragraph(copied.paragraph.clone()))?;
+        let mut lists: HashMap<StyleId, StyleId> = HashMap::new();
+        for list in &copied.lists {
+            lists.insert(
+                list.id,
+                self.style_by_name_or_add(Style::List(list.clone()))?,
+            );
+        }
+        let relink = |attrs: &mut ParaAttrs| {
+            if let Some(Some(list)) = attrs.list_style {
+                attrs.list_style = Some(lists.get(&list).copied());
+            }
+        };
+        let mut paragraph = copied.paragraph.clone();
+        relink(&mut paragraph.paragraph);
+        let mut paragraph_attrs = copied.paragraph_attrs.clone();
+        relink(&mut paragraph_attrs);
+        let paragraph_style = self.style_by_name_or_add(Style::Paragraph(paragraph))?;
         let character_style = match &copied.character {
             Some(style) => Some(self.style_by_name_or_add(Style::Character(style.clone()))?),
             None => None,
@@ -588,7 +654,7 @@ impl Edit {
         for (id, _) in &ranges {
             let p = Position::new(*id, 0);
             self.set_paragraph_style(p, p, paragraph_style)?;
-            self.set_own_paragraph_attrs(*id, copied.paragraph_attrs.clone())?;
+            self.set_own_paragraph_attrs(*id, paragraph_attrs.clone())?;
         }
         if start != end {
             let attrs = copied.character_attrs.clone();
@@ -621,6 +687,11 @@ impl Edit {
                 id,
                 shortcut: None,
                 ..c
+            }),
+            Style::List(l) => Style::List(ListStyle {
+                id,
+                shortcut: None,
+                ..l
             }),
         };
         self.put(style)?;
@@ -693,13 +764,33 @@ impl Edit {
                     shortcut,
                     ..source.flat_character_style(id).expect("a character style")
                 }),
+                StyleFamily::List => Style::List(ListStyle {
+                    id: target,
+                    shortcut,
+                    ..source.styles().list(id).expect("a list style").clone()
+                }),
             }
             .with_name(&name);
             map.insert(id, target);
             order.push((id, target, flat));
         }
+        // List styles first, since paragraph styles name them.
         for (_, _, flat) in &order {
-            self.put(flat.clone())?;
+            if flat.family() == StyleFamily::List {
+                self.put(flat.clone())?;
+            }
+        }
+        // The list styles that paragraph styles name, by import, by name
+        // or added.
+        for (_, _, flat) in &mut order {
+            if let Style::Paragraph(p) = flat {
+                self.relink_list(source, &mut p.paragraph, &mut map)?;
+            }
+        }
+        for (_, _, flat) in &order {
+            if flat.family() != StyleFamily::List {
+                self.put(flat.clone())?;
+            }
         }
         // The style in the document for a style of the source, by import
         // or by name.
@@ -719,7 +810,7 @@ impl Edit {
             let parent = original.parent().and_then(|p| find(self, p));
             let next = match original {
                 Style::Paragraph(p) => p.next.and_then(|n| find(self, n)),
-                Style::Character(_) => None,
+                Style::Character(_) | Style::List(_) => None,
             };
             let mut linked = flat.clone();
             if let Style::Paragraph(p) = &mut linked {
@@ -728,9 +819,13 @@ impl Edit {
             if parent.is_some() {
                 let with_parent = match (&linked, original) {
                     (Style::Paragraph(p), Style::Paragraph(o)) => {
+                        let mut paragraph = o.paragraph.clone();
+                        if let Some(Some(list)) = paragraph.list_style {
+                            paragraph.list_style = Some(map.get(&list).copied());
+                        }
                         Style::Paragraph(ParagraphStyle {
                             parent,
-                            paragraph: o.paragraph.clone(),
+                            paragraph,
                             character: o.character.clone(),
                             ..p.clone()
                         })
@@ -756,5 +851,32 @@ impl Edit {
             self.put(linked)?;
         }
         Ok(ids.iter().map(|id| map[id]).collect())
+    }
+
+    /// Points the list style that attributes from another document name
+    /// to the list style of this document: the one imported for it, the
+    /// one with its name, or a copy added.
+    fn relink_list(
+        &mut self,
+        source: &Document,
+        attrs: &mut ParaAttrs,
+        map: &mut HashMap<StyleId, StyleId>,
+    ) -> Result<(), ModelError> {
+        let Some(Some(list)) = attrs.list_style else {
+            return Ok(());
+        };
+        let target = match map.get(&list) {
+            Some(target) => Some(*target),
+            None => match source.styles().list(list) {
+                Some(style) => {
+                    let target = self.style_by_name_or_add(Style::List(style.clone()))?;
+                    map.insert(list, target);
+                    Some(target)
+                }
+                None => None,
+            },
+        };
+        attrs.list_style = Some(target);
+        Ok(())
     }
 }

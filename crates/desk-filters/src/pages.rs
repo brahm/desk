@@ -18,13 +18,15 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use desk_iwork::pages::{self as iwork, PAGE_BREAK};
 use desk_iwork::sf::{
-    Family, LineSpacingMode, Properties, StrokePattern, Style as IworkStyle, Stylesheet, Value,
+    self as sf, Family, LineSpacingMode, Properties, StrokePattern, Style as IworkStyle,
+    Stylesheet, Value,
 };
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, Document, LINE_BREAK, Language, Length, Ligatures, LineColor, LineSpacing,
-    LineStyle, Metadata, Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph,
-    ParagraphStyle, Rgba, Run, Shadow, StyleId, TabAlignment, TabLeader, TabStop, TabStops,
+    CharacterStyle, Document, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor,
+    LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, NumberFormat, Op, PageSetup,
+    ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow, StyleId,
+    TabAlignment, TabLeader, TabStop, TabStops,
 };
 
 use crate::FilterError;
@@ -91,9 +93,8 @@ fn differs(value: &Value, neutral: f64) -> bool {
 fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
     for (name, value) in &properties.0 {
         let lost = match name.as_str() {
-            "listStyle" => {
-                matches!(value, Value::ListStyle { labels: true, .. }).then_some(Formatting::Lists)
-            }
+            "listStyle" => matches!(value, Value::ListStyle { images: true, .. })
+                .then_some(Formatting::ImageBullets),
             "underlineColor" | "word_underline" | "word_strikethrough" => {
                 differs(value, 0.0).then_some(Formatting::LineDetails)
             }
@@ -377,6 +378,10 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
         background: color_or_none(properties, "paragraphFill"),
         // Set from the chain of styles, by `para_border`.
         border: None,
+        // Set by the importer, which makes the list styles.
+        list_style: None,
+        list_level: None,
+        list_start: None,
     }
 }
 
@@ -450,7 +455,86 @@ struct Importer<'a> {
     document: Document,
     /// The model style of each named style, by identifier.
     ids: HashMap<(Family, String), StyleId>,
+    /// The model list style of each list style met, by its object ID or
+    /// identifier; `None` for those without labels.
+    lists: HashMap<String, Option<StyleId>>,
     body: StyleId,
+}
+
+/// The levels of a list style of Pages, through its parents.
+fn list_levels(sheet: &Stylesheet, style: &sf::ListStyle) -> [ListLevel; LIST_LEVELS] {
+    let chain = sheet.list_ancestry(style);
+    fn get<'a, T>(
+        chain: &[&'a sf::ListStyle],
+        property: impl Fn(&'a sf::ListStyle) -> Option<&'a Vec<T>>,
+        level: usize,
+    ) -> Option<&'a T> {
+        chain.iter().find_map(|s| property(s)?.get(level))
+    }
+    std::array::from_fn(|level| {
+        let label = get(&chain, |s| s.labels.as_ref(), level);
+        let (label, start) = match label {
+            None | Some(sf::ListLabel::None) => (ListLabel::None, 1),
+            Some(sf::ListLabel::Image) => (ListLabel::bullet("\u{2022}"), 1),
+            Some(sf::ListLabel::Text {
+                kind,
+                format,
+                first,
+            }) => {
+                let number = match kind.as_str() {
+                    "decimal" => Some(NumberFormat::Decimal),
+                    "upper-roman" => Some(NumberFormat::UpperRoman),
+                    "lower-roman" => Some(NumberFormat::LowerRoman),
+                    "upper-alpha" => Some(NumberFormat::UpperAlpha),
+                    "lower-alpha" => Some(NumberFormat::LowerAlpha),
+                    _ => None,
+                };
+                match number {
+                    Some(number) if format.contains("%L") => {
+                        let tiered = format.contains("%P") && level > 0;
+                        let format = format.replace("%P", "");
+                        let (prefix, suffix) = format.split_once("%L").unwrap_or(("", ""));
+                        (
+                            ListLabel::Number {
+                                format: number,
+                                prefix: prefix.into(),
+                                suffix: suffix.into(),
+                                tiered,
+                            },
+                            *first,
+                        )
+                    }
+                    _ if format.is_empty() => (ListLabel::None, 1),
+                    _ => (ListLabel::bullet(format), 1),
+                }
+            }
+        };
+        let geometry = get(&chain, |s| s.geometries.as_ref(), level);
+        let indent = |property: fn(&sf::ListStyle) -> Option<&Vec<f64>>| {
+            Length::from_pt(get(&chain, property, level).copied().unwrap_or(0.0))
+        };
+        let mut text_indent = indent(|s| s.text_indents.as_ref());
+        if matches!(
+            get(&chain, |s| s.labels.as_ref(), level),
+            Some(sf::ListLabel::Image)
+        ) {
+            // The picture is a square as tall as 12 point text, scaled,
+            // and the text starts after it, as after a text bullet that
+            // wide.
+            let scale = geometry.map_or(1.0, |g| g.scale);
+            text_indent = text_indent.max(Length::from_pt(12.0 * scale));
+        }
+        ListLevel {
+            label,
+            start,
+            label_indent: indent(|s| s.label_indents.as_ref()),
+            text_indent,
+            size: geometry.map_or(100, |g| (g.scale * 100.0).round().clamp(1.0, 1000.0) as u16),
+            scale_with_text: geometry.is_none_or(|g| g.scale_with_text),
+            raise: Length::from_pt(geometry.map_or(0.0, |g| g.offset)),
+            color: None,
+        }
+    })
 }
 
 impl<'a> Importer<'a> {
@@ -461,6 +545,7 @@ impl<'a> Importer<'a> {
             sheet,
             document,
             ids: HashMap::new(),
+            lists: HashMap::new(),
             body,
         };
         importer.styles()?;
@@ -469,6 +554,18 @@ impl<'a> Importer<'a> {
 
     fn styles(&mut self) -> Result<(), FilterError> {
         let sheet = self.sheet;
+        // The named list styles, as the Styles drawer of Pages lists them.
+        for style in &sheet.list_styles {
+            if style.name.is_some() && style.parent.is_none() {
+                let known = style
+                    .ident
+                    .as_ref()
+                    .is_some_and(|ident| self.lists.contains_key(ident));
+                if !known {
+                    self.list(style)?;
+                }
+            }
+        }
         let named: Vec<&IworkStyle> = sheet.styles.iter().filter(|s| is_named(s)).collect();
         let body_style = named
             .iter()
@@ -614,8 +711,91 @@ impl<'a> Importer<'a> {
                 paragraph.next = Some(next);
                 self.document.put_style(paragraph)?;
             }
+            // The list style, which the model inherits as Pages does.
+            if let Some(value) = style.properties.get("listStyle")
+                && let Some(list) = self.list_value(value)?
+                && let Some(mut paragraph) = self.document.styles().paragraph(*id).cloned()
+                && paragraph.paragraph.list_style != Some(list)
+            {
+                paragraph.paragraph.list_style = Some(list);
+                self.document.put_style(paragraph)?;
+            }
         }
         Ok(())
+    }
+
+    /// The model list style for a list style of Pages, made when first
+    /// met: a named style keeps its name, and an anonymous one, which is
+    /// how Pages saves changes to the list of a paragraph, takes the
+    /// style with the same levels or a new one named after its parent.
+    /// `None` for a list style without labels, as None.
+    fn list(&mut self, style: &sf::ListStyle) -> Result<Option<StyleId>, FilterError> {
+        let key = style
+            .id
+            .clone()
+            .or_else(|| style.ident.clone())
+            .unwrap_or_default();
+        if let Some(found) = self.lists.get(&key) {
+            return Ok(*found);
+        }
+        let sheet = self.sheet;
+        let levels = list_levels(sheet, style);
+        let found = if levels.iter().all(|l| !l.label.is_some()) {
+            None
+        } else {
+            let styles = self.document.styles();
+            let same = styles
+                .iter()
+                .find(|s| matches!(s, desk_model::Style::List(l) if *l.levels == levels))
+                .map(desk_model::Style::id);
+            match same {
+                Some(id) if style.name.is_none() => Some(id),
+                _ => {
+                    let base = style
+                        .name
+                        .clone()
+                        .or_else(|| {
+                            sheet
+                                .list_ancestry(style)
+                                .iter()
+                                .find_map(|s| s.name.clone())
+                        })
+                        .unwrap_or_else(|| "List".to_owned());
+                    let name = styles.unique_name(desk_model::StyleFamily::List, &base);
+                    let id = self.document.new_id();
+                    self.document.put_style(ListStyle {
+                        id,
+                        name: name.as_str().into(),
+                        shortcut: None,
+                        levels: levels.into(),
+                    })?;
+                    Some(id)
+                }
+            }
+        };
+        self.lists.insert(key, found);
+        // A named style is met again by its identifier.
+        if let Some(ident) = &style.ident
+            && style.name.is_some()
+        {
+            self.lists.entry(ident.clone()).or_insert(found);
+        }
+        Ok(found)
+    }
+
+    /// The list style that a `listStyle` property names.
+    fn list_value(&mut self, value: &Value) -> Result<Option<Option<StyleId>>, FilterError> {
+        let sheet = self.sheet;
+        Ok(match value {
+            Value::Null => Some(None),
+            Value::ListStyle { id, ident, .. } => {
+                match sheet.list_style(id.as_deref(), ident.as_deref()) {
+                    Some(style) => Some(self.list(style)?),
+                    None => Some(None),
+                }
+            }
+            _ => None,
+        })
     }
 
     /// The named style that a chain starts from, and how many anonymous
@@ -645,6 +825,22 @@ impl<'a> Importer<'a> {
             let (named, anonymous) = self.base(&chain, Family::Paragraph);
             style = named.unwrap_or(self.body);
             (attrs, base) = merged(&chain, anonymous);
+            if let Some(value) = chain[..anonymous]
+                .iter()
+                .find_map(|s| s.properties.get("listStyle"))
+            {
+                attrs.list_style = self.list_value(value)?;
+            }
+        }
+        let styles = self.document.styles();
+        let format = styles.resolve_paragraph(style, &attrs);
+        if let Some(list) = format.list_style.and_then(|id| styles.list(id)) {
+            if source.list_level > 0 {
+                attrs.list_level = Some(source.list_level);
+            }
+            if source.restart_list {
+                attrs.list_start = Some(Some(list.level(source.list_level).start));
+            }
         }
         let mut pieces: Vec<Vec<Run>> = vec![Vec::new()];
         for run in &source.runs {

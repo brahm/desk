@@ -129,6 +129,9 @@ pub struct Preferences {
     pub center_origin: bool,
     /// Whether the vertical ruler shows with the horizontal one (FMT-17).
     pub vertical_ruler: bool,
+    /// Whether a paragraph that starts with "•", "-", "*", "1.", "a." or
+    /// "I." and a space becomes a list on Return (LST-01).
+    pub automatic_lists: bool,
 }
 
 impl Default for Preferences {
@@ -149,11 +152,13 @@ impl Default for Preferences {
             percent: false,
             center_origin: false,
             vertical_ruler: false,
+            automatic_lists: true,
         }
     }
 }
 
 const RULERS: &str = "rulers";
+const EDITING: &str = "editing";
 
 impl Preferences {
     /// Reads preferences from a key file; what it lacks keeps its default.
@@ -170,6 +175,9 @@ impl Preferences {
         out.percent = flag("percent", out.percent);
         out.center_origin = flag("center-origin", out.center_origin);
         out.vertical_ruler = flag("vertical-ruler", out.vertical_ruler);
+        out.automatic_lists = file
+            .boolean(EDITING, "automatic-lists")
+            .unwrap_or(out.automatic_lists);
         out
     }
 
@@ -178,6 +186,7 @@ impl Preferences {
         file.set_boolean(RULERS, "percent", self.percent);
         file.set_boolean(RULERS, "center-origin", self.center_origin);
         file.set_boolean(RULERS, "vertical-ruler", self.vertical_ruler);
+        file.set_boolean(EDITING, "automatic-lists", self.automatic_lists);
     }
 }
 
@@ -300,29 +309,43 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     rulers.add(&percent);
     rulers.add(&center);
     rulers.add(&vertical);
+    let lists = adw::SwitchRow::builder()
+        .title(tr("Automatically Detect Lists"))
+        .subtitle(tr(
+            "“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return",
+        ))
+        .active(current.automatic_lists)
+        .build();
+    let editing = adw::PreferencesGroup::builder()
+        .title(tr("Editing"))
+        .build();
+    editing.add(&lists);
     let page = adw::PreferencesPage::builder()
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
         .build();
     page.add(&rulers);
+    page.add(&editing);
     let dialog = adw::PreferencesDialog::builder()
         .title(tr("Preferences"))
         .build();
     dialog.add(&page);
 
     let update = {
-        let (units, percent, center, vertical) = (
+        let (units, percent, center, vertical, lists) = (
             units.downgrade(),
             percent.downgrade(),
             center.downgrade(),
             vertical.downgrade(),
+            lists.downgrade(),
         );
         move || {
-            let (Some(units), Some(percent), Some(center), Some(vertical)) = (
+            let (Some(units), Some(percent), Some(center), Some(vertical), Some(lists)) = (
                 units.upgrade(),
                 percent.upgrade(),
                 center.upgrade(),
                 vertical.upgrade(),
+                lists.upgrade(),
             ) else {
                 return;
             };
@@ -334,12 +357,13 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
                 percent: percent.is_active(),
                 center_origin: center.is_active(),
                 vertical_ruler: vertical.is_active(),
+                automatic_lists: lists.is_active(),
             });
         }
     };
     let changed = update.clone();
     units.connect_selected_notify(move |_| changed());
-    for row in [&percent, &center, &vertical] {
+    for row in [&percent, &center, &vertical, &lists] {
         let changed = update.clone();
         row.connect_active_notify(move |_| changed());
     }
@@ -357,6 +381,7 @@ mod tests {
             percent: true,
             center_origin: true,
             vertical_ruler: true,
+            automatic_lists: false,
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -364,6 +389,7 @@ mod tests {
         // What a file lacks keeps its default.
         let empty = glib::KeyFile::new();
         assert!(!Preferences::read(&empty).percent);
+        assert!(Preferences::read(&empty).automatic_lists);
     }
 
     #[test]

@@ -47,6 +47,7 @@ mod document;
 mod error;
 mod format;
 mod id;
+mod list;
 mod op;
 mod style;
 mod styling;
@@ -63,6 +64,10 @@ pub use format::{
     TabStops,
 };
 pub use id::NodeId;
+pub use list::{
+    LIST_LEVELS, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind, NumberFormat,
+    Numbering, detect_marker,
+};
 pub use op::Op;
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
 pub use styling::{CopiedStyle, Overrides};

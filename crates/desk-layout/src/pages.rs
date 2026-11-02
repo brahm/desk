@@ -109,10 +109,13 @@ impl DocumentLayout {
 
 /// Lays out the body of a document on pages.
 pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout {
+    let styles = document.styles();
+    let items = styles.list_items(document.body().iter());
     let texts: Vec<ParagraphText> = document
         .body()
         .iter()
-        .map(|paragraph| ParagraphText::new(document.styles(), paragraph))
+        .zip(&items)
+        .map(|(paragraph, item)| ParagraphText::new_in_list(styles, paragraph, item.as_ref()))
         .collect();
     paginate_texts(*document.page_setup(), &texts, system)
 }

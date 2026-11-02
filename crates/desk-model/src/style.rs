@@ -15,6 +15,7 @@ use imbl::OrdMap;
 use crate::error::ModelError;
 use crate::format::{CharAttrs, CharFormat, ParaAttrs, ParaFormat};
 use crate::id::NodeId;
+use crate::list::ListStyle;
 
 /// The identifier of a style. Styles are nodes, so a style keeps its
 /// identifier when it is renamed.
@@ -27,6 +28,8 @@ pub enum StyleFamily {
     Paragraph,
     /// Character styles.
     Character,
+    /// List styles, which set the bullets, numbers and indents of lists.
+    List,
 }
 
 /// A paragraph style. It also sets character attributes for the text of
@@ -102,6 +105,8 @@ pub enum Style {
     Paragraph(ParagraphStyle),
     /// A character style.
     Character(CharacterStyle),
+    /// A list style.
+    List(ListStyle),
 }
 
 impl Style {
@@ -110,6 +115,7 @@ impl Style {
         match self {
             Self::Paragraph(style) => style.id,
             Self::Character(style) => style.id,
+            Self::List(style) => style.id,
         }
     }
 
@@ -118,6 +124,7 @@ impl Style {
         match self {
             Self::Paragraph(style) => &style.name,
             Self::Character(style) => &style.name,
+            Self::List(style) => &style.name,
         }
     }
 
@@ -126,6 +133,7 @@ impl Style {
         match self {
             Self::Paragraph(style) => style.parent,
             Self::Character(style) => style.parent,
+            Self::List(_) => None,
         }
     }
 
@@ -134,6 +142,7 @@ impl Style {
         match self {
             Self::Paragraph(style) => style.shortcut,
             Self::Character(style) => style.shortcut,
+            Self::List(style) => style.shortcut,
         }
     }
 
@@ -142,6 +151,7 @@ impl Style {
         match &mut self {
             Self::Paragraph(style) => style.name = name.into(),
             Self::Character(style) => style.name = name.into(),
+            Self::List(style) => style.name = name.into(),
         }
         self
     }
@@ -151,6 +161,7 @@ impl Style {
         match &mut self {
             Self::Paragraph(style) => style.shortcut = key,
             Self::Character(style) => style.shortcut = key,
+            Self::List(style) => style.shortcut = key,
         }
         self
     }
@@ -160,6 +171,7 @@ impl Style {
         match self {
             Self::Paragraph(_) => StyleFamily::Paragraph,
             Self::Character(_) => StyleFamily::Character,
+            Self::List(_) => StyleFamily::List,
         }
     }
 }
@@ -167,6 +179,12 @@ impl Style {
 impl From<ParagraphStyle> for Style {
     fn from(style: ParagraphStyle) -> Self {
         Self::Paragraph(style)
+    }
+}
+
+impl From<ListStyle> for Style {
+    fn from(style: ListStyle) -> Self {
+        Self::List(style)
     }
 }
 
@@ -217,6 +235,14 @@ impl Styles {
     pub fn character(&self, id: StyleId) -> Option<&CharacterStyle> {
         match self.get(id) {
             Some(Style::Character(style)) => Some(style),
+            _ => None,
+        }
+    }
+
+    /// A list style by identifier.
+    pub fn list(&self, id: StyleId) -> Option<&ListStyle> {
+        match self.get(id) {
+            Some(Style::List(style)) => Some(style),
             _ => None,
         }
     }
@@ -295,6 +321,11 @@ impl Styles {
         {
             self.check_family(next, StyleFamily::Paragraph)?;
         }
+        if let Style::Paragraph(paragraph) = style
+            && let Some(Some(list)) = paragraph.paragraph.list_style
+        {
+            self.check_family(list, StyleFamily::List)?;
+        }
         // Walk up from the new parent: reaching the style itself means the
         // change would make a cycle.
         let mut parent = style.parent();
@@ -318,7 +349,8 @@ impl Styles {
         self.iter().any(|style| {
             style.id() != id
                 && (style.parent() == Some(id)
-                    || matches!(style, Style::Paragraph(p) if p.next == Some(id)))
+                    || matches!(style, Style::Paragraph(p)
+                        if p.next == Some(id) || p.paragraph.list_style == Some(Some(id))))
         })
     }
 

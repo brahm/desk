@@ -15,9 +15,10 @@ use std::fmt;
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
     CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, LINE_BREAK,
-    Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, Metadata, ModelError, Op,
-    PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow,
-    Style, StyleId, TabAlignment, TabLeader, TabStop, TabStops,
+    LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, ListLabel,
+    ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder,
+    ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId, TabAlignment,
+    TabLeader, TabStop, TabStops,
 };
 use desk_odf as odf;
 
@@ -414,6 +415,10 @@ fn para_attrs(p: &odf::ParagraphProperties) -> ParaAttrs {
             .filter(|l| l.millipoints() > 0),
         background: p.background.map(background),
         border: para_border(p),
+        // Lists come from the list elements and list styles.
+        list_style: None,
+        list_level: None,
+        list_start: None,
     }
 }
 
@@ -630,6 +635,144 @@ fn odf_default_size(source: &odf::TextDocument) -> f64 {
         .unwrap_or(CharFormat::default().font_size.to_pt())
 }
 
+/// The size that the raise of a list label is measured against, since
+/// ODF raises labels by a percentage of their size and the model by a
+/// length: 12 points, the size of the text Pages measures labels for.
+const LABEL_RAISE_BASE: f64 = 12.0;
+
+/// The levels of a list style of ODF; the levels it does not set have no
+/// label.
+fn list_levels(style: &odf::ListStyle) -> [ListLevel; LIST_LEVELS] {
+    std::array::from_fn(|index| {
+        let Some(level) = style
+            .levels
+            .iter()
+            .find(|l| usize::from(l.level) == index + 1)
+        else {
+            return ListLevel::new(ListLabel::None, index, Length::ZERO);
+        };
+        let (label, start) = match &level.label {
+            odf::ListLabel::Bullet(c) => (ListLabel::bullet(&c.to_string()), 1),
+            odf::ListLabel::Number {
+                format,
+                prefix,
+                suffix,
+                display_levels,
+                start,
+            } => {
+                let number = match format.as_str() {
+                    "1" => Some(NumberFormat::Decimal),
+                    "I" => Some(NumberFormat::UpperRoman),
+                    "i" => Some(NumberFormat::LowerRoman),
+                    "A" => Some(NumberFormat::UpperAlpha),
+                    "a" => Some(NumberFormat::LowerAlpha),
+                    _ => None,
+                };
+                let label = match number {
+                    Some(format) => ListLabel::Number {
+                        format,
+                        prefix: prefix.as_str().into(),
+                        suffix: suffix.as_str().into(),
+                        tiered: *display_levels > 1,
+                    },
+                    // Without a number, the prefix and the suffix are a
+                    // bullet of more than one character.
+                    None if prefix.is_empty() && suffix.is_empty() => ListLabel::None,
+                    None => ListLabel::bullet(&format!("{prefix}{suffix}")),
+                };
+                (label, *start)
+            }
+        };
+        let size = level
+            .relative_size
+            .or(level.text.font_size_percent)
+            .map_or(100, |p| p.round().clamp(1.0, 1000.0) as u16);
+        let raise = match level.text.position {
+            Some(odf::TextPosition::Percent(p)) => Length::from_pt(p * LABEL_RAISE_BASE / 100.0),
+            _ => Length::ZERO,
+        };
+        ListLevel {
+            label,
+            start,
+            label_indent: level.space_before.map_or(Length::ZERO, length),
+            text_indent: level.min_label_width.map_or(Length::ZERO, length),
+            size,
+            scale_with_text: true,
+            raise,
+            color: level.text.color.map(rgba),
+        }
+    })
+}
+
+/// A list style of the model as one of ODF.
+fn odf_list_style(style: &ListStyle, name: String) -> odf::ListStyle {
+    let display_name = (name != *style.name).then(|| style.name.to_string());
+    let levels = style
+        .levels
+        .iter()
+        .enumerate()
+        .map(|(index, level)| {
+            let number =
+                |format: &str, prefix: &str, suffix: &str, tiered: bool| odf::ListLabel::Number {
+                    format: format.to_owned(),
+                    prefix: prefix.to_owned(),
+                    suffix: suffix.to_owned(),
+                    display_levels: if tiered { index as u8 + 1 } else { 1 },
+                    start: level.start,
+                };
+            let label = match &level.label {
+                ListLabel::None => number("", "", "", false),
+                ListLabel::Bullet(text) => {
+                    let mut chars = text.chars();
+                    match (chars.next(), chars.next()) {
+                        (Some(c), None) => odf::ListLabel::Bullet(c),
+                        _ => number("", text, "", false),
+                    }
+                }
+                ListLabel::Number {
+                    format,
+                    prefix,
+                    suffix,
+                    tiered,
+                } => number(
+                    match format {
+                        NumberFormat::Decimal => "1",
+                        NumberFormat::UpperRoman => "I",
+                        NumberFormat::LowerRoman => "i",
+                        NumberFormat::UpperAlpha => "A",
+                        NumberFormat::LowerAlpha => "a",
+                    },
+                    prefix,
+                    suffix,
+                    *tiered,
+                ),
+            };
+            let sized = level.size != 100;
+            odf::ListLevelStyle {
+                level: index as u8 + 1,
+                relative_size: (sized && matches!(label, odf::ListLabel::Bullet(_)))
+                    .then_some(f64::from(level.size)),
+                label,
+                space_before: Some(odf_length(level.label_indent)),
+                min_label_width: Some(odf_length(level.text_indent)),
+                text: odf::TextProperties {
+                    font_size_percent: sized.then_some(f64::from(level.size)),
+                    color: level.color.map(odf_color),
+                    position: (level.raise != Length::ZERO).then(|| {
+                        odf::TextPosition::Percent(level.raise.to_pt() / LABEL_RAISE_BASE * 100.0)
+                    }),
+                    ..odf::TextProperties::default()
+                },
+            }
+        })
+        .collect();
+    odf::ListStyle {
+        name,
+        display_name,
+        levels,
+    }
+}
+
 /// Builds a document from an ODF text document.
 pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     let mut document = Document::new_word_processing();
@@ -664,6 +807,55 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         }
         names.insert(id, name);
     }
+    // List styles, which paragraph styles name. Automatic ones take the
+    // style with the same levels, or come in as new styles.
+    let mut lists: HashMap<&str, StyleId> = HashMap::new();
+    for (automatic, style) in source
+        .list_styles
+        .iter()
+        .map(|s| (false, s))
+        .chain(source.automatic_list_styles.iter().map(|s| (true, s)))
+    {
+        let levels = list_levels(style);
+        if levels.iter().all(|l| !l.label.is_some()) {
+            continue;
+        }
+        let same = document
+            .styles()
+            .iter()
+            .find(|s| matches!(s, Style::List(l) if *l.levels == levels))
+            .map(Style::id);
+        let id = match same {
+            Some(id) if automatic => id,
+            _ => {
+                let base = if automatic {
+                    "List"
+                } else {
+                    style.shown_name()
+                };
+                let name = document
+                    .styles()
+                    .unique_name(desk_model::StyleFamily::List, base);
+                let id = document.new_id();
+                document.put_style(ListStyle {
+                    id,
+                    name: name.as_str().into(),
+                    shortcut: source
+                        .style_shortcuts
+                        .iter()
+                        .find(|s| s.family == odf::Family::List && s.style == style.name)
+                        .map(|s| s.key),
+                    levels: levels.into(),
+                })?;
+                id
+            }
+        };
+        lists.entry(style.name.as_str()).or_insert(id);
+    }
+    let list_of = |name: &Option<String>| -> Option<Option<StyleId>> {
+        name.as_deref().map(|n| lists.get(n).copied())
+    };
+
     let defaults = &source.default_style;
     let mut default_style = ParagraphStyle::new(default, DEFAULT_NAME);
     default_style.paragraph = para_attrs(&defaults.paragraph);
@@ -686,6 +878,9 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             .next
             .as_deref()
             .and_then(|n| ids.get(&(odf::Family::Paragraph, n)).copied());
+        if let Some(list) = list_of(&standard.list_style) {
+            default_style.paragraph.list_style = Some(list);
+        }
     }
 
     // Twice: without parents and next styles, then with them, dropping a
@@ -709,13 +904,17 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .find(|s| s.family == style.family && s.style == style.name)
                 .map(|s| s.key);
             let built: Style = match style.family {
+                odf::Family::List => continue,
                 odf::Family::Paragraph => ParagraphStyle {
                     id,
                     name: names[&id].as_str().into(),
                     shortcut,
                     parent: link(&style.parent, odf::Family::Paragraph).or(Some(default)),
                     next: link(&style.next, odf::Family::Paragraph),
-                    paragraph: para_attrs(&style.properties.paragraph),
+                    paragraph: ParaAttrs {
+                        list_style: list_of(&style.list_style),
+                        ..para_attrs(&style.properties.paragraph)
+                    },
                     character: char_attrs(&style.properties.text, size),
                 }
                 .into(),
@@ -736,6 +935,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         p.next = None;
                     }
                     Style::Character(c) => c.parent = None,
+                    Style::List(_) => {}
                 }
                 document.put_style(plain)?;
             }
@@ -759,8 +959,57 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         .get(0)
         .expect("a new document has a paragraph")
         .id();
+    // The list styles that a list was met with, for lists that start
+    // again rather than going on from the one before.
+    let mut listed: HashSet<StyleId> = HashSet::new();
     for (index, paragraph) in source.body.iter().enumerate() {
-        let built = import_paragraph(source, &mut document, &ids, default, paragraph, relative)?;
+        let mut built =
+            import_paragraph(source, &mut document, &ids, default, paragraph, relative)?;
+        // The list style that the automatic style of the paragraph sets.
+        if let Some(automatic) = paragraph.style.as_deref().and_then(|name| {
+            source
+                .automatic_styles
+                .iter()
+                .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+        }) && let Some(own) = list_of(&automatic.list_style)
+        {
+            let attrs = ParaAttrs {
+                list_style: Some(own),
+                ..built.attrs().clone()
+            };
+            built = Paragraph::from_runs(
+                built.id(),
+                built.style(),
+                attrs,
+                built.runs().cloned().collect::<Vec<_>>(),
+            )?;
+        }
+        if let Some(member) = &paragraph.list
+            && let Some(&list) = lists.get(member.style.as_str())
+        {
+            let mut attrs = built.attrs().clone();
+            let styles = document.styles();
+            let resolved = styles.resolve_paragraph(built.style(), &attrs);
+            if resolved.list_style != Some(list) {
+                attrs.list_style = Some(Some(list));
+            }
+            if member.level > 0 {
+                attrs.list_level = Some(member.level);
+            }
+            let restart = member.first && !member.continues && listed.contains(&list);
+            if let Some(start) = member.start {
+                attrs.list_start = Some(Some(start));
+            } else if restart && let Some(style) = styles.list(list) {
+                attrs.list_start = Some(Some(style.level(member.level).start));
+            }
+            listed.insert(list);
+            built = Paragraph::from_runs(
+                built.id(),
+                built.style(),
+                attrs,
+                built.runs().cloned().collect::<Vec<_>>(),
+            )?;
+        }
         document.apply(Op::InsertParagraph {
             index: index + 1,
             paragraph: built,
@@ -964,6 +1213,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 family: match style.family() {
                     desk_model::StyleFamily::Paragraph => odf::Family::Paragraph,
                     desk_model::StyleFamily::Character => odf::Family::Text,
+                    desk_model::StyleFamily::List => odf::Family::List,
                 },
                 style: names[&style.id()].clone(),
             });
@@ -974,12 +1224,20 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let name = names[&style.id()].clone();
         let display_name = (name != style.name()).then(|| style.name().to_owned());
         out.styles.push(match style {
+            Style::List(l) => {
+                out.list_styles.push(odf_list_style(l, name));
+                continue;
+            }
             Style::Paragraph(p) => odf::Style {
                 name,
                 display_name,
                 family: odf::Family::Paragraph,
                 parent: p.parent.map(|id| names[&id].clone()),
                 next: p.next.map(|id| names[&id].clone()),
+                list_style: p
+                    .paragraph
+                    .list_style
+                    .map(|list| list.map_or_else(String::new, |id| names[&id].clone())),
                 properties: odf::Properties {
                     paragraph: odf_paragraph_properties(
                         &p.paragraph,
@@ -998,6 +1256,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 family: odf::Family::Text,
                 parent: c.parent.map(|id| names[&id].clone()),
                 next: None,
+                list_style: None,
                 properties: odf::Properties {
                     paragraph: odf::ParagraphProperties::default(),
                     text: text_properties(
@@ -1011,38 +1270,58 @@ pub fn export(document: &Document) -> odf::TextDocument {
 
     // Automatic styles for direct formatting, one per distinct format.
     let mut automatic: Vec<odf::Style> = Vec::new();
-    let mut automatic_name =
-        |family: odf::Family, parent: Option<String>, properties: odf::Properties| -> String {
-            if let Some(existing) = automatic
-                .iter()
-                .find(|s| s.family == family && s.parent == parent && s.properties == properties)
-            {
-                return existing.name.clone();
-            }
-            let prefix = match family {
-                odf::Family::Paragraph => "P",
-                odf::Family::Text => "T",
-            };
-            let count = automatic.iter().filter(|s| s.family == family).count();
-            let name = format!("{prefix}{}", count + 1);
-            automatic.push(odf::Style {
-                name: name.clone(),
-                display_name: None,
-                family,
-                parent,
-                next: None,
-                properties,
-            });
-            name
+    let mut automatic_name = |family: odf::Family,
+                              parent: Option<String>,
+                              list_style: Option<String>,
+                              properties: odf::Properties|
+     -> String {
+        if let Some(existing) = automatic.iter().find(|s| {
+            s.family == family
+                && s.parent == parent
+                && s.list_style == list_style
+                && s.properties == properties
+        }) {
+            return existing.name.clone();
+        }
+        let prefix = match family {
+            odf::Family::Paragraph => "P",
+            odf::Family::Text => "T",
+            odf::Family::List => "L",
         };
-    for paragraph in document.body().iter() {
+        let count = automatic.iter().filter(|s| s.family == family).count();
+        let name = format!("{prefix}{}", count + 1);
+        automatic.push(odf::Style {
+            name: name.clone(),
+            display_name: None,
+            family,
+            parent,
+            next: None,
+            list_style,
+            properties,
+        });
+        name
+    };
+    // The lists of the body: which list style each paragraph is an item
+    // of, and where each run of neighbors in one list starts.
+    let items = styles.list_items(document.body().iter());
+    let mut listed: HashSet<StyleId> = HashSet::new();
+    let mut previous: Option<StyleId> = None;
+    for (paragraph, item) in document.body().iter().zip(&items) {
         let style_name = names[&paragraph.style()].clone();
-        let style = if paragraph.attrs().is_empty() {
+        // The level and the start of an item are in the list elements.
+        let own = ParaAttrs {
+            list_level: None,
+            list_start: None,
+            ..paragraph.attrs().clone()
+        };
+        let style = if own.is_empty() {
             style_name
         } else {
             automatic_name(
                 odf::Family::Paragraph,
                 Some(style_name),
+                own.list_style
+                    .map(|list| list.map_or_else(String::new, |id| names[&id].clone())),
                 odf::Properties {
                     paragraph: odf_paragraph_properties(
                         paragraph.attrs(),
@@ -1063,6 +1342,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     Some(automatic_name(
                         odf::Family::Text,
                         named,
+                        None,
                         odf::Properties {
                             paragraph: odf::ParagraphProperties::default(),
                             text: text_properties(
@@ -1078,9 +1358,24 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 }
             })
             .collect();
+        let list = item.as_ref().map(|item| {
+            let first = previous != Some(item.style);
+            let start = paragraph.attrs().list_start.flatten();
+            let member = odf::ListMember {
+                style: names[&item.style].clone(),
+                level: item.level,
+                start,
+                first,
+                continues: first && start.is_none() && listed.contains(&item.style),
+            };
+            listed.insert(item.style);
+            member
+        });
+        previous = item.as_ref().map(|i| i.style);
         out.body.push(odf::Paragraph {
             style: Some(style),
             outline_level: None,
+            list,
             spans,
         });
     }

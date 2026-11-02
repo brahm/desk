@@ -102,7 +102,8 @@ impl Edit {
     ///
     /// At the end of a paragraph, the new paragraph takes the next style
     /// of the paragraph style. Otherwise both halves keep the style and
-    /// the attributes, except that only the first half starts a page.
+    /// the attributes, except that only the first half starts a page or
+    /// starts its list again.
     pub fn split_paragraph(&mut self, at: Position) -> Result<Position, ModelError> {
         let body = self.doc.body();
         let index = body
@@ -122,6 +123,8 @@ impl Edit {
             ParaAttrs::default()
         };
         attrs.page_break_before = None;
+        // The new item counts on from the one it was split from.
+        attrs.list_start = None;
         let id = self.new_id();
         if !tail.is_empty() {
             self.apply(Op::ReplaceText {

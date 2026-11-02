@@ -696,6 +696,7 @@ impl DocumentWindow {
         for family in [
             desk_model::StyleFamily::Paragraph,
             desk_model::StyleFamily::Character,
+            desk_model::StyleFamily::List,
         ] {
             for style in crate::styles_drawer::sorted(source.styles(), family) {
                 // The styles that the document lacks are chosen at first.
@@ -708,6 +709,7 @@ impl DocumentWindow {
                     .subtitle(match family {
                         desk_model::StyleFamily::Paragraph => tr("Paragraph Style"),
                         desk_model::StyleFamily::Character => tr("Character Style"),
+                        desk_model::StyleFamily::List => tr("List Style"),
                     })
                     .activatable_widget(&check)
                     .build();

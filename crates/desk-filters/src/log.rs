@@ -43,8 +43,8 @@ pub enum Content {
 /// Formatting that an import left out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Formatting {
-    /// Bullets and numbers of lists.
-    Lists,
+    /// Bullets that are pictures, drawn as text bullets.
+    ImageBullets,
     /// The color and width of underlines and strikethroughs, and lines
     /// under words only.
     LineDetails,
@@ -140,7 +140,7 @@ impl fmt::Display for Content {
 impl fmt::Display for Formatting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::Lists => "list bullets and numbers",
+            Self::ImageBullets => "image bullets, which are drawn as text bullets",
             Self::LineDetails => "the color and width of lines through and under text",
             Self::DropCaps => "drop caps",
             Self::HiddenText => "hidden text, which is shown",
@@ -187,7 +187,7 @@ mod tests {
         let mut log = ImportLog::default();
         assert!(log.is_empty());
         log.add(Warning::Content(Content::Headers), 1);
-        log.add(Warning::Formatting(Formatting::Lists), 2);
+        log.add(Warning::Formatting(Formatting::ImageBullets), 2);
         log.add(Warning::Content(Content::Headers), 2);
         log.add(Warning::Content(Content::Footers), 0);
         log.add(Warning::Setting(Setting::FacingPages), 1);
@@ -196,7 +196,7 @@ mod tests {
             lines,
             [
                 "Left out headers (3)",
-                "Left out list bullets and numbers, in 2 paragraphs",
+                "Left out image bullets, which are drawn as text bullets, in 2 paragraphs",
                 "Left out facing pages, so left pages have the margins of right pages"
             ]
         );

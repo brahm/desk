@@ -20,6 +20,7 @@ use gtk::{gdk, glib};
 use crate::editing::{Format, TextEditor};
 use crate::effects::Effects;
 use crate::i18n::{n_, tr};
+use crate::lists_pane::ListsGroup;
 use crate::preferences::{self, Units};
 use crate::tab_stops::{self, TabStopsGroup};
 
@@ -349,6 +350,7 @@ pub struct Inspector {
     left: adw::SpinRow,
     right: adw::SpinRow,
     tabs: Rc<TabStopsGroup>,
+    lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
     /// The units of the indents, those of the rulers.
     units: Cell<Units>,
@@ -426,6 +428,7 @@ impl Inspector {
         let left = row(&tr("Left"), "", 0.0, 1.0, 1.0, 0);
         let right = row(&tr("Right"), "", 0.0, 1.0, 1.0, 0);
         let tabs = TabStopsGroup::new(editor.clone(), units);
+        let lists = ListsGroup::new(editor.clone(), units);
         let effects = Effects::new(editor.clone());
 
         let spacing = adw::PreferencesGroup::builder()
@@ -451,6 +454,7 @@ impl Inspector {
         content.append(&spacing);
         content.append(&indents);
         content.append(tabs.widget());
+        content.append(lists.widget());
         for group in effects.groups() {
             content.append(group);
         }
@@ -469,6 +473,7 @@ impl Inspector {
             left,
             right,
             tabs,
+            lists,
             effects,
             units: Cell::new(units),
             shown: RefCell::new(None),
@@ -519,6 +524,7 @@ impl Inspector {
         tab_stops::set_units(&self.right, units, 0.0, 1584.0);
         self.updating.set(false);
         self.tabs.set_units(units);
+        self.lists.set_units(units);
         let shown = self.shown.borrow().clone();
         if let Some(format) = shown {
             self.show(&format);
@@ -561,6 +567,7 @@ impl Inspector {
         );
         self.updating.set(false);
         self.tabs.show(paragraph);
+        self.lists.show(format);
         self.effects.show(&format.character, paragraph);
     }
 }

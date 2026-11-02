@@ -8,8 +8,9 @@ use std::collections::BTreeSet;
 use crate::ns;
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Style, TabType,
-    TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
+    LineHeight, ListLabel, ListStyle, Meta, PageLayout, Paragraph, ParagraphProperties, Properties,
+    Style, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow,
+    TextTransform,
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
@@ -62,11 +63,12 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for style in &document.automatic_styles {
         write_style(&mut w, style);
     }
+    for style in &document.automatic_list_styles {
+        write_list_style(&mut w, style);
+    }
     w.end();
     w.start("office:body").start("office:text");
-    for paragraph in &document.body {
-        write_paragraph(&mut w, paragraph);
-    }
+    write_body(&mut w, &document.body);
     w.end().end().end();
     let content = w.finish();
 
@@ -80,6 +82,9 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     w.end();
     for style in &document.styles {
         write_style(&mut w, style);
+    }
+    for style in &document.list_styles {
+        write_list_style(&mut w, style);
     }
     w.end();
     w.start("office:automatic-styles");
@@ -124,6 +129,7 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         let family = match shortcut.family {
             Family::Paragraph => "paragraph",
             Family::Text => "text",
+            Family::List => "list",
         };
         w.start("config:config-item")
             .attr("config:name", &format!("F{}", shortcut.key))
@@ -167,13 +173,129 @@ fn write_style(w: &mut Writer, style: &Style) {
             "style:family",
             match style.family {
                 Family::Paragraph => "paragraph",
-                Family::Text => "text",
+                // List styles are written as `text:list-style`.
+                Family::Text | Family::List => "text",
             },
         )
         .attr_opt("style:parent-style-name", style.parent.as_deref())
-        .attr_opt("style:next-style-name", style.next.as_deref());
+        .attr_opt("style:next-style-name", style.next.as_deref())
+        .attr_opt("style:list-style-name", style.list_style.as_deref());
     write_properties(w, &style.properties);
     w.end();
+}
+
+fn write_list_style(w: &mut Writer, style: &ListStyle) {
+    w.start("text:list-style")
+        .attr("style:name", &style.name)
+        .attr_opt("style:display-name", style.display_name.as_deref());
+    for level in &style.levels {
+        match &level.label {
+            ListLabel::Bullet(c) => {
+                w.start("text:list-level-style-bullet")
+                    .attr("text:level", &level.level.to_string())
+                    .attr("text:bullet-char", &c.to_string());
+                if let Some(size) = level.relative_size {
+                    w.attr("text:bullet-relative-size", &format!("{}%", decimal(size)));
+                }
+            }
+            ListLabel::Number {
+                format,
+                prefix,
+                suffix,
+                display_levels,
+                start,
+            } => {
+                w.start("text:list-level-style-number")
+                    .attr("text:level", &level.level.to_string());
+                if !prefix.is_empty() {
+                    w.attr("style:num-prefix", prefix);
+                }
+                if !suffix.is_empty() {
+                    w.attr("style:num-suffix", suffix);
+                }
+                w.attr("style:num-format", format);
+                if *display_levels > 1 {
+                    w.attr("text:display-levels", &display_levels.to_string());
+                }
+                if *start != 1 {
+                    w.attr("text:start-value", &start.to_string());
+                }
+            }
+        }
+        w.start("style:list-level-properties");
+        len(w, "text:space-before", level.space_before);
+        len(w, "text:min-label-width", level.min_label_width);
+        w.end();
+        if level.text != TextProperties::default() {
+            w.start("style:text-properties");
+            text_attrs(w, &level.text);
+            w.end();
+        }
+        w.end();
+    }
+    w.end();
+}
+
+/// Writes the paragraphs of the body, with neighbors in the same list in
+/// one `text:list` and deeper levels in lists nested in its items.
+fn write_body(w: &mut Writer, body: &[Paragraph]) {
+    // For each open list, from the outermost, whether an item is open.
+    let mut open: Vec<bool> = Vec::new();
+    let mut style: Option<&str> = None;
+    let close_to = |w: &mut Writer, open: &mut Vec<bool>, depth: usize| {
+        while open.len() > depth {
+            if open.pop() == Some(true) {
+                w.end();
+            }
+            w.end();
+        }
+    };
+    for paragraph in body {
+        let Some(member) = &paragraph.list else {
+            close_to(w, &mut open, 0);
+            write_paragraph(w, paragraph);
+            continue;
+        };
+        if open.is_empty() || member.first || style != Some(member.style.as_str()) {
+            close_to(w, &mut open, 0);
+            w.start("text:list").attr("text:style-name", &member.style);
+            if member.continues {
+                w.attr("text:continue-numbering", "true");
+            }
+            open.push(false);
+            style = Some(&member.style);
+        }
+        let depth = usize::from(member.level) + 1;
+        close_to(w, &mut open, depth);
+        let start_item = |w: &mut Writer, start: Option<u32>| {
+            w.start("text:list-item");
+            if let Some(start) = start {
+                w.attr("text:start-value", &start.to_string());
+            }
+        };
+        if open.len() == depth {
+            if open[depth - 1] {
+                w.end();
+            }
+            start_item(w, member.start);
+            open[depth - 1] = true;
+        }
+        while open.len() < depth {
+            let last = open.len() - 1;
+            if !open[last] {
+                start_item(w, None);
+                open[last] = true;
+            }
+            w.start("text:list");
+            open.push(false);
+            if open.len() == depth {
+                start_item(w, member.start);
+                open[depth - 1] = true;
+            }
+        }
+        write_paragraph(w, paragraph);
+    }
+    close_to(w, &mut open, 0);
 }
 
 fn write_properties(w: &mut Writer, properties: &Properties) {

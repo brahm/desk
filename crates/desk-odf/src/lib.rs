@@ -53,9 +53,9 @@ pub use package::{
 pub use read::read_streams;
 pub use text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style,
-    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
-    TextShadow, TextTransform,
+    LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, PageLayout, Paragraph,
+    ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign,
+    TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
 };
 pub use units::{Color, Length};
 pub use write::{Streams, VERSION, write_streams};
