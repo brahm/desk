@@ -13,9 +13,10 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use desk_model::{
-    Alignment, Baseline, Capitalization, CharAttrs, CharacterStyle, Document, LINE_BREAK, Language,
-    Length, LineColor, LineSpacing, LineStyle, Metadata, ModelError, Op, PageSetup, ParaAttrs,
-    Paragraph, ParagraphStyle, Rgba, Run, Style, StyleId,
+    Alignment, Baseline, Capitalization, CharAttrs, CharacterStyle, DEFAULT_TAB_INTERVAL, Document,
+    LINE_BREAK, Language, Length, LineColor, LineSpacing, LineStyle, Metadata, ModelError, Op,
+    PageSetup, ParaAttrs, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Style, StyleId,
+    TabAlignment, TabLeader, TabStop, TabStops,
 };
 use desk_odf as odf;
 
@@ -265,7 +266,80 @@ fn para_attrs(p: &odf::ParagraphProperties) -> ParaAttrs {
         keep_with_next: p.keep_with_next,
         keep_lines_together: p.keep_together,
         widow_control,
+        tab_stops: p
+            .tab_stops
+            .as_ref()
+            .map(|stops| TabStops::new(stops.iter().map(tab_stop))),
+        default_tab_interval: p
+            .tab_stop_distance
+            .map(length)
+            .filter(|l| l.millipoints() > 0),
     }
+}
+
+fn tab_stop(stop: &odf::TabStop) -> TabStop {
+    let leader = match stop.leader_text {
+        Some('.' | '\u{2026}') => TabLeader::Dots,
+        Some('-' | '\u{2013}' | '\u{2014}') => TabLeader::Dashes,
+        Some('_') => TabLeader::Line,
+        Some('\u{2192}') => TabLeader::Arrows,
+        _ => match stop.leader_style {
+            odf::LeaderStyle::None => TabLeader::None,
+            odf::LeaderStyle::Solid => TabLeader::Line,
+            odf::LeaderStyle::Dotted => TabLeader::Dots,
+            odf::LeaderStyle::Dash => TabLeader::Dashes,
+        },
+    };
+    TabStop {
+        position: length(stop.position),
+        alignment: match stop.kind {
+            odf::TabType::Left => TabAlignment::Left,
+            odf::TabType::Center => TabAlignment::Center,
+            odf::TabType::Right => TabAlignment::Right,
+            odf::TabType::Char => TabAlignment::Decimal,
+        },
+        leader,
+        decimal: stop.char.unwrap_or('.'),
+    }
+}
+
+fn odf_tab_stop(stop: &TabStop) -> odf::TabStop {
+    let (leader_style, leader_text) = match stop.leader {
+        TabLeader::None => (odf::LeaderStyle::None, None),
+        TabLeader::Dots => (odf::LeaderStyle::Dotted, Some('.')),
+        TabLeader::Dashes => (odf::LeaderStyle::Dash, Some('-')),
+        TabLeader::Line => (odf::LeaderStyle::Solid, Some('_')),
+        TabLeader::Arrows => (odf::LeaderStyle::Solid, Some('\u{2192}')),
+    };
+    odf::TabStop {
+        position: odf_length(stop.position),
+        kind: match stop.alignment {
+            TabAlignment::Left => odf::TabType::Left,
+            TabAlignment::Center => odf::TabType::Center,
+            TabAlignment::Right => odf::TabType::Right,
+            TabAlignment::Decimal => odf::TabType::Char,
+        },
+        char: (stop.alignment == TabAlignment::Decimal).then_some(stop.decimal),
+        leader_style,
+        leader_text,
+    }
+}
+
+/// The tab stops moved by a distance, as between the left edge of the
+/// text, where the model measures them from, and the indent, where ODF
+/// does.
+fn shifted(stops: &TabStops, by: Length) -> TabStops {
+    TabStops::new(stops.stops().iter().map(|s| TabStop {
+        position: s.position + by,
+        ..*s
+    }))
+}
+
+/// Whether a level of styles, a style or a paragraph, must say where its
+/// tab stops are, because the indent they are measured from in ODF
+/// changes there.
+fn tabs_move_at(attrs: &ParaAttrs, resolved: &ParaFormat) -> bool {
+    (attrs.tab_stops.is_some() || attrs.left_indent.is_some()) && !resolved.tab_stops.is_empty()
 }
 
 fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
@@ -292,6 +366,11 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
         keep_together: a.keep_lines_together,
         widows: a.widow_control.map(|w| if w { 2 } else { 0 }),
         orphans: a.widow_control.map(|w| if w { 2 } else { 0 }),
+        tab_stops: a
+            .tab_stops
+            .as_ref()
+            .map(|stops| stops.stops().iter().map(odf_tab_stop).collect()),
+        tab_stop_distance: a.default_tab_interval.map(odf_length),
         ..odf::ParagraphProperties::default()
     };
     match a.line_spacing {
@@ -404,7 +483,17 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             }
         }
     }
+    // Desk writes the distance of the default stops even when it is the
+    // default of the model, for other programs, which have defaults of
+    // their own.
+    if default_style.paragraph.default_tab_interval == Some(DEFAULT_TAB_INTERVAL) {
+        default_style.paragraph.default_tab_interval = None;
+    }
     document.put_style(default_style)?;
+
+    // ODF measures tab stops from the indent, unless the settings say
+    // otherwise, and the model from the left edge of the text.
+    let relative = source.tabs_relative_to_indent.unwrap_or(true);
 
     // The paragraphs, after the empty one of a new document, which goes.
     let first = document
@@ -413,7 +502,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         .expect("a new document has a paragraph")
         .id();
     for (index, paragraph) in source.body.iter().enumerate() {
-        let built = import_paragraph(source, &mut document, &ids, default, paragraph)?;
+        let built = import_paragraph(source, &mut document, &ids, default, paragraph, relative)?;
         document.apply(Op::InsertParagraph {
             index: index + 1,
             paragraph: built,
@@ -421,6 +510,29 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     }
     if !source.body.is_empty() {
         document.apply(Op::RemoveParagraph { paragraph: first })?;
+    }
+    // The stops of the styles move after those of the paragraphs, which
+    // are measured from the indents the styles had as read.
+    if relative {
+        let styles = document.styles();
+        let moved: Vec<Style> = styles
+            .iter()
+            .filter_map(|style| {
+                let Style::Paragraph(p) = style else {
+                    return None;
+                };
+                let resolved = styles.resolve_paragraph(p.id, &ParaAttrs::default());
+                tabs_move_at(&p.paragraph, &resolved).then(|| {
+                    let mut p = p.clone();
+                    p.paragraph.tab_stops =
+                        Some(shifted(&resolved.tab_stops, resolved.left_indent));
+                    Style::Paragraph(p)
+                })
+            })
+            .collect();
+        for style in moved {
+            document.put_style(style)?;
+        }
     }
 
     let page = &source.page_layout;
@@ -460,6 +572,7 @@ fn import_paragraph(
     ids: &HashMap<(odf::Family, &str), StyleId>,
     default: StyleId,
     paragraph: &odf::Paragraph,
+    relative: bool,
 ) -> Result<Paragraph, FilterError> {
     // A paragraph style that is automatic holds direct formatting over a
     // common style, its parent.
@@ -481,6 +594,12 @@ fn import_paragraph(
                 .unwrap_or(default);
             attrs = para_attrs(&automatic.properties.paragraph);
             base = char_attrs(&automatic.properties.text);
+        }
+    }
+    if relative {
+        let resolved = document.styles().resolve_paragraph(style, &attrs);
+        if tabs_move_at(&attrs, &resolved) {
+            attrs.tab_stops = Some(shifted(&resolved.tab_stops, resolved.left_indent));
         }
     }
     let runs = paragraph.spans.iter().map(|span| {
@@ -531,6 +650,26 @@ fn odf_name(name: &str) -> String {
     if out.is_empty() { "_".to_owned() } else { out }
 }
 
+/// The ODF properties of a level of styles, a style or a paragraph, whose
+/// format resolves to `resolved`, with the tab stops measured from the
+/// indent. The default style says how far apart the default stops are,
+/// which other programs set otherwise.
+fn odf_paragraph_properties(
+    attrs: &ParaAttrs,
+    resolved: &ParaFormat,
+    default: bool,
+) -> odf::ParagraphProperties {
+    let mut properties = paragraph_properties(attrs);
+    if tabs_move_at(attrs, resolved) {
+        let stops = shifted(&resolved.tab_stops, -resolved.left_indent);
+        properties.tab_stops = Some(stops.stops().iter().map(odf_tab_stop).collect());
+    }
+    if default {
+        properties.tab_stop_distance = Some(odf_length(resolved.default_tab_interval));
+    }
+    properties
+}
+
 /// Builds an ODF text document from a document.
 pub fn export(document: &Document) -> odf::TextDocument {
     let styles = document.styles();
@@ -566,7 +705,11 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 parent: p.parent.map(|id| names[&id].clone()),
                 next: p.next.map(|id| names[&id].clone()),
                 properties: odf::Properties {
-                    paragraph: paragraph_properties(&p.paragraph),
+                    paragraph: odf_paragraph_properties(
+                        &p.paragraph,
+                        &styles.resolve_paragraph(p.id, &ParaAttrs::default()),
+                        p.id == default,
+                    ),
                     text: text_properties(&p.character),
                 },
             },
@@ -619,7 +762,11 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 odf::Family::Paragraph,
                 Some(style_name),
                 odf::Properties {
-                    paragraph: paragraph_properties(paragraph.attrs()),
+                    paragraph: odf_paragraph_properties(
+                        paragraph.attrs(),
+                        &styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+                        false,
+                    ),
                     text: odf::TextProperties::default(),
                 },
             )

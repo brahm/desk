@@ -246,6 +246,127 @@ impl Default for LineSpacing {
     }
 }
 
+/// Where the text after a tab lines up with its tab stop (FMT-16).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TabAlignment {
+    /// The text starts at the stop.
+    #[default]
+    Left,
+    /// The text is centered on the stop.
+    Center,
+    /// The text ends at the stop.
+    Right,
+    /// The decimal separator of the text is at the stop, and text without
+    /// one ends there.
+    Decimal,
+}
+
+/// What fills the space that a tab leaves before its text (FMT-16).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TabLeader {
+    /// Nothing.
+    #[default]
+    None,
+    /// A row of dots.
+    Dots,
+    /// A row of dashes.
+    Dashes,
+    /// A line.
+    Line,
+    /// A row of arrows.
+    Arrows,
+}
+
+impl TabLeader {
+    /// The character repeated to fill the space, if any.
+    pub fn character(self) -> Option<char> {
+        match self {
+            Self::None => None,
+            Self::Dots => Some('.'),
+            Self::Dashes => Some('-'),
+            Self::Line => Some('_'),
+            Self::Arrows => Some('\u{2192}'),
+        }
+    }
+}
+
+/// A tab stop (FMT-16).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TabStop {
+    /// The distance from the left edge of the text, as the ruler shows it,
+    /// not from the indent.
+    pub position: Length,
+    /// How the text lines up with the stop.
+    pub alignment: TabAlignment,
+    /// What fills the space before the text.
+    pub leader: TabLeader,
+    /// The decimal separator, for a decimal stop.
+    pub decimal: char,
+}
+
+impl TabStop {
+    /// A left stop without a leader at a position.
+    pub fn left(position: Length) -> Self {
+        Self {
+            position,
+            alignment: TabAlignment::Left,
+            leader: TabLeader::None,
+            decimal: '.',
+        }
+    }
+}
+
+/// The tab stops of a paragraph, ordered by position, with at most one at
+/// each position (FMT-16).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct TabStops(Arc<[TabStop]>);
+
+impl TabStops {
+    /// No stops: tabs go to the default stops.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// The stops, ordered by position. Of two stops at one position, the
+    /// last is kept.
+    pub fn new(stops: impl IntoIterator<Item = TabStop>) -> Self {
+        let mut stops: Vec<TabStop> = stops.into_iter().collect();
+        stops.reverse();
+        stops.sort_by_key(|s| s.position);
+        stops.dedup_by_key(|s| s.position);
+        Self(stops.into())
+    }
+
+    /// The stops, ordered by position.
+    pub fn stops(&self) -> &[TabStop] {
+        &self.0
+    }
+
+    /// Whether there are no stops.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// These stops with one added, or put in place of the one at its
+    /// position.
+    pub fn with(&self, stop: TabStop) -> Self {
+        Self::new(self.0.iter().copied().chain([stop]))
+    }
+
+    /// These stops without the one at a position.
+    pub fn without(&self, position: Length) -> Self {
+        Self::new(self.0.iter().copied().filter(|s| s.position != position))
+    }
+
+    /// The first stop past `x`, a distance from the left edge of the text.
+    pub fn after(&self, x: Length) -> Option<&TabStop> {
+        self.0.iter().find(|s| s.position > x)
+    }
+}
+
+/// The distance between the default tab stops of Pages, half an inch.
+pub const DEFAULT_TAB_INTERVAL: Length = Length::from_points(36);
+
 formatting! {
     /// Paragraph attributes that a style or a paragraph sets.
     attrs ParaAttrs;
@@ -278,6 +399,11 @@ formatting! {
         /// Avoid a single line of the paragraph alone at the top or the
         /// bottom of a page (EST-05).
         widow_control: bool = false,
+        /// The tab stops (FMT-16).
+        tab_stops: TabStops = TabStops::none(),
+        /// The distance between the default tab stops, which tabs go to
+        /// past the last stop (FMT-16).
+        default_tab_interval: Length = DEFAULT_TAB_INTERVAL,
     }
 }
 
@@ -302,6 +428,23 @@ mod tests {
         assert_eq!(attrs.font_size, Some(Length::from_points(14)));
         assert!(!attrs.is_empty());
         assert!(CharAttrs::default().is_empty());
+    }
+
+    #[test]
+    fn fmt_16_tab_stops_are_ordered_and_one_per_position() {
+        let at = |pt| Length::from_points(pt);
+        let stops = TabStops::new([TabStop::left(at(144)), TabStop::left(at(72))]);
+        let right = TabStop {
+            alignment: TabAlignment::Right,
+            ..TabStop::left(at(144))
+        };
+        let stops = stops.with(right);
+        assert_eq!(stops.stops().len(), 2);
+        assert_eq!(stops.stops()[0].position, at(72));
+        assert_eq!(stops.stops()[1].alignment, TabAlignment::Right);
+        assert_eq!(stops.after(at(72)).map(|s| s.position), Some(at(144)));
+        assert_eq!(stops.after(at(144)), None);
+        assert_eq!(stops.without(at(72)).stops().len(), 1);
     }
 
     #[test]

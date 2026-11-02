@@ -4,10 +4,10 @@
 //! Reading and writing text documents.
 
 use desk_odf::{
-    Break, Color, Family, LINE_BREAK, Length, Line, LineColor, LineHeight, Meta, OdfError,
-    PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TextAlign, TextDocument,
-    TextPosition, TextProperties, TextTransform, read_odt, read_streams, write_odt,
-    write_odt_with_thumbnail,
+    Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line, LineColor, LineHeight, Meta,
+    OdfError, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TabStop,
+    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextTransform, read_odt,
+    read_streams, write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -82,6 +82,25 @@ fn full_document() -> TextDocument {
                         margin_left: Some(Length(36.0)),
                         margin_right: Some(Length(18.0)),
                         text_indent: Some(Length(-18.0)),
+                        tab_stops: Some(vec![
+                            TabStop {
+                                position: Length(72.0),
+                                ..TabStop::default()
+                            },
+                            TabStop {
+                                position: Length(144.0),
+                                kind: TabType::Char,
+                                char: Some(','),
+                                leader_style: LeaderStyle::Dotted,
+                                leader_text: Some('.'),
+                            },
+                            TabStop {
+                                position: Length(200.0),
+                                kind: TabType::Right,
+                                ..TabStop::default()
+                            },
+                        ]),
+                        tab_stop_distance: Some(Length(35.4)),
                         ..ParagraphProperties::default()
                     },
                     text: TextProperties::default(),
@@ -100,6 +119,8 @@ fn full_document() -> TextDocument {
                         keep_with_next: Some(true),
                         keep_together: Some(true),
                         line_height_at_least: Some(Length(20.0)),
+                        // No stops, over those of Body.
+                        tab_stops: Some(Vec::new()),
                         ..ParagraphProperties::default()
                     },
                     text: TextProperties {
@@ -199,6 +220,7 @@ fn full_document() -> TextDocument {
             },
             Paragraph::default(),
         ],
+        tabs_relative_to_indent: None,
     }
 }
 
@@ -209,6 +231,40 @@ fn a_document_comes_back_as_it_was_written() {
     keep("odf-full.odt", &bytes);
     let read = read_odt(&bytes).unwrap();
     assert_eq!(read, document);
+}
+
+#[test]
+fn fmt_16_tab_stops_are_measured_as_the_settings_say() {
+    let mut bytes = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut bytes));
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("content.xml", options).unwrap();
+        std::io::Write::write_all(&mut zip, content("<text:p>a</text:p>").as_bytes()).unwrap();
+        zip.start_file("settings.xml", options).unwrap();
+        std::io::Write::write_all(
+            &mut zip,
+            br#"<office:document-settings
+                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0">
+              <office:settings><config:config-item-set config:name="ooo:configuration-settings">
+                <config:config-item config:name="TabsRelativeToIndent" config:type="boolean">false</config:config-item>
+              </config:config-item-set></office:settings></office:document-settings>"#,
+        )
+        .unwrap();
+        zip.finish().unwrap();
+    }
+    assert_eq!(
+        read_odt(&bytes).unwrap().tabs_relative_to_indent,
+        Some(false)
+    );
+    // Without settings, LibreOffice measures them from the indent.
+    assert_eq!(
+        read_odt(&write_odt(&full_document()).unwrap())
+            .unwrap()
+            .tabs_relative_to_indent,
+        None
+    );
 }
 
 #[test]

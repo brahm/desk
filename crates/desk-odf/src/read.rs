@@ -6,11 +6,11 @@
 use std::collections::HashMap;
 
 use crate::error::OdfError;
-use crate::ns::{DC, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
+use crate::ns::{CONFIG, DC, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
 use crate::text::{
-    Break, Family, LINE_BREAK, Line, LineColor, LineHeight, Meta, PageLayout, Paragraph,
-    ParagraphProperties, Properties, Span, Style, TextAlign, TextDocument, TextPosition,
-    TextProperties, TextTransform,
+    Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, Meta, PageLayout,
+    Paragraph, ParagraphProperties, Properties, Span, Style, TabStop, TabType, TextAlign,
+    TextDocument, TextPosition, TextProperties, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -266,6 +266,55 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
         keep_together: always("keep-together"),
         widows: e.attr(FO, "widows").and_then(|v| v.parse().ok()),
         orphans: e.attr(FO, "orphans").and_then(|v| v.parse().ok()),
+        tab_stops: e.child(STYLE, "tab-stops").map(|stops| {
+            stops
+                .children_named(STYLE, "tab-stop")
+                .filter_map(tab_stop)
+                .collect()
+        }),
+        tab_stop_distance: length(e, STYLE, "tab-stop-distance"),
+    }
+}
+
+fn tab_stop(e: &Element) -> Option<TabStop> {
+    let first_char = |name: &str| e.attr(STYLE, name).and_then(|v| v.chars().next());
+    Some(TabStop {
+        position: length(e, STYLE, "position")?,
+        kind: match e.attr(STYLE, "type") {
+            Some("center") => TabType::Center,
+            Some("right") => TabType::Right,
+            Some("char") => TabType::Char,
+            _ => TabType::Left,
+        },
+        char: first_char("char"),
+        leader_style: match e.attr(STYLE, "leader-style") {
+            Some("solid") => LeaderStyle::Solid,
+            Some("dotted") => LeaderStyle::Dotted,
+            Some("dash" | "long-dash" | "dot-dash" | "dot-dot-dash" | "wave") => LeaderStyle::Dash,
+            _ => LeaderStyle::None,
+        },
+        leader_text: first_char("leader-text").filter(|c| *c != ' '),
+    })
+}
+
+/// Reads `TabsRelativeToIndent` from the settings stream, if it is there.
+pub(crate) fn tabs_relative_to_indent(settings: &str) -> Option<bool> {
+    let root = xml::parse(settings).ok()?;
+    let mut found = None;
+    visit(&root, &mut |e| {
+        if e.name.is(CONFIG, "config-item")
+            && e.attr(CONFIG, "name") == Some("TabsRelativeToIndent")
+        {
+            found = Some(e.text().trim() == "true");
+        }
+    });
+    found
+}
+
+fn visit(e: &Element, f: &mut impl FnMut(&Element)) {
+    f(e);
+    for child in e.elements() {
+        visit(child, f);
     }
 }
 

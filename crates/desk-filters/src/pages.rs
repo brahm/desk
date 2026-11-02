@@ -21,7 +21,8 @@ use desk_iwork::sf::{Family, LineSpacingMode, Properties, Style as IworkStyle, S
 use desk_model::{
     Alignment, Baseline, Capitalization, CharAttrs, CharFormat, CharacterStyle, Document,
     LINE_BREAK, Language, Length, LineColor, LineSpacing, LineStyle, Metadata, Op, PageSetup,
-    ParaAttrs, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, StyleId,
+    ParaAttrs, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, StyleId, TabAlignment, TabLeader,
+    TabStop, TabStops,
 };
 
 use crate::FilterError;
@@ -91,11 +92,6 @@ fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
             "listStyle" => {
                 matches!(value, Value::ListStyle { labels: true, .. }).then_some(Formatting::Lists)
             }
-            "tabs" => differs(value, 0.0).then_some(Formatting::TabStops),
-            // Pages' default, half an inch.
-            "defaultTabStops" => matches!(value, Value::Number(n) if (n - 36.0).abs() > 1.0
-                    && (n - 35.43307).abs() > 0.01)
-            .then_some(Formatting::TabStops),
             "tracking" => differs(value, 0.0).then_some(Formatting::CharacterSpacing),
             "textShadow" => differs(value, 0.0).then_some(Formatting::TextShadows),
             "outline" => differs(value, 0.0).then_some(Formatting::OutlinedText),
@@ -267,6 +263,67 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
         keep_with_next: flag(properties, "keepWithNext"),
         keep_lines_together: flag(properties, "keepLinesTogether"),
         widow_control: flag(properties, "widowControl"),
+        tab_stops: match properties.get("tabs") {
+            Some(Value::Tabs(tabs)) => {
+                let decimal = properties
+                    .string("decimalTab")
+                    .and_then(|s| s.chars().next())
+                    .unwrap_or_else(decimal_separator);
+                Some(TabStops::new(
+                    tabs.iter()
+                        .filter(|t| t.position.is_finite())
+                        .map(|tab| TabStop {
+                            position: Length::from_pt(tab.position),
+                            alignment: match tab.align.as_str() {
+                                "center" => TabAlignment::Center,
+                                "right" => TabAlignment::Right,
+                                "decimal" => TabAlignment::Decimal,
+                                _ => TabAlignment::Left,
+                            },
+                            leader: match tab.leader.as_deref().and_then(|l| l.chars().next()) {
+                                None => TabLeader::None,
+                                Some('.' | '\u{2026}') => TabLeader::Dots,
+                                Some('_') => TabLeader::Line,
+                                Some('\u{2192}' | '>') => TabLeader::Arrows,
+                                Some(_) => TabLeader::Dashes,
+                            },
+                            decimal,
+                        }),
+                ))
+            }
+            Some(Value::Null) => Some(TabStops::none()),
+            _ => None,
+        },
+        default_tab_interval: properties
+            .number("defaultTabStops")
+            .filter(|n| *n > 0.0)
+            .map(Length::from_pt),
+    }
+}
+
+/// The decimal separator of the system, which Pages lines decimal tab
+/// stops up on unless the document says otherwise: a comma in most
+/// languages of Europe and South America, and a point elsewhere. It is read
+/// from the locale variables, as the C library does.
+fn decimal_separator() -> char {
+    const COMMA: &[&str] = &[
+        "af", "az", "be", "bg", "bs", "ca", "cs", "da", "de", "el", "es", "et", "eu", "fi", "fo",
+        "fr", "gl", "hr", "hu", "hy", "id", "is", "it", "ka", "kk", "ky", "lt", "lv", "mk", "mn",
+        "nb", "nl", "nn", "no", "pl", "pt", "ro", "ru", "sk", "sl", "sq", "sr", "sv", "tr", "uk",
+        "uz", "vi",
+    ];
+    // Countries where these languages write a point.
+    const POINT: &[&str] = &["de_CH", "es_MX", "es_US", "it_CH"];
+    let locale = ["LC_ALL", "LC_NUMERIC", "LANG"]
+        .iter()
+        .find_map(|name| std::env::var(name).ok().filter(|v| !v.is_empty()))
+        .unwrap_or_default();
+    let tag = locale.split(['.', '@']).next().unwrap_or_default();
+    let language = tag.split(['_', '-']).next().unwrap_or_default();
+    if COMMA.contains(&language) && !POINT.contains(&tag) {
+        ','
+    } else {
+        '.'
     }
 }
 

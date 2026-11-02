@@ -36,6 +36,7 @@ pub mod fonts;
 mod input;
 mod layout;
 mod space;
+mod tabs;
 
 pub use fonts::{FontChoice, FontMatch, PagesFont};
 pub use input::{ParagraphText, SMALL_CAPS_SCALE};

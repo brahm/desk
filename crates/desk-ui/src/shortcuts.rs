@@ -32,6 +32,7 @@ const SECTIONS: &[Section] = &[
             ("<Control><Alt>w", n_("Close all windows")),
             ("<Control>q", n_("Quit")),
             ("F11", n_("Fullscreen")),
+            ("<Control>comma", n_("Preferences")),
             ("<Control>question", n_("Keyboard shortcuts")),
         ],
     ),
@@ -76,6 +77,7 @@ const SECTIONS: &[Section] = &[
             ("<Control>braceright", n_("Align right")),
             ("<Control><Shift>i", n_("Show invisibles")),
             ("<Control><Alt>i", n_("Inspector")),
+            ("<Control>r", n_("Show ruler")),
         ],
     ),
     (

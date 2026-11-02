@@ -397,6 +397,10 @@ pub enum CapitalizationSpec {
     Title,
 }
 
+/// The distance between default tab stops, in points, of Pages on the
+/// reference machine: 1.25 cm, as Pages saves it.
+pub const PAGES_TAB_INTERVAL: f64 = 35.43307;
+
 impl CaseSpec {
     /// Reads a description.
     pub fn parse(text: &str) -> Result<Self, SpecError> {
@@ -496,6 +500,9 @@ impl CaseSpec {
         let default = document.styles().default_paragraph();
         let mut style = ParagraphStyle::new(default, "Body");
         style.paragraph = para_attrs(&self.defaults);
+        // Pages on the reference machine, in Portuguese, puts the default
+        // tab stops 1.25 cm apart.
+        style.paragraph.default_tab_interval = Some(Length::from_pt(PAGES_TAB_INTERVAL));
         style.character = char_attrs(self.defaults.character());
         document.put_style(style)?;
 
@@ -560,6 +567,7 @@ fn para_attrs(f: &ParagraphSpec) -> ParaAttrs {
         keep_with_next: f.keep_with_next,
         keep_lines_together: f.keep_lines_together,
         widow_control: f.widow_control,
+        ..ParaAttrs::default()
     }
 }
 

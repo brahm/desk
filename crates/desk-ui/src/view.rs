@@ -23,6 +23,7 @@ struct State {
     zoom: f64,
     painter: Option<Painter>,
     on_zoom: Vec<Box<dyn Fn(f64)>>,
+    on_pages: Vec<Box<dyn Fn()>>,
     /// The selection and the cursor, drawn over the pages.
     selection: Vec<SpanRect>,
     caret: Option<CaretRect>,
@@ -67,6 +68,7 @@ impl DocumentView {
             zoom: geometry::DEFAULT_ZOOM,
             painter: Painter::new().ok(),
             on_zoom: Vec::new(),
+            on_pages: Vec::new(),
             selection: Vec::new(),
             caret: None,
             caret_on: true,
@@ -93,6 +95,11 @@ impl DocumentView {
     pub fn set_pages(&self, pages: Vec<DisplayList>) {
         self.state.borrow_mut().pages = pages;
         self.resize();
+        let callbacks = std::mem::take(&mut self.state.borrow_mut().on_pages);
+        for callback in &callbacks {
+            callback();
+        }
+        self.state.borrow_mut().on_pages = callbacks;
     }
 
     /// The widget that takes the keyboard and the pointer.
@@ -169,6 +176,41 @@ impl DocumentView {
         let rect = rects.get(page)?;
         let scale = self.zoom() * PIXELS_PER_POINT;
         Some((rect.x + x * scale, rect.y + y * scale))
+    }
+
+    /// Where a point of a page falls in the part of the view in sight, in
+    /// pixels from its top left corner.
+    pub fn to_visible(&self, page: usize, x: f64, y: f64) -> Option<(f64, f64)> {
+        let (ax, ay) = self.to_area(page, x, y)?;
+        Some((
+            ax - self.scrolled.hadjustment().value(),
+            ay - self.scrolled.vadjustment().value(),
+        ))
+    }
+
+    /// How many pixels one point of a page takes at this zoom.
+    pub fn scale(&self) -> f64 {
+        self.zoom() * PIXELS_PER_POINT
+    }
+
+    /// The cursor, if it shows.
+    pub fn caret(&self) -> Option<CaretRect> {
+        self.state.borrow().caret
+    }
+
+    /// Calls `f` whenever the pages move in the view: on scrolling, on a
+    /// change of zoom or of size, and when the pages change.
+    pub fn connect_moved(&self, f: impl Fn() + 'static) {
+        let f = Rc::new(f);
+        for adjustment in [self.scrolled.hadjustment(), self.scrolled.vadjustment()] {
+            let f = f.clone();
+            adjustment.connect_value_changed(move |_| f());
+        }
+        let resized = f.clone();
+        self.area.connect_resize(move |_, _, _| resized());
+        let zoomed = f.clone();
+        self.connect_zoom_changed(move |_| zoomed());
+        self.state.borrow_mut().on_pages.push(Box::new(move || f()));
     }
 
     /// Scrolls so that a cursor is in sight.

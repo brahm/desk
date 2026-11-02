@@ -52,9 +52,9 @@ pub use package::{
 };
 pub use read::read_streams;
 pub use text::{
-    Break, Family, LINE_BREAK, Line, LineColor, LineHeight, Meta, PageLayout, Paragraph,
-    ParagraphProperties, Properties, Span, Style, TextAlign, TextDocument, TextPosition,
-    TextProperties, TextTransform,
+    Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, Meta, PageLayout,
+    Paragraph, ParagraphProperties, Properties, Span, Style, TabStop, TabType, TextAlign,
+    TextDocument, TextPosition, TextProperties, TextTransform,
 };
 pub use units::{Color, Length};
 pub use write::{Streams, VERSION, write_streams};
