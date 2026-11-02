@@ -626,7 +626,7 @@ fn page_layout(styles: &Element) -> Option<PageLayout> {
         margin_bottom: length(p, FO, "margin-bottom"),
         margin_left: length(p, FO, "margin-left"),
         margin_right: length(p, FO, "margin-right"),
-        mirrored: p.attr(STYLE, "page-usage").map(|u| u == "mirrored"),
+        mirrored: layout.attr(STYLE, "page-usage").map(|u| u == "mirrored"),
         columns: p.child(STYLE, "columns").and_then(columns),
     })
 }

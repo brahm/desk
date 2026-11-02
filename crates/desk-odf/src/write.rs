@@ -726,9 +726,11 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
 }
 
 fn write_page_layout(w: &mut Writer, page: &PageLayout) {
-    w.start("style:page-layout")
-        .attr("style:name", "pm1")
-        .start("style:page-layout-properties");
+    w.start("style:page-layout").attr("style:name", "pm1");
+    if page.mirrored == Some(true) {
+        w.attr("style:page-usage", "mirrored");
+    }
+    w.start("style:page-layout-properties");
     len(w, "fo:page-width", page.width);
     len(w, "fo:page-height", page.height);
     if let (Some(width), Some(height)) = (page.width, page.height) {
@@ -745,9 +747,6 @@ fn write_page_layout(w: &mut Writer, page: &PageLayout) {
     len(w, "fo:margin-bottom", page.margin_bottom);
     len(w, "fo:margin-left", page.margin_left);
     len(w, "fo:margin-right", page.margin_right);
-    if page.mirrored == Some(true) {
-        w.attr("style:page-usage", "mirrored");
-    }
     if let Some(columns) = &page.columns {
         write_columns(w, columns);
     }
