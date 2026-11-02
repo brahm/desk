@@ -392,6 +392,11 @@ impl Editor {
         self.document
     }
 
+    /// The number of actions that Undo can take back.
+    pub fn undo_depth(&self) -> usize {
+        self.undo.len()
+    }
+
     /// Runs a user action as a transaction, which Undo can take back.
     /// An action that changes nothing does not enter the history.
     pub fn edit<T>(

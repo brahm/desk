@@ -15,7 +15,7 @@ use gtk::prelude::*;
 use gtk::{gdk, glib};
 
 use crate::geometry::{self, PIXELS_PER_POINT, PageRect};
-use crate::text_nav::{CaretRect, SpanRect};
+use crate::text_nav::{CaretRect, Invisible, InvisibleMark, SpanRect};
 
 struct State {
     pages: Vec<DisplayList>,
@@ -27,6 +27,8 @@ struct State {
     caret: Option<CaretRect>,
     /// Whether the cursor shows now: it blinks, and hides without focus.
     caret_on: bool,
+    /// The marks of the invisible characters, when they show (INT-10).
+    invisibles: Vec<InvisibleMark>,
 }
 
 /// The document area of a window.
@@ -68,6 +70,7 @@ impl DocumentView {
             selection: Vec::new(),
             caret: None,
             caret_on: true,
+            invisibles: Vec::new(),
         }));
         let view = Self {
             scrolled,
@@ -105,6 +108,12 @@ impl DocumentView {
             state.caret = caret;
             state.caret_on = true;
         }
+        self.area.queue_draw();
+    }
+
+    /// Sets the marks of the invisible characters; none hides them.
+    pub fn set_invisibles(&self, marks: Vec<InvisibleMark>) {
+        self.state.borrow_mut().invisibles = marks;
         self.area.queue_draw();
     }
 
@@ -427,6 +436,7 @@ fn draw_marks(
     scale: f64,
     focused: bool,
 ) {
+    draw_invisibles(cr, state, page, rect, scale);
     // The accent color of GNOME, lighter without focus.
     let alpha = if focused { 0.3 } else { 0.15 };
     cr.set_source_rgba(0.21, 0.52, 0.89, alpha);
@@ -451,6 +461,43 @@ fn draw_marks(
     cr.move_to(x, rect.y + caret.top * scale);
     cr.line_to(x, rect.y + caret.bottom * scale);
     cr.stroke().ok();
+}
+
+/// The marks of the invisible characters of a page, in the blue of Pages.
+fn draw_invisibles(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
+    let mut marks = state
+        .invisibles
+        .iter()
+        .filter(|m| m.page == page)
+        .peekable();
+    if marks.peek().is_none() {
+        return;
+    }
+    cr.set_source_rgb(0.25, 0.45, 0.85);
+    cr.select_font_face(
+        "Sans",
+        gtk::cairo::FontSlant::Normal,
+        gtk::cairo::FontWeight::Normal,
+    );
+    for mark in marks {
+        cr.set_font_size((mark.ascent * 0.7 * scale).max(4.0));
+        let text = mark.kind.mark();
+        let Ok(extents) = cr.text_extents(text) else {
+            continue;
+        };
+        let x = match mark.kind {
+            Invisible::Paragraph | Invisible::LineBreak => mark.x0 * scale + 1.0,
+            _ => (mark.x0 + mark.x1) / 2.0 * scale - extents.x_advance() / 2.0,
+        };
+        cr.move_to(rect.x + x, rect.y + mark.baseline * scale);
+        cr.show_text(text).ok();
+    }
 }
 
 /// The shadow and white sheet of a page.
