@@ -21,6 +21,7 @@ use desk_render::DisplayList;
 use gtk::prelude::*;
 use gtk::{gdk, glib};
 
+use crate::access::AccessText;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
@@ -52,6 +53,8 @@ struct State {
     on_select: Vec<Rc<dyn Fn()>>,
     /// Whether the invisible characters show (INT-10).
     invisibles: bool,
+    /// The text as screen readers read it.
+    access: AccessText,
     on_change: Vec<Rc<dyn Fn()>>,
     /// The text of a word or paragraph that a double or triple click
     /// selected, which a drag then extends by whole words or paragraphs.
@@ -139,6 +142,7 @@ impl TextEditor {
                 pending: None,
                 on_select: Vec::new(),
                 invisibles: false,
+                access: AccessText::default(),
             })),
         };
         this.show_pages();
@@ -459,17 +463,20 @@ impl TextEditor {
     }
 
     fn show_pages(&self) {
-        let (pages, invisibles) = {
+        let (pages, invisibles, text) = {
             let state = self.state.borrow();
+            let text = AccessText::new(state.editor.document(), &state.layout);
             let invisibles = if state.invisibles {
                 text_nav::invisibles(state.editor.document(), &state.layout)
             } else {
                 Vec::new()
             };
-            (DisplayList::pages(&state.layout), invisibles)
+            (DisplayList::pages(&state.layout), invisibles, text)
         };
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
+        self.view.access().set_text(text.clone());
+        self.state.borrow_mut().access = text;
     }
 
     /// Gives the keyboard back to the document.
@@ -632,6 +639,16 @@ impl TextEditor {
             )
         };
         self.view.set_marks(rects, caret);
+        let (focus, range) = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let selection = state.selection;
+            let offset = |spot| state.access.offset_of(document, spot);
+            let (start, end) = selection.ordered();
+            let range = (!selection.is_empty()).then(|| (offset(start), offset(end)));
+            (offset(selection.focus), range)
+        };
+        self.view.access().set_caret(focus, range);
         self.selection_changed();
         if let Some(caret) = caret {
             self.view.scroll_to(&caret);

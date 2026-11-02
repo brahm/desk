@@ -122,6 +122,7 @@ impl FormatBar {
                 .build(),
         ));
         color.set_tooltip_text(Some("Text Color"));
+        labelled(&color, "Text Color");
         root.append(&color);
 
         let toggles = gtk::Box::builder().css_classes(["linked"]).build();
@@ -139,13 +140,13 @@ impl FormatBar {
                 "Strikethrough",
             ),
         ] {
-            toggles.append(
-                &gtk::ToggleButton::builder()
-                    .icon_name(icon)
-                    .action_name(action)
-                    .tooltip_text(tooltip)
-                    .build(),
-            );
+            let button = gtk::ToggleButton::builder()
+                .icon_name(icon)
+                .action_name(action)
+                .tooltip_text(tooltip)
+                .build();
+            labelled(&button, tooltip);
+            toggles.append(&button);
         }
         root.append(&toggles);
 
@@ -160,6 +161,7 @@ impl FormatBar {
                 .icon_name(icon)
                 .tooltip_text(tooltip)
                 .build();
+            labelled(&button, tooltip);
             button.set_action_name(Some("win.align"));
             button.set_action_target_value(Some(&target.to_variant()));
             alignments.append(&button);
@@ -168,13 +170,13 @@ impl FormatBar {
 
         let spacer = gtk::Box::builder().hexpand(true).build();
         root.append(&spacer);
-        root.append(
-            &gtk::ToggleButton::builder()
-                .icon_name("sidebar-show-right-symbolic")
-                .action_name("win.inspector")
-                .tooltip_text("Inspector")
-                .build(),
-        );
+        let inspector = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-right-symbolic")
+            .action_name("win.inspector")
+            .tooltip_text("Inspector")
+            .build();
+        labelled(&inspector, "Inspector");
+        root.append(&inspector);
 
         let this = Rc::new(Self {
             root,
@@ -472,6 +474,11 @@ impl Inspector {
         set(&self.right, paragraph.right_indent.to_pt());
         self.updating.set(false);
     }
+}
+
+/// Names a button that shows only an icon, for screen readers.
+pub fn labelled(widget: &impl IsA<gtk::Accessible>, label: &str) {
+    widget.update_property(&[gtk::accessible::Property::Label(label)]);
 }
 
 /// The value of a boolean action's state.

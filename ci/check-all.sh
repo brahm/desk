@@ -34,6 +34,8 @@ step 'Parity with Pages'
 cargo run --locked --quiet --package desk-testkit --bin desk-parity
 step "Minimum Rust version ($msrv)"
 cargo "+$msrv" check --workspace --all-targets --locked
+step 'UI tests'
+ci/ui-test.sh
 step 'ODF validation'
 ci/validate-odf.sh
 step 'Fuzzing'

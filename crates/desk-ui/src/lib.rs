@@ -14,6 +14,8 @@
 pub use adw;
 pub use gtk;
 
+mod access;
+mod area;
 mod editing;
 mod formatting;
 pub mod geometry;

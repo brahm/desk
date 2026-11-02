@@ -108,6 +108,7 @@ impl DocumentWindow {
                 .build();
             header.pack_start(&open);
         }
+        formatting::labelled(&menu_button, "Main Menu");
         header.pack_end(&menu_button);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
@@ -115,6 +116,7 @@ impl DocumentWindow {
             .action_name("win.fullscreen")
             .visible(false)
             .build();
+        formatting::labelled(&leave_fullscreen, "Leave Fullscreen");
         header.pack_end(&leave_fullscreen);
         let warnings_button = gtk::Button::builder()
             .icon_name("dialog-warning-symbolic")
@@ -122,6 +124,7 @@ impl DocumentWindow {
             .action_name("win.warnings")
             .visible(false)
             .build();
+        formatting::labelled(&warnings_button, "Document Warnings");
         header.pack_end(&warnings_button);
 
         let status = adw::StatusPage::builder()
@@ -387,6 +390,9 @@ impl DocumentWindow {
             self.title
                 .set_subtitle(&path.as_deref().map(folder_of).unwrap_or_default());
             self.window.set_title(Some(&format!("{edited}{name}")));
+            self.view
+                .access()
+                .update_property(&[gtk::accessible::Property::Label(&name)]);
             self.counts_label
                 .set_label(&counts(editor.word_count(), self.view.page_count()));
         }
