@@ -21,6 +21,8 @@ use crate::geometry;
 use crate::i18n::{tr, trn};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
+use crate::spelling::MistakeKind;
+use crate::spelling_window::SpellingSlot;
 use crate::styles_drawer::StylesDrawer;
 use crate::view::DocumentView;
 use crate::writing_tools::{self, Lookup};
@@ -66,6 +68,8 @@ pub struct DocumentWindow {
     find: FindSlot,
     search_sidebar: Rc<SearchSidebar>,
     search_split: adw::OverlaySplitView,
+    /// The Spelling and Grammar window, made when first shown.
+    spelling: SpellingSlot,
     format_revealer: gtk::Revealer,
     ruler: Ruler,
     vertical_ruler: Ruler,
@@ -83,7 +87,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 31] = [
+const DOCUMENT_ACTIONS: [&str; 36] = [
     "save",
     "save-as",
     "save-copy",
@@ -115,6 +119,11 @@ const DOCUMENT_ACTIONS: [&str; 31] = [
     "look-up-web",
     "look-up-wikipedia",
     "statistics",
+    "check-spelling",
+    "spelling",
+    "correct-spelling",
+    "ignore-spelling",
+    "learn-spelling",
 ];
 
 thread_local! {
@@ -309,6 +318,7 @@ impl DocumentWindow {
             find: FindSlot::default(),
             search_sidebar,
             search_split,
+            spelling: SpellingSlot::default(),
             format_revealer,
             ruler,
             vertical_ruler,
@@ -318,9 +328,22 @@ impl DocumentWindow {
         this.add_actions();
         this.show_rulers();
         let weak = Rc::downgrade(&this);
-        preferences::connect_changed(move |_| {
+        preferences::connect_changed(move |p| {
             if let Some(this) = weak.upgrade() {
                 this.show_rulers();
+                formatting::set_state(
+                    &this.window,
+                    "check-spelling-while-typing",
+                    p.check_spelling.to_variant(),
+                );
+                formatting::set_state(
+                    &this.window,
+                    "proofread-while-typing",
+                    p.proofread.to_variant(),
+                );
+                if let Some(editor) = this.editor() {
+                    editor.update_squiggles();
+                }
             }
         });
         {
@@ -1203,6 +1226,7 @@ impl DocumentWindow {
         self.window.add_action(&paste_style);
 
         self.add_find_actions();
+        self.add_spelling_actions();
 
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);
@@ -1319,6 +1343,79 @@ impl DocumentWindow {
         self.window.add_action(&recent);
     }
 
+    /// Spelling and proofreading (TXT-10, TXT-11).
+    fn add_spelling_actions(self: &Rc<Self>) {
+        let simple: [(&str, WindowAction); 4] = [
+            ("check-spelling", |this| {
+                if let Some(editor) = this.editor() {
+                    editor.next_mistake(true, preferences::get().proofread);
+                }
+            }),
+            ("spelling", |this| {
+                let cell = this.editor.clone();
+                this.spelling
+                    .present(&this.window, Rc::new(move || cell.borrow().clone()));
+            }),
+            ("ignore-spelling", |this| {
+                if let Some(editor) = this.editor() {
+                    let word = editor.selected_text();
+                    crate::spelling::ignore(&word);
+                    editor.update_squiggles();
+                }
+            }),
+            ("learn-spelling", |this| {
+                if let Some(editor) = this.editor() {
+                    let word = editor.selected_text();
+                    crate::spelling::learn(&word);
+                    editor.update_squiggles();
+                }
+            }),
+        ];
+        for (name, run) in simple {
+            let weak = Rc::downgrade(self);
+            let action = gio::SimpleAction::new(name, None);
+            action.connect_activate(move |_, _| {
+                if let Some(this) = weak.upgrade() {
+                    run(&this);
+                }
+            });
+            self.window.add_action(&action);
+        }
+        let correct = gio::SimpleAction::new("correct-spelling", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        correct.connect_activate(move |_, parameter| {
+            if let (Some(editor), Some(text)) = (
+                weak.upgrade().and_then(|this| this.editor()),
+                parameter.and_then(|p| p.get::<String>()),
+            ) {
+                editor.correct(&text);
+            }
+        });
+        self.window.add_action(&correct);
+        let current = preferences::get();
+        for (name, state, set) in [
+            (
+                "check-spelling-while-typing",
+                current.check_spelling,
+                (|p, on| p.check_spelling = on) as fn(&mut preferences::Preferences, bool),
+            ),
+            ("proofread-while-typing", current.proofread, |p, on| {
+                p.proofread = on
+            }),
+        ] {
+            let action = gio::SimpleAction::new_stateful(name, None, &state.to_variant());
+            action.connect_change_state(move |action, value| {
+                if let Some(on) = value.and_then(|v| v.get::<bool>()) {
+                    action.set_state(&on.to_variant());
+                    let mut preferences = preferences::get();
+                    set(&mut preferences, on);
+                    preferences::set(preferences);
+                }
+            });
+            self.window.add_action(&action);
+        }
+    }
+
     /// Looks the selection, or the word at the cursor, up (INT-20).
     fn look_up(&self, lookup: Lookup) {
         if let Some(editor) = self.editor() {
@@ -1330,6 +1427,10 @@ impl DocumentWindow {
     /// Menu key (INT-21).
     fn connect_context_menu(&self) {
         let menu = gio::Menu::new();
+        // The guesses for a misspelled word or a mistake, filled when the
+        // menu opens on one (TXT-10, TXT-11).
+        let guesses = gio::Menu::new();
+        menu.append_section(None, &guesses);
         let edit = gio::Menu::new();
         edit.append(Some(&tr("Cu_t")), Some("win.cut"));
         edit.append(Some(&tr("_Copy")), Some("win.copy"));
@@ -1357,9 +1458,13 @@ impl DocumentWindow {
             .button(gdk::BUTTON_SECONDARY)
             .build();
         let menu_popover = popover.downgrade();
+        let editor = self.editor.clone();
+        let menu_guesses = guesses.clone();
         click.connect_pressed(move |gesture, _, x, y| {
             if let Some(popover) = menu_popover.upgrade() {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
+                let editor = editor.borrow().clone();
+                fill_guesses(&menu_guesses, editor.and_then(|e| e.mistake_at(x, y)));
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
                 popover.popup();
             }
@@ -1387,6 +1492,14 @@ impl DocumentWindow {
             if let (true, Some(popover), Some(area)) =
                 (menu_key, menu_popover.upgrade(), area.upgrade())
             {
+                let current = editor.borrow().clone();
+                let preferences = preferences::get();
+                fill_guesses(
+                    &guesses,
+                    current.and_then(|e| {
+                        e.selected_mistake(preferences.check_spelling, preferences.proofread)
+                    }),
+                );
                 // At the middle of the visible area.
                 let (width, height) = (area.width() / 2, area.height() / 3);
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(width, height, 1, 1)));
@@ -1396,6 +1509,38 @@ impl DocumentWindow {
             glib::Propagation::Proceed
         });
         self.view.area().add_controller(keys);
+    }
+}
+
+/// Fills the section of the context menu with the guesses for a mistake,
+/// or empties it.
+fn fill_guesses(menu: &gio::Menu, found: Option<(crate::spelling::Mistake, String)>) {
+    menu.remove_all();
+    let Some((mistake, text)) = found else {
+        return;
+    };
+    if let MistakeKind::Proofreading(_) = mistake.kind {
+        // What is wrong, as an item that does nothing.
+        menu.append(Some(&mistake.description()), Some("win.none"));
+    }
+    let guesses = mistake.suggestions(&text);
+    if guesses.is_empty() {
+        menu.append(Some(&tr("No Guesses Found")), Some("win.none"));
+    }
+    for guess in guesses.iter().take(6) {
+        let label = if guess.is_empty() {
+            tr("Delete")
+        } else {
+            // Underscores would be mnemonics.
+            guess.replace('_', "__")
+        };
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some("win.correct-spelling"), Some(&guess.to_variant()));
+        menu.append_item(&item);
+    }
+    if let MistakeKind::Spelling { .. } = mistake.kind {
+        menu.append(Some(&tr("_Ignore Spelling")), Some("win.ignore-spelling"));
+        menu.append(Some(&tr("_Learn Spelling")), Some("win.learn-spelling"));
     }
 }
 
@@ -1444,6 +1589,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         find.append(Some(&tr("_Find & Replace…")), Some("win.find"));
         find.append(Some(&tr("_Search…")), Some("win.search"));
         find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
+        find.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
         menu.append_section(None, &find);
         let styles = gio::Menu::new();
         styles.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
@@ -1466,6 +1612,27 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         Some("app.about"),
     );
     menu.append_section(None, &help);
+    menu
+}
+
+/// Spelling and Grammar, in the main menu (TXT-10, TXT-11).
+fn spelling_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(
+        Some(&tr("Show _Spelling and Grammar")),
+        Some("win.spelling"),
+    );
+    menu.append(Some(&tr("_Check Document Now")), Some("win.check-spelling"));
+    let typing = gio::Menu::new();
+    typing.append(
+        Some(&tr("Check Spelling While _Typing")),
+        Some("win.check-spelling-while-typing"),
+    );
+    typing.append(
+        Some(&tr("Check _Grammar While Typing")),
+        Some("win.proofread-while-typing"),
+    );
+    menu.append_section(None, &typing);
     menu
 }
 

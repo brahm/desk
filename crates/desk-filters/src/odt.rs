@@ -367,10 +367,12 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         outline: a.outline,
         shadow: a.shadow.map(odf_shadow),
         background: a.background.map(odf_background),
+        // A paragraph attribute, which the paragraph styles write.
+        hyphenate: None,
     }
 }
 
-fn para_attrs(p: &odf::ParagraphProperties) -> ParaAttrs {
+fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttrs {
     let line_spacing = if let Some(at_least) = p.line_height_at_least {
         Some(LineSpacing::AtLeast(length(at_least)))
     } else if let Some(between) = p.line_spacing {
@@ -389,6 +391,7 @@ fn para_attrs(p: &odf::ParagraphProperties) -> ParaAttrs {
         (widows, orphans) => Some(widows.unwrap_or(0) >= 2 || orphans.unwrap_or(0) >= 2),
     };
     ParaAttrs {
+        hyphenate: t.hyphenate,
         alignment: p.align.map(|a| match a {
             odf::TextAlign::Start | odf::TextAlign::Left => Alignment::Left,
             odf::TextAlign::Center => Alignment::Center,
@@ -858,7 +861,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
 
     let defaults = &source.default_style;
     let mut default_style = ParagraphStyle::new(default, DEFAULT_NAME);
-    default_style.paragraph = para_attrs(&defaults.paragraph);
+    default_style.paragraph = para_attrs(&defaults.paragraph, &defaults.text);
     default_style.character = char_attrs(&defaults.text, odf_default_size(source));
     if let Some(standard) = standard {
         default_style.name = names[&default].as_str().into();
@@ -867,9 +870,10 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             .iter()
             .find(|s| s.family == odf::Family::Paragraph && s.style == standard.name)
             .map(|s| s.key);
-        default_style
-            .paragraph
-            .merge(&para_attrs(&standard.properties.paragraph));
+        default_style.paragraph.merge(&para_attrs(
+            &standard.properties.paragraph,
+            &standard.properties.text,
+        ));
         default_style.character.merge(&char_attrs(
             &standard.properties.text,
             odf_default_size(source),
@@ -913,7 +917,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     next: link(&style.next, odf::Family::Paragraph),
                     paragraph: ParaAttrs {
                         list_style: list_of(&style.list_style),
-                        ..para_attrs(&style.properties.paragraph)
+                        ..para_attrs(&style.properties.paragraph, &style.properties.text)
                     },
                     character: char_attrs(&style.properties.text, size),
                 }
@@ -1102,7 +1106,7 @@ fn import_paragraph(
                 .as_deref()
                 .and_then(|p| ids.get(&(odf::Family::Paragraph, p)).copied())
                 .unwrap_or(default);
-            attrs = para_attrs(&automatic.properties.paragraph);
+            attrs = para_attrs(&automatic.properties.paragraph, &automatic.properties.text);
             base = char_attrs(&automatic.properties.text, paragraph_size);
         }
     }
@@ -1244,10 +1248,13 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         &styles.resolve_paragraph(p.id, &ParaAttrs::default()),
                         p.id == default,
                     ),
-                    text: text_properties(
-                        &p.character,
-                        &styles.resolve_character(p.id, None, &CharAttrs::default()),
-                    ),
+                    text: odf::TextProperties {
+                        hyphenate: p.paragraph.hyphenate,
+                        ..text_properties(
+                            &p.character,
+                            &styles.resolve_character(p.id, None, &CharAttrs::default()),
+                        )
+                    },
                 },
             },
             Style::Character(c) => odf::Style {
@@ -1328,7 +1335,10 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         &styles.resolve_paragraph(paragraph.style(), paragraph.attrs()),
                         false,
                     ),
-                    text: odf::TextProperties::default(),
+                    text: odf::TextProperties {
+                        hyphenate: paragraph.attrs().hyphenate,
+                        ..odf::TextProperties::default()
+                    },
                 },
             )
         };

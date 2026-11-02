@@ -659,6 +659,9 @@ formatting! {
         /// The number that the item takes, where its list starts again,
         /// instead of the one after the item before it (LST-04).
         list_start: Option<u32> = None,
+        /// Whether words break with a hyphen at the ends of lines, by the
+        /// patterns of their language (TXT-09).
+        hyphenate: bool = false,
     }
 }
 

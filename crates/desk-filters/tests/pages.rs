@@ -300,7 +300,7 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
 }
 
 #[test]
-fn est_11_txt_09_facing_pages_and_automatic_hyphenation_are_logged() {
+fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
     let anon = format!(
         r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-1"><sf:property-map>{}</sf:property-map></sf:paragraphstyle>"#,
         number("hyphenate", "0", "c"),
@@ -309,10 +309,23 @@ fn est_11_txt_09_facing_pages_and_automatic_hyphenation_are_logged() {
 <sf:p sf:style="A-1">Sem hifenização<sf:crbr/></sf:p>
 <sf:p sf:style="paragraph-style-90">Hifenizado também</sf:p>"#;
     let plain = index(STYLES, &anon, body);
-    let (_, log) = read_pages_logged(plain.as_bytes()).unwrap();
+    let hyphenated_paragraphs = |document: &desk_model::Document| -> Vec<bool> {
+        document
+            .body()
+            .iter()
+            .map(|p| {
+                document
+                    .styles()
+                    .resolve_paragraph(p.style(), p.attrs())
+                    .hyphenate
+            })
+            .collect()
+    };
+    let (document, log) = read_pages_logged(plain.as_bytes()).unwrap();
     // Without automatic hyphenation, Pages breaks words only at soft
-    // hyphens, as Desk does.
+    // hyphens.
     assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(hyphenated_paragraphs(&document), [false, false, false]);
     let setting = |on: &str| {
         format!(
             r#"<sl:publication-info>{}</sl:publication-info><sl:slprint-info"#,
@@ -323,19 +336,15 @@ fn est_11_txt_09_facing_pages_and_automatic_hyphenation_are_logged() {
         r#"sf:right="54"/>"#,
         r#"sf:right="54" sf:facing-pages="true"/>"#,
     );
-    let (_, log) = read_pages_logged(hyphenated.as_bytes()).unwrap();
+    let (document, log) = read_pages_logged(hyphenated.as_bytes()).unwrap();
+    // A style that turns it off keeps its paragraphs whole.
+    assert_eq!(hyphenated_paragraphs(&document), [true, false, true]);
     let entries: Vec<(Warning, usize)> = log
         .entries()
         .iter()
         .map(|e| (e.warning.clone(), e.count))
         .collect();
-    assert_eq!(
-        entries,
-        [
-            (Warning::Setting(Setting::FacingPages), 1),
-            (Warning::Formatting(Formatting::Hyphenation), 2),
-        ]
-    );
+    assert_eq!(entries, [(Warning::Setting(Setting::FacingPages), 1)]);
     let off = plain.replace("<sl:slprint-info", &setting("0"));
     assert!(read_pages_logged(off.as_bytes()).unwrap().1.is_empty());
 }

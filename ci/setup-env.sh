@@ -27,7 +27,8 @@ $sudo apt-get install --yes --no-install-recommends \
     fonts-liberation fonts-dejavu-core fonts-texgyre fonts-urw-base35 \
     fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils jing unzip \
     xvfb xauth xdotool dbus at-spi2-core python3-gi gir1.2-atspi-2.0 gettext \
-    desktop-file-utils appstream
+    desktop-file-utils appstream \
+    hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br
 
 if ! command -v rustup >/dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |

@@ -349,6 +349,8 @@ pub struct Inspector {
     first_line: adw::SpinRow,
     left: adw::SpinRow,
     right: adw::SpinRow,
+    /// Whether words break with hyphens (TXT-09).
+    hyphenate: adw::SwitchRow,
     tabs: Rc<TabStopsGroup>,
     lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
@@ -443,6 +445,14 @@ impl Inspector {
         indents.add(&first_line);
         indents.add(&left);
         indents.add(&right);
+        let hyphenate = adw::SwitchRow::builder()
+            .title(tr("Hyphenate Words"))
+            .subtitle(tr("At the ends of lines, in the language of the text"))
+            .build();
+        let hyphenation = adw::PreferencesGroup::builder()
+            .title(tr("Hyphenation"))
+            .build();
+        hyphenation.add(&hyphenate);
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(18)
@@ -453,6 +463,7 @@ impl Inspector {
             .build();
         content.append(&spacing);
         content.append(&indents);
+        content.append(&hyphenation);
         content.append(tabs.widget());
         content.append(lists.widget());
         for group in effects.groups() {
@@ -472,6 +483,7 @@ impl Inspector {
             first_line,
             left,
             right,
+            hyphenate,
             tabs,
             lists,
             effects,
@@ -484,6 +496,23 @@ impl Inspector {
         preferences::connect_changed(move |p| {
             if let Some(this) = weak.upgrade() {
                 this.set_units(p.units);
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let hyphenate_editor = editor.clone();
+        this.hyphenate.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            if let Some(editor) = hyphenate_editor() {
+                editor.set_paragraph_attrs(
+                    "Hyphenation",
+                    &ParaAttrs {
+                        hyphenate: Some(row.is_active()),
+                        ..ParaAttrs::default()
+                    },
+                );
             }
         });
         for (row, field) in [
@@ -565,6 +594,9 @@ impl Inspector {
             &self.right,
             tab_stops::in_units(paragraph.right_indent, units),
         );
+        if self.hyphenate.is_active() != paragraph.hyphenate {
+            self.hyphenate.set_active(paragraph.hyphenate);
+        }
         self.updating.set(false);
         self.tabs.show(paragraph);
         self.lists.show(format);

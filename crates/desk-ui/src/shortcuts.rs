@@ -99,6 +99,8 @@ const SECTIONS: &[Section] = &[
             ("<Control>e", n_("Use selection for Find")),
             ("<Control>j", n_("Jump to the selection")),
             ("<Control><Shift>f", n_("Search sidebar")),
+            ("<Control>semicolon", n_("Find the next misspelled word")),
+            ("<Control>colon", n_("Spelling and Grammar")),
         ],
     ),
     (

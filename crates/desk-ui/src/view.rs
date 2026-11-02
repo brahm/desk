@@ -31,6 +31,18 @@ struct State {
     caret_on: bool,
     /// The marks of the invisible characters, when they show (INT-10).
     invisibles: Vec<InvisibleMark>,
+    /// The lines under misspelled words and mistakes (TXT-10, TXT-11).
+    squiggles: Vec<Squiggle>,
+}
+
+/// A line under text that the spelling checker or the proofreader marks.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Squiggle {
+    /// Where the text is.
+    pub span: SpanRect,
+    /// Whether it is a mistake of the proofreader, drawn in green, rather
+    /// than a misspelling, in red.
+    pub proofreading: bool,
 }
 
 /// The document area of a window.
@@ -73,6 +85,7 @@ impl DocumentView {
             caret: None,
             caret_on: true,
             invisibles: Vec::new(),
+            squiggles: Vec::new(),
         }));
         let view = Self {
             scrolled,
@@ -124,6 +137,19 @@ impl DocumentView {
             state.caret_on = true;
         }
         self.area.queue_draw();
+    }
+
+    /// Sets the lines under misspelled words and mistakes.
+    pub fn set_squiggles(&self, squiggles: Vec<Squiggle>) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let changed = state.squiggles != squiggles;
+            state.squiggles = squiggles;
+            changed
+        };
+        if changed {
+            self.area.queue_draw();
+        }
     }
 
     /// Sets the marks of the invisible characters; none hides them.
@@ -487,6 +513,7 @@ fn draw_marks(
     focused: bool,
 ) {
     draw_invisibles(cr, state, page, rect, scale);
+    draw_squiggles(cr, state, page, rect, scale);
     // The accent color of GNOME, lighter without focus.
     let alpha = if focused { 0.3 } else { 0.15 };
     cr.set_source_rgba(0.21, 0.52, 0.89, alpha);
@@ -511,6 +538,43 @@ fn draw_marks(
     cr.move_to(x, rect.y + caret.top * scale);
     cr.line_to(x, rect.y + caret.bottom * scale);
     cr.stroke().ok();
+}
+
+/// The dashed lines under misspelled words, in red, and mistakes, in
+/// green, as Pages draws them.
+fn draw_squiggles(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
+    for proofreading in [false, true] {
+        let mut lines = state
+            .squiggles
+            .iter()
+            .filter(|s| s.span.page == page && s.proofreading == proofreading)
+            .peekable();
+        if lines.peek().is_none() {
+            continue;
+        }
+        if proofreading {
+            cr.set_source_rgb(0.18, 0.62, 0.25);
+        } else {
+            cr.set_source_rgb(0.86, 0.12, 0.12);
+        }
+        cr.set_line_width(1.5);
+        cr.set_dash(&[2.0, 2.0], 0.0);
+        for line in lines {
+            let span = &line.span;
+            // A little above the bottom of the line, under the descenders.
+            let y = (rect.y + span.y1 * scale - 1.5).round() + 0.25;
+            cr.move_to(rect.x + span.x0 * scale, y);
+            cr.line_to(rect.x + span.x1 * scale, y);
+        }
+        cr.stroke().ok();
+        cr.set_dash(&[], 0.0);
+    }
 }
 
 /// The marks of the invisible characters of a page, in the blue of Pages.
