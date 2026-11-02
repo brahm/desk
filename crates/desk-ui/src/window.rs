@@ -14,6 +14,7 @@ use desk_model::{CharAttrs, Document, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
 use crate::editing::TextEditor;
+use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
 use crate::i18n::{tr, trn};
@@ -50,6 +51,8 @@ pub struct DocumentWindow {
     editor: Rc<RefCell<Option<TextEditor>>>,
     format_bar: Rc<FormatBar>,
     inspector: Rc<Inspector>,
+    /// The Fonts window (INT-15), made when first shown.
+    fonts: FontsSlot,
     split: adw::OverlaySplitView,
     format_revealer: gtk::Revealer,
     ruler: Ruler,
@@ -68,7 +71,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 15] = [
+const DOCUMENT_ACTIONS: [&str; 16] = [
     "save",
     "save-as",
     "save-copy",
@@ -84,6 +87,7 @@ const DOCUMENT_ACTIONS: [&str; 15] = [
     "strikethrough",
     "align",
     "inspector",
+    "fonts",
 ];
 
 /// The character toggles of the format bar: an action and what it sets.
@@ -249,6 +253,7 @@ impl DocumentWindow {
             editor,
             format_bar,
             inspector,
+            fonts: FontsSlot::default(),
             split,
             format_revealer,
             ruler,
@@ -388,6 +393,9 @@ impl DocumentWindow {
         let format = editor.format();
         self.format_bar.show(&format);
         self.inspector.show(&format);
+        if let Some(fonts) = self.fonts.visible() {
+            fonts.show(&format.character, &format.paragraph);
+        }
         let setup = *editor.document().page_setup();
         self.ruler.show(setup, &format.paragraph);
         self.vertical_ruler.show(setup, &format.paragraph);
@@ -933,6 +941,20 @@ impl DocumentWindow {
             split.set_show_sidebar(on);
         });
         self.window.add_action(&inspector);
+
+        let fonts = gio::SimpleAction::new("fonts", None);
+        let weak = Rc::downgrade(self);
+        fonts.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(editor) = this.editor() else { return };
+            let cell = this.editor.clone();
+            let window = this
+                .fonts
+                .present(&this.window, Rc::new(move || cell.borrow().clone()));
+            let format = editor.format();
+            window.show(&format.character, &format.paragraph);
+        });
+        self.window.add_action(&fonts);
         // The sidebar also closes by itself on a narrow window.
         let window = self.window.downgrade();
         self.split.connect_show_sidebar_notify(move |split| {
@@ -1014,6 +1036,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         save.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
         menu.append_section(None, &save);
         let document = gio::Menu::new();
+        document.append(Some(&tr("Show _Fonts")), Some("win.fonts"));
         document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));

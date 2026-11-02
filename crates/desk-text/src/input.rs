@@ -10,7 +10,7 @@
 
 use std::ops::Range;
 
-use desk_model::{Capitalization, CharFormat, ParaFormat, Paragraph, Styles};
+use desk_model::{Capitalization, CharFormat, Ligatures, ParaFormat, Paragraph, Styles};
 
 use crate::fonts::pages_font;
 
@@ -88,6 +88,7 @@ impl ParagraphText {
             // Pages joins fi and fl, and no other letters, in the fonts of
             // the Mac that have those ligatures (DOC-05).
             let ligatures = format.capitalization == Capitalization::None
+                && format.ligatures != Ligatures::None
                 && pages_font(&format.font_family).is_some_and(|f| f.ligatures);
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {

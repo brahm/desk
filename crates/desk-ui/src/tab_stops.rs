@@ -54,7 +54,7 @@ fn leader_name(leader: TabLeader) -> String {
     }
 }
 
-fn string_list(names: impl IntoIterator<Item = String>) -> gtk::StringList {
+pub(crate) fn string_list(names: impl IntoIterator<Item = String>) -> gtk::StringList {
     let names: Vec<String> = names.into_iter().collect();
     gtk::StringList::new(&names.iter().map(String::as_str).collect::<Vec<_>>())
 }

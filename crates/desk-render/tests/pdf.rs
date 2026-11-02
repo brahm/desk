@@ -66,7 +66,7 @@ fn glyphs_are_placed_on_the_page_with_their_color() {
         .iter()
         .filter_map(|item| match item {
             Item::Glyphs { color, glyphs, .. } => Some((*color, glyphs)),
-            Item::Rect { .. } => None,
+            _ => None,
         })
         .collect();
     assert_eq!(glyphs.len(), 2);
@@ -94,7 +94,7 @@ fn fmt_01_fmt_02_lines_become_rectangles() {
             Item::Rect {
                 y, width, height, ..
             } => Some((*y, *width, *height)),
-            Item::Glyphs { .. } => None,
+            _ => None,
         })
         .collect();
     // Two underlines and one strikethrough, as wide as the word.

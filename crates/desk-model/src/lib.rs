@@ -56,8 +56,9 @@ mod units;
 pub use document::{Container, Document, Metadata, PageSetup, PagedFlow, Statistics};
 pub use error::ModelError;
 pub use format::{
-    Alignment, Baseline, Capitalization, CharAttrs, CharFormat, DEFAULT_TAB_INTERVAL, Language,
-    LineColor, LineSpacing, LineStyle, ParaAttrs, ParaFormat, TabAlignment, TabLeader, TabStop,
+    Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
+    DEFAULT_TAB_INTERVAL, FontFeature, FontFeatures, Language, Ligatures, LineColor, LineSpacing,
+    LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow, TabAlignment, TabLeader, TabStop,
     TabStops,
 };
 pub use id::NodeId;

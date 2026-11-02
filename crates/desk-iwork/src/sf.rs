@@ -102,6 +102,10 @@ pub enum Value {
     },
     /// Tab stops, in the order saved.
     Tabs(Vec<Tab>),
+    /// A shadow (`sf:shadow`).
+    Shadow(Shadow),
+    /// A line (`sf:stroke`).
+    Stroke(Stroke),
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -116,6 +120,43 @@ pub struct Tab {
     pub align: String,
     /// `sf:leader`, the text that fills the space before the stop.
     pub leader: Option<String>,
+}
+
+/// A shadow (`sf:shadow`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Shadow {
+    /// `sf:angle`, in degrees counterclockwise from the right.
+    pub angle: f64,
+    /// `sf:offset`, in points.
+    pub offset: f64,
+    /// `sf:radius`, the blur, in points.
+    pub radius: f64,
+    /// `sf:opacity`, from 0 to 1.
+    pub opacity: f64,
+    /// The color.
+    pub color: Color,
+}
+
+/// How a line is drawn (`sf:pattern`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum StrokePattern {
+    /// `solid`.
+    Solid,
+    /// `empty`: no line.
+    Empty,
+    /// `pattern`: dashes and gaps, as multiples of the width.
+    Dashes(Vec<f64>),
+}
+
+/// A line (`sf:stroke`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Stroke {
+    /// `sf:width`, in points.
+    pub width: f64,
+    /// The color.
+    pub color: Color,
+    /// How it is drawn.
+    pub pattern: StrokePattern,
 }
 
 impl Value {
@@ -166,6 +207,63 @@ impl Value {
                     })
                     .collect(),
             ),
+            "shadow" => {
+                let get = |name, default| {
+                    element
+                        .attr(SF, name)
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite())
+                        .unwrap_or(default)
+                };
+                Self::Shadow(Shadow {
+                    angle: get("angle", 315.0),
+                    offset: get("offset", 4.0),
+                    radius: get("radius", 4.0),
+                    opacity: get("opacity", 1.0).clamp(0.0, 1.0),
+                    color: element
+                        .children_named(SF, "color")
+                        .next()
+                        .and_then(color)
+                        .unwrap_or(Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                })
+            }
+            "stroke" => {
+                let pattern = element.children_named(SF, "pattern").next();
+                Self::Stroke(Stroke {
+                    width: element
+                        .attr(SF, "width")
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite() && *v >= 0.0)
+                        .unwrap_or(1.0),
+                    color: element
+                        .children_named(SF, "color")
+                        .next()
+                        .and_then(color)
+                        .unwrap_or(Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                    pattern: match pattern.and_then(|p| p.attr(SF, "type")) {
+                        Some("empty") => StrokePattern::Empty,
+                        Some("pattern") => StrokePattern::Dashes(
+                            pattern
+                                .into_iter()
+                                .flat_map(|p| p.descendants())
+                                .filter(|e| e.name.is(SF, "element"))
+                                .filter_map(|e| e.attr(SF, "val")?.trim().parse().ok())
+                                .collect(),
+                        ),
+                        _ => StrokePattern::Solid,
+                    },
+                })
+            }
             other => Self::Other(other.to_owned()),
         }
     }

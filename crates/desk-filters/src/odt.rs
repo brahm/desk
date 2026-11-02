@@ -13,10 +13,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use desk_model::{
-    Alignment, Baseline, Capitalization, CharAttrs, CharacterStyle, DEFAULT_TAB_INTERVAL, Document,
-    LINE_BREAK, Language, Length, LineColor, LineSpacing, LineStyle, Metadata, ModelError, Op,
-    PageSetup, ParaAttrs, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Style, StyleId,
-    TabAlignment, TabLeader, TabStop, TabStops,
+    Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, LINE_BREAK,
+    Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, Metadata, ModelError, Op,
+    PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow,
+    Style, StyleId, TabAlignment, TabLeader, TabStop, TabStops,
 };
 use desk_odf as odf;
 
@@ -119,9 +120,111 @@ fn odf_color(color: Rgba) -> odf::Color {
     }
 }
 
-/// The character attributes of ODF text properties. Font sizes in
-/// percent of the parent style are not kept.
-fn char_attrs(t: &odf::TextProperties) -> CharAttrs {
+/// The family of a font name as LibreOffice writes it, with the features
+/// of the font after a colon, as in `Linux Libertine G:liga=0&smcp`, and
+/// the ligatures and features it sets (FMT-08, FMT-09).
+fn font_name(name: &str) -> (&str, Option<Ligatures>, Option<FontFeatures>) {
+    let Some((family, settings)) = name.split_once(':') else {
+        return (name, None, None);
+    };
+    let mut ligatures = None;
+    let mut features = Vec::new();
+    for setting in settings.split('&') {
+        let (tag, value) = match setting.split_once('=') {
+            Some((tag, value)) => (tag.trim(), value.trim().parse().unwrap_or(1)),
+            None => (setting.trim(), 1),
+        };
+        match (tag, value) {
+            ("liga", 0) => ligatures = Some(Ligatures::None),
+            ("liga", _) => ligatures = ligatures.or(Some(Ligatures::Default)),
+            ("dlig", v) if v > 0 => ligatures = Some(Ligatures::All),
+            ("clig", _) | ("dlig", _) => {}
+            _ => features.extend(FontFeature::new(tag, value)),
+        }
+    }
+    let features = (!features.is_empty()).then(|| FontFeatures::new(features));
+    (family, ligatures, features)
+}
+
+/// The font name of a family with ligatures and features, as LibreOffice
+/// writes it.
+fn odf_font_name(
+    family: &str,
+    ligatures: Option<Ligatures>,
+    features: Option<&FontFeatures>,
+) -> String {
+    let mut settings: Vec<String> = match ligatures {
+        Some(Ligatures::Default) => vec!["liga".into()],
+        Some(Ligatures::None) => vec!["liga=0".into(), "clig=0".into()],
+        Some(Ligatures::All) => vec!["dlig".into()],
+        None => Vec::new(),
+    };
+    for feature in features.map(FontFeatures::features).unwrap_or_default() {
+        settings.push(match feature.value {
+            1 => feature.tag().to_owned(),
+            v => format!("{}={v}", feature.tag()),
+        });
+    }
+    if settings.is_empty() {
+        family.to_owned()
+    } else {
+        format!("{family}:{}", settings.join("&"))
+    }
+}
+
+/// A shadow from `fo:text-shadow`, which has no opacity: it is opaque.
+fn shadow(shadow: odf::TextShadow) -> Option<Shadow> {
+    let odf::TextShadow::Shadow {
+        dx,
+        dy,
+        blur,
+        color,
+    } = shadow
+    else {
+        return None;
+    };
+    let angle = (-dy.0).atan2(dx.0).to_degrees().round() as i32;
+    Some(Shadow {
+        angle: angle.rem_euclid(360),
+        offset: Length::from_pt(dx.0.hypot(dy.0)),
+        blur: blur.map_or(Length::ZERO, length),
+        opacity: 100,
+        color: color.map_or(Rgba::BLACK, rgba),
+    })
+}
+
+fn odf_shadow(shadow: Option<Shadow>) -> odf::TextShadow {
+    match shadow {
+        None => odf::TextShadow::None,
+        Some(shadow) => {
+            let (dx, dy) = shadow.displacement();
+            odf::TextShadow::Shadow {
+                dx: odf::Length(dx),
+                dy: odf::Length(dy),
+                blur: Some(odf_length(shadow.blur)),
+                color: Some(odf_color(shadow.color)),
+            }
+        }
+    }
+}
+
+fn background(background: odf::Background) -> Option<Rgba> {
+    match background {
+        odf::Background::Transparent => None,
+        odf::Background::Color(color) => Some(rgba(color)),
+    }
+}
+
+fn odf_background(background: Option<Rgba>) -> odf::Background {
+    background.map_or(odf::Background::Transparent, |c| {
+        odf::Background::Color(odf_color(c))
+    })
+}
+
+/// The character attributes of ODF text properties, whose text is
+/// `size` points large. Font sizes in percent of the parent style are not
+/// kept.
+fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
     let language = t.language.as_ref().map(|language| {
         // `zxx` is "no linguistic content", as Desk writes the undetermined
         // language.
@@ -148,8 +251,12 @@ fn char_attrs(t: &odf::TextProperties) -> CharAttrs {
         }
         (None, None) => None,
     };
+    let (family, ligatures, font_features) = match t.font_family.as_deref() {
+        Some(name) => font_name(name),
+        None => ("", None, None),
+    };
     CharAttrs {
-        font_family: t.font_family.as_deref().map(Into::into),
+        font_family: t.font_family.as_ref().map(|_| family.into()),
         font_size: t.font_size.map(length),
         bold: t.font_weight.map(|w| w >= 600),
         italic: t.italic,
@@ -170,10 +277,22 @@ fn char_attrs(t: &odf::TextProperties) -> CharAttrs {
         baseline_shift: None,
         capitalization,
         language,
+        // The spacing of ODF is a length, the tracking of Pages a part of
+        // the font size.
+        tracking: t
+            .letter_spacing
+            .map(|l| (l.0 / size.max(1.0) * 1000.0).round() as i32),
+        outline: t.outline,
+        shadow: t.shadow.map(shadow),
+        ligatures,
+        font_features,
+        background: t.background.map(background),
     }
 }
 
-fn text_properties(a: &CharAttrs) -> odf::TextProperties {
+/// The ODF text properties of character attributes, at a level of styles,
+/// a style or a run, whose format resolves to `resolved`.
+fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties {
     let (language, script, country) = match &a.language {
         Some(language) if language.tag() != "und" => {
             let mut parts = language.tag().split('-');
@@ -197,8 +316,21 @@ fn text_properties(a: &CharAttrs) -> odf::TextProperties {
         LineStyle::Single => odf::Line::Single,
         LineStyle::Double => odf::Line::Double,
     };
+    // Ligatures and features go with the font name, which they need.
+    let font_family = if a.font_family.is_some()
+        || a.ligatures.is_some()
+        || a.font_features.as_ref().is_some_and(|f| !f.is_empty())
+    {
+        Some(odf_font_name(
+            a.font_family.as_deref().unwrap_or(&resolved.font_family),
+            a.ligatures,
+            a.font_features.as_ref(),
+        ))
+    } else {
+        None
+    };
     odf::TextProperties {
-        font_family: a.font_family.as_deref().map(str::to_owned),
+        font_family,
         font_size: a.font_size.map(odf_length),
         font_size_percent: None,
         font_weight: a.bold.map(|b| if b { 700 } else { 400 }),
@@ -228,6 +360,12 @@ fn text_properties(a: &CharAttrs) -> odf::TextProperties {
         language,
         country,
         script,
+        letter_spacing: a
+            .tracking
+            .map(|t| odf::Length(f64::from(t) / 1000.0 * resolved.font_size.to_pt())),
+        outline: a.outline,
+        shadow: a.shadow.map(odf_shadow),
+        background: a.background.map(odf_background),
     }
 }
 
@@ -274,7 +412,82 @@ fn para_attrs(p: &odf::ParagraphProperties) -> ParaAttrs {
             .tab_stop_distance
             .map(length)
             .filter(|l| l.millipoints() > 0),
+        background: p.background.map(background),
+        border: para_border(p),
     }
+}
+
+/// The rules or border of a paragraph from its ODF borders: lines above
+/// and below are rules, and lines on all four sides a border.
+fn para_border(p: &odf::ParagraphProperties) -> Option<ParaBorder> {
+    let sides = [p.border_top, p.border_bottom, p.border_left, p.border_right];
+    if sides.iter().all(Option::is_none) {
+        return None;
+    }
+    let line = |b: Option<odf::Border>| match b {
+        Some(odf::Border::Line {
+            width,
+            style,
+            color,
+        }) => Some((width, style, color)),
+        _ => None,
+    };
+    let [top, bottom, left, right] = sides.map(line);
+    let kind = match (
+        top.is_some(),
+        bottom.is_some(),
+        left.is_some() && right.is_some(),
+    ) {
+        (true, true, true) => BorderSides::Box,
+        (true, true, false) => BorderSides::AboveAndBelow,
+        (true, false, _) => BorderSides::Above,
+        (false, true, _) => BorderSides::Below,
+        (false, false, _) => return Some(ParaBorder::default()),
+    };
+    let (padding, first) = if top.is_some() {
+        (p.padding_top, top)
+    } else {
+        (p.padding_bottom, bottom)
+    };
+    let (width, style, color) = first?;
+    Some(ParaBorder {
+        sides: kind,
+        width: length(width),
+        color: rgba(color),
+        style: match style {
+            odf::BorderLine::Solid => BorderStyle::Solid,
+            odf::BorderLine::Dashed => BorderStyle::Dashed,
+            odf::BorderLine::Dotted => BorderStyle::Dotted,
+        },
+        offset: padding.map_or(Length::ZERO, length),
+    })
+}
+
+/// Writes the rules or border of a paragraph as ODF borders, with
+/// `none` on the sides without a line.
+fn odf_border(p: &mut odf::ParagraphProperties, border: &ParaBorder) {
+    let line = odf::Border::Line {
+        width: odf_length(border.width),
+        style: match border.style {
+            BorderStyle::Solid => odf::BorderLine::Solid,
+            BorderStyle::Dashed => odf::BorderLine::Dashed,
+            BorderStyle::Dotted => odf::BorderLine::Dotted,
+        },
+        color: odf_color(border.color),
+    };
+    let sides = border.sides;
+    let boxed = sides == BorderSides::Box;
+    let side = |on: bool| {
+        if on {
+            (Some(line), Some(odf_length(border.offset)))
+        } else {
+            (Some(odf::Border::None), None)
+        }
+    };
+    (p.border_top, p.padding_top) = side(sides.above());
+    (p.border_bottom, p.padding_bottom) = side(sides.below());
+    (p.border_left, p.padding_left) = side(boxed);
+    (p.border_right, p.padding_right) = side(boxed);
 }
 
 fn tab_stop(stop: &odf::TabStop) -> TabStop {
@@ -371,8 +584,12 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
             .as_ref()
             .map(|stops| stops.stops().iter().map(odf_tab_stop).collect()),
         tab_stop_distance: a.default_tab_interval.map(odf_length),
+        background: a.background.map(odf_background),
         ..odf::ParagraphProperties::default()
     };
+    if let Some(border) = &a.border {
+        odf_border(&mut p, border);
+    }
     match a.line_spacing {
         Some(LineSpacing::Multiple { percent }) => {
             p.line_height = Some(odf::LineHeight::Percent(f64::from(percent)));
@@ -385,6 +602,32 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
         None => {}
     }
     p
+}
+
+/// The font size that a style of an ODF document sets, itself or through
+/// its parents, in points.
+fn odf_font_size(
+    source: &odf::TextDocument,
+    family: odf::Family,
+    name: Option<&str>,
+) -> Option<f64> {
+    let mut name = name;
+    // The chain is short; the bound keeps a cycle from looping forever.
+    for _ in 0..64 {
+        let style = source.style(family, name?)?;
+        if let Some(size) = style.properties.text.font_size {
+            return Some(size.0);
+        }
+        name = style.parent.as_deref();
+    }
+    None
+}
+
+/// The size of the text of the default style of an ODF document.
+fn odf_default_size(source: &odf::TextDocument) -> f64 {
+    odf_font_size(source, odf::Family::Paragraph, Some(DEFAULT_STYLE))
+        .or(source.default_style.text.font_size.map(|s| s.0))
+        .unwrap_or(CharFormat::default().font_size.to_pt())
 }
 
 /// Builds a document from an ODF text document.
@@ -424,15 +667,16 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     let defaults = &source.default_style;
     let mut default_style = ParagraphStyle::new(default, DEFAULT_NAME);
     default_style.paragraph = para_attrs(&defaults.paragraph);
-    default_style.character = char_attrs(&defaults.text);
+    default_style.character = char_attrs(&defaults.text, odf_default_size(source));
     if let Some(standard) = standard {
         default_style.name = names[&default].as_str().into();
         default_style
             .paragraph
             .merge(&para_attrs(&standard.properties.paragraph));
-        default_style
-            .character
-            .merge(&char_attrs(&standard.properties.text));
+        default_style.character.merge(&char_attrs(
+            &standard.properties.text,
+            odf_default_size(source),
+        ));
         default_style.next = standard
             .next
             .as_deref()
@@ -447,6 +691,8 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             if id == default {
                 continue;
             }
+            let size = odf_font_size(source, style.family, Some(&style.name))
+                .unwrap_or_else(|| odf_default_size(source));
             let link = |name: &Option<String>, family| {
                 name.as_deref()
                     .and_then(|n| ids.get(&(family, n)).copied())
@@ -459,14 +705,14 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     parent: link(&style.parent, odf::Family::Paragraph).or(Some(default)),
                     next: link(&style.next, odf::Family::Paragraph),
                     paragraph: para_attrs(&style.properties.paragraph),
-                    character: char_attrs(&style.properties.text),
+                    character: char_attrs(&style.properties.text, size),
                 }
                 .into(),
                 odf::Family::Text => CharacterStyle {
                     id,
                     name: names[&id].as_str().into(),
                     parent: link(&style.parent, odf::Family::Text),
-                    character: char_attrs(&style.properties.text),
+                    character: char_attrs(&style.properties.text, size),
                 }
                 .into(),
             };
@@ -579,6 +825,9 @@ fn import_paragraph(
     let mut style = default;
     let mut attrs = ParaAttrs::default();
     let mut base = CharAttrs::default();
+    // The size of the text of the paragraph, for the spacing of letters.
+    let paragraph_size = odf_font_size(source, odf::Family::Paragraph, paragraph.style.as_deref())
+        .unwrap_or_else(|| odf_default_size(source));
     if let Some(name) = &paragraph.style {
         if let Some(&id) = ids.get(&(odf::Family::Paragraph, name.as_str())) {
             style = id;
@@ -593,7 +842,7 @@ fn import_paragraph(
                 .and_then(|p| ids.get(&(odf::Family::Paragraph, p)).copied())
                 .unwrap_or(default);
             attrs = para_attrs(&automatic.properties.paragraph);
-            base = char_attrs(&automatic.properties.text);
+            base = char_attrs(&automatic.properties.text, paragraph_size);
         }
     }
     if relative {
@@ -617,7 +866,9 @@ fn import_paragraph(
                     .parent
                     .as_deref()
                     .and_then(|p| ids.get(&(odf::Family::Text, p)).copied());
-                run_attrs.merge(&char_attrs(&automatic.properties.text));
+                let size =
+                    odf_font_size(source, odf::Family::Text, Some(name)).unwrap_or(paragraph_size);
+                run_attrs.merge(&char_attrs(&automatic.properties.text, size));
             }
         }
         // The model keeps paragraph breaks out of runs.
@@ -710,7 +961,10 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         &styles.resolve_paragraph(p.id, &ParaAttrs::default()),
                         p.id == default,
                     ),
-                    text: text_properties(&p.character),
+                    text: text_properties(
+                        &p.character,
+                        &styles.resolve_character(p.id, None, &CharAttrs::default()),
+                    ),
                 },
             },
             Style::Character(c) => odf::Style {
@@ -721,7 +975,10 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 next: None,
                 properties: odf::Properties {
                     paragraph: odf::ParagraphProperties::default(),
-                    text: text_properties(&c.character),
+                    text: text_properties(
+                        &c.character,
+                        &styles.resolve_character(default, Some(c.id), &CharAttrs::default()),
+                    ),
                 },
             },
         });
@@ -783,7 +1040,10 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         named,
                         odf::Properties {
                             paragraph: odf::ParagraphProperties::default(),
-                            text: text_properties(&run.attrs),
+                            text: text_properties(
+                                &run.attrs,
+                                &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                            ),
                         },
                     ))
                 };
