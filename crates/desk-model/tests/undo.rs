@@ -55,6 +55,20 @@ enum Action {
         paragraph: usize,
         heading: bool,
     },
+    NewStyle {
+        from: (usize, usize),
+        to: (usize, usize),
+        apply: bool,
+    },
+    Redefine {
+        at: (usize, usize),
+        heading: bool,
+    },
+    Revert {
+        from: (usize, usize),
+        to: (usize, usize),
+    },
+    DeleteStyle,
 }
 
 fn text() -> impl Strategy<Value = String> {
@@ -92,6 +106,11 @@ fn action() -> impl Strategy<Value = Action> {
             .prop_map(|(paragraph, center)| Action::Align { paragraph, center }),
         1 => (0..8usize, any::<bool>())
             .prop_map(|(paragraph, heading)| Action::ParagraphStyle { paragraph, heading }),
+        1 => (point(), point(), any::<bool>())
+            .prop_map(|(from, to, apply)| Action::NewStyle { from, to, apply }),
+        1 => (point(), any::<bool>()).prop_map(|(at, heading)| Action::Redefine { at, heading }),
+        1 => (point(), point()).prop_map(|(from, to)| Action::Revert { from, to }),
+        1 => Just(Action::DeleteStyle),
     ]
 }
 
@@ -193,6 +212,38 @@ fn run(edit: &mut Edit, fixture: &Fixture, action: &Action) -> Result<(), ModelE
                 doc.styles().default_paragraph()
             };
             edit.set_paragraph_style(at, at, style)
+        }
+        Action::NewStyle { from, to, apply } => {
+            let (a, b) = ordered(&doc, *from, *to);
+            let name = doc
+                .styles()
+                .unique_name(desk_model::StyleFamily::Paragraph, "Style");
+            edit.new_paragraph_style(&name, a, b, *apply).map(drop)
+        }
+        Action::Redefine { at, heading } => {
+            let at = position(&doc, *at);
+            let style = if *heading {
+                fixture.heading
+            } else {
+                fixture.emphasis
+            };
+            edit.redefine_style(style, at, at)
+        }
+        Action::Revert { from, to } => {
+            let (a, b) = ordered(&doc, *from, *to);
+            edit.revert_to_style(a, b)
+        }
+        Action::DeleteStyle => {
+            let styles = doc.styles();
+            let made = styles.iter().map(|s| s.id()).find(|id| {
+                *id != styles.default_paragraph()
+                    && *id != fixture.heading
+                    && *id != fixture.emphasis
+            });
+            match made {
+                Some(id) => edit.delete_style(id, Some(fixture.heading)),
+                None => Ok(()),
+            }
         }
     }
 }

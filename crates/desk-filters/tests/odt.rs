@@ -33,17 +33,19 @@ fn describe(document: &Document) -> String {
         .iter()
         .map(|style| match style {
             Style::Paragraph(p) => format!(
-                "paragraph style {:?} parent {:?} next {:?} {:?} {:?}",
+                "paragraph style {:?} parent {:?} next {:?} key {:?} {:?} {:?}",
                 p.name,
                 p.parent.and_then(name),
                 p.next.and_then(name),
+                p.shortcut,
                 p.paragraph,
                 p.character
             ),
             Style::Character(c) => format!(
-                "character style {:?} parent {:?} {:?}",
+                "character style {:?} parent {:?} key {:?} {:?}",
                 c.name,
                 c.parent.and_then(name),
+                c.shortcut,
                 c.character
             ),
         })
@@ -102,6 +104,7 @@ fn sample() -> Document {
         .put_style(ParagraphStyle {
             id: heading,
             name: "Título 1".into(),
+            shortcut: Some(1),
             parent: Some(body),
             next: Some(body),
             paragraph: ParaAttrs {
@@ -129,6 +132,7 @@ fn sample() -> Document {
         .put_style(ParagraphStyle {
             id: quote,
             name: "Quote".into(),
+            shortcut: None,
             parent: Some(body),
             next: None,
             paragraph: ParaAttrs {
@@ -149,6 +153,7 @@ fn sample() -> Document {
         .put_style(CharacterStyle {
             id: emphasis,
             name: "Ênfase".into(),
+            shortcut: Some(8),
             parent: None,
             character: CharAttrs {
                 italic: Some(true),
@@ -161,6 +166,7 @@ fn sample() -> Document {
         .put_style(CharacterStyle {
             id: strong,
             name: "Strong Emphasis".into(),
+            shortcut: None,
             parent: Some(emphasis),
             character: CharAttrs {
                 bold: Some(true),

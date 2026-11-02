@@ -26,6 +26,8 @@ pub struct Streams {
     pub styles: String,
     /// `meta.xml`.
     pub meta: String,
+    /// `settings.xml`, when there are settings to keep.
+    pub settings: Option<String>,
 }
 
 fn root(w: &mut Writer, name: &'static str) {
@@ -96,7 +98,41 @@ pub fn write_streams(document: &TextDocument) -> Streams {
         content,
         styles,
         meta: write_meta(&document.meta),
+        settings: write_settings(document),
     }
+}
+
+/// The name of the settings that Desk keeps the shortcuts of styles in.
+pub(crate) const SHORTCUTS: &str = "DeskStyleShortcuts";
+
+/// Writes the settings: the shortcuts of styles, as one item per function
+/// key holding the family and the name of the style, as in
+/// `paragraph:Heading_20_1`.
+fn write_settings(document: &TextDocument) -> Option<String> {
+    if document.style_shortcuts.is_empty() {
+        return None;
+    }
+    let mut w = Writer::new();
+    w.start("office:document-settings")
+        .attr("xmlns:office", ns::OFFICE)
+        .attr("xmlns:config", ns::CONFIG)
+        .attr("office:version", VERSION);
+    w.start("office:settings")
+        .start("config:config-item-set")
+        .attr("config:name", SHORTCUTS);
+    for shortcut in &document.style_shortcuts {
+        let family = match shortcut.family {
+            Family::Paragraph => "paragraph",
+            Family::Text => "text",
+        };
+        w.start("config:config-item")
+            .attr("config:name", &format!("F{}", shortcut.key))
+            .attr("config:type", "string")
+            .text(&format!("{family}:{}", shortcut.style))
+            .end();
+    }
+    w.end().end().end();
+    Some(w.finish())
 }
 
 /// A font family as a quoted CSS string.

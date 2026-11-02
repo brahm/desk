@@ -60,6 +60,10 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
     document.tabs_relative_to_indent = settings
         .as_deref()
         .and_then(crate::read::tabs_relative_to_indent);
+    document.style_shortcuts = settings
+        .as_deref()
+        .map(crate::read::style_shortcuts)
+        .unwrap_or_default();
     Ok(document)
 }
 
@@ -89,10 +93,17 @@ pub fn write_odt_with_thumbnail(
         ("content.xml", &streams.content),
         ("styles.xml", &streams.styles),
         ("meta.xml", &streams.meta),
-        ("META-INF/manifest.xml", &manifest(thumbnail.is_some())),
+        (
+            "META-INF/manifest.xml",
+            &manifest(thumbnail.is_some(), streams.settings.is_some()),
+        ),
     ] {
         zip.start_file(name, deflated)?;
         zip.write_all(text.as_bytes())?;
+    }
+    if let Some(settings) = &streams.settings {
+        zip.start_file("settings.xml", deflated)?;
+        zip.write_all(settings.as_bytes())?;
     }
     if let Some(png) = thumbnail {
         // PNG is compressed already.
@@ -102,7 +113,7 @@ pub fn write_odt_with_thumbnail(
     Ok(zip.finish()?.into_inner())
 }
 
-fn manifest(thumbnail: bool) -> String {
+fn manifest(thumbnail: bool, settings: bool) -> String {
     let mut w = crate::xml::Writer::new();
     w.start("manifest:manifest")
         .attr("xmlns:manifest", crate::ns::MANIFEST)
@@ -112,7 +123,8 @@ fn manifest(thumbnail: bool) -> String {
         .attr("manifest:version", VERSION)
         .attr("manifest:media-type", MEDIA_TYPE)
         .end();
-    for path in ["content.xml", "styles.xml", "meta.xml"] {
+    let streams = ["content.xml", "styles.xml", "meta.xml", "settings.xml"];
+    for path in &streams[..if settings { 4 } else { 3 }] {
         w.start("manifest:file-entry")
             .attr("manifest:full-path", path)
             .attr("manifest:media-type", "text/xml")

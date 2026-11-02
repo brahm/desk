@@ -35,6 +35,20 @@ pub struct TextDocument {
     /// positions of tab stops are measured from the indent of the
     /// paragraph. LibreOffice takes it as set when it is missing.
     pub tabs_relative_to_indent: Option<bool>,
+    /// The function keys that apply styles, which Desk keeps in
+    /// `settings.xml` because ODF has no attribute for them.
+    pub style_shortcuts: Vec<StyleShortcut>,
+}
+
+/// A function key that applies a style.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StyleShortcut {
+    /// The function key, from 1 for F1 to 8 for F8.
+    pub key: u8,
+    /// The family of the style.
+    pub family: Family,
+    /// The `style:name` of the style.
+    pub style: String,
 }
 
 impl TextDocument {

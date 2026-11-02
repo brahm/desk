@@ -9,8 +9,9 @@ use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT};
 use crate::text::{
     Background, Border, BorderLine, Break, Family, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, TabStop,
-    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
+    LineHeight, Meta, PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style,
+    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    TextShadow, TextTransform,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -412,6 +413,44 @@ pub(crate) fn tabs_relative_to_indent(settings: &str) -> Option<bool> {
             && e.attr(CONFIG, "name") == Some("TabsRelativeToIndent")
         {
             found = Some(e.text().trim() == "true");
+        }
+    });
+    found
+}
+
+/// Reads the shortcuts of styles from the settings stream.
+pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
+    let Ok(root) = xml::parse(settings) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    visit(&root, &mut |e| {
+        if !(e.name.is(CONFIG, "config-item-set")
+            && e.attr(CONFIG, "name") == Some(crate::write::SHORTCUTS))
+        {
+            return;
+        }
+        for item in e.children_named(CONFIG, "config-item") {
+            let key = item
+                .attr(CONFIG, "name")
+                .and_then(|n| n.strip_prefix('F'))
+                .and_then(|n| n.parse::<u8>().ok())
+                .filter(|k| (1..=8).contains(k));
+            let text = item.text();
+            let (family, style) = match text.split_once(':') {
+                Some(("paragraph", style)) => (Family::Paragraph, style),
+                Some(("text", style)) => (Family::Text, style),
+                _ => continue,
+            };
+            if let Some(key) = key
+                && !style.is_empty()
+            {
+                found.push(StyleShortcut {
+                    key,
+                    family,
+                    style: style.to_owned(),
+                });
+            }
         }
     });
     found

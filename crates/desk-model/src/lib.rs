@@ -49,6 +49,7 @@ mod format;
 mod id;
 mod op;
 mod style;
+mod styling;
 mod text;
 mod transaction;
 mod units;
@@ -64,6 +65,7 @@ pub use format::{
 pub use id::NodeId;
 pub use op::Op;
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
+pub use styling::{CopiedStyle, Overrides};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
 pub use transaction::{Edit, Editor, Transaction};
 pub use units::{Length, Rgba};

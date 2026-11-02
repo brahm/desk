@@ -182,7 +182,7 @@ impl Edit {
     }
 
     /// Changes each run between two positions.
-    fn map_runs(
+    pub(crate) fn map_runs(
         &mut self,
         start: Position,
         end: Position,

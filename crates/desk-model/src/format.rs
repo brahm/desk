@@ -78,6 +78,23 @@ macro_rules! formatting {
                 )*
             }
 
+            /// The attributes that are set to a value other than the one
+            /// they have in `base`.
+            pub fn difference(&self, base: &$format) -> Self {
+                Self {
+                    $($field: self.$field.clone().filter(|value| *value != base.$field),)*
+                }
+            }
+
+            /// Clears every attribute that `other` sets.
+            pub fn remove(&mut self, other: &Self) {
+                $(
+                    if other.$field.is_some() {
+                        self.$field = None;
+                    }
+                )*
+            }
+
             /// Writes the attributes that are set over a resolved format.
             pub fn apply_to(&self, format: &mut $format) {
                 $(
