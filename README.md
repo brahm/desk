@@ -97,7 +97,9 @@ The code is one Cargo workspace, with one crate per directory in
 
 The CI checks formatting, Clippy warnings, tests and documentation, the
 minimum Rust version, the licenses and advisories of dependencies (with
-cargo-deny) and REUSE compliance. It also checks two dependency rules:
+cargo-deny) and REUSE compliance. UI tests in [tests/ui](tests/ui) drive
+Desk Writer and read it through the accessibility tree, as a screen
+reader does. It also checks two dependency rules:
 the MPL-2.0 libraries use no other Desk crate, and only `desk-ui` and the
 apps use GTK.
 
@@ -148,6 +150,16 @@ miss, sending old iWork documents for the test corpus, or sending code.
 Open an [issue](https://github.com/brahm/desk/issues) for any of these.
 Before you open a pull request, run `ci/check-all.sh`, which runs every
 check of the CI; `ci/setup-env.sh` installs what it needs.
+
+### Translations
+
+The interface is in English and Brazilian Portuguese. The translations
+are gettext catalogs in [po](po), built into the apps, which pick the
+language of the desktop. To translate Desk into another language, add
+its code to `po/LINGUAS`, run `ci/update-translations.sh` to create its
+catalog from `po/desk.pot`, and translate it with a PO editor such as
+Gtranslator or Poedit. Run the script again when the strings of the code
+change.
 
 ## Website
 

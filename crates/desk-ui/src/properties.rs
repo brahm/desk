@@ -7,6 +7,7 @@
 use std::path::Path;
 use std::time::SystemTime;
 
+use crate::i18n::tr;
 use adw::prelude::*;
 use gtk::glib;
 
@@ -31,7 +32,7 @@ fn when(time: Option<SystemTime>) -> String {
     time.and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
         .and_then(|d| glib::DateTime::from_unix_local(d.as_secs() as i64).ok())
         .and_then(|t| t.format("%c").ok())
-        .map_or_else(|| "Unknown".to_owned(), String::from)
+        .map_or_else(|| tr("Unknown"), String::from)
 }
 
 /// Shows the information of the file at `path` over `parent`.
@@ -43,18 +44,18 @@ pub fn show(parent: &impl IsA<gtk::Widget>, path: &Path) {
         .map(|p| p.display().to_string())
         .unwrap_or_default();
     let rows = [
-        ("Name", crate::window::display_name(path)),
-        ("Location", location),
+        (tr("Name"), crate::window::display_name(path)),
+        (tr("Location"), location),
         (
-            "Size",
+            tr("Size"),
             format!("{} ({size} bytes)", glib::format_size(size)),
         ),
         (
-            "Created",
+            tr("Created"),
             when(metadata.as_ref().and_then(|m| m.created().ok())),
         ),
         (
-            "Modified",
+            tr("Modified"),
             when(metadata.as_ref().and_then(|m| m.modified().ok())),
         ),
     ];
@@ -65,7 +66,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>, path: &Path) {
         .build();
     for (title, value) in rows {
         let row = adw::ActionRow::builder()
-            .title(title)
+            .title(&title)
             .subtitle(glib::markup_escape_text(&value))
             .subtitle_selectable(true)
             .css_classes(["property"])
@@ -86,7 +87,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>, path: &Path) {
     view.set_content(Some(&adw::Clamp::builder().child(&content).build()));
 
     let dialog = adw::Dialog::builder()
-        .title("Document Info")
+        .title(tr("Document Info"))
         .content_width(420)
         .child(&view)
         .build();

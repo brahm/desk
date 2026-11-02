@@ -4,6 +4,7 @@
 //! The Warnings window (INT-22): what an import left out and the fonts
 //! that were replaced, which can be copied as text.
 
+use crate::i18n::tr;
 use adw::prelude::*;
 
 /// Shows the warnings of a document over `parent`.
@@ -23,9 +24,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>, document: &str, warnings: &[String])
 
     let text = warnings.join("\n");
     let copy = gtk::Button::builder()
-        .label("_Copy")
+        .label(tr("_Copy"))
         .use_underline(true)
-        .tooltip_text("Copy the warnings as text")
+        .tooltip_text(tr("Copy the warnings as text"))
         .build();
     copy.connect_clicked(move |button| {
         button.clipboard().set_text(&text);
@@ -35,9 +36,10 @@ pub fn show(parent: &impl IsA<gtk::Widget>, document: &str, warnings: &[String])
     header.pack_start(&copy);
 
     let description = gtk::Label::builder()
-        .label(format!(
-            "{document} opened with these changes. Saving it keeps them."
-        ))
+        .label(
+            tr("{document} opened with these changes. Saving it keeps them.")
+                .replace("{document}", document),
+        )
         .wrap(true)
         .xalign(0.0)
         .css_classes(["dim-label"])
@@ -64,7 +66,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>, document: &str, warnings: &[String])
     view.set_content(Some(&scrolled));
 
     let dialog = adw::Dialog::builder()
-        .title("Document Warnings")
+        .title(tr("Document Warnings"))
         .content_width(480)
         .content_height(400)
         .child(&view)

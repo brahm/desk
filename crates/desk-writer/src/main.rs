@@ -9,6 +9,7 @@
 use std::path::Path;
 
 use desk_ui::gtk::glib;
+use desk_ui::i18n::{n_, tr};
 use desk_ui::{AppInfo, Document, Opened, Opener};
 
 const APP: AppInfo = AppInfo {
@@ -20,11 +21,11 @@ const APP: AppInfo = AppInfo {
 /// The documents that Desk Writer opens.
 const OPENER: Opener = Opener {
     filters: &[
-        ("OpenDocument Text", &["odt", "ott"]),
-        ("Pages Documents", &["pages", "template"]),
+        (n_("OpenDocument Text"), &["odt", "ott"]),
+        (n_("Pages Documents"), &["pages", "template"]),
     ],
     open,
-    saves: ("OpenDocument Text", "odt"),
+    saves: (n_("OpenDocument Text"), "odt"),
     save,
 };
 
@@ -56,9 +57,9 @@ fn open(path: &Path) -> Result<Opened, String> {
                 warnings: log.entries().iter().map(|e| format!("{e}.")).collect(),
             })
         }
-        _ => Err(
-            "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages).".to_owned(),
-        ),
+        _ => Err(tr(
+            "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages).",
+        )),
     }
 }
 

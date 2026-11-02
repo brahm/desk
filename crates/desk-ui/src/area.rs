@@ -40,7 +40,7 @@ mod imp {
             self.parent_constructed();
             self.obj().update_property(&[
                 gtk::accessible::Property::MultiLine(true),
-                gtk::accessible::Property::Label("Document"),
+                gtk::accessible::Property::Label(&crate::i18n::tr("Document")),
             ]);
         }
     }
