@@ -26,6 +26,7 @@ mod preferences;
 mod properties;
 mod ruler;
 mod shortcuts;
+mod styles_drawer;
 mod tab_stops;
 pub mod text_nav;
 mod view;
@@ -248,6 +249,9 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.align('center')", &["<Control>bar"]),
             ("win.align('right')", &["<Control>braceright"]),
             ("win.invisibles", &["<Control><Shift>i"]),
+            ("win.styles-drawer", &["<Control><Shift>t"]),
+            ("win.copy-style", &["<Control><Alt>c"]),
+            ("win.paste-style", &["<Control><Alt>v"]),
             ("win.inspector", &["<Control><Alt>i"]),
             ("win.fonts", &["<Control>t"]),
             ("win.show-help-overlay", &["<Control>question"]),
@@ -367,21 +371,7 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
 
 /// The Open dialog, through the file chooser portal in Flatpak (DOC-03).
 fn show_open_dialog(app: &adw::Application, info: AppInfo, opener: &'static Opener) {
-    let filters = gio::ListStore::new::<gtk::FileFilter>();
-    let all = gtk::FileFilter::new();
-    all.set_name(Some(&tr("All Documents")));
-    for (name, patterns) in opener.filters {
-        let filter = gtk::FileFilter::new();
-        filter.set_name(Some(&tr(name)));
-        for pattern in *patterns {
-            filter.add_suffix(pattern);
-            all.add_suffix(pattern);
-        }
-        filters.append(&filter);
-    }
-    // The index inside a package of Pages, which opens the package.
-    all.add_pattern("index.xml.gz");
-    filters.insert(0, &all);
+    let (filters, all) = document_filters(opener);
     let dialog = gtk::FileDialog::builder()
         .title(tr("Open a Document"))
         .modal(true)
@@ -398,6 +388,27 @@ fn show_open_dialog(app: &adw::Application, info: AppInfo, opener: &'static Open
             }
         }
     });
+}
+
+/// The filters of the documents that an app opens, and the one of all of
+/// them, which comes first.
+pub(crate) fn document_filters(opener: &Opener) -> (gio::ListStore, gtk::FileFilter) {
+    let filters = gio::ListStore::new::<gtk::FileFilter>();
+    let all = gtk::FileFilter::new();
+    all.set_name(Some(&tr("All Documents")));
+    for (name, patterns) in opener.filters {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&tr(name)));
+        for pattern in *patterns {
+            filter.add_suffix(pattern);
+            all.add_suffix(pattern);
+        }
+        filters.append(&filter);
+    }
+    // The index inside a package of Pages, which opens the package.
+    all.add_pattern("index.xml.gz");
+    filters.insert(0, &all);
+    (filters, all)
 }
 
 fn show_about(app: &adw::Application, info: AppInfo) {

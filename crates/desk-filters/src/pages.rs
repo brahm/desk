@@ -551,6 +551,7 @@ impl<'a> Importer<'a> {
                         self.document.put_style(ParagraphStyle {
                             id: *id,
                             name: name.as_str().into(),
+                            shortcut: None,
                             parent,
                             next: None,
                             paragraph,
@@ -561,6 +562,7 @@ impl<'a> Importer<'a> {
                         self.document.put_style(CharacterStyle {
                             id: *id,
                             name: name.as_str().into(),
+                            shortcut: None,
                             parent: parent
                                 .filter(|_| style.parent.as_deref() != Some(NULL_CHARACTER)),
                             character: merged(&[style], 1).1,
@@ -579,6 +581,7 @@ impl<'a> Importer<'a> {
                             self.document.put_style(ParagraphStyle {
                                 id: *id,
                                 name: name.as_str().into(),
+                                shortcut: None,
                                 parent: (*id != self.body).then_some(self.body),
                                 next: None,
                                 paragraph,
@@ -587,6 +590,29 @@ impl<'a> Importer<'a> {
                         }
                     }
                 }
+            }
+        }
+
+        // The next styles, once every style they can name exists.
+        for (style, id, _) in &order {
+            if style.family != Family::Paragraph {
+                continue;
+            }
+            let next = sheet
+                .ancestry(style)
+                .iter()
+                .find_map(|s| s.properties.get("followingParagraphStyle"))
+                .and_then(|value| match value {
+                    Value::StyleRef(ident) => {
+                        self.ids.get(&(Family::Paragraph, ident.clone())).copied()
+                    }
+                    _ => None,
+                });
+            if let Some(next) = next.filter(|next| next != id)
+                && let Some(mut paragraph) = self.document.styles().paragraph(*id).cloned()
+            {
+                paragraph.next = Some(next);
+                self.document.put_style(paragraph)?;
             }
         }
         Ok(())

@@ -6,8 +6,9 @@
 use desk_odf::{
     Background, Border, BorderLine, Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line,
     LineColor, LineHeight, Meta, OdfError, PageLayout, Paragraph, ParagraphProperties, Properties,
-    Span, Style, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
-    TextShadow, TextTransform, read_odt, read_streams, write_odt, write_odt_with_thumbnail,
+    Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition,
+    TextProperties, TextShadow, TextTransform, read_odt, read_streams, write_odt,
+    write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -248,6 +249,18 @@ fn full_document() -> TextDocument {
             Paragraph::default(),
         ],
         tabs_relative_to_indent: None,
+        style_shortcuts: vec![
+            StyleShortcut {
+                key: 1,
+                family: Family::Paragraph,
+                style: "Heading_20_1".into(),
+            },
+            StyleShortcut {
+                key: 8,
+                family: Family::Text,
+                style: "Emphasis".into(),
+            },
+        ],
     }
 }
 

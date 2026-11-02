@@ -42,6 +42,9 @@ pub struct ParagraphStyle {
     /// The style of the paragraph that Return starts at the end of a
     /// paragraph with this style. `None` keeps the same style.
     pub next: Option<StyleId>,
+    /// The function key that applies the style, from 1 for F1 to 8 for F8
+    /// (STY-04).
+    pub shortcut: Option<u8>,
     /// The paragraph attributes.
     pub paragraph: ParaAttrs,
     /// The character attributes for the text of the paragraph.
@@ -56,6 +59,7 @@ impl ParagraphStyle {
             name: name.into(),
             parent: None,
             next: None,
+            shortcut: None,
             paragraph: ParaAttrs::default(),
             character: CharAttrs::default(),
         }
@@ -71,6 +75,9 @@ pub struct CharacterStyle {
     pub name: Arc<str>,
     /// The style it inherits from.
     pub parent: Option<StyleId>,
+    /// The function key that applies the style, from 1 for F1 to 8 for F8
+    /// (STY-04).
+    pub shortcut: Option<u8>,
     /// The character attributes.
     pub character: CharAttrs,
 }
@@ -82,6 +89,7 @@ impl CharacterStyle {
             id,
             name: name.into(),
             parent: None,
+            shortcut: None,
             character: CharAttrs::default(),
         }
     }
@@ -119,6 +127,32 @@ impl Style {
             Self::Paragraph(style) => style.parent,
             Self::Character(style) => style.parent,
         }
+    }
+
+    /// The function key that applies the style, from 1 to 8.
+    pub fn shortcut(&self) -> Option<u8> {
+        match self {
+            Self::Paragraph(style) => style.shortcut,
+            Self::Character(style) => style.shortcut,
+        }
+    }
+
+    /// The same style with another name.
+    pub fn with_name(mut self, name: &str) -> Self {
+        match &mut self {
+            Self::Paragraph(style) => style.name = name.into(),
+            Self::Character(style) => style.name = name.into(),
+        }
+        self
+    }
+
+    /// The same style with another shortcut.
+    pub fn with_shortcut(mut self, key: Option<u8>) -> Self {
+        match &mut self {
+            Self::Paragraph(style) => style.shortcut = key,
+            Self::Character(style) => style.shortcut = key,
+        }
+        self
     }
 
     /// The family.
@@ -193,6 +227,23 @@ impl Styles {
             .find(|style| style.family() == family && style.name() == name)
     }
 
+    /// The style that a function key applies, from 1 for F1 to 8 for F8.
+    pub fn by_shortcut(&self, key: u8) -> Option<&Style> {
+        self.iter().find(|style| style.shortcut() == Some(key))
+    }
+
+    /// A name that no style of the family has: the name itself, or the
+    /// name followed by the first free number from 2, as "Body 2".
+    pub fn unique_name(&self, family: StyleFamily, name: &str) -> String {
+        if self.by_name(family, name).is_none() {
+            return name.to_owned();
+        }
+        (2..)
+            .map(|n| format!("{name} {n}"))
+            .find(|candidate| self.by_name(family, candidate).is_none())
+            .expect("a free number")
+    }
+
     /// All styles, in the order of their identifiers.
     pub fn iter(&self) -> impl Iterator<Item = &Style> {
         self.styles.values()
@@ -232,6 +283,11 @@ impl Styles {
                 style: id,
                 expected: old.family(),
             });
+        }
+        if let Some(key) = style.shortcut()
+            && !(1..=8).contains(&key)
+        {
+            return Err(ModelError::InvalidShortcut(key));
         }
         if let Style::Paragraph(paragraph) = style
             && let Some(next) = paragraph.next

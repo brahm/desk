@@ -106,6 +106,9 @@ pub enum Value {
     Shadow(Shadow),
     /// A line (`sf:stroke`).
     Stroke(Stroke),
+    /// A paragraph or character style, by its identifier, as the
+    /// following paragraph style refers to one.
+    StyleRef(String),
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -264,6 +267,9 @@ impl Value {
                     },
                 })
             }
+            "paragraphstyle" | "characterstyle" => element
+                .attr(SF, "ident")
+                .map_or_else(|| Self::Other("style".into()), |i| Self::StyleRef(i.into())),
             other => Self::Other(other.to_owned()),
         }
     }

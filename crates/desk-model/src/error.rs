@@ -31,6 +31,10 @@ pub enum ModelError {
     StyleInUse(StyleId),
     /// The default paragraph style cannot be removed.
     DefaultStyle,
+    /// Another style of the family has this name.
+    DuplicateStyleName(String),
+    /// A style shortcut is a function key from 1 to 8.
+    InvalidShortcut(u8),
     /// Another node already has this identifier.
     DuplicateId(NodeId),
     /// The range is outside the paragraph or splits a character.
@@ -66,6 +70,8 @@ impl fmt::Display for ModelError {
             Self::StyleCycle(id) => write!(f, "style {id} would inherit from itself"),
             Self::StyleInUse(id) => write!(f, "style {id} is in use"),
             Self::DefaultStyle => write!(f, "the default paragraph style cannot be removed"),
+            Self::DuplicateStyleName(name) => write!(f, "a style is already named {name:?}"),
+            Self::InvalidShortcut(key) => write!(f, "F{key} cannot be a style shortcut"),
             Self::DuplicateId(id) => write!(f, "the identifier {id} is already in use"),
             Self::InvalidRange { paragraph, range } => write!(
                 f,

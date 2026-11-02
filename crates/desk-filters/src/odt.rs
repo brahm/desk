@@ -670,6 +670,11 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     default_style.character = char_attrs(&defaults.text, odf_default_size(source));
     if let Some(standard) = standard {
         default_style.name = names[&default].as_str().into();
+        default_style.shortcut = source
+            .style_shortcuts
+            .iter()
+            .find(|s| s.family == odf::Family::Paragraph && s.style == standard.name)
+            .map(|s| s.key);
         default_style
             .paragraph
             .merge(&para_attrs(&standard.properties.paragraph));
@@ -698,10 +703,16 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     .and_then(|n| ids.get(&(family, n)).copied())
                     .filter(|_| pass == 1)
             };
+            let shortcut = source
+                .style_shortcuts
+                .iter()
+                .find(|s| s.family == style.family && s.style == style.name)
+                .map(|s| s.key);
             let built: Style = match style.family {
                 odf::Family::Paragraph => ParagraphStyle {
                     id,
                     name: names[&id].as_str().into(),
+                    shortcut,
                     parent: link(&style.parent, odf::Family::Paragraph).or(Some(default)),
                     next: link(&style.next, odf::Family::Paragraph),
                     paragraph: para_attrs(&style.properties.paragraph),
@@ -711,6 +722,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 odf::Family::Text => CharacterStyle {
                     id,
                     name: names[&id].as_str().into(),
+                    shortcut,
                     parent: link(&style.parent, odf::Family::Text),
                     character: char_attrs(&style.properties.text, size),
                 }
@@ -945,6 +957,19 @@ pub fn export(document: &Document) -> odf::TextDocument {
     }
 
     let mut out = odf::TextDocument::default();
+    for style in styles.iter() {
+        if let Some(key) = style.shortcut() {
+            out.style_shortcuts.push(odf::StyleShortcut {
+                key,
+                family: match style.family() {
+                    desk_model::StyleFamily::Paragraph => odf::Family::Paragraph,
+                    desk_model::StyleFamily::Character => odf::Family::Text,
+                },
+                style: names[&style.id()].clone(),
+            });
+        }
+    }
+    out.style_shortcuts.sort_by_key(|s| s.key);
     for style in styles.iter() {
         let name = names[&style.id()].clone();
         let display_name = (name != style.name()).then(|| style.name().to_owned());

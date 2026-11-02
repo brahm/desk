@@ -62,8 +62,11 @@ for file in "$out"/files/*.odt; do
     unzip -q -o "$file" -d "$dir"
     # -i: the ODF schemas are not compatible with DTD ID types, as the
     # OASIS validator also assumes.
-    if ! jing -i "$schemas/OpenDocument-v1.3-schema.rng" \
-        "$dir/content.xml" "$dir/styles.xml" "$dir/meta.xml" ||
+    streams=("$dir/content.xml" "$dir/styles.xml" "$dir/meta.xml")
+    if [[ -f $dir/settings.xml ]]; then
+        streams+=("$dir/settings.xml")
+    fi
+    if ! jing -i "$schemas/OpenDocument-v1.3-schema.rng" "${streams[@]}" ||
         ! jing -i "$schemas/OpenDocument-v1.3-manifest-schema.rng" \
             "$dir/META-INF/manifest.xml"; then
         echo "error: $(basename "$file") is not valid ODF 1.3" >&2

@@ -230,6 +230,36 @@ def main():
         check("Ctrl+T shows the Fonts window", showing(fonts))
         check("it has the shadow", find_named(fonts, "Shadow") is not None)
         check("it has the typography", find_named(fonts, "Ligatures") is not None)
+
+        # Ctrl+Shift+T shows the Styles drawer, with the style of the
+        # paragraph chosen in its list (INT-18).
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+shift+t")
+        paragraphs = wait_for(
+            "the Styles drawer",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.LIST
+                    and n.get_name() == "Paragraph Styles"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
+        check("Ctrl+Shift+T shows the Styles drawer", True)
+        chosen = [
+            n
+            for n in walk(paragraphs)
+            if n.get_role() == Atspi.Role.LIST_ITEM
+            and n.get_state_set().contains(Atspi.StateType.SELECTED)
+        ]
+        check("the style of the paragraph is chosen in the drawer", len(chosen) == 1)
+        check("the character styles show", showing(find_named(app, "Character Styles")))
     finally:
         writer.terminate()
         writer.wait(timeout=10)
