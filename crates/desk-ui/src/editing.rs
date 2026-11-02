@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use desk_layout::DocumentLayout;
 use desk_model::{
-    CharAttrs, CharFormat, Document, Editor, LINE_BREAK, ModelError, ParaAttrs, ParaFormat,
+    CharAttrs, CharFormat, Document, Editor, LINE_BREAK, Length, ModelError, ParaAttrs, ParaFormat,
     StyleFamily, StyleId,
 };
 use desk_render::DisplayList;
@@ -74,6 +74,38 @@ fn autocorrect(
     ))
 }
 
+/// Corrects the misspelled word that ends at `at` when the dictionary has
+/// one suggestion for it (TXT-07), and returns where `at` moved.
+fn accept_single_suggestion(
+    edit: &mut desk_model::Edit,
+    at: desk_model::Position,
+) -> Result<desk_model::Position, ModelError> {
+    let document = edit.document();
+    let paragraph = document.paragraph(at.paragraph)?;
+    let text = paragraph.text();
+    let mistakes = crate::spelling::mistakes(document.styles(), paragraph, true, false);
+    let Some(mistake) = mistakes.iter().find(|m| m.range.end == at.offset) else {
+        return Ok(at);
+    };
+    let suggestions = mistake.suggestions(&text);
+    let [suggestion] = suggestions.as_slice() else {
+        return Ok(at);
+    };
+    let found = desk_model::Found {
+        paragraph: at.paragraph,
+        index: 0,
+        range: mistake.range.clone(),
+    };
+    let end = edit.replace_found(&found, suggestion)?;
+    Ok(desk_model::Position::new(at.paragraph, end.offset))
+}
+
+thread_local! {
+    /// The text last copied in Desk, with its styles, while the clipboard
+    /// still holds that text.
+    static COPIED: RefCell<Option<(String, desk_model::Fragment)>> = const { RefCell::new(None) };
+}
+
 /// The position of the model at a spot.
 fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, ModelError> {
     spot.position(document).ok_or(ModelError::IndexOutOfBounds {
@@ -115,6 +147,9 @@ struct State {
     /// More selected ranges, which Select All Uses adds (STY-09). Changes
     /// of formatting apply to them too; moving the cursor drops them.
     others: Vec<Selection>,
+    /// Whether a Ctrl-click or the drag after it is adding a range to the
+    /// selection, which keeps the others (TXT-03).
+    adding: bool,
     /// The cursor at the end of a word being typed, which the spelling
     /// checker leaves unmarked until the cursor leaves it.
     squiggle_skip: Option<Spot>,
@@ -203,6 +238,7 @@ impl TextEditor {
                 invisibles: false,
                 access: AccessText::default(),
                 others: Vec::new(),
+                adding: false,
                 squiggle_skip: None,
             })),
         };
@@ -306,12 +342,24 @@ impl TextEditor {
         text
     }
 
-    /// Copies the selection to the clipboard.
+    /// Copies the selection to the clipboard, as text for other apps and
+    /// with its styles for Desk (TXT-04).
     pub fn copy(&self) {
         let text = self.selected_text();
-        if !text.is_empty() {
-            self.view.area().clipboard().set_text(&text);
+        if text.is_empty() {
+            return;
         }
+        let fragment = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let (start, end) = state.selection.ordered();
+            at_spot(document, start)
+                .and_then(|a| at_spot(document, end).map(|b| (a, b)))
+                .and_then(|(a, b)| document.copy_fragment(a, b))
+                .ok()
+        };
+        COPIED.with(|c| *c.borrow_mut() = fragment.map(|f| (text.clone(), f)));
+        self.view.area().clipboard().set_text(&text);
     }
 
     /// Copies the selection and deletes it.
@@ -323,17 +371,74 @@ impl TextEditor {
         self.replace_selection("Cut", "");
     }
 
-    /// Inserts the text of the clipboard over the selection.
+    /// Inserts the clipboard over the selection: text copied in Desk
+    /// keeps its styles, and text from other apps takes the format at the
+    /// cursor (TXT-04).
     pub fn paste(&self) {
+        self.paste_keeping_style(true);
+    }
+
+    /// Inserts the text of the clipboard over the selection with the
+    /// format at the cursor: Paste and Match Style (TXT-04).
+    pub fn paste_matching_style(&self) {
+        self.paste_keeping_style(false);
+    }
+
+    fn paste_keeping_style(&self, keep: bool) {
         let weak = self.downgrade();
         self.view
             .area()
             .clipboard()
             .read_text_async(gtk::gio::Cancellable::NONE, move |result| {
-                if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
-                    this.replace_selection("Paste", &text);
+                let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) else {
+                    return;
+                };
+                let fragment = keep
+                    .then(|| {
+                        COPIED.with(|c| {
+                            c.borrow()
+                                .as_ref()
+                                .filter(|(copied, _)| copied.as_str() == text.as_str())
+                                .map(|(_, f)| f.clone())
+                        })
+                    })
+                    .flatten();
+                match fragment {
+                    Some(fragment) => this.paste_fragment(&fragment),
+                    None => this.replace_selection("Paste", &text),
                 }
             });
+    }
+
+    /// Replaces a font family with another one in the whole document, as
+    /// one action of the history (INT-22).
+    pub fn replace_font(&self, from: &str, to: &str) {
+        let before = self.selection();
+        let result = self
+            .state
+            .borrow_mut()
+            .editor
+            .edit("Replace Font", |edit| edit.replace_font_family(from, to))
+            .map(|()| Some(before.focus));
+        self.finish_edit(before, result);
+    }
+
+    /// Replaces the selection with text copied with its styles.
+    fn paste_fragment(&self, fragment: &desk_model::Fragment) {
+        let before = self.selection();
+        let (start, end) = before.ordered();
+        let result = self.state.borrow_mut().editor.edit("Paste", |edit| {
+            let from = at_spot(edit.document(), start)?;
+            let to = at_spot(edit.document(), end)?;
+            let at = if start == end {
+                from
+            } else {
+                edit.delete(from, to)?
+            };
+            let after = edit.paste_fragment(at, fragment)?;
+            Ok(Spot::of(edit.document(), after))
+        });
+        self.finish_edit(before, result);
     }
 
     /// Undoes the last action.
@@ -426,7 +531,10 @@ impl TextEditor {
                 if let Some(c) = typed
                     && desk_model::ends_word(c)
                 {
-                    let corrected = autocorrect(edit, at, &preferences.autocorrect)?;
+                    let mut corrected = autocorrect(edit, at, &preferences.autocorrect)?;
+                    if preferences.accept_single_suggestion {
+                        corrected = accept_single_suggestion(edit, corrected)?;
+                    }
                     after.offset = after.offset + corrected.offset - at.offset;
                 }
                 Ok(Spot::of(edit.document(), after))
@@ -903,6 +1011,51 @@ impl TextEditor {
         });
     }
 
+    /// Changes the margins of the page, as one action of the history
+    /// (FMT-18). With `keep_indents`, how far each edge of the text moved
+    /// in, in points, the paragraphs of the selection change their indents
+    /// so that they stay where they are on the page.
+    pub fn set_margins(
+        &self,
+        name: &str,
+        setup: desk_model::PageSetup,
+        keep_indents: Option<(f64, f64)>,
+    ) {
+        let ranges = self.ranges();
+        self.format_edit(name, move |edit| {
+            edit.set_page_setup(setup)?;
+            let Some((left, right)) = keep_indents else {
+                return Ok(());
+            };
+            for (start, end) in ranges {
+                let document = edit.document();
+                let from = at_spot(document, start)?;
+                let to = at_spot(document, end)?;
+                for (id, _) in document.paragraph_ranges(from, to)? {
+                    let paragraph = edit.document().paragraph(id)?;
+                    let format = edit
+                        .document()
+                        .styles()
+                        .resolve_paragraph(paragraph.style(), paragraph.attrs());
+                    let indent = |value: Length, shift: f64| {
+                        Length::from_pt((value.to_pt() - shift).max(0.0))
+                    };
+                    let at = desk_model::Position::new(id, 0);
+                    edit.set_paragraph_attrs(
+                        at,
+                        at,
+                        &ParaAttrs {
+                            left_indent: Some(indent(format.left_indent, left)),
+                            right_indent: Some(indent(format.right_indent, right)),
+                            ..ParaAttrs::default()
+                        },
+                    )?;
+                }
+            }
+            Ok(())
+        });
+    }
+
     /// Gives the paragraphs of the selection a paragraph style.
     pub fn set_paragraph_style(&self, style: StyleId) {
         self.format_ranges("Paragraph Style", |edit, from, to| {
@@ -1005,6 +1158,19 @@ impl TextEditor {
             })
             .flatten();
         (all, selected)
+    }
+
+    /// The lines of the document, and of the selection when there is one
+    /// (DOC-20).
+    pub fn line_counts(&self) -> (usize, Option<usize>) {
+        let state = self.state.borrow();
+        let (start, end) = state.selection.ordered();
+        let selected = (start != end).then(|| {
+            state
+                .layout
+                .lines_between((start.paragraph, start.offset), (end.paragraph, end.offset))
+        });
+        (state.layout.line_count(), selected)
     }
 
     /// Everything that a search finds in the document (TXT-12, TXT-13).
@@ -1259,7 +1425,9 @@ impl TextEditor {
             };
             if state.selection != selection {
                 state.pending = None;
-                state.others.clear();
+                if !state.adding {
+                    state.others.clear();
+                }
             }
             state.selection = selection;
             let mut rects = text_nav::selection_rects(&state.layout, &selection);
@@ -1557,9 +1725,21 @@ impl TextEditor {
             let Some(spot) = this.spot_at(x, y) else {
                 return;
             };
-            let shift = gesture
-                .current_event_state()
-                .contains(gdk::ModifierType::SHIFT_MASK);
+            let modifiers = gesture.current_event_state();
+            let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
+            let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
+            {
+                // Ctrl and a click start another range, and keep what was
+                // selected (TXT-03).
+                let mut state = this.state.borrow_mut();
+                state.adding = control && !shift;
+                if state.adding {
+                    let current = state.selection;
+                    if !current.is_empty() && !state.others.contains(&current) {
+                        state.others.push(current);
+                    }
+                }
+            }
             let unit = match presses {
                 1 => Unit::Character,
                 2 => Unit::Word,
@@ -1579,6 +1759,12 @@ impl TextEditor {
                 let selection = this.unit_at(spot, unit);
                 this.select(selection);
                 this.state.borrow_mut().drag_from = Some(selection);
+            }
+        });
+        let weak = self.downgrade();
+        click.connect_released(move |_, _, _, _| {
+            if let Some(this) = weak.upgrade() {
+                this.state.borrow_mut().adding = false;
             }
         });
         self.view.area().add_controller(click);
@@ -1606,7 +1792,9 @@ impl TextEditor {
             let Some(this) = weak.upgrade() else {
                 return Default::default();
             };
-            this.state.borrow_mut().drag_from = None;
+            let mut state = this.state.borrow_mut();
+            state.drag_from = None;
+            state.adding = false;
         });
         self.view.area().add_controller(drag);
     }
@@ -1627,5 +1815,39 @@ impl TextEditor {
             view.set_caret_on(on);
             glib::ControlFlow::Continue
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use desk_model::{Editor, Language};
+
+    #[test]
+    fn txt_07_a_misspelling_with_one_suggestion_is_corrected() {
+        if desk_lang::speller("en-US").is_none() {
+            return;
+        }
+        let english = CharAttrs {
+            language: Some(Language::new("en-US")),
+            ..CharAttrs::default()
+        };
+        let correct = |text: &str| {
+            let mut editor = Editor::new(Document::new_word_processing());
+            let start = editor.document().start();
+            editor
+                .edit("Typing", |edit| {
+                    let end = edit.insert_text(start, text)?;
+                    edit.set_character_attrs(start, end, &english)?;
+                    accept_single_suggestion(edit, end)
+                })
+                .unwrap();
+            editor.document().body().get(0).unwrap().text().to_string()
+        };
+        // The dictionary has one suggestion for "acheive", and three for
+        // "recieve".
+        assert_eq!(correct("We acheive"), "We achieve");
+        assert_eq!(correct("We recieve"), "We recieve");
+        assert_eq!(correct("We achieve"), "We achieve");
     }
 }

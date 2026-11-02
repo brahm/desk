@@ -76,7 +76,7 @@ pub use list::{
 };
 pub use op::Op;
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
-pub use styling::{CopiedStyle, Overrides};
+pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
 pub use transaction::{Edit, Editor, Transaction};
 pub use units::{Length, Rgba};

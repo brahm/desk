@@ -99,6 +99,25 @@ pub struct DocumentLayout {
 }
 
 impl DocumentLayout {
+    /// How many lines the text has, in every page (DOC-20).
+    pub fn line_count(&self) -> usize {
+        self.pages.iter().map(|p| p.lines.len()).sum()
+    }
+
+    /// How many lines hold some of the text from `start` to `end`, each
+    /// a paragraph and an offset in it (DOC-20).
+    pub fn lines_between(&self, start: (usize, usize), end: (usize, usize)) -> usize {
+        self.pages
+            .iter()
+            .flat_map(|p| &p.lines)
+            .filter(|l| {
+                let first = (l.paragraph, l.line.range.start);
+                let last = (l.paragraph, l.line.range.end);
+                first < end && start < last.max((l.paragraph, l.line.range.start + 1))
+            })
+            .count()
+    }
+
     /// The page that a paragraph starts on.
     pub fn page_of(&self, paragraph: usize) -> Option<usize> {
         self.pages

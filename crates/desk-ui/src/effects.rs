@@ -86,6 +86,15 @@ impl ColorRow {
             .build();
         labelled(&button, &format!("{title}: {}", tr("Color")));
         let row = adw::ActionRow::builder().title(title).build();
+        let picker = crate::eyedropper::button(&button);
+        // A color picked from the screen turns the color on.
+        let on = switch.downgrade();
+        picker.connect_clicked(move |_| {
+            if let Some(on) = on.upgrade() {
+                on.set_active(true);
+            }
+        });
+        row.add_suffix(&picker);
         row.add_suffix(&button);
         row.add_suffix(&switch);
         row.set_activatable_widget(Some(&switch));

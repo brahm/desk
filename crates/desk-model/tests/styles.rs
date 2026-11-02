@@ -549,3 +549,123 @@ fn sty_10_import_replaces_or_renames_duplicates() {
         1
     );
 }
+
+#[test]
+fn txt_04_paste_keeps_the_styles_of_the_copied_text() {
+    let (mut source, heading) = editor();
+    let (a, b, c) = (at(&source, 0, 0), at(&source, 0, 4), at(&source, 0, 7));
+    source
+        .edit("Format", |edit| {
+            edit.set_paragraph_style(a, a, heading)?;
+            // "two" in italics.
+            edit.set_character_attrs(b, c, &italic())
+        })
+        .unwrap();
+    // "two three" of the heading and "fo" of the next paragraph.
+    let fragment = source
+        .document()
+        .copy_fragment(at(&source, 0, 4), at(&source, 1, 2))
+        .unwrap();
+    assert_eq!(fragment.text(), "two three\nfo");
+    assert!(!fragment.whole_start);
+
+    // Into the middle of a paragraph of a document without Heading.
+    let mut target = Editor::new(Document::new_word_processing());
+    let start = target.document().start();
+    target
+        .edit("Typing", |edit| edit.insert_text(start, "abcd").map(|_| ()))
+        .unwrap();
+    let middle = at(&target, 0, 2);
+    let end = target
+        .edit("Paste", |edit| edit.paste_fragment(middle, &fragment))
+        .unwrap();
+    assert_eq!(paragraph(&target, 0).text(), "abtwo three");
+    assert_eq!(paragraph(&target, 1).text(), "focd");
+    // The text that joins the paragraph keeps its look there.
+    let joined = look(&target, 0, 2);
+    assert!(joined.weight.is_bold());
+    assert_eq!(joined.font_size, Length::from_points(18));
+    assert!(look(&target, 0, 3).italic);
+    assert!(!look(&target, 0, 0).weight.is_bold());
+    // The next paragraph takes its own style, which comes along by name.
+    let styles = target.document().styles();
+    let default = styles.default_paragraph();
+    assert_eq!(paragraph(&target, 1).style(), default);
+    assert!(styles.by_name(StyleFamily::Paragraph, "Heading").is_none());
+    assert_eq!(end, at(&target, 1, 2));
+
+    // A whole paragraph into an empty one takes its style.
+    let whole = source
+        .document()
+        .copy_fragment(at(&source, 0, 0), at(&source, 0, 13))
+        .unwrap();
+    let mut empty = Editor::new(Document::new_word_processing());
+    let start = empty.document().start();
+    empty
+        .edit("Paste", |edit| edit.paste_fragment(start, &whole))
+        .unwrap();
+    let styles = empty.document().styles();
+    let added = styles
+        .by_name(StyleFamily::Paragraph, "Heading")
+        .expect("the style comes along");
+    assert_eq!(paragraph(&empty, 0).style(), added.id());
+    assert!(paragraph(&empty, 0).runs().next().unwrap().attrs.is_empty());
+    assert!(look(&empty, 0, 4).italic);
+}
+
+#[test]
+fn int_22_a_missing_font_is_replaced_everywhere() {
+    let (mut editor, heading) = editor();
+    let (a, b) = (at(&editor, 0, 0), at(&editor, 1, 2));
+    let palatino = CharAttrs {
+        font_family: Some("Palatino".into()),
+        ..CharAttrs::default()
+    };
+    editor
+        .edit("Format", |edit| {
+            edit.set_paragraph_style(a, a, heading)?;
+            let mut style = edit.document().styles().paragraph(heading).unwrap().clone();
+            style.character.font_family = Some("palatino".into());
+            edit.apply(desk_model::Op::PutStyle {
+                style: style.into(),
+            })?;
+            edit.set_character_attrs(a, b, &palatino)
+        })
+        .unwrap();
+    editor
+        .edit("Replace Font", |edit| {
+            edit.replace_font_family("Palatino", "TeX Gyre Pagella")
+        })
+        .unwrap();
+    let styles = editor.document().styles();
+    assert_eq!(
+        styles
+            .paragraph(heading)
+            .unwrap()
+            .character
+            .font_family
+            .as_deref(),
+        Some("TeX Gyre Pagella")
+    );
+    for (index, offset) in [(0, 0), (1, 1), (1, 3)] {
+        assert_eq!(
+            &*look(&editor, index, offset).font_family,
+            if (index, offset) == (1, 3) {
+                "Helvetica"
+            } else {
+                "TeX Gyre Pagella"
+            },
+            "{index} {offset}"
+        );
+    }
+    // The family that text has when no style sets one.
+    editor
+        .edit("Replace Font", |edit| {
+            edit.replace_font_family("Helvetica", "TeX Gyre Heros")
+        })
+        .unwrap();
+    assert_eq!(&*look(&editor, 1, 3).font_family, "TeX Gyre Heros");
+    // One step of the history.
+    editor.undo().unwrap();
+    assert_eq!(&*look(&editor, 1, 3).font_family, "Helvetica");
+}

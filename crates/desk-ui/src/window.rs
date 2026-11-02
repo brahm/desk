@@ -52,7 +52,7 @@ pub struct DocumentWindow {
     path: RefCell<Option<PathBuf>>,
     /// The name of the document, which is its file's unless untitled.
     name: RefCell<String>,
-    warnings: RefCell<Vec<String>>,
+    warnings: RefCell<Vec<crate::Warning>>,
     editor: Rc<RefCell<Option<TextEditor>>>,
     format_bar: Rc<FormatBar>,
     inspector: Rc<Inspector>,
@@ -87,7 +87,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 38] = [
+const DOCUMENT_ACTIONS: [&str; 39] = [
     "save",
     "save-as",
     "save-copy",
@@ -97,6 +97,7 @@ const DOCUMENT_ACTIONS: [&str; 38] = [
     "cut",
     "copy",
     "paste",
+    "paste-match-style",
     "bold",
     "italic",
     "underline",
@@ -329,10 +330,18 @@ impl DocumentWindow {
         });
         this.add_actions();
         this.show_rulers();
+        {
+            let current = preferences::get();
+            this.view.set_zoom(f64::from(current.zoom) / 100.0);
+            this.zoom_button
+                .set_label(&geometry::zoom_label(this.view.zoom()));
+            this.show_window_preferences(&current);
+        }
         let weak = Rc::downgrade(&this);
         preferences::connect_changed(move |p| {
             if let Some(this) = weak.upgrade() {
                 this.show_rulers();
+                this.show_window_preferences(p);
                 formatting::set_state(
                     &this.window,
                     "check-spelling-while-typing",
@@ -509,6 +518,13 @@ impl DocumentWindow {
         );
     }
 
+    /// Shows what the preferences say about the window: the counts at
+    /// the bottom and the color of invisibles.
+    fn show_window_preferences(&self, preferences: &preferences::Preferences) {
+        self.counts_label.set_visible(preferences.show_counts);
+        self.view.set_invisibles_color(preferences.invisibles_color);
+    }
+
     /// Shows the rulers that Show Ruler and the preferences ask for.
     fn show_rulers(&self) {
         let on = self.action_state("ruler");
@@ -580,8 +596,29 @@ impl DocumentWindow {
         }
     }
 
-    fn show_warnings(&self) {
-        crate::warnings::show(&self.window, &self.name.borrow(), &self.warnings.borrow());
+    fn show_warnings(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        let replace = move |from: &str, to: &str| {
+            let Some(this) = weak.upgrade() else {
+                return false;
+            };
+            let Some(editor) = this.editor() else {
+                return false;
+            };
+            editor.replace_font(from, to);
+            this.warnings
+                .borrow_mut()
+                .retain(|w| w.font.as_deref() != Some(from));
+            this.warnings_button
+                .set_visible(!this.warnings.borrow().is_empty());
+            true
+        };
+        crate::warnings::show(
+            &self.window,
+            &self.name.borrow(),
+            &self.warnings.borrow(),
+            Rc::new(replace),
+        );
     }
 
     fn alert(&self, heading: &str, body: &str) {
@@ -1046,6 +1083,7 @@ impl DocumentWindow {
             ("cut", TextEditor::cut),
             ("copy", TextEditor::copy),
             ("paste", TextEditor::paste),
+            ("paste-match-style", TextEditor::paste_matching_style),
             ("select-all", TextEditor::select_all),
         ] {
             let weak = Rc::downgrade(self);
@@ -1292,10 +1330,11 @@ impl DocumentWindow {
             ("statistics", |this| {
                 if let Some(editor) = this.editor() {
                     let (all, selected) = editor.statistics();
+                    let (lines, selected_lines) = editor.line_counts();
                     writing_tools::show_statistics(
                         &this.window,
-                        &all,
-                        selected.as_ref(),
+                        (&all, lines),
+                        selected.as_ref().map(|s| (s, selected_lines.unwrap_or(0))),
                         this.view.page_count(),
                     );
                 }
@@ -1464,6 +1503,10 @@ impl DocumentWindow {
         edit.append(Some(&tr("Cu_t")), Some("win.cut"));
         edit.append(Some(&tr("_Copy")), Some("win.copy"));
         edit.append(Some(&tr("_Paste")), Some("win.paste"));
+        edit.append(
+            Some(&tr("Paste and _Match Style")),
+            Some("win.paste-match-style"),
+        );
         edit.append(Some(&tr("Select _All")), Some("win.select-all"));
         menu.append_section(None, &edit);
         let format = gio::Menu::new();

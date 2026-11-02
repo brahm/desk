@@ -40,6 +40,47 @@ pub struct CopiedStyle {
     pub lists: Vec<ListStyle>,
 }
 
+/// Text copied with its styles, to paste into the same or another document
+/// keeping its look (TXT-04).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Fragment {
+    /// The paragraphs, the first and the last of them maybe in part.
+    pub paragraphs: Vec<FragmentParagraph>,
+    /// Whether the first paragraph was copied from its start.
+    pub whole_start: bool,
+    /// The list styles that the paragraphs name.
+    pub lists: Vec<ListStyle>,
+}
+
+/// A paragraph of a [`Fragment`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FragmentParagraph {
+    /// The paragraph style, with every attribute it resolves to and no
+    /// parent.
+    pub style: ParagraphStyle,
+    /// The attributes set on the paragraph itself.
+    pub attrs: ParaAttrs,
+    /// The text, in runs with their character styles, each with every
+    /// attribute its chain sets and no parent, and their attributes.
+    pub runs: Vec<(String, Option<CharacterStyle>, CharAttrs)>,
+}
+
+impl Fragment {
+    /// The text, with a line feed between paragraphs.
+    pub fn text(&self) -> String {
+        self.paragraphs
+            .iter()
+            .map(|p| {
+                p.runs
+                    .iter()
+                    .map(|(t, _, _)| t.as_str())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 /// Where the formatting of some text differs from its styles: the red
 /// arrows of the Styles drawer (STY-06).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -145,6 +186,47 @@ impl Document {
             paragraph_attrs: paragraph.attrs().clone(),
             character: style.and_then(|id| self.flat_character_style(id)),
             character_attrs: attrs,
+        })
+    }
+
+    /// The text between two positions with its styles, for Copy (TXT-04).
+    pub fn copy_fragment(&self, start: Position, end: Position) -> Result<Fragment, ModelError> {
+        let styles = self.styles();
+        let mut lists: Vec<ListStyle> = Vec::new();
+        let mut paragraphs = Vec::new();
+        for (id, range) in self.paragraph_ranges(start, end)? {
+            let paragraph = self.paragraph(id)?;
+            let own = styles
+                .resolve_paragraph(paragraph.style(), &ParaAttrs::default())
+                .list_style;
+            let direct = paragraph.attrs().list_style.flatten();
+            for list in [own, direct].into_iter().flatten() {
+                if let Some(list) = styles.list(list)
+                    && !lists.iter().any(|l| l.id == list.id)
+                {
+                    lists.push(list.clone());
+                }
+            }
+            let runs = paragraph
+                .slice(range)?
+                .into_iter()
+                .map(|run| {
+                    let style = run.style.and_then(|s| self.flat_character_style(s));
+                    (run.text().to_owned(), style, run.attrs.clone())
+                })
+                .collect();
+            paragraphs.push(FragmentParagraph {
+                style: self
+                    .flat_paragraph_style(paragraph.style())
+                    .ok_or(ModelError::UnknownStyle(paragraph.style()))?,
+                attrs: paragraph.attrs().clone(),
+                runs,
+            });
+        }
+        Ok(Fragment {
+            paragraphs,
+            whole_start: start.offset == 0,
+            lists,
         })
     }
 
@@ -616,6 +698,134 @@ impl Edit {
             }
         }
         self.apply(Op::RemoveStyle { style: id })
+    }
+
+    /// Replaces a font family with another in every style and all the
+    /// text, as the Warnings window does for a missing font (INT-22).
+    pub fn replace_font_family(&mut self, from: &str, to: &str) -> Result<(), ModelError> {
+        let matches = |family: &Option<std::sync::Arc<str>>| {
+            family
+                .as_deref()
+                .is_some_and(|f| f.eq_ignore_ascii_case(from))
+        };
+        let to: std::sync::Arc<str> = to.into();
+        let changed: Vec<Style> = self
+            .document()
+            .styles()
+            .iter()
+            .filter_map(|style| match style {
+                Style::Paragraph(p) if matches(&p.character.font_family) => {
+                    let mut p = p.clone();
+                    p.character.font_family = Some(to.clone());
+                    Some(Style::Paragraph(p))
+                }
+                Style::Character(c) if matches(&c.character.font_family) => {
+                    let mut c = c.clone();
+                    c.character.font_family = Some(to.clone());
+                    Some(Style::Character(c))
+                }
+                _ => None,
+            })
+            .collect();
+        for style in changed {
+            self.put(style)?;
+        }
+        // The family that no style sets, which text takes by default.
+        let styles = self.document().styles();
+        let default = styles.default_paragraph();
+        let resolved = styles.resolve_character(default, None, &CharAttrs::default());
+        if resolved.font_family.eq_ignore_ascii_case(from)
+            && let Some(mut style) = styles.paragraph(default).cloned()
+        {
+            style.character.font_family = Some(to.clone());
+            self.put(style)?;
+        }
+        let (start, end) = (self.document().start(), self.document().end());
+        self.map_runs(start, end, |run| {
+            if matches(&run.attrs.font_family) {
+                run.attrs.font_family = Some(to.clone());
+            }
+        })
+    }
+
+    /// Pastes copied text at a position with its styles (TXT-04), and
+    /// returns the position after it. Styles that the document does not
+    /// have by name come with it. The text of the first paragraph joins
+    /// the paragraph at the position and keeps its look there, unless that
+    /// paragraph is empty and the first paragraph was copied whole; the
+    /// other paragraphs take their own styles.
+    pub fn paste_fragment(
+        &mut self,
+        at: Position,
+        fragment: &Fragment,
+    ) -> Result<Position, ModelError> {
+        let mut lists: HashMap<StyleId, StyleId> = HashMap::new();
+        for list in &fragment.lists {
+            lists.insert(
+                list.id,
+                self.style_by_name_or_add(Style::List(list.clone()))?,
+            );
+        }
+        let relink = |attrs: &mut ParaAttrs| {
+            if let Some(Some(list)) = attrs.list_style {
+                attrs.list_style = Some(lists.get(&list).copied());
+            }
+        };
+        let mut position = at;
+        for (i, source) in fragment.paragraphs.iter().enumerate() {
+            let mut style = source.style.clone();
+            relink(&mut style.paragraph);
+            let mut attrs = source.attrs.clone();
+            relink(&mut attrs);
+            let joins = i == 0
+                && !(fragment.whole_start && self.document().paragraph(at.paragraph)?.is_empty());
+            if i > 0 {
+                position = self.split_paragraph(position)?;
+            }
+            if !joins {
+                let id = self.style_by_name_or_add(Style::Paragraph(style.clone()))?;
+                let p = Position::new(position.paragraph, 0);
+                self.set_paragraph_style(p, p, id)?;
+                self.set_own_paragraph_attrs(position.paragraph, attrs)?;
+            }
+            let target = self.document().paragraph(position.paragraph)?.style();
+            let mut runs = Vec::new();
+            for (text, character, run_attrs) in &source.runs {
+                let character_id = match character {
+                    Some(c) => Some(self.style_by_name_or_add(Style::Character(c.clone()))?),
+                    None => None,
+                };
+                let attrs = if joins {
+                    // The look that the text had, over what the paragraph
+                    // it joins gives it.
+                    let mut look = CharFormat::default();
+                    style.character.apply_to(&mut look);
+                    if let Some(c) = character {
+                        c.character.apply_to(&mut look);
+                    }
+                    run_attrs.apply_to(&mut look);
+                    let base = self.document().styles().resolve_character(
+                        target,
+                        character_id,
+                        &CharAttrs::default(),
+                    );
+                    CharAttrs::from(look).difference(&base)
+                } else {
+                    run_attrs.clone()
+                };
+                runs.push(crate::text::Run::with_attrs(text, character_id, attrs));
+            }
+            let len: usize = source.runs.iter().map(|(t, _, _)| t.len()).sum();
+            if len > 0 {
+                self.apply(Op::ReplaceText {
+                    paragraph: position.paragraph,
+                    range: position.offset..position.offset,
+                    runs,
+                })?;
+            }
+            position.offset += len;
+        }
+        Ok(position)
     }
 
     /// Pastes a copied style over the text between two positions (STY-08):

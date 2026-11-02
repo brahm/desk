@@ -68,7 +68,7 @@ pub fn look_up(parent: &impl IsA<gtk::Window>, lookup: Lookup, text: &str) {
 }
 
 /// The rows of the counts, as (title, value).
-pub fn rows(statistics: &Statistics, pages: Option<usize>) -> Vec<(String, String)> {
+pub fn rows(statistics: &Statistics, lines: usize, pages: Option<usize>) -> Vec<(String, String)> {
     let mut out = vec![
         (tr("Words"), statistics.words.to_string()),
         (tr("Characters"), statistics.characters.to_string()),
@@ -77,6 +77,7 @@ pub fn rows(statistics: &Statistics, pages: Option<usize>) -> Vec<(String, Strin
             statistics.characters_without_spaces.to_string(),
         ),
         (tr("Paragraphs"), statistics.paragraphs.to_string()),
+        (tr("Lines"), lines.to_string()),
     ];
     if let Some(pages) = pages {
         out.push((tr("Pages"), pages.to_string()));
@@ -88,14 +89,14 @@ pub fn rows(statistics: &Statistics, pages: Option<usize>) -> Vec<(String, Strin
 /// one.
 pub fn show_statistics(
     parent: &impl IsA<gtk::Widget>,
-    all: &Statistics,
-    selected: Option<&Statistics>,
+    all: (&Statistics, usize),
+    selected: Option<(&Statistics, usize)>,
     pages: usize,
 ) {
     let page = adw::PreferencesPage::new();
-    let group = |title: &str, statistics: &Statistics, pages: Option<usize>| {
+    let group = |title: &str, (statistics, lines): (&Statistics, usize), pages: Option<usize>| {
         let group = adw::PreferencesGroup::builder().title(title).build();
-        for (title, value) in rows(statistics, pages) {
+        for (title, value) in rows(statistics, lines, pages) {
             let row = adw::ActionRow::builder().title(title).build();
             let value = gtk::Label::builder()
                 .label(value)
@@ -151,8 +152,10 @@ mod tests {
             characters: 30,
             characters_without_spaces: 25,
         };
-        assert_eq!(rows(&statistics, None).len(), 4);
-        let rows = rows(&statistics, Some(3));
+        assert_eq!(rows(&statistics, 7, None).len(), 5);
+        let rows = rows(&statistics, 7, Some(3));
         assert_eq!(rows.last().map(|r| r.1.as_str()), Some("3"));
+        // DOC-20: the lines, before the pages.
+        assert_eq!(rows[rows.len() - 2].1, "7");
     }
 }

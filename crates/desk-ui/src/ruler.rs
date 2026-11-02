@@ -7,8 +7,10 @@
 //! tab stops of the paragraph at the cursor, which it changes: dragging a
 //! marker moves an indent or a stop, a click makes a left stop, a double
 //! click on a stop changes its alignment, and dragging a stop off the
-//! ruler takes it away. The vertical ruler shows the top and bottom
-//! margins. Both count in the units of the preferences.
+//! ruler takes it away. Dragging the edge of a margin moves the margin of
+//! the page, and the indents with it; with Alt, the indents stay where
+//! they are on the page (FMT-18). The vertical ruler shows the top and
+//! bottom margins. Both count in the units of the preferences.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -41,6 +43,10 @@ enum Marker {
     Right,
     /// A tab stop, by its index.
     Tab(usize),
+    /// The left margin of the page, at the left edge of the text.
+    LeftMargin,
+    /// The right margin of the page, at the right edge of the text.
+    RightMargin,
 }
 
 /// A marker being dragged.
@@ -56,6 +62,8 @@ struct Drag {
     moved: bool,
     /// Whether a stop is off the ruler, to go when it is let go.
     off: bool,
+    /// Whether Alt was held, so that a margin moves without the indents.
+    keep_indents: bool,
 }
 
 struct State {
@@ -313,7 +321,25 @@ impl Ruler {
                         let stop = format.tab_stops.stops()[index];
                         draw_tab(cr, x, across, stop.alignment);
                     }
+                    Marker::LeftMargin | Marker::RightMargin => {}
                 }
+            }
+            // A margin being dragged: a line where it goes.
+            if let Some(Drag {
+                marker: Some(Marker::LeftMargin | Marker::RightMargin),
+                moved: true,
+                position,
+                ..
+            }) = drag
+                && let Some(x) = ruler.to_pixels(text_start + position)
+            {
+                let x = x.round() + 0.5;
+                cr.set_source_rgba(accent.0, accent.1, accent.2, 1.0);
+                cr.set_line_width(2.0);
+                cr.move_to(x, 0.0);
+                cr.line_to(x, across);
+                let _ = cr.stroke();
+                cr.set_line_width(1.0);
             }
         });
     }
@@ -323,9 +349,12 @@ impl Ruler {
             .button(gtk::gdk::BUTTON_PRIMARY)
             .build();
         let ruler = self.downgrade();
-        drag.connect_drag_begin(move |_, x, y| {
+        drag.connect_drag_begin(move |gesture, x, y| {
             let Some(ruler) = ruler.upgrade() else { return };
-            let marker = ruler.marker_at(x, y);
+            let keep_indents = gesture
+                .current_event_state()
+                .contains(gtk::gdk::ModifierType::ALT_MASK);
+            let marker = ruler.marker_at(x, y, keep_indents);
             let position = ruler.position_at(x).unwrap_or(0.0);
             ruler.state.borrow_mut().drag = Some(Drag {
                 marker,
@@ -333,6 +362,7 @@ impl Ruler {
                 position,
                 moved: false,
                 off: false,
+                keep_indents,
             });
         });
         let ruler = self.downgrade();
@@ -403,6 +433,15 @@ impl Ruler {
                         ..ParaAttrs::default()
                     },
                 ),
+                (Some(marker @ (Marker::LeftMargin | Marker::RightMargin)), true) => {
+                    let setup = ruler.state.borrow().setup;
+                    let Some((setup, shift)) = moved_margin(setup, marker, drag.position) else {
+                        return;
+                    };
+                    let shift = drag.keep_indents.then_some(shift);
+                    editor.set_margins(&tr("Margins"), setup, shift);
+                    return;
+                }
                 (Some(Marker::Right), true) => {
                     let setup = ruler.state.borrow().setup;
                     let width = setup.body_width();
@@ -431,7 +470,7 @@ impl Ruler {
             }
             let Some(ruler) = ruler.upgrade() else { return };
             let (Some(Marker::Tab(index)), Some(format), Some(editor)) = (
-                ruler.marker_at(x, y),
+                ruler.marker_at(x, y, false),
                 ruler.state.borrow().format.clone(),
                 editor(),
             ) else {
@@ -450,18 +489,34 @@ impl Ruler {
         self.area.add_controller(click);
     }
 
-    /// The marker under a point of the ruler.
-    fn marker_at(&self, x: f64, y: f64) -> Option<Marker> {
+    /// The marker under a point of the ruler. The edges of the margins
+    /// come after the markers of the paragraph, unless `margins_first`.
+    fn marker_at(&self, x: f64, y: f64, margins_first: bool) -> Option<Marker> {
         let state = self.state.borrow();
         let format = state.format.as_ref()?;
         let text_start = state.setup.margin_left.to_pt();
+        let width = state.setup.body_width().to_pt();
         let thickness = f64::from(THICKNESS);
         let band = |marker: Marker| match marker {
             Marker::FirstLine => y < thickness / 3.0,
             Marker::Tab(_) => (thickness / 3.0..thickness * 2.0 / 3.0 + 2.0).contains(&y),
             Marker::Left | Marker::Right => y >= thickness / 2.0,
+            Marker::LeftMargin | Marker::RightMargin => true,
         };
-        markers(format, state.setup.body_width().to_pt())
+        let near = |position: f64| {
+            let at = self.to_pixels(text_start + position)?;
+            let distance = (at - x).abs();
+            (distance <= GRAB).then_some(distance)
+        };
+        let margin = [(Marker::LeftMargin, 0.0), (Marker::RightMargin, width)]
+            .into_iter()
+            .filter_map(|(marker, position)| Some((marker, near(position)?)))
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(marker, _)| marker);
+        if margins_first && margin.is_some() {
+            return margin;
+        }
+        let paragraph = markers(format, width)
             .into_iter()
             .filter(|&(marker, _)| band(marker))
             .filter_map(|(marker, position)| {
@@ -470,7 +525,8 @@ impl Ruler {
                 (distance <= GRAB).then_some((marker, distance))
             })
             .min_by(|a, b| a.1.total_cmp(&b.1))
-            .map(|(marker, _)| marker)
+            .map(|(marker, _)| marker);
+        paragraph.or(margin)
     }
 
     /// The distance from the left edge of the text of a point of the
@@ -550,6 +606,39 @@ fn markers(format: &ParaFormat, width: f64) -> Vec<(Marker, f64)> {
     out
 }
 
+/// The narrowest text that dragging a margin leaves, in points.
+const MIN_TEXT_WIDTH: f64 = 36.0;
+
+/// The page setup with a margin dragged to `position`, in points from the
+/// left edge of the text, and how far each edge of the text moved in, in
+/// points: what the indents lose to stay where they are on the page.
+fn moved_margin(
+    setup: PageSetup,
+    marker: Marker,
+    position: f64,
+) -> Option<(PageSetup, (f64, f64))> {
+    let width = setup.body_width().to_pt();
+    let mut out = setup;
+    let shift = match marker {
+        Marker::LeftMargin => {
+            let delta = position
+                .max(-setup.margin_left.to_pt())
+                .min(width - MIN_TEXT_WIDTH);
+            out.margin_left = Length::from_pt(setup.margin_left.to_pt() + delta);
+            (delta, 0.0)
+        }
+        Marker::RightMargin => {
+            let delta = (width - position)
+                .max(-setup.margin_right.to_pt())
+                .min(width - MIN_TEXT_WIDTH);
+            out.margin_right = Length::from_pt(setup.margin_right.to_pt() + delta);
+            (0.0, delta)
+        }
+        _ => return None,
+    };
+    (out != setup).then_some((out, shift))
+}
+
 /// Attributes that set the tab stops.
 fn tabs(stops: TabStops) -> ParaAttrs {
     ParaAttrs {
@@ -616,5 +705,30 @@ mod tests {
         );
         assert_eq!(format_number(2.0), "2");
         assert_eq!(format_number(2.5), "2.5");
+    }
+
+    #[test]
+    fn fmt_18_dragging_a_margin_moves_the_edge_of_the_text() {
+        let setup = PageSetup {
+            width: Length::from_points(600),
+            margin_left: Length::from_points(72),
+            margin_right: Length::from_points(72),
+            ..PageSetup::default()
+        };
+        // The left margin 18 pt to the right.
+        let (moved, shift) = moved_margin(setup, Marker::LeftMargin, 18.0).unwrap();
+        assert_eq!(moved.margin_left, Length::from_points(90));
+        assert_eq!(moved.margin_right, Length::from_points(72));
+        assert_eq!(shift, (18.0, 0.0));
+        // The right margin 36 pt to the right: 36 pt narrower margin.
+        let (moved, shift) = moved_margin(setup, Marker::RightMargin, 456.0 + 36.0).unwrap();
+        assert_eq!(moved.margin_right, Length::from_points(36));
+        assert_eq!(shift, (0.0, -36.0));
+        // Not past the edge of the paper, nor over the other margin.
+        let (moved, _) = moved_margin(setup, Marker::LeftMargin, -100.0).unwrap();
+        assert_eq!(moved.margin_left, Length::ZERO);
+        let (moved, _) = moved_margin(setup, Marker::LeftMargin, 1000.0).unwrap();
+        assert_eq!(moved.body_width(), Length::from_points(36));
+        assert!(moved_margin(setup, Marker::LeftMargin, 0.0).is_none());
     }
 }

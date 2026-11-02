@@ -289,3 +289,24 @@ fn a_line_taller_than_the_page_overflows_it() {
     let layout = paginate_texts(setup(5.0), &texts, &mut system);
     assert_eq!(counts(&layout), [vec![(0, 1)], vec![(0, 1)], vec![(0, 1)]]);
 }
+
+#[test]
+fn doc_20_lines_count_in_the_document_and_the_selection() {
+    let mut system = TextSystem::new();
+    let height = line_height(&mut system);
+    // Two lines on each page, so the paragraphs break across pages.
+    let texts = [
+        para(3, ParaFormat::default()),
+        para(1, ParaFormat::default()),
+        para(2, ParaFormat::default()),
+    ];
+    let layout = paginate_texts(setup(height * 2.0 + 1.0), &texts, &mut system);
+    assert!(layout.pages.len() > 1);
+    assert_eq!(layout.line_count(), 6);
+    // The whole first paragraph, but not the start of the second.
+    assert_eq!(layout.lines_between((0, 0), (1, 0)), 3);
+    // The second paragraph and the first letter of the third.
+    assert_eq!(layout.lines_between((1, 0), (2, 1)), 2);
+    // A selection inside one line.
+    assert_eq!(layout.lines_between((0, 1), (0, 2)), 1);
+}
