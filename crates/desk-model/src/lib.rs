@@ -58,7 +58,9 @@ mod transaction;
 mod units;
 
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
-pub use document::{Container, Document, Metadata, PageSetup, PagedFlow, Statistics};
+pub use document::{
+    Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics, TextSettings,
+};
 pub use error::ModelError;
 pub use find::{Found, Query};
 pub use format::{

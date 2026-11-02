@@ -5,7 +5,7 @@
 
 use std::ops::Range;
 
-use crate::document::{Metadata, PageSetup};
+use crate::document::{Metadata, PageSetup, TextSettings};
 use crate::format::ParaAttrs;
 use crate::id::NodeId;
 use crate::style::{Style, StyleId};
@@ -77,5 +77,10 @@ pub enum Op {
     SetMetadata {
         /// The metadata.
         metadata: Metadata,
+    },
+    /// Sets the settings of the text of the whole document.
+    SetTextSettings {
+        /// The settings.
+        settings: TextSettings,
     },
 }

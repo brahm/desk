@@ -25,6 +25,55 @@ pub struct Metadata {
     pub keywords: Vec<String>,
 }
 
+/// Settings of the text of the whole document: whether words are
+/// hyphenated and ligatures used at all (TXT-09, FMT-09), and the words
+/// that are never hyphenated.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextSettings {
+    /// Whether the paragraphs that allow it are hyphenated. When off, no
+    /// word is, whatever its paragraph says.
+    pub hyphenation: bool,
+    /// Whether text uses ligatures. When off, none is formed, whatever the
+    /// text asks for.
+    pub ligatures: bool,
+    /// The words that are never hyphenated, anywhere in the document
+    /// ("Never Hyphenate"), in lower case and in order.
+    pub never_hyphenate: std::collections::BTreeSet<String>,
+    /// How the space after a paragraph and the space before the next one
+    /// make the space between them.
+    pub spacing: ParagraphSpacing,
+}
+
+/// How the space after a paragraph and the space before the next make the
+/// space between them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ParagraphSpacing {
+    /// The larger of the two, as in Pages (FMT-15).
+    #[default]
+    Larger,
+    /// The sum of the two, as in LibreOffice and Word.
+    Sum,
+}
+
+impl Default for TextSettings {
+    fn default() -> Self {
+        Self {
+            hyphenation: true,
+            ligatures: true,
+            never_hyphenate: std::collections::BTreeSet::new(),
+            spacing: ParagraphSpacing::Larger,
+        }
+    }
+}
+
+impl TextSettings {
+    /// Whether a word may be hyphenated, by the list of words never
+    /// hyphenated.
+    pub fn may_hyphenate(&self, word: &str) -> bool {
+        self.never_hyphenate.is_empty() || !self.never_hyphenate.contains(&word.to_lowercase())
+    }
+}
+
 /// The size and margins of the pages (EST-02, EST-03).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PageSetup {
@@ -168,6 +217,7 @@ impl Statistics {
 pub struct Document {
     ids: IdAllocator,
     metadata: Metadata,
+    text_settings: TextSettings,
     styles: Styles,
     container: Container,
 }
@@ -177,6 +227,7 @@ impl PartialEq for Document {
     /// that a document has yet to hand out are not content.
     fn eq(&self, other: &Self) -> bool {
         self.metadata == other.metadata
+            && self.text_settings == other.text_settings
             && self.styles == other.styles
             && self.container == other.container
     }
@@ -194,6 +245,7 @@ impl Document {
         Self {
             ids,
             metadata: Metadata::default(),
+            text_settings: TextSettings::default(),
             styles: Styles::new(ParagraphStyle::new(body_style, "Body")),
             container: Container::Pages(PagedFlow {
                 page: PageSetup::default(),
@@ -210,6 +262,11 @@ impl Document {
     /// The metadata.
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
+    }
+
+    /// The settings of the text of the whole document.
+    pub fn text_settings(&self) -> &TextSettings {
+        &self.text_settings
     }
 
     /// The styles.
@@ -431,6 +488,10 @@ impl Document {
             Op::SetMetadata { metadata } => {
                 let old = std::mem::replace(&mut self.metadata, metadata);
                 Ok(Op::SetMetadata { metadata: old })
+            }
+            Op::SetTextSettings { settings } => {
+                let old = std::mem::replace(&mut self.text_settings, settings);
+                Ok(Op::SetTextSettings { settings: old })
             }
         }
     }

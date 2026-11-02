@@ -12,7 +12,7 @@ use std::ops::Range;
 
 use desk_model::{
     Capitalization, CharFormat, Length, Ligatures, LineStyle, ListItem, ParaFormat, Paragraph,
-    Styles,
+    Styles, TextSettings,
 };
 
 use crate::fonts::pages_font;
@@ -21,7 +21,7 @@ use crate::layout::SOFT_HYPHEN;
 /// The byte offsets in a text where its words may break with a hyphen,
 /// in order: none for the undetermined language or a language without
 /// patterns, nor in words that have soft hyphens of their own.
-fn hyphen_points(text: &str, language: &str) -> Vec<usize> {
+fn hyphen_points(text: &str, language: &str, settings: &TextSettings) -> Vec<usize> {
     if language == "und" {
         return Vec::new();
     }
@@ -30,7 +30,10 @@ fn hyphen_points(text: &str, language: &str) -> Vec<usize> {
     };
     desk_lang::words(text)
         .into_iter()
-        .filter(|range| !text[range.clone()].contains(SOFT_HYPHEN))
+        .filter(|range| {
+            let word = &text[range.clone()];
+            !word.contains(SOFT_HYPHEN) && settings.may_hyphenate(word)
+        })
         .flat_map(|range| {
             patterns
                 .hyphenate(&text[range.clone()])
@@ -95,19 +98,37 @@ pub struct ParagraphText {
 impl ParagraphText {
     /// Prepares a paragraph of a document, resolving its styles.
     pub fn new(styles: &Styles, paragraph: &Paragraph) -> Self {
+        Self::new_with(styles, &TextSettings::default(), paragraph)
+    }
+
+    /// Prepares a paragraph of a document with the settings of its text:
+    /// whether it is hyphenated and has ligatures at all, and the words
+    /// never hyphenated.
+    pub fn new_with(styles: &Styles, settings: &TextSettings, paragraph: &Paragraph) -> Self {
         let base = styles.resolve_character(paragraph.style(), None, &Default::default());
         let format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
         let runs = paragraph.runs().map(|run| {
             let format = styles.resolve_character(paragraph.style(), run.style, &run.attrs);
             (run.text(), format)
         });
-        Self::from_runs(format, base, runs)
+        Self::from_runs_with(settings, format, base, runs)
     }
 
     /// Prepares a paragraph of a document that is an item of a list, as
     /// [`Styles::list_items`] numbers them, or not in a list with `None`.
     pub fn new_in_list(styles: &Styles, paragraph: &Paragraph, item: Option<&ListItem>) -> Self {
-        let text = Self::new(styles, paragraph);
+        Self::new_in_document(styles, &TextSettings::default(), paragraph, item)
+    }
+
+    /// Prepares a paragraph of a document, with the settings of its text,
+    /// as an item of a list or not in a list with `None`.
+    pub fn new_in_document(
+        styles: &Styles,
+        settings: &TextSettings,
+        paragraph: &Paragraph,
+        item: Option<&ListItem>,
+    ) -> Self {
+        let text = Self::new_with(styles, settings, paragraph);
         match item {
             Some(item) => text.with_label(item),
             None => text,
@@ -166,6 +187,17 @@ impl ParagraphText {
         base: CharFormat,
         runs: impl IntoIterator<Item = (&'a str, CharFormat)>,
     ) -> Self {
+        Self::from_runs_with(&TextSettings::default(), paragraph, base, runs)
+    }
+
+    /// Prepares text from pieces with resolved formats, with the settings
+    /// of the text of its document.
+    pub fn from_runs_with<'a>(
+        settings: &TextSettings,
+        paragraph: ParaFormat,
+        base: CharFormat,
+        runs: impl IntoIterator<Item = (&'a str, CharFormat)>,
+    ) -> Self {
         let mut out = Self {
             text: String::new(),
             offsets: Vec::new(),
@@ -177,12 +209,16 @@ impl ParagraphText {
         let mut model_offset = 0;
         let mut transformed = false;
         let mut previous: Option<char> = None;
-        let hyphenate = out.paragraph.hyphenate;
-        for (text, format) in runs {
+        let hyphenate = out.paragraph.hyphenate && settings.hyphenation;
+        for (text, mut format) in runs {
+            // A document without ligatures has none anywhere (FMT-09).
+            if !settings.ligatures {
+                format.ligatures = Ligatures::None;
+            }
             // Where words may break with a hyphen, by the patterns of
             // their language (TXT-09).
             let hyphens = if hyphenate {
-                hyphen_points(text, format.language.tag())
+                hyphen_points(text, format.language.tag(), settings)
             } else {
                 Vec::new()
             };
