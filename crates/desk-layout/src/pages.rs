@@ -6,10 +6,10 @@
 use std::collections::HashMap;
 
 use desk_model::{
-    Document, Layout, PageSetup, ParaBorder, ParaFormat, ParagraphSpacing, Rgba, Section,
-    SectionStart, Start,
+    Document, Layout, MarginKind, MarginPlace, PageSetup, ParaBorder, ParaFormat, Paragraph,
+    ParagraphSpacing, Rgba, Section, SectionStart, Start,
 };
-use desk_text::{Column, Line, ParagraphText, TextSystem};
+use desk_text::{Column, FieldValues, Line, ParagraphText, TextSystem};
 
 /// How much a line may stick out of the bottom of the body and still
 /// count as fitting, to absorb rounding.
@@ -105,6 +105,10 @@ pub struct Page {
     /// The parts of paragraphs on the page that have a background or a
     /// border, from top to bottom.
     pub blocks: Vec<PlacedBlock>,
+    /// The lines of the header and the footer of the page, from top to
+    /// bottom (EST-12). Their paragraphs are indexes in the header or
+    /// footer they come from.
+    pub margin_lines: Vec<PlacedLine>,
 }
 
 /// A word processing document laid out on pages.
@@ -114,6 +118,9 @@ pub struct DocumentLayout {
     pub setup: PageSetup,
     /// The pages. There is always at least one.
     pub pages: Vec<Page>,
+    /// The sections that have pages, in order: [`Page::section`] is an
+    /// index in it.
+    pub sections: Vec<Section>,
 }
 
 impl DocumentLayout {
@@ -144,25 +151,159 @@ impl DocumentLayout {
     }
 }
 
-/// Lays out the body of a document on pages.
+/// Lays out the body of a document on pages, with the headers and
+/// footers of the pages.
+///
+/// A field in the body shows the number of its page and the number of
+/// pages: the body is laid out once to know them and again with them
+/// (EST-27).
 pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout {
     let styles = document.styles();
     let settings = document.text_settings();
     let items = styles.list_items(document.body().iter());
-    let texts: Vec<ParagraphText> = document
+    let prepare = |index: usize, paragraph: &Paragraph, values: FieldValues| {
+        ParagraphText::new_in_document_with(
+            styles,
+            settings,
+            paragraph,
+            items[index].as_ref(),
+            values,
+        )
+    };
+    let mut texts: Vec<ParagraphText> = document
         .body()
         .iter()
-        .zip(&items)
-        .map(|(paragraph, item)| {
-            ParagraphText::new_in_document(styles, settings, paragraph, item.as_ref())
-        })
+        .enumerate()
+        .map(|(i, paragraph)| prepare(i, paragraph, FieldValues::default()))
         .collect();
-    paginate_texts_spaced(
-        *document.page_setup(),
-        &texts,
-        system,
-        settings.spacing == ParagraphSpacing::Sum,
-    )
+    let sum = settings.spacing == ParagraphSpacing::Sum;
+    let setup = *document.page_setup();
+    let mut layout = paginate_texts_spaced(setup, &texts, system, sum);
+    let with_fields: Vec<usize> = document
+        .body()
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| has_fields(p))
+        .map(|(i, _)| i)
+        .collect();
+    if !with_fields.is_empty() {
+        let pages = layout.pages.len() as u32;
+        for &i in &with_fields {
+            let page = layout
+                .page_of(i)
+                .map_or(1, |index| layout.pages[index].number);
+            let paragraph = document.body().get(i).expect("index is in the body");
+            texts[i] = prepare(i, paragraph, FieldValues { page, pages });
+        }
+        layout = paginate_texts_spaced(setup, &texts, system, sum);
+    }
+    place_margins(document, &mut layout, system);
+    layout
+}
+
+/// Whether a paragraph has a field.
+fn has_fields(paragraph: &Paragraph) -> bool {
+    paragraph.runs().any(|run| run.attrs.field.is_some())
+}
+
+/// Lays out the header and the footer of each page (EST-12, EST-19).
+///
+/// The rules, from the PDFs of Pages:
+///
+/// - The top of the first line of the header is the header margin below
+///   the top of the paper, and the bottom of the text of the last line of
+///   the footer the footer margin above its bottom.
+/// - They span the page between its left and right margins.
+/// - The first page of a section whose first page differs takes the first
+///   page header, and the left pages of a section whose left and right
+///   pages differ take the left one: every second page, whether pages
+///   face each other or not.
+pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &mut TextSystem) {
+    let setup = layout.setup;
+    let styles = document.styles();
+    let settings = document.text_settings();
+    let margins = document.headers_footers();
+    let pages = layout.pages.len() as u32;
+    let height = setup.height.to_pt() as f32;
+    for (index, page) in layout.pages.iter_mut().enumerate() {
+        page.margin_lines.clear();
+        let section = layout
+            .sections
+            .get(page.section)
+            .copied()
+            .unwrap_or(setup.section);
+        let values = FieldValues {
+            page: page.number,
+            pages,
+        };
+        let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
+        for (kind, shown) in [
+            (MarginKind::Header, setup.headers),
+            (MarginKind::Footer, setup.footers),
+        ] {
+            if !shown {
+                continue;
+            }
+            let place = MarginPlace::of_page(
+                kind,
+                page.first_of_section,
+                index % 2 == 1,
+                section.first_page_different,
+                section.left_right_different,
+            );
+            let paragraphs = margins.get(place);
+            if paragraphs.iter().all(Paragraph::is_empty) {
+                continue;
+            }
+            let items = styles.list_items(paragraphs.iter());
+            let mut lines = Vec::new();
+            let mut y = 0.0f32;
+            let mut after = 0.0f32;
+            for (i, paragraph) in paragraphs.iter().enumerate() {
+                let text = ParagraphText::new_in_document_with(
+                    styles,
+                    settings,
+                    paragraph,
+                    items[i].as_ref(),
+                    values,
+                );
+                let format = text.paragraph().clone();
+                let laid = system.layout(&text, &Column::new(width), 0.0).lines;
+                let Some(first) = laid.first() else {
+                    continue;
+                };
+                if i > 0 {
+                    y += after.max(format.space_before.to_pt() as f32);
+                }
+                let dy = y - first.top;
+                let mut bottom = y;
+                for (n, line) in laid.iter().enumerate() {
+                    bottom = dy + line.top + line.height;
+                    lines.push(PlacedLine {
+                        paragraph: i,
+                        index: n,
+                        line: line.clone(),
+                        origin: (page.margins.0, dy),
+                    });
+                }
+                y = bottom;
+                after = format.space_after.to_pt() as f32;
+            }
+            let shift = match kind {
+                MarginKind::Header => setup.header_margin.to_pt() as f32,
+                MarginKind::Footer => {
+                    let text_bottom = lines
+                        .last()
+                        .map_or(0.0, |l: &PlacedLine| l.origin.1 + l.line.text_bottom);
+                    height - setup.footer_margin.to_pt() as f32 - text_bottom
+                }
+            };
+            for line in &mut lines {
+                line.origin.1 += shift;
+            }
+            page.margin_lines.extend(lines);
+        }
+    }
 }
 
 /// A paragraph laid out at the top of an endless column of one width.
@@ -549,6 +690,7 @@ impl Paginator<'_> {
         DocumentLayout {
             setup: self.setup,
             pages: self.pages,
+            sections: self.sections,
         }
     }
 

@@ -120,7 +120,8 @@ impl DisplayList {
         for block in &page.blocks {
             list.block_background(block);
         }
-        for placed in &page.lines {
+        // The header and footer are drawn as the body is (EST-12).
+        for placed in page.lines.iter().chain(&page.margin_lines) {
             let (dx, dy) = placed.origin;
             // The backgrounds of runs span the height of the line, with
             // edges on whole points, as Pages draws them (FMT-20).

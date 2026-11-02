@@ -246,14 +246,13 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
     assert_eq!(
         entries,
         [
-            (Warning::Content(Content::Headers), 1),
             (Warning::Content(Content::FloatingObjects), 2),
             (Warning::Content(Content::InlineObjects), 2),
             (Warning::Formatting(Formatting::DropCaps), 2),
         ]
     );
     assert_eq!(
-        log.entries()[3].to_string(),
+        log.entries()[2].to_string(),
         "Left out drop caps, in 2 paragraphs"
     );
     // The documents of the other tests lose nothing.
@@ -276,13 +275,10 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
     assert_eq!(
         entries,
         [
-            (Warning::Content(Content::Headers), 1),
-            (Warning::Content(Content::Footers), 1),
             (Warning::Content(Content::FloatingObjects), 1),
             (Warning::Content(Content::InlineObjects), 1),
             (Warning::Content(Content::Footnotes), 1),
             (Warning::Content(Content::Comments), 1),
-            (Warning::Content(Content::Fields), 2),
         ]
     );
     // The text of the body is kept, without that of the footnote and the

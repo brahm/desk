@@ -15,8 +15,9 @@ use std::time::Duration;
 
 use desk_layout::DocumentLayout;
 use desk_model::{
-    CharAttrs, CharFormat, Document, Editor, LINE_BREAK, Layout, Length, ModelError, PageSetup,
-    ParaAttrs, ParaFormat, Section, Start, StyleFamily, StyleId,
+    CharAttrs, CharFormat, Document, Editor, FIELD_CHARACTER, Field, LINE_BREAK, Layout, Length,
+    MarginPlace, ModelError, PageSetup, ParaAttrs, ParaFormat, Section, Start, StyleFamily,
+    StyleId,
 };
 use desk_render::DisplayList;
 use gtk::prelude::*;
@@ -39,6 +40,35 @@ pub enum BreakKind {
     Layout,
     /// The text after it starts a new section on a new page.
     Section,
+}
+
+/// A field that Insert puts at the cursor (EST-27).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FieldKind {
+    /// The number of the page.
+    PageNumber,
+    /// The number of pages.
+    PageCount,
+    /// Today's date.
+    Date,
+    /// The name of the file.
+    FileName,
+}
+
+/// The pattern of the dates that Insert puts, in the symbols of Unicode,
+/// and the same in those of GLib.
+const DATE_PATTERN: (&str, &str) = ("d MMMM y", "%-d %B %Y");
+
+/// A field of today's date.
+pub fn today() -> Field {
+    let shown = glib::DateTime::now_local()
+        .and_then(|now| now.format(DATE_PATTERN.1))
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    Field::DateTime {
+        pattern: DATE_PATTERN.0.into(),
+        shown: shown.into(),
+    }
 }
 
 /// Whether a paragraph is an item of a list: its list style has a label at
@@ -169,6 +199,9 @@ struct State {
     /// Whether a Ctrl-click or the drag after it is adding a range to the
     /// selection, which keeps the others (TXT-03).
     adding: bool,
+    /// The name of the file of the document, which a field of the file
+    /// name shows when it is inserted (EST-27).
+    file_name: String,
     /// The cursor at the end of a word being typed, which the spelling
     /// checker leaves unmarked until the cursor leaves it.
     squiggle_skip: Option<Spot>,
@@ -200,6 +233,8 @@ pub struct Format {
     pub layout: Layout,
     /// The section that the selection starts in.
     pub section: Section,
+    /// The headers and footers of the document.
+    pub headers: desk_model::HeadersFooters,
 }
 
 /// Edits the document of a window.
@@ -266,6 +301,7 @@ impl TextEditor {
                 others: Vec::new(),
                 adding: false,
                 squiggle_skip: None,
+                file_name: String::new(),
             })),
         };
         this.show_pages();
@@ -701,6 +737,63 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
+    /// Sets the name of the file of the document, which fields of the file
+    /// name show.
+    pub fn set_file_name(&self, name: &str) {
+        self.state.borrow_mut().file_name = name.to_owned();
+    }
+
+    /// The name of the file of the document.
+    pub fn file_name(&self) -> String {
+        self.state.borrow().file_name.clone()
+    }
+
+    /// A field of the file name, or of today's date, as Insert makes them.
+    pub fn new_field(&self, kind: FieldKind) -> Field {
+        match kind {
+            FieldKind::PageNumber => Field::PageNumber,
+            FieldKind::PageCount => Field::PageCount,
+            FieldKind::Date => today(),
+            FieldKind::FileName => Field::FileName {
+                shown: self.file_name().into(),
+            },
+        }
+    }
+
+    /// Puts a field at the cursor, or in place of the selection (EST-27).
+    pub fn insert_field(&self, field: Field) {
+        let before = self.selection();
+        let (start, end) = before.ordered();
+        let pending = self.state.borrow_mut().pending.take();
+        let result = {
+            let mut state = self.state.borrow_mut();
+            state.editor.edit("Insert Field", |edit| {
+                let document = edit.document();
+                let from = at_spot(document, start)?;
+                let to = at_spot(document, end)?;
+                let at = edit.delete(from, to)?;
+                let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+                let mut attrs = pending.unwrap_or_default();
+                attrs.field = Some(Some(field));
+                edit.set_character_attrs(at, after, &attrs)?;
+                Ok(Spot::of(edit.document(), after))
+            })
+        };
+        self.finish_edit(before, result);
+    }
+
+    /// Sets the text of a header or a footer from the text of its row in
+    /// the Inspector, as [`crate::headers_pane`] writes it.
+    pub fn set_header_footer_text(&self, place: MarginPlace, text: &str) {
+        let file_name = self.file_name();
+        let text = text.to_owned();
+        self.format_edit("Header and Footer", move |edit| {
+            let old = edit.document().headers_footers().get(place).to_vec();
+            let paragraphs = crate::headers_pane::paragraphs(edit, &text, &old, &file_name)?;
+            edit.set_header_footer(place, paragraphs)
+        });
+    }
+
     /// Changes the layout that the cursor is in, as one action of the
     /// history.
     pub fn set_layout(&self, name: &str, layout: Layout) {
@@ -1083,6 +1176,7 @@ impl TextEditor {
             setup: *document.page_setup(),
             layout: document.layout_at(start.paragraph).1,
             section: document.section_at(start.paragraph).1,
+            headers: document.headers_footers().clone(),
         }
     }
 

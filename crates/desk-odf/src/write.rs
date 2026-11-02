@@ -7,10 +7,10 @@ use std::collections::BTreeSet;
 
 use crate::ns;
 use crate::text::{
-    Background, Border, BorderLine, Break, Columns, Family, LINE_BREAK, LeaderStyle, Line,
-    LineColor, LineHeight, ListLabel, ListMember, ListStyle, Meta, PageLayout, Paragraph,
-    ParagraphProperties, Properties, SectionStart, SectionStyle, Style, TabType, TextAlign,
-    TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
+    Background, Border, BorderLine, Break, Columns, Family, Field, HeaderFooter, HeaderFooterStyle,
+    LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel, ListMember, ListStyle, Meta,
+    PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Style,
+    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
@@ -93,14 +93,29 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     w.end();
     w.start("office:automatic-styles");
+    for style in &document.master_styles {
+        write_style(&mut w, style);
+    }
     write_page_layout(&mut w, &document.page_layout);
     w.end();
     w.start("office:master-styles")
         .start("style:master-page")
         .attr("style:name", "Standard")
-        .attr("style:page-layout-name", "pm1")
-        .end()
-        .end();
+        .attr("style:page-layout-name", "pm1");
+    let master = &document.master;
+    for (name, part) in [
+        ("style:header", &master.header),
+        ("style:header-left", &master.header_left),
+        ("style:header-first", &master.header_first),
+        ("style:footer", &master.footer),
+        ("style:footer-left", &master.footer_left),
+        ("style:footer-first", &master.footer_first),
+    ] {
+        if let Some(part) = part {
+            write_header_footer(&mut w, name, part);
+        }
+    }
+    w.end().end();
     w.end();
     let styles = w.finish();
 
@@ -725,6 +740,29 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
     write_background(w, t.background);
 }
 
+fn write_header_footer(w: &mut Writer, name: &'static str, part: &HeaderFooter) {
+    w.start(name);
+    if !part.display {
+        w.attr("style:display", "false");
+    }
+    for paragraph in &part.paragraphs {
+        write_paragraph(w, paragraph);
+    }
+    w.end();
+}
+
+fn write_header_footer_style(
+    w: &mut Writer,
+    name: &'static str,
+    spacing: &str,
+    style: &HeaderFooterStyle,
+) {
+    w.start(name).start("style:header-footer-properties");
+    len(w, "fo:min-height", style.min_height);
+    len(w, spacing, style.spacing);
+    w.end().end();
+}
+
 fn write_page_layout(w: &mut Writer, page: &PageLayout) {
     w.start("style:page-layout").attr("style:name", "pm1");
     if page.mirrored == Some(true) {
@@ -750,7 +788,14 @@ fn write_page_layout(w: &mut Writer, page: &PageLayout) {
     if let Some(columns) = &page.columns {
         write_columns(w, columns);
     }
-    w.end().end();
+    w.end();
+    if let Some(header) = &page.header {
+        write_header_footer_style(w, "style:header-style", "fo:margin-bottom", header);
+    }
+    if let Some(footer) = &page.footer {
+        write_header_footer_style(w, "style:footer-style", "fo:margin-top", footer);
+    }
+    w.end();
 }
 
 /// Writes text so that a reader collapsing white space gets it back:
@@ -828,14 +873,44 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
     w.attr_opt("text:style-name", paragraph.style.as_deref());
     let mut text = TextWriter { after_space: true };
     for span in &paragraph.spans {
-        match &span.style {
-            Some(style) => {
-                w.start("text:span").attr("text:style-name", style);
-                text.write(w, &span.text);
-                w.end();
-            }
+        if let Some(style) = &span.style {
+            w.start("text:span").attr("text:style-name", style);
+        }
+        match &span.field {
+            Some(field) => write_field(w, field, &span.text),
             None => text.write(w, &span.text),
         }
+        if span.style.is_some() {
+            w.end();
+        }
+        if span.field.is_some() {
+            text.after_space = false;
+        }
+    }
+    w.end();
+}
+
+fn write_field(w: &mut Writer, field: &Field, shown: &str) {
+    match field {
+        Field::PageNumber => {
+            w.start("text:page-number")
+                .attr("text:select-page", "current");
+        }
+        Field::PageCount => {
+            w.start("text:page-count");
+        }
+        Field::Date { pattern } => {
+            w.start("text:date").attr("text:fixed", "true");
+            w.attr_opt("desk:pattern", pattern.as_deref());
+        }
+        Field::FileName => {
+            w.start("text:file-name")
+                .attr("text:display", "name")
+                .attr("text:fixed", "true");
+        }
+    }
+    if !shown.is_empty() {
+        w.text(shown);
     }
     w.end();
 }

@@ -136,6 +136,17 @@ fn doc_22_documents_of_pages_import_as_their_cases() {
         assert!(log.is_empty(), "{}: {:?}", case.name, log.entries());
         let built = case.spec.document().unwrap();
         assert_eq!(resolved(&imported), resolved(&built), "{}", case.name);
-        assert_eq!(imported.page_setup(), built.page_setup(), "{}", case.name);
+        // The cases have no headers or footers, so where they would go
+        // does not matter.
+        assert!(imported.headers_footers().is_empty(), "{}", case.name);
+        let built_setup = built.page_setup();
+        let setup = desk_model::PageSetup {
+            headers: built_setup.headers,
+            footers: built_setup.footers,
+            header_margin: built_setup.header_margin,
+            footer_margin: built_setup.footer_margin,
+            ..*imported.page_setup()
+        };
+        assert_eq!(&setup, built_setup, "{}", case.name);
     }
 }

@@ -5,7 +5,8 @@
 //! Layout inspectors of Pages have them (EST-01, EST-07, EST-10, EST-16,
 //! EST-18): the paper, its orientation and margins, the columns of the
 //! layout the cursor is in and the space around it, and the page its
-//! section starts on and how its pages are numbered.
+//! section starts on, how its pages are numbered and whether its first
+//! and left pages have headers and footers of their own (EST-19).
 //!
 //! The layout or section changed is the one that holds the cursor: the
 //! one that started at a break before it, or the first one of the
@@ -122,6 +123,10 @@ pub struct LayoutGroups {
     start: adw::ComboRow,
     continues: adw::SwitchRow,
     first_number: adw::SpinRow,
+    /// Whether the first page has a header and footer of its own (EST-19).
+    first_different: adw::SwitchRow,
+    /// Whether left pages have a header and footer of their own (EST-19).
+    left_right_different: adw::SwitchRow,
     units: Cell<Units>,
     /// The page setup, layout and section shown.
     shown: RefCell<(PageSetup, Layout, Section)>,
@@ -178,12 +183,22 @@ impl LayoutGroups {
             .subtitle(tr("From the section before"))
             .build();
         let first_number = spin(tr("Start Page Numbers At"), 1.0, 9999.0);
+        let first_different = adw::SwitchRow::builder()
+            .title(tr("Different First Page"))
+            .subtitle(tr("With a header and footer of its own"))
+            .build();
+        let left_right_different = adw::SwitchRow::builder()
+            .title(tr("Different Left and Right Pages"))
+            .subtitle(tr("Left pages have a header and footer of their own"))
+            .build();
         let section_group = adw::PreferencesGroup::builder()
             .title(tr("Section"))
             .build();
         section_group.add(&start);
         section_group.add(&continues);
         section_group.add(&first_number);
+        section_group.add(&first_different);
+        section_group.add(&left_right_different);
 
         let this = Rc::new(Self {
             page_group,
@@ -204,6 +219,8 @@ impl LayoutGroups {
             start,
             continues,
             first_number,
+            first_different,
+            left_right_different,
             units: Cell::new(units),
             shown: RefCell::new(Default::default()),
             updating: Cell::new(false),
@@ -271,6 +288,16 @@ impl LayoutGroups {
                 this.section_changed();
             }
         });
+        for row in [&self.first_different, &self.left_right_different] {
+            let weak = Rc::downgrade(self);
+            row.connect_active_notify(move |_| {
+                if let Some(this) = weak.upgrade()
+                    && !this.updating.get()
+                {
+                    this.section_changed();
+                }
+            });
+        }
         let weak = Rc::downgrade(self);
         self.continues.connect_active_notify(move |_| {
             if let Some(this) = weak.upgrade()
@@ -380,6 +407,14 @@ impl LayoutGroups {
             self.continues.set_active(continues);
         }
         self.first_number.set_sensitive(!continues);
+        if self.first_different.is_active() != section.first_page_different {
+            self.first_different
+                .set_active(section.first_page_different);
+        }
+        if self.left_right_different.is_active() != section.left_right_different {
+            self.left_right_different
+                .set_active(section.left_right_different);
+        }
         set(
             &self.first_number,
             f64::from(section.first_number.unwrap_or(1)),
@@ -454,7 +489,8 @@ impl LayoutGroups {
                 .unwrap_or_default(),
             first_number: (!self.continues.is_active())
                 .then(|| self.first_number.value().round() as u32),
-            ..shown
+            first_page_different: self.first_different.is_active(),
+            left_right_different: self.left_right_different.is_active(),
         };
         if section != shown
             && let Some(editor) = (self.editor)()

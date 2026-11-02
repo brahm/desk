@@ -20,7 +20,9 @@ use desk_model::{
     ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style,
     StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
-use desk_model::{Layout, Section, Start};
+use desk_model::{
+    FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, Section, Start,
+};
 use desk_odf as odf;
 
 use crate::sections;
@@ -293,6 +295,7 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
         ligatures,
         font_features,
         background: t.background.map(background),
+        field: None,
     }
 }
 
@@ -1099,6 +1102,27 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     set(&mut setup.margin_left, page.margin_left);
     set(&mut setup.margin_right, page.margin_right);
     setup.facing_pages = page.mirrored == Some(true);
+    // The margin of ODF is above the header, and the body starts below
+    // it (EST-12).
+    let master = &source.master;
+    let shown = |part: &Option<odf::HeaderFooter>| part.as_ref().is_some_and(|p| p.display);
+    setup.headers = shown(&master.header);
+    setup.footers = shown(&master.footer);
+    let size = |style: &odf::HeaderFooterStyle| {
+        length(style.min_height.unwrap_or_default()) + length(style.spacing.unwrap_or_default())
+    };
+    if setup.headers
+        && let Some(style) = &page.header
+    {
+        setup.header_margin = setup.margin_top;
+        setup.margin_top = setup.margin_top + size(style);
+    }
+    if setup.footers
+        && let Some(style) = &page.footer
+    {
+        setup.footer_margin = setup.margin_bottom;
+        setup.margin_bottom = setup.margin_bottom + size(style);
+    }
     // The columns of the pages are the layout outside any section.
     let page_layout = Layout {
         columns: page.columns.as_ref().map_or(desk_model::Columns::ONE, |c| {
@@ -1266,6 +1290,53 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         }
     }
 
+    // The headers and footers, whose paragraphs name the automatic
+    // styles of the styles.
+    let styled = odf::TextDocument {
+        default_style: source.default_style.clone(),
+        styles: source.styles.clone(),
+        automatic_styles: source.master_styles.clone(),
+        ..odf::TextDocument::default()
+    };
+    for (place, part) in [
+        (MarginPages::Default, &master.header, MarginKind::Header),
+        (MarginPages::First, &master.header_first, MarginKind::Header),
+        (MarginPages::Left, &master.header_left, MarginKind::Header),
+        (MarginPages::Default, &master.footer, MarginKind::Footer),
+        (MarginPages::First, &master.footer_first, MarginKind::Footer),
+        (MarginPages::Left, &master.footer_left, MarginKind::Footer),
+    ]
+    .map(|(pages, part, kind)| (MarginPlace::new(kind, pages), part))
+    {
+        let Some(part) = part else {
+            continue;
+        };
+        let mut paragraphs = Vec::new();
+        for paragraph in &part.paragraphs {
+            paragraphs.push(import_paragraph(
+                &styled,
+                &mut document,
+                &ids,
+                default,
+                paragraph,
+                relative,
+            )?);
+        }
+        if paragraphs.iter().all(Paragraph::is_empty) {
+            continue;
+        }
+        // Other programs show the first and left ones whenever they are
+        // there; Desk, when the section asks for them.
+        if setup.section == Section::default() {
+            match place.pages {
+                MarginPages::First => setup.section.first_page_different = true,
+                MarginPages::Left => setup.section.left_right_different = true,
+                MarginPages::Default => {}
+            }
+        }
+        document.apply(Op::SetHeaderFooter { place, paragraphs })?;
+    }
+
     document.apply(Op::SetPageSetup { page: setup })?;
 
     let text = &source.text_settings;
@@ -1300,6 +1371,36 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         },
     })?;
     Ok(document)
+}
+
+/// The field of the model for a field of ODF that shows a text.
+fn model_field(field: &odf::Field, shown: &str) -> Field {
+    match field {
+        odf::Field::PageNumber => Field::PageNumber,
+        odf::Field::PageCount => Field::PageCount,
+        odf::Field::Date { pattern } => Field::DateTime {
+            pattern: pattern.as_deref().unwrap_or_default().into(),
+            shown: shown.into(),
+        },
+        odf::Field::FileName => Field::FileName {
+            shown: shown.into(),
+        },
+    }
+}
+
+/// The field of ODF for a field of the model, with the text it shows.
+fn odf_field(field: &Field) -> (odf::Field, String) {
+    match field {
+        Field::PageNumber => (odf::Field::PageNumber, field.text(1, 1)),
+        Field::PageCount => (odf::Field::PageCount, field.text(1, 1)),
+        Field::DateTime { pattern, shown } => (
+            odf::Field::Date {
+                pattern: (!pattern.is_empty()).then(|| pattern.to_string()),
+            },
+            shown.to_string(),
+        ),
+        Field::FileName { shown } => (odf::Field::FileName, shown.to_string()),
+    }
 }
 
 fn import_paragraph(
@@ -1361,6 +1462,10 @@ fn import_paragraph(
                 run_attrs.merge(&char_attrs(&automatic.properties.text, size));
             }
         }
+        if let Some(field) = &span.field {
+            run_attrs.field = Some(Some(model_field(field, &span.text)));
+            return Run::with_attrs(&FIELD_CHARACTER.to_string(), run_style, run_attrs);
+        }
         // The model keeps paragraph breaks out of runs.
         let text: String = span
             .text
@@ -1419,6 +1524,158 @@ fn odf_hyphenate(hyphenate: Option<bool>, document: bool) -> (Option<bool>, Opti
         Some(true) if !document => (Some(false), Some(true)),
         other => (other, None),
     }
+}
+
+/// The spans of ODF for the runs of a paragraph, with the text style that
+/// `style` gives each run. A field is a span of its own for each of its
+/// characters.
+fn export_spans(
+    paragraph: &Paragraph,
+    mut style: impl FnMut(&Run) -> Option<String>,
+) -> Vec<odf::Span> {
+    let mut spans = Vec::new();
+    for run in paragraph.runs() {
+        let name = style(run);
+        match &run.attrs.field {
+            Some(Some(field)) => {
+                let (field, shown) = odf_field(field);
+                for _ in run.text().chars() {
+                    spans.push(odf::Span {
+                        style: name.clone(),
+                        text: shown.clone(),
+                        field: Some(field.clone()),
+                    });
+                }
+            }
+            _ => spans.push(odf::Span {
+                style: name,
+                text: run.text().replace(LINE_BREAK, &odf::LINE_BREAK.to_string()),
+                field: None,
+            }),
+        }
+    }
+    spans
+}
+
+/// The headers and footers of a document in the master page, with the
+/// automatic styles of their direct formatting.
+fn export_margins(
+    document: &Document,
+    names: &HashMap<StyleId, String>,
+    out: &mut odf::TextDocument,
+) {
+    let styles = document.styles();
+    let setup = document.page_setup();
+    let margins = document.headers_footers();
+    let mut automatic: Vec<odf::Style> = Vec::new();
+    let mut automatic_name = |family: odf::Family, parent: String, properties: odf::Properties| {
+        if let Some(existing) = automatic.iter().find(|s| {
+            s.family == family && s.parent.as_ref() == Some(&parent) && s.properties == properties
+        }) {
+            return existing.name.clone();
+        }
+        let prefix = match family {
+            odf::Family::Text => "MT",
+            _ => "MP",
+        };
+        let count = automatic.iter().filter(|s| s.family == family).count();
+        let name = format!("{prefix}{}", count + 1);
+        automatic.push(odf::Style {
+            name: name.clone(),
+            display_name: None,
+            family,
+            parent: Some(parent),
+            next: None,
+            list_style: None,
+            properties,
+        });
+        name
+    };
+    let mut part = |place: MarginPlace, shown: bool| -> Option<odf::HeaderFooter> {
+        let paragraphs = margins.get(place);
+        let empty = paragraphs.iter().all(Paragraph::is_empty);
+        if empty && (place.pages != MarginPages::Default || !shown) {
+            return None;
+        }
+        let mut out = Vec::new();
+        for paragraph in paragraphs {
+            let style_name = names[&paragraph.style()].clone();
+            let own = ParaAttrs {
+                list_level: None,
+                list_start: None,
+                list_override: None,
+                list_style: None,
+                ..paragraph.attrs().without_structure()
+            };
+            let style = if own.is_empty() {
+                style_name
+            } else {
+                automatic_name(
+                    odf::Family::Paragraph,
+                    style_name,
+                    odf::Properties {
+                        paragraph: odf_paragraph_properties(
+                            &own,
+                            &styles.resolve_paragraph(paragraph.style(), &own),
+                            false,
+                        ),
+                        text: odf::TextProperties::default(),
+                    },
+                )
+            };
+            let spans = export_spans(paragraph, |run| {
+                let attrs = run.attrs.without_field();
+                let named = run.style.map(|id| names[&id].clone());
+                if attrs.is_empty() {
+                    return named;
+                }
+                let properties = odf::Properties {
+                    paragraph: odf::ParagraphProperties::default(),
+                    text: text_properties(
+                        &attrs,
+                        &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                    ),
+                };
+                // A text style without a parent names none.
+                Some(match named {
+                    Some(parent) => automatic_name(odf::Family::Text, parent, properties),
+                    None => automatic_name(odf::Family::Text, String::new(), properties),
+                })
+            });
+            out.push(odf::Paragraph {
+                style: Some(style),
+                spans,
+                ..odf::Paragraph::default()
+            });
+        }
+        if out.is_empty() {
+            out.push(odf::Paragraph {
+                style: Some(names[&styles.default_paragraph()].clone()),
+                ..odf::Paragraph::default()
+            });
+        }
+        Some(odf::HeaderFooter {
+            display: shown,
+            paragraphs: out,
+        })
+    };
+    let header = |pages| MarginPlace::new(MarginKind::Header, pages);
+    let footer = |pages| MarginPlace::new(MarginKind::Footer, pages);
+    out.master = odf::MasterPage {
+        header: part(header(MarginPages::Default), setup.headers),
+        header_first: part(header(MarginPages::First), setup.headers),
+        header_left: part(header(MarginPages::Left), setup.headers),
+        footer: part(footer(MarginPages::Default), setup.footers),
+        footer_first: part(footer(MarginPages::First), setup.footers),
+        footer_left: part(footer(MarginPages::Left), setup.footers),
+    };
+    // Text styles without a parent.
+    for style in &mut automatic {
+        if style.parent.as_deref() == Some("") {
+            style.parent = None;
+        }
+    }
+    out.master_styles = automatic;
 }
 
 /// Builds an ODF text document from a document.
@@ -1637,32 +1894,26 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 },
             )
         };
-        let spans = paragraph
-            .runs()
-            .map(|run| {
-                let named = run.style.map(|id| names[&id].clone());
-                let style = if run.attrs.is_empty() {
-                    named
-                } else {
-                    Some(automatic_name(
-                        odf::Family::Text,
-                        named,
-                        None,
-                        odf::Properties {
-                            paragraph: odf::ParagraphProperties::default(),
-                            text: text_properties(
-                                &run.attrs,
-                                &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
-                            ),
-                        },
-                    ))
-                };
-                odf::Span {
-                    style,
-                    text: run.text().replace(LINE_BREAK, &odf::LINE_BREAK.to_string()),
-                }
-            })
-            .collect();
+        let spans = export_spans(paragraph, |run| {
+            let named = run.style.map(|id| names[&id].clone());
+            let attrs = run.attrs.without_field();
+            if attrs.is_empty() {
+                named
+            } else {
+                Some(automatic_name(
+                    odf::Family::Text,
+                    named,
+                    None,
+                    odf::Properties {
+                        paragraph: odf::ParagraphProperties::default(),
+                        text: text_properties(
+                            &attrs,
+                            &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                        ),
+                    },
+                ))
+            }
+        });
         let list = item.as_ref().map(|item| {
             let first = previous != Some(item.style);
             let start = paragraph.attrs().list_start.flatten();
@@ -1717,6 +1968,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
     }
     out.automatic_styles = automatic;
     out.section_styles = section_styles;
+    export_margins(document, &names, &mut out);
     out.pictures = pictures;
 
     let page = document.page_setup();
@@ -1729,7 +1981,24 @@ pub fn export(document: &Document) -> odf::TextDocument {
         margin_right: Some(odf_length(page.margin_right)),
         mirrored: page.facing_pages.then_some(true),
         columns: None,
+        header: None,
+        footer: None,
     };
+    // The margin of ODF is above the header, whose height takes the rest
+    // of the margin of the body (EST-12).
+    let room = |body: Length, edge: Length| odf::HeaderFooterStyle {
+        min_height: Some(odf_length(Length::from_pt((body - edge).to_pt().max(0.0)))),
+        spacing: Some(odf::Length(0.0)),
+    };
+    if out.master.header.as_ref().is_some_and(|h| h.display) {
+        out.page_layout.margin_top = Some(odf_length(page.header_margin.min(page.margin_top)));
+        out.page_layout.header = Some(room(page.margin_top, page.header_margin));
+    }
+    if out.master.footer.as_ref().is_some_and(|f| f.display) {
+        out.page_layout.margin_bottom =
+            Some(odf_length(page.footer_margin.min(page.margin_bottom)));
+        out.page_layout.footer = Some(room(page.margin_bottom, page.footer_margin));
+    }
     let meta = document.metadata();
     let some = |s: &str| (!s.is_empty()).then(|| s.to_owned());
     out.meta = odf::Meta {

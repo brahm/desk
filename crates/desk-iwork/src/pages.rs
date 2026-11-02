@@ -56,6 +56,10 @@ pub struct PageGeometry {
     /// right margins are then the inside and outside ones, swapped on left
     /// pages.
     pub facing: bool,
+    /// The distance from the top of the paper to the header.
+    pub header: f64,
+    /// The distance from the bottom of the paper to the footer.
+    pub footer: f64,
 }
 
 impl Default for PageGeometry {
@@ -69,15 +73,44 @@ impl Default for PageGeometry {
             left: 72.0,
             right: 72.0,
             facing: false,
+            header: 36.0,
+            footer: 36.0,
         }
     }
 }
+
+/// What a field of the text shows (EST-27).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Field {
+    /// The number of its page (`sf:page-number`).
+    PageNumber,
+    /// The number of pages (`sf:page-count`).
+    PageCount,
+    /// A date and time (`sf:date-time`).
+    DateTime {
+        /// The pattern of the date, in the symbols of Unicode (`sf:format`).
+        format: String,
+        /// The text that Pages shows.
+        shown: String,
+    },
+    /// The name of the file (`sf:filename`).
+    FileName {
+        /// The text that Pages shows.
+        shown: String,
+    },
+}
+
+/// The character that a field takes in the text of its run.
+pub const FIELD: char = '\u{fffc}';
 
 /// A run of text with one character style.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Run {
     /// The character style, by `sf:style`, for text inside a span.
     pub style: Option<String>,
+    /// The field that the run is, when it is one: its text is then one
+    /// [`FIELD`].
+    pub field: Option<Field>,
     /// The text, with breaks as [`LINE_BREAK`], [`PAGE_BREAK`],
     /// [`COLUMN_BREAK`] and tabs as `\t`. A column break that ends a
     /// paragraph is not kept: the next paragraph starts a new column.
@@ -117,6 +150,15 @@ pub struct PagesDocument {
     pub stylesheet: Stylesheet,
     /// The paragraphs of the body.
     pub body: Vec<Paragraph>,
+    /// The headers, by the name Pages gives them, as
+    /// `SFWPDefaultOddHeaderIdentifier`, with their paragraphs.
+    pub headers: Vec<(String, Vec<Paragraph>)>,
+    /// The footers, as the headers.
+    pub footers: Vec<(String, Vec<Paragraph>)>,
+    /// Whether pages show their headers (Document Inspector).
+    pub has_headers: bool,
+    /// Whether pages show their footers (Document Inspector).
+    pub has_footers: bool,
     /// The kinds of content that the reader skipped, by element name, in
     /// the order first met, with how many of each: what an import cannot
     /// show yet. Besides the elements of the body, `headers`, `footers`
@@ -188,17 +230,6 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     }
     let ids = Ids::new(&root);
     let mut skipped = Vec::new();
-    // Pages saves a header and a footer for each section even when they
-    // are empty, so only those with text count.
-    for name in ["headers", "footers"] {
-        let count = root
-            .children_named(SF, name)
-            .map(|part| part.elements().filter(|e| has_text(e)).count())
-            .sum::<usize>();
-        if count > 0 {
-            skipped.push((name.to_owned(), count));
-        }
-    }
     let count = root
         .children_named(SL, "drawables")
         .map(floating_objects)
@@ -218,6 +249,8 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             .unwrap_or_default(),
         auto_hyphenation: publication_flag(&root, "kSFWPAutoHyphenationProperty").unwrap_or(false),
         use_ligatures: publication_flag(&root, "kSFWPUseLigaturesProperty").unwrap_or(true),
+        has_headers: publication_flag(&root, "kSFWPHasHeadersProperty").unwrap_or(true),
+        has_footers: publication_flag(&root, "kSFWPHasFootersProperty").unwrap_or(true),
         ..PagesDocument::default()
     };
     let Some(storage) = root
@@ -235,16 +268,45 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         document.stylesheet = Stylesheet::read(&ids, sheet);
     }
     if let Some(body) = storage.child(SF, "text-body") {
-        let mut reader = BodyReader {
-            ids: &ids,
-            document: &mut document,
-            section: None,
-            layout: None,
-            column_break: false,
-        };
-        reader.block(body);
+        read_block(&ids, &mut document, body);
+    }
+    // The headers and footers, each in a text storage of its own, read
+    // as the body is.
+    for (name, item) in [("headers", "header"), ("footers", "footer")] {
+        for part in root.children_named(SF, name) {
+            for element in part.children_named(SF, item) {
+                let text = element
+                    .child(SF, "text-storage")
+                    .and_then(|s| s.child(SF, "text-body"));
+                let Some(text) = text else {
+                    continue;
+                };
+                let body = std::mem::take(&mut document.body);
+                read_block(&ids, &mut document, text);
+                let paragraphs = std::mem::replace(&mut document.body, body);
+                let name_attr = element.attr(SF, "name").unwrap_or_default().to_owned();
+                let list = if item == "header" {
+                    &mut document.headers
+                } else {
+                    &mut document.footers
+                };
+                list.push((name_attr, paragraphs));
+            }
+        }
     }
     Ok(document)
+}
+
+/// Reads the paragraphs of a text body into the body of a document.
+fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) {
+    let mut reader = BodyReader {
+        ids,
+        document,
+        section: None,
+        layout: None,
+        column_break: false,
+    };
+    reader.block(body);
 }
 
 /// The strings of a metadata field, which holds a string or an array.
@@ -308,6 +370,11 @@ fn page_geometry(info: &Element) -> PageGeometry {
                 *field = value;
             }
         }
+        for (field, name) in [(&mut page.header, "header"), (&mut page.footer, "footer")] {
+            if let Some(value) = number(margins, SF, name) {
+                *field = value;
+            }
+        }
         page.facing = margins.attr(SF, "facing-pages") == Some("true");
     }
     page
@@ -338,17 +405,6 @@ fn floating_objects(drawables: &Element) -> usize {
         }
     }
     count
-}
-
-/// Whether an element holds text other than white space.
-fn has_text(element: &Element) -> bool {
-    std::iter::once(element)
-        .chain(element.descendants())
-        .any(|e| {
-            e.children
-                .iter()
-                .any(|n| matches!(n, Node::Text(t) if !t.trim().is_empty()))
-        })
 }
 
 /// Elements that hold nothing to show, or that Pages saves only to lay
@@ -473,6 +529,21 @@ impl BodyReader<'_, '_> {
                         "pgbr" => push(runs, style, &PAGE_BREAK.to_string()),
                         "contbr" => push(runs, style, &COLUMN_BREAK.to_string()),
                         "tab" => push(runs, style, "\t"),
+                        "page-number" => push_field(runs, style, Field::PageNumber),
+                        "page-count" => push_field(runs, style, Field::PageCount),
+                        "date-time" => {
+                            let field = Field::DateTime {
+                                format: child.attr(SF, "format").unwrap_or_default().to_owned(),
+                                shown: child.text(),
+                            };
+                            push_field(runs, style, field);
+                        }
+                        "filename" => {
+                            let field = Field::FileName {
+                                shown: child.text(),
+                            };
+                            push_field(runs, style, field);
+                        }
                         name if IGNORED.contains(&name) => {}
                         _ => self.skip(child),
                     }
@@ -483,13 +554,26 @@ impl BodyReader<'_, '_> {
     }
 }
 
-/// Adds text to the last run when it has the same style.
+/// Adds text to the last run when it has the same style and is not a
+/// field.
 fn push(runs: &mut Vec<Run>, style: Option<&str>, text: &str) {
     match runs.last_mut() {
-        Some(last) if last.style.as_deref() == style => last.text.push_str(text),
+        Some(last) if last.style.as_deref() == style && last.field.is_none() => {
+            last.text.push_str(text);
+        }
         _ => runs.push(Run {
             style: style.map(str::to_owned),
+            field: None,
             text: text.to_owned(),
         }),
     }
+}
+
+/// Adds a field, as a run of its own.
+fn push_field(runs: &mut Vec<Run>, style: Option<&str>, field: Field) {
+    runs.push(Run {
+        style: style.map(str::to_owned),
+        field: Some(field),
+        text: FIELD.to_string(),
+    });
 }

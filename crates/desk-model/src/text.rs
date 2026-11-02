@@ -267,13 +267,14 @@ impl Paragraph {
     }
 
     /// The formatting that text typed at an offset takes: that of the
-    /// character before it, or of the first character at the start.
+    /// character before it, or of the first character at the start, but
+    /// never its field.
     pub fn format_at(&self, offset: usize) -> (Option<StyleId>, CharAttrs) {
         let mut start = 0;
         for run in &self.runs {
             let end = start + run.len();
             if offset <= end && (offset > start || start == 0) {
-                return (run.style, run.attrs.clone());
+                return (run.style, run.attrs.without_field());
             }
             start = end;
         }

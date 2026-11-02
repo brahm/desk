@@ -84,6 +84,22 @@ pub struct Label {
     pub image: Option<(Picture, f32)>,
 }
 
+/// What the fields of a paragraph show: the number of its page and the
+/// number of pages (EST-27).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FieldValues {
+    /// The number that the page of the paragraph shows.
+    pub page: u32,
+    /// The number of pages of the document.
+    pub pages: u32,
+}
+
+impl Default for FieldValues {
+    fn default() -> Self {
+        Self { page: 1, pages: 1 }
+    }
+}
+
 /// A paragraph ready for layout: its text with capitalization applied, its
 /// character formats and its paragraph format.
 #[derive(Clone, Debug)]
@@ -108,13 +124,24 @@ impl ParagraphText {
     /// whether it is hyphenated and has ligatures at all, and the words
     /// never hyphenated.
     pub fn new_with(styles: &Styles, settings: &TextSettings, paragraph: &Paragraph) -> Self {
+        Self::new_with_values(styles, settings, paragraph, FieldValues::default())
+    }
+
+    /// Prepares a paragraph of a document, as [`ParagraphText::new_with`]
+    /// does, with its fields showing these values.
+    pub fn new_with_values(
+        styles: &Styles,
+        settings: &TextSettings,
+        paragraph: &Paragraph,
+        values: FieldValues,
+    ) -> Self {
         let base = styles.resolve_character(paragraph.style(), None, &Default::default());
         let format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
         let runs = paragraph.runs().map(|run| {
             let format = styles.resolve_character(paragraph.style(), run.style, &run.attrs);
             (run.text(), format)
         });
-        Self::from_runs_with(settings, format, base, runs)
+        Self::from_runs_in(settings, values, format, base, runs)
     }
 
     /// Prepares a paragraph of a document that is an item of a list, as
@@ -131,7 +158,20 @@ impl ParagraphText {
         paragraph: &Paragraph,
         item: Option<&ListItem>,
     ) -> Self {
-        let text = Self::new_with(styles, settings, paragraph);
+        Self::new_in_document_with(styles, settings, paragraph, item, FieldValues::default())
+    }
+
+    /// Prepares a paragraph of a document, as
+    /// [`ParagraphText::new_in_document`] does, with its fields showing
+    /// these values.
+    pub fn new_in_document_with(
+        styles: &Styles,
+        settings: &TextSettings,
+        paragraph: &Paragraph,
+        item: Option<&ListItem>,
+        values: FieldValues,
+    ) -> Self {
+        let text = Self::new_with_values(styles, settings, paragraph, values);
         match item {
             Some(item) => text.with_label(item),
             None => text,
@@ -207,6 +247,20 @@ impl ParagraphText {
         base: CharFormat,
         runs: impl IntoIterator<Item = (&'a str, CharFormat)>,
     ) -> Self {
+        Self::from_runs_in(settings, FieldValues::default(), paragraph, base, runs)
+    }
+
+    /// Prepares text from pieces with resolved formats, with the settings
+    /// of the text of its document and the values of its fields. A field
+    /// takes the place of its character, whole: an offset inside its text
+    /// is the offset of the field.
+    pub fn from_runs_in<'a>(
+        settings: &TextSettings,
+        values: FieldValues,
+        paragraph: ParaFormat,
+        base: CharFormat,
+        runs: impl IntoIterator<Item = (&'a str, CharFormat)>,
+    ) -> Self {
         let mut out = Self {
             text: String::new(),
             offsets: Vec::new(),
@@ -226,7 +280,7 @@ impl ParagraphText {
             }
             // Where words may break with a hyphen, by the patterns of
             // their language (TXT-09).
-            let hyphens = if hyphenate {
+            let hyphens = if hyphenate && format.field.is_none() {
                 hyphen_points(text, format.language.tag(), settings)
             } else {
                 Vec::new()
@@ -246,6 +300,19 @@ impl ParagraphText {
                 && pages_font(&format.font_family).is_some_and(|f| f.ligatures);
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
+                if let Some(field) = &format.field {
+                    let start = out.text.len();
+                    let shown = field.text(values.page, values.pages);
+                    out.text.push_str(&shown);
+                    out.offsets.push((start, model_offset));
+                    if !shown.is_empty() {
+                        out.push_range(start..out.text.len(), index, false);
+                    }
+                    model_offset += c.len_utf8();
+                    transformed = true;
+                    previous = shown.chars().last();
+                    continue;
+                }
                 if hyphens.binary_search(&(model_offset - run_start)).is_ok() {
                     let start = out.text.len();
                     out.text.push(SOFT_HYPHEN);
@@ -391,5 +458,29 @@ mod tests {
         assert_eq!(text.to_model(2), 2);
         assert_eq!(text.ranges.len(), 1);
         assert_eq!(text.formats().len(), 1);
+    }
+
+    #[test]
+    fn est_27_a_field_shows_its_value_whole() {
+        let mut field = format(Capitalization::None);
+        field.field = Some(desk_model::Field::PageNumber);
+        let text = ParagraphText::from_runs_in(
+            &TextSettings::default(),
+            FieldValues {
+                page: 12,
+                pages: 20,
+            },
+            ParaFormat::default(),
+            CharFormat::default(),
+            [
+                ("p. ", CharFormat::default()),
+                ("\u{fffc}", field),
+                (".", CharFormat::default()),
+            ],
+        );
+        assert_eq!(text.text(), "p. 12.");
+        assert_eq!(text.to_model(3), 3);
+        assert_eq!(text.to_model(4), 3);
+        assert_eq!(text.to_model(5), 6);
     }
 }

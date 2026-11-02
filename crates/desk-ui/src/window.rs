@@ -13,7 +13,7 @@ use adw::prelude::*;
 use desk_model::{CharAttrs, Document, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
-use crate::editing::{BreakKind, TextEditor};
+use crate::editing::{BreakKind, FieldKind, TextEditor};
 use crate::find::{self, FindSlot, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
@@ -87,7 +87,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 43] = [
+const DOCUMENT_ACTIONS: [&str; 47] = [
     "save",
     "save-as",
     "save-copy",
@@ -113,6 +113,10 @@ const DOCUMENT_ACTIONS: [&str; 43] = [
     "insert-column-break",
     "insert-layout-break",
     "insert-section-break",
+    "insert-page-number",
+    "insert-page-count",
+    "insert-date",
+    "insert-file-name",
     "find",
     "find-next",
     "find-previous",
@@ -469,6 +473,7 @@ impl DocumentWindow {
 
     fn show_document(self: &Rc<Self>, document: Document) {
         let editor = TextEditor::new(&self.view, document);
+        editor.set_file_name(&self.name.borrow());
         let weak = Rc::downgrade(self);
         editor.connect_changed(move || {
             if let Some(this) = weak.upgrade() {
@@ -710,6 +715,7 @@ impl DocumentWindow {
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {
             editor.mark_saved();
+            editor.set_file_name(&self.name.borrow());
         }
         remember_recent(path);
         self.refresh();
@@ -1290,6 +1296,22 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
 
+        for (name, kind) in [
+            ("insert-page-number", FieldKind::PageNumber),
+            ("insert-page-count", FieldKind::PageCount),
+            ("insert-date", FieldKind::Date),
+            ("insert-file-name", FieldKind::FileName),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                    editor.insert_field(editor.new_field(kind));
+                }
+            });
+            self.window.add_action(&action);
+        }
+
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);
         import.connect_activate(move |_, _| {
@@ -1737,16 +1759,25 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     menu
 }
 
-/// The breaks of the Insert menu (EST-04, EST-08, EST-09, EST-16).
+/// The breaks and fields of the Insert menu (EST-04, EST-08, EST-09,
+/// EST-16, EST-27).
 fn insert_menu() -> gio::Menu {
-    let menu = gio::Menu::new();
-    menu.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
-    menu.append(Some(&tr("_Column Break")), Some("win.insert-column-break"));
-    menu.append(Some(&tr("_Layout Break")), Some("win.insert-layout-break"));
-    menu.append(
+    let breaks = gio::Menu::new();
+    breaks.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
+    breaks.append(Some(&tr("_Column Break")), Some("win.insert-column-break"));
+    breaks.append(Some(&tr("_Layout Break")), Some("win.insert-layout-break"));
+    breaks.append(
         Some(&tr("_Section Break")),
         Some("win.insert-section-break"),
     );
+    let fields = gio::Menu::new();
+    fields.append(Some(&tr("Page _Number")), Some("win.insert-page-number"));
+    fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
+    fields.append(Some(&tr("_Date")), Some("win.insert-date"));
+    fields.append(Some(&tr("_File Name")), Some("win.insert-file-name"));
+    let menu = gio::Menu::new();
+    menu.append_section(None, &breaks);
+    menu.append_section(None, &fields);
     menu
 }
 

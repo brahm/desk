@@ -83,7 +83,7 @@ mod tests {
         let saved = desk_filters::read_odt(&bytes).unwrap();
         assert_eq!(saved.statistics().words, opened.document.statistics().words);
         assert!(!opened.warnings.is_empty());
-        assert!(opened.warnings[0].starts_with("Left out headers"));
+        assert!(opened.warnings[0].starts_with("Left out"));
         assert!(super::open(&dir.join("manifest.tsv")).is_err());
     }
 

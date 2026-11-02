@@ -29,6 +29,7 @@ use desk_model::{
     StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_model::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
+use desk_model::{Field, MarginKind, MarginPages, MarginPlace};
 
 use crate::FilterError;
 use crate::log::{Content, Formatting, ImportLog, Warning};
@@ -920,6 +921,9 @@ impl<'a> Importer<'a> {
                 run_style = named;
                 run_attrs.merge(&merged(&chain, anonymous).1);
             }
+            if let Some(field) = &run.field {
+                run_attrs.field = Some(Some(model_field(field)));
+            }
             for (i, piece) in run.text.split(PAGE_BREAK).enumerate() {
                 if i > 0 {
                     pieces.push(Vec::new());
@@ -1040,6 +1044,36 @@ fn section(sheet: &Stylesheet, style: Option<&str>) -> Section {
     out
 }
 
+/// The field of the model for a field of Pages (EST-27).
+fn model_field(field: &iwork::Field) -> Field {
+    match field {
+        iwork::Field::PageNumber => Field::PageNumber,
+        iwork::Field::PageCount => Field::PageCount,
+        iwork::Field::DateTime { format, shown } => Field::DateTime {
+            pattern: format.as_str().into(),
+            shown: shown.as_str().into(),
+        },
+        iwork::Field::FileName { shown } => Field::FileName {
+            shown: shown.as_str().into(),
+        },
+    }
+}
+
+/// The header or footer of the model that a header or footer of Pages is,
+/// by its name.
+fn margin_place(kind: MarginKind, name: &str) -> Option<MarginPlace> {
+    let pages = if name.contains("Odd") {
+        MarginPages::Default
+    } else if name.contains("First") {
+        MarginPages::First
+    } else if name.contains("Even") {
+        MarginPages::Left
+    } else {
+        return None;
+    };
+    Some(MarginPlace::new(kind, pages))
+}
+
 /// Maps a Pages document to the model.
 pub fn import(source: &iwork::PagesDocument) -> Result<Document, FilterError> {
     import_logged(source).map(|(document, _)| document)
@@ -1123,6 +1157,28 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             index += 1;
         }
     }
+    // The headers and footers, with the styles of the body.
+    for (kind, parts) in [
+        (MarginKind::Header, &source.headers),
+        (MarginKind::Footer, &source.footers),
+    ] {
+        for (name, paragraphs) in parts {
+            let Some(place) = margin_place(kind, name) else {
+                continue;
+            };
+            let mut built = Vec::new();
+            for paragraph in paragraphs {
+                built.extend(importer.paragraph(paragraph, None)?);
+            }
+            if built.iter().all(Paragraph::is_empty) {
+                built.clear();
+            }
+            importer.document.apply(Op::SetHeaderFooter {
+                place,
+                paragraphs: built,
+            })?;
+        }
+    }
     let mut document = importer.document;
     if index > 1 {
         document.apply(Op::RemoveParagraph { paragraph: first })?;
@@ -1141,6 +1197,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             facing_pages: page.facing,
             section: first_section,
             layout: first_layout,
+            headers: source.has_headers,
+            footers: source.has_footers,
+            header_margin: length(page.header),
+            footer_margin: length(page.footer),
         },
     })?;
     // Whether Pages hyphenates and forms ligatures at all, from the

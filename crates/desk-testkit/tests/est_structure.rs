@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! EST-07 to EST-11, EST-16 and EST-18: documents saved by Pages '09 on the
-//! reference machine with columns, layouts, facing pages and sections put
-//! their words where Pages put them in its PDF, on as many pages.
+//! EST-07 to EST-12, EST-16, EST-18, EST-19 and EST-27: documents saved by
+//! Pages '09 on the reference machine with columns, layouts, facing pages,
+//! sections, headers, footers and fields put their words where Pages put
+//! them in its PDF, on as many pages.
 
 use std::path::{Path, PathBuf};
 
@@ -66,10 +67,23 @@ fn est_16_est_18_sections_match_pages() {
     // The second section starts a page, numbered from 5.
     assert_eq!(numbers, [1, 5]);
     assert_eq!(desk.len(), reference.len(), "{name}: pages");
-    // Every word is where Pages put it up to the field of the page
-    // number, which the fields of EST-27 add.
+    // Every word is where Pages put it, the page number of the second
+    // section in its field (EST-27) among them.
     let diff = compare_words(&reference, &desk);
-    let mismatch = diff.first_mismatch.as_ref().expect("the field is missing");
-    assert_eq!(mismatch.reference.as_deref(), Some("sectio5n"), "{diff:?}");
-    assert!(diff.max_offset <= DEFAULT_POSITION_TOLERANCE, "{diff:?}");
+    assert!(diff.passes(DEFAULT_POSITION_TOLERANCE), "{diff:?}");
+}
+
+#[test]
+fn est_12_headers_and_footers_match_pages() {
+    check("est-12-headers-footers");
+}
+
+#[test]
+fn est_19_first_left_and_right_pages_match_pages() {
+    check("est-19-first-left-right");
+}
+
+#[test]
+fn est_27_fields_match_pages() {
+    check("est-27-fields");
 }
