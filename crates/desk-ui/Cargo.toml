@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 adw.workspace = true
+desk-lang.workspace = true
 desk-layout.workspace = true
 desk-model.workspace = true
 desk-render.workspace = true

@@ -225,9 +225,10 @@ def main():
         wait_for(
             "the effects in the Inspector",
             lambda: showing(find_named(app, "Character Spacing"))
-            and showing(find_named(app, "Borders and Rules")),
+            and showing(find_named(app, "Borders and Rules"))
+            and showing(find_named(app, "Hyphenate Words")),
         )
-        check("the Inspector shows spacing, borders and rules", True)
+        check("the Inspector shows spacing, hyphenation, borders and rules", True)
         press("ctrl+alt+i")
 
         # Ctrl+T shows the Fonts window, with its effects and typography
@@ -342,6 +343,21 @@ def main():
             lambda: "\u201chello\u201d" in text_of(document),
         )
         check("Replace All replaces the matches", True)
+
+        # Ctrl+: shows the Spelling and Grammar window (TXT-10).
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+colon")
+        wait_for(
+            "the Spelling and Grammar window",
+            lambda: any(
+                n.get_role() == Atspi.Role.FRAME and n.get_name() == "Spelling and Grammar"
+                for n in walk(app)
+            ),
+        )
+        check("Ctrl+: shows the Spelling and Grammar window", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

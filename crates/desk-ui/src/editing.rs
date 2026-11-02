@@ -115,6 +115,9 @@ struct State {
     /// More selected ranges, which Select All Uses adds (STY-09). Changes
     /// of formatting apply to them too; moving the cursor drops them.
     others: Vec<Selection>,
+    /// The cursor at the end of a word being typed, which the spelling
+    /// checker leaves unmarked until the cursor leaves it.
+    squiggle_skip: Option<Spot>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -198,9 +201,11 @@ impl TextEditor {
                 invisibles: false,
                 access: AccessText::default(),
                 others: Vec::new(),
+                squiggle_skip: None,
             })),
         };
         this.show_pages();
+        this.update_squiggles();
         this.connect_keyboard();
         this.connect_pointer();
         this.connect_input_method();
@@ -565,7 +570,183 @@ impl TextEditor {
         self.show_pages();
         self.state.borrow_mut().goal = None;
         self.select(selection);
+        self.update_squiggles();
         self.changed();
+    }
+
+    /// Marks the misspelled words and the mistakes of the proofreader,
+    /// as the preferences ask (TXT-10, TXT-11).
+    pub fn update_squiggles(&self) {
+        let preferences = crate::preferences::get();
+        let squiggles = {
+            let mut state = self.state.borrow_mut();
+            let cursor =
+                (state.typing && state.selection.is_empty()).then_some(state.selection.focus);
+            let mut skipped = None;
+            let mut squiggles = Vec::new();
+            let document = state.editor.document();
+            for (index, paragraph) in document.body().iter().enumerate() {
+                for mistake in crate::spelling::mistakes(
+                    document.styles(),
+                    paragraph,
+                    preferences.check_spelling,
+                    preferences.proofread,
+                ) {
+                    if let Some(cursor) = cursor
+                        && cursor.paragraph == index
+                        && mistake.range.end == cursor.offset
+                        && matches!(mistake.kind, crate::spelling::MistakeKind::Spelling { .. })
+                    {
+                        skipped = Some(cursor);
+                        continue;
+                    }
+                    let selection = Selection {
+                        anchor: Spot::new(index, mistake.range.start),
+                        focus: Spot::new(index, mistake.range.end),
+                    };
+                    let proofreading =
+                        matches!(mistake.kind, crate::spelling::MistakeKind::Proofreading(_));
+                    for span in text_nav::selection_rects(&state.layout, &selection) {
+                        squiggles.push(crate::view::Squiggle { span, proofreading });
+                    }
+                }
+            }
+            state.squiggle_skip = skipped;
+            squiggles
+        };
+        self.view.set_squiggles(squiggles);
+    }
+
+    /// The mistakes of a paragraph, by its index, as the preferences ask.
+    fn mistakes_of(
+        &self,
+        index: usize,
+        spelling: bool,
+        proofreading: bool,
+    ) -> Vec<crate::spelling::Mistake> {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        document
+            .body()
+            .get(index)
+            .map(|p| crate::spelling::mistakes(document.styles(), p, spelling, proofreading))
+            .unwrap_or_default()
+    }
+
+    /// The text of a paragraph, by its index.
+    fn paragraph_text(&self, index: usize) -> String {
+        let state = self.state.borrow();
+        state
+            .editor
+            .document()
+            .body()
+            .get(index)
+            .map(|p| p.text())
+            .unwrap_or_default()
+    }
+
+    /// The mistake under a point of the document area, which it selects,
+    /// with the text of its paragraph, for the context menu.
+    pub fn mistake_at(&self, x: f64, y: f64) -> Option<(crate::spelling::Mistake, String)> {
+        let preferences = crate::preferences::get();
+        let spot = self.spot_at(x, y)?;
+        let mistake = self
+            .mistakes_of(
+                spot.paragraph,
+                preferences.check_spelling,
+                preferences.proofread,
+            )
+            .into_iter()
+            .find(|m| m.range.start <= spot.offset && spot.offset <= m.range.end)?;
+        self.select_mistake(spot.paragraph, &mistake);
+        Some((mistake, self.paragraph_text(spot.paragraph)))
+    }
+
+    fn select_mistake(&self, index: usize, mistake: &crate::spelling::Mistake) {
+        self.state.borrow_mut().typing = false;
+        self.select(Selection {
+            anchor: Spot::new(index, mistake.range.start),
+            focus: Spot::new(index, mistake.range.end),
+        });
+    }
+
+    /// The mistake that the selection is, if it is one.
+    pub fn selected_mistake(
+        &self,
+        spelling: bool,
+        proofreading: bool,
+    ) -> Option<(crate::spelling::Mistake, String)> {
+        let (start, end) = self.selection().ordered();
+        if start.paragraph != end.paragraph {
+            return None;
+        }
+        let mistake = self
+            .mistakes_of(start.paragraph, spelling, proofreading)
+            .into_iter()
+            .find(|m| m.range == (start.offset..end.offset))?;
+        Some((mistake, self.paragraph_text(start.paragraph)))
+    }
+
+    /// Selects the next mistake after the selection, going round the
+    /// document (Check Spelling), and gives it with the text of its
+    /// paragraph.
+    pub fn next_mistake(
+        &self,
+        spelling: bool,
+        proofreading: bool,
+    ) -> Option<(crate::spelling::Mistake, String)> {
+        let (_, end) = self.selection().ordered();
+        let count = self.state.borrow().editor.document().body().len();
+        for step in 0..=count {
+            let index = (end.paragraph + step) % count.max(1);
+            let found = self
+                .mistakes_of(index, spelling, proofreading)
+                .into_iter()
+                .find(|m| step > 0 || m.range.start >= end.offset)
+                .or_else(|| {
+                    // Round to the start of the first paragraph.
+                    (step == count)
+                        .then(|| {
+                            self.mistakes_of(index, spelling, proofreading)
+                                .into_iter()
+                                .next()
+                        })
+                        .flatten()
+                });
+            if let Some(mistake) = found {
+                self.select_mistake(index, &mistake);
+                return Some((mistake, self.paragraph_text(index)));
+            }
+        }
+        None
+    }
+
+    /// Replaces the selection with a correction, which takes the
+    /// formatting of the text it replaces.
+    pub fn correct(&self, with: &str) {
+        let (start, end) = self.selection().ordered();
+        if start.paragraph != end.paragraph {
+            return;
+        }
+        let paragraph = {
+            let state = self.state.borrow();
+            state
+                .editor
+                .document()
+                .body()
+                .get(start.paragraph)
+                .map(|p| p.id())
+        };
+        if let Some(paragraph) = paragraph {
+            self.replace_found(
+                &desk_model::Found {
+                    paragraph,
+                    index: start.paragraph,
+                    range: start.offset..end.offset,
+                },
+                with,
+            );
+        }
     }
 
     fn changed(&self) {
@@ -1064,6 +1245,10 @@ impl TextEditor {
             (offset(selection.focus), range)
         };
         self.view.access().set_caret(focus, range);
+        let skip = self.state.borrow().squiggle_skip;
+        if skip.is_some_and(|s| s != self.state.borrow().selection.focus) {
+            self.update_squiggles();
+        }
         self.selection_changed();
         if let Some(caret) = caret {
             self.view.scroll_to(&caret);

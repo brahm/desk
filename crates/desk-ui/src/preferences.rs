@@ -140,6 +140,11 @@ pub struct Preferences {
     pub smart_quotes: bool,
     /// The corrections made while typing (TXT-07).
     pub autocorrect: AutoCorrect,
+    /// Whether misspelled words are marked as they are typed (TXT-10).
+    pub check_spelling: bool,
+    /// Whether the mistakes of the proofreader are marked as they are
+    /// typed (TXT-11).
+    pub proofread: bool,
 }
 
 impl Default for Preferences {
@@ -163,6 +168,8 @@ impl Default for Preferences {
             automatic_lists: true,
             smart_quotes: true,
             autocorrect: AutoCorrect::default(),
+            check_spelling: true,
+            proofread: false,
         }
     }
 }
@@ -188,6 +195,8 @@ impl Preferences {
         let editing = |key: &str, default: bool| file.boolean(EDITING, key).unwrap_or(default);
         out.automatic_lists = editing("automatic-lists", out.automatic_lists);
         out.smart_quotes = editing("smart-quotes", out.smart_quotes);
+        out.check_spelling = editing("check-spelling", out.check_spelling);
+        out.proofread = editing("proofread", out.proofread);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -217,6 +226,8 @@ impl Preferences {
         file.set_boolean(RULERS, "vertical-ruler", self.vertical_ruler);
         file.set_boolean(EDITING, "automatic-lists", self.automatic_lists);
         file.set_boolean(EDITING, "smart-quotes", self.smart_quotes);
+        file.set_boolean(EDITING, "check-spelling", self.check_spelling);
+        file.set_boolean(EDITING, "proofread", self.proofread);
         let correct = &self.autocorrect;
         file.set_boolean(EDITING, "fix-capitalization", correct.capitalization);
         file.set_boolean(EDITING, "superscript-ordinals", correct.ordinals);
@@ -533,6 +544,8 @@ mod tests {
             vertical_ruler: true,
             automatic_lists: false,
             smart_quotes: false,
+            check_spelling: false,
+            proofread: true,
             autocorrect: AutoCorrect {
                 ordinals: false,
                 replacements: vec![

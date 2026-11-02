@@ -28,6 +28,8 @@ mod preferences;
 mod properties;
 mod ruler;
 mod shortcuts;
+mod spelling;
+mod spelling_window;
 mod styles_drawer;
 mod tab_stops;
 pub mod text_nav;
@@ -263,6 +265,8 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.use-selection-for-find", &["<Control>e"]),
             ("win.jump-to-selection", &["<Control>j"]),
             ("win.search", &["<Control><Shift>f"]),
+            ("win.check-spelling", &["<Control>semicolon"]),
+            ("win.spelling", &["<Control>colon"]),
             ("win.show-help-overlay", &["<Control>question"]),
         ] {
             app.set_accels_for_action(action, keys);
