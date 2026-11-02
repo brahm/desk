@@ -323,9 +323,12 @@ fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
     };
     let (document, log) = read_pages_logged(plain.as_bytes()).unwrap();
     // Without automatic hyphenation, Pages breaks words only at soft
-    // hyphens.
+    // hyphens: the document is not hyphenated, and its paragraphs keep
+    // what they allow.
     assert!(log.is_empty(), "{:?}", log.entries());
-    assert_eq!(hyphenated_paragraphs(&document), [false, false, false]);
+    assert!(!document.text_settings().hyphenation);
+    assert!(document.text_settings().ligatures);
+    assert_eq!(hyphenated_paragraphs(&document), [true, false, true]);
     let setting = |on: &str| {
         format!(
             r#"<sl:publication-info>{}</sl:publication-info><sl:slprint-info"#,
@@ -338,6 +341,7 @@ fn est_11_txt_09_facing_pages_are_logged_and_hyphenation_is_kept() {
     );
     let (document, log) = read_pages_logged(hyphenated.as_bytes()).unwrap();
     // A style that turns it off keeps its paragraphs whole.
+    assert!(document.text_settings().hyphenation);
     assert_eq!(hyphenated_paragraphs(&document), [true, false, true]);
     let entries: Vec<(Warning, usize)> = log
         .entries()

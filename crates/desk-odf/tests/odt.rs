@@ -7,8 +7,8 @@ use desk_odf::{
     Background, Border, BorderLine, Break, Color, Family, LINE_BREAK, LeaderStyle, Length, Line,
     LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, Meta, OdfError,
     PageLayout, Paragraph, ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop,
-    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
-    read_odt, read_streams, write_odt, write_odt_with_thumbnail,
+    TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings, TextShadow,
+    TextTransform, read_odt, read_streams, write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -145,6 +145,8 @@ fn full_document() -> TextDocument {
                         font_family: Some("Liberation Sans".into()),
                         font_size: Some(Length(18.0)),
                         font_weight: Some(700),
+                        hyphenate: Some(false),
+                        desk_hyphenate: Some(true),
                         ..TextProperties::default()
                     },
                 },
@@ -203,6 +205,7 @@ fn full_document() -> TextDocument {
                         transform: Some(TextTransform::Uppercase),
                         small_caps: Some(true),
                         letter_spacing: Some(Length(2.4)),
+                        tracking: Some(200),
                         outline: Some(true),
                         shadow: Some(TextShadow::Shadow {
                             dx: Length(2.0),
@@ -214,6 +217,7 @@ fn full_document() -> TextDocument {
                                 b: 64,
                             }),
                         }),
+                        shadow_opacity: Some(45.0),
                         background: Some(Background::Transparent),
                         ..TextProperties::default()
                     },
@@ -307,6 +311,12 @@ fn full_document() -> TextDocument {
         }],
         automatic_list_styles: Vec::new(),
         tabs_relative_to_indent: None,
+        text_settings: TextSettings {
+            hyphenation: Some(false),
+            ligatures: Some(false),
+            never_hyphenate: vec!["desk".into(), "liberation".into()],
+            larger_spacing: Some(true),
+        },
         style_shortcuts: vec![
             StyleShortcut {
                 key: 1,

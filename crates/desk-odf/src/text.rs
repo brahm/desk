@@ -43,6 +43,24 @@ pub struct TextDocument {
     /// The automatic list styles, which other programs write for lists
     /// formatted directly.
     pub automatic_list_styles: Vec<ListStyle>,
+    /// The settings of the text that Desk keeps in `settings.xml`.
+    pub text_settings: TextSettings,
+}
+
+/// The settings of the text of a document, which ODF has no place for and
+/// Desk keeps in `settings.xml`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TextSettings {
+    /// Whether the document is hyphenated, when it says.
+    pub hyphenation: Option<bool>,
+    /// Whether the document uses ligatures, when it says.
+    pub ligatures: Option<bool>,
+    /// The words never hyphenated.
+    pub never_hyphenate: Vec<String>,
+    /// Whether the space between two paragraphs is the larger of the space
+    /// below the first and the space above the second, as in Pages, rather
+    /// than their sum, as in other programs. Desk writes it as true.
+    pub larger_spacing: Option<bool>,
 }
 
 /// A list style (`text:list-style`).
@@ -271,6 +289,17 @@ pub struct TextProperties {
     /// `fo:hyphenate`: whether words break with hyphens at the ends of
     /// lines.
     pub hyphenate: Option<bool>,
+    /// `desk:hyphenate`: whether the paragraph allows hyphens when its
+    /// document hyphenates, written when the document does not, which
+    /// then writes `fo:hyphenate` false for other programs.
+    pub desk_hyphenate: Option<bool>,
+    /// `desk:shadow-opacity`: the opacity of `fo:text-shadow`, in percent,
+    /// which ODF has no field for.
+    pub shadow_opacity: Option<f64>,
+    /// `desk:tracking`: the spacing of letters in thousandths of the font
+    /// size, as Pages measures it, beside the length of
+    /// `fo:letter-spacing` that other programs read.
+    pub tracking: Option<i32>,
 }
 
 /// `fo:text-shadow`.

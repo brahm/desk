@@ -19,7 +19,7 @@ INT-11	11	Barra de ferramentas personalizável	Botões para Páginas ou Seções
 INT-12	7	Barra de formatação contextual	Os controles mudam com a seleção. Para texto: Gaveta de Estilos, estilo de parágrafo e de caractere, fonte, face, tamanho, cor, alinhamento, espaçamento, colunas e lista.	23	Aplicativo
 INT-13	7	Inspetor com dez painéis	Documento, Layout, Ajuste (Wrap), Texto, Gráfico (Graphic), Métricas, Tabela, Gráfico (Chart), Link e QuickTime. Várias janelas de Inspetor podem ficar abertas ao mesmo tempo.	23–24	Aplicativo
 INT-14	6	Navegador de Mídia	Dá acesso às bibliotecas de fotos, música e filmes, com busca e pastas extras. Itens são arrastados para a página ou para um poço de imagem do Inspetor.	24–25	Aplicativo
-INT-15	4	Janela Fontes	Família, face, tamanho e coleções. Efeitos de sublinhado e tachado (simples ou duplo), cor do texto, cor de fundo do parágrafo e sombra com opacidade, desfoque, deslocamento e ângulo.	25–26	Parcial: opacidade da sombra
+INT-15	4	Janela Fontes	Família, face, tamanho e coleções. Efeitos de sublinhado e tachado (simples ou duplo), cor do texto, cor de fundo do parágrafo e sombra com opacidade, desfoque, deslocamento e ângulo.	25–26	Extensão: opacidade da sombra
 INT-16	3	Janela Cores	Roda de cores, modelos de cor, brilho, opacidade, paleta salva e conta-gotas na tela.	26–27	Aplicativo
 INT-17	4	Réguas e guias de alinhamento	A régua horizontal (e a vertical, opcional) controla recuos, tabulações, margens e colunas. Guias aparecem ao mover objetos.	27, 96, 161	Aplicativo
 INT-18	4	Gaveta de Estilos (Styles Drawer)	Lista com prévia os estilos de parágrafo, de caractere e de lista. Permite aplicar e criar estilos e ocultar os de lista e de caractere.	27–28	Aplicativo
@@ -58,7 +58,7 @@ TXT-05	3	Acentos, teclados e caracteres especiais	Visualizador de Teclado e jane
 TXT-06	4	Aspas inteligentes	Preferência que converte aspas retas em curvas, de abertura e de fechamento.	89, 117	Aplicativo
 TXT-07	4	Correção e substituição automáticas	Corrigir maiúsculas, ordinais sobrescritos (1st, 2nd), detectar e-mails e URLs como links (preferência do computador, não do documento), detectar listas, aceitar a sugestão única do corretor e uma tabela de substituições, como (c) para ©, ligada ou desligada por linha.	117	Aplicativo
 TXT-08	1	Espaço inseparável	Option-Espaço.	118	Nativo
-TXT-09	4	Hifenização automática	Ligada por padrão. Pode ser desligada no documento ou no parágrafo. Por palavra, "Nunca Hifenizar" vale para todas as ocorrências no documento.	116–117	Parcial: exceções por palavra
+TXT-09	4	Hifenização automática	Ligada por padrão. Pode ser desligada no documento ou no parágrafo. Por palavra, "Nunca Hifenizar" vale para todas as ocorrências. O Pages guarda a palavra nas preferências do usuário, e o Desk a guarda no documento.	116–117	Extensão: documento e exceções por palavra
 TXT-10	4	Verificação ortográfica	Sublinhado vermelho tracejado durante a digitação. Verificação do cursor até o fim ou só na seleção, com Cmd-; para avançar. Janela com sugestões e as ações Corrigir, Ignorar, Aprender e Esquecer. O idioma é definido por trecho de texto.	118–119	Nativo (idioma)
 TXT-11	4	Revisor gramatical (Proofreader)	Funciona durante a digitação ou sob demanda. Aponta maiúsculas, pontuação, palavras duplicadas, palavras rebuscadas, formatação, classes gramaticais, jargão, erros ortográficos e expressões de gênero.	120	Aplicativo
 TXT-12	4	Localizar e substituir	Modos Simples e Avançado. Substituir Tudo, Substituir, Substituir e Buscar, Próximo e Anterior, Usar Seleção para Buscar e Ir para a Seleção.	120–121	Aplicativo
@@ -74,19 +74,19 @@ REV-07	8	Salvar cópia como final	Gera uma cópia com tudo aceito e sem comentá
 REV-08	8	Comentários	Ancorados no cursor, numa seleção, num objeto ou numa célula. O balão cresce com o texto e aceita estilos. Inserir um comentário mostra todos. São impressos quando visíveis, com a página ajustada para caber.	76–77, 256	Parcial: âncora em objetos
 FMT-01	1	Negrito, itálico e sublinhado	Pela barra de formatação, pelo menu Formatar e pela janela Fontes. Sublinhado simples ou duplo.	83	Nativo
 FMT-02	1	Tachado	Simples ou duplo, com cor própria independente da cor do texto.	83–84	Nativo
-FMT-03	4	Sombra de texto	Opacidade, desfoque, deslocamento e ângulo, pela janela Fontes ou pelo Inspetor Gráfico.	84, 168	Parcial: opacidade
+FMT-03	4	Sombra de texto	Opacidade, desfoque, deslocamento e ângulo, pela janela Fontes ou pelo Inspetor Gráfico.	84, 168	Extensão: opacidade
 FMT-04	4	Texto contornado	Formatar > Fonte > Contorno. O manual avisa que pode aparecer diferente em outros programas.	84	Nativo
 FMT-05	1	Tamanho da fonte	Maior e Menor em passos de 1 pt, ou valor exato na janela Fontes.	84–85	Nativo
 FMT-06	1	Linha de base	Subscrito e sobrescrito (com fonte menor), Elevar e Baixar e deslocamento exato em pontos.	85, 128	Nativo
 FMT-07	1	Maiúsculas	Todas Maiúsculas, Versalete, Título (inicial de cada palavra) e Nenhuma.	85	Nativo
 FMT-08	4	Tipografia avançada	Janela Tipografia com os recursos da fonte (como Zapfino e Hoefler Text).	86, 89	Parcial: recursos de fonte
 FMT-09	4	Ligaduras	Padrão, Nenhuma ou Todas por seleção. "Usar ligaduras" no documento e "Remover ligaduras" no parágrafo ou estilo.	89, 128	Extensão
-FMT-10	4	Espaçamento entre caracteres	Tracking em porcentagem, pelo Inspetor de Texto ou por Formatar > Fonte.	89, 93	Parcial: porcentagem
+FMT-10	4	Espaçamento entre caracteres	Tracking em porcentagem, pelo Inspetor de Texto ou por Formatar > Fonte.	89, 93	Extensão: porcentagem
 FMT-11	1	Cor do texto	Pela barra, pelo Inspetor ou pela janela Fontes. A última ferramenta usada prevalece.	93	Nativo
 FMT-12	1	Alinhamento horizontal	Esquerda, centro, direita e justificado. Em células há "Auto Alinhar": texto à esquerda e números à direita.	90–91	Parcial: auto alinhar
 FMT-13	6	Alinhamento vertical	Topo, meio ou base em caixas de texto, formas e células.	91	Nativo
 FMT-14	1	Espaçamento entre linhas	Simples, Dupla, Múltipla, Pelo Menos, Exatamente (entre linhas de base) e Entre (soma espaço sem aumentar a altura da linha).	91–92	Nativo
-FMT-15	1	Espaço antes e depois do parágrafo	Entre dois parágrafos vale o maior dos dois valores, sem somar. O espaço antes do primeiro parágrafo de caixa, forma ou célula é ignorado.	92–93	Parcial: regra do maior valor
+FMT-15	1	Espaço antes e depois do parágrafo	Entre dois parágrafos vale o maior dos dois valores, sem somar. O espaço antes do primeiro parágrafo de caixa, forma ou célula é ignorado.	92–93	Extensão: regra do maior valor
 FMT-16	4	Tabulações	Esquerda, centro, direita e decimal, com caractere decimal configurável e preenchimento tracejado ou pontilhado. Pela régua (clique cria, duplo clique troca o tipo, arrastar para fora apaga) ou pelo Inspetor. Distância padrão de meia polegada.	94–96	Nativo
 FMT-17	4	Preferências de régua	Unidades, porcentagem da página, origem no centro e régua vertical. Valem para todos os documentos.	96–97	Aplicativo
 FMT-18	1	Recuos	Primeira linha, esquerda e direita, pela régua ou pelo Inspetor, inclusive recuo deslocado. Option move a margem sem mexer no recuo.	97–98	Nativo
@@ -96,7 +96,7 @@ FMT-21	4	Bordas e filetes	Estilo de linha, cor e espessura. Filete acima, abaixo
 FMT-22	1	Idioma do texto	Define o dicionário de ortografia e de hifenização por parágrafo, trecho ou estilo.	119, 128	Nativo
 LST-01	4	Detecção automática de listas	"•", "-", "*", "1.", "a." ou "I." seguidos de espaço e Return criam a lista. Pode ser desligada nas Preferências.	100	Aplicativo
 LST-02	4	Níveis e edição de listas	Tab e Shift-Tab mudam o nível com os filhos. Com Option, só o item muda. Arrastar o marcador cria o item em outro nível. Return duas vezes encerra a lista, e Shift-Return cria um parágrafo sem marcador.	100–101	Nativo
-LST-03	4	Marcadores	De texto (com cor), de imagem do app ou de imagem própria. Tamanho em porcentagem ou "Escalar com o texto". Recuo do marcador e do texto e alinhamento vertical do marcador.	101–102, 132–133	Parcial: escala com o texto
+LST-03	4	Marcadores	De texto (com cor), de imagem do app ou de imagem própria. Tamanho em porcentagem ou "Escalar com o texto". Recuo do marcador e do texto e alinhamento vertical do marcador.	101–102, 132–133	Nativo
 LST-04	4	Listas numeradas	Arábicos, romanos ou letras, com recuos ajustáveis. Opções Continuar da Anterior e Iniciar Em.	102–103, 133	Nativo
 LST-05	4	Listas escalonadas (Legal e Harvard)	1, 1.1, 1.1.1 ou I, A, 1, a), (1)... com estilo próprio em cada um dos 9 níveis.	103, 131	Nativo
 STY-01	4	Três tipos de estilo	Parágrafo (fonte, espaçamentos, sombra, fundo, recuos, tabulações, quebras e próximo estilo), caractere e lista. O estilo de lista só define marcadores e recuos, e a aparência do texto vem do parágrafo.	123–126	Nativo

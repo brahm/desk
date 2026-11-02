@@ -56,6 +56,7 @@ done
 
 status=0
 count=0
+extended=0
 for file in "$out"/files/*.odt; do
     dir=$out/unpacked/$(basename "$file" .odt)
     mkdir -p "$dir"
@@ -66,6 +67,12 @@ for file in "$out"/files/*.odt; do
     if [[ -f $dir/settings.xml ]]; then
         streams+=("$dir/settings.xml")
     fi
+    # Desk writes extensions in its own namespace, which an extended
+    # document must conform without (ODF 1.3, part 3, section 3.17).
+    if grep -qE ' desk:[a-z-]+=' "${streams[@]}"; then
+        extended=$((extended + 1))
+    fi
+    python3 ci/strip-extensions.py "${streams[@]}"
     if ! jing -i "$schemas/OpenDocument-v1.3-schema.rng" "${streams[@]}" ||
         ! jing -i "$schemas/OpenDocument-v1.3-manifest-schema.rng" \
             "$dir/META-INF/manifest.xml"; then
@@ -79,6 +86,6 @@ if [[ $count -eq 0 ]]; then
     exit 1
 fi
 if [[ $status -eq 0 ]]; then
-    echo "All $count documents are valid ODF 1.3."
+    echo "All $count documents are valid ODF 1.3 ($extended extended with desk: attributes)."
 fi
 exit "$status"

@@ -11,7 +11,7 @@ use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharacterStyle,
     Document, FontFeature, FontFeatures, LINE_BREAK, Language, Length, Ligatures, LineColor,
     LineSpacing, LineStyle, Metadata, NO_BREAK_SPACE, Op, PageSetup, ParaAttrs, ParaBorder,
-    Paragraph, ParagraphStyle, Rgba, Run, Shadow, Style,
+    Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style, TextSettings,
 };
 use desk_odf as odf;
 
@@ -93,9 +93,10 @@ fn describe(document: &Document) -> String {
         }
     }
     out.push_str(&format!(
-        "{:?}\n{:?}\n",
+        "{:?}\n{:?}\n{:?}\n",
         document.page_setup(),
-        document.metadata()
+        document.metadata(),
+        document.text_settings()
     ));
     out
 }
@@ -283,8 +284,8 @@ fn sample() -> Document {
                             angle: 300,
                             offset: Length::from_points(4),
                             blur: Length::from_points(3),
-                            // ODF has no opacity.
-                            opacity: 100,
+                            // Kept in desk:shadow-opacity (FMT-03).
+                            opacity: 45,
                             color: Rgba::rgb(0x40, 0x40, 0x40),
                         })),
                         tracking: Some(-50),
@@ -333,6 +334,16 @@ fn sample() -> Document {
                 author: "Brahm".into(),
                 comments: "Notas & observações".into(),
                 keywords: vec!["desk".into(), "odt".into()],
+            },
+        })
+        .unwrap();
+    document
+        .apply(Op::SetTextSettings {
+            settings: TextSettings {
+                hyphenation: false,
+                ligatures: false,
+                never_hyphenate: ["desk".to_owned(), "odt".to_owned()].into(),
+                spacing: ParagraphSpacing::Larger,
             },
         })
         .unwrap();
@@ -868,7 +879,12 @@ fn lst_02_05_lists_are_kept() {
                 tiered: false,
             };
             level.start = 3;
-            edit.set_list_level(legal, 3, level)
+            edit.set_list_level(legal, 3, level)?;
+            // A label of 18 points whatever the size of the text (LST-03).
+            let mut level = edit.document().styles().list(bullet).unwrap().levels[1].clone();
+            level.size = 150;
+            level.scale_with_text = false;
+            edit.set_list_level(bullet, 1, level)
         })
         .unwrap();
     let document = editor.document().clone();
@@ -1009,4 +1025,101 @@ fn txt_09_hyphenation_of_styles_and_paragraphs_is_kept() {
         })
         .collect();
     assert_eq!(hyphenate, [true, false, true, false]);
+
+    // In a document that is not hyphenated, other programs read that no
+    // paragraph is, and Desk what each allows.
+    let mut settings = document.text_settings().clone();
+    settings.hyphenation = false;
+    document.apply(Op::SetTextSettings { settings }).unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-hyphenation-off.odt", &bytes);
+    let odf = odf::read_odt(&bytes).unwrap();
+    assert!(
+        odf.styles
+            .iter()
+            .chain(&odf.automatic_styles)
+            .all(|s| s.properties.text.hyphenate != Some(true))
+    );
+    let read = read_odt(&bytes).unwrap();
+    assert!(!read.text_settings().hyphenation);
+    let again: Vec<bool> = read
+        .body()
+        .iter()
+        .map(|p| {
+            read.styles()
+                .resolve_paragraph(p.style(), p.attrs())
+                .hyphenate
+        })
+        .collect();
+    assert_eq!(again, hyphenate);
+}
+
+#[test]
+fn fmt_10_tracking_keeps_its_part_of_the_size_under_another_size() {
+    // A style tracks its text by 10%, and a run of it twice the size: the
+    // tracking stays 10% of each size, though ODF writes the spacing of
+    // the style in points.
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let tracked = document.new_id();
+    let mut style = ParagraphStyle::new(tracked, "Tracked");
+    style.parent = Some(body);
+    style.character.tracking = Some(100);
+    document.put_style(style).unwrap();
+    let first = document.body().get(0).unwrap().id();
+    let paragraph = Paragraph::from_runs(
+        document.new_id(),
+        tracked,
+        ParaAttrs::default(),
+        vec![
+            Run::new("Small "),
+            Run::with_attrs(
+                "large",
+                None,
+                CharAttrs {
+                    font_size: Some(Length::from_points(24)),
+                    ..CharAttrs::default()
+                },
+            ),
+            Run::with_attrs(
+                " odd",
+                None,
+                CharAttrs {
+                    font_size: Some(Length::from_pt(9.7)),
+                    tracking: Some(33),
+                    ..CharAttrs::default()
+                },
+            ),
+        ],
+    )
+    .unwrap();
+    document
+        .apply(Op::InsertParagraph {
+            index: 1,
+            paragraph,
+        })
+        .unwrap();
+    document
+        .apply(Op::RemoveParagraph { paragraph: first })
+        .unwrap();
+    let read = read_odt(&write_odt(&document).unwrap()).unwrap();
+    let paragraph = read.body().get(0).unwrap();
+    for run in paragraph.runs() {
+        let format = read
+            .styles()
+            .resolve_character(paragraph.style(), run.style, &run.attrs);
+        let expected = if run.text() == " odd" { 33 } else { 100 };
+        assert_eq!(format.tracking, expected, "{}", run.text());
+    }
+}
+
+#[test]
+fn fmt_15_documents_of_other_programs_add_the_spaces_between_paragraphs() {
+    let foreign = odf::TextDocument::default();
+    let document = import(&foreign).unwrap();
+    assert_eq!(document.text_settings().spacing, ParagraphSpacing::Sum);
+    // Desk says it takes the larger, so its documents keep that.
+    let mine = Document::new_word_processing();
+    let read = read_odt(&write_odt(&mine).unwrap()).unwrap();
+    assert_eq!(read.text_settings().spacing, ParagraphSpacing::Larger);
 }

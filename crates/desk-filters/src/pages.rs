@@ -26,7 +26,7 @@ use desk_model::{
     CharacterStyle, Document, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor,
     LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, NumberFormat, Op, PageSetup,
     ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphStyle, Rgba, Run, Shadow, StyleId,
-    TabAlignment, TabLeader, TabStop, TabStops,
+    TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 
 use crate::FilterError;
@@ -111,6 +111,9 @@ fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
 fn pages_paragraph_defaults() -> ParaFormat {
     ParaFormat {
         widow_control: true,
+        // Paragraphs allow hyphenation unless their style says otherwise;
+        // the document decides whether Pages hyphenates at all (TXT-09).
+        hyphenate: true,
         ..ParaFormat::default()
     }
 }
@@ -314,9 +317,7 @@ fn para_border(chain: &[&IworkStyle], own: usize) -> Option<ParaBorder> {
 /// line indent, which depends on the left indent.
 fn para_attrs(properties: &Properties) -> ParaAttrs {
     ParaAttrs {
-        // Set from the document and the styles together, for each
-        // paragraph.
-        hyphenate: None,
+        hyphenate: flag(properties, "hyphenate"),
         alignment: properties.number("alignment").map(|n| match n as i64 {
             1 => Alignment::Right,
             2 => Alignment::Center,
@@ -912,22 +913,6 @@ fn paragraph_losses(sheet: &Stylesheet, paragraph: &iwork::Paragraph) -> BTreeSe
     lost
 }
 
-/// Whether a paragraph of Pages allows automatic hyphenation: its style
-/// nearest to it that sets `hyphenate` sets it on, or none does.
-fn hyphenates(sheet: &Stylesheet, paragraph: &iwork::Paragraph) -> bool {
-    let Some(style) = paragraph.style.as_deref().and_then(|s| sheet.find(s)) else {
-        return true;
-    };
-    sheet
-        .ancestry(style)
-        .iter()
-        .find_map(|s| match s.properties.get("hyphenate")? {
-            Value::Number(n) => Some(*n != 0.0),
-            _ => None,
-        })
-        .unwrap_or(true)
-}
-
 /// Maps a Pages document to the model, with what was left out.
 pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportLog), FilterError> {
     let mut log = ImportLog::default();
@@ -953,24 +938,11 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .id();
     let mut index = 1;
     for paragraph in &source.body {
-        // Automatic hyphenation, where the document and the paragraph
-        // allow it (TXT-09).
-        let hyphenate = source.auto_hyphenation && hyphenates(&source.stylesheet, paragraph);
         for built in importer.paragraph(paragraph)? {
-            let (id, style) = (built.id(), built.style());
-            let mut attrs = built.attrs().clone();
             importer.document.apply(Op::InsertParagraph {
                 index,
                 paragraph: built,
             })?;
-            if hyphenate {
-                attrs.hyphenate = Some(true);
-                importer.document.apply(Op::SetParagraphFormat {
-                    paragraph: id,
-                    style,
-                    attrs,
-                })?;
-            }
             index += 1;
         }
     }
@@ -989,6 +961,15 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             margin_bottom: length(page.bottom),
             margin_left: length(page.left),
             margin_right: length(page.right),
+        },
+    })?;
+    // Whether Pages hyphenates and forms ligatures at all, from the
+    // Document Inspector (TXT-09, FMT-09).
+    document.apply(Op::SetTextSettings {
+        settings: TextSettings {
+            hyphenation: source.auto_hyphenation,
+            ligatures: source.use_ligatures,
+            ..TextSettings::default()
         },
     })?;
     let meta = &source.metadata;

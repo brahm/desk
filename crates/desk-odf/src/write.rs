@@ -40,6 +40,7 @@ fn root(w: &mut Writer, name: &'static str) {
         .attr("xmlns:svg", ns::SVG)
         .attr("xmlns:meta", ns::META)
         .attr("xmlns:dc", ns::DC)
+        .attr("xmlns:desk", ns::DESK)
         .attr("office:version", VERSION);
 }
 
@@ -110,11 +111,24 @@ pub fn write_streams(document: &TextDocument) -> Streams {
 /// The name of the settings that Desk keeps the shortcuts of styles in.
 pub(crate) const SHORTCUTS: &str = "DeskStyleShortcuts";
 
+/// The name of the settings that Desk keeps the settings of the text in.
+pub(crate) const TEXT_SETTINGS: &str = "DeskTextSettings";
+
+fn config_item(w: &mut Writer, name: &str, kind: &str, value: &str) {
+    w.start("config:config-item")
+        .attr("config:name", name)
+        .attr("config:type", kind)
+        .text(value)
+        .end();
+}
+
 /// Writes the settings: the shortcuts of styles, as one item per function
 /// key holding the family and the name of the style, as in
-/// `paragraph:Heading_20_1`.
+/// `paragraph:Heading_20_1`, and the settings of the text.
 fn write_settings(document: &TextDocument) -> Option<String> {
-    if document.style_shortcuts.is_empty() {
+    let text = &document.text_settings;
+    let has_text = *text != Default::default();
+    if document.style_shortcuts.is_empty() && !has_text {
         return None;
     }
     let mut w = Writer::new();
@@ -122,8 +136,35 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         .attr("xmlns:office", ns::OFFICE)
         .attr("xmlns:config", ns::CONFIG)
         .attr("office:version", VERSION);
-    w.start("office:settings")
-        .start("config:config-item-set")
+    w.start("office:settings");
+    if has_text {
+        w.start("config:config-item-set")
+            .attr("config:name", TEXT_SETTINGS);
+        let boolean = |b: bool| if b { "true" } else { "false" };
+        if let Some(hyphenation) = text.hyphenation {
+            config_item(&mut w, "Hyphenation", "boolean", boolean(hyphenation));
+        }
+        if let Some(ligatures) = text.ligatures {
+            config_item(&mut w, "Ligatures", "boolean", boolean(ligatures));
+        }
+        if let Some(larger) = text.larger_spacing {
+            config_item(&mut w, "LargerSpacing", "boolean", boolean(larger));
+        }
+        if !text.never_hyphenate.is_empty() {
+            config_item(
+                &mut w,
+                "NeverHyphenate",
+                "string",
+                &text.never_hyphenate.join("\n"),
+            );
+        }
+        w.end();
+    }
+    if document.style_shortcuts.is_empty() {
+        w.end().end();
+        return Some(w.finish());
+    }
+    w.start("config:config-item-set")
         .attr("config:name", SHORTCUTS);
     for shortcut in &document.style_shortcuts {
         let family = match shortcut.family {
@@ -536,6 +577,15 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
     }
     if let Some(hyphenate) = t.hyphenate {
         w.attr("fo:hyphenate", if hyphenate { "true" } else { "false" });
+    }
+    if let Some(hyphenate) = t.desk_hyphenate {
+        w.attr("desk:hyphenate", if hyphenate { "true" } else { "false" });
+    }
+    if let Some(tracking) = t.tracking {
+        w.attr("desk:tracking", &tracking.to_string());
+    }
+    if let Some(opacity) = t.shadow_opacity {
+        w.attr("desk:shadow-opacity", &format!("{}%", decimal(opacity)));
     }
     w.attr_opt("fo:language", t.language.as_deref())
         .attr_opt("fo:country", t.country.as_deref())
