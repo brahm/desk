@@ -103,16 +103,20 @@ jobs:
         run: ci/ui-test.sh
 
   translations:
-    name: Translations
+    name: Translations and desktop files
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Install the gettext tools
+      - name: Install the gettext tools and the desktop file validators
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends gettext
+          sudo apt-get install --yes --no-install-recommends gettext desktop-file-utils appstream
       - name: Check that every string is in the template and the catalogs build
         run: ci/update-translations.sh --check
+      - name: Validate the desktop files and the AppStream metadata
+        run: |
+          desktop-file-validate data/*.desktop
+          appstreamcli validate --no-net --pedantic data/*.metainfo.xml
 
   fuzz:
     name: Fuzz the readers

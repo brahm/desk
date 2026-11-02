@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Desk Writer
+GenericName=Word Processor
+GenericName[pt_BR]=Processador de texto
+Comment=Write letters, reports and documents laid out as in Pages
+Comment[pt_BR]=Escreva cartas, relatórios e documentos com a diagramação do Pages
+Icon=br.com.brahm.Desk.Writer
+Exec=desk-writer %F
+Terminal=false
+StartupNotify=true
+DBusActivatable=false
+Categories=Office;WordProcessor;GTK;
+Keywords=document;text;writer;word;pages;odt;
+Keywords[pt_BR]=documento;texto;editor;palavra;pages;odt;
+MimeType=application/vnd.oasis.opendocument.text;application/vnd.oasis.opendocument.text-template;application/vnd.apple.pages;application/x-iwork-pages-sffpages;

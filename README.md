@@ -34,10 +34,18 @@ libraries can already read and write simple ODT text documents, read
 the text of Pages '09 documents, listing what they hold that Desk cannot
 show yet, lay them out into pages as Pages does
 and export them to PDF with `desk-convert`. Desk Writer opens them, edits
-their text with undo and the clipboard, and saves them as ODT, but cannot
-change their formatting yet. A first test version will come
-out as a nightly Flatpak once Desk Writer can open, edit and save
-formatted text, and more will follow as each phase of the plan is done.
+and formats their text with undo and the clipboard, works with a screen
+reader, and saves them as ODT. Its test version is a nightly Flatpak,
+built from `main` every night:
+
+```sh
+# Download desk-writer-nightly.flatpak from
+# https://github.com/brahm/desk/releases/tag/nightly, then:
+flatpak install --user desk-writer-nightly.flatpak
+flatpak run br.com.brahm.Desk.Writer
+```
+
+More will follow as each phase of the plan is done.
 
 Desk is built by one person working with Claude, Anthropic's AI, with
 the same engineering rigor expected of any team: every feature of the
