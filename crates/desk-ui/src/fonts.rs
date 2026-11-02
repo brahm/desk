@@ -331,8 +331,14 @@ impl FontsWindow {
             (tr("Underline"), underline.upcast_ref::<gtk::Widget>()),
             (tr("Strikethrough"), strikethrough.upcast_ref()),
             (tr("Text"), color.upcast_ref()),
+            (
+                String::new(),
+                crate::eyedropper::button(&color).upcast_ref(),
+            ),
         ] {
-            bar.append(&gtk::Label::new(Some(&label)));
+            if !label.is_empty() {
+                bar.append(&gtk::Label::new(Some(&label)));
+            }
             bar.append(widget);
         }
 

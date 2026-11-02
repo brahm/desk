@@ -31,6 +31,8 @@ struct State {
     caret_on: bool,
     /// The marks of the invisible characters, when they show (INT-10).
     invisibles: Vec<InvisibleMark>,
+    /// The color they are drawn in.
+    invisibles_color: desk_model::Rgba,
     /// The lines under misspelled words and mistakes (TXT-10, TXT-11).
     squiggles: Vec<Squiggle>,
 }
@@ -85,6 +87,7 @@ impl DocumentView {
             caret: None,
             caret_on: true,
             invisibles: Vec::new(),
+            invisibles_color: crate::preferences::INVISIBLES_COLOR,
             squiggles: Vec::new(),
         }));
         let view = Self {
@@ -150,6 +153,12 @@ impl DocumentView {
         if changed {
             self.area.queue_draw();
         }
+    }
+
+    /// Sets the color of the invisible characters (INT-10).
+    pub fn set_invisibles_color(&self, color: desk_model::Rgba) {
+        self.state.borrow_mut().invisibles_color = color;
+        self.area.queue_draw();
     }
 
     /// Sets the marks of the invisible characters; none hides them.
@@ -593,7 +602,13 @@ fn draw_invisibles(
     if marks.peek().is_none() {
         return;
     }
-    cr.set_source_rgb(0.25, 0.45, 0.85);
+    let color = state.invisibles_color;
+    cr.set_source_rgba(
+        f64::from(color.r) / 255.0,
+        f64::from(color.g) / 255.0,
+        f64::from(color.b) / 255.0,
+        f64::from(color.a) / 255.0,
+    );
     cr.select_font_face(
         "Sans",
         gtk::cairo::FontSlant::Normal,

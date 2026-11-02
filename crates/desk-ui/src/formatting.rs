@@ -128,7 +128,10 @@ impl FormatBar {
         ));
         color.set_tooltip_text(Some(&tr("Text Color")));
         labelled(&color, &tr("Text Color"));
-        root.append(&color);
+        let colors = gtk::Box::builder().css_classes(["linked"]).build();
+        colors.append(&color);
+        colors.append(&crate::eyedropper::button(&color));
+        root.append(&colors);
 
         let toggles = gtk::Box::builder().css_classes(["linked"]).build();
         for (icon, action, tooltip) in [

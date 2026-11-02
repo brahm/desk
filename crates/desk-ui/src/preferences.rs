@@ -14,7 +14,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::glib;
 
-use desk_model::{AutoCorrect, Replacement};
+use desk_model::{AutoCorrect, Replacement, Rgba};
 
 use crate::i18n::tr;
 
@@ -145,7 +145,20 @@ pub struct Preferences {
     /// Whether the mistakes of the proofreader are marked as they are
     /// typed (TXT-11).
     pub proofread: bool,
+    /// Whether a misspelled word that the dictionary has one suggestion
+    /// for is corrected as it is typed (TXT-07).
+    pub accept_single_suggestion: bool,
+    /// The zoom of a new window, in percent (INT-07).
+    pub zoom: u32,
+    /// The color of the invisible characters (INT-10).
+    pub invisibles_color: Rgba,
+    /// Whether the words and pages of the document show at the bottom of
+    /// the window (DOC-20).
+    pub show_counts: bool,
 }
+
+/// The color of invisible characters until it is changed.
+pub const INVISIBLES_COLOR: Rgba = Rgba::rgb(64, 115, 217);
 
 impl Default for Preferences {
     fn default() -> Self {
@@ -170,12 +183,42 @@ impl Default for Preferences {
             autocorrect: AutoCorrect::default(),
             check_spelling: true,
             proofread: false,
+            accept_single_suggestion: false,
+            zoom: 100,
+            invisibles_color: INVISIBLES_COLOR,
+            show_counts: true,
         }
     }
 }
 
 const RULERS: &str = "rulers";
 const EDITING: &str = "editing";
+const WINDOW: &str = "window";
+
+/// A color as `#rrggbb`, or `#rrggbbaa` when it is not opaque.
+fn color_key(color: Rgba) -> String {
+    let Rgba { r, g, b, a } = color;
+    if a == 255 {
+        format!("#{r:02x}{g:02x}{b:02x}")
+    } else {
+        format!("#{r:02x}{g:02x}{b:02x}{a:02x}")
+    }
+}
+
+fn color_from_key(key: &str) -> Option<Rgba> {
+    let hex = key.strip_prefix('#')?;
+    let byte = |i: usize| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok();
+    match hex.len() {
+        6 => Some(Rgba::rgb(byte(0)?, byte(2)?, byte(4)?)),
+        8 => Some(Rgba {
+            r: byte(0)?,
+            g: byte(2)?,
+            b: byte(4)?,
+            a: byte(6)?,
+        }),
+        _ => None,
+    }
+}
 
 impl Preferences {
     /// Reads preferences from a key file; what it lacks keeps its default.
@@ -197,6 +240,21 @@ impl Preferences {
         out.smart_quotes = editing("smart-quotes", out.smart_quotes);
         out.check_spelling = editing("check-spelling", out.check_spelling);
         out.proofread = editing("proofread", out.proofread);
+        out.accept_single_suggestion =
+            editing("accept-single-suggestion", out.accept_single_suggestion);
+        if let Ok(zoom) = file.integer(RULERS, "zoom") {
+            out.zoom = zoom.clamp(10, 1000) as u32;
+        }
+        if let Some(color) = file
+            .string(WINDOW, "invisibles-color")
+            .ok()
+            .and_then(|c| color_from_key(&c))
+        {
+            out.invisibles_color = color;
+        }
+        out.show_counts = file
+            .boolean(WINDOW, "show-counts")
+            .unwrap_or(out.show_counts);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -228,6 +286,18 @@ impl Preferences {
         file.set_boolean(EDITING, "smart-quotes", self.smart_quotes);
         file.set_boolean(EDITING, "check-spelling", self.check_spelling);
         file.set_boolean(EDITING, "proofread", self.proofread);
+        file.set_boolean(
+            EDITING,
+            "accept-single-suggestion",
+            self.accept_single_suggestion,
+        );
+        file.set_integer(RULERS, "zoom", self.zoom as i32);
+        file.set_string(
+            WINDOW,
+            "invisibles-color",
+            &color_key(self.invisibles_color),
+        );
+        file.set_boolean(WINDOW, "show-counts", self.show_counts);
         let correct = &self.autocorrect;
         file.set_boolean(EDITING, "fix-capitalization", correct.capitalization);
         file.set_boolean(EDITING, "superscript-ordinals", correct.ordinals);
@@ -396,6 +466,29 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         current.vertical_ruler,
         |p, on| p.vertical_ruler = on,
     ));
+    let zooms: Vec<String> = crate::geometry::ZOOM_LEVELS
+        .iter()
+        .map(|z| crate::geometry::zoom_label(*z))
+        .collect();
+    let zoom = adw::ComboRow::builder()
+        .title(tr("Default Zoom"))
+        .subtitle(tr("Of new windows"))
+        .model(&gtk::StringList::new(
+            &zooms.iter().map(String::as_str).collect::<Vec<_>>(),
+        ))
+        .selected(
+            crate::geometry::ZOOM_LEVELS
+                .iter()
+                .position(|z| (z * 100.0).round() as u32 == current.zoom)
+                .unwrap_or(3) as u32,
+        )
+        .build();
+    zoom.connect_selected_notify(|row| {
+        if let Some(level) = crate::geometry::ZOOM_LEVELS.get(row.selected() as usize) {
+            change(|p| p.zoom = (level * 100.0).round() as u32);
+        }
+    });
+    rulers.add(&zoom);
     let editing = adw::PreferencesGroup::builder()
         .title(tr("Editing"))
         .build();
@@ -427,7 +520,36 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         current.autocorrect.ordinals,
         |p, on| p.autocorrect.ordinals = on,
     ));
+    correction.add(&switch(
+        &tr("Use Spelling Suggestion"),
+        &tr("A misspelled word with one suggestion is corrected"),
+        current.accept_single_suggestion,
+        |p, on| p.accept_single_suggestion = on,
+    ));
     correction.add(&replacements_row(&current.autocorrect));
+    let window = adw::PreferencesGroup::builder().title(tr("Window")).build();
+    window.add(&switch(
+        &tr("Show Word and Page Count"),
+        &tr("At the bottom of the window"),
+        current.show_counts,
+        |p, on| p.show_counts = on,
+    ));
+    let color = gtk::ColorDialogButton::builder()
+        .dialog(&gtk::ColorDialog::new())
+        .rgba(&crate::formatting::to_gdk(current.invisibles_color))
+        .valign(gtk::Align::Center)
+        .build();
+    color.connect_rgba_notify(|button| {
+        let color = crate::formatting::from_gdk(&button.rgba());
+        change(|p| p.invisibles_color = color);
+    });
+    let invisibles = adw::ActionRow::builder()
+        .title(tr("Invisibles Color"))
+        .subtitle(tr("Of spaces, tabs and breaks when they are shown"))
+        .build();
+    invisibles.add_suffix(&color);
+    invisibles.set_activatable_widget(Some(&color));
+    window.add(&invisibles);
     let page = adw::PreferencesPage::builder()
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
@@ -435,6 +557,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     page.add(&rulers);
     page.add(&editing);
     page.add(&correction);
+    page.add(&window);
     let dialog = adw::PreferencesDialog::builder()
         .title(tr("Preferences"))
         .build();
@@ -557,6 +680,15 @@ mod tests {
                 ],
                 ..AutoCorrect::default()
             },
+            accept_single_suggestion: true,
+            zoom: 150,
+            invisibles_color: Rgba {
+                r: 200,
+                g: 10,
+                b: 0,
+                a: 128,
+            },
+            show_counts: false,
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -565,6 +697,9 @@ mod tests {
         let empty = glib::KeyFile::new();
         assert!(!Preferences::read(&empty).percent);
         assert!(Preferences::read(&empty).automatic_lists);
+        assert!(Preferences::read(&empty).show_counts);
+        assert_eq!(Preferences::read(&empty).zoom, 100);
+        assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
         assert_eq!(
             Preferences::read(&empty).autocorrect,
             AutoCorrect::default()
