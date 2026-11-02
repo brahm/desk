@@ -43,8 +43,10 @@
 //! # Ok::<(), desk_model::ModelError>(())
 //! ```
 
+mod autocorrect;
 mod document;
 mod error;
+mod find;
 mod format;
 mod id;
 mod list;
@@ -55,8 +57,10 @@ mod text;
 mod transaction;
 mod units;
 
+pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
 pub use document::{Container, Document, Metadata, PageSetup, PagedFlow, Statistics};
 pub use error::ModelError;
+pub use find::{Found, Query};
 pub use format::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
     DEFAULT_TAB_INTERVAL, FontFeature, FontFeatures, Language, Ligatures, LineColor, LineSpacing,
