@@ -354,6 +354,7 @@ fn sample() -> Document {
                 ligatures: false,
                 never_hyphenate: ["desk".to_owned(), "odt".to_owned()].into(),
                 spacing: ParagraphSpacing::Larger,
+                notes: Default::default(),
             },
         })
         .unwrap();
@@ -1268,4 +1269,115 @@ fn est_07_est_18_columns_and_page_numbers_of_other_programs_are_read() {
         panic!("{starts:?}");
     };
     assert_eq!(section.first_number, Some(7));
+}
+
+#[test]
+fn est_13_est_14_notes_are_kept() {
+    use desk_model::{FIELD_CHARACTER, Field, Note, NoteFormat, NoteKind, NoteNumbering};
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let first = document.body().get(0).unwrap().id();
+    let marked = |note| CharAttrs {
+        field: Some(Some(Field::NoteMark { note })),
+        baseline: Some(Baseline::Superscript),
+        ..CharAttrs::default()
+    };
+    let mark = FIELD_CHARACTER.to_string();
+    let numbered = document.new_id();
+    let own = document.new_id();
+    for (note, own_mark, text) in [
+        (numbered, None, "A numbered note."),
+        (own, Some("**"), "A note with a mark of its own."),
+    ] {
+        let id = document.new_id();
+        let paragraph = Paragraph::from_runs(
+            id,
+            body,
+            ParaAttrs::default(),
+            vec![Run::with_attrs(&mark, None, marked(note)), Run::new(text)],
+        )
+        .unwrap();
+        document
+            .apply(Op::SetNote {
+                id: note,
+                note: Some(Note {
+                    id: note,
+                    mark: own_mark.map(Into::into),
+                    paragraphs: vec![paragraph].into(),
+                }),
+            })
+            .unwrap();
+    }
+    let id = document.new_id();
+    let paragraph = Paragraph::from_runs(
+        id,
+        body,
+        ParaAttrs::default(),
+        vec![
+            Run::new("Two notes"),
+            Run::with_attrs(&mark, None, marked(numbered)),
+            Run::new(" here"),
+            Run::with_attrs(&mark, None, marked(own)),
+        ],
+    )
+    .unwrap();
+    document
+        .apply(Op::InsertParagraph {
+            index: 1,
+            paragraph,
+        })
+        .unwrap();
+    document
+        .apply(Op::RemoveParagraph { paragraph: first })
+        .unwrap();
+    let mut settings = document.text_settings().clone();
+    settings.notes.kind = NoteKind::SectionEndnotes;
+    settings.notes.format = NoteFormat::Symbols;
+    settings.notes.numbering = NoteNumbering::Page;
+    settings.notes.gap = Length::from_points(20);
+    document.apply(Op::SetTextSettings { settings }).unwrap();
+
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-notes.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.text_settings().notes, document.text_settings().notes);
+    // The body refers to each note where it did, and each note keeps its
+    // text, after its mark, and its mark of its own.
+    let refs: Vec<_> = read
+        .body()
+        .get(0)
+        .unwrap()
+        .runs()
+        .filter_map(|r| match &r.attrs.field {
+            Some(Some(Field::NoteMark { note })) => Some(*note),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(refs.len(), 2);
+    assert_eq!(
+        read.body()
+            .get(0)
+            .unwrap()
+            .text()
+            .replace(FIELD_CHARACTER, ""),
+        "Two notes here"
+    );
+    let notes: Vec<_> = refs
+        .iter()
+        .map(|id| read.notes().get(*id).unwrap())
+        .collect();
+    assert_eq!(notes[0].mark, None);
+    assert_eq!(notes[1].mark.as_deref(), Some("**"));
+    for (note, text) in notes
+        .iter()
+        .zip(["A numbered note.", "A note with a mark of its own."])
+    {
+        let paragraph = &note.paragraphs[0];
+        let runs: Vec<_> = paragraph.runs().collect();
+        assert_eq!(
+            runs[0].attrs.field,
+            Some(Some(Field::NoteMark { note: note.id }))
+        );
+        assert_eq!(paragraph.text().replace(FIELD_CHARACTER, ""), text);
+    }
 }

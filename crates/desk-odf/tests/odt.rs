@@ -6,10 +6,10 @@
 use desk_odf::{
     Background, Border, BorderLine, Break, Color, Family, Field, HeaderFooter, HeaderFooterStyle,
     LINE_BREAK, LeaderStyle, Length, Line, LineColor, LineHeight, ListLabel, ListLevelStyle,
-    ListMember, ListStyle, MasterPage, Meta, OdfError, PageLayout, Paragraph, ParagraphProperties,
-    Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument,
-    TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, read_odt, read_streams,
-    write_odt, write_odt_with_thumbnail,
+    ListMember, ListStyle, MasterPage, Meta, Note, OdfError, PageLayout, Paragraph,
+    ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign,
+    TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, read_odt,
+    read_streams, write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -276,7 +276,22 @@ fn full_document() -> TextDocument {
                 outline_level: Some(1),
                 list: None,
                 section: None,
-                spans: vec![span(None, "Título")],
+                spans: vec![
+                    span(None, "Título"),
+                    field(
+                        Field::Note(Box::new(Note {
+                            id: Some("ftn1".into()),
+                            endnote: false,
+                            label: Some("*".into()),
+                            body: vec![Paragraph {
+                                style: Some("Body".into()),
+                                spans: vec![span(None, "Uma nota.")],
+                                ..Paragraph::default()
+                            }],
+                        })),
+                        "*",
+                    ),
+                ],
             },
             Paragraph {
                 style: Some("P1".into()),
@@ -402,6 +417,10 @@ fn full_document() -> TextDocument {
             ligatures: Some(false),
             never_hyphenate: vec!["desk".into(), "liberation".into()],
             larger_spacing: Some(true),
+            note_kind: Some("section".into()),
+            note_format: Some("symbols".into()),
+            note_numbering: Some("page".into()),
+            note_gap: Some("20pt".into()),
         },
         style_shortcuts: vec![
             StyleShortcut {

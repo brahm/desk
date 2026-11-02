@@ -87,3 +87,23 @@ fn est_19_first_left_and_right_pages_match_pages() {
 fn est_27_fields_match_pages() {
     check("est-27-fields");
 }
+
+#[test]
+fn est_13_footnotes_match_pages() {
+    check("est-13-footnotes");
+}
+
+#[test]
+fn est_13_endnotes_of_the_document_match_pages() {
+    check("est-13-endnotes-document");
+}
+
+#[test]
+fn est_13_endnotes_of_sections_match_pages() {
+    check("est-13-endnotes-section");
+}
+
+#[test]
+fn est_14_est_15_marks_of_notes_match_pages() {
+    check("est-14-15-note-marks");
+}

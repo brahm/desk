@@ -8,6 +8,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::error::ModelError;
 use crate::header::HeadersFooters;
 use crate::id::{IdAllocator, NodeId};
+use crate::note::{Note, NoteSettings, Notes};
 use crate::op::Op;
 use crate::section::{Columns, Layout, Section, SectionStart};
 use crate::style::{ParagraphStyle, Style, StyleFamily, StyleId, Styles};
@@ -44,6 +45,8 @@ pub struct TextSettings {
     /// How the space after a paragraph and the space before the next one
     /// make the space between them.
     pub spacing: ParagraphSpacing,
+    /// Where the notes go and how they are numbered (EST-13).
+    pub notes: NoteSettings,
 }
 
 /// How the space after a paragraph and the space before the next make the
@@ -64,6 +67,7 @@ impl Default for TextSettings {
             ligatures: true,
             never_hyphenate: std::collections::BTreeSet::new(),
             spacing: ParagraphSpacing::Larger,
+            notes: NoteSettings::default(),
         }
     }
 }
@@ -205,6 +209,8 @@ pub struct PagedFlow {
     pub body: TextFlow,
     /// The headers and footers (EST-12, EST-19).
     pub margins: HeadersFooters,
+    /// The footnotes or endnotes (EST-13).
+    pub notes: Notes,
 }
 
 /// Where the content of a document lives. Each app has its own container
@@ -294,6 +300,7 @@ impl Document {
                 page: PageSetup::default(),
                 body: TextFlow::new(Paragraph::new(first, body_style)),
                 margins: HeadersFooters::default(),
+                notes: Notes::default(),
             }),
         }
     }
@@ -347,6 +354,13 @@ impl Document {
     pub fn headers_footers(&self) -> &HeadersFooters {
         match &self.container {
             Container::Pages(flow) => &flow.margins,
+        }
+    }
+
+    /// The notes.
+    pub fn notes(&self) -> &Notes {
+        match &self.container {
+            Container::Pages(flow) => &flow.notes,
         }
     }
 
@@ -529,6 +543,7 @@ impl Document {
                         .headers_footers()
                         .paragraphs()
                         .any(|p| p.uses_style(style))
+                    || self.notes().paragraphs().any(|p| p.uses_style(style))
                 {
                     return Err(ModelError::StyleInUse(style));
                 }
@@ -556,6 +571,26 @@ impl Document {
                     place,
                     paragraphs: old,
                 })
+            }
+            Op::SetNote { id, note } => {
+                if let Some(note) = &note {
+                    if note.id != id {
+                        return Err(ModelError::DuplicateId(id));
+                    }
+                    for paragraph in note.paragraphs.iter() {
+                        self.styles
+                            .check_family(paragraph.style(), StyleFamily::Paragraph)?;
+                        self.check_list_style(paragraph.attrs())?;
+                        self.check_runs_styles(paragraph.runs())?;
+                    }
+                    self.ids.observe(id);
+                    for paragraph in note.paragraphs.iter() {
+                        self.ids.observe(paragraph.id());
+                    }
+                }
+                let Container::Pages(flow) = &mut self.container;
+                let old: Option<Note> = flow.notes.replace(id, note);
+                Ok(Op::SetNote { id, note: old })
             }
             Op::SetMetadata { metadata } => {
                 let old = std::mem::replace(&mut self.metadata, metadata);

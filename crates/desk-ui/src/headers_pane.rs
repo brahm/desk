@@ -36,6 +36,7 @@ fn token(field: &Field) -> &'static str {
         Field::PageCount => "{pages}",
         Field::DateTime { .. } => "{date}",
         Field::FileName { .. } => "{file}",
+        Field::NoteMark { .. } => "",
     }
 }
 

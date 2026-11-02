@@ -51,6 +51,7 @@ mod format;
 mod header;
 mod id;
 mod list;
+mod note;
 mod op;
 mod picture;
 mod section;
@@ -78,6 +79,7 @@ pub use list::{
     LIST_LEVELS, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind, NumberFormat,
     Numbering, detect_marker,
 };
+pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use op::Op;
 pub use picture::Picture;
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};

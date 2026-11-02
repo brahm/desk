@@ -54,7 +54,7 @@ pub use read::read_streams;
 pub use text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, PageLayout, Paragraph,
+    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
     ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
     TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
     TextShadow, TextTransform,

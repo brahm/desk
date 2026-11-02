@@ -98,6 +98,33 @@ pub enum Field {
         /// The text that Pages shows.
         shown: String,
     },
+    /// Where the body refers to a footnote or an endnote (`sf:footnote`):
+    /// the nth refers to the nth of [`PagesDocument::notes`].
+    Note {
+        /// The mark of its own that the note shows instead of a number,
+        /// when it has one (`sf:mark`).
+        mark: Option<String>,
+    },
+    /// The mark at the start of the text of a note (`sf:footnote-mark`).
+    NoteMark,
+}
+
+/// How the notes of a document show, from the Document Inspector
+/// (EST-13, EST-15).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct NoteProperties {
+    /// Footnotes (0), endnotes at the end of the document (1) or of each
+    /// section (2) (`kSFWPFootnoteKindProperty`).
+    pub kind: u8,
+    /// Arabic numbers (0), Roman numbers (1) or symbols (2)
+    /// (`kSFWPFootnoteFormatProperty`).
+    pub format: u8,
+    /// Numbered through the document (0), again on each page (1) or in
+    /// each section (2) (`kSFWPFootnoteNumberingProperty`).
+    pub numbering: u8,
+    /// The space between notes, in points, when the document says
+    /// (`kSFWPFootnoteGapProperty`).
+    pub gap: Option<f64>,
 }
 
 /// The character that a field takes in the text of its run.
@@ -155,6 +182,11 @@ pub struct PagesDocument {
     pub headers: Vec<(String, Vec<Paragraph>)>,
     /// The footers, as the headers.
     pub footers: Vec<(String, Vec<Paragraph>)>,
+    /// The footnotes or endnotes, in the order the body refers to them,
+    /// each with its paragraphs.
+    pub notes: Vec<Vec<Paragraph>>,
+    /// How the notes show.
+    pub note_properties: NoteProperties,
     /// Whether pages show their headers (Document Inspector).
     pub has_headers: bool,
     /// Whether pages show their footers (Document Inspector).
@@ -215,6 +247,15 @@ fn publication_flag(root: &Element, name: &str) -> Option<bool> {
         .map(|n| n.trim() != "0")
 }
 
+/// A number of the publication info of a document.
+fn publication_number(root: &Element, name: &str) -> Option<f64> {
+    root.child(SL, "publication-info")
+        .and_then(|info| info.child(SL, name))
+        .and_then(|p| p.child(SL, "number"))
+        .and_then(|n| n.attr(SFA, "number"))
+        .and_then(|n| n.trim().parse().ok())
+}
+
 /// Reads a Pages document from the text of its index.
 pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     let root = xml::parse(index)?;
@@ -249,6 +290,13 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             .unwrap_or_default(),
         auto_hyphenation: publication_flag(&root, "kSFWPAutoHyphenationProperty").unwrap_or(false),
         use_ligatures: publication_flag(&root, "kSFWPUseLigaturesProperty").unwrap_or(true),
+        note_properties: NoteProperties {
+            kind: publication_number(&root, "kSFWPFootnoteKindProperty").unwrap_or(0.0) as u8,
+            format: publication_number(&root, "kSFWPFootnoteFormatProperty").unwrap_or(0.0) as u8,
+            numbering: publication_number(&root, "kSFWPFootnoteNumberingProperty").unwrap_or(0.0)
+                as u8,
+            gap: publication_number(&root, "kSFWPFootnoteGapProperty"),
+        },
         has_headers: publication_flag(&root, "kSFWPHasHeadersProperty").unwrap_or(true),
         has_footers: publication_flag(&root, "kSFWPHasFootersProperty").unwrap_or(true),
         ..PagesDocument::default()
@@ -269,6 +317,25 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     }
     if let Some(body) = storage.child(SF, "text-body") {
         read_block(&ids, &mut document, body);
+    }
+    // The notes, in a text storage of their own inside that of the body.
+    // Each ends with a note break; what follows the last is an empty
+    // paragraph that Pages keeps there.
+    let notes = storage
+        .child(SF, "footnotes")
+        .and_then(|n| n.child(SF, "text-storage"))
+        .and_then(|s| s.child(SF, "text-body"));
+    if let Some(notes) = notes {
+        let body = std::mem::take(&mut document.body);
+        let ends = read_block(&ids, &mut document, notes);
+        let mut paragraphs = std::mem::replace(&mut document.body, body).into_iter();
+        let mut start = 0;
+        for end in ends {
+            document
+                .notes
+                .push(paragraphs.by_ref().take(end - start).collect());
+            start = end;
+        }
     }
     // The headers and footers, each in a text storage of its own, read
     // as the body is.
@@ -297,16 +364,21 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     Ok(document)
 }
 
-/// Reads the paragraphs of a text body into the body of a document.
-fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) {
+/// Reads the paragraphs of a text body into the body of a document, and
+/// returns how many paragraphs there are after each note break.
+fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Vec<usize> {
+    let start = document.body.len();
     let mut reader = BodyReader {
         ids,
         document,
         section: None,
         layout: None,
         column_break: false,
+        note_break: false,
+        note_ends: Vec::new(),
     };
     reader.block(body);
+    reader.note_ends.into_iter().map(|e| e - start).collect()
 }
 
 /// The strings of a metadata field, which holds a string or an array.
@@ -439,6 +511,10 @@ struct BodyReader<'a, 'b> {
     layout: Option<String>,
     /// Whether the next paragraph starts a new column.
     column_break: bool,
+    /// Whether the paragraph being read ends a note.
+    note_break: bool,
+    /// The number of paragraphs read when each note ended.
+    note_ends: Vec<usize>,
 }
 
 impl BodyReader<'_, '_> {
@@ -500,6 +576,9 @@ impl BodyReader<'_, '_> {
         }
         paragraph.runs.retain(|run| !run.text.is_empty());
         self.document.body.push(paragraph);
+        if std::mem::take(&mut self.note_break) {
+            self.note_ends.push(self.document.body.len());
+        }
     }
 
     /// Reads the text inside a paragraph or a span into runs.
@@ -544,6 +623,19 @@ impl BodyReader<'_, '_> {
                             };
                             push_field(runs, style, field);
                         }
+                        "footnote" => {
+                            let field = Field::Note {
+                                mark: child
+                                    .attr(SF, "autonumber")
+                                    .is_none()
+                                    .then(|| child.attr(SF, "mark"))
+                                    .flatten()
+                                    .map(str::to_owned),
+                            };
+                            push_field(runs, style, field);
+                        }
+                        "footnote-mark" => push_field(runs, style, Field::NoteMark),
+                        "footnotebr" => self.note_break = true,
                         name if IGNORED.contains(&name) => {}
                         _ => self.skip(child),
                     }

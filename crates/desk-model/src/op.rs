@@ -9,6 +9,7 @@ use crate::document::{Metadata, PageSetup, TextSettings};
 use crate::format::ParaAttrs;
 use crate::header::MarginPlace;
 use crate::id::NodeId;
+use crate::note::Note;
 use crate::style::{Style, StyleId};
 use crate::text::{Paragraph, Run};
 
@@ -80,6 +81,13 @@ pub enum Op {
         place: MarginPlace,
         /// Its paragraphs; none to empty it.
         paragraphs: Vec<Paragraph>,
+    },
+    /// Adds, replaces or removes a note (EST-13).
+    SetNote {
+        /// The note.
+        id: NodeId,
+        /// The note; none to remove it.
+        note: Option<Note>,
     },
     /// Sets the information about the document.
     SetMetadata {

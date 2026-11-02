@@ -169,6 +169,16 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(larger) = text.larger_spacing {
             config_item(&mut w, "LargerSpacing", "boolean", boolean(larger));
         }
+        for (name, value) in [
+            ("NoteKind", &text.note_kind),
+            ("NoteFormat", &text.note_format),
+            ("NoteNumbering", &text.note_numbering),
+            ("NoteGap", &text.note_gap),
+        ] {
+            if let Some(value) = value {
+                config_item(&mut w, name, "string", value);
+            }
+        }
         if !text.never_hyphenate.is_empty() {
             config_item(
                 &mut w,
@@ -907,6 +917,26 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             w.start("text:file-name")
                 .attr("text:display", "name")
                 .attr("text:fixed", "true");
+        }
+        Field::Note(note) => {
+            w.start("text:note");
+            w.attr_opt("text:id", note.id.as_deref());
+            w.attr(
+                "text:note-class",
+                if note.endnote { "endnote" } else { "footnote" },
+            );
+            w.start("text:note-citation");
+            w.attr_opt("text:label", note.label.as_deref());
+            if !shown.is_empty() {
+                w.text(shown);
+            }
+            w.end();
+            w.start("text:note-body");
+            for paragraph in &note.body {
+                write_paragraph(w, paragraph);
+            }
+            w.end().end();
+            return;
         }
     }
     if !shown.is_empty() {

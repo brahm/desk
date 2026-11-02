@@ -324,6 +324,18 @@ impl Edit {
         Ok(())
     }
 
+    /// Adds, replaces or removes a note.
+    pub fn set_note(
+        &mut self,
+        id: crate::NodeId,
+        note: Option<crate::Note>,
+    ) -> Result<(), ModelError> {
+        if self.doc.notes().get(id) != note.as_ref() {
+            self.apply(Op::SetNote { id, note })?;
+        }
+        Ok(())
+    }
+
     /// Sets the settings of the text of the whole document.
     pub fn set_text_settings(&mut self, settings: TextSettings) -> Result<(), ModelError> {
         if &settings != self.doc.text_settings() {
