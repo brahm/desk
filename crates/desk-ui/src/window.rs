@@ -905,6 +905,58 @@ impl DocumentWindow {
         dialog.present(Some(&self.window));
     }
 
+    /// Opens the document that a link points to, in its window if it is
+    /// open already, and goes to its bookmark (EST-25).
+    fn open_linked(self: &Rc<Self>, link: &str) {
+        let crate::links::Target::Document { file, bookmark } = crate::links::Target::parse(link)
+        else {
+            return;
+        };
+        let folder = self
+            .path
+            .borrow()
+            .as_deref()
+            .and_then(Path::parent)
+            .map(Path::to_owned);
+        let Some((path, bookmark)) =
+            crate::links::document_file(&file, &bookmark, folder.as_deref())
+        else {
+            self.alert(
+                &tr("Cannot Follow Link"),
+                &tr("Save this document first: the link names a file from its folder."),
+            );
+            return;
+        };
+        let open = WINDOWS.with(|w| {
+            w.borrow()
+                .iter()
+                .find(|w| w.path.borrow().as_deref() == Some(path.as_path()))
+                .cloned()
+        });
+        let window = match open {
+            Some(window) => window,
+            None => {
+                let (Some(opener), Some(app)) = (
+                    self.opener,
+                    self.window
+                        .application()
+                        .and_then(|a| a.downcast::<adw::Application>().ok()),
+                ) else {
+                    return;
+                };
+                let window = Self::new(&app, self.info, Some(opener));
+                window.load(opener, &path);
+                window
+            }
+        };
+        window.window.present();
+        if !bookmark.is_empty()
+            && let Some(editor) = window.editor()
+        {
+            editor.go_to_bookmark(&bookmark);
+        }
+    }
+
     /// Opens a copy of the document, untitled, in a new window (DOC-14).
     fn duplicate(&self) {
         let (Some(editor), Some(app)) = (
@@ -1348,6 +1400,15 @@ impl DocumentWindow {
             }
         });
         self.window.add_action(&auto);
+
+        let linked = gio::SimpleAction::new("open-linked", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        linked.connect_activate(move |_, link| {
+            if let (Some(this), Some(link)) = (weak.upgrade(), link.and_then(|l| l.str())) {
+                this.open_linked(link);
+            }
+        });
+        self.window.add_action(&linked);
 
         let note = gio::SimpleAction::new("insert-note", None);
         let weak = Rc::downgrade(self);

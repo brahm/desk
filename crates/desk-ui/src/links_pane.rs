@@ -20,6 +20,7 @@ use desk_model::{StyleId, TocLevel, TocSettings};
 use crate::editing::Format;
 use crate::formatting::{EditorOf, labelled};
 use crate::i18n::tr;
+use crate::links::Target;
 
 /// An icon button for the end of a row.
 fn icon_button(icon: &str, label: &str) -> gtk::Button {
@@ -39,9 +40,19 @@ type Shown = (Option<Arc<str>>, Vec<Arc<str>>);
 /// The Links and Bookmarks group of the Inspector.
 pub struct LinksGroup {
     group: adw::PreferencesGroup,
+    /// What the link at the cursor points to: a web page, an e-mail
+    /// message, a document or a bookmark (EST-25).
+    kind: adw::ComboRow,
+    /// Its address, whom the message is to, the file or the bookmark.
     link: adw::EntryRow,
+    /// The subject of the message, or the bookmark of the document.
+    second: adw::EntryRow,
+    choose: gtk::Button,
     inactive: adw::SwitchRow,
     bookmarks: adw::PreferencesGroup,
+    /// Whether the bookmarks are listed by name, rather than in the order
+    /// of their pages (EST-26).
+    by_name: gtk::DropDown,
     rows: RefCell<Vec<adw::EntryRow>>,
     /// The link at the cursor and the names of the bookmarks shown.
     shown: RefCell<Shown>,
@@ -52,14 +63,31 @@ pub struct LinksGroup {
 impl LinksGroup {
     /// The group for the editor of a window.
     pub fn new(editor: EditorOf) -> Rc<Self> {
-        let link = adw::EntryRow::builder()
-            .title(tr("Link at the Cursor"))
-            .show_apply_button(true)
+        let kinds = [
+            tr("Webpage"),
+            tr("Email Message"),
+            tr("Document"),
+            tr("Bookmark"),
+        ];
+        let kinds: Vec<&str> = kinds.iter().map(String::as_str).collect();
+        let kind = adw::ComboRow::builder()
+            .title(tr("Link To"))
+            .model(&gtk::StringList::new(&kinds))
             .build();
         let open = icon_button("go-next-symbolic", &tr("Follow Link"));
         let remove = icon_button("user-trash-symbolic", &tr("Remove Link"));
-        link.add_suffix(&open);
-        link.add_suffix(&remove);
+        kind.add_suffix(&open);
+        kind.add_suffix(&remove);
+        let link = adw::EntryRow::builder()
+            .title(tr("Address"))
+            .show_apply_button(true)
+            .build();
+        let choose = icon_button("document-open-symbolic", &tr("Choose Document"));
+        link.add_suffix(&choose);
+        let second = adw::EntryRow::builder()
+            .title(tr("Subject"))
+            .show_apply_button(true)
+            .build();
         let inactive = adw::SwitchRow::builder()
             .title(tr("Make Links Inactive"))
             .subtitle(tr(
@@ -72,7 +100,9 @@ impl LinksGroup {
                 "Insert ▸ Hyperlink links the selection. A link to a bookmark starts with #.",
             ))
             .build();
+        group.add(&kind);
         group.add(&link);
+        group.add(&second);
         group.add(&inactive);
         let bookmarks = adw::PreferencesGroup::builder()
             .title(tr("Bookmarks"))
@@ -80,22 +110,51 @@ impl LinksGroup {
                 "Insert ▸ Bookmark marks the selection. An empty name takes a bookmark away.",
             ))
             .build();
+        let by_name = gtk::DropDown::from_strings(&[&tr("By Page"), &tr("By Name")]);
+        by_name.set_valign(gtk::Align::Center);
+        by_name.set_tooltip_text(Some(&tr("Sort Bookmarks")));
+        labelled(&by_name, &tr("Sort Bookmarks"));
+        bookmarks.set_header_suffix(Some(&by_name));
         let this = Rc::new(Self {
             group,
+            kind,
             link,
+            second,
+            choose,
             inactive,
             bookmarks,
+            by_name,
             rows: RefCell::new(Vec::new()),
             shown: RefCell::new(Default::default()),
             updating: Cell::new(false),
             editor,
         });
+        for row in [&this.link, &this.second] {
+            let weak = Rc::downgrade(&this);
+            row.connect_apply(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.apply();
+                }
+            });
+        }
         let weak = Rc::downgrade(&this);
-        this.link.connect_apply(move |row| {
+        this.by_name.connect_selected_notify(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.fill_bookmarks();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        this.kind.connect_selected_notify(move |_| {
             if let Some(this) = weak.upgrade()
-                && let Some(editor) = (this.editor)()
+                && !this.updating.get()
             {
-                editor.set_link(&row.text());
+                this.show_kind();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        this.choose.connect_clicked(move |button| {
+            if let Some(this) = weak.upgrade() {
+                this.choose_document(button);
             }
         });
         let weak = Rc::downgrade(&this);
@@ -140,26 +199,119 @@ impl LinksGroup {
         if self.inactive.is_active() != inactive {
             self.inactive.set_active(inactive);
         }
-        self.link.set_visible(format.link.is_some());
+        let changed = self.shown.borrow().0 != format.link;
+        for row in [
+            self.kind.upcast_ref::<gtk::Widget>(),
+            self.link.upcast_ref(),
+        ] {
+            row.set_visible(format.link.is_some());
+        }
         if let Some(link) = &format.link
-            && self.link.text() != **link
+            && changed
         {
-            self.link.set_text(link);
+            let target = Target::parse(link);
+            self.kind.set_selected(target.kind());
+            let (first, second) = match &target {
+                Target::Web(address) => (address.as_str(), ""),
+                Target::Email { to, subject } => (to.as_str(), subject.as_str()),
+                Target::Document { file, bookmark } => (file.as_str(), bookmark.as_str()),
+                Target::Bookmark(name) => (name.as_str(), ""),
+            };
+            self.link.set_text(first);
+            self.second.set_text(second);
+        }
+        self.updating.set(false);
+        self.show_kind();
+        self.updating.set(true);
+        if format.link.is_none() {
+            self.second.set_visible(false);
+            self.choose.set_visible(false);
         }
         let names_changed = self.shown.borrow().1 != format.bookmarks;
         *self.shown.borrow_mut() = (format.link.clone(), format.bookmarks.clone());
         if names_changed {
-            for row in self.rows.borrow_mut().drain(..) {
-                self.bookmarks.remove(&row);
-            }
-            for name in &format.bookmarks {
-                let row = self.bookmark_row(name);
-                self.bookmarks.add(&row);
-                self.rows.borrow_mut().push(row);
-            }
+            self.fill_bookmarks();
         }
         self.bookmarks.set_visible(!format.bookmarks.is_empty());
         self.updating.set(false);
+    }
+
+    /// Lists the bookmarks, in the order chosen.
+    fn fill_bookmarks(self: &Rc<Self>) {
+        for row in self.rows.borrow_mut().drain(..) {
+            self.bookmarks.remove(&row);
+        }
+        let mut names = self.shown.borrow().1.clone();
+        if self.by_name.selected() == 1 {
+            names.sort_by_cached_key(|n| n.to_lowercase());
+        }
+        for name in &names {
+            let row = self.bookmark_row(name);
+            self.bookmarks.add(&row);
+            self.rows.borrow_mut().push(row);
+        }
+    }
+
+    /// Names the rows for the kind of link chosen.
+    fn show_kind(&self) {
+        let kind = self.kind.selected();
+        let (first, second) = match kind {
+            1 => (tr("To"), Some(tr("Subject"))),
+            2 => (tr("File"), Some(tr("Bookmark in the Document"))),
+            3 => (tr("Bookmark"), None),
+            _ => (tr("Address"), None),
+        };
+        self.link.set_title(&first);
+        self.second.set_visible(second.is_some());
+        if let Some(second) = second {
+            self.second.set_title(&second);
+        }
+        self.choose.set_visible(kind == 2);
+    }
+
+    /// Links the text at the cursor to what the rows say.
+    fn apply(&self) {
+        let Some(editor) = (self.editor)() else {
+            return;
+        };
+        let first = self.link.text().to_string();
+        let second = self.second.text().to_string();
+        let target = match self.kind.selected() {
+            1 => Target::Email {
+                to: first,
+                subject: second,
+            },
+            2 => Target::Document {
+                file: first,
+                bookmark: second,
+            },
+            3 => Target::Bookmark(first),
+            _ => Target::Web(first),
+        };
+        let empty = matches!(&target, Target::Web(a) | Target::Bookmark(a) if a.is_empty())
+            || matches!(&target, Target::Email { to, .. } if to.is_empty())
+            || matches!(&target, Target::Document { file, .. } if file.is_empty());
+        editor.set_link(&if empty { String::new() } else { target.link() });
+    }
+
+    /// Asks for the document that the link opens.
+    fn choose_document(self: &Rc<Self>, button: &gtk::Button) {
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Choose Document"))
+            .modal(true)
+            .build();
+        let window = button.root().and_downcast::<gtk::Window>();
+        let weak = Rc::downgrade(self);
+        dialog.open(
+            window.as_ref(),
+            gtk::gio::Cancellable::NONE,
+            move |result| {
+                if let (Some(this), Ok(file)) = (weak.upgrade(), result) {
+                    this.link.set_text(&file.uri());
+                    this.apply();
+                }
+            },
+        );
     }
 
     fn bookmark_row(self: &Rc<Self>, name: &Arc<str>) -> adw::EntryRow {

@@ -1315,6 +1315,13 @@ impl TextEditor {
             self.go_to_bookmark(name);
             return;
         }
+        // Another document opens in the app, at its bookmark.
+        if let crate::links::Target::Document { .. } = crate::links::Target::parse(link) {
+            if let Some(root) = self.view.area().root() {
+                let _ = root.activate_action("win.open-linked", Some(&link.to_variant()));
+            }
+            return;
+        }
         let window = self.view.area().root().and_downcast::<gtk::Window>();
         gtk::UriLauncher::new(link).launch(
             window.as_ref(),
