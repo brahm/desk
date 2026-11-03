@@ -89,7 +89,8 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 56] = [
+const DOCUMENT_ACTIONS: [&str; 57] = [
+    "special-characters",
     "save",
     "save-as",
     "save-copy",
@@ -984,7 +985,7 @@ impl DocumentWindow {
                 |s| s.to_string_lossy().into_owned(),
             );
         let copy = DocumentWindow::new(&app, self.info, self.opener);
-        copy.load_untitled(editor.document(), format!("{stem} copy"));
+        copy.load_untitled(editor.document(), copy_name(&stem));
         copy.view.set_zoom(self.view.zoom());
         copy.window.present();
     }
@@ -1180,6 +1181,7 @@ impl DocumentWindow {
             ("paste", TextEditor::paste),
             ("paste-match-style", TextEditor::paste_matching_style),
             ("select-all", TextEditor::select_all),
+            ("special-characters", TextEditor::special_characters),
         ] {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
@@ -2096,6 +2098,10 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
         find.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
         find.append_submenu(Some(&tr("_Insert")), &insert_menu());
+        find.append(
+            Some(&tr("Special _Characters…")),
+            Some("win.special-characters"),
+        );
         menu.append_section(None, &find);
         let styles = gio::Menu::new();
         styles.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
@@ -2119,6 +2125,12 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     );
     menu.append_section(None, &help);
     menu
+}
+
+/// The name of an untitled copy of a document, as Duplicate gives it
+/// (DOC-14).
+fn copy_name(name: &str) -> String {
+    tr("{name} copy").replace("{name}", name)
 }
 
 /// The breaks, fields, notes, tables of contents, links and bookmarks of
@@ -2275,6 +2287,11 @@ fn remember_recent(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn doc_14_a_copy_is_named_after_the_original() {
+        assert_eq!(copy_name("Letter"), "Letter copy");
+    }
 
     #[test]
     fn doc_09_a_saved_file_gets_the_extension_of_its_kind() {

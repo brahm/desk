@@ -448,6 +448,8 @@ pub struct TextProperties {
     pub italic: Option<bool>,
     /// `style:text-underline-style` and `style:text-underline-type`.
     pub underline: Option<Line>,
+    /// `style:text-underline-color`.
+    pub underline_color: Option<LineColor>,
     /// `style:text-line-through-style` and `style:text-line-through-type`.
     pub line_through: Option<Line>,
     /// `style:text-line-through-color`.

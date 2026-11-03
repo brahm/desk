@@ -215,6 +215,7 @@ fn sample() -> Document {
                         strikethrough: Some(LineStyle::Double),
                         strikethrough_color: Some(LineColor::Custom(Rgba::rgb(255, 0, 0))),
                         underline: Some(LineStyle::Single),
+                        underline_color: Some(LineColor::Custom(Rgba::rgb(0, 0, 255))),
                         ..CharAttrs::default()
                     },
                 ),

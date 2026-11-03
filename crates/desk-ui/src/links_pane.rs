@@ -210,14 +210,25 @@ impl LinksGroup {
             && changed
         {
             let target = Target::parse(link);
-            self.kind.set_selected(target.kind());
+            if !matches!(target, Target::Slide(_)) {
+                self.kind.set_selected(target.kind());
+            }
             let (first, second) = match &target {
                 Target::Web(address) => (address.as_str(), ""),
                 Target::Email { to, subject } => (to.as_str(), subject.as_str()),
                 Target::Document { file, bookmark } => (file.as_str(), bookmark.as_str()),
                 Target::Bookmark(name) => (name.as_str(), ""),
+                Target::Slide(_) => ("", ""),
             };
-            self.link.set_text(first);
+            // A link to a slide, which only Desk Slides follows, shows what
+            // it does and stays as it is (IOP-32).
+            let slide = match &target {
+                Target::Slide(slide) => Some(slide.describe()),
+                _ => None,
+            };
+            self.kind.set_sensitive(slide.is_none());
+            self.link.set_editable(slide.is_none());
+            self.link.set_text(slide.as_deref().unwrap_or(first));
             self.second.set_text(second);
         }
         self.updating.set(false);
@@ -255,6 +266,12 @@ impl LinksGroup {
     /// Names the rows for the kind of link chosen.
     fn show_kind(&self) {
         let kind = self.kind.selected();
+        if !self.kind.is_sensitive() {
+            self.link.set_title(&tr("Link of a Presentation"));
+            self.second.set_visible(false);
+            self.choose.set_visible(false);
+            return;
+        }
         let (first, second) = match kind {
             1 => (tr("To"), Some(tr("Subject"))),
             2 => (tr("File"), Some(tr("Bookmark in the Document"))),
@@ -274,6 +291,9 @@ impl LinksGroup {
         let Some(editor) = (self.editor)() else {
             return;
         };
+        if !self.kind.is_sensitive() {
+            return;
+        }
         let first = self.link.text().to_string();
         let second = self.second.text().to_string();
         let target = match self.kind.selected() {

@@ -5,9 +5,16 @@
 //! web page, an e-mail message with its subject, another document, at
 //! one of its bookmarks if wanted, or a bookmark of this document. Each
 //! is kept as the text of a URI.
+//!
+//! Some links only work in one app, such as going to a slide in Keynote
+//! (IOP-32). They are kept as `desk:slide/…` URIs, so that text copied
+//! between the apps keeps them, and the other apps show what they do
+//! without following them.
 
 use gtk::gio::prelude::FileExt;
 use gtk::glib;
+
+use crate::i18n::tr;
 
 /// What a link points to.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,6 +38,53 @@ pub enum Target {
     },
     /// A bookmark of this document.
     Bookmark(String),
+    /// A slide of the presentation, which only Desk Slides follows.
+    Slide(Slide),
+}
+
+/// The slide that a link of a presentation goes to, as Keynote's Link
+/// inspector offers them (IOP-32).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Slide {
+    /// The slide of a number, from 1.
+    Number(u32),
+    /// The next slide.
+    Next,
+    /// The slide before.
+    Previous,
+    /// The first slide.
+    First,
+    /// The last slide.
+    Last,
+    /// The slide shown last.
+    LastViewed,
+    /// Ends the slideshow.
+    Exit,
+}
+
+/// The words of `desk:slide/…` links, with their slides.
+const SLIDES: [(&str, Slide); 6] = [
+    ("next", Slide::Next),
+    ("previous", Slide::Previous),
+    ("first", Slide::First),
+    ("last", Slide::Last),
+    ("last-viewed", Slide::LastViewed),
+    ("exit", Slide::Exit),
+];
+
+impl Slide {
+    /// What the link does, for the apps that do not follow it.
+    pub fn describe(self) -> String {
+        match self {
+            Self::Number(n) => tr("Goes to slide {n}").replace("{n}", &n.to_string()),
+            Self::Next => tr("Goes to the next slide"),
+            Self::Previous => tr("Goes to the previous slide"),
+            Self::First => tr("Goes to the first slide"),
+            Self::Last => tr("Goes to the last slide"),
+            Self::LastViewed => tr("Goes to the slide shown last"),
+            Self::Exit => tr("Ends the slideshow"),
+        }
+    }
 }
 
 /// The extensions of the documents that a link opens in the app.
@@ -49,6 +103,16 @@ fn unescape(text: &str) -> String {
 impl Target {
     /// What a link points to.
     pub fn parse(link: &str) -> Self {
+        if let Some(slide) = link.strip_prefix("desk:slide/") {
+            let found = SLIDES
+                .iter()
+                .find(|(word, _)| *word == slide)
+                .map(|(_, s)| *s)
+                .or_else(|| slide.parse().ok().filter(|n| *n > 0).map(Slide::Number));
+            if let Some(slide) = found {
+                return Self::Slide(slide);
+            }
+        }
         if let Some(name) = link.strip_prefix('#') {
             return Self::Bookmark(name.to_owned());
         }
@@ -93,6 +157,14 @@ impl Target {
             Self::Document { file, bookmark } if bookmark.is_empty() => file.clone(),
             Self::Document { file, bookmark } => format!("{file}#{}", escape(bookmark)),
             Self::Bookmark(name) => format!("#{name}"),
+            Self::Slide(Slide::Number(n)) => format!("desk:slide/{n}"),
+            Self::Slide(slide) => {
+                let word = SLIDES
+                    .iter()
+                    .find(|(_, s)| s == slide)
+                    .map_or("next", |(w, _)| w);
+                format!("desk:slide/{word}")
+            }
         }
     }
 
@@ -104,6 +176,7 @@ impl Target {
             Self::Email { .. } => 1,
             Self::Document { .. } => 2,
             Self::Bookmark(_) => 3,
+            Self::Slide(_) => 4,
         }
     }
 }
@@ -131,6 +204,30 @@ pub fn document_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn iop_32_links_of_a_presentation_are_kept() {
+        for (link, slide) in [
+            ("desk:slide/3", Slide::Number(3)),
+            ("desk:slide/next", Slide::Next),
+            ("desk:slide/previous", Slide::Previous),
+            ("desk:slide/first", Slide::First),
+            ("desk:slide/last", Slide::Last),
+            ("desk:slide/last-viewed", Slide::LastViewed),
+            ("desk:slide/exit", Slide::Exit),
+        ] {
+            let target = Target::parse(link);
+            assert_eq!(target, Target::Slide(slide), "{link}");
+            assert_eq!(target.link(), link);
+            assert!(!slide.describe().is_empty());
+        }
+        assert_eq!(Slide::Number(3).describe(), "Goes to slide 3");
+        // Anything else of the scheme stays a plain address.
+        assert_eq!(
+            Target::parse("desk:slide/0"),
+            Target::Web("desk:slide/0".into())
+        );
+    }
 
     #[test]
     fn est_25_links_say_what_they_point_to() {

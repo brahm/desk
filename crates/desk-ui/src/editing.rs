@@ -514,6 +514,45 @@ impl TextEditor {
         });
     }
 
+    /// Shows the emoji and symbols of GTK at the cursor, and types the one
+    /// chosen (TXT-05, as Edit ▸ Special Characters in Pages). Accents and
+    /// the scripts of Chinese, Japanese and Korean come through the input
+    /// methods.
+    pub fn special_characters(&self) {
+        let caret = {
+            let state = self.state.borrow();
+            text_nav::caret(&state.layout, state.selection.focus)
+        };
+        let area = self.view.area();
+        let chooser = gtk::EmojiChooser::new();
+        chooser.set_parent(area);
+        if let Some(caret) = caret
+            && let Some((x, y)) = self.view.to_area(caret.page, caret.x, caret.top)
+        {
+            let bottom = self
+                .view
+                .to_area(caret.page, caret.x, caret.bottom)
+                .map_or(y + 1.0, |(_, b)| b);
+            chooser.set_pointing_to(Some(&gdk::Rectangle::new(
+                x as i32,
+                y as i32,
+                1,
+                (bottom - y).max(1.0) as i32,
+            )));
+        }
+        let weak = self.downgrade();
+        chooser.connect_emoji_picked(move |_, text| {
+            if let Some(this) = weak.upgrade() {
+                this.replace_selection("Typing", text);
+            }
+        });
+        chooser.connect_closed(|chooser| {
+            let chooser = chooser.clone();
+            glib::idle_add_local_once(move || chooser.unparent());
+        });
+        chooser.popup();
+    }
+
     /// The selected text, with paragraphs on lines of their own.
     pub fn selected_text(&self) -> String {
         let state = self.state.borrow();
@@ -1313,6 +1352,11 @@ impl TextEditor {
     pub fn open_link(&self, link: &str) {
         if let Some(name) = link.strip_prefix('#') {
             self.go_to_bookmark(name);
+            return;
+        }
+        // A link of a presentation does nothing in a document (IOP-32).
+        if let crate::links::Target::Slide(_) = crate::links::Target::parse(link) {
+            self.view.area().error_bell();
             return;
         }
         // Another document opens in the app, at its bookmark.

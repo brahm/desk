@@ -47,6 +47,7 @@ const SECTIONS: &[Section] = &[
             ("<Control>v", n_("Paste")),
             ("<Control><Shift><Alt>v", n_("Paste and match style")),
             ("<Control>a", n_("Select all")),
+            ("<Control>period", n_("Special characters")),
             ("<Shift>Return", n_("Line break")),
             ("<Control>BackSpace", n_("Delete the word before")),
         ],

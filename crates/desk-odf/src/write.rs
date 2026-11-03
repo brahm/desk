@@ -741,8 +741,14 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
         w.attr("fo:font-style", if italic { "italic" } else { "normal" });
     }
     write_line(w, "underline", t.underline);
-    if t.underline.is_some_and(|l| l != Line::None) {
-        w.attr("style:text-underline-color", "font-color");
+    match t.underline_color {
+        Some(LineColor::FontColor) => {
+            w.attr("style:text-underline-color", "font-color");
+        }
+        Some(LineColor::Color(color)) => {
+            w.attr("style:text-underline-color", &color.to_string());
+        }
+        None => {}
     }
     write_line(w, "line-through", t.line_through);
     match t.line_through_color {

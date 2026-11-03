@@ -31,9 +31,7 @@ pub fn describe(entry: &Entry) -> String {
         Warning::Formatting(formatting) => {
             let what = match formatting {
                 Formatting::ImageBullets => tr("image bullets, which are drawn as text bullets"),
-                Formatting::LineDetails => {
-                    tr("the color and width of lines through and under text")
-                }
+                Formatting::LineDetails => tr("lines under or through words only"),
                 Formatting::DropCaps => tr("drop caps"),
                 Formatting::HiddenText => tr("hidden text, which is shown"),
                 Formatting::FontFeatures => tr("font features"),

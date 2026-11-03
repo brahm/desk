@@ -307,6 +307,13 @@ impl Reader {
             italic: e.attr(FO, "font-style").map(|s| s != "normal"),
             underline: line(e, "underline"),
             line_through: line(e, "line-through"),
+            underline_color: e.attr(STYLE, "text-underline-color").and_then(|c| {
+                if c == "font-color" {
+                    Some(LineColor::FontColor)
+                } else {
+                    Color::parse(c).map(LineColor::Color)
+                }
+            }),
             line_through_color: e.attr(STYLE, "text-line-through-color").and_then(|c| {
                 if c == "font-color" {
                     Some(LineColor::FontColor)

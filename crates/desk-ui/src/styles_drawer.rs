@@ -124,6 +124,38 @@ pub fn sorted(styles: &Styles, family: StyleFamily) -> Vec<Style> {
     list
 }
 
+/// The styles that the entries of the tables of contents of a document
+/// use: those of their levels, and those that their paragraphs have.
+pub fn toc_entry_styles(document: &desk_model::Document) -> Vec<StyleId> {
+    let mut ids: Vec<StyleId> = document
+        .text_settings()
+        .toc
+        .levels
+        .iter()
+        .map(|l| l.entry)
+        .collect();
+    let body = document.body();
+    for (index, paragraph) in body.iter().enumerate() {
+        if document.table_of_contents_at(index).is_some() {
+            ids.push(paragraph.style());
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+/// The styles that the drawer lists for a family. In a table of contents,
+/// as in Pages, the paragraph styles are only those of its entries
+/// (EST-22, INT-18).
+pub fn listed(styles: &Styles, family: StyleFamily, toc: Option<&[StyleId]>) -> Vec<Style> {
+    let mut list = sorted(styles, family);
+    if let (StyleFamily::Paragraph, Some(entries)) = (family, toc) {
+        list.retain(|s| entries.contains(&s.id()));
+    }
+    list
+}
+
 impl StylesDrawer {
     /// A drawer that works on the editor that `editor` gives.
     pub fn new(editor: EditorOf) -> Rc<Self> {
@@ -727,13 +759,17 @@ impl StylesDrawer {
     /// Shows the styles of the document and the style at the selection.
     pub fn show(&self, editor: &TextEditor) {
         let styles = editor.styles();
+        let document = editor.document();
+        let toc = document
+            .table_of_contents_at(editor.selection().focus.paragraph)
+            .map(|_| toc_entry_styles(&document));
         let mut wanted = Vec::new();
         for family in [
             StyleFamily::Paragraph,
             StyleFamily::Character,
             StyleFamily::List,
         ] {
-            for style in sorted(&styles, family) {
+            for style in listed(&styles, family, toc.as_deref()) {
                 wanted.push((
                     style.id(),
                     style.name().to_owned(),
@@ -743,7 +779,7 @@ impl StylesDrawer {
             }
         }
         if *self.shown.borrow() != wanted {
-            self.rebuild(&styles);
+            self.rebuild(&styles, toc.as_deref());
             *self.shown.borrow_mut() = wanted;
         }
         self.updating.set(true);
@@ -815,7 +851,7 @@ impl StylesDrawer {
         });
     }
 
-    fn rebuild(&self, styles: &Styles) {
+    fn rebuild(&self, styles: &Styles, toc: Option<&[StyleId]>) {
         self.updating.set(true);
         self.paragraphs.remove_all();
         self.characters.remove_all();
@@ -838,7 +874,7 @@ impl StylesDrawer {
             StyleFamily::Character,
             StyleFamily::List,
         ] {
-            for style in sorted(styles, family) {
+            for style in listed(styles, family, toc) {
                 let line = gtk::Box::builder().spacing(6).build();
                 let name = gtk::Label::builder()
                     .label(style.name())
@@ -920,4 +956,55 @@ fn style_menu() -> gio::Menu {
     manage.append(Some(&tr("_Delete Style…")), Some("styles.delete"));
     menu.append_section(None, &manage);
     menu
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use desk_model::{Document, Editor, TocLevel};
+
+    #[test]
+    fn int_18_est_22_in_a_table_of_contents_the_drawer_lists_its_styles() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Setup", |edit| {
+                let heading = edit.new_paragraph_style("Heading 1", start, start, true)?;
+                edit.new_paragraph_style("Quote", start, start, false)?;
+                let mut settings = edit.document().text_settings().clone();
+                settings.toc.levels = vec![TocLevel {
+                    style: heading,
+                    entry: edit.document().styles().default_paragraph(),
+                    page_number: true,
+                }];
+                edit.set_text_settings(settings)?;
+                edit.insert_text(start, "Chapter")?;
+                edit.add_toc_entry_styles()?;
+                edit.insert_table_of_contents(0)
+            })
+            .unwrap();
+        let document = editor.document();
+        let styles = document.styles();
+        let entries = toc_entry_styles(document);
+        let entry = styles
+            .by_name(StyleFamily::Paragraph, "TOC Heading 1")
+            .unwrap()
+            .id();
+        assert_eq!(entries, [entry]);
+        let names = |toc| -> Vec<String> {
+            listed(styles, StyleFamily::Paragraph, toc)
+                .iter()
+                .map(|s| s.name().to_owned())
+                .collect()
+        };
+        assert_eq!(names(Some(&entries)), ["TOC Heading 1"]);
+        // Elsewhere, every paragraph style.
+        assert!(names(None).len() > 2);
+        assert!(names(None).contains(&"Quote".to_owned()));
+        // Character styles stay as they are.
+        assert_eq!(
+            listed(styles, StyleFamily::Character, Some(&entries)).len(),
+            sorted(styles, StyleFamily::Character).len()
+        );
+    }
 }

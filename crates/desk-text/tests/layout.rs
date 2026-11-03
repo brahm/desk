@@ -147,6 +147,20 @@ fn fmt_02_underline_and_strikethrough_are_decorations() {
         strikethrough_color: LineColor::Custom(red),
         ..sans()
     };
+    let blue = Rgba::rgb(0, 0, 255);
+    let colored = lay(
+        &mut system,
+        ParaFormat::default(),
+        &[(
+            "marked",
+            CharFormat {
+                underline_color: LineColor::Custom(blue),
+                ..marked.clone()
+            },
+        )],
+    );
+    // FMT-01: the underline has a color of its own too.
+    assert_eq!(colored.lines[0].decorations[0].color, blue);
     let layout = lay(
         &mut system,
         ParaFormat::default(),

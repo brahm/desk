@@ -494,11 +494,54 @@ pub fn tests_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<Strin
             }
         }
     }
+    // The checks of the UI tests, which run the app through the
+    // accessibility tree, name their rows at the end of what they check.
+    let ui = crates
+        .parent()
+        .map(|root| root.join("tests/ui"))
+        .filter(|dir| dir.is_dir());
+    if let Some(ui) = ui {
+        for entry in std::fs::read_dir(ui)? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|e| e == "py") {
+                scan_ui_checks(&std::fs::read_to_string(&path)?, &mut found);
+            }
+        }
+    }
     for tests in found.values_mut() {
         tests.sort();
         tests.dedup();
     }
     Ok(found)
+}
+
+/// The checks of a UI test that name rows, as
+/// `check("Duplicate opens a copy (DOC-14)", ...)`, by what they check.
+fn scan_ui_checks(text: &str, found: &mut BTreeMap<String, Vec<String>>) {
+    let mut rest = text;
+    while let Some(at) = rest.find("check(") {
+        rest = &rest[at + "check(".len()..];
+        let Some(open) = rest.trim_start().strip_prefix('"') else {
+            continue;
+        };
+        let Some(end) = open.find('"') else { break };
+        let what = &open[..end];
+        let Some(ids) = what
+            .strip_suffix(')')
+            .and_then(|w| w.rsplit_once('(').map(|(_, ids)| ids))
+        else {
+            continue;
+        };
+        let ids: Vec<&str> = ids.split(", ").collect();
+        if ids.iter().all(|id| crate::matrix::is_id(id)) {
+            for id in ids {
+                found
+                    .entry(id.to_owned())
+                    .or_default()
+                    .push(format!("ui: {what}"));
+            }
+        }
+    }
 }
 
 fn scan_tests(text: &str, found: &mut BTreeMap<String, Vec<String>>) {
@@ -565,5 +608,14 @@ mod tests {
         assert_eq!(found["EST-05"], ["est_05_widows"]);
         assert_eq!(found["FMT-12"], ["fmt_12_align"]);
         assert!(!found.contains_key("EST-04"));
+
+        let mut found = BTreeMap::new();
+        scan_ui_checks(
+            "check(\"Duplicate opens a copy (DOC-14)\", True)\ncheck(\n    \"two rows (FMT-01, FMT-02)\",\n    x)\ncheck(\"no row (here)\", y)\ncheck(what, z)\n",
+            &mut found,
+        );
+        assert_eq!(found["DOC-14"], ["ui: Duplicate opens a copy (DOC-14)"]);
+        assert_eq!(found["FMT-02"], ["ui: two rows (FMT-01, FMT-02)"]);
+        assert_eq!(found.len(), 3);
     }
 }

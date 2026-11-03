@@ -695,3 +695,25 @@ fn est_22_est_25_links_saved_by_pages_are_read() {
         ]
     );
 }
+
+#[test]
+fn fmt_01_fmt_02_colors_of_lines_saved_by_pages_are_read() {
+    use desk_model::LineColor;
+    let (document, log) =
+        desk_filters::read_pages_at_logged(&fixture("fmt-01-02-emphasis.pages")).unwrap();
+    let colors: Vec<LineColor> = document
+        .body()
+        .iter()
+        .flat_map(|p| {
+            p.runs()
+                .filter_map(|r| r.attrs.underline_color)
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert!(
+        colors.contains(&LineColor::Custom(Rgba::rgb(255, 0, 0))),
+        "{colors:?}"
+    );
+    // The color of the underline is no longer left out.
+    assert!(log.is_empty(), "{log:?}");
+}
