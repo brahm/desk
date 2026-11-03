@@ -275,6 +275,7 @@ pub fn default_toc(document: &Document) -> desk_model::TocSettings {
                 page_number: true,
             })
             .collect(),
+        page_links: true,
     }
 }
 
@@ -627,6 +628,9 @@ impl TextEditor {
     fn paste_fragment(&self, fragment: &desk_model::Fragment) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let result = self.state.borrow_mut().editor.edit("Paste", |edit| {
             let from = at_spot(edit.document(), start)?;
             let to = at_spot(edit.document(), end)?;
@@ -687,6 +691,9 @@ impl TextEditor {
     pub fn replace_selection(&self, name: &str, text: &str) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let typing = name == "Typing" && start == end;
         let result = {
             let mut state = self.state.borrow_mut();
@@ -784,6 +791,9 @@ impl TextEditor {
         } else {
             before.ordered()
         };
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Delete", |edit| {
@@ -804,6 +814,9 @@ impl TextEditor {
     fn split(&self) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let preferences = crate::preferences::get();
         let automatic = preferences.automatic_lists;
         let result = {
@@ -840,6 +853,9 @@ impl TextEditor {
     pub fn insert_break(&self, kind: BreakKind) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Insert Break", |edit| {
@@ -992,6 +1008,9 @@ impl TextEditor {
     pub fn insert_field(&self, field: Field) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let pending = self.state.borrow_mut().pending.take();
         let result = {
             let mut state = self.state.borrow_mut();
@@ -1016,6 +1035,9 @@ impl TextEditor {
     pub fn insert_note(&self) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let pending = self.state.borrow_mut().pending.take();
         let result = {
             let mut state = self.state.borrow_mut();
@@ -1184,34 +1206,107 @@ impl TextEditor {
 
     /// Follows the link of the text at a spot when the links of the
     /// document are active: a bookmark of the document, or a page in the
-    /// browser. An entry of a table of contents goes to its heading.
-    /// Whether there was a link to follow.
+    /// browser. Whether there was a link to follow.
     fn follow_link(&self, spot: Spot) -> bool {
-        let (link, target) = {
+        let link = {
             let state = self.state.borrow();
             let document = state.editor.document();
             if document.text_settings().links_inactive {
                 return false;
             }
-            let target = document
-                .body()
-                .get(spot.paragraph)
-                .and_then(|p| p.attrs().toc_entry.flatten())
-                .and_then(|e| e.target)
-                .and_then(|t| document.body().index_of(t));
-            (link_at(document, spot).map(|(l, _)| l), target)
+            link_at(document, spot).map(|(l, _)| l)
         };
-        match (link, target) {
-            (Some(link), _) => {
+        match link {
+            Some(link) => {
                 self.open_link(&link);
                 true
             }
-            (None, Some(index)) => {
-                self.move_to(Spot::new(index, 0), false, false);
-                true
-            }
-            _ => false,
+            None => false,
         }
+    }
+
+    /// A click on an entry of a table of contents (EST-22, EST-23): on its
+    /// page number, when those are links, it goes to the heading;
+    /// elsewhere it updates the tables and selects the entries of its
+    /// level, which are formatted together. Whether the spot was an
+    /// entry.
+    fn click_toc_entry(&self, spot: Spot) -> bool {
+        let (target, style, follow) = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let Some(paragraph) = document.body().get(spot.paragraph) else {
+                return false;
+            };
+            let Some(entry) = paragraph.attrs().toc_entry.flatten() else {
+                return false;
+            };
+            let settings = document.text_settings();
+            let on_number = paragraph
+                .text()
+                .rfind('\t')
+                .is_some_and(|tab| spot.offset > tab);
+            let follow = settings.toc.page_links && !settings.links_inactive && on_number;
+            (entry.target, paragraph.style(), follow)
+        };
+        let heading = |this: &Self| {
+            let state = this.state.borrow();
+            let document = state.editor.document();
+            target.and_then(|t| document.body().index_of(t))
+        };
+        if follow && let Some(index) = heading(self) {
+            self.move_to(Spot::new(index, 0), false, false);
+            return true;
+        }
+        self.update_tables_of_contents();
+        let selections: Vec<Selection> = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let body = document.body();
+            // The entry again, which updating may have made anew.
+            let index = (0..body.len())
+                .find(|&i| {
+                    body.get(i).is_some_and(|p| {
+                        p.style() == style
+                            && p.attrs().toc_entry.flatten().map(|e| e.target) == Some(target)
+                    })
+                })
+                .unwrap_or(spot.paragraph.min(body.len().saturating_sub(1)));
+            document
+                .entries_of_level(index)
+                .into_iter()
+                .map(|i| Selection {
+                    anchor: Spot::new(i, 0),
+                    focus: Spot::new(i, body.get(i).map_or(0, |p| p.len())),
+                })
+                .collect()
+        };
+        let Some((first, rest)) = selections.split_first() else {
+            return true;
+        };
+        self.state.borrow_mut().typing = false;
+        self.select(*first);
+        self.state.borrow_mut().others = rest.to_vec();
+        self.select(*first);
+        true
+    }
+
+    /// Whether a change of the text from one spot to another would change
+    /// a table of contents, which only updating it changes; the bell
+    /// rings then (EST-22).
+    fn toc_refuses(&self, start: Spot, end: Spot) -> bool {
+        let refused = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            std::iter::once((start, end))
+                .chain(state.others.iter().map(|o| o.ordered()))
+                .any(|(a, b)| {
+                    document.toc_protects((a.paragraph, a.offset), (b.paragraph, b.offset))
+                })
+        };
+        if refused {
+            self.view.area().error_bell();
+        }
+        refused
     }
 
     /// Opens a link: a bookmark of the document, or a page in the browser.
@@ -1380,6 +1475,7 @@ impl TextEditor {
                     settings.toc = default_toc(edit.document());
                     edit.set_text_settings(settings)?;
                 }
+                edit.add_toc_entry_styles()?;
                 edit.insert_table_of_contents(start.paragraph)?;
                 Ok(Some(Spot::new(start.paragraph, 0)))
             })
@@ -2694,7 +2790,11 @@ impl TextEditor {
             }
             // A click on a link follows it, unless the document's links
             // are inactive (EST-25).
-            if presses == 1 && !shift && !control && this.follow_link(spot) {
+            if presses == 1
+                && !shift
+                && !control
+                && (this.click_toc_entry(spot) || this.follow_link(spot))
+            {
                 let mut state = this.state.borrow_mut();
                 state.adding = false;
                 state.drag_from = None;

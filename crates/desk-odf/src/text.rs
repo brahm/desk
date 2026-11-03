@@ -75,6 +75,9 @@ pub struct TocLevel {
     pub entry: String,
     /// Whether the entries show a page number (`text:index-entry-page-number`).
     pub page_number: bool,
+    /// Whether the page number is a link to the heading
+    /// (`text:index-entry-link-start` and `text:index-entry-link-end`).
+    pub link: bool,
 }
 
 /// The headers and footers of a master page (`style:master-page`).

@@ -1438,6 +1438,7 @@ fn est_22_to_est_26_tables_of_contents_links_and_bookmarks_are_kept() {
                     entry,
                     page_number: true,
                 }],
+                page_links: true,
             };
             settings.links_inactive = true;
             edit.set_text_settings(settings)?;

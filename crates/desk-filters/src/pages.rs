@@ -1176,7 +1176,11 @@ fn toc_settings(sheet: &Stylesheet, ids: &HashMap<(Family, String), StyleId>) ->
             .unwrap_or_default()
     };
     levels.sort_by_key(|l| name(l.entry));
-    TocSettings { levels }
+    // Whether Pages makes the numbers links is not known yet.
+    TocSettings {
+        levels,
+        page_links: false,
+    }
 }
 
 /// How the notes of a document show, from those of Pages (EST-13,

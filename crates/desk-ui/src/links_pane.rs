@@ -201,9 +201,11 @@ impl LinksGroup {
 /// The Table of Contents group of the Inspector.
 pub struct TocGroup {
     group: adw::PreferencesGroup,
-    page_numbers: adw::SwitchRow,
+    page_links: adw::SwitchRow,
     styles: adw::ExpanderRow,
-    rows: RefCell<Vec<(StyleId, adw::SwitchRow)>>,
+    /// For each paragraph style, whether it is listed, and whether its
+    /// entries show their page number: Pages' "#" column.
+    rows: RefCell<Vec<(StyleId, adw::SwitchRow, gtk::ToggleButton)>>,
     shown: RefCell<(TocSettings, Vec<(StyleId, String)>)>,
     updating: Cell<bool>,
     editor: EditorOf,
@@ -212,8 +214,8 @@ pub struct TocGroup {
 impl TocGroup {
     /// The group for the editor of a window.
     pub fn new(editor: EditorOf) -> Rc<Self> {
-        let page_numbers = adw::SwitchRow::builder()
-            .title(tr("Page Numbers"))
+        let page_links = adw::SwitchRow::builder()
+            .title(tr("Make Page Numbers Links"))
             .active(true)
             .build();
         let styles = adw::ExpanderRow::builder()
@@ -231,10 +233,10 @@ impl TocGroup {
             .header_suffix(&update)
             .build();
         group.add(&styles);
-        group.add(&page_numbers);
+        group.add(&page_links);
         let this = Rc::new(Self {
             group,
-            page_numbers,
+            page_links,
             styles,
             rows: RefCell::new(Vec::new()),
             shown: RefCell::new(Default::default()),
@@ -250,7 +252,7 @@ impl TocGroup {
             }
         });
         let weak = Rc::downgrade(&this);
-        this.page_numbers.connect_active_notify(move |_| {
+        this.page_links.connect_active_notify(move |_| {
             if let Some(this) = weak.upgrade()
                 && !this.updating.get()
             {
@@ -273,11 +275,19 @@ impl TocGroup {
         let toc = format.text_settings.toc.clone();
         self.updating.set(true);
         if self.shown.borrow().1 != styles {
-            for (_, row) in self.rows.borrow_mut().drain(..) {
+            for (_, row, _) in self.rows.borrow_mut().drain(..) {
                 self.styles.remove(&row);
             }
             for (id, name) in &styles {
                 let row = adw::SwitchRow::builder().title(name).build();
+                let number = gtk::ToggleButton::builder()
+                    .label("#")
+                    .tooltip_text(tr("Show Page Number"))
+                    .valign(gtk::Align::Center)
+                    .active(true)
+                    .css_classes(["flat"])
+                    .build();
+                row.add_suffix(&number);
                 let weak = Rc::downgrade(self);
                 row.connect_active_notify(move |_| {
                     if let Some(this) = weak.upgrade()
@@ -286,19 +296,32 @@ impl TocGroup {
                         this.changed();
                     }
                 });
+                let weak = Rc::downgrade(self);
+                number.connect_toggled(move |_| {
+                    if let Some(this) = weak.upgrade()
+                        && !this.updating.get()
+                    {
+                        this.changed();
+                    }
+                });
                 self.styles.add_row(&row);
-                self.rows.borrow_mut().push((*id, row));
+                self.rows.borrow_mut().push((*id, row, number));
             }
         }
-        for (id, row) in self.rows.borrow().iter() {
-            let listed = toc.level(*id).is_some();
-            if row.is_active() != listed {
-                row.set_active(listed);
+        for (id, row, number) in self.rows.borrow().iter() {
+            let level = toc.level(*id);
+            if row.is_active() != level.is_some() {
+                row.set_active(level.is_some());
             }
+            let shown = level.is_none_or(|l| l.page_number);
+            if number.is_active() != shown {
+                number.set_active(shown);
+            }
+            number.set_sensitive(level.is_some());
         }
-        let numbers = toc.levels.is_empty() || toc.levels.iter().any(|l| l.page_number);
-        if self.page_numbers.is_active() != numbers {
-            self.page_numbers.set_active(numbers);
+        let links = toc.levels.is_empty() || toc.page_links;
+        if self.page_links.is_active() != links {
+            self.page_links.set_active(links);
         }
         let listed = toc.levels.len();
         self.styles.set_subtitle(&if listed == 0 {
@@ -315,14 +338,13 @@ impl TocGroup {
             return;
         };
         let (old, styles) = self.shown.borrow().clone();
-        let page_number = self.page_numbers.is_active();
         let body = editor.styles().default_paragraph();
         let levels = self
             .rows
             .borrow()
             .iter()
-            .filter(|(_, row)| row.is_active())
-            .map(|(id, _)| {
+            .filter(|(_, row, _)| row.is_active())
+            .map(|(id, _, number)| {
                 let entry = old.level(*id).map_or_else(
                     || {
                         let name = styles
@@ -340,11 +362,14 @@ impl TocGroup {
                 TocLevel {
                     style: *id,
                     entry,
-                    page_number,
+                    page_number: number.is_active(),
                 }
             })
             .collect();
-        let toc = TocSettings { levels };
+        let toc = TocSettings {
+            levels,
+            page_links: self.page_links.is_active(),
+        };
         if toc != old {
             editor.set_toc(toc);
         }

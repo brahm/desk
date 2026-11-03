@@ -357,7 +357,7 @@ impl Edit {
         Ok(())
     }
 
-    fn put(&mut self, style: impl Into<Style>) -> Result<(), ModelError> {
+    pub(crate) fn put(&mut self, style: impl Into<Style>) -> Result<(), ModelError> {
         let mut style = style.into();
         // Breaks belong to paragraphs, never to styles.
         // Fields belong to the text.

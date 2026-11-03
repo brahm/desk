@@ -466,6 +466,7 @@ fn full_document() -> TextDocument {
             style: "Heading_20_1".into(),
             entry: "Body".into(),
             page_number: true,
+            link: true,
         }],
         master_styles: vec![Style {
             name: "MP1".into(),

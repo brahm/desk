@@ -672,6 +672,9 @@ impl DocumentWindow {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
+        // Tables of contents are up to date in what is kept, as Pages
+        // updates them when a document closes (EST-22).
+        editor.update_tables_of_contents();
         let pages = editor.pages();
         let document = crate::fields::saved(editor.document(), &path.to_string_lossy());
         match crate::save_document(opener, &document, pages.first(), path) {

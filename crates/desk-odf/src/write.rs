@@ -400,7 +400,13 @@ fn start_toc(w: &mut Writer, number: usize, levels: &[TocLevel]) {
             w.start("text:index-entry-tab-stop")
                 .attr("style:type", "right")
                 .end();
+            if level.link {
+                w.start("text:index-entry-link-start").end();
+            }
             w.start("text:index-entry-page-number").end();
+            if level.link {
+                w.start("text:index-entry-link-end").end();
+            }
         }
         w.end();
     }

@@ -1455,6 +1455,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         })
                     })
                     .collect(),
+                page_links: source.toc_levels.iter().any(|l| l.link),
             },
             links_inactive: text.links_inactive.unwrap_or(false),
         },
@@ -2187,6 +2188,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             style: names[&level.style].clone(),
             entry: names[&level.entry].clone(),
             page_number: level.page_number,
+            link: settings.toc.page_links && level.page_number,
         })
         .collect();
     for style in styles.iter() {

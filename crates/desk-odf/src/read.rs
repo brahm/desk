@@ -144,6 +144,7 @@ fn toc_levels(body: &Element) -> Vec<TocLevel> {
                     .to_owned(),
                 page_number: template
                     .is_some_and(|t| t.child(TEXT, "index-entry-page-number").is_some()),
+                link: template.is_some_and(|t| t.child(TEXT, "index-entry-link-start").is_some()),
             });
         }
     }

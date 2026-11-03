@@ -44,6 +44,9 @@ pub struct TocLevel {
 pub struct TocSettings {
     /// The styles listed, in the order of their levels.
     pub levels: Vec<TocLevel>,
+    /// Whether the numbers of pages are links to their headings, which a
+    /// click follows (EST-22).
+    pub page_links: bool,
 }
 
 impl TocSettings {
@@ -76,6 +79,48 @@ pub fn tables_of_contents(paragraphs: &[&Paragraph]) -> Vec<std::ops::Range<usiz
     out
 }
 
+impl crate::Document {
+    /// The table of contents that paragraph `index` of the body is an
+    /// entry of: the range of the indexes of its entries.
+    pub fn table_of_contents_at(&self, index: usize) -> Option<std::ops::Range<usize>> {
+        let body: Vec<&Paragraph> = self.body().iter().collect();
+        tables_of_contents(&body)
+            .into_iter()
+            .find(|range| range.contains(&index))
+    }
+
+    /// The entries of the table of contents of paragraph `index` that
+    /// have its style: those of its level, which are selected together
+    /// (EST-23).
+    pub fn entries_of_level(&self, index: usize) -> Vec<usize> {
+        let Some(range) = self.table_of_contents_at(index) else {
+            return Vec::new();
+        };
+        let body = self.body();
+        let style = body.get(index).map(Paragraph::style);
+        range
+            .filter(|&i| body.get(i).map(Paragraph::style) == style)
+            .collect()
+    }
+
+    /// Whether a change of the text from one place of the body to another
+    /// would change the text of a table of contents, which only updating
+    /// it changes. Taking a whole table away is allowed.
+    pub fn toc_protects(&self, from: (usize, usize), to: (usize, usize)) -> bool {
+        let inside = |paragraph: usize| self.table_of_contents_at(paragraph);
+        let (start, end) = if from <= to { (from, to) } else { (to, from) };
+        let touched: Vec<std::ops::Range<usize>> = [inside(start.0), inside(end.0)]
+            .into_iter()
+            .flatten()
+            .collect();
+        touched.iter().any(|range| {
+            let last = self.body().get(range.end - 1).map_or(0, Paragraph::len);
+            let covered = start <= (range.start, 0) && end >= (range.end - 1, last) && end > start;
+            !covered
+        })
+    }
+}
+
 /// The text of a paragraph as an entry lists it: without its fields,
 /// marks of notes and line breaks.
 fn entry_text(paragraph: &Paragraph) -> String {
@@ -93,6 +138,57 @@ impl Edit {
     pub fn update_tables_of_contents(&mut self) -> Result<(), ModelError> {
         let settings = self.document().text_settings().toc.clone();
         loop_tables(self, &settings)
+    }
+
+    /// Gives each level whose entries take the default paragraph style a
+    /// style of its own, "TOC" and the name of the style listed, with a
+    /// right tab stop at the edge of the text for the page number, where a
+    /// leader line can go (EST-23).
+    pub fn add_toc_entry_styles(&mut self) -> Result<(), ModelError> {
+        let document = self.document();
+        let default = document.styles().default_paragraph();
+        let page = document.page_setup();
+        let edge = page.width - page.margin_left - page.margin_right;
+        let mut settings = document.text_settings().clone();
+        let mut changed = false;
+        for i in 0..settings.toc.levels.len() {
+            let level = settings.toc.levels[i];
+            if level.entry != default {
+                continue;
+            }
+            let styles = self.document().styles();
+            let listed = styles
+                .get(level.style)
+                .map(|s| s.name().to_owned())
+                .unwrap_or_default();
+            let name = format!("TOC {listed}");
+            let entry = match styles.by_name(crate::StyleFamily::Paragraph, &name) {
+                Some(style) => style.id(),
+                None => {
+                    let id = self.new_id();
+                    let mut style = crate::ParagraphStyle::new(id, &name);
+                    style.parent = Some(default);
+                    let stop = crate::TabStop {
+                        alignment: crate::TabAlignment::Right,
+                        ..crate::TabStop::left(edge)
+                    };
+                    style.paragraph.tab_stops = Some(crate::TabStops::new([stop]));
+                    // Each level a step further in.
+                    let indent = crate::Length::from_points(18 * i as i32);
+                    if i > 0 {
+                        style.paragraph.left_indent = Some(indent);
+                    }
+                    self.put(style)?;
+                    id
+                }
+            };
+            settings.toc.levels[i].entry = entry;
+            changed = true;
+        }
+        if changed {
+            self.set_text_settings(settings)?;
+        }
+        Ok(())
     }
 
     /// Puts an empty table of contents before a paragraph, and fills it.
