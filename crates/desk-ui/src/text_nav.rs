@@ -580,6 +580,26 @@ mod tests {
     }
 
     #[test]
+    fn txt_05_special_characters_move_as_one() {
+        // A family emoji joined by zero-width joiners, a flag, a letter with
+        // a combining accent and Japanese, as the special characters and
+        // the input methods type them.
+        let family = "👩\u{200d}👩\u{200d}👧";
+        let text = format!("{family}🇧🇷e\u{301}日本");
+        let doc = document(&[&text]);
+        let mut spot = Spot::default();
+        let mut stops = Vec::new();
+        while let next = move_char(&doc, spot, true)
+            && next != spot
+        {
+            stops.push(next.offset);
+            spot = next;
+        }
+        let flag = family.len() + "🇧🇷".len();
+        assert_eq!(stops, [family.len(), flag, flag + 3, flag + 6, flag + 9]);
+    }
+
+    #[test]
     fn txt_03_double_and_triple_click_select_a_word_and_a_paragraph() {
         let doc = document(&["Select a word here"]);
         let word = word_at(&doc, Spot::new(0, 10));

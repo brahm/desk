@@ -254,8 +254,13 @@ def main():
                 None,
             ),
         )
-        check("Ctrl+T shows the Fonts window", showing(fonts))
+        check("Ctrl+T shows the Fonts window (INT-15, IOP-06)", showing(fonts))
         check("it has the shadow", find_named(fonts, "Shadow") is not None)
+        check(
+            "it has the colors of the underline and the strikethrough (FMT-01, FMT-02)",
+            find_named(fonts, "Underline Color") is not None
+            and find_named(fonts, "Strikethrough Color") is not None,
+        )
         check("it has the typography", find_named(fonts, "Ligatures") is not None)
 
         # Ctrl+Shift+T shows the Styles drawer, with the style of the
@@ -278,7 +283,7 @@ def main():
                 None,
             ),
         )
-        check("Ctrl+Shift+T shows the Styles drawer", True)
+        check("Ctrl+Shift+T shows the Styles drawer (INT-18)", True)
         chosen = [
             n
             for n in walk(paragraphs)
@@ -301,7 +306,7 @@ def main():
             "the corrected text in the accessibility tree",
             lambda: text_of(document).endswith("\n\u201chi\u201d \u00a9 \n"),
         )
-        check("quotes curl and (c) becomes a symbol", True)
+        check("quotes curl and (c) becomes a symbol (TXT-06, TXT-07)", True)
 
         # The Search sidebar lists the matches as they are typed (TXT-13).
         press("ctrl+shift+f")
@@ -367,6 +372,43 @@ def main():
             ),
         )
         check("Ctrl+: shows the Spelling and Grammar window", True)
+
+        # Ctrl+. shows the emoji and symbols at the cursor (TXT-05).
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+period")
+        wait_for(
+            "the special characters",
+            lambda: any(
+                n.get_name() == "Smileys & People" and showing(n) for n in walk(app)
+            ),
+        )
+        check("Ctrl+. shows the special characters (TXT-05)", True)
+        press("Escape")
+
+        # Duplicate opens an untitled copy beside the original (DOC-14).
+        press("ctrl+shift+d")
+        wait_for(
+            "the copy",
+            lambda: any(
+                n.get_role() == Atspi.Role.FRAME and "Letter copy" in (n.get_name() or "")
+                for n in walk(app)
+            ),
+        )
+        check("Duplicate opens a copy (DOC-14)", True)
+
+        # Close All asks to save each document with changes (DOC-18).
+        press("ctrl+alt+w")
+        wait_for(
+            "the question to save",
+            lambda: any(
+                n.get_name() == "Save Changes?" and showing(n) for n in walk(app)
+            ),
+        )
+        check("Close All asks to save the changes (DOC-18)", True)
+        press("Escape")
     finally:
         writer.terminate()
         writer.wait(timeout=10)

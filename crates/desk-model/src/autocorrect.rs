@@ -261,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn quotes_open_and_close() {
+    fn txt_06_quotes_open_and_close() {
         assert_eq!(smart_quote(None, '"'), '“');
         assert_eq!(smart_quote(Some(' '), '"'), '“');
         assert_eq!(smart_quote(Some('a'), '"'), '”');
