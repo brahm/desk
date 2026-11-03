@@ -590,3 +590,67 @@ fn est_12_est_16_sections_show_their_own_headers_or_the_ones_before() {
     // The third section uses the headers of the second.
     assert_eq!(headers(&layout), [1, 2, 2, 3]);
 }
+
+#[test]
+fn est_13_a_long_footnote_goes_on_at_the_foot_of_the_next_page() {
+    use desk_model::{CharAttrs, Editor, FIELD_CHARACTER, Field, Note, ParaAttrs, Paragraph, Run};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let note_lines = 18;
+    editor
+        .edit("Setup", |edit| {
+            edit.set_page_setup(setup(200.0))?;
+            let at = edit.insert_text(start, "Text")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            let at = edit.split_paragraph(after)?;
+            edit.insert_text(at, "More")?;
+            let body = edit.document().styles().default_paragraph();
+            let text = vec!["note"; note_lines].join(&LINE_BREAK.to_string());
+            let id = edit.new_id();
+            let paragraph =
+                Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new(&text)])?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![paragraph].into(),
+                }),
+            )
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let layout = paginate(editor.document(), &mut system);
+    let first = &layout.pages[0];
+    let here = first.note_lines.len();
+    assert!(here > 0 && here < note_lines, "{here}");
+    let bottom = first
+        .note_lines
+        .iter()
+        .map(|l| l.origin.1 + l.line.top + l.line.height)
+        .fold(0.0f32, f32::max);
+    let tops: Vec<f32> = first
+        .note_lines
+        .iter()
+        .map(|l| l.origin.1 + l.line.top)
+        .collect();
+    assert!(
+        bottom <= first.body.1 + 0.5,
+        "{bottom} {:?} {here} {tops:?}",
+        first.body
+    );
+    // The mark and its first lines stay together on the first page.
+    assert!(first.lines.iter().any(|l| l.paragraph == 0));
+    let second = &layout.pages[1];
+    assert_eq!(second.note_lines.first().map(|l| l.index), Some(here));
+    assert_eq!(here + second.note_lines.len(), note_lines);
+    // Above the body of the page: the rest starts below the rule.
+    let rule = second.note_rule.expect("a rule").1;
+    assert!(second.note_lines[0].origin.1 + second.note_lines[0].line.top > rule);
+}

@@ -121,6 +121,13 @@ pub struct Page {
     /// The footnotes that the lines of the page refer to, as the body
     /// paragraph that refers to each and the index of the note.
     pub footnotes: Vec<(usize, usize)>,
+    /// The last footnote of the page when only its first lines fit on it:
+    /// the paragraph that refers to it, the note and how many of its lines
+    /// the page shows. The rest go on at the foot of the next page.
+    pub split_note: Option<(usize, usize, usize)>,
+    /// The rest of a footnote that began on the page before: the note and
+    /// its first line here, above the notes of the page.
+    pub carried_note: Option<(usize, usize)>,
     /// The left end of the short rule above the notes on the page, when
     /// there is one (EST-13).
     pub note_rule: Option<(f32, f32)>,
@@ -668,41 +675,114 @@ impl Footnotes {
             .sum()
     }
 
+    /// How far the top of line `line` of a note is from the top of the
+    /// note; its height for the line after the last.
+    fn offset(&self, note: usize, line: usize) -> f32 {
+        let (lines, height) = &self.notes[note];
+        lines.get(line).map_or(*height, |(line, dy)| dy + line.top)
+    }
+
+    /// The lines of each note of a page, in order: the rest of the one
+    /// carried from the page before, then its own.
+    fn parts(&self, page: &Page) -> Vec<(usize, std::ops::Range<usize>)> {
+        let carried = page
+            .carried_note
+            .map(|(note, from)| (note, from..self.notes[note].0.len()));
+        carried
+            .into_iter()
+            .chain(page.footnotes.iter().map(|&(paragraph, note)| {
+                let end = match page.split_note {
+                    Some((p, n, lines)) if p == paragraph && n == note => lines,
+                    _ => self.notes[note].0.len(),
+                };
+                (note, 0..end)
+            }))
+            .collect()
+    }
+
     /// The room that the notes of a page take, with the rule above them.
     fn reserved(&self, page: &Page) -> f32 {
-        if page.footnotes.is_empty() {
+        let parts = self.parts(page);
+        if parts.is_empty() {
             return 0.0;
         }
-        page.footnotes
+        parts
             .iter()
-            .map(|&(_, note)| self.notes[note].1 + self.gap)
+            .map(|(note, lines)| {
+                self.offset(*note, lines.end) - self.offset(*note, lines.start) + self.gap
+            })
             .sum::<f32>()
             - self.gap
             + NOTE_SEPARATION
+    }
+
+    /// When the notes of a line do not all fit in `room`, with the line,
+    /// whether they would with only the first lines of the last of them:
+    /// that note and how many of its lines fit. At least one line of it
+    /// must fit, and one line must go on to the next page.
+    fn split(
+        &self,
+        paragraph: usize,
+        line: &Line,
+        first: bool,
+        room: f32,
+    ) -> Option<(usize, usize)> {
+        let notes: Vec<usize> = self
+            .refs
+            .get(paragraph)?
+            .iter()
+            .filter(|(offset, _)| line.range.contains(offset))
+            .map(|&(_, note)| note)
+            .collect();
+        let (&last, before) = notes.split_last()?;
+        let mut used: f32 = before
+            .iter()
+            .enumerate()
+            .map(|(k, &note)| {
+                let above = if first && k == 0 {
+                    NOTE_SEPARATION
+                } else {
+                    self.gap
+                };
+                self.notes[note].1 + above
+            })
+            .sum();
+        used += if first && before.is_empty() {
+            NOTE_SEPARATION
+        } else {
+            self.gap
+        };
+        let count = self.notes[last].0.len();
+        let fit = (1..count)
+            .take_while(|&m| used + self.offset(last, m) <= room + TOLERANCE)
+            .last()?;
+        Some((last, fit))
     }
 
     /// Puts the notes of each page at its foot, the last one on the bottom
     /// margin, under a short rule.
     fn place(&self, layout: &mut DocumentLayout) {
         for page in &mut layout.pages {
-            if page.footnotes.is_empty() {
+            let parts = self.parts(page);
+            if parts.is_empty() {
                 continue;
             }
             let bottom = page.body.1;
             let mut y = bottom - self.reserved(page) + NOTE_SEPARATION;
             page.note_rule = Some((page.margins.0, y - NOTE_RULE_BELOW));
-            let notes: Vec<usize> = page.footnotes.iter().map(|&(_, n)| n).collect();
-            for note in notes {
-                let (lines, height) = &self.notes[note];
-                for (index, (line, dy)) in lines.iter().enumerate() {
+            for (note, range) in parts {
+                let lines = &self.notes[note].0;
+                let top = self.offset(note, range.start);
+                for index in range.clone() {
+                    let (line, dy) = &lines[index];
                     page.note_lines.push(PlacedLine {
                         paragraph: note,
                         index,
                         line: line.clone(),
-                        origin: (page.margins.0, y + dy),
+                        origin: (page.margins.0, y + dy - top),
                     });
                 }
-                y += height + self.gap;
+                y += self.offset(note, range.end) - top + self.gap;
             }
         }
     }
@@ -791,6 +871,11 @@ impl Paginator<'_> {
         };
         let section = self.sections.last().copied().unwrap_or(self.setup.section);
         let margins = self.section_margins.last().copied().flatten();
+        let carried_note = self
+            .pages
+            .last()
+            .and_then(|p| p.split_note)
+            .map(|(_, note, lines)| (note, lines));
         let body = match self.room {
             Some(room) => room.body(margins, first_of_section, index % 2 == 1, &section),
             None => (
@@ -805,6 +890,7 @@ impl Paginator<'_> {
             left: self.setup.facing_pages && index % 2 == 1,
             margins: self.margins(index),
             body,
+            carried_note,
             ..Page::default()
         });
         index
@@ -952,6 +1038,9 @@ impl Paginator<'_> {
                 page.lines.truncate(line_count);
                 page.blocks.retain(|b| b.paragraph < first);
                 page.footnotes.retain(|&(p, _)| p < first);
+                if page.split_note.is_some_and(|(p, _, _)| p >= first) {
+                    page.split_note = None;
+                }
                 cursor = saved;
                 i = first;
                 continue;
@@ -983,6 +1072,7 @@ impl Paginator<'_> {
             let reserved = footnotes
                 .as_ref()
                 .map_or(0.0, |n| n.reserved(&self.pages[cursor.page]));
+            let split_before = self.pages[cursor.page].split_note.is_some();
             let block = self.block(i, width);
             let n = block.lines.len();
             if a >= n {
@@ -1002,22 +1092,44 @@ impl Paginator<'_> {
             let space = collapsed + above;
             let room = body - cursor.y - space;
             let rest = n - a;
+            let mut split: Option<(usize, usize, usize)> = None;
             let mut k = match &footnotes {
                 None => block.fitting(a, room),
                 Some(notes) => {
-                    // Each line takes the room of its notes too.
+                    // Each line takes the room of its notes too, or of
+                    // the first lines of its last note, whose rest goes
+                    // on the next page.
                     let room = room - reserved;
                     let mut taken = 0.0;
+                    let mut stop = false;
                     (a..n)
                         .take_while(|&b| {
+                            if stop {
+                                return false;
+                            }
                             let line = &block.lines[b];
-                            let cost = notes.cost(i, line, reserved == 0.0 && taken == 0.0);
-                            let fits = line.text_bottom - block.lines[a].top
-                                <= room - taken - cost + TOLERANCE;
+                            let first = reserved == 0.0 && taken == 0.0;
+                            let cost = notes.cost(i, line, first);
+                            let height = line.text_bottom - block.lines[a].top;
+                            if split_before && cost > 0.0 {
+                                return false;
+                            }
+                            let fits = height <= room - taken - cost + TOLERANCE;
                             if fits {
                                 taken += cost;
+                                return true;
                             }
-                            fits
+                            if height > room - taken + TOLERANCE {
+                                return false;
+                            }
+                            match notes.split(i, line, first, room - taken - height) {
+                                Some((note, lines)) => {
+                                    split = Some((b, note, lines));
+                                    stop = true;
+                                    true
+                                }
+                                None => false,
+                            }
                         })
                         .count()
                 }
@@ -1082,6 +1194,11 @@ impl Paginator<'_> {
             };
             let space_after = format.space_after.to_pt() as f32;
             let page = &mut self.pages[cursor.page];
+            if let Some((line, note, lines)) = split
+                && line + 1 == a + k
+            {
+                page.split_note = Some((i, note, lines));
+            }
             if let Some(notes) = &footnotes {
                 for line in &lines {
                     for &(offset, note) in notes.refs.get(i).into_iter().flatten() {
