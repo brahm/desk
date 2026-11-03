@@ -56,6 +56,22 @@ pub struct TextDocument {
     /// The automatic styles of `styles.xml`, which the paragraphs of the
     /// headers and footers name.
     pub master_styles: Vec<Style>,
+    /// What the tables of contents list (`text:table-of-content-source`),
+    /// level by level: those of the first table, written in each.
+    pub toc_levels: Vec<TocLevel>,
+}
+
+/// A level of a table of contents: the paragraphs of a style
+/// (`text:index-source-style`) and the template of their entries
+/// (`text:table-of-content-entry-template`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TocLevel {
+    /// The paragraph style listed.
+    pub style: String,
+    /// `text:style-name` of the entries.
+    pub entry: String,
+    /// Whether the entries show a page number (`text:index-entry-page-number`).
+    pub page_number: bool,
 }
 
 /// The headers and footers of a master page (`style:master-page`).
@@ -187,6 +203,8 @@ pub struct TextSettings {
     pub note_numbering: Option<String>,
     /// The space between notes, as `10pt`.
     pub note_gap: Option<String>,
+    /// Whether links do nothing when clicked.
+    pub links_inactive: Option<bool>,
 }
 
 /// A list style (`text:list-style`).
@@ -694,6 +712,13 @@ pub struct Paragraph {
     /// name, when read, is the end of a section, after which the text
     /// takes the columns of the pages again.
     pub section: Option<String>,
+    /// The names of the bookmarks of one point (`text:bookmark`) at the
+    /// start of the paragraph, as the page references of a table of
+    /// contents name it.
+    pub marks: Vec<String>,
+    /// Whether the paragraph is an entry of a `text:table-of-content`, in
+    /// its `text:index-body`. Neighbors are one table.
+    pub toc: bool,
     /// The text, in spans of one style each.
     pub spans: Vec<Span>,
 }
@@ -737,6 +762,11 @@ pub struct Span {
     pub text: String,
     /// The field that the span is, when it is one.
     pub field: Option<Field>,
+    /// `xlink:href` of the `text:a` that the span is in.
+    pub link: Option<String>,
+    /// The name of the bookmark (`text:bookmark-start` to
+    /// `text:bookmark-end`) that the span is in.
+    pub bookmark: Option<String>,
 }
 
 /// A field of the text, which shows a value that the program fills in.
@@ -754,6 +784,12 @@ pub enum Field {
     },
     /// `text:file-name`, fixed at the name it shows.
     FileName,
+    /// `text:bookmark-ref` with `text:reference-format="page"`: the
+    /// number of the page of a bookmark, by its name.
+    PageOf {
+        /// `text:ref-name`.
+        name: String,
+    },
     /// `text:note`, a footnote or an endnote where the text refers to it.
     /// The text of the span is that of its `text:note-citation`.
     Note(Box<Note>),

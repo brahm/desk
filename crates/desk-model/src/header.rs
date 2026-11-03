@@ -48,6 +48,12 @@ pub enum Field {
         /// The note.
         note: NodeId,
     },
+    /// The number of the page that a paragraph of the body starts on, as
+    /// the entries of a table of contents show it (EST-22).
+    PageOf {
+        /// The paragraph.
+        paragraph: NodeId,
+    },
 }
 
 impl Field {
@@ -58,8 +64,9 @@ impl Field {
             Self::PageNumber => page.to_string(),
             Self::PageCount => pages.to_string(),
             Self::DateTime { shown, .. } | Self::FileName { shown } => shown.to_string(),
-            // Layout numbers the notes.
-            Self::NoteMark { .. } => String::new(),
+            // Layout numbers the notes, and knows the pages of
+            // paragraphs.
+            Self::NoteMark { .. } | Self::PageOf { .. } => String::new(),
         }
     }
 }

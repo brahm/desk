@@ -94,6 +94,9 @@ pub struct FieldValues {
     pub pages: u32,
     /// The marks of the notes, by note (EST-13).
     pub notes: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, String>>>,
+    /// The numbers of the pages that paragraphs of the body start on, by
+    /// paragraph (EST-22).
+    pub pages_of: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, u32>>>,
 }
 
 impl Default for FieldValues {
@@ -102,6 +105,7 @@ impl Default for FieldValues {
             page: 1,
             pages: 1,
             notes: None,
+            pages_of: None,
         }
     }
 }
@@ -115,6 +119,11 @@ impl FieldValues {
                 .as_ref()
                 .and_then(|n| n.get(note).cloned())
                 .unwrap_or_default(),
+            desk_model::Field::PageOf { paragraph } => self
+                .pages_of
+                .as_ref()
+                .and_then(|p| p.get(paragraph))
+                .map_or_else(|| "1".to_owned(), u32::to_string),
             other => other.text(self.page, self.pages),
         }
     }
@@ -496,6 +505,7 @@ mod tests {
                 page: 12,
                 pages: 20,
                 notes: None,
+                pages_of: None,
             },
             ParaFormat::default(),
             CharFormat::default(),

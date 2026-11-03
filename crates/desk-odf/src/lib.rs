@@ -27,7 +27,7 @@
 //!
 //! let mut document = TextDocument::default();
 //! document.body.push(Paragraph {
-//!     spans: vec![Span { style: None, text: "Olá".into(), field: None }],
+//!     spans: vec![Span { text: "Olá".into(), ..Span::default() }],
 //!     ..Paragraph::default()
 //! });
 //! let bytes = write_odt(&document)?;
@@ -57,7 +57,7 @@ pub use text::{
     ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
     ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
     TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
-    TextShadow, TextTransform,
+    TextShadow, TextTransform, TocLevel,
 };
 pub use units::{Color, Length};
 pub use write::{Streams, VERSION, write_streams};

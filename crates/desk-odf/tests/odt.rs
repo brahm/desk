@@ -8,8 +8,8 @@ use desk_odf::{
     LINE_BREAK, LeaderStyle, Length, Line, LineColor, LineHeight, ListLabel, ListLevelStyle,
     ListMember, ListStyle, MasterPage, Meta, Note, OdfError, PageLayout, Paragraph,
     ParagraphProperties, Properties, Span, Style, StyleShortcut, TabStop, TabType, TextAlign,
-    TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, read_odt,
-    read_streams, write_odt, write_odt_with_thumbnail,
+    TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, TocLevel,
+    read_odt, read_streams, write_odt, write_odt_with_thumbnail,
 };
 
 const CONTENT_START: &str = r#"<office:document-content
@@ -42,7 +42,7 @@ fn span(style: Option<&str>, text: &str) -> Span {
     Span {
         style: style.map(str::to_owned),
         text: text.to_owned(),
-        field: None,
+        ..Span::default()
     }
 }
 
@@ -68,6 +68,7 @@ fn item(level: u8, start: Option<u32>, first: bool, continues: bool) -> Paragrap
         }),
         section: None,
         spans: vec![span(None, &format!("item at level {level}"))],
+        ..Paragraph::default()
     }
 }
 
@@ -271,11 +272,29 @@ fn full_document() -> TextDocument {
             ..PageLayout::default()
         },
         body: vec![
+            // A table of contents, whose entry names the page of the
+            // heading by its bookmark (EST-22).
+            Paragraph {
+                style: Some("Body".into()),
+                toc: true,
+                spans: vec![
+                    span(None, "Título\t"),
+                    field(
+                        Field::PageOf {
+                            name: "toc1".into(),
+                        },
+                        "1",
+                    ),
+                ],
+                ..Paragraph::default()
+            },
             Paragraph {
                 style: Some("Heading_20_1".into()),
                 outline_level: Some(1),
                 list: None,
                 section: None,
+                marks: vec!["toc1".into()],
+                toc: false,
                 spans: vec![
                     span(None, "Título"),
                     field(
@@ -304,7 +323,23 @@ fn full_document() -> TextDocument {
                     span(None, " after a space "),
                     span(Some("Emphasis"), " and"),
                     span(Some("T2"), &format!("a{LINE_BREAK}line break")),
+                    // A link and a bookmark (EST-25, EST-26), the link in
+                    // the bookmark and past its end.
+                    Span {
+                        link: Some("https://example.org/?a=1&b=2".into()),
+                        bookmark: Some("Marked".into()),
+                        ..span(Some("Emphasis"), " linked")
+                    },
+                    Span {
+                        link: Some("https://example.org/?a=1&b=2".into()),
+                        ..span(None, " on")
+                    },
+                    Span {
+                        link: Some("#Marked".into()),
+                        ..span(None, " back")
+                    },
                 ],
+                ..Paragraph::default()
             },
             Paragraph::default(),
             item(0, None, true, false),
@@ -398,6 +433,11 @@ fn full_document() -> TextDocument {
             }),
             ..MasterPage::default()
         },
+        toc_levels: vec![TocLevel {
+            style: "Heading_20_1".into(),
+            entry: "Body".into(),
+            page_number: true,
+        }],
         master_styles: vec![Style {
             name: "MP1".into(),
             family: Family::Paragraph,
@@ -417,6 +457,7 @@ fn full_document() -> TextDocument {
             ligatures: Some(false),
             never_hyphenate: vec!["desk".into(), "liberation".into()],
             larger_spacing: Some(true),
+            links_inactive: Some(true),
             note_kind: Some("section".into()),
             note_format: Some("symbols".into()),
             note_numbering: Some("page".into()),

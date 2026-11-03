@@ -47,6 +47,11 @@ pub struct TextSettings {
     pub spacing: ParagraphSpacing,
     /// Where the notes go and how they are numbered (EST-13).
     pub notes: NoteSettings,
+    /// What tables of contents list (EST-22).
+    pub toc: crate::toc::TocSettings,
+    /// Whether links do nothing when clicked, so that their text is edited
+    /// as any other (EST-25).
+    pub links_inactive: bool,
 }
 
 /// How the space after a paragraph and the space before the next make the
@@ -68,6 +73,8 @@ impl Default for TextSettings {
             never_hyphenate: std::collections::BTreeSet::new(),
             spacing: ParagraphSpacing::Larger,
             notes: NoteSettings::default(),
+            toc: crate::toc::TocSettings::default(),
+            links_inactive: false,
         }
     }
 }
@@ -544,6 +551,7 @@ impl Document {
                         .paragraphs()
                         .any(|p| p.uses_style(style))
                     || self.notes().paragraphs().any(|p| p.uses_style(style))
+                    || self.text_settings().toc.uses(style)
                 {
                     return Err(ModelError::StyleInUse(style));
                 }

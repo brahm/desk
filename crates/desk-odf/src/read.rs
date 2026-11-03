@@ -13,7 +13,7 @@ use crate::text::{
     ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
     ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
     TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
-    TextShadow, TextTransform,
+    TextShadow, TextTransform, TocLevel,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -94,11 +94,52 @@ pub fn read_streams(
         .and_then(|body| body.child(OFFICE, "text"))
     {
         collect_paragraphs(text, None, None, &mut document.body);
+        document.toc_levels = toc_levels(text);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
         document.meta = read_meta(meta);
     }
     Ok(document)
+}
+
+/// The levels of the first table of contents of a body that lists
+/// paragraph styles: each style it lists, with the template of its
+/// entries at the same level.
+fn toc_levels(body: &Element) -> Vec<TocLevel> {
+    let mut source = None;
+    visit(body, &mut |e| {
+        if source.is_none() && e.name.is(TEXT, "table-of-content-source") {
+            source = Some(e.clone());
+        }
+    });
+    let Some(source) = source else {
+        return Vec::new();
+    };
+    let level = |e: &Element| {
+        e.attr(TEXT, "outline-level")
+            .and_then(|l| l.trim().parse::<u8>().ok())
+    };
+    let mut out = Vec::new();
+    for styles in source.children_named(TEXT, "index-source-styles") {
+        let template = source
+            .children_named(TEXT, "table-of-content-entry-template")
+            .find(|t| level(t) == level(styles));
+        for style in styles.children_named(TEXT, "index-source-style") {
+            let Some(name) = style.attr(TEXT, "style-name") else {
+                continue;
+            };
+            out.push(TocLevel {
+                style: name.to_owned(),
+                entry: template
+                    .and_then(|t| t.attr(TEXT, "style-name"))
+                    .unwrap_or_default()
+                    .to_owned(),
+                page_number: template
+                    .is_some_and(|t| t.child(TEXT, "index-entry-page-number").is_some()),
+            });
+        }
+    }
+    out
 }
 
 struct Reader {
@@ -557,6 +598,7 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("NoteFormat") => out.note_format = Some(text.trim().to_owned()),
                 Some("NoteNumbering") => out.note_numbering = Some(text.trim().to_owned()),
                 Some("NoteGap") => out.note_gap = Some(text.trim().to_owned()),
+                Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
                 Some("NeverHyphenate") => {
                     out.never_hyphenate = text
                         .lines()
@@ -854,6 +896,19 @@ fn collect_paragraphs(
                 };
                 collect_paragraphs(item, Some(&item_list), section, out);
             }
+        } else if name.is(TEXT, "table-of-content") {
+            // The entries, after the title of the table if it has one.
+            if let Some(body) = child.child(TEXT, "index-body") {
+                for part in body.elements() {
+                    if part.name.is(TEXT, "p") || part.name.is(TEXT, "h") {
+                        let mut paragraph = paragraph(part);
+                        paragraph.toc = true;
+                        out.push(paragraph);
+                    } else {
+                        collect_paragraphs(part, list, section, out);
+                    }
+                }
+            }
         } else if name.ns == DRAW || name.is(OFFICE, "annotation") {
             // Frames and comments are not part of the text flow.
         } else {
@@ -874,6 +929,11 @@ fn collect_paragraphs(
 struct SpanBuilder {
     spans: Vec<Span>,
     collapse: bool,
+    /// The link and the bookmark that the text read now is in.
+    link: Option<String>,
+    bookmark: Option<String>,
+    /// The bookmarks of one point met.
+    marks: Vec<String>,
 }
 
 impl SpanBuilder {
@@ -882,13 +942,20 @@ impl SpanBuilder {
             return;
         }
         match self.spans.last_mut() {
-            Some(last) if last.style.as_deref() == style && last.field.is_none() => {
+            Some(last)
+                if last.style.as_deref() == style
+                    && last.field.is_none()
+                    && last.link == self.link
+                    && last.bookmark == self.bookmark =>
+            {
                 last.text.push_str(text);
             }
             _ => self.spans.push(Span {
                 style: style.map(str::to_owned),
                 text: text.to_owned(),
                 field: None,
+                link: self.link.clone(),
+                bookmark: self.bookmark.clone(),
             }),
         }
     }
@@ -899,6 +966,8 @@ impl SpanBuilder {
             style: style.map(str::to_owned),
             text: e.text(),
             field: Some(field),
+            link: self.link.clone(),
+            bookmark: self.bookmark.clone(),
         });
         self.collapse = false;
     }
@@ -926,6 +995,8 @@ impl SpanBuilder {
             style: style.map(str::to_owned),
             text: citation.map(Element::text).unwrap_or_default(),
             field: Some(Field::Note(Box::new(note))),
+            link: self.link.clone(),
+            bookmark: self.bookmark.clone(),
         });
         self.collapse = false;
     }
@@ -986,11 +1057,35 @@ impl SpanBuilder {
                 }
                 "file-name" => return self.field(style, e, Field::FileName),
                 "note" => return self.note(style, e),
-                // Bookmarks and the like add no text of their own.
-                "bookmark"
-                | "bookmark-start"
-                | "bookmark-end"
-                | "reference-mark"
+                "a" => {
+                    let outer = self.link.take();
+                    self.link = e.attr(XLINK, "href").map(str::to_owned);
+                    self.content(e, style);
+                    self.link = outer;
+                    return;
+                }
+                "bookmark" => {
+                    if let Some(name) = e.attr(TEXT, "name") {
+                        self.marks.push(name.to_owned());
+                    }
+                    return;
+                }
+                "bookmark-start" => {
+                    self.bookmark = e.attr(TEXT, "name").map(str::to_owned);
+                    return;
+                }
+                "bookmark-end" => {
+                    if self.bookmark.as_deref() == e.attr(TEXT, "name") {
+                        self.bookmark = None;
+                    }
+                    return;
+                }
+                "bookmark-ref" if e.attr(TEXT, "reference-format") == Some("page") => {
+                    let name = e.attr(TEXT, "ref-name").unwrap_or_default().to_owned();
+                    return self.field(style, e, Field::PageOf { name });
+                }
+                // Reference marks and the like add no text of their own.
+                "reference-mark"
                 | "reference-mark-start"
                 | "reference-mark-end"
                 | "soft-page-break"
@@ -1013,6 +1108,9 @@ fn paragraph(e: &Element) -> Paragraph {
     let mut builder = SpanBuilder {
         spans: Vec::new(),
         collapse: true,
+        link: None,
+        bookmark: None,
+        marks: Vec::new(),
     };
     builder.content(e, None);
     Paragraph {
@@ -1024,6 +1122,8 @@ fn paragraph(e: &Element) -> Paragraph {
         }),
         list: None,
         section: None,
+        marks: builder.marks,
+        toc: false,
         spans: builder.spans,
     }
 }

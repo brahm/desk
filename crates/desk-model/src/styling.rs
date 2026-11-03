@@ -364,9 +364,9 @@ impl Edit {
         match &mut style {
             Style::Paragraph(p) => {
                 p.paragraph = p.paragraph.without_structure();
-                p.character.field = None;
+                p.character = p.character.without_field();
             }
-            Style::Character(c) => c.character.field = None,
+            Style::Character(c) => c.character = c.character.without_field(),
             _ => {}
         }
         if self.document().styles().get(style.id()).as_ref() != Some(&&style) {
@@ -506,12 +506,7 @@ impl Edit {
             let kept = self.document().paragraph(*id)?.attrs().structure();
             self.set_own_paragraph_attrs(*id, kept)?;
         }
-        self.map_ranges(&ranges, |run| {
-            run.attrs = CharAttrs {
-                field: run.attrs.field.clone(),
-                ..CharAttrs::default()
-            }
-        })
+        self.map_ranges(&ranges, |run| run.attrs = run.attrs.text_bound())
     }
 
     /// Takes the attributes set over a style at a position into the style:
@@ -896,10 +891,9 @@ impl Edit {
             let attrs = copied.character_attrs.clone();
             self.map_ranges(&ranges, |run| {
                 run.style = character_style;
-                run.attrs = CharAttrs {
-                    field: run.attrs.field.clone(),
-                    ..attrs.clone()
-                };
+                let kept = run.attrs.text_bound();
+                run.attrs = attrs.without_field();
+                run.attrs.merge(&kept);
             })?;
         }
         Ok(())

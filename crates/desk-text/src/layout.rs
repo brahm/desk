@@ -648,7 +648,13 @@ impl TextSystem {
                     }
                     next_glyph += count;
                 }
-                let range = run.text_range();
+                let range = match (
+                    spans.iter().map(|s| s.range.start).min(),
+                    spans.iter().map(|s| s.range.end).max(),
+                ) {
+                    (Some(start), Some(end)) => start..end,
+                    _ => run.text_range(),
+                };
                 let x0 = glyph_run.offset() + moved(range.start);
                 let x1 = glyph_run.offset() + glyph_run.advance() + moved(range.end);
                 end_x = end_x.max(x1);
@@ -693,7 +699,8 @@ impl TextSystem {
                         },
                     });
                 }
-                let (run_text, clusters) = run_text(source, run, glyphs.len());
+                let (run_text, clusters) =
+                    run_text(source, run, glyph_run.style_index(), glyphs.len());
                 glyph_runs.push(GlyphRun {
                     font: run.font().clone(),
                     size: run.font_size(),
@@ -836,7 +843,12 @@ fn cluster_spans(glyph_run: &parley::GlyphRun<'_, u32>) -> Vec<ClusterSpan> {
     let end = glyph_run.offset() + glyph_run.advance();
     let mut spans: Vec<ClusterSpan> = Vec::new();
     let mut next = 0;
+    // A run of one font can hold glyph runs of several formats.
+    let style = glyph_run.style_index();
     for cluster in glyph_run.run().visual_clusters() {
+        if cluster.style_index() != style {
+            continue;
+        }
         let glyphs = cluster.glyphs().count();
         spans.push(ClusterSpan {
             range: cluster.text_range(),
@@ -1084,11 +1096,19 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
 /// The text that a run draws and its clusters, as [`GlyphRun::text`] and
 /// [`GlyphRun::clusters`] describe them, given how many glyphs it has,
 /// tabs left out.
-fn run_text(source: &str, run: &parley::Run<'_, u32>, glyphs: usize) -> (String, Vec<(u32, u32)>) {
+fn run_text(
+    source: &str,
+    run: &parley::Run<'_, u32>,
+    style: u16,
+    glyphs: usize,
+) -> (String, Vec<(u32, u32)>) {
     let mut text = String::new();
     let mut clusters = Vec::new();
     let mut count = 0;
     for cluster in run.visual_clusters() {
+        if cluster.style_index() != style {
+            continue;
+        }
         // A tab draws no glyph, and its leader is a run of its own.
         if source[cluster.text_range()].starts_with('\t') {
             continue;

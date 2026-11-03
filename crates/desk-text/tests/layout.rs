@@ -754,3 +754,78 @@ fn txt_03_a_cursor_stops_at_every_character_of_a_line() {
     let empty = plain(&mut system, centred, "");
     assert_eq!(empty.lines[0].carets, vec![(0, 100.0)]);
 }
+
+#[test]
+fn fmt_16_text_after_a_right_tab_in_another_format_moves_with_it() {
+    let mut system = TextSystem::new();
+    let paragraph = ParaFormat {
+        tab_stops: desk_model::TabStops::new([desk_model::TabStop {
+            alignment: desk_model::TabAlignment::Right,
+            ..desk_model::TabStop::left(Length::from_points(180))
+        }]),
+        ..ParaFormat::default()
+    };
+    let bold = CharFormat {
+        weight: FontWeight::BOLD,
+        ..sans()
+    };
+    let layout = lay(&mut system, paragraph, &[("Entry\t", sans()), ("12", bold)]);
+    let line = &layout.lines[0];
+    let last = line.runs.last().unwrap();
+    // The number ends at the stop.
+    assert!(
+        (last.x + last.advance - 180.0).abs() < 0.5,
+        "{:?}",
+        line.runs
+            .iter()
+            .map(|r| (r.x, r.advance))
+            .collect::<Vec<_>>()
+    );
+    let first_glyph = last.glyphs[0].x;
+    assert!(
+        (first_glyph - last.x).abs() < 0.5,
+        "{first_glyph} {}",
+        last.x
+    );
+}
+
+#[test]
+fn est_22_a_field_after_a_right_tab_moves_with_it() {
+    let mut system = TextSystem::new();
+    let paragraph = ParaFormat {
+        tab_stops: desk_model::TabStops::new([desk_model::TabStop {
+            alignment: desk_model::TabAlignment::Right,
+            ..desk_model::TabStop::left(Length::from_points(180))
+        }]),
+        ..ParaFormat::default()
+    };
+    let field = CharFormat {
+        field: Some(desk_model::Field::PageNumber),
+        ..sans()
+    };
+    let text = ParagraphText::from_runs_in(
+        &TextSettings::default(),
+        desk_text::FieldValues {
+            page: 12,
+            ..desk_text::FieldValues::default()
+        },
+        paragraph,
+        sans(),
+        [("Entry\t", sans()), ("\u{fffc}", field)],
+    );
+    let layout = system.layout(&text, &Column::new(200.0), 0.0);
+    let line = &layout.lines[0];
+    let last = line.runs.last().unwrap();
+    assert!(
+        (last.x + last.advance - 180.0).abs() < 0.5 && (last.glyphs[0].x - last.x).abs() < 0.5,
+        "{:?}",
+        line.runs
+            .iter()
+            .map(|r| (
+                r.x,
+                r.advance,
+                r.glyphs.iter().map(|g| g.x).collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>()
+    );
+}

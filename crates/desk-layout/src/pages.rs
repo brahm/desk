@@ -196,14 +196,31 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     if with_fields || plan.numbered_by_page(document) {
         let labels = plan.labels(document, Some(&layout));
         let pages = layout.pages.len() as u32;
+        // The number of the page that each paragraph starts on.
+        let mut numbers = vec![1; document.body().len()];
+        let mut seen = vec![false; document.body().len()];
+        for page in &layout.pages {
+            for line in &page.lines {
+                if let Some(false) = seen.get(line.paragraph).copied() {
+                    seen[line.paragraph] = true;
+                    numbers[line.paragraph] = page.number;
+                }
+            }
+        }
+        let pages_of: std::sync::Arc<HashMap<desk_model::NodeId, u32>> = std::sync::Arc::new(
+            document
+                .body()
+                .iter()
+                .zip(&numbers)
+                .map(|(p, n)| (p.id(), *n))
+                .collect(),
+        );
         for (i, value) in values.iter_mut().enumerate() {
-            let page = layout
-                .page_of(i)
-                .map_or(1, |index| layout.pages[index].number);
             *value = FieldValues {
-                page,
+                page: numbers[i],
                 pages,
                 notes: Some(labels.clone()),
+                pages_of: Some(pages_of.clone()),
             };
         }
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
@@ -247,6 +264,7 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
             page: page.number,
             pages,
             notes: None,
+            pages_of: None,
         };
         let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
         for (kind, shown) in [

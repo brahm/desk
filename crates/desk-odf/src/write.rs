@@ -11,6 +11,7 @@ use crate::text::{
     LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel, ListMember, ListStyle, Meta,
     PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Style,
     TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextShadow, TextTransform,
+    TocLevel,
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
@@ -73,7 +74,7 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     w.end();
     w.start("office:body").start("office:text");
-    write_body(&mut w, &document.body);
+    write_body(&mut w, &document.body, &document.toc_levels);
     w.end().end().end();
     let content = w.finish();
 
@@ -178,6 +179,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
             if let Some(value) = value {
                 config_item(&mut w, name, "string", value);
             }
+        }
+        if let Some(inactive) = text.links_inactive {
+            config_item(&mut w, "LinksInactive", "boolean", boolean(inactive));
         }
         if !text.never_hyphenate.is_empty() {
             config_item(
@@ -373,7 +377,41 @@ fn write_section_style(w: &mut Writer, style: &SectionStyle) {
     w.end().end();
 }
 
-fn write_body(w: &mut Writer, body: &[Paragraph]) {
+/// Opens a table of contents, with what it lists.
+fn start_toc(w: &mut Writer, number: usize, levels: &[TocLevel]) {
+    w.start("text:table-of-content")
+        .attr("text:name", &format!("Table of Contents{number}"));
+    w.start("text:table-of-content-source")
+        .attr("text:outline-level", &levels.len().clamp(1, 10).to_string())
+        .attr("text:use-outline-level", "false")
+        .attr("text:use-index-source-styles", "true");
+    for (i, level) in levels.iter().take(10).enumerate() {
+        let number = (i + 1).to_string();
+        w.start("text:table-of-content-entry-template")
+            .attr("text:outline-level", &number)
+            .attr("text:style-name", &level.entry);
+        w.start("text:index-entry-text").end();
+        if level.page_number {
+            w.start("text:index-entry-tab-stop")
+                .attr("style:type", "right")
+                .end();
+            w.start("text:index-entry-page-number").end();
+        }
+        w.end();
+    }
+    for (i, level) in levels.iter().take(10).enumerate() {
+        w.start("text:index-source-styles")
+            .attr("text:outline-level", &(i + 1).to_string());
+        w.start("text:index-source-style")
+            .attr("text:style-name", &level.style)
+            .end();
+        w.end();
+    }
+    w.end();
+    w.start("text:index-body");
+}
+
+fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
     // For each open list, from the outermost, whether an item is open.
     let mut open: Vec<bool> = Vec::new();
     let mut style: Option<&str> = None;
@@ -388,7 +426,14 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
     // Whether a section is open, and how many were.
     let mut in_section = false;
     let mut sections = 0;
+    // Whether a table of contents is open, and how many were.
+    let mut in_toc = false;
+    let mut tocs = 0;
     for paragraph in body {
+        if in_toc && (!paragraph.toc || paragraph.section.is_some()) {
+            w.end().end();
+            in_toc = false;
+        }
         if let Some(name) = &paragraph.section {
             close_to(w, &mut open, 0);
             if in_section {
@@ -402,6 +447,16 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
                     .attr("text:name", &format!("Section{sections}"));
                 in_section = true;
             }
+        }
+        if paragraph.toc {
+            close_to(w, &mut open, 0);
+            if !in_toc {
+                tocs += 1;
+                start_toc(w, tocs, toc_levels);
+                in_toc = true;
+            }
+            write_paragraph(w, paragraph);
+            continue;
         }
         let Some(member) = &paragraph.list else {
             close_to(w, &mut open, 0);
@@ -451,6 +506,9 @@ fn write_body(w: &mut Writer, body: &[Paragraph]) {
         write_paragraph(w, paragraph);
     }
     close_to(w, &mut open, 0);
+    if in_toc {
+        w.end().end();
+    }
     if in_section {
         w.end();
     }
@@ -881,8 +939,37 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
         }
     }
     w.attr_opt("text:style-name", paragraph.style.as_deref());
+    for mark in &paragraph.marks {
+        w.start("text:bookmark").attr("text:name", mark).end();
+    }
     let mut text = TextWriter { after_space: true };
+    let mut link: Option<&str> = None;
+    let mut bookmark: Option<&str> = None;
     for span in &paragraph.spans {
+        // Bookmarks start and end outside links.
+        if span.bookmark.as_deref() != bookmark {
+            if link.take().is_some() {
+                w.end();
+            }
+            if let Some(name) = bookmark.take() {
+                w.start("text:bookmark-end").attr("text:name", name).end();
+            }
+            if let Some(name) = span.bookmark.as_deref() {
+                w.start("text:bookmark-start").attr("text:name", name).end();
+                bookmark = Some(name);
+            }
+        }
+        if span.link.as_deref() != link {
+            if link.take().is_some() {
+                w.end();
+            }
+            if let Some(href) = span.link.as_deref() {
+                w.start("text:a")
+                    .attr("xlink:type", "simple")
+                    .attr("xlink:href", href);
+                link = Some(href);
+            }
+        }
         if let Some(style) = &span.style {
             w.start("text:span").attr("text:style-name", style);
         }
@@ -896,6 +983,12 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
         if span.field.is_some() {
             text.after_space = false;
         }
+    }
+    if link.is_some() {
+        w.end();
+    }
+    if let Some(name) = bookmark {
+        w.start("text:bookmark-end").attr("text:name", name).end();
     }
     w.end();
 }
@@ -917,6 +1010,11 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             w.start("text:file-name")
                 .attr("text:display", "name")
                 .attr("text:fixed", "true");
+        }
+        Field::PageOf { name } => {
+            w.start("text:bookmark-ref")
+                .attr("text:reference-format", "page")
+                .attr("text:ref-name", name);
         }
         Field::Note(note) => {
             w.start("text:note");

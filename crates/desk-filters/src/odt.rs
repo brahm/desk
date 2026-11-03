@@ -22,7 +22,7 @@ use desk_model::{
 };
 use desk_model::{
     FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
-    NoteKind, NoteNumbering, NoteSettings, Section, Start,
+    NoteKind, NoteNumbering, NoteSettings, Section, Start, TocEntry, TocLevel, TocSettings,
 };
 use desk_odf as odf;
 
@@ -297,6 +297,8 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
         font_features,
         background: t.background.map(background),
         field: None,
+        link: None,
+        bookmark: None,
     }
 }
 
@@ -448,6 +450,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         list_level: None,
         list_start: None,
         list_override: None,
+        toc_entry: None,
     }
 }
 
@@ -1137,9 +1140,42 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     setup.layout = page_layout;
     let mut current_layout = page_layout;
 
+    // The ids of the paragraphs of the body, ahead, for the page
+    // references to them.
+    let body_ids: Vec<NodeId> = source.body.iter().map(|_| document.new_id()).collect();
+    let mut marks = Marks::new();
+    for (paragraph, id) in source.body.iter().zip(&body_ids) {
+        for mark in &paragraph.marks {
+            marks.entry(mark.clone()).or_insert(*id);
+        }
+    }
     for (index, paragraph) in source.body.iter().enumerate() {
-        let mut built =
-            import_paragraph(source, &mut document, &ids, default, paragraph, relative)?;
+        let mut built = import_paragraph(
+            source,
+            &mut document,
+            &ids,
+            default,
+            paragraph,
+            relative,
+            &marks,
+        )?;
+        // Its id, and whether it is an entry of a table of contents.
+        {
+            let mut attrs = built.attrs().clone();
+            if paragraph.toc {
+                let target = built.runs().find_map(|r| match &r.attrs.field {
+                    Some(Some(Field::PageOf { paragraph })) => Some(*paragraph),
+                    _ => None,
+                });
+                attrs.toc_entry = Some(Some(TocEntry { target }));
+            }
+            built = Paragraph::from_runs(
+                body_ids[index],
+                built.style(),
+                attrs,
+                built.runs().cloned().collect::<Vec<_>>(),
+            )?;
+        }
         // The section or layout that starts here.
         let own = paragraph.style.as_deref().and_then(|name| {
             source
@@ -1321,6 +1357,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 default,
                 paragraph,
                 relative,
+                &Marks::new(),
             )?);
         }
         if paragraphs.iter().all(Paragraph::is_empty) {
@@ -1356,6 +1393,22 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 ParagraphSpacing::Sum
             },
             notes: note_settings(text, &source.body),
+            toc: TocSettings {
+                levels: source
+                    .toc_levels
+                    .iter()
+                    .filter_map(|level| {
+                        let find = |name: &str| ids.get(&(odf::Family::Paragraph, name)).copied();
+                        let style = find(&level.style)?;
+                        Some(TocLevel {
+                            style,
+                            entry: find(&level.entry).unwrap_or(default),
+                            page_number: level.page_number,
+                        })
+                    })
+                    .collect(),
+            },
+            links_inactive: text.links_inactive.unwrap_or(false),
         },
     })?;
 
@@ -1465,7 +1518,15 @@ fn import_note(
     let id = document.new_id();
     let mut paragraphs = Vec::with_capacity(note.body.len().max(1));
     for (i, paragraph) in note.body.iter().enumerate() {
-        let built = import_paragraph(source, document, ids, default, paragraph, relative)?;
+        let built = import_paragraph(
+            source,
+            document,
+            ids,
+            default,
+            paragraph,
+            relative,
+            &Marks::new(),
+        )?;
         if i > 0 {
             paragraphs.push(built);
             continue;
@@ -1512,8 +1573,8 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
         odf::Field::FileName => Field::FileName {
             shown: shown.into(),
         },
-        // Notes are read on their own.
-        odf::Field::Note(_) => Field::FileName {
+        // Notes and page references are read on their own.
+        odf::Field::Note(_) | odf::Field::PageOf { .. } => Field::FileName {
             shown: shown.into(),
         },
     }
@@ -1531,10 +1592,14 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
             shown.to_string(),
         ),
         Field::FileName { shown } => (odf::Field::FileName, shown.to_string()),
-        // The body exports notes on their own.
-        Field::NoteMark { .. } => (odf::Field::FileName, String::new()),
+        // The body exports notes and page references on their own.
+        Field::NoteMark { .. } | Field::PageOf { .. } => (odf::Field::FileName, String::new()),
     }
 }
+
+/// The paragraphs of the body by the names of their bookmarks of one
+/// point, which page references name (EST-22).
+type Marks = HashMap<String, NodeId>;
 
 fn import_paragraph(
     source: &odf::TextDocument,
@@ -1543,6 +1608,7 @@ fn import_paragraph(
     default: StyleId,
     paragraph: &odf::Paragraph,
     relative: bool,
+    marks: &Marks,
 ) -> Result<Paragraph, FilterError> {
     // A paragraph style that is automatic holds direct formatting over a
     // common style, its parent.
@@ -1606,6 +1672,27 @@ fn import_paragraph(
                 run_style,
                 run_attrs,
             ));
+            continue;
+        }
+        if let Some(link) = &span.link {
+            run_attrs.link = Some(Some(link.as_str().into()));
+        }
+        if let Some(bookmark) = &span.bookmark {
+            run_attrs.bookmark = Some(Some(bookmark.as_str().into()));
+        }
+        if let Some(odf::Field::PageOf { name }) = &span.field {
+            // A reference to a bookmark that is not at a paragraph of the
+            // body keeps only its text.
+            if let Some(&target) = marks.get(name) {
+                run_attrs.field = Some(Some(Field::PageOf { paragraph: target }));
+                runs.push(Run::with_attrs(
+                    &FIELD_CHARACTER.to_string(),
+                    run_style,
+                    run_attrs,
+                ));
+            } else {
+                runs.push(Run::with_attrs(&span.text, run_style, run_attrs));
+            }
             continue;
         }
         if let Some(field) = &span.field {
@@ -1681,6 +1768,9 @@ fn odf_hyphenate(hyphenate: Option<bool>, document: bool) -> (Option<bool>, Opti
 struct NoteRefs<'a> {
     document: &'a Document,
     order: Vec<NodeId>,
+    /// The names of the bookmarks of one point at the paragraphs that
+    /// page references name.
+    marks: HashMap<NodeId, String>,
 }
 
 impl NoteRefs<'_> {
@@ -1730,7 +1820,21 @@ fn export_spans(
     let mut spans = Vec::new();
     for run in paragraph.runs() {
         let name = style(run);
+        let link = run.attrs.link.clone().flatten().map(|l| l.to_string());
+        let bookmark = run.attrs.bookmark.clone().flatten().map(|b| b.to_string());
+        let first = spans.len();
         match &run.attrs.field {
+            Some(Some(Field::PageOf { paragraph })) => {
+                let name_of = notes.as_deref().and_then(|n| n.marks.get(paragraph));
+                for _ in run.text().chars() {
+                    spans.push(odf::Span {
+                        style: name.clone(),
+                        text: "1".to_owned(),
+                        field: name_of.map(|name| odf::Field::PageOf { name: name.clone() }),
+                        ..odf::Span::default()
+                    });
+                }
+            }
             Some(Some(Field::NoteMark { note })) => {
                 let Some(notes) = notes.as_deref_mut() else {
                     continue;
@@ -1741,6 +1845,7 @@ fn export_spans(
                             style: name.clone(),
                             text: shown,
                             field: Some(field),
+                            ..odf::Span::default()
                         });
                     }
                 }
@@ -1752,14 +1857,19 @@ fn export_spans(
                         style: name.clone(),
                         text: shown.clone(),
                         field: Some(field.clone()),
+                        ..odf::Span::default()
                     });
                 }
             }
             _ => spans.push(odf::Span {
                 style: name,
                 text: run.text().replace(LINE_BREAK, &odf::LINE_BREAK.to_string()),
-                field: None,
+                ..odf::Span::default()
             }),
+        }
+        for span in &mut spans[first..] {
+            span.link.clone_from(&link);
+            span.bookmark.clone_from(&bookmark);
         }
     }
     spans
@@ -1919,10 +2029,21 @@ pub fn export(document: &Document) -> odf::TextDocument {
             // Other programs add the two spaces between paragraphs, so a
             // document that does not say takes the sum (FMT-15).
             larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
+            links_inactive: settings.links_inactive.then_some(true),
             ..odf_note_settings(settings.notes)
         },
         ..odf::TextDocument::default()
     };
+    out.toc_levels = settings
+        .toc
+        .levels
+        .iter()
+        .map(|level| odf::TocLevel {
+            style: names[&level.style].clone(),
+            entry: names[&level.entry].clone(),
+            page_number: level.page_number,
+        })
+        .collect();
     for style in styles.iter() {
         if let Some(key) = style.shortcut() {
             out.style_shortcuts.push(odf::StyleShortcut {
@@ -2034,9 +2155,21 @@ pub fn export(document: &Document) -> odf::TextDocument {
     // is not the plain one, and each one that starts at a paragraph.
     let setup = *document.page_setup();
     let mut section_styles: Vec<odf::SectionStyle> = Vec::new();
+    let mut marks: HashMap<NodeId, String> = HashMap::new();
+    for paragraph in document.body().iter() {
+        for run in paragraph.runs() {
+            if let Some(Some(Field::PageOf { paragraph })) = &run.attrs.field {
+                let n = marks.len() + 1;
+                marks
+                    .entry(*paragraph)
+                    .or_insert_with(|| format!("_Toc{n}"));
+            }
+        }
+    }
     let mut note_refs = NoteRefs {
         document,
         order: Vec::new(),
+        marks,
     };
     for (index, (paragraph, item)) in document.body().iter().zip(&items).enumerate() {
         let start = paragraph
@@ -2073,6 +2206,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             list_level: None,
             list_start: None,
             list_override: None,
+            toc_entry: None,
             ..paragraph.attrs().clone()
         };
         let style = if own.is_empty() && first_number.is_none() {
@@ -2176,6 +2310,13 @@ pub fn export(document: &Document) -> odf::TextDocument {
             outline_level: None,
             list,
             section: section_name,
+            marks: note_refs
+                .marks
+                .get(&paragraph.id())
+                .cloned()
+                .into_iter()
+                .collect(),
+            toc: paragraph.attrs().toc_entry.flatten().is_some(),
             spans,
         });
     }

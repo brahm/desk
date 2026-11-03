@@ -24,6 +24,7 @@ use gtk::prelude::*;
 use gtk::{gdk, glib};
 
 use crate::access::AccessText;
+use crate::i18n::tr;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
@@ -194,6 +195,103 @@ fn note_at(document: &Document, spot: Spot) -> Option<desk_model::Note> {
     best.and_then(|(_, note)| document.notes().get(note).cloned())
 }
 
+/// The linked text at a spot: the character after it, or else the one
+/// before, with the link and the range of the text that shares it.
+fn link_at(document: &Document, spot: Spot) -> Option<(Arc<str>, std::ops::Range<usize>)> {
+    let paragraph = document.body().get(spot.paragraph)?;
+    let mut runs: Vec<(std::ops::Range<usize>, Option<Arc<str>>)> = Vec::new();
+    let mut offset = 0;
+    for run in paragraph.runs() {
+        runs.push((offset..offset + run.len(), run.attrs.link.clone().flatten()));
+        offset += run.len();
+    }
+    let index = runs
+        .iter()
+        .position(|(r, l)| l.is_some() && r.start <= spot.offset && spot.offset < r.end)
+        .or_else(|| {
+            runs.iter()
+                .position(|(r, l)| l.is_some() && r.end == spot.offset && r.start < r.end)
+        })?;
+    let link = runs[index].1.clone()?;
+    let same = |i: usize| runs[i].1.as_deref() == Some(&*link);
+    let mut first = index;
+    while first > 0 && same(first - 1) {
+        first -= 1;
+    }
+    let mut last = index;
+    while last + 1 < runs.len() && same(last + 1) {
+        last += 1;
+    }
+    Some((link, runs[first].0.start..runs[last].0.end))
+}
+
+/// The bookmarks of the body, in order: each name, from the start of its
+/// first text to the end of its last.
+fn bookmarks(document: &Document) -> Vec<(Arc<str>, Spot, Spot)> {
+    let mut out: Vec<(Arc<str>, Spot, Spot)> = Vec::new();
+    for (index, paragraph) in document.body().iter().enumerate() {
+        let mut offset = 0;
+        for run in paragraph.runs() {
+            let end = offset + run.len();
+            if let Some(Some(name)) = &run.attrs.bookmark {
+                match out.iter_mut().find(|(n, _, _)| n == name) {
+                    Some(found) => found.2 = Spot::new(index, end),
+                    None => out.push((
+                        name.clone(),
+                        Spot::new(index, offset),
+                        Spot::new(index, end),
+                    )),
+                }
+            }
+            offset = end;
+        }
+    }
+    out
+}
+
+/// The place a link of the text names as it is typed: a web page when it
+/// names no other kind of place.
+pub fn link_target(text: &str) -> String {
+    let text = text.trim();
+    if text.is_empty()
+        || text.starts_with('#')
+        || text.contains("://")
+        || text.starts_with("mailto:")
+    {
+        text.to_owned()
+    } else if text.contains('@') && !text.contains(char::is_whitespace) {
+        format!("mailto:{text}")
+    } else {
+        format!("https://{text}")
+    }
+}
+
+/// What tables of contents list in a document that chose nothing yet:
+/// the paragraph styles whose names start with "Heading", in the order of
+/// their names, each with the style "TOC" and its name for its entries
+/// when there is one.
+pub fn default_toc(document: &Document) -> desk_model::TocSettings {
+    let styles = document.styles();
+    let mut headings: Vec<(String, StyleId)> = styles
+        .iter()
+        .filter(|s| s.family() == StyleFamily::Paragraph && s.name().starts_with("Heading"))
+        .map(|s| (s.name().to_owned(), s.id()))
+        .collect();
+    headings.sort();
+    desk_model::TocSettings {
+        levels: headings
+            .into_iter()
+            .map(|(name, style)| desk_model::TocLevel {
+                style,
+                entry: styles
+                    .by_name(StyleFamily::Paragraph, &format!("TOC {name}"))
+                    .map_or(styles.default_paragraph(), |s| s.id()),
+                page_number: true,
+            })
+            .collect(),
+    }
+}
+
 /// The position of the model at a spot.
 fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, ModelError> {
     spot.position(document).ok_or(ModelError::IndexOutOfBounds {
@@ -280,6 +378,10 @@ pub struct Format {
     /// The note whose mark is at the cursor, or nearest to it in its
     /// paragraph (EST-13).
     pub note: Option<desk_model::Note>,
+    /// Where the text at the cursor links to (EST-25).
+    pub link: Option<Arc<str>>,
+    /// The names of the bookmarks of the document, in order (EST-26).
+    pub bookmarks: Vec<Arc<str>>,
 }
 
 /// Edits the document of a window.
@@ -911,6 +1013,316 @@ impl TextEditor {
         });
     }
 
+    /// Links the selection to the place its text names, or puts a new
+    /// link at the cursor, selected, to name its place in the Inspector
+    /// (EST-25).
+    pub fn insert_link(&self) {
+        let selection = self.selection();
+        let (start, end) = selection.ordered();
+        if start != end {
+            let text = self.selected_text();
+            let names: Vec<Arc<str>> = bookmarks(&self.state.borrow().editor.snapshot())
+                .into_iter()
+                .map(|(n, _, _)| n)
+                .collect();
+            let trimmed = text.trim();
+            let link = if names.iter().any(|n| &**n == trimmed) {
+                format!("#{trimmed}")
+            } else if trimmed.contains(char::is_whitespace) || !trimmed.contains('.') {
+                "https://".to_owned()
+            } else {
+                link_target(trimmed)
+            };
+            self.format_edit("Insert Link", move |edit| {
+                let document = edit.document();
+                let from = at_spot(document, start)?;
+                let to = at_spot(document, end)?;
+                edit.set_link(from, to, Some(link.into()))
+            });
+            return;
+        }
+        let before = selection;
+        let pending = self.state.borrow_mut().pending.take();
+        let text = "https://";
+        let result = {
+            let mut state = self.state.borrow_mut();
+            state.editor.edit("Insert Link", |edit| {
+                let at = at_spot(edit.document(), start)?;
+                let after = edit.insert_text(at, text)?;
+                if let Some(attrs) = pending {
+                    edit.set_character_attrs(at, after, &attrs.without_field())?;
+                }
+                edit.set_link(at, after, Some(text.into()))?;
+                Ok(Spot::of(edit.document(), after))
+            })
+        };
+        self.finish_edit(before, result);
+        self.select(Selection {
+            anchor: start,
+            focus: Spot::new(start.paragraph, start.offset + text.len()),
+        });
+    }
+
+    /// Changes where the linked text at the cursor, or the selection,
+    /// links to. An empty place takes the link away.
+    pub fn set_link(&self, place: &str) {
+        let (start, end) = self.selection().ordered();
+        let place = link_target(place);
+        let link = (!place.is_empty()).then(|| Arc::<str>::from(place));
+        let range = {
+            let state = self.state.borrow();
+            link_at(state.editor.document(), start)
+        };
+        let (from, to) = match range {
+            Some((_, range))
+                if start == end
+                    || start.paragraph == end.paragraph
+                        && range.start <= start.offset
+                        && end.offset <= range.end =>
+            {
+                (
+                    Spot::new(start.paragraph, range.start),
+                    Spot::new(start.paragraph, range.end),
+                )
+            }
+            _ if start != end => (start, end),
+            _ => return,
+        };
+        let name = if link.is_some() {
+            "Link"
+        } else {
+            "Remove Link"
+        };
+        self.format_edit(name, move |edit| {
+            let document = edit.document();
+            let from = at_spot(document, from)?;
+            let to = at_spot(document, to)?;
+            edit.set_link(from, to, link)
+        });
+    }
+
+    /// Follows the link of the text at a spot when the links of the
+    /// document are active: a bookmark of the document, or a page in the
+    /// browser. An entry of a table of contents goes to its heading.
+    /// Whether there was a link to follow.
+    fn follow_link(&self, spot: Spot) -> bool {
+        let (link, target) = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            if document.text_settings().links_inactive {
+                return false;
+            }
+            let target = document
+                .body()
+                .get(spot.paragraph)
+                .and_then(|p| p.attrs().toc_entry.flatten())
+                .and_then(|e| e.target)
+                .and_then(|t| document.body().index_of(t));
+            (link_at(document, spot).map(|(l, _)| l), target)
+        };
+        match (link, target) {
+            (Some(link), _) => {
+                self.open_link(&link);
+                true
+            }
+            (None, Some(index)) => {
+                self.move_to(Spot::new(index, 0), false, false);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Opens a link: a bookmark of the document, or a page in the browser.
+    pub fn open_link(&self, link: &str) {
+        if let Some(name) = link.strip_prefix('#') {
+            self.go_to_bookmark(name);
+            return;
+        }
+        let window = self.view.area().root().and_downcast::<gtk::Window>();
+        gtk::UriLauncher::new(link).launch(
+            window.as_ref(),
+            gtk::gio::Cancellable::NONE,
+            |result| {
+                if let Err(error) = result {
+                    glib::g_warning!("desk", "cannot open the link: {error}");
+                }
+            },
+        );
+    }
+
+    /// Makes the selection, or the word at the cursor, a bookmark named by
+    /// its text (EST-26).
+    pub fn insert_bookmark(&self) {
+        let (mut start, mut end) = self.selection().ordered();
+        if start == end {
+            let state = self.state.borrow();
+            let Some(paragraph) = state.editor.document().body().get(start.paragraph) else {
+                return;
+            };
+            let text = paragraph.text();
+            let Some(word) = desk_lang::words(&text)
+                .into_iter()
+                .find(|r| r.start <= start.offset && start.offset <= r.end)
+            else {
+                return;
+            };
+            start.offset = word.start;
+            end.offset = word.end;
+        }
+        let text: String = {
+            let state = self.state.borrow();
+            let body = state.editor.document().body();
+            let paragraph = body
+                .get(start.paragraph)
+                .map(|p| p.text())
+                .unwrap_or_default();
+            let to = if end.paragraph == start.paragraph {
+                end.offset
+            } else {
+                paragraph.len()
+            };
+            paragraph
+                .get(start.offset..to)
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let base: String = text
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .filter(|c| !c.is_control() && *c != FIELD_CHARACTER)
+            .take(40)
+            .collect();
+        let base = if base.is_empty() {
+            tr("Bookmark")
+        } else {
+            base
+        };
+        let names: Vec<Arc<str>> = bookmarks(&self.state.borrow().editor.snapshot())
+            .into_iter()
+            .map(|(n, _, _)| n)
+            .collect();
+        let mut name = base.clone();
+        let mut n = 2;
+        while names.iter().any(|b| **b == *name) {
+            name = format!("{base} {n}");
+            n += 1;
+        }
+        self.format_edit("Insert Bookmark", move |edit| {
+            let document = edit.document();
+            let from = at_spot(document, start)?;
+            let to = at_spot(document, end)?;
+            edit.set_bookmark(from, to, Some(name.into()))
+        });
+    }
+
+    /// Selects the text of a bookmark.
+    pub fn go_to_bookmark(&self, name: &str) -> bool {
+        let found = bookmarks(&self.state.borrow().editor.snapshot())
+            .into_iter()
+            .find(|(n, _, _)| &**n == name);
+        match found {
+            Some((_, start, end)) => {
+                self.move_to(start, false, false);
+                self.select(Selection {
+                    anchor: start,
+                    focus: end,
+                });
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Renames a bookmark, and the links to it; an empty name takes the
+    /// bookmark away, and leaves its links.
+    pub fn rename_bookmark(&self, old: &str, new: &str) {
+        let old: Arc<str> = old.into();
+        let new = new.trim().trim_start_matches('#').to_owned();
+        let name = if new.is_empty() {
+            "Remove Bookmark"
+        } else {
+            "Rename Bookmark"
+        };
+        self.format_edit(name, move |edit| {
+            if !new.is_empty()
+                && bookmarks(edit.document())
+                    .iter()
+                    .any(|(n, _, _)| **n == *new)
+            {
+                return Ok(());
+            }
+            let new: Option<Arc<str>> = (!new.is_empty()).then(|| new.into());
+            let to_old = format!("#{old}");
+            let mut marked = Vec::new();
+            let mut linked = Vec::new();
+            for paragraph in edit.document().body().iter() {
+                let mut offset = 0;
+                for run in paragraph.runs() {
+                    let at = desk_model::Position::new(paragraph.id(), offset);
+                    let end = desk_model::Position::new(paragraph.id(), offset + run.len());
+                    if run.attrs.bookmark.clone().flatten().as_deref() == Some(&*old) {
+                        marked.push((at, end));
+                    }
+                    if run.attrs.link.clone().flatten().as_deref() == Some(to_old.as_str()) {
+                        linked.push((at, end));
+                    }
+                    offset += run.len();
+                }
+            }
+            for (at, end) in marked {
+                edit.set_bookmark(at, end, new.clone())?;
+            }
+            if let Some(new) = &new {
+                let link: Arc<str> = format!("#{new}").into();
+                for (at, end) in linked {
+                    edit.set_link(at, end, Some(link.clone()))?;
+                }
+            }
+            Ok(())
+        });
+    }
+
+    /// Puts a table of contents before the paragraph of the cursor
+    /// (EST-22). A document whose tables list nothing yet lists its
+    /// headings, by the styles whose names start with "Heading".
+    pub fn insert_table_of_contents(&self) {
+        let before = self.selection();
+        let (start, _) = before.ordered();
+        let result = {
+            let mut state = self.state.borrow_mut();
+            state.editor.edit("Insert Table of Contents", |edit| {
+                if edit.document().text_settings().toc.levels.is_empty() {
+                    let mut settings = edit.document().text_settings().clone();
+                    settings.toc = default_toc(edit.document());
+                    edit.set_text_settings(settings)?;
+                }
+                edit.insert_table_of_contents(start.paragraph)?;
+                Ok(Some(Spot::new(start.paragraph, 0)))
+            })
+        };
+        self.finish_edit(before, result);
+    }
+
+    /// Makes the entries of every table of contents again (EST-22).
+    pub fn update_tables_of_contents(&self) {
+        self.format_edit("Update Table of Contents", |edit| {
+            edit.update_tables_of_contents()
+        });
+    }
+
+    /// Changes what tables of contents list, and updates them (EST-23).
+    pub fn set_toc(&self, toc: desk_model::TocSettings) {
+        self.format_edit("Table of Contents", move |edit| {
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = toc;
+            edit.set_text_settings(settings)?;
+            edit.update_tables_of_contents()
+        });
+    }
+
     /// Moves the cursor after the mark of the next note in the body, or of
     /// the one before (EST-15). The Inspector then shows that note.
     pub fn go_to_note(&self, forward: bool) -> bool {
@@ -1335,6 +1747,11 @@ impl TextEditor {
             section: document.section_at(start.paragraph).1,
             headers: document.headers_footers().clone(),
             note: note_at(document, start),
+            link: link_at(document, start).map(|(link, _)| link),
+            bookmarks: bookmarks(document)
+                .into_iter()
+                .map(|(name, _, _)| name)
+                .collect(),
         }
     }
 
@@ -2159,6 +2576,14 @@ impl TextEditor {
                 state.label_drag = Some((px, 0));
                 return;
             }
+            // A click on a link follows it, unless the document's links
+            // are inactive (EST-25).
+            if presses == 1 && !shift && !control && this.follow_link(spot) {
+                let mut state = this.state.borrow_mut();
+                state.adding = false;
+                state.drag_from = None;
+                return;
+            }
             let unit = match presses {
                 1 => Unit::Character,
                 2 => Unit::Word,
@@ -2282,5 +2707,67 @@ mod tests {
         assert_eq!(correct("We acheive"), "We achieve");
         assert_eq!(correct("We recieve"), "We recieve");
         assert_eq!(correct("We achieve"), "We achieve");
+    }
+
+    #[test]
+    fn est_25_links_name_their_kind_of_place() {
+        assert_eq!(link_target("example.com"), "https://example.com");
+        assert_eq!(link_target(" http://a.b/c "), "http://a.b/c");
+        assert_eq!(link_target("me@example.com"), "mailto:me@example.com");
+        assert_eq!(link_target("#Intro"), "#Intro");
+        assert_eq!(link_target(""), "");
+    }
+
+    #[test]
+    fn est_25_est_26_links_and_bookmarks_are_found_in_the_text() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Text", |edit| {
+                let id = start.paragraph;
+                edit.insert_text(start, "See the site now")?;
+                let at = |o| desk_model::Position::new(id, o);
+                edit.set_link(at(4), at(8), Some("https://a.b".into()))?;
+                edit.set_link(at(8), at(13), Some("https://a.b".into()))?;
+                edit.set_bookmark(at(0), at(3), Some("See".into()))
+            })
+            .unwrap();
+        let document = editor.document();
+        let (link, range) = link_at(document, Spot::new(0, 10)).unwrap();
+        assert_eq!(&*link, "https://a.b");
+        assert_eq!(range, 4..13);
+        // At the end of a link, the link is still the one before.
+        assert_eq!(link_at(document, Spot::new(0, 13)).unwrap().1, 4..13);
+        assert!(link_at(document, Spot::new(0, 2)).is_none());
+        let marks = bookmarks(document);
+        assert_eq!(marks.len(), 1);
+        assert_eq!(&*marks[0].0, "See");
+        assert_eq!((marks[0].1, marks[0].2), (Spot::new(0, 0), Spot::new(0, 3)));
+    }
+
+    #[test]
+    fn est_23_a_new_table_lists_the_headings() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Styles", |edit| {
+                for name in ["Heading 2", "Heading 1", "TOC Heading 1", "Quote"] {
+                    edit.new_paragraph_style(name, start, start, false)?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        let document = editor.document();
+        let styles = document.styles();
+        let id = |name| styles.by_name(StyleFamily::Paragraph, name).unwrap().id();
+        let toc = default_toc(document);
+        let levels: Vec<_> = toc.levels.iter().map(|l| (l.style, l.entry)).collect();
+        assert_eq!(
+            levels,
+            [
+                (id("Heading 1"), id("TOC Heading 1")),
+                (id("Heading 2"), styles.default_paragraph()),
+            ]
+        );
     }
 }

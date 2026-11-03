@@ -8,6 +8,8 @@
 //! snapshot of the document, which replaces the document only when every
 //! operation succeeded. Snapshots are cheap, so this costs little.
 
+use std::sync::Arc;
+
 use crate::document::{Document, Metadata, PageSetup, TextSettings};
 use crate::error::ModelError;
 use crate::format::{CharAttrs, ParaAttrs};
@@ -221,6 +223,30 @@ impl Edit {
         attrs: &CharAttrs,
     ) -> Result<(), ModelError> {
         self.map_runs(start, end, |run| run.attrs.merge(attrs))
+    }
+
+    /// Links the text between two positions to a place, or takes its
+    /// link away (EST-25).
+    pub fn set_link(
+        &mut self,
+        start: Position,
+        end: Position,
+        link: Option<Arc<str>>,
+    ) -> Result<(), ModelError> {
+        self.map_runs(start, end, |run| run.attrs.link = link.clone().map(Some))
+    }
+
+    /// Makes the text between two positions a bookmark of a name, or not a
+    /// bookmark (EST-26).
+    pub fn set_bookmark(
+        &mut self,
+        start: Position,
+        end: Position,
+        name: Option<Arc<str>>,
+    ) -> Result<(), ModelError> {
+        self.map_runs(start, end, |run| {
+            run.attrs.bookmark = name.clone().map(Some)
+        })
     }
 
     /// Removes the character attributes set on the text between two
