@@ -61,7 +61,7 @@
       <p class="summary">Write, calculate and present</p>
       <p class="developer">by Wagner Brahm, with Claude</p>
       <div class="actions">
-        <a class="pill suggested" href="#install">Install <span class="soon">soon</span></a>
+        <a class="pill suggested" href="#install">Install</a>
         <a class="pill" href="https://github.com/brahm/desk">Source code</a>
       </div>
       <ul class="badges" aria-label="Highlights">
@@ -117,27 +117,27 @@
     <section id="roadmap" aria-labelledby="roadmap-title">
       <h2 id="roadmap-title">What comes next</h2>
       <div class="card">
-        <p class="card-intro">We are starting with Desk Writer, because the text engine is the hardest part and the other two apps depend on it. The first test version is coming soon, and more will follow bit by bit as each stage is done.</p>
+        <p class="card-intro">We are starting with Desk Writer, because the text engine is the hardest part and the other two apps depend on it. Its first five stages are done, and you can already try it in beta. More will follow bit by bit as each stage is done.</p>
         <ol class="timeline">
           <li class="done">
             <h3>Foundation <span class="tag done">done</span></h3>
             <p>Code layout, CI, licenses, icons, and a virtual machine with iWork 9.3 that makes the reference documents.</p>
           </li>
-          <li class="current">
-            <h3>Text core <span class="tag current">in progress</span></h3>
-            <p>Document model, text engine and pagination. It already reads and writes ODT and makes PDFs from the command line.</p>
+          <li class="done">
+            <h3>Text core <span class="tag done">done</span></h3>
+            <p>Document model, text engine and pagination, reading and writing ODT and making PDFs from the command line.</p>
           </li>
-          <li>
-            <h3>iWork reader</h3>
+          <li class="done">
+            <h3>iWork reader <span class="tag done">done</span></h3>
             <p>Opening your old .pages files, and measuring, feature by feature, how close we are to the original.</p>
           </li>
-          <li>
-            <h3>Minimal editor and test version</h3>
-            <p>Opening, editing and saving formatted text in Desk Writer, shipped as a nightly Flatpak.</p>
+          <li class="done">
+            <h3>Minimal editor and test version <span class="tag done">done</span></h3>
+            <p>Opening, editing and saving formatted text in Desk Writer, with a screen reader too, shipped as a nightly Flatpak.</p>
           </li>
-          <li>
-            <h3>Styles, lists and document structure</h3>
-            <p>Spelling, sections, columns, headers, footnotes and tables of contents. The first beta comes out here.</p>
+          <li class="current">
+            <h3>Styles, lists and document structure <span class="tag done">beta</span></h3>
+            <p>Styles, lists, spelling and grammar, sections, columns, headers and footers, footnotes, tables of contents, page thumbnails and the outline, released as the first beta.</p>
           </li>
           <li>
             <h3>Objects, tables, formulas and charts</h3>
@@ -158,16 +158,16 @@
     <section id="install" aria-labelledby="install-title">
       <h2 id="install-title">Install</h2>
       <div class="card">
-        <p class="card-intro">There is nothing to install yet. When the first test version is out, Desk will ship as a Flatpak from its own repository, and all it will take is adding the repository and installing the app:</p>
+        <p class="card-intro">Desk Writer is in beta, as a Flatpak from Desk's own repository. Add the repository and install the app:</p>
         <pre><code>flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
-flatpak install desk br.com.brahm.Desk.Writer</code></pre>
-        <p class="card-note">These commands will only work once the first version is out. Meanwhile, you can build it from the <a href="https://github.com/brahm/desk#building">source code</a>.</p>
+flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
+        <p class="card-note">Or open <a href="desk-writer-beta.flatpakref">desk-writer-beta.flatpakref</a> to install it with GNOME Software. It is a test version: keep a copy of the documents you open with it. For the version built every night from the latest code, use <code>//nightly</code> or <a href="desk-writer-nightly.flatpakref">desk-writer-nightly.flatpakref</a>. You can also build Desk from the <a href="https://github.com/brahm/desk#building">source code</a>.</p>
       </div>
     </section>
 
     <section id="contribute" aria-labelledby="contribute-title">
       <h2 id="contribute-title">Get involved</h2>
-      <p class="section-intro">Desk is free software and just getting started, so every bit of help counts. We are one person and one AI: please be patient with us, and thank you in advance.</p>
+      <p class="section-intro">Desk is free software and still young, so every bit of help counts. We are one person and one AI: please be patient with us, and thank you in advance.</p>
       <ul class="boxed-list">
         <li>
           <a class="row link-row" href="https://github.com/brahm/desk/issues/new">
@@ -198,10 +198,11 @@ flatpak install desk br.com.brahm.Desk.Writer</code></pre>
           </a>
         </li>
         <li>
-          <div class="row">
+          <a class="row link-row" href="https://github.com/brahm/desk/tree/main/po">
             <span class="row-icon"><svg aria-hidden="true"><use href="#i-lang"/></svg></span>
-            <span class="row-text"><strong>Translate</strong><span>Translations open once the interface has text to translate, for every language GNOME supports.</span></span>
-          </div>
+            <span class="row-text"><strong>Translate</strong><span>The interface is in English and Brazilian Portuguese. Add your language with a PO editor such as Gtranslator or Poedit.</span></span>
+            <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
+          </a>
         </li>
       </ul>
     </section>
@@ -211,7 +212,7 @@ flatpak install desk br.com.brahm.Desk.Writer</code></pre>
       <ul class="boxed-list">
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-tag"/></svg></span>
-          <span class="row-text"><strong>Version</strong><span>None yet. The first test version is coming soon.</span></span>
+          <span class="row-text"><strong>Version</strong><span>Desk Writer beta, with nightly builds</span></span>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-license"/></svg></span>

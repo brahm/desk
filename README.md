@@ -29,23 +29,36 @@ document compatibility with Apple iWork '09 (Pages, Numbers and Keynote
 9.3). Documents are saved as OpenDocument (ODF) files, with documented
 extensions for what standard ODF cannot hold.
 
-The project is in early development, starting with Desk Writer. The
-libraries can already read and write simple ODT text documents, read
-the text of Pages '09 documents, listing what they hold that Desk cannot
-show yet, lay them out into pages as Pages does
-and export them to PDF with `desk-convert`. Desk Writer opens them, edits
-and formats their text with undo and the clipboard, works with a screen
-reader, and saves them as ODT. Its test version is a nightly Flatpak,
-built from `main` every night:
+The project is in development, starting with Desk Writer. Its text
+engine, its document structure and its writing tools are done (the
+first five phases of the plan, 97 of the 274 rows of its parity matrix):
+
+- It opens ODT documents and Pages '09 documents, listing what a Pages
+  document holds that Desk cannot show yet, and saves as ODT.
+- It edits and formats text with undo and the clipboard, with
+  paragraph, character and list styles, and works with a screen reader.
+- It checks spelling and grammar as you type, hyphenates, and finds and
+  replaces text in the whole document.
+- It lays out pages as Pages does: sections with their own columns,
+  margins and page numbers, facing pages, headers and footers, footnotes
+  and endnotes, tables of contents, hyperlinks and bookmarks.
+- It shows the pages one by one or two by two, with page thumbnails, and
+  shows the document as an outline whose topics can be moved.
+- `desk-convert` exports documents to PDF from the command line.
+
+Objects and page layout come next, then tables, formulas and charts.
+
+Desk Writer is in beta, in the Flatpak repository of Desk, which also
+has a nightly branch built from `main` every night:
 
 ```sh
-# Download desk-writer-nightly.flatpak from
-# https://github.com/brahm/desk/releases/tag/nightly, then:
-flatpak install --user desk-writer-nightly.flatpak
-flatpak run br.com.brahm.Desk.Writer
+flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
+flatpak install desk br.com.brahm.Desk.Writer//beta
+flatpak run br.com.brahm.Desk.Writer//beta
 ```
 
-More will follow as each phase of the plan is done.
+Use `//nightly` in place of `//beta` for the nightly builds, which are
+also a bundle in the [nightly release](https://github.com/brahm/desk/releases/tag/nightly).
 
 Desk is built by one person working with Claude, Anthropic's AI, with
 the same engineering rigor expected of any team: every feature of the
@@ -152,8 +165,7 @@ to outlines, so the logo does not need the font to render.
 
 ## Contributing
 
-Desk is just starting, and every kind of help counts: trying the test
-versions when they come out, reporting bugs, asking for the features you
+Every kind of help counts: trying the beta, reporting bugs, asking for the features you
 miss, sending old iWork documents for the test corpus, or sending code.
 Open an [issue](https://github.com/brahm/desk/issues) for any of these.
 Before you open a pull request, run `ci/check-all.sh`, which runs every

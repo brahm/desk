@@ -34,9 +34,19 @@ jobs:
       - uses: actions/checkout@v5
       - name: Assemble the site
         run: ci/build-site.sh _site
-      # The Flatpak repository joins the site here when it exists: a step
-      # that puts the signed OSTree repository in _site/repo and the
-      # .flatpakrepo and .flatpakref files at the root. See site/README.md.
+      # The Flatpak repository joins the site: the Flatpak workflow keeps
+      # the signed OSTree repository, its key and the .flatpakrepo and
+      # .flatpakref files as an asset of the "flatpak-repo" release.
+      - name: Add the Flatpak repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release download flatpak-repo --repo "$GITHUB_REPOSITORY" --pattern flatpak-repo.tar --dir "$RUNNER_TEMP"; then
+            tar -xf "$RUNNER_TEMP/flatpak-repo.tar" -C _site
+            ls _site
+          else
+            echo "No Flatpak repository published yet"
+          fi
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
@@ -55,3 +65,28 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  install:
+    name: Install the beta from the published repository
+    needs: deploy
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - name: Install Desk Writer from desk.flatpakrepo
+        run: |
+          site=https://brahm.github.io/desk
+          if ! curl -fsS -o /dev/null "$site/desk.flatpakrepo"; then
+            echo "No Flatpak repository published yet"
+            exit 0
+          fi
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak remote-add --user --if-not-exists desk "$site/desk.flatpakrepo"
+          flatpak remote-ls --user desk
+          for branch in beta nightly; do
+            if flatpak remote-info --user desk br.com.brahm.Desk.Writer//$branch >/dev/null 2>&1; then
+              flatpak install --user --noninteractive --assumeyes desk br.com.brahm.Desk.Writer//$branch
+              flatpak run --user --command=sh br.com.brahm.Desk.Writer//$branch -c 'test -x /app/bin/desk-writer'
+            fi
+          done

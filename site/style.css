@@ -289,14 +289,6 @@ h1, h2, h3 {
   outline-offset: 2px;
 }
 
-.soon {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.25);
-}
-
 .badges {
   list-style: none;
   padding: 0;
