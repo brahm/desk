@@ -477,6 +477,20 @@ fn merged(chain: &[&IworkStyle], count: usize) -> (ParaAttrs, CharAttrs) {
         para.merge(&para_attrs(&style.properties));
         character.merge(&char_attrs(&style.properties));
     }
+    // Bold is a trait of its own over the face: a face chosen here keeps
+    // the bold of the styles it is based on (the TOC entries of
+    // est-22-toc-page-links).
+    let own_bold = chain[..count]
+        .iter()
+        .any(|s| flag(&s.properties, "bold").is_some());
+    if let Some(weight) = character.weight
+        && !own_bold
+        && let Some(bold) = chain[count..]
+            .iter()
+            .find_map(|s| flag(&s.properties, "bold"))
+    {
+        character.weight = Some(weight.with_bold(bold));
+    }
     para.first_line_indent = first_line_indent(chain, count);
     para.border = para_border(chain, count);
     (para, character)
@@ -937,8 +951,8 @@ impl<'a> Importer<'a> {
                 run_style = named;
                 run_attrs.merge(&merged(&chain, anonymous).1);
             }
-            if let Some(link) = &run.link {
-                run_attrs.link = Some(Some(link.as_str().into()));
+            if let Some(href) = &run.link {
+                run_attrs.link = Some(Some(link(href).into()));
             }
             if let Some(bookmark) = &run.bookmark {
                 run_attrs.bookmark = Some(Some(bookmark.as_str().into()));
@@ -1089,29 +1103,66 @@ fn section(sheet: &Stylesheet, style: Option<&str>) -> Section {
     out.first_page_different = number("pageMasterFirstPageDifferent").is_some_and(|n| n != 0.0);
     out.left_right_different =
         number("pageMasterLeftRightPagesDifferent").is_some_and(|n| n != 0.0);
-    // In the order of the menu of Pages: any page, left page, right page.
+    // Pages saves 1 for a right page (est-12-16-section-headers).
     out.start = match number("startKind") {
-        Some(1.0) => SectionStart::LeftPage,
-        Some(2.0) => SectionStart::RightPage,
+        Some(1.0) => SectionStart::RightPage,
+        Some(2.0) => SectionStart::LeftPage,
         _ => SectionStart::AnyPage,
     };
+    // "Use previous headers and footers", on unless the section says.
+    out.own_margins = number("inheritPreviousHF") == Some(0.0);
     out
+}
+
+/// How Pages writes a page number or count (`sf:format`), as the menu of
+/// the field offers: 1, 2, 3; a, b, c; A, B, C; i, ii, iii; I, II, III.
+fn number_format(format: Option<&str>) -> NumberFormat {
+    match format {
+        Some("lower-roman") => NumberFormat::LowerRoman,
+        Some("upper-roman") => NumberFormat::UpperRoman,
+        Some("lower-alpha" | "lower-letter" | "lower-latin") => NumberFormat::LowerAlpha,
+        Some("upper-alpha" | "upper-letter" | "upper-latin") => NumberFormat::UpperAlpha,
+        _ => NumberFormat::Decimal,
+    }
+}
+
+/// A link of Pages as the model keeps it. Pages links another document by
+/// its absolute path (`pages:///Users/…/Other.pages#bookmark`), which the
+/// model keeps as a file URI, so that it opens where the file still is.
+fn link(href: &str) -> String {
+    match href.strip_prefix("pages://") {
+        Some(rest) if rest.starts_with('/') => format!("file://{rest}"),
+        _ => href.to_owned(),
+    }
 }
 
 /// The field of the model for a field of Pages (EST-27).
 fn model_field(field: &iwork::Field) -> Field {
     match field {
-        iwork::Field::PageNumber => Field::PAGE_NUMBER,
-        iwork::Field::PageCount => Field::PAGE_COUNT,
-        iwork::Field::DateTime { format, shown } => Field::DateTime {
+        iwork::Field::PageNumber { format } => Field::PageNumber {
+            format: number_format(format.as_deref()),
+        },
+        iwork::Field::PageCount { format } => Field::PageCount {
+            format: number_format(format.as_deref()),
+        },
+        iwork::Field::DateTime {
+            format,
+            shown,
+            update,
+        } => Field::DateTime {
             pattern: format.as_str().into(),
             shown: shown.as_str().into(),
-            update: false,
+            update: *update,
         },
-        iwork::Field::FileName { shown } => Field::FileName {
+        // Without `sf:display-format`, what it shows is guessed from its
+        // text.
+        iwork::Field::FileName { shown, display } => Field::FileName {
             shown: shown.as_str().into(),
-            path: shown.contains('/'),
-            extension: shown.rsplit('/').next().is_some_and(|n| n.contains('.')),
+            path: display.map_or_else(|| shown.contains('/'), |d| d & 1 != 0),
+            extension: display.map_or_else(
+                || shown.rsplit('/').next().is_some_and(|n| n.contains('.')),
+                |d| d & 2 != 0,
+            ),
         },
         // The importer numbers the notes.
         iwork::Field::Note { .. } | iwork::Field::NoteMark | iwork::Field::PageOf { .. } => {
@@ -1124,7 +1175,11 @@ fn model_field(field: &iwork::Field) -> Field {
 /// (EST-22, EST-23): those shown in them (`showInTOC`), each with the
 /// style of its entries (`tocStyle`), which shows page numbers unless it
 /// says not to (`SLTOCShowPageNumber`).
-fn toc_settings(sheet: &Stylesheet, ids: &HashMap<(Family, String), StyleId>) -> TocSettings {
+fn toc_settings(
+    sheet: &Stylesheet,
+    ids: &HashMap<(Family, String), StyleId>,
+    page_links: bool,
+) -> TocSettings {
     let mut levels: Vec<TocLevel> = Vec::new();
     for style in sheet
         .styles
@@ -1147,10 +1202,13 @@ fn toc_settings(sheet: &Stylesheet, ids: &HashMap<(Family, String), StyleId>) ->
         let Some(entry_style) = sheet.find(entry) else {
             continue;
         };
-        let Some(&entry_id) = ids.get(&(
-            Family::Paragraph,
-            entry_style.ident.clone().unwrap_or_default(),
-        )) else {
+        // Choosing the style of the entries in the TOC Inspector points to
+        // a style of its own over the named one (est-22-toc-page-links).
+        let Some(&entry_id) = sheet
+            .ancestry(entry_style)
+            .iter()
+            .find_map(|s| ids.get(&(Family::Paragraph, s.ident.clone()?)))
+        else {
             continue;
         };
         let page_number = !matches!(
@@ -1176,11 +1234,7 @@ fn toc_settings(sheet: &Stylesheet, ids: &HashMap<(Family, String), StyleId>) ->
             .unwrap_or_default()
     };
     levels.sort_by_key(|l| name(l.entry));
-    // Whether Pages makes the numbers links is not known yet.
-    TocSettings {
-        levels,
-        page_links: false,
-    }
+    TocSettings { levels, page_links }
 }
 
 /// How the notes of a document show, from those of Pages (EST-13,
@@ -1211,12 +1265,16 @@ fn note_settings(properties: iwork::NoteProperties) -> NoteSettings {
 
 /// The header or footer of the model that a header or footer of Pages is,
 /// by its name.
+/// Pages names those of the first section as `SFWPDefaultOddHeaderIdentifier`
+/// and those of a later section after its style, as
+/// `section-style-16-first-page-footer`.
 fn margin_place(kind: MarginKind, name: &str) -> Option<MarginPlace> {
-    let pages = if name.contains("Odd") {
+    let name = name.to_ascii_lowercase();
+    let pages = if name.contains("odd") {
         MarginPages::Default
-    } else if name.contains("First") {
+    } else if name.contains("first") {
         MarginPages::First
-    } else if name.contains("Even") {
+    } else if name.contains("even") {
         MarginPages::Left
     } else {
         return None;
@@ -1303,6 +1361,9 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         }
     }
     let mut index = 1;
+    // The sections after the first with headers and footers of their
+    // own, by their style, with the paragraph that starts each.
+    let mut own_sections: HashMap<&str, NodeId> = HashMap::new();
     for (i, paragraph) in source.body.iter().enumerate() {
         importer.next_id = ahead.get(&i).copied();
         let start = match (&paragraph.section, &paragraph.layout) {
@@ -1314,7 +1375,15 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             (None, Some(l)) => Some(Start::Layout(layout(sheet, Some(l)))),
             (None, None) => None,
         };
-        for built in importer.paragraph(paragraph, start.map(std::sync::Arc::new))? {
+        let own = match (&start, &paragraph.section) {
+            (Some(Start::Section(s, _)), Some(style)) if s.own_margins => Some(style.as_str()),
+            _ => None,
+        };
+        let built = importer.paragraph(paragraph, start.map(std::sync::Arc::new))?;
+        if let (Some(style), Some(first)) = (own, built.first()) {
+            own_sections.insert(style, first.id());
+        }
+        for built in built {
             importer.document.apply(Op::InsertParagraph {
                 index,
                 paragraph: built,
@@ -1331,6 +1400,19 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             let Some(place) = margin_place(kind, name) else {
                 continue;
             };
+            // Those of a later section are named after its style; those of
+            // a section that uses the headers before it are not shown.
+            let section = if name.starts_with("SFWPDefault") {
+                None
+            } else {
+                match own_sections
+                    .iter()
+                    .find(|(style, _)| name.starts_with(&format!("{style}-")))
+                {
+                    Some((_, id)) => Some(*id),
+                    None => continue,
+                }
+            };
             let mut built = Vec::new();
             for paragraph in paragraphs {
                 built.extend(importer.paragraph(paragraph, None)?);
@@ -1339,7 +1421,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
                 built.clear();
             }
             importer.document.apply(Op::SetHeaderFooter {
-                section: None,
+                section,
                 place,
                 paragraphs: built,
             })?;
@@ -1408,7 +1490,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             hyphenation: source.auto_hyphenation,
             ligatures: source.use_ligatures,
             notes: note_settings(source.note_properties),
-            toc: toc_settings(&source.stylesheet, &toc_ids),
+            toc: toc_settings(&source.stylesheet, &toc_ids, source.toc_links),
             ..TextSettings::default()
         },
     })?;

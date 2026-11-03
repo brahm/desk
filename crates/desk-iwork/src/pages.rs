@@ -83,20 +83,33 @@ impl Default for PageGeometry {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Field {
     /// The number of its page (`sf:page-number`).
-    PageNumber,
+    PageNumber {
+        /// How the number is written (`sf:format`), as `lower-roman`;
+        /// none for 1, 2, 3.
+        format: Option<String>,
+    },
     /// The number of pages (`sf:page-count`).
-    PageCount,
+    PageCount {
+        /// How the number is written, as for the page number.
+        format: Option<String>,
+    },
     /// A date and time (`sf:date-time`).
     DateTime {
         /// The pattern of the date, in the symbols of Unicode (`sf:format`).
         format: String,
         /// The text that Pages shows.
         shown: String,
+        /// Whether it changes to the date of opening ("Automatically
+        /// update on open", `sf:auto-update`).
+        update: bool,
     },
     /// The name of the file (`sf:filename`).
     FileName {
         /// The text that Pages shows.
         shown: String,
+        /// What it shows (`sf:display-format`), when the document says:
+        /// 1 adds the folder, 2 the extension.
+        display: Option<u8>,
     },
     /// Where the body refers to a footnote or an endnote (`sf:footnote`):
     /// the nth refers to the nth of [`PagesDocument::notes`].
@@ -207,6 +220,10 @@ pub struct PagesDocument {
     pub has_headers: bool,
     /// Whether pages show their footers (Document Inspector).
     pub has_footers: bool,
+    /// Whether the page numbers of tables of contents are links ("Make
+    /// page numbers links", TOC Inspector), true when the document does
+    /// not say.
+    pub toc_links: bool,
     /// The kinds of content that the reader skipped, by element name, in
     /// the order first met, with how many of each: what an import cannot
     /// show yet. Besides the elements of the body, `headers`, `footers`
@@ -315,6 +332,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         },
         has_headers: publication_flag(&root, "kSFWPHasHeadersProperty").unwrap_or(true),
         has_footers: publication_flag(&root, "kSFWPHasFootersProperty").unwrap_or(true),
+        toc_links: publication_flag(&root, "kSFWPTOCLinksEnabledProperty").unwrap_or(true),
         ..PagesDocument::default()
     };
     let Some(storage) = root
@@ -512,6 +530,9 @@ const IGNORED: &[&str] = &[
     "br",
     // The hidden marks of the headings that a table of contents lists.
     "toc-bookmark",
+    // The alias of the file that a link to a document opens, which only
+    // the Finder reads: the link has its path too.
+    "file-alias",
     // The ends of a layout and of a section, which the elements around
     // the paragraphs record.
     "layoutbr",
@@ -675,18 +696,28 @@ impl BodyReader<'_, '_> {
                         "pgbr" => self.push(runs, style, &PAGE_BREAK.to_string()),
                         "contbr" => self.push(runs, style, &COLUMN_BREAK.to_string()),
                         "tab" => self.push(runs, style, "\t"),
-                        "page-number" => self.push_field(runs, style, Field::PageNumber),
-                        "page-count" => self.push_field(runs, style, Field::PageCount),
+                        "page-number" => {
+                            let format = child.attr(SF, "format").map(str::to_owned);
+                            self.push_field(runs, style, Field::PageNumber { format });
+                        }
+                        "page-count" => {
+                            let format = child.attr(SF, "format").map(str::to_owned);
+                            self.push_field(runs, style, Field::PageCount { format });
+                        }
                         "date-time" => {
                             let field = Field::DateTime {
                                 format: child.attr(SF, "format").unwrap_or_default().to_owned(),
                                 shown: child.text(),
+                                update: child.attr(SF, "auto-update") == Some("true"),
                             };
                             self.push_field(runs, style, field);
                         }
                         "filename" => {
                             let field = Field::FileName {
                                 shown: child.text(),
+                                display: child
+                                    .attr(SF, "display-format")
+                                    .and_then(|d| d.trim().parse().ok()),
                             };
                             self.push_field(runs, style, field);
                         }

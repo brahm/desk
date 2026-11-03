@@ -95,6 +95,10 @@ pub struct Page {
     pub section: usize,
     /// Whether it is the first page of its section.
     pub first_of_section: bool,
+    /// Whether it is a page left blank so that the next section starts
+    /// on the side it asks for. Pages shows no header or footer on it
+    /// (est-12-16-section-headers).
+    pub blank: bool,
     /// Whether it is a left page, when pages face each other (EST-11).
     /// The first page is a right page.
     pub left: bool,
@@ -121,7 +125,8 @@ pub struct Page {
     /// The footnotes that the lines of the page refer to, as the body
     /// paragraph that refers to each and the index of the note.
     pub footnotes: Vec<(usize, usize)>,
-    /// The last footnote of the page when only its first lines fit on it:
+    /// The last footnote of the page when only its first lines fit on it,
+    /// which happens only when its line starts the page, as in Pages:
     /// the paragraph that refers to it, the note and how many of its lines
     /// the page shows. The rest go on at the foot of the next page.
     pub split_note: Option<(usize, usize, usize)>,
@@ -272,6 +277,9 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
     let height = setup.height.to_pt() as f32;
     for (index, page) in layout.pages.iter_mut().enumerate() {
         page.margin_lines.clear();
+        if page.blank {
+            continue;
+        }
         let section = layout
             .sections
             .get(page.section)
@@ -972,7 +980,8 @@ impl Paginator<'_> {
             && !self.pages.is_empty()
             && (self.pages.len() % 2 == 1) != left
         {
-            self.add_page(false);
+            let blank = self.add_page(false);
+            self.pages[blank].blank = true;
         }
         self.sections.push(section);
         let margins = self
@@ -1126,6 +1135,14 @@ impl Paginator<'_> {
                                 return true;
                             }
                             if height > room - taken + TOLERANCE {
+                                return false;
+                            }
+                            // As in Pages, the line goes to the next page
+                            // with its notes whole, unless it already
+                            // starts an empty page, where the last note
+                            // cannot fit whole anywhere
+                            // (est-13-footnote-continues).
+                            if !(at_top && b == a && reserved == 0.0) {
                                 return false;
                             }
                             match notes.split(i, line, first, room - taken - height) {
