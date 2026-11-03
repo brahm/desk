@@ -191,7 +191,7 @@ impl FormatBar {
             columns_menu.append_item(&item);
         }
         let columns = gtk::MenuButton::builder()
-            .icon_name("view-columns-symbolic")
+            .icon_name("view-dual-symbolic")
             .menu_model(&columns_menu)
             .tooltip_text(tr("Columns"))
             .build();
