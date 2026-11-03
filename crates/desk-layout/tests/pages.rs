@@ -654,3 +654,52 @@ fn est_13_a_long_footnote_goes_on_at_the_foot_of_the_next_page() {
     let rule = second.note_rule.expect("a rule").1;
     assert!(second.note_lines[0].origin.1 + second.note_lines[0].line.top > rule);
 }
+
+#[test]
+fn est_13_a_footnote_that_fits_a_page_moves_whole_with_its_mark() {
+    use desk_model::{CharAttrs, Editor, FIELD_CHARACTER, Field, Note, ParaAttrs, Paragraph, Run};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let note_lines = 9;
+    editor
+        .edit("Setup", |edit| {
+            edit.set_page_setup(setup(200.0))?;
+            let before = vec!["line"; 7].join(&LINE_BREAK.to_string());
+            let at = edit.insert_text(start, &before)?;
+            let at = edit.split_paragraph(at)?;
+            let at = edit.insert_text(at, "Text")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            let body = edit.document().styles().default_paragraph();
+            let text = vec!["note"; note_lines].join(&LINE_BREAK.to_string());
+            let id = edit.new_id();
+            let paragraph =
+                Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new(&text)])?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![paragraph].into(),
+                }),
+            )
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let layout = paginate(editor.document(), &mut system);
+    assert_eq!(layout.pages.len(), 2);
+    // As in Pages, the line of the mark goes to the next page, and the
+    // note goes whole with it.
+    let first = &layout.pages[0];
+    assert!(first.note_lines.is_empty());
+    assert!(first.lines.iter().all(|l| l.paragraph == 0));
+    let second = &layout.pages[1];
+    assert!(second.lines.iter().any(|l| l.paragraph == 1));
+    assert_eq!(second.note_lines.len(), note_lines);
+    assert!(second.carried_note.is_none() && first.split_note.is_none());
+}

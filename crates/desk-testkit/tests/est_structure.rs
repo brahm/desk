@@ -132,3 +132,59 @@ fn est_22_est_23_a_table_of_contents_matches_pages() {
 fn est_25_est_26_links_and_bookmarks_match_pages() {
     check("est-25-26-links-bookmarks");
 }
+
+#[test]
+fn est_27_number_formats_of_fields_match_pages() {
+    check("est-27-field-formats");
+}
+
+#[test]
+fn est_27_dates_and_file_names_match_pages() {
+    check("est-27-date-filename");
+}
+
+#[test]
+fn est_12_est_16_headers_of_sections_match_pages() {
+    // The third section starts on a right page, after a blank page.
+    let numbers = check("est-12-16-section-headers");
+    assert_eq!(numbers.len(), 5);
+}
+
+#[test]
+fn est_27_auto_page_numbers_match_pages() {
+    check("est-27-auto-page-numbers");
+}
+
+#[test]
+fn est_22_page_links_of_a_table_of_contents_match_pages() {
+    let (mut reference, desk, _) = render("est-22-toc-page-links");
+    for word in reference.iter_mut().flatten() {
+        if word.text.len() > 1
+            && let Some(text) = word.text.strip_suffix('!')
+        {
+            word.text = text.to_owned();
+        }
+    }
+    assert_eq!(desk.len(), reference.len(), "pages");
+    let diff = compare_words(&reference, &desk);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
+    );
+}
+
+#[test]
+fn est_25_est_26_links_to_mail_and_documents_match_pages() {
+    check("est-25-26-links");
+    check("link-target");
+}
+
+#[test]
+fn est_13_a_long_footnote_moves_with_its_mark_as_in_pages() {
+    check("est-13-footnote-continues");
+}
+
+#[test]
+fn est_12_a_tall_header_pushes_the_body_as_in_pages() {
+    check("est-12-tall-header");
+}

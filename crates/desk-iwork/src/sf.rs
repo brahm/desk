@@ -342,8 +342,11 @@ impl Value {
                     right: get("right"),
                 }
             }
+            // A style of its own, without an identifier, is found by its
+            // object ID, as the TOC Inspector saves the style of entries.
             "paragraphstyle" | "characterstyle" | "tocstyle" => element
                 .attr(SF, "ident")
+                .or_else(|| element.attr(SFA, "ID"))
                 .map_or_else(|| Self::Other("style".into()), |i| Self::StyleRef(i.into())),
             other => Self::Other(other.to_owned()),
         }

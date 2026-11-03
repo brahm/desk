@@ -565,3 +565,133 @@ fn int_15_faces_keep_their_weight() {
     // regular.
     assert_eq!(weights, [100, 700, 400, 500]);
 }
+
+/// The fields and links of every run of some paragraphs, in order.
+fn fields_and_links(
+    paragraphs: impl IntoIterator<Item = desk_model::Paragraph>,
+) -> (Vec<desk_model::Field>, Vec<String>) {
+    let mut fields = Vec::new();
+    let mut links = Vec::new();
+    for paragraph in paragraphs {
+        for run in paragraph.runs() {
+            if let Some(Some(field)) = &run.attrs.field {
+                fields.push(field.clone());
+            }
+            if let Some(Some(link)) = &run.attrs.link
+                && links.last() != Some(&link.to_string())
+            {
+                links.push(link.to_string());
+            }
+        }
+    }
+    (fields, links)
+}
+
+#[test]
+fn est_27_formats_of_fields_saved_by_pages_are_read() {
+    use desk_model::{Field, MarginKind, MarginPages, MarginPlace, NumberFormat};
+    let document = desk_filters::read_pages_at(&fixture("est-27-field-formats.pages")).unwrap();
+    let footer = document
+        .section_headers_footers(None)
+        .get(MarginPlace::new(MarginKind::Footer, MarginPages::Default))
+        .to_vec();
+    let (fields, _) = fields_and_links(footer);
+    assert_eq!(
+        fields,
+        [
+            Field::PageNumber {
+                format: NumberFormat::LowerRoman
+            },
+            Field::PageCount {
+                format: NumberFormat::UpperRoman
+            },
+        ]
+    );
+    let document = desk_filters::read_pages_at(&fixture("est-27-date-filename.pages")).unwrap();
+    let (fields, _) = fields_and_links(document.body().iter().cloned());
+    let shape: Vec<(bool, bool, bool)> = fields
+        .iter()
+        .map(|f| match f {
+            Field::DateTime { update, .. } => (true, *update, false),
+            Field::FileName {
+                path, extension, ..
+            } => (false, *path, *extension),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    // A date that updates and one that does not; a file name with its
+    // folder and extension, and one with neither.
+    assert_eq!(
+        shape,
+        [
+            (true, true, false),
+            (true, false, false),
+            (false, true, true),
+            (false, false, false),
+        ]
+    );
+}
+
+#[test]
+fn est_12_est_16_headers_of_sections_saved_by_pages_are_read() {
+    use desk_model::{MarginKind, MarginPages, MarginPlace};
+    let document =
+        desk_filters::read_pages_at(&fixture("est-12-16-section-headers.pages")).unwrap();
+    assert!(document.page_setup().facing_pages);
+    let sections: Vec<(desk_model::NodeId, Section)> = document
+        .body()
+        .iter()
+        .filter_map(|p| match p.attrs().start.clone().flatten().as_deref() {
+            Some(Start::Section(section, _)) => Some((p.id(), section.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sections.len(), 2);
+    assert!(sections[0].1.own_margins);
+    assert_eq!(sections[0].1.start, SectionStart::AnyPage);
+    assert!(!sections[1].1.own_margins);
+    assert_eq!(sections[1].1.start, SectionStart::RightPage);
+    let header = |section| {
+        document
+            .section_headers_footers(section)
+            .get(MarginPlace::new(MarginKind::Header, MarginPages::Default))
+            .iter()
+            .map(|p| p.text())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(header(None), ["Header one"]);
+    assert_eq!(header(Some(sections[0].0)), ["Header two"]);
+}
+
+#[test]
+fn est_22_est_25_links_saved_by_pages_are_read() {
+    let document = desk_filters::read_pages_at(&fixture("est-22-toc-page-links.pages")).unwrap();
+    let toc = &document.text_settings().toc;
+    assert!(toc.page_links);
+    // Heading 1 shows its page number, Heading 2 does not.
+    let shown = |name: &str| {
+        let style = document
+            .styles()
+            .by_name(StyleFamily::Paragraph, name)
+            .unwrap()
+            .id();
+        toc.levels
+            .iter()
+            .find(|l| l.style == style)
+            .unwrap()
+            .page_number
+    };
+    assert!(shown("Heading 1"));
+    assert!(!shown("Heading 2"));
+    let document = desk_filters::read_pages_at(&fixture("est-25-26-links.pages")).unwrap();
+    let (_, links) = fields_and_links(document.body().iter().cloned());
+    assert_eq!(
+        links,
+        [
+            "https://www.example.com/desk/page.html",
+            "mailto:desk@example.com?subject=Desk%20test%20subject",
+            "#this%20bookmarked%20text",
+            "file:///Users/desk/export/fx/link-target.pages#target",
+        ]
+    );
+}
