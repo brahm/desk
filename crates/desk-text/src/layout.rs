@@ -683,7 +683,10 @@ impl TextSystem {
                         y: baseline - m.underline_offset,
                         thickness: m.underline_size,
                         style: format.underline,
-                        color: format.color,
+                        color: match format.underline_color {
+                            desk_model::LineColor::Text => format.color,
+                            desk_model::LineColor::Custom(color) => color,
+                        },
                     });
                 }
                 if format.strikethrough != LineStyle::None {

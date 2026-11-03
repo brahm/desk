@@ -95,7 +95,7 @@ fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
         let lost = match name.as_str() {
             "listStyle" => matches!(value, Value::ListStyle { images: true, .. })
                 .then_some(Formatting::ImageBullets),
-            "underlineColor" | "word_underline" | "word_strikethrough" => {
+            "word_underline" | "word_strikethrough" => {
                 differs(value, 0.0).then_some(Formatting::LineDetails)
             }
             "dropCap" => differs(value, 0.0).then_some(Formatting::DropCaps),
@@ -230,6 +230,11 @@ fn char_attrs(properties: &Properties) -> CharAttrs {
     }
     attrs.color = match properties.get("fontColor") {
         Some(Value::Color(color)) => Some(rgba(*color)),
+        _ => None,
+    };
+    attrs.underline_color = match properties.get("underlineColor") {
+        Some(Value::Color(color)) => Some(LineColor::Custom(rgba(*color))),
+        Some(Value::Null) => Some(LineColor::Text),
         _ => None,
     };
     attrs.strikethrough_color = match properties.get("strikethruColor") {

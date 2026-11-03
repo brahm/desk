@@ -269,6 +269,10 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
         weight: t.font_weight.map(FontWeight::new),
         italic: t.italic,
         underline: t.underline.map(line_style),
+        underline_color: t.underline_color.map(|c| match c {
+            odf::LineColor::FontColor => LineColor::Text,
+            odf::LineColor::Color(c) => LineColor::Custom(rgba(c)),
+        }),
         strikethrough: t.line_through.map(line_style),
         strikethrough_color: t.line_through_color.map(|c| match c {
             odf::LineColor::FontColor => LineColor::Text,
@@ -348,6 +352,10 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         font_weight: a.weight.map(FontWeight::value),
         italic: a.italic,
         underline: a.underline.map(line),
+        underline_color: a.underline_color.map(|c| match c {
+            LineColor::Text => odf::LineColor::FontColor,
+            LineColor::Custom(c) => odf::LineColor::Color(odf_color(c)),
+        }),
         line_through: a.strikethrough.map(line),
         line_through_color: a.strikethrough_color.map(|c| match c {
             LineColor::Text => odf::LineColor::FontColor,

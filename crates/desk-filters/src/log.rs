@@ -43,8 +43,7 @@ pub enum Content {
 pub enum Formatting {
     /// Bullets that are pictures, drawn as text bullets.
     ImageBullets,
-    /// The color and width of underlines and strikethroughs, and lines
-    /// under words only.
+    /// Underlines and strikethroughs under words only, not the spaces.
     LineDetails,
     /// Drop caps.
     DropCaps,
@@ -127,7 +126,7 @@ impl fmt::Display for Formatting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::ImageBullets => "image bullets, which are drawn as text bullets",
-            Self::LineDetails => "the color and width of lines through and under text",
+            Self::LineDetails => "lines under or through words only",
             Self::DropCaps => "drop caps",
             Self::HiddenText => "hidden text, which is shown",
             Self::FontFeatures => "font features",

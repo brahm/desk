@@ -376,6 +376,8 @@ formatting! {
         italic: bool = false,
         /// Underline (FMT-01).
         underline: LineStyle = LineStyle::None,
+        /// The color of the underline (FMT-01).
+        underline_color: LineColor = LineColor::Text,
         /// Strikethrough (FMT-02).
         strikethrough: LineStyle = LineStyle::None,
         /// The color of the strikethrough (FMT-02).

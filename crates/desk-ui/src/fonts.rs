@@ -16,9 +16,18 @@ use std::sync::Arc;
 
 use adw::prelude::*;
 use desk_model::{
-    CharAttrs, CharFormat, FontFeature, FontFeatures, FontWeight, Length, LineStyle, ParaAttrs,
-    ParaFormat, Rgba, Shadow,
+    CharAttrs, CharFormat, FontFeature, FontFeatures, FontWeight, Length, LineColor, LineStyle,
+    ParaAttrs, ParaFormat, Rgba, Shadow,
 };
+
+/// The color of a line drawn with the text that a row shows: its own when
+/// turned on, else that of the text.
+fn line_color(row: &ColorRow) -> LineColor {
+    match row.value() {
+        Some(color) => LineColor::Custom(color),
+        None => LineColor::Text,
+    }
+}
 
 use crate::effects::{Change, ColorRow, LIGATURES, ligatures_name};
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
@@ -237,6 +246,10 @@ pub struct FontsWindow {
     underline: gtk::DropDown,
     strikethrough: gtk::DropDown,
     color: gtk::ColorDialogButton,
+    /// The colors of the underline and the strikethrough, when they are
+    /// not those of the text (FMT-01, FMT-02).
+    underline_color: ColorRow,
+    strikethrough_color: ColorRow,
     background: ColorRow,
     shadow: adw::SwitchRow,
     opacity: adw::SpinRow,
@@ -342,6 +355,14 @@ impl FontsWindow {
             bar.append(widget);
         }
 
+        let underline_color = ColorRow::new(&tr("Underline Color"), Rgba::rgb(255, 0, 0));
+        underline_color
+            .row
+            .set_subtitle(&tr("Otherwise the color of the text"));
+        let strikethrough_color = ColorRow::new(&tr("Strikethrough Color"), Rgba::rgb(255, 0, 0));
+        strikethrough_color
+            .row
+            .set_subtitle(&tr("Otherwise the color of the text"));
         let background = ColorRow::new(&tr("Paragraph Background"), Rgba::rgb(255, 255, 117));
         let shadow = adw::SwitchRow::builder().title(tr("Shadow")).build();
         let spin = |title: String, subtitle: String, min: f64, max: f64, step: f64| {
@@ -358,6 +379,8 @@ impl FontsWindow {
         let effects = adw::PreferencesGroup::builder()
             .title(tr("Effects"))
             .build();
+        effects.add(&underline_color.row);
+        effects.add(&strikethrough_color.row);
         effects.add(&background.row);
         effects.add(&shadow);
         effects.add(&opacity);
@@ -428,6 +451,8 @@ impl FontsWindow {
             underline,
             strikethrough,
             color,
+            underline_color,
+            strikethrough_color,
             background,
             shadow,
             opacity,
@@ -586,6 +611,27 @@ impl FontsWindow {
             })
         });
         self.color.connect_rgba_notify(move |_| color());
+        let underline_color = character("Underline Color", |this| {
+            this.underline_color
+                .button
+                .set_sensitive(this.underline_color.switch.is_active());
+            Some(CharAttrs {
+                underline_color: Some(line_color(&this.underline_color)),
+                ..CharAttrs::default()
+            })
+        });
+        self.underline_color.connect_changed(underline_color);
+        let strikethrough_color = character("Strikethrough Color", |this| {
+            this.strikethrough_color
+                .button
+                .set_sensitive(this.strikethrough_color.switch.is_active());
+            Some(CharAttrs {
+                strikethrough_color: Some(line_color(&this.strikethrough_color)),
+                ..CharAttrs::default()
+            })
+        });
+        self.strikethrough_color
+            .connect_changed(strikethrough_color);
         self.background.connect_changed(with(
             self,
             Rc::new(|this, editor| {
@@ -727,6 +773,13 @@ impl FontsWindow {
         if self.color.rgba() != color {
             self.color.set_rgba(&color);
         }
+        let custom = |color| match color {
+            LineColor::Custom(color) => Some(color),
+            LineColor::Text => None,
+        };
+        self.underline_color.show(custom(character.underline_color));
+        self.strikethrough_color
+            .show(custom(character.strikethrough_color));
         self.background.show(paragraph.background);
         let shadow = character.shadow;
         self.shadow.set_active(shadow.is_some());
