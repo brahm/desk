@@ -498,6 +498,8 @@ fn full_document() -> TextDocument {
             note_format: Some("symbols".into()),
             note_numbering: Some("page".into()),
             note_gap: Some("20pt".into()),
+            header_margin: Some("18pt".into()),
+            footer_margin: None,
         },
         style_shortcuts: vec![
             StyleShortcut {
