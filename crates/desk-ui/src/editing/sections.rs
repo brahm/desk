@@ -21,6 +21,13 @@ pub fn has_sections_clip() -> bool {
 }
 
 impl TextEditor {
+    /// Whether the pages face each other, a left and a right page (EST-11).
+    pub fn facing_pages(&self) -> bool {
+        Self::main_document(&self.state.borrow())
+            .page_setup()
+            .facing_pages
+    }
+
     /// The section of each page, by its index among the sections.
     pub fn page_sections(&self) -> Vec<usize> {
         let state = self.state.borrow();
