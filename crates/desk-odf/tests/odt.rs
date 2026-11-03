@@ -468,6 +468,12 @@ fn full_document() -> TextDocument {
             page_number: true,
             link: true,
         }],
+        notes_configuration: vec![desk_odf::NotesConfiguration {
+            class: "footnote".into(),
+            num_format: Some("i".into()),
+            start_numbering_at: Some("page".into()),
+            footnotes_position: Some("page".into()),
+        }],
         master_styles: vec![Style {
             name: "MP1".into(),
             family: Family::Paragraph,

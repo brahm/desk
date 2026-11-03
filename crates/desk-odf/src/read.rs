@@ -10,10 +10,10 @@ use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLIN
 use crate::text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
-    ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
-    TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
-    TextShadow, TextTransform, TocLevel,
+    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration, PageLayout,
+    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
+    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    TextSettings, TextShadow, TextTransform, TocLevel,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -65,6 +65,14 @@ pub fn read_streams(
                     document.list_styles.push(list);
                 } else if let Some(section) = section_style(element) {
                     document.section_styles.push(section);
+                } else if element.name.is(TEXT, "notes-configuration") {
+                    let attr = |ns, name| element.attr(ns, name).map(str::to_owned);
+                    document.notes_configuration.push(NotesConfiguration {
+                        class: attr(TEXT, "note-class").unwrap_or_else(|| "footnote".into()),
+                        num_format: attr(STYLE, "num-format"),
+                        start_numbering_at: attr(TEXT, "start-numbering-at"),
+                        footnotes_position: attr(TEXT, "footnotes-position"),
+                    });
                 }
             }
         }
@@ -611,6 +619,8 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("NoteFormat") => out.note_format = Some(text.trim().to_owned()),
                 Some("NoteNumbering") => out.note_numbering = Some(text.trim().to_owned()),
                 Some("NoteGap") => out.note_gap = Some(text.trim().to_owned()),
+                Some("HeaderMargin") => out.header_margin = Some(text.trim().to_owned()),
+                Some("FooterMargin") => out.footer_margin = Some(text.trim().to_owned()),
                 Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
                 Some("NeverHyphenate") => {
                     out.never_hyphenate = text

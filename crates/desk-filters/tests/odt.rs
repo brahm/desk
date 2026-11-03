@@ -1615,3 +1615,52 @@ fn est_12_est_16_est_27_sections_keep_their_headers_and_fields_their_formats() {
         ]
     );
 }
+
+#[test]
+fn est_13_notes_follow_the_configuration_of_other_apps() {
+    use desk_model::{NoteFormat, NoteNumbering};
+    let source = odf::TextDocument {
+        notes_configuration: vec![odf::NotesConfiguration {
+            class: "footnote".into(),
+            num_format: Some("i".into()),
+            start_numbering_at: Some("page".into()),
+            footnotes_position: Some("page".into()),
+        }],
+        ..odf::TextDocument::default()
+    };
+    let document = import(&source).unwrap();
+    let notes = document.text_settings().notes;
+    assert_eq!(notes.format, NoteFormat::Roman);
+    assert_eq!(notes.numbering, NoteNumbering::Page);
+    // And Desk writes it for them.
+    let out = export(&document);
+    let footnotes = out
+        .notes_configuration
+        .iter()
+        .find(|c| c.class == "footnote")
+        .unwrap();
+    assert_eq!(footnotes.num_format.as_deref(), Some("i"));
+    assert_eq!(footnotes.start_numbering_at.as_deref(), Some("page"));
+}
+
+#[test]
+fn est_12_the_header_margin_is_kept_while_headers_are_off() {
+    use desk_model::{Editor, Length};
+    let mut editor = Editor::new(desk_model::Document::new_word_processing());
+    editor
+        .edit("Margins", |edit| {
+            let mut setup = *edit.document().page_setup();
+            setup.headers = false;
+            setup.footers = false;
+            setup.header_margin = Length::from_points(20);
+            setup.footer_margin = Length::from_points(50);
+            edit.set_page_setup(setup)
+        })
+        .unwrap();
+    let read = read_odt(&write_odt(editor.document()).unwrap()).unwrap();
+    let setup = read.page_setup();
+    assert!(!setup.headers && !setup.footers);
+    assert_eq!(setup.header_margin, Length::from_points(20));
+    assert_eq!(setup.footer_margin, Length::from_points(50));
+    assert_eq!(setup.margin_top, editor.document().page_setup().margin_top);
+}

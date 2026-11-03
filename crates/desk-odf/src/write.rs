@@ -92,6 +92,20 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for style in &document.list_styles {
         write_list_style(&mut w, style);
     }
+    for notes in &document.notes_configuration {
+        w.start("text:notes-configuration")
+            .attr("text:note-class", &notes.class);
+        if let Some(format) = &notes.num_format {
+            w.attr("style:num-format", format);
+        }
+        if let Some(at) = &notes.start_numbering_at {
+            w.attr("text:start-numbering-at", at);
+        }
+        if let Some(position) = &notes.footnotes_position {
+            w.attr("text:footnotes-position", position);
+        }
+        w.end();
+    }
     w.end();
     w.start("office:automatic-styles");
     for style in &document.master_styles {
@@ -179,6 +193,8 @@ fn write_settings(document: &TextDocument) -> Option<String> {
             ("NoteFormat", &text.note_format),
             ("NoteNumbering", &text.note_numbering),
             ("NoteGap", &text.note_gap),
+            ("HeaderMargin", &text.header_margin),
+            ("FooterMargin", &text.footer_margin),
         ] {
             if let Some(value) = value {
                 config_item(&mut w, name, "string", value);

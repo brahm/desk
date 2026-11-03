@@ -1127,6 +1127,18 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         setup.footer_margin = setup.margin_bottom;
         setup.margin_bottom = setup.margin_bottom + size(style);
     }
+    // Where a header or footer that is off would go, which Desk keeps.
+    let kept = |value: &Option<String>| value.as_deref().and_then(odf::Length::parse).map(length);
+    if !setup.headers
+        && let Some(margin) = kept(&source.text_settings.header_margin)
+    {
+        setup.header_margin = margin;
+    }
+    if !setup.footers
+        && let Some(margin) = kept(&source.text_settings.footer_margin)
+    {
+        setup.footer_margin = margin;
+    }
     // The columns of the pages are the layout outside any section.
     let page_layout = Layout {
         columns: page.columns.as_ref().map_or(desk_model::Columns::ONE, |c| {
@@ -1440,7 +1452,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             } else {
                 ParagraphSpacing::Sum
             },
-            notes: note_settings(text, &source.body),
+            notes: note_settings(text, &source.body, &source.notes_configuration),
             toc: TocSettings {
                 levels: source
                     .toc_levels
@@ -1480,8 +1492,32 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
 /// How the notes of a document show, from the settings Desk keeps, or as
 /// the notes of other programs' files are: endnotes at the end of the
 /// document when they are endnotes.
-fn note_settings(text: &odf::TextSettings, body: &[odf::Paragraph]) -> NoteSettings {
+fn note_settings(
+    text: &odf::TextSettings,
+    body: &[odf::Paragraph],
+    configuration: &[odf::NotesConfiguration],
+) -> NoteSettings {
     let defaults = NoteSettings::default();
+    // What other apps say, when Desk's own settings do not.
+    let footnotes = configuration.iter().find(|c| c.class == "footnote");
+    let format = text.note_format.clone().or_else(|| {
+        match footnotes.and_then(|c| c.num_format.as_deref()) {
+            Some("i" | "I") => Some("roman".to_owned()),
+            _ => None,
+        }
+    });
+    let numbering = text.note_numbering.clone().or_else(|| {
+        match footnotes.and_then(|c| c.start_numbering_at.as_deref()) {
+            Some("page") => Some("page".to_owned()),
+            Some("chapter") => Some("section".to_owned()),
+            _ => None,
+        }
+    });
+    let text = &odf::TextSettings {
+        note_format: format,
+        note_numbering: numbering,
+        ..text.clone()
+    };
     let endnotes = body
         .iter()
         .flat_map(|p| &p.spans)
@@ -1510,6 +1546,31 @@ fn note_settings(text: &odf::TextSettings, body: &[odf::Paragraph]) -> NoteSetti
             .and_then(odf::Length::parse)
             .map_or(defaults.gap, length),
     }
+}
+
+/// The configuration of footnotes and endnotes that other apps read: how
+/// they are numbered, and where footnotes go.
+fn notes_configuration(settings: NoteSettings) -> Vec<odf::NotesConfiguration> {
+    let num_format = match settings.format {
+        NoteFormat::Arabic => Some("1"),
+        NoteFormat::Roman => Some("i"),
+        // ODF has no symbols: other apps number them.
+        NoteFormat::Symbols => None,
+    };
+    let start = match settings.numbering {
+        NoteNumbering::Continuous => "document",
+        NoteNumbering::Page => "page",
+        NoteNumbering::Section => "chapter",
+    };
+    ["footnote", "endnote"]
+        .into_iter()
+        .map(|class| odf::NotesConfiguration {
+            class: class.to_owned(),
+            num_format: num_format.map(str::to_owned),
+            start_numbering_at: Some(start.to_owned()),
+            footnotes_position: (class == "footnote").then(|| "page".to_owned()),
+        })
+        .collect()
 }
 
 /// The settings Desk keeps for the notes of a document, when they are not
@@ -2178,6 +2239,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             links_inactive: settings.links_inactive.then_some(true),
             ..odf_note_settings(settings.notes)
         },
+        notes_configuration: notes_configuration(settings.notes),
         ..odf::TextDocument::default()
     };
     out.toc_levels = settings
@@ -2581,14 +2643,19 @@ pub fn export(document: &Document) -> odf::TextDocument {
         min_height: Some(odf_length(Length::from_pt((body - edge).to_pt().max(0.0)))),
         spacing: Some(odf::Length(0.0)),
     };
+    let default = PageSetup::DEFAULT_HEADER_MARGIN;
     if out.master.header.as_ref().is_some_and(|h| h.display) {
         out.page_layout.margin_top = Some(odf_length(page.header_margin.min(page.margin_top)));
         out.page_layout.header = Some(room(page.margin_top, page.header_margin));
+    } else if page.header_margin != default {
+        out.text_settings.header_margin = Some(odf_length(page.header_margin).to_string());
     }
     if out.master.footer.as_ref().is_some_and(|f| f.display) {
         out.page_layout.margin_bottom =
             Some(odf_length(page.footer_margin.min(page.margin_bottom)));
         out.page_layout.footer = Some(room(page.margin_bottom, page.footer_margin));
+    } else if page.footer_margin != default {
+        out.text_settings.footer_margin = Some(odf_length(page.footer_margin).to_string());
     }
     let meta = document.metadata();
     let some = |s: &str| (!s.is_empty()).then(|| s.to_owned());

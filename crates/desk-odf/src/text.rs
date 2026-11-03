@@ -62,6 +62,23 @@ pub struct TextDocument {
     /// What the tables of contents list (`text:table-of-content-source`),
     /// level by level: those of the first table, written in each.
     pub toc_levels: Vec<TocLevel>,
+    /// How footnotes and endnotes are numbered and where they go
+    /// (`text:notes-configuration`), as other apps read them.
+    pub notes_configuration: Vec<NotesConfiguration>,
+}
+
+/// The configuration of the footnotes or the endnotes of a document
+/// (`text:notes-configuration`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct NotesConfiguration {
+    /// `text:note-class`: `footnote` or `endnote`.
+    pub class: String,
+    /// `style:num-format`, such as `1` or `i`.
+    pub num_format: Option<String>,
+    /// `text:start-numbering-at`: `document`, `chapter` or `page`.
+    pub start_numbering_at: Option<String>,
+    /// `text:footnotes-position`: `text`, `page`, `section` or `document`.
+    pub footnotes_position: Option<String>,
 }
 
 /// A level of a table of contents: the paragraphs of a style
@@ -211,6 +228,12 @@ pub struct TextSettings {
     pub note_gap: Option<String>,
     /// Whether links do nothing when clicked.
     pub links_inactive: Option<bool>,
+    /// How far the header is from the top of the paper, as `36pt`, while
+    /// the pages show none, which ODF has no place for.
+    pub header_margin: Option<String>,
+    /// How far the footer is from the bottom of the paper, while the pages
+    /// show none.
+    pub footer_margin: Option<String>,
 }
 
 /// A list style (`text:list-style`).
