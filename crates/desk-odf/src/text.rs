@@ -45,6 +45,9 @@ pub struct TextDocument {
     pub automatic_list_styles: Vec<ListStyle>,
     /// The settings of the text that Desk keeps in `settings.xml`.
     pub text_settings: TextSettings,
+    /// How the document showed when it was saved, from the view settings
+    /// of `settings.xml`.
+    pub view: ViewSettings,
     /// The pictures of the package that the document links to, by path,
     /// as `Pictures/bullet1.png`, with their bytes.
     pub pictures: Vec<(String, Vec<u8>)>,
@@ -200,6 +203,28 @@ pub struct SectionStyle {
     pub first_page_different: Option<bool>,
     /// `desk:left-right-different`.
     pub left_right_different: Option<bool>,
+}
+
+/// How a document shows, as the first view of `ooo:view-settings` in
+/// `settings.xml` says, with the items that LibreOffice writes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ViewSettings {
+    /// `ZoomType`: 0 for a percentage, 2 for a whole page, 3 for the
+    /// width of the page.
+    pub zoom_type: Option<i16>,
+    /// `ZoomFactor`, the percentage.
+    pub zoom_factor: Option<i16>,
+    /// `ViewLayoutColumns`: how many pages show side by side.
+    pub columns: Option<i16>,
+    /// `DeskOutlineView`: whether Desk shows the document as an outline.
+    pub outline: Option<bool>,
+}
+
+impl ViewSettings {
+    /// Whether it says nothing.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 /// The settings of the text of a document, which ODF has no place for and

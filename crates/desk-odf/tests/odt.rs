@@ -513,6 +513,12 @@ fn full_document() -> TextDocument {
                 style: "Emphasis".into(),
             },
         ],
+        view: desk_odf::ViewSettings {
+            zoom_type: Some(3),
+            zoom_factor: Some(100),
+            columns: Some(2),
+            outline: Some(true),
+        },
     }
 }
 

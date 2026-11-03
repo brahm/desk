@@ -28,6 +28,30 @@ pub struct Metadata {
     pub keywords: Vec<String>,
 }
 
+/// The zoom of a document window (INT-07, INT-08).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ViewZoom {
+    /// A percentage.
+    Percent(u16),
+    /// The pages fill the width of the window.
+    FitWidth,
+    /// A whole page shows.
+    FitPage,
+}
+
+/// How a document shows in its window, which it keeps when it is saved
+/// (INT-08, DOC-16). It is not content: two documents that show
+/// differently are equal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ViewSettings {
+    /// The zoom.
+    pub zoom: ViewZoom,
+    /// Whether two pages show side by side.
+    pub two_pages: bool,
+    /// Whether it shows as an outline (TXT-14).
+    pub outline: bool,
+}
+
 /// Settings of the text of the whole document: whether words are
 /// hyphenated and ligatures used at all (TXT-09, FMT-09), and the words
 /// that are never hyphenated.
@@ -280,6 +304,7 @@ pub struct Document {
     ids: IdAllocator,
     metadata: Metadata,
     text_settings: TextSettings,
+    view: Option<ViewSettings>,
     styles: Styles,
     container: Container,
 }
@@ -308,6 +333,7 @@ impl Document {
             ids,
             metadata: Metadata::default(),
             text_settings: TextSettings::default(),
+            view: None,
             styles: Styles::new(ParagraphStyle::new(body_style, "Body")),
             container: Container::Pages(PagedFlow {
                 page: PageSetup::default(),
@@ -324,9 +350,25 @@ impl Document {
         self.ids.allocate()
     }
 
+    /// Never hands out an identifier that a copy of the document did.
+    pub(crate) fn follow_ids(&mut self, copy: &Document) {
+        self.ids.follow(&copy.ids);
+    }
+
     /// The metadata.
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
+    }
+
+    /// How the document was shown when it was saved, if it says.
+    pub fn view(&self) -> Option<ViewSettings> {
+        self.view
+    }
+
+    /// Sets how the document shows, to save with it. It is not content,
+    /// and has no place in the history.
+    pub fn set_view(&mut self, view: Option<ViewSettings>) {
+        self.view = view;
     }
 
     /// The settings of the text of the whole document.
@@ -351,7 +393,7 @@ impl Document {
         }
     }
 
-    fn body_mut(&mut self) -> &mut TextFlow {
+    pub(crate) fn body_mut(&mut self) -> &mut TextFlow {
         match &mut self.container {
             Container::Pages(flow) => &mut flow.body,
         }

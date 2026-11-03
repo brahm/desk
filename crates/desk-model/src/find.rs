@@ -16,6 +16,7 @@ use crate::document::Document;
 use crate::error::ModelError;
 use crate::id::NodeId;
 use crate::op::Op;
+use crate::story::Story;
 use crate::text::{Position, Run};
 use crate::transaction::Edit;
 
@@ -39,6 +40,9 @@ pub struct Found {
     pub index: usize,
     /// The range in the paragraph, in bytes.
     pub range: Range<usize>,
+    /// The header, footer or note it is in, or none for the body; the
+    /// index is then that of the paragraph in it.
+    pub story: Option<Story>,
 }
 
 impl Found {
@@ -129,18 +133,38 @@ impl Query {
 impl Document {
     /// Everything that a search finds in the body, in order.
     pub fn find(&self, query: &Query) -> Vec<Found> {
-        let mut out = Vec::new();
-        for (index, paragraph) in self.body().iter().enumerate() {
-            for range in query.matches_in(&paragraph.text()) {
-                out.push(Found {
-                    paragraph: paragraph.id(),
-                    index,
-                    range,
-                });
-            }
+        find_in(self.body().iter(), None, query)
+    }
+
+    /// Everything that a search finds in the body, and then in each of
+    /// some headers, footers and notes, in order (TXT-12).
+    pub fn find_everywhere(&self, query: &Query, stories: &[Story]) -> Vec<Found> {
+        let mut out = self.find(query);
+        for &story in stories {
+            let paragraphs = self.story_paragraphs(story);
+            out.extend(find_in(paragraphs.iter(), Some(story), query));
         }
         out
     }
+}
+
+fn find_in<'a>(
+    paragraphs: impl Iterator<Item = &'a crate::text::Paragraph>,
+    story: Option<Story>,
+    query: &Query,
+) -> Vec<Found> {
+    let mut out = Vec::new();
+    for (index, paragraph) in paragraphs.enumerate() {
+        for range in query.matches_in(&paragraph.text()) {
+            out.push(Found {
+                paragraph: paragraph.id(),
+                index,
+                range,
+                story,
+            });
+        }
+    }
+    out
 }
 
 impl Edit {
@@ -181,6 +205,33 @@ impl Edit {
             self.replace_found(piece, with)?;
         }
         Ok(found.len())
+    }
+
+    /// Replaces everything a search finds in the body and in some
+    /// headers, footers and notes (Replace All), and gives how many
+    /// pieces were replaced.
+    pub fn replace_everywhere(
+        &mut self,
+        query: &Query,
+        with: &str,
+        stories: &[Story],
+    ) -> Result<usize, ModelError> {
+        let mut count = self.replace_all(query, with)?;
+        for &story in stories {
+            let paragraphs = self.document().story_paragraphs(story);
+            if find_in(paragraphs.iter(), None, query).is_empty() {
+                continue;
+            }
+            let mut copy = self.document().with_body(paragraphs);
+            let mut replaced = 0;
+            copy.transact("Replace All", |edit| {
+                replaced = edit.replace_all(query, with)?;
+                Ok(())
+            })?;
+            count += replaced;
+            self.set_story(story, copy.body().iter().cloned().collect())?;
+        }
+        Ok(count)
     }
 }
 

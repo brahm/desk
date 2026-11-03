@@ -65,4 +65,9 @@ impl IdAllocator {
     pub(crate) fn observe(&mut self, id: NodeId) {
         self.next = self.next.max(id.get() + 1);
     }
+
+    /// Never allocates what another allocator has handed out.
+    pub(crate) fn follow(&mut self, other: &Self) {
+        self.next = self.next.max(other.next);
+    }
 }

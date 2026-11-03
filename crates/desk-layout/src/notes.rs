@@ -64,6 +64,11 @@ impl NotePlan {
         }
     }
 
+    /// The notes, in the order that the body refers to them.
+    pub fn note_ids(&self) -> Vec<NodeId> {
+        self.refs.iter().map(|&(_, _, id)| id).collect()
+    }
+
     /// Whether the numbers of the notes depend on their pages.
     pub fn numbered_by_page(&self, _document: &Document) -> bool {
         self.settings.numbering == NoteNumbering::Page && !self.refs.is_empty()
@@ -174,10 +179,12 @@ impl NotePlan {
                 for (index, &(paragraph, offset, _)) in self.refs.iter().enumerate() {
                     refs[paragraph].push((offset, index));
                 }
+                let mut parts = Vec::with_capacity(notes.len());
                 let laid = notes
                     .iter()
                     .map(|texts| {
                         let mut lines = Vec::new();
+                        let mut part = Vec::new();
                         let mut y = 0.0f32;
                         for (i, text) in texts.iter().enumerate() {
                             let format = text.paragraph();
@@ -192,16 +199,19 @@ impl NotePlan {
                             for line in &laid {
                                 y = dy + line.top + line.height;
                                 lines.push((line.clone(), dy));
+                                part.push(i);
                             }
                             y += format.space_after.to_pt() as f32
                                 * f32::from(u8::from(i + 1 < texts.len()));
                         }
+                        parts.push(part);
                         (lines, y)
                     })
                     .collect();
                 let footnotes = Rc::new(Footnotes {
                     refs,
                     notes: laid,
+                    parts,
                     gap,
                 });
                 paginate_with_footnotes(setup, &body, system, sum, Some(footnotes), Some(&room))
@@ -251,7 +261,7 @@ impl NotePlan {
         // Endnotes of the document follow its text with no more room than
         // between notes; those of sections take a rule above them.
         let rule = self.settings.kind == NoteKind::SectionEndnotes;
-        let mut sources: Vec<Result<usize, (usize, bool)>> = Vec::new();
+        let mut sources: Vec<Result<usize, (usize, usize, bool)>> = Vec::new();
         let mut notes: Vec<Option<Vec<ParagraphText>>> = notes.into_iter().map(Some).collect();
         let mut body = body.into_iter().map(Some).collect::<Vec<_>>();
         let mut next = 0;
@@ -280,7 +290,7 @@ impl NotePlan {
                             format.space_before = desk_model::Length::from_pt(f64::from(above));
                         }
                         flow.push(text);
-                        sources.push(Err((index, starts && rule)));
+                        sources.push(Err((index, i, starts && rule)));
                     }
                 }
             }
@@ -306,12 +316,13 @@ impl NotePlan {
                         line.paragraph = paragraph;
                         page.lines.push(line);
                     }
-                    Err((note, ruled)) => {
+                    Err((note, part, ruled)) => {
                         if ruled && line.index == 0 {
                             page.note_rule = Some((page.margins.0, line.top() - NOTE_RULE_BELOW));
                         }
                         line.paragraph = note;
                         page.note_lines.push(line);
+                        page.note_parts.push(part);
                     }
                 }
             }

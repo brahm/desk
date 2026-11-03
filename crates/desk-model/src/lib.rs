@@ -43,6 +43,7 @@
 //! # Ok::<(), desk_model::ModelError>(())
 //! ```
 
+mod arrange;
 mod auto_numbers;
 mod autocorrect;
 mod document;
@@ -54,8 +55,10 @@ mod id;
 mod list;
 mod note;
 mod op;
+mod outline;
 mod picture;
 mod section;
+mod story;
 mod style;
 mod styling;
 mod text;
@@ -63,10 +66,12 @@ mod toc;
 mod transaction;
 mod units;
 
+pub use arrange::SectionsClip;
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
 pub use document::{
-    Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics, TextSettings,
+    Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics,
+    TextSettings, ViewSettings, ViewZoom,
 };
 pub use error::ModelError;
 pub use find::{Found, Query};
@@ -87,8 +92,10 @@ pub use list::{
 };
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use op::Op;
+pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::Picture;
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
+pub use story::Story;
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
 pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};

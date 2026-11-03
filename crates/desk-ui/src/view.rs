@@ -21,6 +21,10 @@ use crate::text_nav::{CaretRect, Invisible, InvisibleMark, SpanRect};
 struct State {
     pages: Vec<DisplayList>,
     zoom: f64,
+    /// One page to a row, or two side by side (INT-08).
+    columns: usize,
+    /// Whether the zoom follows the size of the window (INT-08).
+    fit: Option<geometry::Fit>,
     painter: Option<Painter>,
     on_zoom: Vec<Box<dyn Fn(f64)>>,
     on_pages: Vec<Box<dyn Fn()>>,
@@ -83,6 +87,8 @@ impl DocumentView {
         let state = Rc::new(RefCell::new(State {
             pages: Vec::new(),
             zoom: geometry::DEFAULT_ZOOM,
+            columns: 1,
+            fit: None,
             painter: Painter::new().ok(),
             on_zoom: Vec::new(),
             on_pages: Vec::new(),
@@ -103,6 +109,15 @@ impl DocumentView {
         };
         view.connect_drawing();
         view.connect_zoom_gestures();
+        // A zoom that fits the window follows it.
+        for adjustment in [view.scrolled.hadjustment(), view.scrolled.vadjustment()] {
+            let weak = view.downgrade();
+            adjustment.connect_page_size_notify(move |_| {
+                if let Some(view) = weak.upgrade() {
+                    view.refit();
+                }
+            });
+        }
         view
     }
 
@@ -201,19 +216,48 @@ impl DocumentView {
             .enumerate()
             .min_by(|(_, a), (_, b)| {
                 let d = |r: &&PageRect| {
-                    if y < r.y {
+                    let dy = if y < r.y {
                         r.y - y
                     } else if y > r.y + r.height {
                         y - r.y - r.height
                     } else {
                         0.0
-                    }
+                    };
+                    // Two pages side by side are as far down.
+                    let dx = if x < r.x {
+                        r.x - x
+                    } else if x > r.x + r.width {
+                        x - r.x - r.width
+                    } else {
+                        0.0
+                    };
+                    dy + dx
                 };
                 d(a).total_cmp(&d(b))
             })?
             .0;
         let rect = rects[index];
         Some((index, (x - rect.x) / scale, (y - rect.y) / scale))
+    }
+
+    /// The page in the middle of the part of the view in sight.
+    pub fn current_page(&self) -> Option<usize> {
+        let (h, v) = (self.scrolled.hadjustment(), self.scrolled.vadjustment());
+        self.page_at(
+            h.value() + h.page_size() / 2.0,
+            v.value() + v.page_size() / 3.0,
+        )
+        .map(|(page, _, _)| page)
+    }
+
+    /// Scrolls so that the top of a page is at the top of the view.
+    pub fn scroll_to_page(&self, page: usize) {
+        let (rects, _, _) = self.layout(f64::from(self.area.width()));
+        if let Some(rect) = rects.get(page) {
+            self.scrolled
+                .vadjustment()
+                .set_value(rect.y - geometry::PAGE_GAP / 2.0);
+        }
     }
 
     /// Where a point of a page falls in the area.
@@ -302,8 +346,52 @@ impl DocumentView {
         self.state.borrow().zoom
     }
 
-    /// Sets the zoom, keeping the middle of the view where it was.
+    /// Sets the zoom, keeping the middle of the view where it was. The
+    /// zoom no longer follows the window.
     pub fn set_zoom(&self, zoom: f64) {
+        self.state.borrow_mut().fit = None;
+        self.apply_zoom(zoom);
+    }
+
+    /// Makes the zoom fit the window, and follow it, or not.
+    pub fn set_fit(&self, fit: Option<geometry::Fit>) {
+        self.state.borrow_mut().fit = fit;
+        self.refit();
+    }
+
+    /// How the zoom follows the window, if it does.
+    pub fn fit(&self) -> Option<geometry::Fit> {
+        self.state.borrow().fit
+    }
+
+    /// Shows one page to a row, or two side by side (INT-08).
+    pub fn set_columns(&self, columns: usize) {
+        let columns = columns.clamp(1, 2);
+        if self.columns() == columns {
+            return;
+        }
+        self.state.borrow_mut().columns = columns;
+        self.resize();
+        self.refit();
+    }
+
+    /// How many pages show side by side.
+    pub fn columns(&self) -> usize {
+        self.state.borrow().columns
+    }
+
+    fn refit(&self) {
+        let zoom = match self.fit() {
+            Some(geometry::Fit::Width) => self.fit_width_zoom(),
+            Some(geometry::Fit::Page) => self.fit_page_zoom(),
+            None => return,
+        };
+        if self.scrolled.width() > 0 {
+            self.apply_zoom(zoom);
+        }
+    }
+
+    fn apply_zoom(&self, zoom: f64) {
         let zoom = zoom.clamp(geometry::ZOOM_LEVELS[0], geometry::ZOOM_LEVELS[8]);
         let old = self.zoom();
         if (zoom - old).abs() < 1e-9 {
@@ -330,7 +418,7 @@ impl DocumentView {
     /// The zoom at which the widest page fills the width of the view.
     pub fn fit_width_zoom(&self) -> f64 {
         let (width, _) = self.largest_page();
-        geometry::fit_width(width, f64::from(self.scrolled.width()))
+        geometry::fit_width(width, f64::from(self.scrolled.width()), self.columns())
     }
 
     /// The zoom at which a whole page fits in the view.
@@ -341,6 +429,7 @@ impl DocumentView {
             height,
             f64::from(self.scrolled.width()),
             f64::from(self.scrolled.height()),
+            self.columns(),
         )
     }
 
@@ -365,7 +454,7 @@ impl DocumentView {
     }
 
     fn layout(&self, area_width: f64) -> (Vec<PageRect>, f64, f64) {
-        geometry::place_pages(&self.sizes(), self.zoom(), area_width)
+        geometry::place_pages(&self.sizes(), self.zoom(), area_width, self.columns())
     }
 
     fn resize(&self) {
@@ -388,7 +477,8 @@ impl DocumentView {
                 .iter()
                 .map(|p| (f64::from(p.width), f64::from(p.height)))
                 .collect();
-            let (rects, _, _) = geometry::place_pages(&sizes, state.zoom, f64::from(width));
+            let (rects, _, _) =
+                geometry::place_pages(&sizes, state.zoom, f64::from(width), state.columns);
             let vadj = scrolled.vadjustment();
             let (top, bottom) = (vadj.value(), vadj.value() + vadj.page_size());
             let scale = state.zoom * PIXELS_PER_POINT;

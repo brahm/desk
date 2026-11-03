@@ -33,6 +33,7 @@ mod links;
 mod links_pane;
 mod lists_pane;
 mod notes_pane;
+mod outline_view;
 mod preferences;
 mod properties;
 mod ruler;
@@ -42,6 +43,7 @@ mod spelling_window;
 mod styles_drawer;
 mod tab_stops;
 pub mod text_nav;
+mod thumbnails;
 mod view;
 mod warnings;
 mod window;
@@ -192,6 +194,11 @@ pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, Strin
     })
 }
 
+/// Calls `f` with the fonts of the system.
+pub(crate) fn with_text_system<T>(f: impl FnOnce(&mut TextSystem) -> T) -> T {
+    TEXT.with(|text| f(&mut text.borrow_mut()))
+}
+
 /// Lays out a document on pages, with the fonts of the system.
 pub(crate) fn lay_out(document: &Document) -> desk_layout::DocumentLayout {
     TEXT.with(|text| desk_layout::paginate(document, &mut text.borrow_mut()))
@@ -282,6 +289,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.paste-style", &["<Control><Alt>v"]),
             ("win.paste-match-style", &["<Control><Shift><Alt>v"]),
             ("win.inspector", &["<Control><Alt>i"]),
+            ("win.thumbnails", &["F9"]),
             ("win.fonts", &["<Control>t"]),
             ("win.find", &["<Control>f"]),
             ("win.find-next", &["<Control>g"]),
@@ -332,7 +340,11 @@ fn load_css() {
     provider.load_from_string(
         ".desk-document { background-color: alpha(@window_fg_color, 0.1); }\n\
          .desk-ruler { background-color: @headerbar_bg_color; \
-         box-shadow: inset 0 -1px alpha(@window_fg_color, 0.15); }",
+         box-shadow: inset 0 -1px alpha(@window_fg_color, 0.15); }\n\
+         .desk-thumb-section { padding: 6px; border-radius: 8px; \
+         border: 2px solid transparent; }\n\
+         .desk-thumb-section.selected { border-color: #f5c211; \
+         background-color: alpha(#f5c211, 0.15); }",
     );
     gtk::style_context_add_provider_for_display(
         &display,

@@ -437,6 +437,7 @@ def main():
         writer.terminate()
         writer.wait(timeout=10)
     selections_and_colors(work)
+    header_on_the_page(work)
     print("All UI tests passed.")
 
 
@@ -564,6 +565,86 @@ def selections_and_colors(work):
             writer.wait(timeout=10)
         portal.terminate()
         portal.wait(timeout=10)
+
+
+def header_on_the_page(work):
+    """A click above the body puts the cursor in the header, where text is
+    typed as in the body, and Esc takes it back (EST-12)."""
+    letter = work / "Header.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "Header.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Header.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Header.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        x = int(window["X"]) + int(window["WIDTH"]) // 2
+        middle = int(window["Y"]) + int(window["HEIGHT"]) // 2
+        # The line of the letter is in the middle of the window, which the
+        # page fills; going up from it, a click comes to the header.
+        in_header = False
+        for y in range(middle, int(window["Y"]), -8):
+            click(x, y)
+            if text_of(document) == "\n":
+                in_header = True
+                break
+        check("a click above the body puts the cursor in the header", in_header)
+        type_text("Topo")
+        wait_for("the text typed in the header", lambda: text_of(document) == "Topo\n")
+        press("Escape")
+        wait_for("the body again", lambda: text_of(document) == "US Letter, landscape\n")
+        press("ctrl+s")
+
+        def saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    styles = package.read("styles.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return None
+            return styles if "Topo" in styles else None
+
+        styles = wait_for("the saved file", saved)
+        check(
+            "the header holds the text typed (EST-12)",
+            re.search(r"<style:header>.*Topo.*</style:header>", styles, re.S) is not None,
+        )
+        # The whole visit is one action of the body.
+        press("ctrl+z")
+        press("ctrl+s")
+
+        def undone():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    styles = package.read("styles.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return False
+            return "Topo" not in styles
+
+        wait_for("the file saved again", undone)
+        check("Undo takes back the header as one action", text_of(document) == "US Letter, landscape\n")
+
+        # F9 shows the thumbnails of the pages (INT-19).
+        press("F9")
+        wait_for(
+            "the thumbnail of the first page",
+            lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
+        )
+        check("F9 shows the page thumbnails (INT-19)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
 
 
 if __name__ == "__main__":

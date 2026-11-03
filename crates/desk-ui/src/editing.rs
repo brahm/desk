@@ -28,6 +28,17 @@ use crate::i18n::tr;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
+mod navigate;
+mod outline;
+mod sections;
+mod stories;
+
+pub use navigate::Navigate;
+pub use outline::OutlineRow;
+pub use sections::has_sections_clip;
+
+use desk_model::Story;
+
 /// A break that Insert puts at the cursor (EST-04, EST-08, EST-09,
 /// EST-16).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,6 +99,7 @@ fn autocorrect(
         paragraph: at.paragraph,
         index: 0,
         range: correction.range.clone(),
+        story: None,
     };
     let end = edit.replace_found(&found, &correction.text)?;
     if let Some(raised) = &correction.superscript {
@@ -128,6 +140,7 @@ fn accept_single_suggestion(
         paragraph: at.paragraph,
         index: 0,
         range: mistake.range.clone(),
+        story: None,
     };
     let end = edit.replace_found(&found, suggestion)?;
     Ok(desk_model::Position::new(at.paragraph, end.offset))
@@ -392,6 +405,9 @@ struct State {
     /// The cursor at the end of a word being typed, which the spelling
     /// checker leaves unmarked until the cursor leaves it.
     squiggle_skip: Option<Spot>,
+    /// The header, footer or note being edited on the page, while the
+    /// editor edits a copy of it (EST-12, EST-13).
+    story: Option<stories::StoryMode>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -502,6 +518,7 @@ impl TextEditor {
                 adding: false,
                 squiggle_skip: None,
                 file_name: String::new(),
+                story: None,
             })),
         };
         this.show_pages();
@@ -516,23 +533,32 @@ impl TextEditor {
 
     /// The document as it is now.
     pub fn document(&self) -> Document {
-        self.state.borrow().editor.snapshot()
+        let state = self.state.borrow();
+        match &state.story {
+            Some(mode) => mode.main.snapshot(),
+            None => state.editor.snapshot(),
+        }
     }
 
     /// The pages as they are now.
     pub fn pages(&self) -> Vec<DisplayList> {
-        DisplayList::pages(&self.state.borrow().layout)
+        let state = self.state.borrow();
+        DisplayList::pages(Self::main_layout(&state))
     }
 
     /// The number of words of the document.
     pub fn word_count(&self) -> usize {
-        self.state.borrow().editor.document().statistics().words
+        Self::main_document(&self.state.borrow()).statistics().words
     }
 
     /// Whether the document has changed since it was saved or opened.
     pub fn is_modified(&self) -> bool {
         let state = self.state.borrow();
-        state.undo.last().map(|a| a.2) != state.saved
+        let last = match &state.story {
+            Some(mode) => state.undo.last().or(mode.undo.last()),
+            None => state.undo.last(),
+        };
+        last.map(|a| a.2) != state.saved
     }
 
     /// Notes that the document as it is now was saved. The next letter
@@ -540,7 +566,11 @@ impl TextEditor {
     pub fn mark_saved(&self) {
         {
             let mut state = self.state.borrow_mut();
-            state.saved = state.undo.last().map(|a| a.2);
+            let last = match &state.story {
+                Some(mode) => state.undo.last().or(mode.undo.last()),
+                None => state.undo.last(),
+            };
+            state.saved = last.map(|a| a.2);
             state.typing = false;
         }
         self.changed();
@@ -548,12 +578,22 @@ impl TextEditor {
 
     /// Whether Undo has something to take back.
     pub fn can_undo(&self) -> bool {
-        self.state.borrow().editor.undo_name().is_some()
+        let state = self.state.borrow();
+        state.editor.undo_name().is_some()
+            || state
+                .story
+                .as_ref()
+                .is_some_and(|m| m.main.undo_name().is_some())
     }
 
     /// Whether Redo has something to bring back.
     pub fn can_redo(&self) -> bool {
-        self.state.borrow().editor.redo_name().is_some()
+        let state = self.state.borrow();
+        state.editor.redo_name().is_some()
+            || state
+                .story
+                .as_ref()
+                .is_some_and(|m| m.main.redo_name().is_some())
     }
 
     /// Calls `f` after every change of the document.
@@ -748,6 +788,10 @@ impl TextEditor {
     /// Undoes the last action.
     pub fn undo(&self) {
         self.state.borrow_mut().typing = false;
+        if self.story().is_some() && self.state.borrow().undo.is_empty() {
+            // Nothing left of the visit: Undo goes on in the body.
+            self.leave_story(None);
+        }
         let restored = {
             let mut state = self.state.borrow_mut();
             match state.editor.undo() {
@@ -769,6 +813,9 @@ impl TextEditor {
     /// Redoes the last undone action.
     pub fn redo(&self) {
         self.state.borrow_mut().typing = false;
+        if self.story().is_some() && self.state.borrow().redo.is_empty() {
+            self.leave_story(None);
+        }
         let restored = {
             let mut state = self.state.borrow_mut();
             match state.editor.redo() {
@@ -960,6 +1007,10 @@ impl TextEditor {
     /// paragraph splits there, and the text after the break starts a
     /// page, a column, a layout or a section.
     pub fn insert_break(&self, kind: BreakKind) {
+        if self.story().is_some() {
+            // Not in headers, footers and notes, as in Pages.
+            return;
+        }
         let before = self.selection();
         let (start, end) = before.ordered();
         if self.toc_refuses(start, end) {
@@ -1142,6 +1193,10 @@ impl TextEditor {
     /// selection, with an empty note (EST-13). The note takes the Footnote
     /// Text style when the document has one.
     pub fn insert_note(&self) {
+        if self.story().is_some() {
+            // Not in headers, footers and notes, as in Pages.
+            return;
+        }
         let before = self.selection();
         let (start, end) = before.ordered();
         if self.toc_refuses(start, end) {
@@ -1586,6 +1641,10 @@ impl TextEditor {
     /// (EST-22). A document whose tables list nothing yet lists its
     /// headings, by the styles whose names start with "Heading".
     pub fn insert_table_of_contents(&self) {
+        if self.story().is_some() {
+            // Not in headers, footers and notes, as in Pages.
+            return;
+        }
         let before = self.selection();
         let (start, _) = before.ordered();
         let result = {
@@ -1808,9 +1867,13 @@ impl TextEditor {
 
     /// Lays out the document again and shows a selection.
     fn after_change(&self, selection: Selection) {
-        {
+        if !self.sync_story() {
             let mut state = self.state.borrow_mut();
             state.layout = crate::lay_out(state.editor.document());
+        }
+        if self.story().is_some_and(|story| !self.story_exists(story)) {
+            self.leave_story(None);
+            return;
         }
         self.show_pages();
         self.state.borrow_mut().goal = None;
@@ -1969,26 +2032,47 @@ impl TextEditor {
             self.state.borrow_mut().spelling_scope = None;
             return None;
         }
-        let count = self.state.borrow().editor.document().body().len();
+        // From the selection to the end of its text, then through the
+        // headers, footers and notes, and round to the selection.
+        let contexts: Vec<Option<Story>> = std::iter::once(None)
+            .chain(
+                stories::story_pages(Self::main_layout(&self.state.borrow()))
+                    .into_iter()
+                    .map(|(story, _)| Some(story)),
+            )
+            .collect();
+        let here = self.story();
+        let rank = contexts.iter().position(|c| *c == here).unwrap_or(0);
+        let count = contexts.len();
         for step in 0..=count {
-            let index = (end.paragraph + step) % count.max(1);
-            let found = self
-                .mistakes_of(index, spelling, proofreading)
-                .into_iter()
-                .find(|m| step > 0 || m.range.start >= end.offset)
-                .or_else(|| {
-                    // Round to the start of the first paragraph.
-                    (step == count)
-                        .then(|| {
-                            self.mistakes_of(index, spelling, proofreading)
-                                .into_iter()
-                                .next()
-                        })
-                        .flatten()
-                });
-            if let Some(mistake) = found {
-                self.select_mistake(index, &mistake);
-                return Some((mistake, self.paragraph_text(index)));
+            let context = contexts[(rank + step) % count];
+            let (styles, paragraphs) = {
+                let state = self.state.borrow();
+                let document = Self::main_document(&state);
+                let paragraphs = match context {
+                    None => document.body().iter().cloned().collect(),
+                    Some(story) => document.story_paragraphs(story),
+                };
+                (document.styles().clone(), paragraphs)
+            };
+            for (index, paragraph) in paragraphs.iter().enumerate() {
+                let found = crate::spelling::mistakes(&styles, paragraph, spelling, proofreading)
+                    .into_iter()
+                    .find(|m| {
+                        let at = (index, m.range.start);
+                        if step == 0 {
+                            at >= (end.paragraph, end.offset)
+                        } else if step == count {
+                            at < (end.paragraph, end.offset)
+                        } else {
+                            true
+                        }
+                    });
+                if let Some(mistake) = found {
+                    self.go_to_story(context);
+                    self.select_mistake(index, &mistake);
+                    return Some((mistake, paragraph.text()));
+                }
             }
         }
         None
@@ -2016,6 +2100,7 @@ impl TextEditor {
                     paragraph,
                     index: start.paragraph,
                     range: start.offset..end.offset,
+                    story: None,
                 },
                 with,
             );
@@ -2038,7 +2123,11 @@ impl TextEditor {
             } else {
                 Vec::new()
             };
-            (DisplayList::pages(&state.layout), invisibles, text)
+            (
+                DisplayList::pages(Self::main_layout(&state)),
+                invisibles,
+                text,
+            )
         };
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
@@ -2350,13 +2439,21 @@ impl TextEditor {
         (state.layout.line_count(), selected)
     }
 
-    /// Everything that a search finds in the document (TXT-12, TXT-13).
+    /// Everything that a search finds in the document, and in its
+    /// headers, footers and notes (TXT-12, TXT-13).
     pub fn find(&self, query: &desk_model::Query) -> Vec<desk_model::Found> {
-        self.state.borrow().editor.document().find(query)
+        let state = self.state.borrow();
+        let stories: Vec<Story> = stories::story_pages(Self::main_layout(&state))
+            .into_iter()
+            .map(|(story, _)| story)
+            .collect();
+        Self::main_document(&state).find_everywhere(query, &stories)
     }
 
-    /// Selects a piece of text that a search found, and shows it.
+    /// Selects a piece of text that a search found, and shows it, in the
+    /// header, footer or note it is in.
     pub fn select_found(&self, found: &desk_model::Found) {
+        self.go_to_story(found.story);
         self.state.borrow_mut().typing = false;
         self.select(Selection {
             anchor: Spot {
@@ -2379,16 +2476,26 @@ impl TextEditor {
     /// The page, from 0, that a piece of text is on.
     pub fn page_of(&self, found: &desk_model::Found) -> Option<usize> {
         let state = self.state.borrow();
-        let spot = Spot {
-            paragraph: found.index,
-            offset: found.range.start,
-        };
-        text_nav::caret(&state.layout, spot).map(|c| c.page)
+        let layout = Self::main_layout(&state);
+        match found.story {
+            Some(story) => stories::story_pages(layout)
+                .into_iter()
+                .find(|(s, _)| *s == story)
+                .map(|(_, page)| page),
+            None => {
+                let spot = Spot {
+                    paragraph: found.index,
+                    offset: found.range.start,
+                };
+                text_nav::caret(layout, spot).map(|c| c.page)
+            }
+        }
     }
 
     /// Replaces a piece of text that a search found, as one action of the
     /// history, and puts the cursor after it.
     pub fn replace_found(&self, found: &desk_model::Found, with: &str) {
+        self.go_to_story(found.story);
         let before = self.selection();
         let result = self.state.borrow_mut().editor.edit("Replace", |edit| {
             let after = edit.replace_found(found, with)?;
@@ -2397,14 +2504,24 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
-    /// Replaces everything a search finds, as one action of the history,
-    /// and gives how many pieces were replaced.
+    /// Replaces everything a search finds, in the body and in the
+    /// headers, footers and notes, as one action of the history, and
+    /// gives how many pieces were replaced.
     pub fn replace_all(&self, query: &desk_model::Query, with: &str) -> usize {
+        self.leave_story(None);
         let before = self.selection();
+        let stories: Vec<Story> = stories::story_pages(&self.state.borrow().layout)
+            .into_iter()
+            .map(|(story, _)| story)
+            .collect();
         let mut count = 0;
         let result = self.state.borrow_mut().editor.edit("Replace All", |edit| {
-            count = edit.replace_all(query, with)?;
-            Ok(Some(before.ordered().0))
+            count = edit.replace_everywhere(query, with, &stories)?;
+            let last = edit.document().body().len().saturating_sub(1);
+            let (start, _) = before.ordered();
+            let paragraph = start.paragraph.min(last);
+            let length = edit.document().body().get(paragraph).map_or(0, |p| p.len());
+            Ok(Some(Spot::new(paragraph, start.offset.min(length))))
         });
         if count > 0 {
             self.finish_edit(before, result);
@@ -2801,6 +2918,12 @@ impl TextEditor {
             let Some(this) = weak.upgrade() else {
                 return glib::Propagation::Proceed;
             };
+            // Esc takes the cursor from a header, footer or note back to
+            // the body.
+            if key == gdk::Key::Escape && this.story().is_some() {
+                this.leave_story(None);
+                return glib::Propagation::Stop;
+            }
             if this.handle_key(key, modifiers) {
                 glib::Propagation::Stop
             } else {
@@ -2899,9 +3022,24 @@ impl TextEditor {
                 return Default::default();
             };
             this.view.area().grab_focus();
+            // A click in a header, footer or note puts the cursor there,
+            // and a click in the body takes it back (EST-12, EST-13).
+            if !gesture
+                .current_event_state()
+                .contains(gdk::ModifierType::SHIFT_MASK)
+            {
+                this.press_story(x, y);
+            }
             let Some(spot) = this.spot_at(x, y) else {
                 return;
             };
+            // A double click on the mark of a note goes to the note, and
+            // on the mark at the start of the note back to the body.
+            if presses == 2 && this.double_click_mark(spot) {
+                let mut state = this.state.borrow_mut();
+                state.drag_from = None;
+                return;
+            }
             let modifiers = gesture.current_event_state();
             let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
             let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);

@@ -645,6 +645,44 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
     out
 }
 
+/// Reads the first view of the view settings in the settings stream.
+pub(crate) fn view_settings(settings: &str) -> crate::text::ViewSettings {
+    let mut out = crate::text::ViewSettings::default();
+    let Ok(root) = xml::parse(settings) else {
+        return out;
+    };
+    // The views are the entries of the map named Views, in the set of
+    // the view settings.
+    fn views(e: &Element) -> Option<&Element> {
+        if e.name.is(CONFIG, "config-item-set")
+            && e.attr(CONFIG, "name") == Some("ooo:view-settings")
+        {
+            return e
+                .children_named(CONFIG, "config-item-map-indexed")
+                .find(|m| m.attr(CONFIG, "name") == Some("Views"))?
+                .children_named(CONFIG, "config-item-map-entry")
+                .next();
+        }
+        e.elements().find_map(views)
+    }
+    let view = views(&root);
+    let Some(view) = view else {
+        return out;
+    };
+    for item in view.children_named(CONFIG, "config-item") {
+        let text = item.text();
+        let text = text.trim();
+        match item.attr(CONFIG, "name") {
+            Some("ZoomType") => out.zoom_type = text.parse().ok(),
+            Some("ZoomFactor") => out.zoom_factor = text.parse().ok(),
+            Some("ViewLayoutColumns") => out.columns = text.parse().ok(),
+            Some("DeskOutlineView") => out.outline = Some(text == "true"),
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Reads the shortcuts of styles from the settings stream.
 pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
     let Ok(root) = xml::parse(settings) else {

@@ -118,10 +118,16 @@ pub struct Page {
     /// bottom (EST-12). Their paragraphs are indexes in the header or
     /// footer they come from.
     pub margin_lines: Vec<PlacedLine>,
+    /// For each line of [`Page::margin_lines`], the header or footer it
+    /// belongs to, so that it can be edited on the page.
+    pub margin_places: Vec<MarginPlace>,
     /// The notes on the page: its footnotes at its foot, or the endnotes
     /// that end up on it (EST-13). Their paragraphs are the indexes of the
     /// notes, in the order the body refers to them.
     pub note_lines: Vec<PlacedLine>,
+    /// For each line of [`Page::note_lines`], the index of its paragraph
+    /// in the note.
+    pub note_parts: Vec<usize>,
     /// The footnotes that the lines of the page refer to, as the body
     /// paragraph that refers to each and the index of the note.
     pub footnotes: Vec<(usize, usize)>,
@@ -167,6 +173,9 @@ pub struct DocumentLayout {
     /// document has fields (EST-27); empty when it is laid out without
     /// them.
     pub field_values: Vec<FieldValues>,
+    /// The notes, in the order that the body refers to them: the
+    /// paragraphs of [`Page::note_lines`] are indexes in it.
+    pub notes: Vec<desk_model::NodeId>,
 }
 
 impl DocumentLayout {
@@ -252,6 +261,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     }
     place_margins(document, &mut layout, system);
     layout.field_values = values;
+    layout.notes = plan.note_ids();
     layout
 }
 
@@ -274,66 +284,100 @@ fn has_fields(paragraph: &Paragraph) -> bool {
 ///   face each other or not.
 pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &mut TextSystem) {
     let setup = layout.setup;
-    let pages = layout.pages.len() as u32;
-    let height = setup.height.to_pt() as f32;
-    for (index, page) in layout.pages.iter_mut().enumerate() {
-        page.margin_lines.clear();
-        if page.blank {
-            continue;
-        }
-        let section = layout
-            .sections
-            .get(page.section)
-            .copied()
-            .unwrap_or(setup.section);
-        // The headers and footers of the section, or of the one before
-        // whose it uses (EST-12, EST-16).
-        let margins = document
-            .section_headers_footers(layout.section_margins.get(page.section).copied().flatten());
-        let values = FieldValues {
-            page: page.number,
-            pages,
-            notes: None,
-            pages_of: None,
-        };
-        let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
-        for (kind, shown) in [
-            (MarginKind::Header, setup.headers),
-            (MarginKind::Footer, setup.footers),
-        ] {
-            if !shown {
-                continue;
-            }
-            let place = MarginPlace::of_page(
-                kind,
-                page.first_of_section,
-                index % 2 == 1,
-                section.first_page_different,
-                section.left_right_different,
-            );
-            let paragraphs = margins.get(place);
-            if paragraphs.iter().all(Paragraph::is_empty) {
-                continue;
-            }
-            let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
-            for line in &mut lines {
-                line.origin.0 = page.margins.0;
-            }
-            let shift = match kind {
-                MarginKind::Header => setup.header_margin.to_pt() as f32,
-                MarginKind::Footer => {
-                    let text_bottom = lines
-                        .last()
-                        .map_or(0.0, |l: &PlacedLine| l.origin.1 + l.line.text_bottom);
-                    height - setup.footer_margin.to_pt() as f32 - text_bottom
+    for index in 0..layout.pages.len() {
+        let mut lines = Vec::new();
+        let mut places = Vec::new();
+        if !layout.pages[index].blank {
+            for (kind, shown) in [
+                (MarginKind::Header, setup.headers),
+                (MarginKind::Footer, setup.footers),
+            ] {
+                if !shown {
+                    continue;
                 }
-            };
-            for line in &mut lines {
-                line.origin.1 += shift;
+                let (place, section) = margin_of_page(layout, index, kind);
+                let margins = document.section_headers_footers(section);
+                let paragraphs = margins.get(place);
+                if paragraphs.iter().all(Paragraph::is_empty) {
+                    continue;
+                }
+                let placed = margin_lines(document, layout, index, kind, paragraphs, system);
+                places.extend(placed.iter().map(|_| place));
+                lines.extend(placed);
             }
-            page.margin_lines.extend(lines);
         }
+        let page = &mut layout.pages[index];
+        page.margin_lines = lines;
+        page.margin_places = places;
     }
+}
+
+/// The header or footer that page `index` shows, and the section whose
+/// headers and footers it is, by the paragraph that starts it, or none
+/// for the first (EST-12, EST-16, EST-19).
+pub fn margin_of_page(
+    layout: &DocumentLayout,
+    index: usize,
+    kind: MarginKind,
+) -> (MarginPlace, Option<desk_model::NodeId>) {
+    let setup = layout.setup;
+    let page = &layout.pages[index];
+    let section = layout
+        .sections
+        .get(page.section)
+        .copied()
+        .unwrap_or(setup.section);
+    let place = MarginPlace::of_page(
+        kind,
+        page.first_of_section,
+        index % 2 == 1,
+        section.first_page_different,
+        section.left_right_different,
+    );
+    (
+        place,
+        layout.section_margins.get(page.section).copied().flatten(),
+    )
+}
+
+/// The lines of a header or footer with these paragraphs on page `index`,
+/// where the page shows it, even when they are empty: to show the cursor
+/// in an empty header that is being edited (EST-12).
+pub fn margin_lines(
+    document: &Document,
+    layout: &DocumentLayout,
+    index: usize,
+    kind: MarginKind,
+    paragraphs: &[Paragraph],
+    system: &mut TextSystem,
+) -> Vec<PlacedLine> {
+    let setup = layout.setup;
+    let height = setup.height.to_pt() as f32;
+    let page = &layout.pages[index];
+    let values = FieldValues {
+        page: page.number,
+        pages: layout.pages.len() as u32,
+        notes: None,
+        pages_of: None,
+    };
+    let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
+    let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
+    for line in &mut lines {
+        line.origin.0 = page.margins.0;
+    }
+    let shift = match kind {
+        MarginKind::Header => setup.header_margin.to_pt() as f32,
+        MarginKind::Footer => {
+            let text_bottom = lines
+                .last()
+                .map_or(0.0, |l: &PlacedLine| l.origin.1 + l.line.text_bottom);
+            height - setup.footer_margin.to_pt() as f32 - text_bottom
+        }
+    };
+    for line in &mut lines {
+        line.origin.1 += shift;
+    }
+    lines
 }
 
 /// The room that the headers and footers of a document take on its pages,
@@ -664,6 +708,8 @@ pub(crate) struct Footnotes {
     /// The lines of each note, with the offset of each from the top of
     /// the note, and its height.
     pub notes: Vec<(Vec<(Line, f32)>, f32)>,
+    /// For each line of each note, the index of its paragraph in the note.
+    pub parts: Vec<Vec<usize>>,
     /// The space between two notes, and above the first.
     pub gap: f32,
 }
@@ -805,6 +851,8 @@ impl Footnotes {
                         line: line.clone(),
                         origin: (page.margins.0, y + dy - top),
                     });
+                    page.note_parts
+                        .push(self.parts[note].get(index).copied().unwrap_or(0));
                 }
                 y += self.offset(note, range.end) - top + self.gap;
             }
@@ -1087,6 +1135,7 @@ impl Paginator<'_> {
             sections: self.sections,
             section_margins: self.section_margins,
             field_values: Vec::new(),
+            notes: Vec::new(),
         }
     }
 

@@ -1665,3 +1665,39 @@ fn est_12_the_header_margin_is_kept_while_headers_are_off() {
     assert_eq!(setup.footer_margin, Length::from_points(50));
     assert_eq!(setup.margin_top, editor.document().page_setup().margin_top);
 }
+
+#[test]
+fn int_08_the_view_is_kept_in_the_settings() {
+    let mut document = Document::new_word_processing();
+    assert_eq!(
+        read_odt(&write_odt(&document).unwrap()).unwrap().view(),
+        None
+    );
+    for view in [
+        desk_model::ViewSettings {
+            zoom: desk_model::ViewZoom::Percent(150),
+            two_pages: true,
+            outline: false,
+        },
+        desk_model::ViewSettings {
+            zoom: desk_model::ViewZoom::FitWidth,
+            two_pages: false,
+            outline: true,
+        },
+        desk_model::ViewSettings {
+            zoom: desk_model::ViewZoom::FitPage,
+            two_pages: false,
+            outline: false,
+        },
+    ] {
+        document.set_view(Some(view));
+        let bytes = write_odt(&document).unwrap();
+        // With the items of LibreOffice: 3 is the width of the page.
+        let odf = export(&document).view;
+        if view.zoom == desk_model::ViewZoom::FitWidth {
+            assert_eq!(odf.zoom_type, Some(3));
+        }
+        assert_eq!(odf.columns, Some(if view.two_pages { 2 } else { 1 }));
+        assert_eq!(read_odt(&bytes).unwrap().view(), Some(view));
+    }
+}
