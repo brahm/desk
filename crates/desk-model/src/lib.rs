@@ -55,6 +55,7 @@ mod id;
 mod list;
 mod note;
 mod op;
+mod outline;
 mod picture;
 mod section;
 mod story;
@@ -91,6 +92,7 @@ pub use list::{
 };
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use op::Op;
+pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::Picture;
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 pub use story::Story;

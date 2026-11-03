@@ -33,6 +33,7 @@ mod links;
 mod links_pane;
 mod lists_pane;
 mod notes_pane;
+mod outline_view;
 mod preferences;
 mod properties;
 mod ruler;

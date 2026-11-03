@@ -29,10 +29,12 @@ use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
 mod navigate;
+mod outline;
 mod sections;
 mod stories;
 
 pub use navigate::Navigate;
+pub use outline::OutlineRow;
 pub use sections::has_sections_clip;
 
 use desk_model::Story;

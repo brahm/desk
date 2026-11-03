@@ -73,6 +73,7 @@ pub struct DocumentWindow {
     navigate_by: gtk::MenuButton,
     page_entry: gtk::Entry,
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
+    outline: Rc<crate::outline_view::OutlineView>,
     thumbnails_split: adw::OverlaySplitView,
     /// The Spelling and Grammar window, made when first shown.
     spelling: SpellingSlot,
@@ -93,7 +94,8 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 60] = [
+const DOCUMENT_ACTIONS: [&str; 61] = [
+    "outline",
     "navigate",
     "thumbnails",
     "delete-page",
@@ -330,6 +332,9 @@ impl DocumentWindow {
         pages.attach(vertical_ruler.widget(), 0, 1, 1, 1);
         pages.attach(view.widget(), 1, 1, 1, 1);
         stack.add_named(&pages, Some("document"));
+        // The document as an outline (TXT-14).
+        let outline = crate::outline_view::OutlineView::new(editor_of());
+        stack.add_named(outline.widget(), Some("outline"));
         let format_revealer = gtk::Revealer::builder()
             .child(format_bar.widget())
             .reveal_child(false)
@@ -405,6 +410,7 @@ impl DocumentWindow {
             page_entry,
             thumbnails,
             thumbnails_split,
+            outline,
             spelling: SpellingSlot::default(),
             format_revealer,
             ruler,
@@ -479,7 +485,7 @@ impl DocumentWindow {
             let bar = bottom_bar.downgrade();
             this.stack.connect_visible_child_name_notify(move |stack| {
                 if let Some(bar) = bar.upgrade() {
-                    bar.set_revealed(stack.visible_child_name().as_deref() == Some("document"));
+                    bar.set_revealed(stack.visible_child_name().as_deref() != Some("empty"));
                 }
             });
         }
@@ -626,6 +632,7 @@ impl DocumentWindow {
                 this.refresh();
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
+                this.outline.document_changed();
             }
         });
         let weak = Rc::downgrade(self);
@@ -637,6 +644,10 @@ impl DocumentWindow {
         editor.set_show_invisibles(self.action_state("invisibles"));
         *self.editor.borrow_mut() = Some(editor);
         self.stack.set_visible_child_name("document");
+        // A document saved as an outline opens as one (DOC-16).
+        if self.action_state("outline") {
+            self.show_outline(true);
+        }
         self.format_revealer.set_reveal_child(true);
         self.refresh();
         self.show_format();
@@ -1121,6 +1132,20 @@ impl DocumentWindow {
         copy.window.present();
     }
 
+    /// Shows the document as an outline, or as pages (TXT-14).
+    fn show_outline(&self, on: bool) {
+        if self.editor().is_none() {
+            return;
+        }
+        self.stack
+            .set_visible_child_name(if on { "outline" } else { "document" });
+        self.outline.set_shown(on);
+        if !on && let Some(editor) = self.editor() {
+            editor.show_selection();
+            editor.focus();
+        }
+    }
+
     /// Deletes the page the cursor is on, after asking (TXT-02).
     fn delete_page(self: &Rc<Self>) {
         let Some(editor) = self.editor() else {
@@ -1548,6 +1573,19 @@ impl DocumentWindow {
             this.thumbnails.set_shown(on, this.window.upcast_ref());
         });
         self.window.add_action(&thumbnails);
+
+        // The document as an outline, or as pages (TXT-14).
+        let outline = gio::SimpleAction::new_stateful("outline", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        outline.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            this.show_outline(on);
+        });
+        self.window.add_action(&outline);
 
         // Edit ▸ Delete Page, after asking (TXT-02).
         let delete_page = gio::SimpleAction::new("delete-page", None);
@@ -2354,6 +2392,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         document.append(Some(&tr("Show _Styles Drawer")), Some("win.styles-drawer"));
         document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
         document.append(Some(&tr("Show Page _Thumbnails")), Some("win.thumbnails"));
+        document.append(Some(&tr("Show as _Outline")), Some("win.outline"));
         document.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
