@@ -216,19 +216,48 @@ impl DocumentView {
             .enumerate()
             .min_by(|(_, a), (_, b)| {
                 let d = |r: &&PageRect| {
-                    if y < r.y {
+                    let dy = if y < r.y {
                         r.y - y
                     } else if y > r.y + r.height {
                         y - r.y - r.height
                     } else {
                         0.0
-                    }
+                    };
+                    // Two pages side by side are as far down.
+                    let dx = if x < r.x {
+                        r.x - x
+                    } else if x > r.x + r.width {
+                        x - r.x - r.width
+                    } else {
+                        0.0
+                    };
+                    dy + dx
                 };
                 d(a).total_cmp(&d(b))
             })?
             .0;
         let rect = rects[index];
         Some((index, (x - rect.x) / scale, (y - rect.y) / scale))
+    }
+
+    /// The page in the middle of the part of the view in sight.
+    pub fn current_page(&self) -> Option<usize> {
+        let (h, v) = (self.scrolled.hadjustment(), self.scrolled.vadjustment());
+        self.page_at(
+            h.value() + h.page_size() / 2.0,
+            v.value() + v.page_size() / 3.0,
+        )
+        .map(|(page, _, _)| page)
+    }
+
+    /// Scrolls so that the top of a page is at the top of the view.
+    pub fn scroll_to_page(&self, page: usize) {
+        let (rects, _, _) = self.layout(f64::from(self.area.width()));
+        if let Some(rect) = rects.get(page) {
+            self.scrolled
+                .vadjustment()
+                .set_value(rect.y - geometry::PAGE_GAP / 2.0);
+        }
     }
 
     /// Where a point of a page falls in the area.

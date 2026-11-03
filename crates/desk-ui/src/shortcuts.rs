@@ -79,6 +79,7 @@ const SECTIONS: &[Section] = &[
             ("<Control>braceright", n_("Align right")),
             ("<Control><Shift>i", n_("Show invisibles")),
             ("<Control><Alt>i", n_("Inspector")),
+            ("F9", n_("Page Thumbnails")),
             ("<Control>t", n_("Show fonts")),
             ("<Control><Shift>t", n_("Show the Styles drawer")),
             ("<Control><Alt>c", n_("Copy style")),

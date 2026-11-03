@@ -70,6 +70,10 @@ pub struct DocumentWindow {
     find: FindSlot,
     search_sidebar: Rc<SearchSidebar>,
     search_split: adw::OverlaySplitView,
+    navigate_by: gtk::MenuButton,
+    page_entry: gtk::Entry,
+    thumbnails: Rc<crate::thumbnails::Thumbnails>,
+    thumbnails_split: adw::OverlaySplitView,
     /// The Spelling and Grammar window, made when first shown.
     spelling: SpellingSlot,
     format_revealer: gtk::Revealer,
@@ -89,7 +93,10 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 57] = [
+const DOCUMENT_ACTIONS: [&str; 60] = [
+    "navigate",
+    "thumbnails",
+    "delete-page",
     "special-characters",
     "save",
     "save-as",
@@ -259,6 +266,41 @@ impl DocumentWindow {
             .margin_bottom(3)
             .build();
         bottom.append(&zoom_button);
+        // The arrows, what they go to, and Go to Page (INT-19).
+        let previous = gtk::Button::builder()
+            .icon_name("go-up-symbolic")
+            .tooltip_text(tr("Previous"))
+            .action_name("win.navigate")
+            .action_target(&false.to_variant())
+            .css_classes(["flat"])
+            .build();
+        let next = gtk::Button::builder()
+            .icon_name("go-down-symbolic")
+            .tooltip_text(tr("Next"))
+            .action_name("win.navigate")
+            .action_target(&true.to_variant())
+            .css_classes(["flat"])
+            .build();
+        let navigate_by = gtk::MenuButton::builder()
+            .label(tr("Page"))
+            .menu_model(&navigate_menu())
+            .direction(gtk::ArrowType::Up)
+            .tooltip_text(tr("Go To"))
+            .css_classes(["flat"])
+            .build();
+        let page_entry = gtk::Entry::builder()
+            .width_chars(4)
+            .max_width_chars(5)
+            .input_purpose(gtk::InputPurpose::Digits)
+            .xalign(0.5)
+            .tooltip_text(tr("Go to Page"))
+            .valign(gtk::Align::Center)
+            .build();
+        crate::formatting::labelled(&page_entry, &tr("Go to Page"));
+        bottom.append(&previous);
+        bottom.append(&next);
+        bottom.append(&navigate_by);
+        bottom.append(&page_entry);
         bottom.append(&counts_label);
         let bottom_bar = gtk::ActionBar::new();
         bottom_bar.pack_start(&bottom);
@@ -292,8 +334,16 @@ impl DocumentWindow {
             .child(format_bar.widget())
             .reveal_child(false)
             .build();
-        let search_split = adw::OverlaySplitView::builder()
+        // The page thumbnails, beside the pages (INT-19, EST-17).
+        let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
+        let thumbnails_split = adw::OverlaySplitView::builder()
             .content(&stack)
+            .sidebar(thumbnails.widget())
+            .sidebar_position(gtk::PackType::Start)
+            .show_sidebar(false)
+            .build();
+        let search_split = adw::OverlaySplitView::builder()
+            .content(&thumbnails_split)
             .sidebar(search_sidebar.widget())
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
@@ -351,6 +401,10 @@ impl DocumentWindow {
             find: FindSlot::default(),
             search_sidebar,
             search_split,
+            navigate_by,
+            page_entry,
+            thumbnails,
+            thumbnails_split,
             spelling: SpellingSlot::default(),
             format_revealer,
             ruler,
@@ -392,6 +446,32 @@ impl DocumentWindow {
             this.view.connect_zoom_changed(move |zoom| {
                 if let Some(label) = label.upgrade() {
                     label.set_label(&geometry::zoom_label(zoom));
+                }
+            });
+        }
+        {
+            // The page in sight shows in Go to Page.
+            let weak = Rc::downgrade(&this);
+            this.view.connect_moved(move || {
+                if let Some(this) = weak.upgrade()
+                    && !this.page_entry.has_focus()
+                    && let Some(page) = this.view.current_page()
+                {
+                    this.page_entry.set_text(&(page + 1).to_string());
+                }
+            });
+            let weak = Rc::downgrade(&this);
+            this.page_entry.connect_activate(move |entry| {
+                let Some(this) = weak.upgrade() else {
+                    return;
+                };
+                let count = this.view.page_count();
+                if let (Ok(page), Some(editor)) =
+                    (entry.text().trim().parse::<usize>(), this.editor())
+                    && (1..=count).contains(&page)
+                {
+                    editor.go_to_page(page - 1);
+                    editor.focus();
                 }
             });
         }
@@ -545,6 +625,7 @@ impl DocumentWindow {
             if let Some(this) = weak.upgrade() {
                 this.refresh();
                 this.search_sidebar.document_changed();
+                this.thumbnails.refresh();
             }
         });
         let weak = Rc::downgrade(self);
@@ -1040,6 +1121,40 @@ impl DocumentWindow {
         copy.window.present();
     }
 
+    /// Deletes the page the cursor is on, after asking (TXT-02).
+    fn delete_page(self: &Rc<Self>) {
+        let Some(editor) = self.editor() else {
+            return;
+        };
+        let Some(page) = editor.cursor_page() else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Delete Page?")),
+            Some(
+                &tr("Everything on page {n} will be deleted.")
+                    .replace("{n}", &(page + 1).to_string()),
+            ),
+        );
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("delete", &tr("_Delete"));
+        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.choose(
+            Some(&self.window),
+            gio::Cancellable::NONE,
+            move |response| {
+                if let (Some(this), "delete") = (weak.upgrade(), response.as_str())
+                    && let Some(editor) = this.editor()
+                {
+                    editor.delete_page(page);
+                }
+            },
+        );
+    }
+
     /// Goes back to the document as it was last saved, after asking
     /// (DOC-12).
     fn revert(self: &Rc<Self>) {
@@ -1377,6 +1492,72 @@ impl DocumentWindow {
             this.show_rulers();
         });
         self.window.add_action(&ruler);
+
+        // The arrows at the bottom, and what they go to (INT-19).
+        let navigate_by = gio::SimpleAction::new_stateful(
+            "navigate-by",
+            Some(glib::VariantTy::STRING),
+            &"page".to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        navigate_by.connect_activate(move |action, parameter| {
+            let (Some(this), Some(value)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+            else {
+                return;
+            };
+            action.set_state(&value.to_variant());
+            let kind = crate::editing::Navigate::from_name(&value);
+            this.navigate_by.set_label(&navigate_label(kind));
+        });
+        self.window.add_action(&navigate_by);
+        let navigate = gio::SimpleAction::new("navigate", Some(glib::VariantTy::BOOLEAN));
+        let weak = Rc::downgrade(self);
+        navigate.connect_activate(move |_, parameter| {
+            let (Some(this), Some(forward)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<bool>()))
+            else {
+                return;
+            };
+            let kind = this
+                .window
+                .lookup_action("navigate-by")
+                .and_then(|a| a.state())
+                .and_then(|s| s.get::<String>())
+                .map_or(crate::editing::Navigate::Page, |n| {
+                    crate::editing::Navigate::from_name(&n)
+                });
+            if let Some(editor) = this.editor()
+                && !editor.navigate(kind, forward)
+            {
+                this.window.error_bell();
+            }
+        });
+        self.window.add_action(&navigate);
+
+        // The page thumbnails (INT-19).
+        let thumbnails = gio::SimpleAction::new_stateful("thumbnails", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        thumbnails.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            this.thumbnails_split.set_show_sidebar(on);
+            this.thumbnails.set_shown(on, this.window.upcast_ref());
+        });
+        self.window.add_action(&thumbnails);
+
+        // Edit ▸ Delete Page, after asking (TXT-02).
+        let delete_page = gio::SimpleAction::new("delete-page", None);
+        let weak = Rc::downgrade(self);
+        delete_page.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.delete_page();
+            }
+        });
+        self.window.add_action(&delete_page);
 
         let inspector = gio::SimpleAction::new_stateful("inspector", None, &false.to_variant());
         let split = self.split.downgrade();
@@ -2172,6 +2353,8 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         document.append(Some(&tr("Show _Fonts")), Some("win.fonts"));
         document.append(Some(&tr("Show _Styles Drawer")), Some("win.styles-drawer"));
         document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
+        document.append(Some(&tr("Show Page _Thumbnails")), Some("win.thumbnails"));
+        document.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append_section(None, &document);
@@ -2315,6 +2498,29 @@ fn with_extension(path: PathBuf, extension: &str) -> PathBuf {
         name.push(extension);
         path.with_file_name(name)
     }
+}
+
+/// The name of what the arrows go to, on the button that chooses it.
+fn navigate_label(kind: crate::editing::Navigate) -> String {
+    use crate::editing::Navigate;
+    match kind {
+        Navigate::Page => tr("Page"),
+        Navigate::Section => tr("Section"),
+        Navigate::Link => tr("Link"),
+        Navigate::Bookmark => tr("Bookmark"),
+        Navigate::Style => tr("Style"),
+    }
+}
+
+/// The menu of what the arrows at the bottom go to (INT-19).
+fn navigate_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    for kind in crate::editing::Navigate::ALL {
+        let item = gio::MenuItem::new(Some(&navigate_label(kind)), None);
+        item.set_action_and_target_value(Some("win.navigate-by"), Some(&kind.name().to_variant()));
+        menu.append_item(&item);
+    }
+    menu
 }
 
 /// The zoom menu at the bottom of the window (INT-07).

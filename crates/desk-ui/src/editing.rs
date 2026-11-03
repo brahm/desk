@@ -28,7 +28,12 @@ use crate::i18n::tr;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
+mod navigate;
+mod sections;
 mod stories;
+
+pub use navigate::Navigate;
+pub use sections::has_sections_clip;
 
 use desk_model::Story;
 

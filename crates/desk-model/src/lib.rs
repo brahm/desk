@@ -43,6 +43,7 @@
 //! # Ok::<(), desk_model::ModelError>(())
 //! ```
 
+mod arrange;
 mod auto_numbers;
 mod autocorrect;
 mod document;
@@ -64,6 +65,7 @@ mod toc;
 mod transaction;
 mod units;
 
+pub use arrange::SectionsClip;
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
 pub use document::{
