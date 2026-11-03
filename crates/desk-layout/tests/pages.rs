@@ -656,6 +656,70 @@ fn est_13_a_long_footnote_goes_on_at_the_foot_of_the_next_page() {
 }
 
 #[test]
+fn est_13_a_note_longer_than_a_page_goes_on_over_several() {
+    use desk_model::{CharAttrs, Editor, FIELD_CHARACTER, Field, Note, ParaAttrs, Paragraph, Run};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let note_lines = 40;
+    editor
+        .edit("Setup", |edit| {
+            edit.set_page_setup(setup(200.0))?;
+            let at = edit.insert_text(start, "Text")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            let at = edit.split_paragraph(after)?;
+            edit.insert_text(at, "More")?;
+            let body = edit.document().styles().default_paragraph();
+            let text = vec!["note"; note_lines].join(&LINE_BREAK.to_string());
+            let id = edit.new_id();
+            let paragraph =
+                Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new(&text)])?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![paragraph].into(),
+                }),
+            )
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let layout = paginate(editor.document(), &mut system);
+    // Every line of the note shows once, in order, on three pages or
+    // more, and none goes below the body of its page.
+    let shown: Vec<usize> = layout
+        .pages
+        .iter()
+        .flat_map(|p| p.note_lines.iter().map(|l| l.index))
+        .collect();
+    assert_eq!(shown, (0..note_lines).collect::<Vec<_>>());
+    let with_notes = layout
+        .pages
+        .iter()
+        .filter(|p| !p.note_lines.is_empty())
+        .count();
+    assert!(with_notes >= 3, "{with_notes}");
+    for page in &layout.pages {
+        for line in &page.note_lines {
+            assert!(line.origin.1 + line.line.top + line.line.height <= page.body.1 + 0.5);
+        }
+    }
+    // The text after the mark comes after the note.
+    assert!(
+        layout
+            .pages
+            .iter()
+            .any(|p| p.lines.iter().any(|l| l.paragraph == 1))
+    );
+}
+
+#[test]
 fn est_13_a_footnote_that_fits_a_page_moves_whole_with_its_mark() {
     use desk_model::{CharAttrs, Editor, FIELD_CHARACTER, Field, Note, ParaAttrs, Paragraph, Run};
     let mut editor = Editor::new(Document::new_word_processing());

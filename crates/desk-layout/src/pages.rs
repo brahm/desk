@@ -130,9 +130,10 @@ pub struct Page {
     /// the paragraph that refers to it, the note and how many of its lines
     /// the page shows. The rest go on at the foot of the next page.
     pub split_note: Option<(usize, usize, usize)>,
-    /// The rest of a footnote that began on the page before: the note and
-    /// its first line here, above the notes of the page.
-    pub carried_note: Option<(usize, usize)>,
+    /// The rest of a footnote that began on a page before: the note, its
+    /// first line here and the line after its last here, above the notes
+    /// of the page. A rest taller than the page goes on to the next one.
+    pub carried_note: Option<(usize, usize, usize)>,
     /// The left end of the short rule above the notes on the page, when
     /// there is one (EST-13).
     pub note_rule: Option<(f32, f32)>,
@@ -695,12 +696,22 @@ impl Footnotes {
         lines.get(line).map_or(*height, |(line, dy)| dy + line.top)
     }
 
+    /// The line after the last of a note, from line `from`, that fits in
+    /// `room` with the rule above it: the end of the note when it fits,
+    /// and one line at least.
+    fn carried_end(&self, note: usize, from: usize, room: f32) -> usize {
+        let count = self.notes[note].0.len();
+        let top = self.offset(note, from);
+        (from + 1..=count)
+            .take_while(|&m| self.offset(note, m) - top + NOTE_SEPARATION <= room + TOLERANCE)
+            .last()
+            .unwrap_or(from + 1)
+    }
+
     /// The lines of each note of a page, in order: the rest of the one
     /// carried from the page before, then its own.
     fn parts(&self, page: &Page) -> Vec<(usize, std::ops::Range<usize>)> {
-        let carried = page
-            .carried_note
-            .map(|(note, from)| (note, from..self.notes[note].0.len()));
+        let carried = page.carried_note.map(|(note, from, to)| (note, from..to));
         carried
             .into_iter()
             .chain(page.footnotes.iter().map(|&(paragraph, note)| {
@@ -884,17 +895,26 @@ impl Paginator<'_> {
         };
         let section = self.sections.last().copied().unwrap_or(self.setup.section);
         let margins = self.section_margins.last().copied().flatten();
-        let carried_note = self
-            .pages
-            .last()
-            .and_then(|p| p.split_note)
-            .map(|(_, note, lines)| (note, lines));
         let body = match self.room {
             Some(room) => room.body(margins, first_of_section, index % 2 == 1, &section),
             None => (
                 self.top(),
                 (self.setup.height - self.setup.margin_bottom).to_pt() as f32,
             ),
+        };
+        // The rest of a note split on the page before, or of one that
+        // filled it and goes on.
+        let carried_from = self.pages.last().and_then(|p| {
+            p.split_note
+                .map(|(_, note, lines)| (note, lines))
+                .or_else(|| p.carried_note.map(|(note, _, to)| (note, to)))
+        });
+        let carried_note = match (carried_from, &self.footnotes) {
+            (Some((note, from)), Some(notes)) if from < notes.notes[note].0.len() => {
+                let to = notes.carried_end(note, from, body.1 - body.0);
+                Some((note, from, to))
+            }
+            _ => None,
         };
         self.pages.push(Page {
             number,
@@ -1088,6 +1108,7 @@ impl Paginator<'_> {
                 .as_ref()
                 .map_or(0.0, |n| n.reserved(&self.pages[cursor.page]));
             let split_before = self.pages[cursor.page].split_note.is_some();
+            let carries = self.pages[cursor.page].carried_note.is_some();
             let block = self.block(i, width);
             let n = block.lines.len();
             if a >= n {
@@ -1175,8 +1196,9 @@ impl Paginator<'_> {
                         k = if a == 0 && k == 2 { 0 } else { k - 1 };
                     }
                 }
-                if at_top {
-                    // Nothing better is possible: overflow the column.
+                // Nothing better is possible: overflow the column, unless
+                // the rest of a note fills the page, which then goes on.
+                if at_top && !carries {
                     k = k.max(1);
                 }
             }
