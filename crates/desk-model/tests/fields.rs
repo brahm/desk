@@ -78,3 +78,90 @@ fn est_27_fields_stay_with_their_character() {
     };
     assert_eq!(style.character.field, None);
 }
+
+#[test]
+fn est_27_auto_page_numbers_fill_the_footers_of_every_section() {
+    use desk_model::{
+        Alignment, AutoPageNumbers, Layout, MarginKind, MarginPages, MarginPlace, NumberAlignment,
+        ParaAttrs, Paragraph, Run, Section, Start,
+    };
+    use std::sync::Arc;
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let header = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    let footer = |pages| MarginPlace::new(MarginKind::Footer, pages);
+    let second = editor
+        .edit("Sections", |edit| {
+            let at = edit.insert_text(start, "one")?;
+            let at = edit.split_paragraph(at)?;
+            let own = Section {
+                own_margins: true,
+                ..Section::default()
+            };
+            edit.set_paragraph_attrs(
+                at,
+                at,
+                &ParaAttrs {
+                    start: Some(Some(Arc::new(Start::Section(own, Layout::default())))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let style = edit.document().styles().default_paragraph();
+            let title = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                [Run::new("Title")],
+            )?;
+            edit.set_header_footer(header, vec![title])?;
+            Ok(at.paragraph)
+        })
+        .unwrap();
+    let numbers = AutoPageNumbers {
+        kind: MarginKind::Footer,
+        alignment: NumberAlignment::Outside,
+        first_page: false,
+        whole_document: true,
+    };
+    editor
+        .edit("Auto Page Numbers", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let line = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                [Run::with_attrs(
+                    &FIELD_CHARACTER.to_string(),
+                    Default::default(),
+                    CharAttrs {
+                        field: Some(Some(Field::PAGE_NUMBER)),
+                        ..CharAttrs::default()
+                    },
+                )],
+            )?;
+            edit.set_auto_page_numbers(0, numbers, &line)
+        })
+        .unwrap();
+    let document = editor.document();
+    assert!(document.page_setup().footers);
+    for key in [None, Some(second)] {
+        let margins = document.section_headers_footers(key);
+        let alignment = |pages| {
+            let paragraphs = margins.get(footer(pages));
+            assert_eq!(paragraphs.len(), 1, "{key:?} {pages:?}");
+            paragraphs[0].attrs().alignment
+        };
+        assert_eq!(alignment(MarginPages::Default), Some(Alignment::Right));
+        assert_eq!(alignment(MarginPages::Left), Some(Alignment::Left));
+        assert!(margins.get(footer(MarginPages::First)).is_empty());
+    }
+    // The first page keeps its header, which now has a copy of its own.
+    let first = document.section_headers_footers(None);
+    let text = first.get(MarginPlace::new(MarginKind::Header, MarginPages::First));
+    assert_eq!(text.len(), 1);
+    assert_eq!(text[0].text(), "Title");
+    for index in [0, 1] {
+        let section = document.section_at(index).1;
+        assert!(section.first_page_different && section.left_right_different);
+    }
+}

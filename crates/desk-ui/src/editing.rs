@@ -1451,6 +1451,30 @@ impl TextEditor {
         });
     }
 
+    /// Puts the numbers of pages in the headers or footers, as Insert >
+    /// Auto Page Numbers (EST-27). `text` is the line, where `{page}` and
+    /// `{pages}` are the number of the page and of pages.
+    pub fn set_auto_page_numbers(&self, numbers: desk_model::AutoPageNumbers, text: &str) {
+        let file_name = self.file_name();
+        let text = text.to_owned();
+        let (start, _) = self.selection().ordered();
+        self.format_edit("Auto Page Numbers", move |edit| {
+            let at = start.paragraph;
+            let section = edit.document().headers_section(at);
+            let place = MarginPlace::new(numbers.kind, desk_model::MarginPages::Default);
+            let old = edit
+                .document()
+                .section_headers_footers(section)
+                .get(place)
+                .to_vec();
+            let mut line = crate::headers_pane::paragraphs(edit, &text, &old, &file_name)?;
+            let Some(line) = line.pop() else {
+                return Ok(());
+            };
+            edit.set_auto_page_numbers(at, numbers, &line)
+        });
+    }
+
     /// Changes the layout that the cursor is in, as one action of the
     /// history.
     pub fn set_layout(&self, name: &str, layout: Layout) {

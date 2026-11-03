@@ -43,6 +43,7 @@
 //! # Ok::<(), desk_model::ModelError>(())
 //! ```
 
+mod auto_numbers;
 mod autocorrect;
 mod document;
 mod error;
@@ -62,6 +63,7 @@ mod toc;
 mod transaction;
 mod units;
 
+pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
 pub use document::{
     Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics, TextSettings,

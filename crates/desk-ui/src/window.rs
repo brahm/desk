@@ -89,7 +89,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 54] = [
+const DOCUMENT_ACTIONS: [&str; 55] = [
     "save",
     "save-as",
     "save-copy",
@@ -116,6 +116,7 @@ const DOCUMENT_ACTIONS: [&str; 54] = [
     "insert-layout-break",
     "insert-section-break",
     "insert-page-number",
+    "insert-auto-page-numbers",
     "insert-page-count",
     "insert-date",
     "insert-file-name",
@@ -1334,6 +1335,17 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
 
+        let auto = gio::SimpleAction::new("insert-auto-page-numbers", None);
+        let weak = Rc::downgrade(self);
+        auto.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade()
+                && let Some(editor) = this.editor()
+            {
+                crate::auto_numbers::present(&this.window, &editor);
+            }
+        });
+        self.window.add_action(&auto);
+
         let note = gio::SimpleAction::new("insert-note", None);
         let weak = Rc::downgrade(self);
         note.connect_activate(move |_, _| {
@@ -2024,6 +2036,10 @@ fn insert_menu() -> gio::Menu {
         Some("win.insert-section-break"),
     );
     let fields = gio::Menu::new();
+    fields.append(
+        Some(&tr("_Auto Page Numbers…")),
+        Some("win.insert-auto-page-numbers"),
+    );
     fields.append(Some(&tr("Page _Number")), Some("win.insert-page-number"));
     fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
     fields.append(Some(&tr("_Date")), Some("win.insert-date"));
