@@ -664,7 +664,7 @@ fn est_13_a_footnote_that_fits_a_page_moves_whole_with_its_mark() {
     editor
         .edit("Setup", |edit| {
             edit.set_page_setup(setup(200.0))?;
-            let before = vec!["line"; 7].join(&LINE_BREAK.to_string());
+            let before = ["line"; 7].join(&LINE_BREAK.to_string());
             let at = edit.insert_text(start, &before)?;
             let at = edit.split_paragraph(at)?;
             let at = edit.insert_text(at, "Text")?;
