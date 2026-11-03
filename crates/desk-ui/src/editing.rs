@@ -235,6 +235,63 @@ fn bookmarks(document: &Document) -> Vec<(Arc<str>, Spot, Spot)> {
     out
 }
 
+/// The email or web address that the text before the cursor ends with,
+/// which Pages makes a link as it is typed (TXT-07): a word that starts
+/// with "www." or "http", or an address with "@" and a dot after it.
+/// Gives its range, without the punctuation after it, and where it
+/// links to.
+pub fn typed_address(before: &str) -> Option<(std::ops::Range<usize>, String)> {
+    let start = before
+        .char_indices()
+        .rev()
+        .find(|(_, c)| c.is_whitespace())
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    let word = &before[start..];
+    let opening = |c: char| matches!(c, '(' | '[' | '{' | '"' | '\'' | '“' | '‘');
+    let closing = |c: char| {
+        matches!(
+            c,
+            '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}' | '"' | '\'' | '”' | '’'
+        )
+    };
+    let address = word.trim_start_matches(opening).trim_end_matches(closing);
+    let lower = address.to_lowercase();
+    let web = ["www.", "http://", "https://"]
+        .iter()
+        .any(|p| lower.starts_with(p) && lower.len() > p.len());
+    let email = address.split_once('@').is_some_and(|(name, domain)| {
+        !name.is_empty()
+            && !domain.contains('@')
+            && domain
+                .split_once('.')
+                .is_some_and(|(host, top)| !host.is_empty() && !top.is_empty())
+    });
+    if !(web || email) {
+        return None;
+    }
+    let from = start + (word.len() - word.trim_start_matches(opening).len());
+    Some((from..from + address.len(), link_target(address)))
+}
+
+/// Makes the address that ends before `at` a link, unless its text links
+/// somewhere already (TXT-07).
+fn detect_link(edit: &mut desk_model::Edit, at: desk_model::Position) -> Result<(), ModelError> {
+    let paragraph = edit.document().paragraph(at.paragraph)?;
+    let text = paragraph.text();
+    let Some((range, target)) = typed_address(text.get(..at.offset).unwrap_or_default()) else {
+        return Ok(());
+    };
+    let (_, attrs) = paragraph.format_at(range.start + 1);
+    if attrs.link.is_some() {
+        return Ok(());
+    }
+    edit.set_link(
+        desk_model::Position::new(at.paragraph, range.start),
+        desk_model::Position::new(at.paragraph, range.end),
+        Some(Arc::from(target)),
+    )
+}
+
 /// The place a link of the text names as it is typed: a web page when it
 /// names no other kind of place.
 pub fn link_target(text: &str) -> String {
@@ -320,6 +377,9 @@ struct State {
     /// Whether the last action was typing at the cursor, which the next
     /// letter typed continues as one step of the history.
     typing: bool,
+    /// The text that Check Spelling was limited to, by selecting it
+    /// first (TXT-10), while it goes through it.
+    spelling_scope: Option<(Spot, Spot)>,
     /// More selected ranges, which Select All Uses adds (STY-09). Changes
     /// of formatting apply to them too; moving the cursor drops them.
     others: Vec<Selection>,
@@ -437,6 +497,7 @@ impl TextEditor {
                 on_select: Vec::new(),
                 invisibles: false,
                 access: AccessText::default(),
+                spelling_scope: None,
                 others: Vec::new(),
                 adding: false,
                 squiggle_skip: None,
@@ -775,6 +836,12 @@ impl TextEditor {
                 // The corrections of the word that the character ends
                 // (TXT-07).
                 if let Some(c) = typed
+                    && c.is_whitespace()
+                    && preferences.detect_links
+                {
+                    detect_link(edit, at)?;
+                }
+                if let Some(c) = typed
                     && desk_model::ends_word(c)
                 {
                     let mut corrected = autocorrect(edit, at, &preferences.autocorrect)?;
@@ -872,6 +939,9 @@ impl TextEditor {
                     }
                 }
                 let mut at = if start == end {
+                    if preferences.detect_links {
+                        detect_link(edit, from)?;
+                    }
                     autocorrect(edit, from, &preferences.autocorrect)?
                 } else {
                     edit.delete(from, to)?
@@ -1864,13 +1934,41 @@ impl TextEditor {
 
     /// Selects the next mistake after the selection, going round the
     /// document (Check Spelling), and gives it with the text of its
-    /// paragraph.
+    /// paragraph. With text selected that is not a mistake, it looks only
+    /// in that text, from its start, and goes on through it each time it
+    /// is asked again (TXT-10).
     pub fn next_mistake(
         &self,
         spelling: bool,
         proofreading: bool,
     ) -> Option<(crate::spelling::Mistake, String)> {
-        let (_, end) = self.selection().ordered();
+        let (start, end) = self.selection().ordered();
+        let scope = if start != end && self.selected_mistake(spelling, proofreading).is_none() {
+            Some((start, end, start))
+        } else {
+            let scope = self.state.borrow().spelling_scope;
+            scope
+                .filter(|&(from, to)| from <= start && end <= to)
+                .map(|(from, to)| (from, to, end))
+        };
+        self.state.borrow_mut().spelling_scope = scope.map(|(from, to, _)| (from, to));
+        if let Some((_, to, after)) = scope {
+            for index in after.paragraph..=to.paragraph {
+                let found = self
+                    .mistakes_of(index, spelling, proofreading)
+                    .into_iter()
+                    .find(|m| {
+                        (index > after.paragraph || m.range.start >= after.offset)
+                            && (index < to.paragraph || m.range.end <= to.offset)
+                    });
+                if let Some(mistake) = found {
+                    self.select_mistake(index, &mistake);
+                    return Some((mistake, self.paragraph_text(index)));
+                }
+            }
+            self.state.borrow_mut().spelling_scope = None;
+            return None;
+        }
         let count = self.state.borrow().editor.document().body().len();
         for step in 0..=count {
             let index = (end.paragraph + step) % count.max(1);
@@ -2974,6 +3072,57 @@ mod tests {
         assert_eq!(correct("We acheive"), "We achieve");
         assert_eq!(correct("We recieve"), "We recieve");
         assert_eq!(correct("We achieve"), "We achieve");
+    }
+
+    #[test]
+    fn txt_07_typed_addresses_become_links() {
+        fn found(text: &str) -> Option<(&str, String)> {
+            typed_address(text).map(|(r, t)| (&text[r], t))
+        }
+        assert_eq!(
+            found("See www.gnome.org"),
+            Some(("www.gnome.org", "https://www.gnome.org".into()))
+        );
+        assert_eq!(
+            found("(https://a.b/c),"),
+            Some(("https://a.b/c", "https://a.b/c".into()))
+        );
+        assert_eq!(
+            found("Mail me@example.com."),
+            Some(("me@example.com", "mailto:me@example.com".into()))
+        );
+        assert_eq!(
+            found("Olá “www.x.pt”"),
+            Some(("www.x.pt", "https://www.x.pt".into()))
+        );
+        for text in ["www.", "http://", "a@b", "@b.c", "gnome.org", "e-mail", ""] {
+            assert_eq!(found(text), None, "{text}");
+        }
+        // In the text, the address before the cursor takes the link,
+        // unless it links somewhere already.
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Typing", |edit| {
+                let end = edit.insert_text(start, "Go to www.gnome.org")?;
+                detect_link(edit, end)
+            })
+            .unwrap();
+        let document = editor.document();
+        let (link, range) = link_at(document, Spot::new(0, 8)).unwrap();
+        assert_eq!(&*link, "https://www.gnome.org");
+        assert_eq!(range, 6..19);
+        assert!(link_at(document, Spot::new(0, 2)).is_none());
+        editor
+            .edit("Typing", |edit| {
+                let id = edit.document().body().get(0).unwrap().id();
+                let at = desk_model::Position::new(id, 19);
+                edit.set_link(start, at, Some(Arc::from("#Elsewhere")))?;
+                detect_link(edit, at)
+            })
+            .unwrap();
+        let (link, _) = link_at(editor.document(), Spot::new(0, 8)).unwrap();
+        assert_eq!(&*link, "#Elsewhere");
     }
 
     #[test]

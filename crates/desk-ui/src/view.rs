@@ -35,6 +35,9 @@ struct State {
     invisibles_color: desk_model::Rgba,
     /// The lines under misspelled words and mistakes (TXT-10, TXT-11).
     squiggles: Vec<Squiggle>,
+    /// The color around the pages that full screen chose (DOC-07); none
+    /// leaves the grey of the window.
+    backdrop: Option<desk_model::Rgba>,
 }
 
 /// A line under text that the spelling checker or the proofreader marks.
@@ -88,6 +91,7 @@ impl DocumentView {
             caret_on: true,
             invisibles: Vec::new(),
             invisibles_color: crate::preferences::INVISIBLES_COLOR,
+            backdrop: None,
             squiggles: Vec::new(),
         }));
         let view = Self {
@@ -158,6 +162,13 @@ impl DocumentView {
     /// Sets the color of the invisible characters (INT-10).
     pub fn set_invisibles_color(&self, color: desk_model::Rgba) {
         self.state.borrow_mut().invisibles_color = color;
+        self.area.queue_draw();
+    }
+
+    /// Sets the color around the pages, or gives back the window's
+    /// (DOC-07).
+    pub fn set_backdrop(&self, color: Option<desk_model::Rgba>) {
+        self.state.borrow_mut().backdrop = color;
         self.area.queue_draw();
     }
 
@@ -382,6 +393,15 @@ impl DocumentView {
             let (top, bottom) = (vadj.value(), vadj.value() + vadj.page_size());
             let scale = state.zoom * PIXELS_PER_POINT;
             let dark = adw_is_dark(area);
+            if let Some(color) = state.backdrop {
+                cr.set_source_rgba(
+                    f64::from(color.r) / 255.0,
+                    f64::from(color.g) / 255.0,
+                    f64::from(color.b) / 255.0,
+                    f64::from(color.a) / 255.0,
+                );
+                cr.paint().ok();
+            }
             for (index, rect) in rects.iter().enumerate() {
                 if rect.y + rect.height < top || rect.y > bottom {
                     continue;

@@ -194,6 +194,16 @@ impl DocumentWindow {
             .build();
         formatting::labelled(&leave_fullscreen, &tr("Leave Fullscreen"));
         header.pack_end(&leave_fullscreen);
+        // Full screen has its own background, as Pages does (DOC-07).
+        let backdrop = gtk::ColorDialogButton::builder()
+            .dialog(&gtk::ColorDialog::builder().title(tr("Background")).build())
+            .rgba(&gdk::RGBA::new(0.25, 0.25, 0.25, 1.0))
+            .tooltip_text(tr("Background"))
+            .valign(gtk::Align::Center)
+            .visible(false)
+            .build();
+        formatting::labelled(&backdrop, &tr("Background"));
+        header.pack_end(&backdrop);
         let warnings_button = gtk::Button::builder()
             .icon_name("dialog-warning-symbolic")
             .tooltip_text(tr("Document Warnings"))
@@ -393,7 +403,7 @@ impl DocumentWindow {
                 }
             });
         }
-        this.connect_fullscreen(&leave_fullscreen);
+        this.connect_fullscreen(&leave_fullscreen, &backdrop);
         this.connect_context_menu();
         this.window
             .set_help_overlay(Some(&crate::shortcuts::window(opener.is_some())));
@@ -685,7 +695,12 @@ impl DocumentWindow {
         editor.update_tables_of_contents();
         let pages = editor.pages();
         let document = crate::fields::saved(editor.document(), &path.to_string_lossy());
-        match crate::save_document(opener, &document, pages.first(), path) {
+        // A picture of the first page, unless the preferences leave it out
+        // (DOC-09).
+        let preview = pages
+            .first()
+            .filter(|_| crate::preferences::get().include_preview);
+        match crate::save_document(opener, &document, preview, path) {
             Ok(()) => true,
             Err(message) => {
                 self.alert(
@@ -1070,15 +1085,29 @@ impl DocumentWindow {
     /// Full screen hides the header bar until the pointer reaches the top
     /// of the screen; the counts stay at the bottom, and Esc leaves it
     /// (DOC-07). A window always opens in the normal mode.
-    fn connect_fullscreen(self: &Rc<Self>, leave: &gtk::Button) {
+    fn connect_fullscreen(self: &Rc<Self>, leave: &gtk::Button, backdrop: &gtk::ColorDialogButton) {
         let weak = Rc::downgrade(self);
         let leave = leave.downgrade();
+        let button = backdrop.downgrade();
         self.window.connect_fullscreened_notify(move |window| {
             let Some(this) = weak.upgrade() else { return };
             let fullscreen = window.is_fullscreen();
             this.toolbar_view.set_reveal_top_bars(!fullscreen);
             if let Some(leave) = leave.upgrade() {
                 leave.set_visible(fullscreen);
+            }
+            if let Some(button) = button.upgrade() {
+                button.set_visible(fullscreen);
+                this.view
+                    .set_backdrop(fullscreen.then(|| formatting::from_gdk(&button.rgba())));
+            }
+        });
+        let weak = Rc::downgrade(self);
+        backdrop.connect_rgba_notify(move |button| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.window.is_fullscreen() {
+                this.view
+                    .set_backdrop(Some(formatting::from_gdk(&button.rgba())));
             }
         });
 
