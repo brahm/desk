@@ -411,6 +411,13 @@ formatting! {
         ///
         /// [`FIELD_CHARACTER`]: crate::FIELD_CHARACTER
         field: Option<Field> = None,
+        /// Where the text links to (EST-25): a web page, an email address
+        /// as `mailto:`, a bookmark of the document as `#name`, or another
+        /// file. Links belong to the text, as fields do.
+        link: Option<Arc<str>> = None,
+        /// The name of the bookmark that the text is (EST-26). A bookmark
+        /// is the text that carries its name, which belongs to the text.
+        bookmark: Option<Arc<str>> = None,
     }
 }
 
@@ -736,15 +743,33 @@ formatting! {
         /// Whether words break with a hyphen at the ends of lines, by the
         /// patterns of their language (TXT-09).
         hyphenate: bool = false,
+        /// That the paragraph is an entry of a table of contents (EST-22),
+        /// which updating the table makes again. It belongs to the
+        /// paragraph, never to its style.
+        toc_entry: Option<crate::toc::TocEntry> = None,
     }
 }
 
 impl CharAttrs {
-    /// The attributes without the field.
+    /// The attributes without those that belong to the text: its field,
+    /// its link and its bookmark. Styles never hold them.
     pub fn without_field(&self) -> Self {
         Self {
             field: None,
+            link: None,
+            bookmark: None,
             ..self.clone()
+        }
+    }
+
+    /// Only the attributes that belong to the text: what reverting and
+    /// pasting a style keep.
+    pub fn text_bound(&self) -> Self {
+        Self {
+            field: self.field.clone(),
+            link: self.link.clone(),
+            bookmark: self.bookmark.clone(),
+            ..Self::default()
         }
     }
 }
@@ -758,6 +783,7 @@ impl ParaAttrs {
         Self {
             column_break_before: self.column_break_before,
             start: self.start.clone(),
+            toc_entry: self.toc_entry,
             ..Self::default()
         }
     }
@@ -767,6 +793,7 @@ impl ParaAttrs {
         Self {
             column_break_before: None,
             start: None,
+            toc_entry: None,
             ..self.clone()
         }
     }

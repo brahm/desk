@@ -107,3 +107,28 @@ fn est_13_endnotes_of_sections_match_pages() {
 fn est_14_est_15_marks_of_notes_match_pages() {
     check("est-14-15-note-marks");
 }
+
+#[test]
+fn est_22_est_23_a_table_of_contents_matches_pages() {
+    let (mut reference, desk, _) = render("est-22-23-toc");
+    // Pages draws the tab before each page number with a glyph that its
+    // PDF names "!", at the end of the text of the entry.
+    for word in reference.iter_mut().flatten() {
+        if word.text.len() > 1
+            && let Some(text) = word.text.strip_suffix('!')
+        {
+            word.text = text.to_owned();
+        }
+    }
+    assert_eq!(desk.len(), reference.len(), "pages");
+    let diff = compare_words(&reference, &desk);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
+    );
+}
+
+#[test]
+fn est_25_est_26_links_and_bookmarks_match_pages() {
+    check("est-25-26-links-bookmarks");
+}

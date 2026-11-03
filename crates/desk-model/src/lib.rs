@@ -58,6 +58,7 @@ mod section;
 mod style;
 mod styling;
 mod text;
+mod toc;
 mod transaction;
 mod units;
 
@@ -86,5 +87,6 @@ pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, St
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
 pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
+pub use toc::{TocEntry, TocLevel, TocSettings, tables_of_contents};
 pub use transaction::{Edit, Editor, Transaction};
 pub use units::{Length, Rgba};

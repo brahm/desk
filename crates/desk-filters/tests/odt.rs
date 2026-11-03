@@ -355,6 +355,8 @@ fn sample() -> Document {
                 never_hyphenate: ["desk".to_owned(), "odt".to_owned()].into(),
                 spacing: ParagraphSpacing::Larger,
                 notes: Default::default(),
+                toc: Default::default(),
+                links_inactive: true,
             },
         })
         .unwrap();
@@ -493,21 +495,23 @@ fn foreign() -> odf::TextDocument {
                 outline_level: None,
                 list: None,
                 section: None,
+                marks: Vec::new(),
+                toc: false,
                 spans: vec![
                     odf::Span {
                         style: None,
                         text: "bold, right".into(),
-                        field: None,
+                        ..odf::Span::default()
                     },
                     odf::Span {
                         style: Some("T1".into()),
                         text: "raised".into(),
-                        field: None,
+                        ..odf::Span::default()
                     },
                     odf::Span {
                         style: Some("missing".into()),
                         text: " unknown style".into(),
-                        field: None,
+                        ..odf::Span::default()
                     },
                 ],
             },
@@ -516,6 +520,8 @@ fn foreign() -> odf::TextDocument {
                 outline_level: Some(1),
                 list: None,
                 section: None,
+                marks: Vec::new(),
+                toc: false,
                 spans: vec![],
             },
         ],
@@ -1380,4 +1386,116 @@ fn est_13_est_14_notes_are_kept() {
         );
         assert_eq!(paragraph.text().replace(FIELD_CHARACTER, ""), text);
     }
+}
+
+#[test]
+fn est_22_to_est_26_tables_of_contents_links_and_bookmarks_are_kept() {
+    use desk_model::{Editor, FIELD_CHARACTER, Field, Position, TocLevel, TocSettings};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let mut ids = vec![start.paragraph];
+            let mut at = edit.insert_text(start, "Chapter one")?;
+            for text in ["See the site or the chapter", "Chapter two"] {
+                at = edit.split_paragraph(at)?;
+                ids.push(at.paragraph);
+                at = edit.insert_text(at, text)?;
+            }
+            let heading = edit.new_paragraph_style("Heading", start, start, false)?;
+            let entry = edit.new_paragraph_style("TOC Heading", start, start, false)?;
+            for &id in [ids[0], ids[2]].iter() {
+                edit.set_paragraph_style(Position::new(id, 0), Position::new(id, 0), heading)?;
+            }
+            let link = |url: &str| CharAttrs {
+                link: Some(Some(url.into())),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(
+                Position::new(ids[1], 8),
+                Position::new(ids[1], 12),
+                &link("https://example.com/"),
+            )?;
+            edit.set_character_attrs(
+                Position::new(ids[1], 20),
+                Position::new(ids[1], 27),
+                &link("#Two"),
+            )?;
+            edit.set_character_attrs(
+                Position::new(ids[2], 0),
+                Position::new(ids[2], 11),
+                &CharAttrs {
+                    bookmark: Some(Some("Two".into())),
+                    ..CharAttrs::default()
+                },
+            )?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry,
+                    page_number: true,
+                }],
+            };
+            settings.links_inactive = true;
+            edit.set_text_settings(settings)?;
+            edit.insert_table_of_contents(0)
+        })
+        .unwrap();
+    let document = editor.document();
+
+    let bytes = write_odt(document).unwrap();
+    keep("filters-toc.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert!(read.text_settings().links_inactive);
+    let name = |d: &Document, id| d.styles().get(id).unwrap().name().to_owned();
+    let levels: Vec<_> = read
+        .text_settings()
+        .toc
+        .levels
+        .iter()
+        .map(|l| (name(&read, l.style), name(&read, l.entry), l.page_number))
+        .collect();
+    assert_eq!(
+        levels,
+        [("Heading".to_owned(), "TOC Heading".to_owned(), true)]
+    );
+    let body: Vec<_> = read.body().iter().collect();
+    assert_eq!(body.len(), 5);
+    // The entries keep their text, and their page fields the headings
+    // they list.
+    for (entry, (target, text)) in body[..2]
+        .iter()
+        .zip([(2, "Chapter one"), (4, "Chapter two")])
+    {
+        assert_eq!(
+            entry.attrs().toc_entry.flatten().unwrap().target,
+            Some(body[target].id())
+        );
+        assert_eq!(entry.text(), format!("{text}\t{FIELD_CHARACTER}"));
+        let field = entry.runs().find_map(|r| r.attrs.field.clone().flatten());
+        assert_eq!(
+            field,
+            Some(Field::PageOf {
+                paragraph: body[target].id()
+            })
+        );
+    }
+    let attrs = |p: &Paragraph, text: &str| -> CharAttrs {
+        let at = p.text().find(text).unwrap();
+        p.format_at(at + 1).1
+    };
+    assert_eq!(
+        attrs(body[3], "site").link.flatten().as_deref(),
+        Some("https://example.com/")
+    );
+    assert_eq!(
+        attrs(body[3], "chapter").link.flatten().as_deref(),
+        Some("#Two")
+    );
+    assert_eq!(attrs(body[3], "See").link, None);
+    assert_eq!(
+        attrs(body[4], "Chapter").bookmark.flatten().as_deref(),
+        Some("Two")
+    );
 }

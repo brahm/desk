@@ -31,6 +31,7 @@ use desk_model::{
 use desk_model::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 use desk_model::{Field, MarginKind, MarginPages, MarginPlace};
 use desk_model::{NodeId, Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings};
+use desk_model::{TocLevel, TocSettings};
 
 use crate::FilterError;
 use crate::log::{Content, Formatting, ImportLog, Warning};
@@ -71,9 +72,7 @@ fn warning(element: &str) -> Warning {
         "attachment" | "attachment-ref" => Content::InlineObjects,
         "annotation" | "annotation-field" => Content::Comments,
         "page-number" | "page-count" | "date-time" | "filename" | "merge-field" => Content::Fields,
-        "toc" => Content::TablesOfContents,
         "change-ref" | "changed-ref" | "changes-ref" => Content::TrackedChanges,
-        "bookmark" => Content::Bookmarks,
         other => Content::Other(other.to_owned()),
     };
     Warning::Content(content)
@@ -346,6 +345,7 @@ fn para_border(chain: &[&IworkStyle], own: usize) -> Option<ParaBorder> {
 /// line indent, which depends on the left indent.
 fn para_attrs(properties: &Properties) -> ParaAttrs {
     ParaAttrs {
+        toc_entry: None,
         hyphenate: flag(properties, "hyphenate"),
         alignment: properties.number("alignment").map(|n| match n as i64 {
             1 => Alignment::Right,
@@ -504,6 +504,11 @@ struct Importer<'a> {
     references: usize,
     /// The note whose text is being read.
     note: Option<NodeId>,
+    /// The paragraphs of the body by the names of their marks, which the
+    /// entries of tables of contents name (EST-22), and the id that the
+    /// next paragraph read takes.
+    marks: HashMap<String, NodeId>,
+    next_id: Option<NodeId>,
 }
 
 /// The levels of a list style of Pages, through its parents.
@@ -612,6 +617,8 @@ impl<'a> Importer<'a> {
             notes: Vec::new(),
             references: 0,
             note: None,
+            marks: HashMap::new(),
+            next_id: None,
         };
         importer.styles()?;
         Ok(importer)
@@ -930,6 +937,12 @@ impl<'a> Importer<'a> {
                 run_style = named;
                 run_attrs.merge(&merged(&chain, anonymous).1);
             }
+            if let Some(link) = &run.link {
+                run_attrs.link = Some(Some(link.as_str().into()));
+            }
+            if let Some(bookmark) = &run.bookmark {
+                run_attrs.bookmark = Some(Some(bookmark.as_str().into()));
+            }
             if let Some(field) = &run.field {
                 let field = match field {
                     iwork::Field::Note { .. } => {
@@ -942,6 +955,13 @@ impl<'a> Importer<'a> {
                     iwork::Field::NoteMark => {
                         let Some(note) = self.note else { continue };
                         Field::NoteMark { note }
+                    }
+                    iwork::Field::PageOf { bookmark } => {
+                        // A page number whose paragraph is gone is left out.
+                        let Some(&paragraph) = self.marks.get(bookmark) else {
+                            continue;
+                        };
+                        Field::PageOf { paragraph }
                     }
                     field => model_field(field),
                 };
@@ -970,6 +990,7 @@ impl<'a> Importer<'a> {
             }
         }
         let mut out = Vec::with_capacity(pieces.len());
+        let next_id = self.next_id.take();
         for (i, runs) in pieces.into_iter().enumerate() {
             let mut attrs = attrs.clone();
             if i > 0 {
@@ -980,7 +1001,17 @@ impl<'a> Importer<'a> {
                 }
                 attrs.start = start.clone().map(Some);
             }
-            let id = self.document.new_id();
+            if source.toc {
+                let target = runs.iter().find_map(|r| match &r.attrs.field {
+                    Some(Some(Field::PageOf { paragraph })) => Some(*paragraph),
+                    _ => None,
+                });
+                attrs.toc_entry = Some(Some(desk_model::TocEntry { target }));
+            }
+            let id = match next_id {
+                Some(id) if i == 0 => id,
+                _ => self.document.new_id(),
+            };
             out.push(Paragraph::from_runs(id, style, attrs, runs)?);
         }
         Ok(out)
@@ -1080,8 +1111,69 @@ fn model_field(field: &iwork::Field) -> Field {
             shown: shown.as_str().into(),
         },
         // The importer numbers the notes.
-        iwork::Field::Note { .. } | iwork::Field::NoteMark => Field::PageNumber,
+        iwork::Field::Note { .. } | iwork::Field::NoteMark | iwork::Field::PageOf { .. } => {
+            Field::PageNumber
+        }
     }
+}
+
+/// What tables of contents list, from the paragraph styles of Pages
+/// (EST-22, EST-23): those shown in them (`showInTOC`), each with the
+/// style of its entries (`tocStyle`), which shows page numbers unless it
+/// says not to (`SLTOCShowPageNumber`).
+fn toc_settings(sheet: &Stylesheet, ids: &HashMap<(Family, String), StyleId>) -> TocSettings {
+    let mut levels: Vec<TocLevel> = Vec::new();
+    for style in sheet
+        .styles
+        .iter()
+        .filter(|s| s.family == Family::Paragraph)
+    {
+        let Some(ident) = &style.ident else { continue };
+        let Some(&id) = ids.get(&(Family::Paragraph, ident.clone())) else {
+            continue;
+        };
+        let chain = sheet.ancestry(style);
+        let get = |name: &str| chain.iter().find_map(|s| s.properties.get(name));
+        let shown = matches!(get("showInTOC"), Some(Value::Number(n)) if *n != 0.0);
+        let Some(Value::StyleRef(entry)) = get("tocStyle") else {
+            continue;
+        };
+        if !shown || levels.iter().any(|l| l.style == id) {
+            continue;
+        }
+        let Some(entry_style) = sheet.find(entry) else {
+            continue;
+        };
+        let Some(&entry_id) = ids.get(&(
+            Family::Paragraph,
+            entry_style.ident.clone().unwrap_or_default(),
+        )) else {
+            continue;
+        };
+        let page_number = !matches!(
+            sheet
+                .ancestry(entry_style)
+                .iter()
+                .find_map(|s| s.properties.get("SLTOCShowPageNumber")),
+            Some(Value::Number(n)) if *n == 0.0
+        );
+        levels.push(TocLevel {
+            style: id,
+            entry: entry_id,
+            page_number,
+        });
+    }
+    // In the order of the levels of their entries, by name.
+    let name = |id: StyleId| -> String {
+        sheet
+            .styles
+            .iter()
+            .find(|s| ids.get(&(s.family, s.ident.clone().unwrap_or_default())) == Some(&id))
+            .and_then(|s| s.name.clone())
+            .unwrap_or_default()
+    };
+    levels.sort_by_key(|l| name(l.entry));
+    TocSettings { levels }
 }
 
 /// How the notes of a document show, from those of Pages (EST-13,
@@ -1194,8 +1286,18 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .body
         .first()
         .map_or_else(Layout::default, |p| layout(sheet, p.layout.as_deref()));
+    // The ids of the paragraphs that entries of tables of contents name,
+    // ahead of them.
+    let mut ahead: HashMap<usize, NodeId> = HashMap::new();
+    for (i, paragraph) in source.body.iter().enumerate() {
+        for mark in &paragraph.marks {
+            let id = *ahead.entry(i).or_insert_with(|| importer.document.new_id());
+            importer.marks.entry(mark.clone()).or_insert(id);
+        }
+    }
     let mut index = 1;
     for (i, paragraph) in source.body.iter().enumerate() {
+        importer.next_id = ahead.get(&i).copied();
         let start = match (&paragraph.section, &paragraph.layout) {
             _ if i == 0 => None,
             (Some(s), l) => Some(Start::Section(
@@ -1266,6 +1368,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             }),
         })?;
     }
+    let toc_ids = importer.ids.clone();
     let mut document = importer.document;
     if index > 1 {
         document.apply(Op::RemoveParagraph { paragraph: first })?;
@@ -1297,6 +1400,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             hyphenation: source.auto_hyphenation,
             ligatures: source.use_ligatures,
             notes: note_settings(source.note_properties),
+            toc: toc_settings(&source.stylesheet, &toc_ids),
             ..TextSettings::default()
         },
     })?;

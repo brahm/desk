@@ -107,6 +107,12 @@ pub enum Field {
     },
     /// The mark at the start of the text of a note (`sf:footnote-mark`).
     NoteMark,
+    /// The number of the page of a paragraph, by the name of its mark
+    /// (`sf:toc-pagenum`, in an entry of a table of contents).
+    PageOf {
+        /// `sf:bookmark`: a name of [`Paragraph::marks`].
+        bookmark: String,
+    },
 }
 
 /// How the notes of a document show, from the Document Inspector
@@ -138,6 +144,10 @@ pub struct Run {
     /// The field that the run is, when it is one: its text is then one
     /// [`FIELD`].
     pub field: Option<Field>,
+    /// `href` of the `sf:link` that the run is in (EST-25).
+    pub link: Option<String>,
+    /// `sf:name` of the `sf:bookmark` that the run is in (EST-26).
+    pub bookmark: Option<String>,
     /// The text, with breaks as [`LINE_BREAK`], [`PAGE_BREAK`],
     /// [`COLUMN_BREAK`] and tabs as `\t`. A column break that ends a
     /// paragraph is not kept: the next paragraph starts a new column.
@@ -162,6 +172,12 @@ pub struct Paragraph {
     /// The style of the layout that starts at this paragraph, by
     /// `sf:style`: the first paragraph of each `sf:layout`.
     pub layout: Option<String>,
+    /// The names of the hidden marks (`sf:toc-bookmark`) in the paragraph,
+    /// by which entries of tables of contents find it.
+    pub marks: Vec<String>,
+    /// Whether the paragraph is an entry of a table of contents (`sf:toc`).
+    /// Neighbors are one table.
+    pub toc: bool,
     /// The text, in runs.
     pub runs: Vec<Run>,
 }
@@ -374,6 +390,10 @@ fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Ve
         section: None,
         layout: None,
         column_break: false,
+        in_toc: false,
+        link: None,
+        bookmark: None,
+        marks: Vec::new(),
         note_break: false,
         note_ends: Vec::new(),
     };
@@ -501,7 +521,7 @@ const IGNORED: &[&str] = &[
 /// Elements around text that the reader keeps, by recording the element
 /// and reading what it holds: tracked changes, whose text Pages shows with
 /// its markup, and bookmarks.
-const WRAPPERS: &[&str] = &["change-ref", "changed-ref", "changes-ref", "bookmark"];
+const WRAPPERS: &[&str] = &["change-ref", "changed-ref", "changes-ref"];
 
 struct BodyReader<'a, 'b> {
     ids: &'a Ids<'a>,
@@ -511,6 +531,13 @@ struct BodyReader<'a, 'b> {
     layout: Option<String>,
     /// Whether the next paragraph starts a new column.
     column_break: bool,
+    /// Whether the paragraphs read are entries of a table of contents.
+    in_toc: bool,
+    /// The link and the bookmark that the text read now is in, and the
+    /// marks of the paragraph read.
+    link: Option<String>,
+    bookmark: Option<String>,
+    marks: Vec<String>,
     /// Whether the paragraph being read ends a note.
     note_break: bool,
     /// The number of paragraphs read when each note ended.
@@ -546,6 +573,16 @@ impl BodyReader<'_, '_> {
                     self.block(child);
                 }
                 "text-body" => self.block(child),
+                // A table of contents: its entries, each a paragraph.
+                "toc" => {
+                    let outer = std::mem::replace(&mut self.in_toc, true);
+                    for content in child.elements() {
+                        for entry in content.elements() {
+                            self.block(entry);
+                        }
+                    }
+                    self.in_toc = outer;
+                }
                 name if IGNORED.contains(&name) => {}
                 _ => self.skip(child),
             }
@@ -564,9 +601,12 @@ impl BodyReader<'_, '_> {
             column_break_before: std::mem::take(&mut self.column_break),
             section: self.section.take(),
             layout: self.layout.take(),
+            marks: Vec::new(),
+            toc: self.in_toc,
             runs: Vec::new(),
         };
         self.inline(element, None, &mut paragraph.runs);
+        paragraph.marks = std::mem::take(&mut self.marks);
         // A column break ends its paragraph, as a return does.
         if let Some(last) = paragraph.runs.last_mut()
             && last.text.ends_with(COLUMN_BREAK)
@@ -585,7 +625,7 @@ impl BodyReader<'_, '_> {
     fn inline(&mut self, element: &Element, style: Option<&str>, runs: &mut Vec<Run>) {
         for node in &element.children {
             match node {
-                Node::Text(text) => push(runs, style, text),
+                Node::Text(text) => self.push(runs, style, text),
                 Node::Element(child)
                     if child.name.ns == SF && WRAPPERS.contains(&child.name.local.as_str()) =>
                 {
@@ -597,31 +637,58 @@ impl BodyReader<'_, '_> {
                 Node::Element(child) if child.name.ns == SF => {
                     let child = self.ids.deref(child);
                     match child.name.local.as_str() {
-                        "span" | "link" => {
+                        "span" => {
                             let inner = child.attr(SF, "style").or(style);
                             self.inline(child, inner, runs);
+                        }
+                        "link" => {
+                            let outer = self.link.take();
+                            self.link = child
+                                .attr("", "href")
+                                .or(child.attr(SF, "href"))
+                                .map(str::to_owned);
+                            let inner = child.attr(SF, "style").or(style);
+                            self.inline(child, inner, runs);
+                            self.link = outer;
+                        }
+                        "bookmark" => {
+                            let outer = self.bookmark.take();
+                            self.bookmark = child.attr(SF, "name").map(str::to_owned);
+                            self.inline(child, style, runs);
+                            self.bookmark = outer;
+                        }
+                        "toc-bookmark" => {
+                            if let Some(name) = child.attr(SF, "name") {
+                                self.marks.push(name.to_owned());
+                            }
+                        }
+                        "toc-pagenum" => {
+                            let field = Field::PageOf {
+                                bookmark: child.attr(SF, "bookmark").unwrap_or_default().to_owned(),
+                            };
+                            self.push_field(runs, style, field);
                         }
                         // Placeholder text of a template, which Pages
                         // shows and prints until it is replaced.
                         "ghost-text" | "ghost-text-ref" => self.inline(child, style, runs),
-                        "lnbr" => push(runs, style, &LINE_BREAK.to_string()),
-                        "pgbr" => push(runs, style, &PAGE_BREAK.to_string()),
-                        "contbr" => push(runs, style, &COLUMN_BREAK.to_string()),
-                        "tab" => push(runs, style, "\t"),
-                        "page-number" => push_field(runs, style, Field::PageNumber),
-                        "page-count" => push_field(runs, style, Field::PageCount),
+                        "lnbr" => self.push(runs, style, &LINE_BREAK.to_string()),
+                        "pgbr" => self.push(runs, style, &PAGE_BREAK.to_string()),
+                        "contbr" => self.push(runs, style, &COLUMN_BREAK.to_string()),
+                        "tab" => self.push(runs, style, "\t"),
+                        "page-number" => self.push_field(runs, style, Field::PageNumber),
+                        "page-count" => self.push_field(runs, style, Field::PageCount),
                         "date-time" => {
                             let field = Field::DateTime {
                                 format: child.attr(SF, "format").unwrap_or_default().to_owned(),
                                 shown: child.text(),
                             };
-                            push_field(runs, style, field);
+                            self.push_field(runs, style, field);
                         }
                         "filename" => {
                             let field = Field::FileName {
                                 shown: child.text(),
                             };
-                            push_field(runs, style, field);
+                            self.push_field(runs, style, field);
                         }
                         "footnote" => {
                             let field = Field::Note {
@@ -632,9 +699,9 @@ impl BodyReader<'_, '_> {
                                     .flatten()
                                     .map(str::to_owned),
                             };
-                            push_field(runs, style, field);
+                            self.push_field(runs, style, field);
                         }
-                        "footnote-mark" => push_field(runs, style, Field::NoteMark),
+                        "footnote-mark" => self.push_field(runs, style, Field::NoteMark),
                         "footnotebr" => self.note_break = true,
                         name if IGNORED.contains(&name) => {}
                         _ => self.skip(child),
@@ -646,26 +713,37 @@ impl BodyReader<'_, '_> {
     }
 }
 
-/// Adds text to the last run when it has the same style and is not a
-/// field.
-fn push(runs: &mut Vec<Run>, style: Option<&str>, text: &str) {
-    match runs.last_mut() {
-        Some(last) if last.style.as_deref() == style && last.field.is_none() => {
-            last.text.push_str(text);
+impl BodyReader<'_, '_> {
+    /// Adds text to the last run when it has the same style, link and
+    /// bookmark and is not a field.
+    fn push(&self, runs: &mut Vec<Run>, style: Option<&str>, text: &str) {
+        match runs.last_mut() {
+            Some(last)
+                if last.style.as_deref() == style
+                    && last.field.is_none()
+                    && last.link == self.link
+                    && last.bookmark == self.bookmark =>
+            {
+                last.text.push_str(text);
+            }
+            _ => runs.push(Run {
+                style: style.map(str::to_owned),
+                field: None,
+                link: self.link.clone(),
+                bookmark: self.bookmark.clone(),
+                text: text.to_owned(),
+            }),
         }
-        _ => runs.push(Run {
-            style: style.map(str::to_owned),
-            field: None,
-            text: text.to_owned(),
-        }),
     }
-}
 
-/// Adds a field, as a run of its own.
-fn push_field(runs: &mut Vec<Run>, style: Option<&str>, field: Field) {
-    runs.push(Run {
-        style: style.map(str::to_owned),
-        field: Some(field),
-        text: FIELD.to_string(),
-    });
+    /// Adds a field, as a run of its own.
+    fn push_field(&self, runs: &mut Vec<Run>, style: Option<&str>, field: Field) {
+        runs.push(Run {
+            style: style.map(str::to_owned),
+            field: Some(field),
+            link: self.link.clone(),
+            bookmark: self.bookmark.clone(),
+            text: FIELD.to_string(),
+        });
+    }
 }

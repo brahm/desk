@@ -342,7 +342,7 @@ impl Value {
                     right: get("right"),
                 }
             }
-            "paragraphstyle" | "characterstyle" => element
+            "paragraphstyle" | "characterstyle" | "tocstyle" => element
                 .attr(SF, "ident")
                 .map_or_else(|| Self::Other("style".into()), |i| Self::StyleRef(i.into())),
             other => Self::Other(other.to_owned()),
@@ -470,7 +470,9 @@ pub struct Style {
 impl Style {
     fn read(ids: &Ids<'_>, element: &Element) -> Option<Self> {
         let family = match element.name.local.as_str() {
-            "paragraphstyle" => Family::Paragraph,
+            // The styles of the entries of tables of contents are
+            // paragraph styles.
+            "paragraphstyle" | "tocstyle" => Family::Paragraph,
             "characterstyle" => Family::Character,
             "layoutstyle" => Family::Layout,
             "sectionstyle" => Family::Section,

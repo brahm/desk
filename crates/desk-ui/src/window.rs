@@ -34,6 +34,8 @@ const REVEAL_EDGE: f64 = 4.0;
 
 /// What an action of the window does.
 type WindowAction = fn(&Rc<DocumentWindow>);
+/// What an action of the menus does to the editor of a window.
+type EditorAction = fn(&TextEditor);
 
 /// A window and the document it shows, if any.
 pub struct DocumentWindow {
@@ -87,7 +89,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 50] = [
+const DOCUMENT_ACTIONS: [&str; 54] = [
     "save",
     "save-as",
     "save-copy",
@@ -120,6 +122,10 @@ const DOCUMENT_ACTIONS: [&str; 50] = [
     "insert-note",
     "next-note",
     "previous-note",
+    "insert-toc",
+    "update-toc",
+    "insert-link",
+    "insert-bookmark",
     "find",
     "find-next",
     "find-previous",
@@ -1335,6 +1341,25 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
 
+        // Tables of contents, links and bookmarks (EST-22, EST-25,
+        // EST-26).
+        let structure: [(&str, EditorAction); 4] = [
+            ("insert-toc", TextEditor::insert_table_of_contents),
+            ("update-toc", TextEditor::update_tables_of_contents),
+            ("insert-link", TextEditor::insert_link),
+            ("insert-bookmark", TextEditor::insert_bookmark),
+        ];
+        for (name, run) in structure {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                    run(&editor);
+                }
+            });
+            self.window.add_action(&action);
+        }
+
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);
         import.connect_activate(move |_, _| {
@@ -1782,8 +1807,9 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     menu
 }
 
-/// The breaks, fields and notes of the Insert menu (EST-04, EST-08,
-/// EST-09, EST-13, EST-15, EST-16, EST-27).
+/// The breaks, fields, notes, tables of contents, links and bookmarks of
+/// the Insert menu (EST-04, EST-08, EST-09, EST-13, EST-15, EST-16,
+/// EST-22, EST-25, EST-26, EST-27).
 fn insert_menu() -> gio::Menu {
     let breaks = gio::Menu::new();
     breaks.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
@@ -1802,10 +1828,19 @@ fn insert_menu() -> gio::Menu {
     notes.append(Some(&tr("Foot_note")), Some("win.insert-note"));
     notes.append(Some(&tr("Ne_xt Note")), Some("win.next-note"));
     notes.append(Some(&tr("Pre_vious Note")), Some("win.previous-note"));
+    let structure = gio::Menu::new();
+    structure.append(Some(&tr("_Table of Contents")), Some("win.insert-toc"));
+    structure.append(
+        Some(&tr("Update Table of C_ontents")),
+        Some("win.update-toc"),
+    );
+    structure.append(Some(&tr("_Hyperlink")), Some("win.insert-link"));
+    structure.append(Some(&tr("_Bookmark")), Some("win.insert-bookmark"));
     let menu = gio::Menu::new();
     menu.append_section(None, &breaks);
     menu.append_section(None, &fields);
     menu.append_section(None, &notes);
+    menu.append_section(None, &structure);
     menu
 }
 
