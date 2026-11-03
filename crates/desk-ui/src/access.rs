@@ -4,7 +4,8 @@
 //! The text of a document as assistive technologies read it: the
 //! paragraphs one after the other, each ending with a new line, with
 //! offsets counted in characters, as the accessibility interfaces of GTK
-//! count them.
+//! count them. A field reads as what it shows, such as the number of its
+//! page, rather than as the character that holds its place (EST-27).
 
 use desk_layout::DocumentLayout;
 use desk_model::Document;
@@ -35,6 +36,9 @@ pub struct AccessText {
     paragraphs: Vec<u32>,
     /// The character ranges of the lines, in order.
     lines: Vec<(u32, u32)>,
+    /// For each paragraph, its fields: where each is in the paragraph, in
+    /// bytes, and how many characters its text has.
+    fields: Vec<Vec<(usize, u32)>>,
 }
 
 impl AccessText {
@@ -42,15 +46,36 @@ impl AccessText {
     pub fn new(document: &Document, layout: &DocumentLayout) -> Self {
         let mut text = String::new();
         let mut paragraphs = Vec::new();
+        let mut fields = Vec::new();
         let mut chars = 0u32;
         let mut texts = Vec::new();
-        for paragraph in document.body().iter() {
+        for (index, paragraph) in document.body().iter().enumerate() {
+            let values = layout.field_values.get(index).cloned().unwrap_or_default();
             let t = paragraph.text();
             paragraphs.push(chars);
-            chars += t.chars().count() as u32 + 1;
-            text.push_str(&t);
+            let mut own = Vec::new();
+            let mut at = 0;
+            let start = text.len();
+            for run in paragraph.runs() {
+                match run.attrs.field.clone().flatten() {
+                    Some(field) => {
+                        for c in run.text().chars() {
+                            let shown = values.text(&field);
+                            own.push((at, shown.chars().count() as u32));
+                            text.push_str(&shown);
+                            at += c.len_utf8();
+                        }
+                    }
+                    None => {
+                        text.push_str(run.text());
+                        at += run.len();
+                    }
+                }
+            }
+            chars += text[start..].chars().count() as u32 + 1;
             text.push('\n');
             texts.push(t);
+            fields.push(own);
         }
         let mut lines = Vec::new();
         for page in &layout.pages {
@@ -60,7 +85,8 @@ impl AccessText {
                 else {
                     continue;
                 };
-                let count = |bytes: usize| t.get(..bytes).map_or(0, |s| s.chars().count()) as u32;
+                let own = &fields[line.paragraph];
+                let count = |bytes: usize| characters(t, own, bytes);
                 let range = &line.line.range;
                 let mut end = start + count(range.end);
                 // The last line of a paragraph takes its new line.
@@ -74,6 +100,7 @@ impl AccessText {
             text,
             paragraphs,
             lines,
+            fields,
         }
     }
 
@@ -102,7 +129,11 @@ impl AccessText {
             .get(spot.paragraph)
             .map(|p| p.text())
             .unwrap_or_default();
-        start + text.get(..spot.offset).map_or(0, |s| s.chars().count()) as u32
+        let fields = self
+            .fields
+            .get(spot.paragraph)
+            .map_or(&[][..], Vec::as_slice);
+        start + characters(&text, fields, spot.offset)
     }
 
     /// The text between two character offsets.
@@ -180,6 +211,19 @@ impl AccessText {
     }
 }
 
+/// How many characters of the text read come before a byte of a
+/// paragraph, each field counting as the characters it shows.
+fn characters(text: &str, fields: &[(usize, u32)], bytes: usize) -> u32 {
+    let before = text.get(..bytes).map_or(0, |s| s.chars().count()) as u32;
+    fields
+        .iter()
+        .filter(|(at, _)| *at < bytes)
+        .map(|&(_, shown)| i64::from(shown) - 1)
+        .sum::<i64>()
+        .saturating_add(i64::from(before))
+        .max(0) as u32
+}
+
 /// What changed between two texts: where the change starts, how many
 /// characters it removed, and how many it inserted.
 pub fn change(old: &str, new: &str) -> (u32, u32, u32) {
@@ -243,6 +287,64 @@ mod tests {
         // One line each, with its new line.
         assert_eq!(access.range_at(3, Unit::Line), (0, 15));
         assert_eq!(access.range_at(17, Unit::Line), (15, 20));
+    }
+
+    #[test]
+    fn est_27_fields_read_as_what_they_show() {
+        use desk_model::{CharAttrs, FIELD_CHARACTER, Field};
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Field", |edit| {
+                let at = edit.insert_text(start, "Page ")?;
+                let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+                edit.set_character_attrs(
+                    at,
+                    after,
+                    &CharAttrs {
+                        field: Some(Some(Field::PageCount {
+                            format: desk_model::NumberFormat::UpperRoman,
+                        })),
+                        ..CharAttrs::default()
+                    },
+                )?;
+                edit.insert_text(after, " end")
+            })
+            .unwrap();
+        let mut document = editor.into_document();
+        // Four pages, so the count reads IV.
+        let mut editor = Editor::new(document);
+        editor
+            .edit("Pages", |edit| {
+                let id = edit.document().body().get(0).unwrap().id();
+                let mut at = Position::new(id, edit.document().body().get(0).unwrap().len());
+                for _ in 0..3 {
+                    at = edit.split_paragraph(at)?;
+                    edit.set_paragraph_attrs(
+                        at,
+                        at,
+                        &desk_model::ParaAttrs {
+                            page_break_before: Some(true),
+                            ..Default::default()
+                        },
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        document = editor.into_document();
+        let layout = desk_layout::paginate(&document, &mut TextSystem::new());
+        let access = AccessText::new(&document, &layout);
+        assert!(
+            access.text().starts_with("Page IV end\n"),
+            "{:?}",
+            access.text()
+        );
+        // After the field, offsets count its two letters.
+        let after = "Page ".len() + FIELD_CHARACTER.len_utf8();
+        assert_eq!(access.offset_of(&document, Spot::new(0, after)), 7);
+        assert_eq!(access.offset_of(&document, Spot::new(0, 5)), 5);
+        assert_eq!(access.range_at(0, Unit::Line), (0, 12));
     }
 
     #[test]

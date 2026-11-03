@@ -149,6 +149,28 @@ impl Edit {
     /// where it was. When the text spans paragraphs, they join into the
     /// first one, which keeps its style.
     pub fn delete(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
+        // The notes whose marks go: those with no mark left go too
+        // (EST-13).
+        let mut marked: Vec<NodeId> = Vec::new();
+        for (id, range) in self.doc.paragraph_ranges(start, end)? {
+            for run in self.doc.paragraph(id)?.slice(range)? {
+                if let Some(Some(crate::Field::NoteMark { note })) = run.attrs.field
+                    && !marked.contains(&note)
+                {
+                    marked.push(note);
+                }
+            }
+        }
+        let at = self.delete_text(start, end)?;
+        for note in marked {
+            if self.doc.notes().get(note).is_some() && !self.doc.has_note_mark(note) {
+                self.set_note(note, None)?;
+            }
+        }
+        Ok(at)
+    }
+
+    fn delete_text(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
         let ranges = self.doc.paragraph_ranges(start, end)?;
         let (first, first_range) = ranges[0].clone();
         if ranges.len() == 1 {

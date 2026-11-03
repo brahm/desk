@@ -165,3 +165,75 @@ fn est_27_auto_page_numbers_fill_the_footers_of_every_section() {
         assert!(section.first_page_different && section.left_right_different);
     }
 }
+
+#[test]
+fn est_13_a_copied_mark_has_its_own_note_and_a_deleted_one_takes_it_away() {
+    use desk_model::{Note, ParaAttrs, Paragraph, Position, Run};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let note = editor
+        .edit("Note", |edit| {
+            let at = edit.insert_text(start, "A")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            edit.insert_text(after, "B")?;
+            let style = edit.document().styles().default_paragraph();
+            let text = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                [
+                    Run::with_attrs(&FIELD_CHARACTER.to_string(), None, mark),
+                    Run::new(" said"),
+                ],
+            )?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![text].into(),
+                }),
+            )?;
+            Ok(note)
+        })
+        .unwrap();
+    let paragraph = start.paragraph;
+    let fragment = editor
+        .document()
+        .copy_fragment(Position::new(paragraph, 0), Position::new(paragraph, 4))
+        .unwrap();
+    assert_eq!(fragment.notes.len(), 1);
+    editor
+        .edit("Paste", |edit| {
+            edit.paste_fragment(Position::new(paragraph, 5), &fragment)
+                .map(|_| ())
+        })
+        .unwrap();
+    let document = editor.document();
+    let copies: Vec<_> = document.notes().iter().map(|n| n.id).collect();
+    assert_eq!(copies.len(), 2);
+    let copy = copies.into_iter().find(|&id| id != note).unwrap();
+    assert!(document.has_note_mark(note) && document.has_note_mark(copy));
+    // The copy's text starts with its own mark.
+    let first = &document.notes().get(copy).unwrap().paragraphs[0];
+    let own = first.runs().next().unwrap().attrs.field.clone();
+    assert_eq!(own, Some(Some(Field::NoteMark { note: copy })));
+
+    // Deleting the first mark takes its note away; undo brings it back.
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(paragraph, 1), Position::new(paragraph, 4))
+                .map(|_| ())
+        })
+        .unwrap();
+    assert!(editor.document().notes().get(note).is_none());
+    assert!(editor.document().notes().get(copy).is_some());
+    editor.undo().unwrap();
+    assert!(editor.document().notes().get(note).is_some());
+}

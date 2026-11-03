@@ -157,6 +157,10 @@ pub struct DocumentLayout {
     /// paragraph that starts it, or none for those of the first section
     /// (EST-16).
     pub section_margins: Vec<Option<desk_model::NodeId>>,
+    /// What the fields of each paragraph of the body show, when the
+    /// document has fields (EST-27); empty when it is laid out without
+    /// them.
+    pub field_values: Vec<FieldValues>,
 }
 
 impl DocumentLayout {
@@ -241,6 +245,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     place_margins(document, &mut layout, system);
+    layout.field_values = values;
     layout
 }
 
@@ -1052,6 +1057,7 @@ impl Paginator<'_> {
             pages: self.pages,
             sections: self.sections,
             section_margins: self.section_margins,
+            field_values: Vec::new(),
         }
     }
 

@@ -408,6 +408,18 @@ impl Document {
         None
     }
 
+    /// Whether the body holds a mark of a note.
+    pub fn has_note_mark(&self, note: NodeId) -> bool {
+        self.body().iter().any(|p| {
+            p.runs().any(|r| {
+                matches!(
+                    r.attrs.field,
+                    Some(Some(crate::Field::NoteMark { note: n })) if n == note
+                )
+            })
+        })
+    }
+
     /// The notes.
     pub fn notes(&self) -> &Notes {
         match &self.container {
