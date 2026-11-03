@@ -634,6 +634,14 @@ def header_on_the_page(work):
 
         wait_for("the file saved again", undone)
         check("Undo takes back the header as one action", text_of(document) == "US Letter, landscape\n")
+
+        # F9 shows the thumbnails of the pages (INT-19).
+        press("F9")
+        wait_for(
+            "the thumbnail of the first page",
+            lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
+        )
+        check("F9 shows the page thumbnails (INT-19)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
