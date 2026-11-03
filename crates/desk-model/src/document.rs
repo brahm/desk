@@ -249,6 +249,8 @@ pub struct Statistics {
     pub characters: usize,
     /// Characters that are not white space.
     pub characters_without_spaces: usize,
+    /// Sections that the text is in (DOC-20, EST-16).
+    pub sections: usize,
 }
 
 impl Statistics {
@@ -453,6 +455,7 @@ impl Document {
         for paragraph in self.body().iter() {
             statistics.add_text(&paragraph.text());
         }
+        statistics.sections = self.sections_between(0, self.body().len().saturating_sub(1));
         statistics
     }
 
@@ -472,6 +475,9 @@ impl Document {
                 .collect();
             statistics.add_text(&text);
         }
+        let body = self.body();
+        let index = |id| body.index_of(id).ok_or(ModelError::UnknownParagraph(id));
+        statistics.sections = self.sections_between(index(start.paragraph)?, index(end.paragraph)?);
         Ok(statistics)
     }
 

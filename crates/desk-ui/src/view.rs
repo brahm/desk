@@ -615,8 +615,18 @@ fn draw_invisibles(
         gtk::cairo::FontWeight::Normal,
     );
     for mark in marks {
-        cr.set_font_size((mark.ascent * 0.7 * scale).max(4.0));
-        let text = mark.kind.mark();
+        let size = (mark.ascent * 0.7 * scale).max(4.0);
+        let Some(text) = mark.kind.mark() else {
+            draw_break(
+                cr,
+                mark.kind,
+                rect.x + mark.x0 * scale + 1.0,
+                rect.y + mark.baseline * scale,
+                size,
+            );
+            continue;
+        };
+        cr.set_font_size(size);
         let Ok(extents) = cr.text_extents(text) else {
             continue;
         };
@@ -627,6 +637,53 @@ fn draw_invisibles(
         cr.move_to(rect.x + x, rect.y + mark.baseline * scale);
         cr.show_text(text).ok();
     }
+}
+
+/// The mark of a break, as the table of invisibles of Pages draws it: a
+/// sheet with a folded corner for a page, a frame split in two for a
+/// column, a frame with a band above for a layout, and a sheet with a
+/// bar and lines for a section. It stands on the baseline at `x`, `size`
+/// high.
+fn draw_break(cr: &gtk::cairo::Context, kind: Invisible, x: f64, baseline: f64, size: f64) {
+    let (h, w) = (size, size * 0.75);
+    let (left, top) = (x, baseline - h);
+    cr.set_line_width((size / 10.0).max(1.0));
+    let line = |x0: f64, y0: f64, x1: f64, y1: f64| {
+        cr.move_to(left + x0, top + y0);
+        cr.line_to(left + x1, top + y1);
+    };
+    match kind {
+        Invisible::PageBreak => {
+            let fold = w * 0.35;
+            cr.move_to(left, top);
+            cr.line_to(left + w - fold, top);
+            cr.line_to(left + w, top + fold);
+            cr.line_to(left + w, top + h);
+            cr.line_to(left, top + h);
+            cr.close_path();
+            line(w - fold, 0.0, w - fold, fold);
+            cr.line_to(left + w, top + fold);
+        }
+        Invisible::ColumnBreak => {
+            cr.rectangle(left, top, w, h);
+            line(w / 2.0, 0.0, w / 2.0, h);
+        }
+        Invisible::LayoutBreak => {
+            cr.rectangle(left, top, w, h);
+            line(0.0, h * 0.25, w, h * 0.25);
+            line(w / 2.0, h * 0.25, w / 2.0, h);
+        }
+        Invisible::SectionBreak => {
+            cr.rectangle(left, top, w, h);
+            cr.stroke().ok();
+            cr.rectangle(left, top, w * 0.3, h);
+            cr.fill().ok();
+            line(w * 0.5, h * 0.35, w * 0.8, h * 0.35);
+            line(w * 0.5, h * 0.55, w * 0.8, h * 0.55);
+        }
+        _ => {}
+    }
+    cr.stroke().ok();
 }
 
 /// The shadow and white sheet of a page.

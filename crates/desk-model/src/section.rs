@@ -195,6 +195,14 @@ impl Document {
             })
             .unwrap_or((None, self.page_setup().section))
     }
+
+    /// How many sections paragraphs `first` to `last` of the body are in
+    /// (DOC-20).
+    pub fn sections_between(&self, first: usize, last: usize) -> usize {
+        1 + (first + 1..=last)
+            .filter(|&i| matches!(self.start_at(i), Some(Start::Section(..))))
+            .count()
+    }
 }
 
 #[cfg(test)]
@@ -265,6 +273,15 @@ mod tests {
         assert_eq!(document.layout_at(2), (Some(2), Layout::default()));
         let last = document.body().get(2).unwrap().attrs();
         assert_eq!(last.column_break_before, Some(true));
+        // DOC-20: a layout break leaves the text in one section.
+        assert_eq!(document.statistics().sections, 2);
+        assert_eq!(document.sections_between(0, 1), 1);
+        assert_eq!(document.sections_between(1, 2), 2);
+        let (one, three) = (
+            Position::new(document.body().get(1).unwrap().id(), 0),
+            Position::new(document.body().get(2).unwrap().id(), 2),
+        );
+        assert_eq!(document.statistics_between(one, three).unwrap().sections, 2);
         assert!(last.start.is_some());
     }
 }
