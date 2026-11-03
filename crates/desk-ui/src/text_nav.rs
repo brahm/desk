@@ -446,17 +446,42 @@ pub enum Invisible {
     LineBreak,
     /// The end of a paragraph.
     Paragraph,
+    /// The end of a paragraph before a page break.
+    PageBreak,
+    /// The end of a paragraph before a column break.
+    ColumnBreak,
+    /// The end of a paragraph before a layout break.
+    LayoutBreak,
+    /// The end of a paragraph before a section break.
+    SectionBreak,
 }
 
 impl Invisible {
-    /// The mark drawn for it, as in Pages.
-    pub fn mark(self) -> &'static str {
+    /// The mark drawn for it, as in Pages, or `None` for a break, which
+    /// is drawn as a small picture of what it starts.
+    pub fn mark(self) -> Option<&'static str> {
         match self {
-            Self::Space => "·",
-            Self::NoBreakSpace => "°",
-            Self::Tab => "→",
-            Self::LineBreak => "↵",
-            Self::Paragraph => "¶",
+            Self::Space => Some("·"),
+            Self::NoBreakSpace => Some("°"),
+            Self::Tab => Some("→"),
+            Self::LineBreak => Some("↵"),
+            Self::Paragraph => Some("¶"),
+            Self::PageBreak | Self::ColumnBreak | Self::LayoutBreak | Self::SectionBreak => None,
+        }
+    }
+
+    /// The mark of the end of a paragraph, which Pages draws as the break
+    /// that starts the next one, if any (INT-10).
+    fn end_of(next: Option<&desk_model::Paragraph>) -> Self {
+        let Some(attrs) = next.map(desk_model::Paragraph::attrs) else {
+            return Self::Paragraph;
+        };
+        match attrs.start.as_ref().and_then(|s| s.as_deref()) {
+            Some(desk_model::Start::Section(..)) => Self::SectionBreak,
+            Some(desk_model::Start::Layout(_)) => Self::LayoutBreak,
+            None if attrs.page_break_before == Some(true) => Self::PageBreak,
+            None if attrs.column_break_before == Some(true) => Self::ColumnBreak,
+            None => Self::Paragraph,
         }
     }
 }
@@ -517,7 +542,7 @@ pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<Invisible
                 let end = x(text.len());
                 marks.push(InvisibleMark {
                     page,
-                    kind: Invisible::Paragraph,
+                    kind: Invisible::end_of(document.body().get(line.paragraph + 1)),
                     x0: end,
                     x1: end,
                     baseline,
@@ -690,6 +715,80 @@ mod tests {
         assert!(marks[0].ascent > 0.0);
         // The empty paragraph ends at its start, on the next line.
         assert!(marks[3].baseline > marks[2].baseline);
+    }
+
+    #[test]
+    fn int_10_the_end_before_a_break_is_drawn_as_the_break() {
+        use desk_model::{Layout, ParaAttrs, Section, Start};
+        use std::sync::Arc;
+        let mut editor = Editor::new(document(&["a", "b", "c", "d", "e"]));
+        editor
+            .edit("Breaks", |edit| {
+                let breaks = [
+                    ParaAttrs {
+                        page_break_before: Some(true),
+                        ..ParaAttrs::default()
+                    },
+                    ParaAttrs {
+                        column_break_before: Some(true),
+                        ..ParaAttrs::default()
+                    },
+                    ParaAttrs {
+                        start: Some(Some(Arc::new(Start::Layout(Layout::default())))),
+                        ..ParaAttrs::default()
+                    },
+                    ParaAttrs {
+                        start: Some(Some(Arc::new(Start::Section(
+                            Section::default(),
+                            Layout::default(),
+                        )))),
+                        ..ParaAttrs::default()
+                    },
+                ];
+                for (index, attrs) in breaks.iter().enumerate() {
+                    let id = edit.document().body().get(index + 1).unwrap().id();
+                    let at = Position::new(id, 0);
+                    edit.set_paragraph_attrs(at, at, attrs)?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        let doc = editor.into_document();
+        let kinds: Vec<_> = invisibles(&doc, &laid_out(&doc))
+            .iter()
+            .map(|m| m.kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                Invisible::PageBreak,
+                Invisible::ColumnBreak,
+                Invisible::LayoutBreak,
+                Invisible::SectionBreak,
+                Invisible::Paragraph
+            ]
+        );
+        assert!(kinds[..4].iter().all(|k| k.mark().is_none()));
+        // Deleting the mark of a break removes the break with it.
+        let mut editor = Editor::new(doc);
+        editor
+            .edit("Delete", |edit| {
+                let body = edit.document().body();
+                let (a, b) = (body.get(0).unwrap().id(), body.get(1).unwrap().id());
+                edit.delete(Position::new(a, 1), Position::new(b, 0))
+            })
+            .unwrap();
+        let doc = editor.into_document();
+        assert_eq!(doc.body().get(0).unwrap().text(), "ab");
+        assert_ne!(
+            doc.body().get(0).unwrap().attrs().page_break_before,
+            Some(true)
+        );
+        let kinds: Vec<_> = invisibles(&doc, &laid_out(&doc))
+            .iter()
+            .map(|m| m.kind)
+            .collect();
+        assert_eq!(kinds[0], Invisible::ColumnBreak);
     }
 
     #[test]

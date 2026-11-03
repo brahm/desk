@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-03 11:04+0000\n"
+"POT-Creation-Date: 2026-11-03 14:34+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,7 +19,7 @@ msgstr ""
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
 #: crates/desk-ui/src/area.rs:43 crates/desk-ui/src/formatting.rs:509
-#: crates/desk-ui/src/links_pane.rs:69 crates/desk-ui/src/writing_tools.rs:114
+#: crates/desk-ui/src/links_pane.rs:69 crates/desk-ui/src/writing_tools.rs:115
 msgid "Document"
 msgstr ""
 
@@ -2424,15 +2424,19 @@ msgstr ""
 msgid "Paragraphs"
 msgstr ""
 
-#: crates/desk-ui/src/writing_tools.rs:83
+#: crates/desk-ui/src/writing_tools.rs:81
+msgid "Sections"
+msgstr ""
+
+#: crates/desk-ui/src/writing_tools.rs:84
 msgid "Pages"
 msgstr ""
 
-#: crates/desk-ui/src/writing_tools.rs:112
+#: crates/desk-ui/src/writing_tools.rs:113
 msgid "Selection"
 msgstr ""
 
-#: crates/desk-ui/src/writing_tools.rs:119
+#: crates/desk-ui/src/writing_tools.rs:120
 msgid "Statistics"
 msgstr ""
 

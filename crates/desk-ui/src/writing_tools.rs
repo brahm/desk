@@ -78,6 +78,7 @@ pub fn rows(statistics: &Statistics, lines: usize, pages: Option<usize>) -> Vec<
         ),
         (tr("Paragraphs"), statistics.paragraphs.to_string()),
         (tr("Lines"), lines.to_string()),
+        (tr("Sections"), statistics.sections.to_string()),
     ];
     if let Some(pages) = pages {
         out.push((tr("Pages"), pages.to_string()));
@@ -151,11 +152,13 @@ mod tests {
             words: 5,
             characters: 30,
             characters_without_spaces: 25,
+            sections: 2,
         };
-        assert_eq!(rows(&statistics, 7, None).len(), 5);
+        assert_eq!(rows(&statistics, 7, None).len(), 6);
         let rows = rows(&statistics, 7, Some(3));
         assert_eq!(rows.last().map(|r| r.1.as_str()), Some("3"));
-        // DOC-20: the lines, before the pages.
-        assert_eq!(rows[rows.len() - 2].1, "7");
+        // DOC-20: the lines and the sections, before the pages.
+        assert_eq!(rows[rows.len() - 3].1, "7");
+        assert_eq!(rows[rows.len() - 2].1, "2");
     }
 }
