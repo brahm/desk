@@ -148,14 +148,15 @@ impl Thumbnails {
                 .css_classes(["caption"])
                 .build();
             let item = gtk::Box::builder()
+                .accessible_role(gtk::AccessibleRole::Group)
                 .orientation(gtk::Orientation::Vertical)
                 .spacing(4)
                 .build();
             item.append(&picture);
             item.append(&label);
-            item.update_property(&[gtk::accessible::Property::Label(
-                &tr("Page {n}").replace("{n}", &number),
-            )]);
+            let name = tr("Page {n}").replace("{n}", &number);
+            picture.set_alternative_text(Some(&name));
+            item.update_property(&[gtk::accessible::Property::Label(&name)]);
             self.connect_page(&item, index, section);
             if let Some((_, frame)) = &frame {
                 frame.append(&item);
