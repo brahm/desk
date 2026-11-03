@@ -642,7 +642,7 @@ fn est_12_est_16_headers_of_sections_saved_by_pages_are_read() {
         .body()
         .iter()
         .filter_map(|p| match p.attrs().start.clone().flatten().as_deref() {
-            Some(Start::Section(section, _)) => Some((p.id(), section.clone())),
+            Some(Start::Section(section, _)) => Some((p.id(), *section)),
             _ => None,
         })
         .collect();
