@@ -593,6 +593,7 @@ fn a_style_named_like_the_default_keeps_one_name() {
             parent: None,
             next: None,
             list_style: None,
+            master_page: None,
             properties: odf::Properties::default(),
         }],
         ..odf::TextDocument::default()
@@ -621,6 +622,7 @@ fn control_characters_in_style_names_are_kept() {
             parent: None,
             next: None,
             list_style: None,
+            master_page: None,
             properties: odf::Properties::default(),
         }],
         ..odf::TextDocument::default()
@@ -1497,5 +1499,118 @@ fn est_22_to_est_26_tables_of_contents_links_and_bookmarks_are_kept() {
     assert_eq!(
         attrs(body[4], "Chapter").bookmark.flatten().as_deref(),
         Some("Two")
+    );
+}
+
+#[test]
+fn est_12_est_16_est_27_sections_keep_their_headers_and_fields_their_formats() {
+    use desk_model::{
+        Editor, FIELD_CHARACTER, Field, MarginKind, MarginPages, MarginPlace, NumberFormat,
+        Position, Section, Start,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let header = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    let second = editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Two")?;
+            let mut setup = *edit.document().page_setup();
+            setup.headers = true;
+            edit.set_page_setup(setup)?;
+            let body = edit.document().styles().default_paragraph();
+            let field = |field| {
+                Run::with_attrs(
+                    &FIELD_CHARACTER.to_string(),
+                    None,
+                    CharAttrs {
+                        field: Some(Some(field)),
+                        ..CharAttrs::default()
+                    },
+                )
+            };
+            let first = Paragraph::from_runs(
+                edit.new_id(),
+                body,
+                ParaAttrs::default(),
+                [
+                    Run::new("Page "),
+                    field(Field::PageNumber {
+                        format: NumberFormat::LowerRoman,
+                    }),
+                    Run::new(" "),
+                    field(Field::DateTime {
+                        pattern: "y".into(),
+                        shown: "2026".into(),
+                        update: true,
+                    }),
+                    Run::new(" "),
+                    field(Field::FileName {
+                        shown: "Notes".into(),
+                        path: false,
+                        extension: false,
+                    }),
+                ],
+            )?;
+            edit.set_header_footer(header, vec![first])?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section {
+                            own_margins: true,
+                            ..Section::default()
+                        },
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let own = Paragraph::from_runs(
+                edit.new_id(),
+                body,
+                ParaAttrs::default(),
+                [Run::new("Chapter two")],
+            )?;
+            edit.set_section_header_footer(Some(at.paragraph), header, vec![own])?;
+            Ok(at.paragraph)
+        })
+        .unwrap();
+    let document = editor.document();
+    assert_eq!(document.headers_section(1), Some(second));
+
+    let bytes = write_odt(document).unwrap();
+    keep("filters-section-headers.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let second = read.body().get(1).unwrap().id();
+    assert_eq!(read.headers_section(1), Some(second));
+    assert_eq!(read.headers_section(0), None);
+    assert_eq!(
+        read.section_headers_footers(Some(second)).get(header)[0].text(),
+        "Chapter two"
+    );
+    let fields: Vec<Field> = read.headers_footers().get(header)[0]
+        .runs()
+        .filter_map(|r| r.attrs.field.clone().flatten())
+        .collect();
+    assert_eq!(
+        fields,
+        [
+            Field::PageNumber {
+                format: NumberFormat::LowerRoman
+            },
+            Field::DateTime {
+                pattern: "y".into(),
+                shown: "2026".into(),
+                update: true,
+            },
+            Field::FileName {
+                shown: "Notes".into(),
+                path: false,
+                extension: false,
+            },
+        ]
     );
 }

@@ -472,3 +472,121 @@ fn est_05_keep_with_next_moves_to_the_next_column() {
     let lines = &layout.pages[0].lines;
     assert_eq!(lines[2].origin.0, 155.0);
 }
+
+/// A document with these paragraphs, the first header of the document
+/// and the headers of the sections that start at the given paragraphs.
+fn with_headers(
+    texts: &[&str],
+    header: &str,
+    sections: &[(usize, bool, Option<&str>)],
+) -> Document {
+    use desk_model::{
+        Editor, MarginKind, MarginPages, MarginPlace, ParaAttrs, Paragraph, Position, Run,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let mut ids = vec![start.paragraph];
+            let mut at = edit.insert_text(start, texts[0])?;
+            for text in &texts[1..] {
+                at = edit.split_paragraph(at)?;
+                ids.push(at.paragraph);
+                at = edit.insert_text(at, text)?;
+            }
+            let mut page = setup(200.0);
+            page.headers = true;
+            page.header_margin = Length::from_points(10);
+            edit.set_page_setup(page)?;
+            let body = edit.document().styles().default_paragraph();
+            let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+            let paragraph = |edit: &mut desk_model::Edit, text: &str| {
+                let id = edit.new_id();
+                Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new(text)])
+            };
+            let first = paragraph(edit, header)?;
+            edit.set_header_footer(place, vec![first])?;
+            for &(index, own, text) in sections {
+                let id = ids[index];
+                edit.set_paragraph_attrs(
+                    Position::new(id, 0),
+                    Position::new(id, 0),
+                    &ParaAttrs {
+                        start: Some(Some(Arc::new(Start::Section(
+                            Section {
+                                own_margins: own,
+                                ..Section::default()
+                            },
+                            Layout::default(),
+                        )))),
+                        ..ParaAttrs::default()
+                    },
+                )?;
+                if let Some(text) = text {
+                    let own = paragraph(edit, text)?;
+                    edit.set_section_header_footer(Some(id), place, vec![own])?;
+                }
+            }
+            Ok(())
+        })
+        .unwrap();
+    editor.into_document()
+}
+
+/// The words of the header of each page.
+fn headers(layout: &DocumentLayout) -> Vec<usize> {
+    layout.pages.iter().map(|p| p.margin_lines.len()).collect()
+}
+
+#[test]
+fn est_12_a_tall_header_pushes_the_body_down() {
+    let mut system = TextSystem::new();
+    let tall = ["line"; 4].join(&LINE_BREAK.to_string());
+    let document = with_headers(&["Text"], &tall, &[]);
+    let layout = paginate(&document, &mut system);
+    let page = &layout.pages[0];
+    let header_bottom = page
+        .margin_lines
+        .iter()
+        .map(|l| l.origin.1 + l.line.top + l.line.height)
+        .fold(0.0f32, f32::max);
+    assert!(header_bottom > 20.0, "the header reaches past the margin");
+    assert!((page.body.0 - header_bottom).abs() < 0.5, "{:?}", page.body);
+    assert!(page.lines[0].top() >= header_bottom - 0.01);
+    // A shorter header moves the body less, and never above the margin.
+    let document = with_headers(&["Text"], "Short", &[]);
+    let layout = paginate(&document, &mut system);
+    let short = &layout.pages[0];
+    let short_bottom = short
+        .margin_lines
+        .iter()
+        .map(|l| l.origin.1 + l.line.top + l.line.height)
+        .fold(0.0f32, f32::max);
+    assert!(short_bottom < header_bottom);
+    assert!(
+        (short.body.0 - short_bottom.max(20.0)).abs() < 0.5,
+        "{:?}",
+        short.body
+    );
+    assert!(short.body.0 < page.body.0);
+}
+
+#[test]
+fn est_12_est_16_sections_show_their_own_headers_or_the_ones_before() {
+    let mut system = TextSystem::new();
+    let two = ["line"; 2].join(&LINE_BREAK.to_string());
+    let three = ["line"; 3].join(&LINE_BREAK.to_string());
+    let document = with_headers(
+        &["One", "Two", "Three", "Four"],
+        "Header",
+        &[
+            (1, true, Some(&two)),
+            (2, false, None),
+            (3, true, Some(&three)),
+        ],
+    );
+    let layout = paginate(&document, &mut system);
+    assert_eq!(layout.pages.len(), 4);
+    // The third section uses the headers of the second.
+    assert_eq!(headers(&layout), [1, 2, 2, 3]);
+}

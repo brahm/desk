@@ -15,6 +15,7 @@
 use std::sync::Arc;
 
 use crate::id::NodeId;
+use crate::list::NumberFormat;
 use crate::text::Paragraph;
 
 /// The character that holds the place of a field in the text.
@@ -24,9 +25,15 @@ pub const FIELD_CHARACTER: char = '\u{fffc}';
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Field {
     /// The number of the page it is on.
-    PageNumber,
+    PageNumber {
+        /// How the number is written.
+        format: NumberFormat,
+    },
     /// The number of pages of the document.
-    PageCount,
+    PageCount {
+        /// How the number is written.
+        format: NumberFormat,
+    },
     /// A date and time, as it was when the field was inserted or last
     /// updated.
     DateTime {
@@ -35,11 +42,18 @@ pub enum Field {
         pattern: Arc<str>,
         /// The date as it shows.
         shown: Arc<str>,
+        /// Whether it shows the date of the day the document is opened,
+        /// as Pages' "Automatically update on open".
+        update: bool,
     },
     /// The name of the file of the document.
     FileName {
         /// The name as it shows.
         shown: Arc<str>,
+        /// Whether the folder of the file shows before its name.
+        path: bool,
+        /// Whether the extension of the file shows after its name.
+        extension: bool,
     },
     /// The mark of a note (EST-13, EST-14): where the body refers to it,
     /// and at the start of its text. It shows the number of the note, or
@@ -57,17 +71,84 @@ pub enum Field {
 }
 
 impl Field {
+    /// The number of the page, in digits.
+    pub const PAGE_NUMBER: Self = Self::PageNumber {
+        format: NumberFormat::Decimal,
+    };
+    /// The number of pages, in digits.
+    pub const PAGE_COUNT: Self = Self::PageCount {
+        format: NumberFormat::Decimal,
+    };
+
     /// The text that the field shows on a page with a number, in a
     /// document of so many pages.
     pub fn text(&self, page: u32, pages: u32) -> String {
         match self {
-            Self::PageNumber => page.to_string(),
-            Self::PageCount => pages.to_string(),
-            Self::DateTime { shown, .. } | Self::FileName { shown } => shown.to_string(),
+            Self::PageNumber { format } => format.write(page),
+            Self::PageCount { format } => format.write(pages),
+            Self::DateTime { shown, .. } | Self::FileName { shown, .. } => shown.to_string(),
             // Layout numbers the notes, and knows the pages of
             // paragraphs.
             Self::NoteMark { .. } | Self::PageOf { .. } => String::new(),
         }
+    }
+}
+
+/// Writes today's date in a pattern of LDML, or `None` when it cannot.
+pub type DateWriter<'a> = &'a dyn Fn(&str) -> Option<String>;
+
+/// The name of a file as a field of it shows it: its folder before it,
+/// and its extension after it, when the field shows them. `file` is the
+/// path of the file, or only its name when it has no folder yet.
+pub fn file_shown(file: &str, path: bool, extension: bool) -> String {
+    let (folder, name) = match file.rfind('/') {
+        Some(at) => (&file[..at], &file[at + 1..]),
+        None => ("", file),
+    };
+    let name = match name.rfind('.') {
+        Some(at) if !extension && at > 0 => &name[..at],
+        _ => name,
+    };
+    if path && !folder.is_empty() {
+        format!("{folder}/{name}")
+    } else {
+        name.to_owned()
+    }
+}
+
+impl Field {
+    /// The field again for a file and, when it shows the date the
+    /// document is opened, for the date of today written by `date` from
+    /// its pattern. None when it stays as it is.
+    pub fn refreshed(&self, file: &str, date: Option<DateWriter<'_>>) -> Option<Self> {
+        let field = match self {
+            Self::FileName {
+                shown,
+                path,
+                extension,
+            } => {
+                let now = file_shown(file, *path, *extension);
+                (now != **shown).then(|| Self::FileName {
+                    shown: now.into(),
+                    path: *path,
+                    extension: *extension,
+                })?
+            }
+            Self::DateTime {
+                pattern,
+                shown,
+                update: true,
+            } => {
+                let now = date.and_then(|date| date(pattern))?;
+                (now != **shown).then(|| Self::DateTime {
+                    pattern: pattern.clone(),
+                    shown: now.into(),
+                    update: true,
+                })?
+            }
+            _ => return None,
+        };
+        Some(field)
     }
 }
 
@@ -136,7 +217,8 @@ impl MarginPlace {
         Self::new(kind, pages)
     }
 
-    fn index(self) -> usize {
+    /// Its place among [`MarginPlace::ALL`].
+    pub fn index(self) -> usize {
         let kind = match self.kind {
             MarginKind::Header => 0,
             MarginKind::Footer => 3,
@@ -195,12 +277,42 @@ mod tests {
 
     #[test]
     fn est_27_fields_show_their_value() {
-        assert_eq!(Field::PageNumber.text(3, 9), "3");
-        assert_eq!(Field::PageCount.text(3, 9), "9");
+        assert_eq!(Field::PAGE_NUMBER.text(3, 9), "3");
+        assert_eq!(Field::PAGE_COUNT.text(3, 9), "9");
+        let roman = Field::PageNumber {
+            format: NumberFormat::LowerRoman,
+        };
+        assert_eq!(roman.text(4, 9), "iv");
         let date = Field::DateTime {
             pattern: "d/M/y".into(),
             shown: "1/11/2026".into(),
+            update: false,
         };
         assert_eq!(date.text(1, 1), "1/11/2026");
+    }
+
+    #[test]
+    fn est_27_file_names_show_their_folder_and_extension() {
+        let file = "/home/ana/Cartas/Convite.odt";
+        assert_eq!(file_shown(file, false, true), "Convite.odt");
+        assert_eq!(file_shown(file, false, false), "Convite");
+        assert_eq!(file_shown(file, true, true), file);
+        assert_eq!(file_shown(file, true, false), "/home/ana/Cartas/Convite");
+        assert_eq!(file_shown("Sem título", true, false), "Sem título");
+        assert_eq!(file_shown(".hidden", false, false), ".hidden");
+        let date = Field::DateTime {
+            pattern: "y".into(),
+            shown: "2025".into(),
+            update: true,
+        };
+        let today = |_: &str| Some("2026".to_owned());
+        let refreshed = date.refreshed("", Some(&today)).unwrap();
+        assert_eq!(refreshed.text(1, 1), "2026");
+        let fixed = Field::DateTime {
+            pattern: "y".into(),
+            shown: "2025".into(),
+            update: false,
+        };
+        assert_eq!(fixed.refreshed("", Some(&today)), None);
     }
 }

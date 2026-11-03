@@ -74,7 +74,10 @@ pub use format::{
     LineSpacing, LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow, TabAlignment, TabLeader,
     TabStop, TabStops,
 };
-pub use header::{FIELD_CHARACTER, Field, HeadersFooters, MarginKind, MarginPages, MarginPlace};
+pub use header::{
+    DateWriter, FIELD_CHARACTER, Field, HeadersFooters, MarginKind, MarginPages, MarginPlace,
+    file_shown,
+};
 pub use id::NodeId;
 pub use list::{
     LIST_LEVELS, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind, NumberFormat,

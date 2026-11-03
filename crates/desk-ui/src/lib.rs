@@ -20,6 +20,7 @@ mod bullet_pictures;
 mod editing;
 mod effects;
 mod eyedropper;
+mod fields;
 mod find;
 mod fonts;
 mod formatting;

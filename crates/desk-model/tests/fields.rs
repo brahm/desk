@@ -29,7 +29,7 @@ fn est_27_fields_stay_with_their_character() {
                 start,
                 end,
                 &CharAttrs {
-                    field: Some(Some(Field::PageNumber)),
+                    field: Some(Some(Field::PAGE_NUMBER)),
                     weight: Some(FontWeight::BOLD),
                     ..CharAttrs::default()
                 },
@@ -41,7 +41,7 @@ fn est_27_fields_stay_with_their_character() {
     let after = editor
         .edit("Typing", |edit| edit.insert_text(end, "x"))
         .unwrap();
-    assert_eq!(field(editor.document(), 0), Some(Some(Field::PageNumber)));
+    assert_eq!(field(editor.document(), 0), Some(Some(Field::PAGE_NUMBER)));
     assert_eq!(field(editor.document(), end.offset), None);
     let paragraph = editor.document().body().get(0).unwrap();
     assert_eq!(
@@ -56,7 +56,7 @@ fn est_27_fields_stay_with_their_character() {
     let paragraph = editor.document().body().get(0).unwrap();
     let first = paragraph.runs().next().unwrap();
     assert_eq!(first.attrs.weight, None);
-    assert_eq!(first.attrs.field, Some(Some(Field::PageNumber)));
+    assert_eq!(first.attrs.field, Some(Some(Field::PAGE_NUMBER)));
 
     // A character style cannot hold a field.
     let id = editor
@@ -64,7 +64,7 @@ fn est_27_fields_stay_with_their_character() {
             edit.new_character_style(
                 "Numbered",
                 CharAttrs {
-                    field: Some(Some(Field::PageCount)),
+                    field: Some(Some(Field::PAGE_COUNT)),
                     ..CharAttrs::default()
                 },
                 start,

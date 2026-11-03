@@ -1101,18 +1101,21 @@ fn section(sheet: &Stylesheet, style: Option<&str>) -> Section {
 /// The field of the model for a field of Pages (EST-27).
 fn model_field(field: &iwork::Field) -> Field {
     match field {
-        iwork::Field::PageNumber => Field::PageNumber,
-        iwork::Field::PageCount => Field::PageCount,
+        iwork::Field::PageNumber => Field::PAGE_NUMBER,
+        iwork::Field::PageCount => Field::PAGE_COUNT,
         iwork::Field::DateTime { format, shown } => Field::DateTime {
             pattern: format.as_str().into(),
             shown: shown.as_str().into(),
+            update: false,
         },
         iwork::Field::FileName { shown } => Field::FileName {
             shown: shown.as_str().into(),
+            path: shown.contains('/'),
+            extension: shown.rsplit('/').next().is_some_and(|n| n.contains('.')),
         },
         // The importer numbers the notes.
         iwork::Field::Note { .. } | iwork::Field::NoteMark | iwork::Field::PageOf { .. } => {
-            Field::PageNumber
+            Field::PAGE_NUMBER
         }
     }
 }
@@ -1332,6 +1335,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
                 built.clear();
             }
             importer.document.apply(Op::SetHeaderFooter {
+                section: None,
                 place,
                 paragraphs: built,
             })?;

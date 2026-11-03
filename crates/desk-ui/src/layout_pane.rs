@@ -127,6 +127,9 @@ pub struct LayoutGroups {
     first_different: adw::SwitchRow,
     /// Whether left pages have a header and footer of their own (EST-19).
     left_right_different: adw::SwitchRow,
+    /// Whether the section shows the headers and footers of the one
+    /// before (EST-12).
+    previous_margins: adw::SwitchRow,
     units: Cell<Units>,
     /// The page setup, layout and section shown.
     shown: RefCell<(PageSetup, Layout, Section)>,
@@ -191,6 +194,11 @@ impl LayoutGroups {
             .title(tr("Different Left and Right Pages"))
             .subtitle(tr("Left pages have a header and footer of their own"))
             .build();
+        let previous_margins = adw::SwitchRow::builder()
+            .title(tr("Use Previous Headers and Footers"))
+            .subtitle(tr("Those of the section before, rather than its own"))
+            .active(true)
+            .build();
         let section_group = adw::PreferencesGroup::builder()
             .title(tr("Section"))
             .build();
@@ -199,6 +207,7 @@ impl LayoutGroups {
         section_group.add(&first_number);
         section_group.add(&first_different);
         section_group.add(&left_right_different);
+        section_group.add(&previous_margins);
 
         let this = Rc::new(Self {
             page_group,
@@ -221,6 +230,7 @@ impl LayoutGroups {
             first_number,
             first_different,
             left_right_different,
+            previous_margins,
             units: Cell::new(units),
             shown: RefCell::new(Default::default()),
             updating: Cell::new(false),
@@ -288,7 +298,11 @@ impl LayoutGroups {
                 this.section_changed();
             }
         });
-        for row in [&self.first_different, &self.left_right_different] {
+        for row in [
+            &self.first_different,
+            &self.left_right_different,
+            &self.previous_margins,
+        ] {
             let weak = Rc::downgrade(self);
             row.connect_active_notify(move |_| {
                 if let Some(this) = weak.upgrade()
@@ -345,6 +359,10 @@ impl LayoutGroups {
 
     /// Shows the layout and section at the selection.
     pub fn show(&self, format: &Format) {
+        // The first section has headers and footers of its own (EST-12).
+        self.updating.set(true);
+        self.previous_margins.set_visible(!format.first_section);
+        self.updating.set(false);
         self.show_structure(format.setup, format.layout, format.section);
     }
 
@@ -414,6 +432,9 @@ impl LayoutGroups {
         if self.left_right_different.is_active() != section.left_right_different {
             self.left_right_different
                 .set_active(section.left_right_different);
+        }
+        if self.previous_margins.is_active() == section.own_margins {
+            self.previous_margins.set_active(!section.own_margins);
         }
         set(
             &self.first_number,
@@ -491,6 +512,7 @@ impl LayoutGroups {
                 .then(|| self.first_number.value().round() as u32),
             first_page_different: self.first_different.is_active(),
             left_right_different: self.left_right_different.is_active(),
+            own_margins: !self.previous_margins.is_active() && self.previous_margins.is_visible(),
         };
         if section != shown
             && let Some(editor) = (self.editor)()

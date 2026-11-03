@@ -56,21 +56,7 @@ pub enum FieldKind {
     FileName,
 }
 
-/// The pattern of the dates that Insert puts, in the symbols of Unicode,
-/// and the same in those of GLib.
-const DATE_PATTERN: (&str, &str) = ("d MMMM y", "%-d %B %Y");
-
-/// A field of today's date.
-pub fn today() -> Field {
-    let shown = glib::DateTime::now_local()
-        .and_then(|now| now.format(DATE_PATTERN.1))
-        .map(|s| s.to_string())
-        .unwrap_or_default();
-    Field::DateTime {
-        pattern: DATE_PATTERN.0.into(),
-        shown: shown.into(),
-    }
-}
+pub use crate::fields::today;
 
 /// Whether a paragraph is an item of a list: its list style has a label at
 /// its level.
@@ -373,6 +359,11 @@ pub struct Format {
     pub layout: Layout,
     /// The section that the selection starts in.
     pub section: Section,
+    /// Whether that section is the first one of the document.
+    pub first_section: bool,
+    /// The section whose headers and footers the selection shows, by the
+    /// paragraph that starts it, or none for the first one's (EST-16).
+    pub headers_section: Option<desk_model::NodeId>,
     /// The headers and footers of the document.
     pub headers: desk_model::HeadersFooters,
     /// The note whose mark is at the cursor, or nearest to it in its
@@ -884,13 +875,13 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
-    /// Sets the name of the file of the document, which fields of the file
-    /// name show.
+    /// Sets the file of the document, its path or only its name when it
+    /// has none, which fields of the file name show.
     pub fn set_file_name(&self, name: &str) {
         self.state.borrow_mut().file_name = name.to_owned();
     }
 
-    /// The name of the file of the document.
+    /// The file of the document: its path, or only its name.
     pub fn file_name(&self) -> String {
         self.state.borrow().file_name.clone()
     }
@@ -898,13 +889,103 @@ impl TextEditor {
     /// A field of the file name, or of today's date, as Insert makes them.
     pub fn new_field(&self, kind: FieldKind) -> Field {
         match kind {
-            FieldKind::PageNumber => Field::PageNumber,
-            FieldKind::PageCount => Field::PageCount,
+            FieldKind::PageNumber => Field::PAGE_NUMBER,
+            FieldKind::PageCount => Field::PAGE_COUNT,
             FieldKind::Date => today(),
             FieldKind::FileName => Field::FileName {
-                shown: self.file_name().into(),
+                shown: desk_model::file_shown(&self.file_name(), false, true).into(),
+                path: false,
+                extension: true,
             },
         }
+    }
+
+    /// The field at the cursor that has a format (EST-27): the one
+    /// selected, or just after or before the cursor. With the spot where
+    /// it starts.
+    pub fn field_at_cursor(&self) -> Option<(Spot, Field)> {
+        let state = self.state.borrow();
+        let (start, _) = state.selection.ordered();
+        let paragraph = state.editor.document().body().get(start.paragraph)?;
+        let mut offset = 0;
+        let mut before = None;
+        for run in paragraph.runs() {
+            let end = offset + run.len();
+            if let Some(Some(field)) = &run.attrs.field
+                && !matches!(field, Field::NoteMark { .. } | Field::PageOf { .. })
+            {
+                let found = (Spot::new(start.paragraph, offset), field.clone());
+                if offset <= start.offset && start.offset < end {
+                    return Some(found);
+                }
+                if end == start.offset {
+                    before = Some(found);
+                }
+            }
+            offset = end;
+        }
+        before
+    }
+
+    /// Selects the field under a point of the view, as a secondary click
+    /// on it does before its menu opens. Whether there was one.
+    pub fn select_field_at(&self, x: f64, y: f64) -> bool {
+        let Some(spot) = self.spot_at(x, y) else {
+            return false;
+        };
+        let (start, end) = self.selection().ordered();
+        // A click inside the selection keeps it.
+        if start != end && start <= spot && spot <= end {
+            return false;
+        }
+        self.select(Selection::cursor(spot));
+        match self.field_at_cursor() {
+            Some((at, _)) => {
+                self.select(Selection {
+                    anchor: at,
+                    focus: Spot::new(at.paragraph, at.offset + FIELD_CHARACTER.len_utf8()),
+                });
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Changes the field at the cursor, as the menu of a field does.
+    pub fn set_field_at_cursor(&self, field: Field) {
+        let Some((spot, old)) = self.field_at_cursor() else {
+            return;
+        };
+        if old == field {
+            return;
+        }
+        let file = self.file_name();
+        // A new format of a file name or date shows at once.
+        let field = field
+            .refreshed(&file, Some(&crate::fields::format_date))
+            .unwrap_or(field);
+        self.format_edit("Field Format", move |edit| {
+            let at = at_spot(edit.document(), spot)?;
+            let end =
+                desk_model::Position::new(at.paragraph, at.offset + FIELD_CHARACTER.len_utf8());
+            edit.set_character_attrs(
+                at,
+                end,
+                &CharAttrs {
+                    field: Some(Some(field)),
+                    ..CharAttrs::default()
+                },
+            )
+        });
+    }
+
+    /// Shows the file in the fields of the file name, as when the
+    /// document is saved under another name (EST-27).
+    pub fn refresh_fields(&self) {
+        let file = self.file_name();
+        self.format_edit("Update Fields", move |edit| {
+            edit.refresh_fields(&file, None)
+        });
     }
 
     /// Puts a field at the cursor, or in place of the selection (EST-27).
@@ -1356,10 +1437,17 @@ impl TextEditor {
     pub fn set_header_footer_text(&self, place: MarginPlace, text: &str) {
         let file_name = self.file_name();
         let text = text.to_owned();
+        let (start, _) = self.selection().ordered();
         self.format_edit("Header and Footer", move |edit| {
-            let old = edit.document().headers_footers().get(place).to_vec();
+            // Those of the section at the cursor (EST-16).
+            let section = edit.document().headers_section(start.paragraph);
+            let old = edit
+                .document()
+                .section_headers_footers(section)
+                .get(place)
+                .to_vec();
             let paragraphs = crate::headers_pane::paragraphs(edit, &text, &old, &file_name)?;
-            edit.set_header_footer(place, paragraphs)
+            edit.set_section_header_footer(section, place, paragraphs)
         });
     }
 
@@ -1745,7 +1833,11 @@ impl TextEditor {
             setup: *document.page_setup(),
             layout: document.layout_at(start.paragraph).1,
             section: document.section_at(start.paragraph).1,
-            headers: document.headers_footers().clone(),
+            first_section: document.section_at(start.paragraph).0.is_none(),
+            headers_section: document.headers_section(start.paragraph),
+            headers: document
+                .section_headers_footers(document.headers_section(start.paragraph))
+                .clone(),
             note: note_at(document, start),
             link: link_at(document, start).map(|(link, _)| link),
             bookmarks: bookmarks(document)

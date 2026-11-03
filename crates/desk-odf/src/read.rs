@@ -76,6 +76,14 @@ pub fn read_streams(
         }
         if let Some(master) = master_page(styles) {
             document.master = read_master(master);
+            let name = master.attr(STYLE, "name");
+            if let Some(masters) = styles.child(OFFICE, "master-styles") {
+                document.masters = masters
+                    .children_named(STYLE, "master-page")
+                    .filter(|m| m.attr(STYLE, "name") != name)
+                    .filter_map(|m| Some((m.attr(STYLE, "name")?.to_owned(), read_master(m))))
+                    .collect();
+            }
         }
     }
     if let Some(automatic) = content.child(OFFICE, "automatic-styles") {
@@ -164,6 +172,10 @@ impl Reader {
             parent: element.attr(STYLE, "parent-style-name").map(str::to_owned),
             next: element.attr(STYLE, "next-style-name").map(str::to_owned),
             list_style: element.attr(STYLE, "list-style-name").map(str::to_owned),
+            master_page: element
+                .attr(STYLE, "master-page-name")
+                .filter(|n| !n.is_empty())
+                .map(str::to_owned),
             properties: self.properties(element),
         })
     }
@@ -1048,14 +1060,22 @@ impl SpanBuilder {
                 "line-break" => return self.literal(style, &LINE_BREAK.to_string()),
                 // The page number of another page is only its text.
                 "page-number" if e.attr(TEXT, "select-page").is_none_or(|p| p == "current") => {
-                    return self.field(style, e, Field::PageNumber);
+                    let num_format = e.attr(STYLE, "num-format").map(str::to_owned);
+                    return self.field(style, e, Field::PageNumber { num_format });
                 }
-                "page-count" => return self.field(style, e, Field::PageCount),
+                "page-count" => {
+                    let num_format = e.attr(STYLE, "num-format").map(str::to_owned);
+                    return self.field(style, e, Field::PageCount { num_format });
+                }
                 "date" => {
                     let pattern = e.attr(DESK, "pattern").map(str::to_owned);
-                    return self.field(style, e, Field::Date { pattern });
+                    let fixed = e.attr(TEXT, "fixed") == Some("true");
+                    return self.field(style, e, Field::Date { pattern, fixed });
                 }
-                "file-name" => return self.field(style, e, Field::FileName),
+                "file-name" => {
+                    let display = e.attr(TEXT, "display").unwrap_or("full").to_owned();
+                    return self.field(style, e, Field::FileName { display });
+                }
                 "note" => return self.note(style, e),
                 "a" => {
                     let outer = self.link.take();

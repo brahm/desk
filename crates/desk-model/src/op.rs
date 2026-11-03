@@ -77,6 +77,9 @@ pub enum Op {
     },
     /// Sets the text of a header or a footer (EST-12, EST-19).
     SetHeaderFooter {
+        /// The section, by the paragraph that starts it; none for the
+        /// first section.
+        section: Option<NodeId>,
         /// The header or footer.
         place: MarginPlace,
         /// Its paragraphs; none to empty it.

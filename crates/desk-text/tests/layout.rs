@@ -800,7 +800,7 @@ fn est_22_a_field_after_a_right_tab_moves_with_it() {
         ..ParaFormat::default()
     };
     let field = CharFormat {
-        field: Some(desk_model::Field::PageNumber),
+        field: Some(desk_model::Field::PAGE_NUMBER),
         ..sans()
     };
     let text = ParagraphText::from_runs_in(

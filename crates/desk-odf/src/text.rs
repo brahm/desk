@@ -53,6 +53,9 @@ pub struct TextDocument {
     pub section_styles: Vec<SectionStyle>,
     /// The headers and footers of the master page.
     pub master: MasterPage,
+    /// The other master pages, by name, with the same page layout: the
+    /// headers and footers of later sections.
+    pub masters: Vec<(String, MasterPage)>,
     /// The automatic styles of `styles.xml`, which the paragraphs of the
     /// headers and footers name.
     pub master_styles: Vec<Style>,
@@ -349,6 +352,9 @@ pub struct Style {
     pub next: Option<String>,
     /// `style:list-style-name`, of a paragraph style: empty for no list.
     pub list_style: Option<String>,
+    /// `style:master-page-name`, of a paragraph style: the master page
+    /// that a paragraph of it starts, on a new page.
+    pub master_page: Option<String>,
     /// Properties of the properties elements.
     pub properties: Properties,
 }
@@ -773,17 +779,30 @@ pub struct Span {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Field {
     /// `text:page-number`, of the current page.
-    PageNumber,
+    PageNumber {
+        /// `style:num-format`: `1`, `i`, `I`, `a` or `A`.
+        num_format: Option<String>,
+    },
     /// `text:page-count`.
-    PageCount,
-    /// `text:date`, fixed at the date it shows. `desk:pattern` keeps the
-    /// pattern of the date in the symbols of Unicode.
+    PageCount {
+        /// `style:num-format`.
+        num_format: Option<String>,
+    },
+    /// `text:date`. `desk:pattern` keeps the pattern of the date in the
+    /// symbols of Unicode.
     Date {
         /// The pattern, as `EEEE, d MMMM y`.
         pattern: Option<String>,
+        /// `text:fixed`: whether it keeps the date it shows, rather than
+        /// showing the date the document is opened.
+        fixed: bool,
     },
     /// `text:file-name`, fixed at the name it shows.
-    FileName,
+    FileName {
+        /// `text:display`: `full`, `path`, `name` or
+        /// `name-and-extension`.
+        display: String,
+    },
     /// `text:bookmark-ref` with `text:reference-format="page"`: the
     /// number of the page of a bookmark, by its name.
     PageOf {

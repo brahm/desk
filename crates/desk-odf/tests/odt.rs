@@ -143,6 +143,7 @@ fn full_document() -> TextDocument {
                 parent: Some("Body".into()),
                 next: Some("Body".into()),
                 list_style: None,
+                master_page: Some("Desk1".into()),
                 properties: Properties {
                     paragraph: ParagraphProperties {
                         break_before: Some(Break::Page),
@@ -397,12 +398,34 @@ fn full_document() -> TextDocument {
         automatic_list_styles: Vec::new(),
         pictures: vec![("Pictures/bullet1.png".into(), b"\x89PNG picture".to_vec())],
         section_styles: Vec::new(),
+        masters: vec![(
+            "Desk1".into(),
+            MasterPage {
+                header: Some(HeaderFooter {
+                    display: true,
+                    paragraphs: vec![Paragraph {
+                        style: Some("Body".into()),
+                        spans: vec![span(None, "Chapter header")],
+                        ..Paragraph::default()
+                    }],
+                }),
+                ..MasterPage::default()
+            },
+        )],
         master: MasterPage {
             header: Some(HeaderFooter {
                 display: true,
                 paragraphs: vec![Paragraph {
                     style: Some("MP1".into()),
-                    spans: vec![span(None, "Página "), field(Field::PageNumber, "1")],
+                    spans: vec![
+                        span(None, "Página "),
+                        field(
+                            Field::PageNumber {
+                                num_format: Some("i".into()),
+                            },
+                            "i",
+                        ),
+                    ],
                     ..Paragraph::default()
                 }],
             }),
@@ -410,7 +433,12 @@ fn full_document() -> TextDocument {
                 display: true,
                 paragraphs: vec![Paragraph {
                     style: Some("Body".into()),
-                    spans: vec![field(Field::FileName, "notas.odt")],
+                    spans: vec![field(
+                        Field::FileName {
+                            display: "name-and-extension".into(),
+                        },
+                        "notas.odt",
+                    )],
                     ..Paragraph::default()
                 }],
             }),
@@ -419,11 +447,12 @@ fn full_document() -> TextDocument {
                 paragraphs: vec![Paragraph {
                     style: Some("Body".into()),
                     spans: vec![
-                        field(Field::PageCount, "3"),
+                        field(Field::PageCount { num_format: None }, "3"),
                         span(None, " "),
                         field(
                             Field::Date {
                                 pattern: Some("d/M/y".into()),
+                                fixed: false,
                             },
                             "1/11/2026",
                         ),
@@ -659,6 +688,7 @@ fn font_families_are_css_lists() {
         parent: None,
         next: None,
         list_style: None,
+        master_page: None,
         properties: Properties {
             text: TextProperties {
                 font_family: Some("O'Neil \\ Sans".into()),
@@ -851,6 +881,7 @@ fn est_07_est_16_sections_and_mirrored_pages_are_written_and_read_again() {
         parent: None,
         next: None,
         list_style: None,
+        master_page: None,
         properties: Properties {
             paragraph: ParagraphProperties {
                 break_before: Some(Break::Page),

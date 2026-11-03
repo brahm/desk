@@ -32,8 +32,8 @@ const PARAGRAPHS: &str = " ¶ ";
 /// The text of each field in a row.
 fn token(field: &Field) -> &'static str {
     match field {
-        Field::PageNumber => "{page}",
-        Field::PageCount => "{pages}",
+        Field::PageNumber { .. } => "{page}",
+        Field::PageCount { .. } => "{pages}",
         Field::DateTime { .. } => "{date}",
         Field::FileName { .. } => "{file}",
         Field::NoteMark { .. } | Field::PageOf { .. } => "",
@@ -96,11 +96,16 @@ pub fn paragraphs(
     };
     let date = kept("{date}").unwrap_or_else(crate::editing::today);
     let file = kept("{file}").unwrap_or_else(|| Field::FileName {
-        shown: file_name.into(),
+        shown: desk_model::file_shown(file_name, false, true).into(),
+        path: false,
+        extension: true,
     });
+    // Numbers of pages keep their format.
+    let page = kept("{page}").unwrap_or(Field::PAGE_NUMBER);
+    let pages = kept("{pages}").unwrap_or(Field::PAGE_COUNT);
     let fields = [
-        ("{page}", Field::PageNumber),
-        ("{pages}", Field::PageCount),
+        ("{page}", page),
+        ("{pages}", pages),
         ("{date}", date),
         ("{file}", file),
     ];
@@ -352,7 +357,9 @@ mod tests {
         assert_eq!(
             file.attrs.field,
             Some(Some(Field::FileName {
-                shown: "Notes.odt".into()
+                shown: "Notes.odt".into(),
+                path: false,
+                extension: true,
             }))
         );
         // A new text keeps the date and file name fields as they were.
