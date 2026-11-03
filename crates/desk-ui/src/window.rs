@@ -89,7 +89,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 55] = [
+const DOCUMENT_ACTIONS: [&str; 56] = [
     "save",
     "save-as",
     "save-copy",
@@ -117,6 +117,7 @@ const DOCUMENT_ACTIONS: [&str; 55] = [
     "insert-section-break",
     "insert-page-number",
     "insert-auto-page-numbers",
+    "columns",
     "insert-page-count",
     "insert-date",
     "insert-file-name",
@@ -530,8 +531,9 @@ impl DocumentWindow {
             fonts.show(&format.character, &format.paragraph);
         }
         let setup = *editor.document().page_setup();
-        self.ruler.show(setup, &format.paragraph);
-        self.vertical_ruler.show(setup, &format.paragraph);
+        self.ruler.show(setup, format.layout, &format.paragraph);
+        self.vertical_ruler
+            .show(setup, format.layout, &format.paragraph);
         let character = &format.character;
         for (name, on) in [
             ("bold", character.weight.is_bold()),
@@ -545,6 +547,11 @@ impl DocumentWindow {
             &self.window,
             "align",
             formatting::alignment_name(format.paragraph.alignment).to_variant(),
+        );
+        formatting::set_state(
+            &self.window,
+            "columns",
+            i32::from(format.layout.columns.count).to_variant(),
         );
     }
 
@@ -1389,6 +1396,33 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+
+        // The number of columns of the layout at the cursor, which keep
+        // their gap (EST-07).
+        let columns = gio::SimpleAction::new_stateful(
+            "columns",
+            Some(glib::VariantTy::INT32),
+            &1i32.to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        columns.connect_activate(move |action, count| {
+            let (Some(this), Some(count)) = (weak.upgrade(), count.and_then(|c| c.get::<i32>()))
+            else {
+                return;
+            };
+            if let Some(editor) = this.editor() {
+                let format = editor.format();
+                let gap = crate::layout_pane::gap(&format.setup, &format.layout);
+                let count = count.clamp(1, desk_model::MAX_COLUMNS as i32) as u8;
+                let layout =
+                    crate::layout_pane::with_columns(&format.setup, &format.layout, count, gap);
+                if layout != format.layout {
+                    editor.set_layout("Columns", layout);
+                }
+                action.set_state(&i32::from(count).to_variant());
+            }
+        });
+        self.window.add_action(&columns);
 
         let auto = gio::SimpleAction::new("insert-auto-page-numbers", None);
         let weak = Rc::downgrade(self);

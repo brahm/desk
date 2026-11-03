@@ -82,7 +82,7 @@ pub fn with_paper(setup: &PageSetup, paper: usize) -> PageSetup {
 }
 
 /// The width of the text of a layout, in points.
-fn layout_width(setup: &PageSetup, layout: &Layout) -> f64 {
+pub(crate) fn layout_width(setup: &PageSetup, layout: &Layout) -> f64 {
     (setup.width - setup.margin_left - setup.margin_right - layout.left - layout.right)
         .to_pt()
         .max(1.0)
@@ -103,6 +103,67 @@ pub fn with_columns(setup: &PageSetup, layout: &Layout, count: u8, gap: f64) -> 
     }
 }
 
+/// The width of a column, or the gap after it, set to `points`, as the
+/// table of columns of Pages' Layout inspector sets them: the columns
+/// stop being as wide as each other, and the column after it, or the one
+/// before the last, takes up the difference, keeping at least
+/// [`MIN_COLUMN`] points.
+pub fn set_column(
+    setup: &PageSetup,
+    layout: &Layout,
+    index: usize,
+    gap: bool,
+    points: f64,
+) -> Layout {
+    let width = layout_width(setup, layout);
+    let columns = layout.columns;
+    let count = usize::from(columns.count.clamp(1, MAX_COLUMNS as u8));
+    if index >= count || (gap && index + 1 >= count) || count < 2 {
+        return *layout;
+    }
+    // Uneven, from what the columns are now.
+    let spans = columns.spans(width);
+    let mut widths: Vec<f64> = spans.iter().map(|(_, w)| *w).collect();
+    let mut gaps: Vec<f64> = (0..count)
+        .map(|i| match spans.get(i + 1) {
+            Some((next, _)) => next - spans[i].0 - spans[i].1,
+            None => 0.0,
+        })
+        .collect();
+    let other = if gap || index + 1 < count {
+        index + 1
+    } else {
+        index - 1
+    };
+    let old = if gap { gaps[index] } else { widths[index] };
+    let floor = if gap { 0.0 } else { MIN_COLUMN };
+    let most = old + widths[other] - MIN_COLUMN;
+    let new = points.clamp(floor, most.max(floor));
+    let change = new - old;
+    if gap {
+        gaps[index] = new;
+    } else {
+        widths[index] = new;
+    }
+    widths[other] -= change;
+    let part = |points: f64| (points / width * f64::from(PARTS)).round().max(0.0) as u32;
+    let mut out = Columns {
+        equal: false,
+        ..columns
+    };
+    for i in 0..count {
+        out.widths[i] = part(widths[i]);
+        out.gaps[i] = part(gaps[i]);
+    }
+    Layout {
+        columns: out,
+        ..*layout
+    }
+}
+
+/// The narrowest a column gets, in points.
+pub const MIN_COLUMN: f64 = 18.0;
+
 /// The Page, Layout and Section groups of the Inspector.
 pub struct LayoutGroups {
     page_group: adw::PreferencesGroup,
@@ -116,6 +177,13 @@ pub struct LayoutGroups {
     section_group: adw::PreferencesGroup,
     columns: adw::SpinRow,
     gap: adw::SpinRow,
+    /// Whether the columns are as wide as each other (EST-07).
+    equal: adw::SwitchRow,
+    /// The width of each column and the gap after it, which uneven
+    /// columns have.
+    column_rows: adw::ExpanderRow,
+    widths: Vec<adw::SpinRow>,
+    gaps: Vec<adw::SpinRow>,
     before: adw::SpinRow,
     after: adw::SpinRow,
     left: adw::SpinRow,
@@ -162,6 +230,26 @@ impl LayoutGroups {
         page_group.add(&landscape);
         let columns = spin(tr("Columns"), 1.0, MAX_COLUMNS as f64);
         let gap = spin(tr("Gap Between Columns"), 0.0, 1.0);
+        let equal = adw::SwitchRow::builder()
+            .title(tr("Equal Column Width"))
+            .active(true)
+            .build();
+        let column_rows = adw::ExpanderRow::builder()
+            .title(tr("Column Widths"))
+            .build();
+        let mut widths = Vec::new();
+        let mut gaps = Vec::new();
+        for i in 0..MAX_COLUMNS {
+            let n = (i + 1).to_string();
+            let width = spin(tr("Column {n}").replace("{n}", &n), 0.0, 1.0);
+            column_rows.add_row(&width);
+            widths.push(width);
+            if i + 1 < MAX_COLUMNS {
+                let gap = spin(tr("Gap After Column {n}").replace("{n}", &n), 0.0, 1.0);
+                column_rows.add_row(&gap);
+                gaps.push(gap);
+            }
+        }
         let before = spin(tr("Before Layout"), 0.0, 1.0);
         let after = spin(tr("After Layout"), 0.0, 1.0);
         let left = spin(tr("Left Margin"), 0.0, 1.0);
@@ -170,7 +258,11 @@ impl LayoutGroups {
             .title(tr("Layout"))
             .description(tr("The columns and margins of the layout at the cursor"))
             .build();
-        for row in [&columns, &gap, &before, &after, &left, &right] {
+        layout_group.add(&columns);
+        layout_group.add(&gap);
+        layout_group.add(&equal);
+        layout_group.add(&column_rows);
+        for row in [&before, &after, &left, &right] {
             layout_group.add(row);
         }
         let start = adw::ComboRow::builder()
@@ -221,6 +313,10 @@ impl LayoutGroups {
             section_group,
             columns,
             gap,
+            equal,
+            column_rows,
+            widths,
+            gaps,
             before,
             after,
             left,
@@ -290,6 +386,43 @@ impl LayoutGroups {
                 }
             });
         }
+        for (gap, rows) in [(false, &self.widths), (true, &self.gaps)] {
+            for (index, row) in rows.iter().enumerate() {
+                let weak = Rc::downgrade(self);
+                row.connect_value_notify(move |row| {
+                    if let Some(this) = weak.upgrade()
+                        && !this.updating.get()
+                    {
+                        this.column_changed(index, gap, row.value());
+                    }
+                });
+            }
+        }
+        let weak = Rc::downgrade(self);
+        self.equal.connect_active_notify(move |row| {
+            if let Some(this) = weak.upgrade()
+                && !this.updating.get()
+            {
+                if !row.is_active() {
+                    // Uneven, but as wide as before until a width changes.
+                    let (setup, shown, _) = *this.shown.borrow();
+                    let layout = set_column(&setup, &shown, 0, false, {
+                        let spans = shown.columns.spans(layout_width(&setup, &shown));
+                        spans.first().map_or(0.0, |s| s.1)
+                    });
+                    if let Some(editor) = (this.editor)() {
+                        editor.set_layout("Layout", layout);
+                    }
+                    return;
+                }
+                // Equal again, with the gap shown.
+                let (setup, shown, _) = *this.shown.borrow();
+                let layout = with_columns(&setup, &shown, shown.columns.count, gap(&setup, &shown));
+                if let Some(editor) = (this.editor)() {
+                    editor.set_layout("Layout", layout);
+                }
+            }
+        });
         let weak = Rc::downgrade(self);
         self.start.connect_selected_notify(move |_| {
             if let Some(this) = weak.upgrade()
@@ -339,6 +472,9 @@ impl LayoutGroups {
     pub fn set_units(&self, units: Units) {
         self.updating.set(true);
         self.units.set(units);
+        for row in self.widths.iter().chain(&self.gaps) {
+            tab_stops::set_units(row, units, 0.0, 1584.0);
+        }
         for row in [
             &self.gap,
             &self.before,
@@ -412,6 +548,30 @@ impl LayoutGroups {
             &self.gap,
             tab_stops::in_units(Length::from_pt(gap(&setup, &layout)), units),
         );
+        let count = usize::from(layout.columns.count.max(1));
+        let uneven = count > 1 && !layout.columns.equal;
+        if self.equal.is_active() == uneven {
+            self.equal.set_active(!uneven);
+        }
+        self.equal.set_sensitive(count > 1);
+        self.gap.set_sensitive(count > 1 && !uneven);
+        self.column_rows.set_visible(count > 1);
+        let spans = layout.columns.spans(layout_width(&setup, &layout));
+        for (i, row) in self.widths.iter().enumerate() {
+            row.set_visible(i < count);
+            row.set_sensitive(uneven);
+            if let Some((_, w)) = spans.get(i) {
+                set(row, tab_stops::in_units(Length::from_pt(*w), units));
+            }
+        }
+        for (i, row) in self.gaps.iter().enumerate() {
+            row.set_visible(i + 1 < count);
+            row.set_sensitive(uneven);
+            if let (Some(this), Some(next)) = (spans.get(i), spans.get(i + 1)) {
+                let gap = next.0 - this.0 - this.1;
+                set(row, tab_stops::in_units(Length::from_pt(gap), units));
+            }
+        }
         set(&self.before, tab_stops::in_units(layout.before, units));
         set(&self.after, tab_stops::in_units(layout.after, units));
         set(&self.left, tab_stops::in_units(layout.left, units));
@@ -501,6 +661,19 @@ impl LayoutGroups {
         }
     }
 
+    /// A column or the gap after it changed width in the table of
+    /// columns.
+    fn column_changed(&self, index: usize, gap: bool, value: f64) {
+        let (setup, shown, _) = *self.shown.borrow();
+        let points = tab_stops::from_units(value, self.units.get()).to_pt();
+        let layout = set_column(&setup, &shown, index, gap, points);
+        if layout != shown
+            && let Some(editor) = (self.editor)()
+        {
+            editor.set_layout("Column Width", layout);
+        }
+    }
+
     fn section_changed(&self) {
         let (_, _, shown) = *self.shown.borrow();
         let section = Section {
@@ -525,6 +698,30 @@ impl LayoutGroups {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn est_07_a_column_wider_makes_the_next_one_narrower() {
+        let setup = PageSetup::a4();
+        let three = with_columns(&setup, &Layout::default(), 3, 12.0);
+        let width = layout_width(&setup, &three);
+        let before = three.columns.spans(width);
+        let wider = set_column(&setup, &three, 0, false, before[0].1 + 30.0);
+        assert!(!wider.columns.equal);
+        let after = wider.columns.spans(width);
+        assert!((after[0].1 - before[0].1 - 30.0).abs() < 0.01);
+        assert!((after[1].1 - before[1].1 + 30.0).abs() < 0.01);
+        assert!((after[2].1 - before[2].1).abs() < 0.01);
+        // The last column takes from the one before it.
+        let last = set_column(&setup, &three, 2, false, before[2].1 + 10.0);
+        let spans = last.columns.spans(width);
+        assert!((spans[1].1 - before[1].1 + 10.0).abs() < 0.01);
+        // A wider gap makes the next column narrower, and no column gets
+        // narrower than the least.
+        let gap = set_column(&setup, &three, 0, true, 10_000.0);
+        let spans = gap.columns.spans(width);
+        assert!((spans[1].1 - MIN_COLUMN).abs() < 0.01);
+        assert!((spans[2].0 + spans[2].1 - width).abs() < 0.01);
+    }
 
     #[test]
     fn est_01_paper_keeps_its_orientation() {
