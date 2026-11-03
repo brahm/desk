@@ -43,18 +43,31 @@ pub fn zoom_label(zoom: f64) -> String {
     format!("{}%", (zoom * 100.0).round())
 }
 
+/// How the zoom follows the size of the window (INT-08).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fit {
+    /// The pages fill the width.
+    Width,
+    /// A whole page shows.
+    Page,
+}
+
 /// The zoom at which a page of `page_width` points fills `width` logical
-/// pixels with the gap on each side.
-pub fn fit_width(page_width: f64, width: f64) -> f64 {
-    let available = (width - 2.0 * PAGE_GAP).max(1.0);
-    (available / (page_width * PIXELS_PER_POINT)).clamp(ZOOM_LEVELS[0], ZOOM_LEVELS[8])
+/// pixels with the gap on each side, or two pages side by side with the
+/// gap between them.
+pub fn fit_width(page_width: f64, width: f64, columns: usize) -> f64 {
+    let columns = columns.clamp(1, 2) as f64;
+    let available = (width - 2.0 * PAGE_GAP - (columns - 1.0) * PAGE_GAP).max(1.0);
+    (available / (columns * page_width * PIXELS_PER_POINT)).clamp(ZOOM_LEVELS[0], ZOOM_LEVELS[8])
 }
 
 /// The zoom at which a whole page of `page_width` by `page_height` points
-/// fits in `width` by `height` logical pixels.
-pub fn fit_page(page_width: f64, page_height: f64, width: f64, height: f64) -> f64 {
+/// fits in `width` by `height` logical pixels, or two side by side.
+pub fn fit_page(page_width: f64, page_height: f64, width: f64, height: f64, columns: usize) -> f64 {
     let tall = (height - 2.0 * PAGE_GAP).max(1.0) / (page_height * PIXELS_PER_POINT);
-    fit_width(page_width, width).min(tall).max(ZOOM_LEVELS[0])
+    fit_width(page_width, width, columns)
+        .min(tall)
+        .max(ZOOM_LEVELS[0])
 }
 
 /// A page placed in the document area, in logical pixels.
@@ -71,23 +84,43 @@ pub struct PageRect {
 }
 
 /// The pages stacked from top to bottom, centred in an area `area_width`
-/// pixels wide, and the size that the area needs to show them all.
-pub fn place_pages(sizes: &[(f64, f64)], zoom: f64, area_width: f64) -> (Vec<PageRect>, f64, f64) {
+/// pixels wide, one to a row or two side by side (INT-08), and the size
+/// that the area needs to show them all.
+pub fn place_pages(
+    sizes: &[(f64, f64)],
+    zoom: f64,
+    area_width: f64,
+    columns: usize,
+) -> (Vec<PageRect>, f64, f64) {
     let scale = zoom * PIXELS_PER_POINT;
+    let two = columns >= 2;
     let widest = sizes.iter().map(|&(w, _)| w * scale).fold(0.0, f64::max);
-    let content_width = (widest + 2.0 * PAGE_GAP).max(area_width);
+    let row = if two { 2.0 * widest + PAGE_GAP } else { widest };
+    let content_width = (row + 2.0 * PAGE_GAP).max(area_width);
+    let middle = content_width / 2.0;
     let mut y = PAGE_GAP;
     let mut rects = Vec::with_capacity(sizes.len());
-    for &(w, h) in sizes {
-        let width = w * scale;
-        let height = h * scale;
-        rects.push(PageRect {
-            x: ((content_width - width) / 2.0).floor(),
-            y,
-            width,
-            height,
-        });
-        y += height + PAGE_GAP;
+    for pair in sizes.chunks(if two { 2 } else { 1 }) {
+        let mut tallest: f64 = 0.0;
+        for (i, &(w, h)) in pair.iter().enumerate() {
+            let width = w * scale;
+            let height = h * scale;
+            let x = if !two {
+                middle - width / 2.0
+            } else if i == 0 {
+                middle - PAGE_GAP / 2.0 - width
+            } else {
+                middle + PAGE_GAP / 2.0
+            };
+            rects.push(PageRect {
+                x: x.floor(),
+                y,
+                width,
+                height,
+            });
+            tallest = tallest.max(height);
+        }
+        y += tallest + PAGE_GAP;
     }
     (rects, content_width, y)
 }
@@ -109,22 +142,45 @@ mod tests {
     #[test]
     fn int_07_fit_width_and_fit_page() {
         // A4 is 595 points wide: 793 pixels at 100%.
-        let zoom = fit_width(595.0, 793.0 + 2.0 * PAGE_GAP);
+        let zoom = fit_width(595.0, 793.0 + 2.0 * PAGE_GAP, 1);
         assert!((zoom - 1.0).abs() < 0.01, "{zoom}");
-        let page = fit_page(595.0, 842.0, 2000.0, 842.0 * PIXELS_PER_POINT / 2.0 + 48.0);
+        let page = fit_page(
+            595.0,
+            842.0,
+            2000.0,
+            842.0 * PIXELS_PER_POINT / 2.0 + 48.0,
+            1,
+        );
         assert!((page - 0.5).abs() < 0.01, "{page}");
+        // Two pages side by side fit at half the zoom, less the gap.
+        let two = fit_width(595.0, 2.0 * 793.0 + 3.0 * PAGE_GAP, 2);
+        assert!((two - 1.0).abs() < 0.01, "{two}");
     }
 
     #[test]
     fn pages_stack_centred_with_gaps() {
-        let (rects, width, height) = place_pages(&[(612.0, 792.0), (612.0, 792.0)], 0.5, 1000.0);
+        let (rects, width, height) = place_pages(&[(612.0, 792.0), (612.0, 792.0)], 0.5, 1000.0, 1);
         assert_eq!(width, 1000.0);
         assert_eq!(rects[0].y, PAGE_GAP);
         assert_eq!(rects[1].y, PAGE_GAP * 2.0 + 792.0 * PIXELS_PER_POINT * 0.5);
         assert_eq!(rects[0].x, ((1000.0 - 408.0) / 2.0_f64).floor());
         assert_eq!(height, rects[1].y + rects[1].height + PAGE_GAP);
         // A narrow area grows to the widest page.
-        let (_, width, _) = place_pages(&[(612.0, 792.0)], 1.0, 100.0);
+        let (_, width, _) = place_pages(&[(612.0, 792.0)], 1.0, 100.0, 1);
         assert_eq!(width, 816.0 + 2.0 * PAGE_GAP);
+    }
+
+    #[test]
+    fn int_08_two_pages_side_by_side() {
+        let page = (612.0, 792.0);
+        let (rects, width, height) = place_pages(&[page, page, page], 0.5, 0.0, 2);
+        assert_eq!(width, 2.0 * 408.0 + 3.0 * PAGE_GAP);
+        assert_eq!(rects[0].y, rects[1].y);
+        assert_eq!(rects[0].x, PAGE_GAP);
+        assert_eq!(rects[1].x, PAGE_GAP + 408.0 + PAGE_GAP);
+        // The third starts the next row, on the left.
+        assert_eq!(rects[2].x, rects[0].x);
+        assert_eq!(rects[2].y, rects[0].y + 528.0 + PAGE_GAP);
+        assert_eq!(height, rects[2].y + 528.0 + PAGE_GAP);
     }
 }

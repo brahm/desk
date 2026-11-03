@@ -502,7 +502,40 @@ impl DocumentWindow {
         self.show_document(document);
     }
 
+    /// How the document shows now.
+    fn current_view(&self) -> desk_model::ViewSettings {
+        let zoom = match self.view.fit() {
+            Some(geometry::Fit::Width) => desk_model::ViewZoom::FitWidth,
+            Some(geometry::Fit::Page) => desk_model::ViewZoom::FitPage,
+            None => desk_model::ViewZoom::Percent((self.view.zoom() * 100.0).round() as u16),
+        };
+        desk_model::ViewSettings {
+            zoom,
+            two_pages: self.view.columns() == 2,
+            outline: self.action_state("outline"),
+        }
+    }
+
+    /// Shows a document as it showed when it was saved.
+    fn show_view(&self, view: desk_model::ViewSettings) {
+        let layout = if view.two_pages { "two" } else { "one" };
+        if let Some(action) = self.window.lookup_action("page-layout") {
+            action.activate(Some(&layout.to_variant()));
+        }
+        match view.zoom {
+            desk_model::ViewZoom::FitWidth => self.view.set_fit(Some(geometry::Fit::Width)),
+            desk_model::ViewZoom::FitPage => self.view.set_fit(Some(geometry::Fit::Page)),
+            desk_model::ViewZoom::Percent(p) => self.view.set_zoom(f64::from(p) / 100.0),
+        }
+        if let Some(action) = self.window.lookup_action("outline") {
+            action.change_state(&view.outline.to_variant());
+        }
+    }
+
     fn show_document(self: &Rc<Self>, document: Document) {
+        if let Some(view) = document.view() {
+            self.show_view(view);
+        }
         let file = self.file();
         let document = crate::fields::opened(document, &file);
         let editor = TextEditor::new(&self.view, document);
@@ -694,7 +727,9 @@ impl DocumentWindow {
         // updates them when a document closes (EST-22).
         editor.update_tables_of_contents();
         let pages = editor.pages();
-        let document = crate::fields::saved(editor.document(), &path.to_string_lossy());
+        let mut document = crate::fields::saved(editor.document(), &path.to_string_lossy());
+        // How it shows, to reopen the same way (INT-08, DOC-16).
+        document.set_view(Some(self.current_view()));
         // A picture of the first page, unless the preferences leave it out
         // (DOC-09).
         let preview = pages
@@ -1194,13 +1229,32 @@ impl DocumentWindow {
             let zoom = match value.as_str() {
                 "in" => geometry::zoom_in(view.zoom()),
                 "out" => geometry::zoom_out(view.zoom()),
-                "fit-width" => view.fit_width_zoom(),
-                "fit-page" => view.fit_page_zoom(),
+                // The zoom then follows the window (INT-08).
+                "fit-width" => return view.set_fit(Some(geometry::Fit::Width)),
+                "fit-page" => return view.set_fit(Some(geometry::Fit::Page)),
                 level => level.parse().unwrap_or(geometry::DEFAULT_ZOOM),
             };
             view.set_zoom(zoom);
         });
         self.window.add_action(&zoom);
+
+        // One page to a row, or two side by side (INT-08).
+        let weak = Rc::downgrade(self);
+        let layout = gio::SimpleAction::new_stateful(
+            "page-layout",
+            Some(glib::VariantTy::STRING),
+            &"one".to_variant(),
+        );
+        layout.connect_activate(move |action, parameter| {
+            let (Some(this), Some(value)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+            else {
+                return;
+            };
+            action.set_state(&value.to_variant());
+            this.view.set_columns(if value == "two" { 2 } else { 1 });
+        });
+        self.window.add_action(&layout);
 
         for (name, run) in [
             ("undo", TextEditor::undo as fn(&TextEditor)),
@@ -2283,6 +2337,13 @@ fn zoom_menu() -> gio::Menu {
         fit.append_item(&item);
     }
     menu.append_section(None, &fit);
+    let layout = gio::Menu::new();
+    for (label, target) in [(tr("_One Page"), "one"), (tr("_Two Pages"), "two")] {
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some("win.page-layout"), Some(&target.to_variant()));
+        layout.append_item(&item);
+    }
+    menu.append_section(None, &layout);
     menu
 }
 

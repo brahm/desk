@@ -166,7 +166,8 @@ fn config_item(w: &mut Writer, name: &str, kind: &str, value: &str) {
 fn write_settings(document: &TextDocument) -> Option<String> {
     let text = &document.text_settings;
     let has_text = *text != Default::default();
-    if document.style_shortcuts.is_empty() && !has_text {
+    let view = &document.view;
+    if document.style_shortcuts.is_empty() && !has_text && view.is_empty() {
         return None;
     }
     let mut w = Writer::new();
@@ -175,6 +176,32 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         .attr("xmlns:config", ns::CONFIG)
         .attr("office:version", VERSION);
     w.start("office:settings");
+    if !view.is_empty() {
+        // As LibreOffice writes them, which it reads back.
+        w.start("config:config-item-set")
+            .attr("config:name", "ooo:view-settings");
+        w.start("config:config-item-map-indexed")
+            .attr("config:name", "Views");
+        w.start("config:config-item-map-entry");
+        config_item(&mut w, "ViewId", "string", "view2");
+        for (name, value) in [
+            ("ZoomType", view.zoom_type),
+            ("ZoomFactor", view.zoom_factor),
+            ("ViewLayoutColumns", view.columns),
+        ] {
+            if let Some(value) = value {
+                config_item(&mut w, name, "short", &value.to_string());
+            }
+        }
+        if view.columns.is_some() {
+            config_item(&mut w, "ViewLayoutBookMode", "boolean", "false");
+        }
+        if let Some(outline) = view.outline {
+            let value = if outline { "true" } else { "false" };
+            config_item(&mut w, "DeskOutlineView", "boolean", value);
+        }
+        w.end().end().end();
+    }
     if has_text {
         w.start("config:config-item-set")
             .attr("config:name", TEXT_SETTINGS);

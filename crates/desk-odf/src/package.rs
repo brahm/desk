@@ -68,6 +68,10 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
         .as_deref()
         .map(crate::read::text_settings)
         .unwrap_or_default();
+    document.view = settings
+        .as_deref()
+        .map(crate::read::view_settings)
+        .unwrap_or_default();
     // The pictures that the lists link to inside the package.
     let mut hrefs: Vec<String> = document
         .list_styles

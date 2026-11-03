@@ -67,7 +67,8 @@ mod units;
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
 pub use document::{
-    Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics, TextSettings,
+    Container, Document, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics,
+    TextSettings, ViewSettings, ViewZoom,
 };
 pub use error::ModelError;
 pub use find::{Found, Query};

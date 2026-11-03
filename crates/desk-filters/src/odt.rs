@@ -1494,6 +1494,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             keywords: meta.keywords.clone(),
         },
     })?;
+    document.set_view(view_settings(&source.view));
     Ok(document)
 }
 
@@ -2211,6 +2212,43 @@ fn export_margins(
     out.master_styles = automatic;
 }
 
+/// How a document showed, from the view settings of LibreOffice: the
+/// zoom, how many pages side by side, and Desk's outline (INT-08, DOC-16).
+fn view_settings(view: &odf::ViewSettings) -> Option<desk_model::ViewSettings> {
+    if view.is_empty() {
+        return None;
+    }
+    let zoom = match view.zoom_type {
+        Some(2) => desk_model::ViewZoom::FitPage,
+        Some(1 | 3 | 4) => desk_model::ViewZoom::FitWidth,
+        _ => desk_model::ViewZoom::Percent(
+            view.zoom_factor
+                .and_then(|f| u16::try_from(f).ok())
+                .filter(|f| *f > 0)
+                .unwrap_or(100),
+        ),
+    };
+    Some(desk_model::ViewSettings {
+        zoom,
+        two_pages: view.columns.is_some_and(|c| c >= 2),
+        outline: view.outline.unwrap_or(false),
+    })
+}
+
+fn odf_view(view: desk_model::ViewSettings) -> odf::ViewSettings {
+    let (zoom_type, factor) = match view.zoom {
+        desk_model::ViewZoom::Percent(p) => (0, i16::try_from(p).unwrap_or(100)),
+        desk_model::ViewZoom::FitPage => (2, 100),
+        desk_model::ViewZoom::FitWidth => (3, 100),
+    };
+    odf::ViewSettings {
+        zoom_type: Some(zoom_type),
+        zoom_factor: Some(factor),
+        columns: Some(if view.two_pages { 2 } else { 1 }),
+        outline: Some(view.outline),
+    }
+}
+
 /// Builds an ODF text document from a document.
 pub fn export(document: &Document) -> odf::TextDocument {
     let settings = document.text_settings();
@@ -2248,6 +2286,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             ..odf_note_settings(settings.notes)
         },
         notes_configuration: notes_configuration(settings.notes),
+        view: document.view().map(odf_view).unwrap_or_default(),
         ..odf::TextDocument::default()
     };
     out.toc_levels = settings
