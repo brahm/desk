@@ -324,6 +324,11 @@ impl Document {
         self.ids.allocate()
     }
 
+    /// Never hands out an identifier that a copy of the document did.
+    pub(crate) fn follow_ids(&mut self, copy: &Document) {
+        self.ids.follow(&copy.ids);
+    }
+
     /// The metadata.
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
@@ -351,7 +356,7 @@ impl Document {
         }
     }
 
-    fn body_mut(&mut self) -> &mut TextFlow {
+    pub(crate) fn body_mut(&mut self) -> &mut TextFlow {
         match &mut self.container {
             Container::Pages(flow) => &mut flow.body,
         }

@@ -192,6 +192,11 @@ pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, Strin
     })
 }
 
+/// Calls `f` with the fonts of the system.
+pub(crate) fn with_text_system<T>(f: impl FnOnce(&mut TextSystem) -> T) -> T {
+    TEXT.with(|text| f(&mut text.borrow_mut()))
+}
+
 /// Lays out a document on pages, with the fonts of the system.
 pub(crate) fn lay_out(document: &Document) -> desk_layout::DocumentLayout {
     TEXT.with(|text| desk_layout::paginate(document, &mut text.borrow_mut()))

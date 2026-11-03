@@ -64,6 +64,11 @@ impl Edit {
         self.doc.new_id()
     }
 
+    /// Never hands out an identifier that a copy of the document did.
+    pub(crate) fn follow_ids(&mut self, copy: &Document) {
+        self.doc.follow_ids(copy);
+    }
+
     /// Applies one operation.
     pub fn apply(&mut self, op: Op) -> Result<(), ModelError> {
         let inverse = self.doc.apply(op.clone())?;

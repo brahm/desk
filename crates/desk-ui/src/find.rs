@@ -59,15 +59,24 @@ impl Search {
     }
 }
 
+/// Where a match or the selection is: the rank of its header, footer or
+/// note among those searched (the body first), its paragraph and offset.
+pub type Place = (usize, usize, usize);
+
 /// The match after the selection, or before it with `backwards`, going
-/// round the document. A match that is the selection is skipped.
-pub fn next_match(
-    found: &[Found],
-    selection: ((usize, usize), (usize, usize)),
+/// round the document. A match that is the selection is skipped. `rank`
+/// gives the place of a header, footer or note in the order searched.
+pub fn next_match<'a>(
+    found: &'a [Found],
+    selection: (Place, Place),
     backwards: bool,
-) -> Option<&Found> {
+    rank: &dyn Fn(Option<desk_model::Story>) -> usize,
+) -> Option<&'a Found> {
     let (start, end) = selection;
-    let key = |f: &Found| ((f.index, f.range.start), (f.index, f.range.end));
+    let key = |f: &Found| {
+        let r = rank(f.story);
+        ((r, f.index, f.range.start), (r, f.index, f.range.end))
+    };
     if backwards {
         found
             .iter()
@@ -82,10 +91,14 @@ pub fn next_match(
     }
 }
 
-/// The selection of an editor, as (paragraph, offset) pairs.
-fn selection_of(editor: &TextEditor) -> ((usize, usize), (usize, usize)) {
+/// The selection of an editor, as places.
+fn selection_of(editor: &TextEditor) -> (Place, Place) {
     let (start, end) = editor.selection().ordered();
-    ((start.paragraph, start.offset), (end.paragraph, end.offset))
+    let rank = editor.story_rank(editor.story());
+    (
+        (rank, start.paragraph, start.offset),
+        (rank, end.paragraph, end.offset),
+    )
 }
 
 /// Selects the next match of the search, or the previous one, and says
@@ -93,7 +106,8 @@ fn selection_of(editor: &TextEditor) -> ((usize, usize), (usize, usize)) {
 pub fn find_next(editor: &TextEditor, search: &Search, backwards: bool) -> bool {
     let query = search.query.borrow().clone();
     let found = editor.find(&query);
-    match next_match(&found, selection_of(editor), backwards) {
+    let rank = |story| editor.story_rank(story);
+    match next_match(&found, selection_of(editor), backwards, &rank) {
         Some(next) => {
             editor.select_found(next);
             true
@@ -105,10 +119,15 @@ pub fn find_next(editor: &TextEditor, search: &Search, backwards: bool) -> bool 
 /// The match that the selection is, if it is one.
 fn selected_match(editor: &TextEditor, query: &Query) -> Option<Found> {
     let selection = selection_of(editor);
-    editor
-        .find(query)
-        .into_iter()
-        .find(|f| ((f.index, f.range.start), (f.index, f.range.end)) == selection)
+    let story = editor.story();
+    editor.find(query).into_iter().find(|f| {
+        f.story == story
+            && ((f.index, f.range.start), (f.index, f.range.end))
+                == (
+                    (selection.0.1, selection.0.2),
+                    (selection.1.1, selection.1.2),
+                )
+    })
 }
 
 /// The text around a match, with the match in bold, as Pango markup.
@@ -601,11 +620,14 @@ impl SearchSidebar {
         });
         let document = editor.document();
         for piece in found.iter().take(MAX_RESULTS) {
-            let text = document
-                .body()
-                .get(piece.index)
-                .map(|p| p.text())
-                .unwrap_or_default();
+            let text = match piece.story {
+                None => document.body().get(piece.index).map(|p| p.text()),
+                Some(story) => document
+                    .story_paragraphs(story)
+                    .get(piece.index)
+                    .map(|p| p.text()),
+            }
+            .unwrap_or_default();
             let label = gtk::Label::builder()
                 .label(context_markup(&text, piece.range.clone()))
                 .use_markup(true)
@@ -648,22 +670,41 @@ mod tests {
             paragraph: NodeId::new(1).expect("not zero"),
             index,
             range: start..end,
+            story: None,
         }
     }
 
     #[test]
     fn txt_12_next_and_previous_go_round() {
-        let all = [found(0, 2, 4), found(0, 8, 10), found(3, 0, 2)];
-        let at = |f: &Found| ((f.index, f.range.start), (f.index, f.range.end));
+        let note = desk_model::Story::Note(NodeId::new(9).expect("not zero"));
+        let all = [
+            found(0, 2, 4),
+            found(0, 8, 10),
+            found(3, 0, 2),
+            Found {
+                story: Some(note),
+                ..found(0, 0, 2)
+            },
+        ];
+        let rank = |story: Option<desk_model::Story>| usize::from(story.is_some());
+        let at = |f: &Found| {
+            let r = rank(f.story);
+            ((r, f.index, f.range.start), (r, f.index, f.range.end))
+        };
+        let next = |from, backwards| next_match(&all, from, backwards, &rank);
         // From the cursor at the start.
-        assert_eq!(next_match(&all, ((0, 0), (0, 0)), false), Some(&all[0]));
+        assert_eq!(next(((0, 0, 0), (0, 0, 0)), false), Some(&all[0]));
         // From a match, the next one.
-        assert_eq!(next_match(&all, at(&all[0]), false), Some(&all[1]));
+        assert_eq!(next(at(&all[0]), false), Some(&all[1]));
         // From the last, round to the first.
-        assert_eq!(next_match(&all, at(&all[2]), false), Some(&all[0]));
-        assert_eq!(next_match(&all, at(&all[1]), true), Some(&all[0]));
-        assert_eq!(next_match(&all, at(&all[0]), true), Some(&all[2]));
-        assert_eq!(next_match(&[], ((0, 0), (0, 0)), false), None);
+        assert_eq!(next(at(&all[3]), false), Some(&all[0]));
+        assert_eq!(next(at(&all[1]), true), Some(&all[0]));
+        assert_eq!(next(at(&all[0]), true), Some(&all[3]));
+        assert_eq!(next_match(&[], ((0, 0, 0), (0, 0, 0)), false, &rank), None);
+        // A match in a note comes after those in the body, even at the
+        // first paragraph of the note.
+        assert_eq!(next(at(&all[2]), false), Some(&all[3]));
+        assert_eq!(next(((1, 0, 0), (1, 0, 0)), true), Some(&all[2]));
     }
 
     #[test]

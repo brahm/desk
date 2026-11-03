@@ -25,6 +25,6 @@ mod notes;
 mod pages;
 
 pub use pages::{
-    DocumentLayout, NOTE_RULE_LENGTH, NOTE_RULE_WIDTH, Page, PlacedBlock, PlacedLine, paginate,
-    paginate_texts, paginate_texts_spaced,
+    DocumentLayout, NOTE_RULE_LENGTH, NOTE_RULE_WIDTH, Page, PlacedBlock, PlacedLine, margin_lines,
+    margin_of_page, paginate, paginate_texts, paginate_texts_spaced,
 };
