@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::rc::{Rc, Weak};
 
 use adw::prelude::*;
-use desk_model::{CharAttrs, Document, LineStyle, ParaAttrs};
+use desk_model::{CharAttrs, Document, Field, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
 use crate::editing::{BreakKind, FieldKind, TextEditor};
@@ -89,7 +89,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 54] = [
+const DOCUMENT_ACTIONS: [&str; 56] = [
     "save",
     "save-as",
     "save-copy",
@@ -116,6 +116,8 @@ const DOCUMENT_ACTIONS: [&str; 54] = [
     "insert-layout-break",
     "insert-section-break",
     "insert-page-number",
+    "insert-auto-page-numbers",
+    "columns",
     "insert-page-count",
     "insert-date",
     "insert-file-name",
@@ -443,6 +445,15 @@ impl DocumentWindow {
         self.editor.borrow().clone()
     }
 
+    /// The file of the document as fields of the file name show it: its
+    /// path, or its name until it has one.
+    fn file(&self) -> String {
+        self.path.borrow().as_deref().map_or_else(
+            || self.name.borrow().clone(),
+            |p| p.to_string_lossy().into_owned(),
+        )
+    }
+
     /// Whether closing would lose something: changes since the document
     /// was saved, or a document that has never been saved.
     fn needs_saving(&self) -> bool {
@@ -481,8 +492,10 @@ impl DocumentWindow {
     }
 
     fn show_document(self: &Rc<Self>, document: Document) {
+        let file = self.file();
+        let document = crate::fields::opened(document, &file);
         let editor = TextEditor::new(&self.view, document);
-        editor.set_file_name(&self.name.borrow());
+        editor.set_file_name(&file);
         let weak = Rc::downgrade(self);
         editor.connect_changed(move || {
             if let Some(this) = weak.upgrade() {
@@ -518,8 +531,9 @@ impl DocumentWindow {
             fonts.show(&format.character, &format.paragraph);
         }
         let setup = *editor.document().page_setup();
-        self.ruler.show(setup, &format.paragraph);
-        self.vertical_ruler.show(setup, &format.paragraph);
+        self.ruler.show(setup, format.layout, &format.paragraph);
+        self.vertical_ruler
+            .show(setup, format.layout, &format.paragraph);
         let character = &format.character;
         for (name, on) in [
             ("bold", character.weight.is_bold()),
@@ -533,6 +547,11 @@ impl DocumentWindow {
             &self.window,
             "align",
             formatting::alignment_name(format.paragraph.alignment).to_variant(),
+        );
+        formatting::set_state(
+            &self.window,
+            "columns",
+            i32::from(format.layout.columns.count).to_variant(),
         );
     }
 
@@ -660,8 +679,12 @@ impl DocumentWindow {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
+        // Tables of contents are up to date in what is kept, as Pages
+        // updates them when a document closes (EST-22).
+        editor.update_tables_of_contents();
         let pages = editor.pages();
-        match crate::save_document(opener, &editor.document(), pages.first(), path) {
+        let document = crate::fields::saved(editor.document(), &path.to_string_lossy());
+        match crate::save_document(opener, &document, pages.first(), path) {
             Ok(()) => true,
             Err(message) => {
                 self.alert(
@@ -723,8 +746,9 @@ impl DocumentWindow {
         *self.path.borrow_mut() = Some(path.to_owned());
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {
+            editor.set_file_name(&self.file());
+            editor.refresh_fields();
             editor.mark_saved();
-            editor.set_file_name(&self.name.borrow());
         }
         remember_recent(path);
         self.refresh();
@@ -886,6 +910,58 @@ impl DocumentWindow {
             }
         });
         dialog.present(Some(&self.window));
+    }
+
+    /// Opens the document that a link points to, in its window if it is
+    /// open already, and goes to its bookmark (EST-25).
+    fn open_linked(self: &Rc<Self>, link: &str) {
+        let crate::links::Target::Document { file, bookmark } = crate::links::Target::parse(link)
+        else {
+            return;
+        };
+        let folder = self
+            .path
+            .borrow()
+            .as_deref()
+            .and_then(Path::parent)
+            .map(Path::to_owned);
+        let Some((path, bookmark)) =
+            crate::links::document_file(&file, &bookmark, folder.as_deref())
+        else {
+            self.alert(
+                &tr("Cannot Follow Link"),
+                &tr("Save this document first: the link names a file from its folder."),
+            );
+            return;
+        };
+        let open = WINDOWS.with(|w| {
+            w.borrow()
+                .iter()
+                .find(|w| w.path.borrow().as_deref() == Some(path.as_path()))
+                .cloned()
+        });
+        let window = match open {
+            Some(window) => window,
+            None => {
+                let (Some(opener), Some(app)) = (
+                    self.opener,
+                    self.window
+                        .application()
+                        .and_then(|a| a.downcast::<adw::Application>().ok()),
+                ) else {
+                    return;
+                };
+                let window = Self::new(&app, self.info, Some(opener));
+                window.load(opener, &path);
+                window
+            }
+        };
+        window.window.present();
+        if !bookmark.is_empty()
+            && let Some(editor) = window.editor()
+        {
+            editor.go_to_bookmark(&bookmark);
+        }
     }
 
     /// Opens a copy of the document, untitled, in a new window (DOC-14).
@@ -1321,6 +1397,53 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
 
+        // The number of columns of the layout at the cursor, which keep
+        // their gap (EST-07).
+        let columns = gio::SimpleAction::new_stateful(
+            "columns",
+            Some(glib::VariantTy::INT32),
+            &1i32.to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        columns.connect_activate(move |action, count| {
+            let (Some(this), Some(count)) = (weak.upgrade(), count.and_then(|c| c.get::<i32>()))
+            else {
+                return;
+            };
+            if let Some(editor) = this.editor() {
+                let format = editor.format();
+                let gap = crate::layout_pane::gap(&format.setup, &format.layout);
+                let count = count.clamp(1, desk_model::MAX_COLUMNS as i32) as u8;
+                let layout =
+                    crate::layout_pane::with_columns(&format.setup, &format.layout, count, gap);
+                if layout != format.layout {
+                    editor.set_layout("Columns", layout);
+                }
+                action.set_state(&i32::from(count).to_variant());
+            }
+        });
+        self.window.add_action(&columns);
+
+        let auto = gio::SimpleAction::new("insert-auto-page-numbers", None);
+        let weak = Rc::downgrade(self);
+        auto.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade()
+                && let Some(editor) = this.editor()
+            {
+                crate::auto_numbers::present(&this.window, &editor);
+            }
+        });
+        self.window.add_action(&auto);
+
+        let linked = gio::SimpleAction::new("open-linked", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        linked.connect_activate(move |_, link| {
+            if let (Some(this), Some(link)) = (weak.upgrade(), link.and_then(|l| l.str())) {
+                this.open_linked(link);
+            }
+        });
+        self.window.add_action(&linked);
+
         let note = gio::SimpleAction::new("insert-note", None);
         let weak = Rc::downgrade(self);
         note.connect_activate(move |_, _| {
@@ -1340,6 +1463,8 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+
+        self.add_field_actions();
 
         // Tables of contents, links and bookmarks (EST-22, EST-25,
         // EST-26).
@@ -1375,6 +1500,112 @@ impl DocumentWindow {
                 formatting::set_state(&window, "inspector", split.shows_sidebar().to_variant());
             }
         });
+    }
+
+    /// The formats of the field at the cursor, from its context menu
+    /// (EST-27).
+    fn add_field_actions(self: &Rc<Self>) {
+        let change = |this: &Rc<Self>, f: &dyn Fn(Field) -> Field| {
+            if let Some(editor) = this.editor()
+                && let Some((_, field)) = editor.field_at_cursor()
+            {
+                editor.set_field_at_cursor(f(field));
+            }
+        };
+        let number = gio::SimpleAction::new_stateful(
+            "field-number-format",
+            Some(glib::VariantTy::STRING),
+            &"decimal".to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        number.connect_activate(move |_, value| {
+            let (Some(this), Some(name)) = (weak.upgrade(), value.and_then(|v| v.str())) else {
+                return;
+            };
+            let format = crate::fields::number_format(name);
+            change(&this, &|field| match field {
+                Field::PageNumber { .. } => Field::PageNumber { format },
+                Field::PageCount { .. } => Field::PageCount { format },
+                other => other,
+            });
+        });
+        self.window.add_action(&number);
+        let date = gio::SimpleAction::new_stateful(
+            "field-date-format",
+            Some(glib::VariantTy::STRING),
+            &crate::fields::DATE_PATTERN.to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        date.connect_activate(move |_, value| {
+            let (Some(this), Some(pattern)) = (weak.upgrade(), value.and_then(|v| v.str())) else {
+                return;
+            };
+            change(&this, &|field| match field {
+                Field::DateTime { update, .. } => Field::DateTime {
+                    pattern: pattern.into(),
+                    shown: crate::fields::format_date(pattern)
+                        .unwrap_or_default()
+                        .into(),
+                    update,
+                },
+                other => other,
+            });
+        });
+        self.window.add_action(&date);
+        type Toggle = fn(Field) -> Field;
+        let toggles: [(&str, Toggle); 3] = [
+            ("field-date-update", |field| match field {
+                Field::DateTime {
+                    pattern,
+                    shown,
+                    update,
+                } => Field::DateTime {
+                    pattern,
+                    shown,
+                    update: !update,
+                },
+                other => other,
+            }),
+            ("field-file-path", |field| match field {
+                Field::FileName {
+                    shown,
+                    path,
+                    extension,
+                } => Field::FileName {
+                    shown,
+                    path: !path,
+                    extension,
+                },
+                other => other,
+            }),
+            ("field-file-extension", |field| match field {
+                Field::FileName {
+                    shown,
+                    path,
+                    extension,
+                } => Field::FileName {
+                    shown,
+                    path,
+                    extension: !extension,
+                },
+                other => other,
+            }),
+        ];
+        for (name, toggle) in toggles {
+            let action = gio::SimpleAction::new_stateful(name, None, &false.to_variant());
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |action, _| {
+                if let Some(this) = weak.upgrade() {
+                    let on = action
+                        .state()
+                        .and_then(|s| s.get::<bool>())
+                        .unwrap_or(false);
+                    action.set_state(&(!on).to_variant());
+                    change(&this, &toggle);
+                }
+            });
+            self.window.add_action(&action);
+        }
     }
 
     /// Find & Replace, the Search sidebar and the Writing Tools (TXT-12,
@@ -1589,6 +1820,9 @@ impl DocumentWindow {
         // Never Hyphenate for the word at the cursor (TXT-09).
         let hyphenation = gio::Menu::new();
         menu.append_section(None, &hyphenation);
+        // The format of the field at the cursor (EST-27).
+        let field = gio::Menu::new();
+        menu.append_section(None, &field);
         let edit = gio::Menu::new();
         edit.append(Some(&tr("Cu_t")), Some("win.cut"));
         edit.append(Some(&tr("_Copy")), Some("win.copy"));
@@ -1623,6 +1857,8 @@ impl DocumentWindow {
         let editor = self.editor.clone();
         let menu_guesses = guesses.clone();
         let menu_hyphenation = hyphenation.clone();
+        let menu_field = field.clone();
+        let window = self.window.downgrade();
         click.connect_pressed(move |gesture, _, x, y| {
             if let Some(popover) = menu_popover.upgrade() {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
@@ -1632,6 +1868,12 @@ impl DocumentWindow {
                     editor.as_ref().and_then(|e| e.mistake_at(x, y)),
                 );
                 fill_hyphenation(&menu_hyphenation, editor.as_ref());
+                if let Some(editor) = &editor {
+                    editor.select_field_at(x, y);
+                }
+                if let Some(window) = window.upgrade() {
+                    fill_field(&menu_field, &window, editor.as_ref());
+                }
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
                 popover.popup();
             }
@@ -1642,6 +1884,7 @@ impl DocumentWindow {
         let menu_popover = popover.downgrade();
         let area = self.view.area().downgrade();
         let editor = self.editor.clone();
+        let window = self.window.downgrade();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
             // The shortcuts of styles: F1 to F8, with Alt to drop the
             // formatting set over the style (STY-04).
@@ -1668,6 +1911,9 @@ impl DocumentWindow {
                     }),
                 );
                 fill_hyphenation(&hyphenation, current.as_ref());
+                if let Some(window) = window.upgrade() {
+                    fill_field(&field, &window, current.as_ref());
+                }
                 // At the middle of the visible area.
                 let (width, height) = (area.width() / 2, area.height() / 3);
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(width, height, 1, 1)));
@@ -1733,6 +1979,74 @@ fn fill_hyphenation(menu: &gio::Menu, editor: Option<&TextEditor>) {
     let item = gio::MenuItem::new(Some(&label), None);
     item.set_action_and_target_value(Some(action), Some(&word.to_variant()));
     menu.append_item(&item);
+}
+
+/// Fills the section of the context menu with the format of the field at
+/// the cursor, and sets the states of its actions (EST-27): the format of
+/// a number of pages, of a date and whether it updates on open, and
+/// whether a file name shows its folder and extension.
+fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<&TextEditor>) {
+    menu.remove_all();
+    let Some((_, field)) = editor.and_then(TextEditor::field_at_cursor) else {
+        return;
+    };
+    let state = |name: &str, value: glib::Variant| {
+        formatting::set_state(window, name, value);
+    };
+    match &field {
+        Field::PageNumber { format } | Field::PageCount { format } => {
+            state(
+                "field-number-format",
+                crate::fields::number_format_name(*format).to_variant(),
+            );
+            let formats = gio::Menu::new();
+            for (_, name, label) in crate::fields::NUMBER_FORMATS {
+                let item = gio::MenuItem::new(Some(label), None);
+                item.set_action_and_target_value(
+                    Some("win.field-number-format"),
+                    Some(&name.to_variant()),
+                );
+                formats.append_item(&item);
+            }
+            menu.append_submenu(Some(&tr("Number _Format")), &formats);
+        }
+        Field::DateTime {
+            pattern, update, ..
+        } => {
+            state("field-date-format", pattern.to_variant());
+            state("field-date-update", update.to_variant());
+            let formats = gio::Menu::new();
+            for pattern in crate::fields::DATE_FORMATS {
+                let shown = crate::fields::format_date(pattern).unwrap_or_else(|| pattern.into());
+                let item = gio::MenuItem::new(Some(&shown.replace('_', "__")), None);
+                item.set_action_and_target_value(
+                    Some("win.field-date-format"),
+                    Some(&pattern.to_variant()),
+                );
+                formats.append_item(&item);
+            }
+            menu.append_submenu(Some(&tr("Date and Time _Format")), &formats);
+            menu.append(
+                Some(&tr("_Automatically Update on Open")),
+                Some("win.field-date-update"),
+            );
+        }
+        Field::FileName {
+            path, extension, ..
+        } => {
+            state("field-file-path", path.to_variant());
+            state("field-file-extension", extension.to_variant());
+            menu.append(
+                Some(&tr("Show _Directory Path")),
+                Some("win.field-file-path"),
+            );
+            menu.append(
+                Some(&tr("Always Show File_name Extension")),
+                Some("win.field-file-extension"),
+            );
+        }
+        Field::NoteMark { .. } | Field::PageOf { .. } => {}
+    }
 }
 
 /// The number of a function key from F1 to F8.
@@ -1820,6 +2134,10 @@ fn insert_menu() -> gio::Menu {
         Some("win.insert-section-break"),
     );
     let fields = gio::Menu::new();
+    fields.append(
+        Some(&tr("_Auto Page Numbers…")),
+        Some("win.insert-auto-page-numbers"),
+    );
     fields.append(Some(&tr("Page _Number")), Some("win.insert-page-number"));
     fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
     fields.append(Some(&tr("_Date")), Some("win.insert-date"));

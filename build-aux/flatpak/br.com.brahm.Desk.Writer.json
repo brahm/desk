@@ -78,6 +78,41 @@
             ]
         },
         {
+            "name": "gelasio",
+            "buildsystem": "simple",
+            "build-commands": [
+                "install -Dm644 -t /app/share/fonts/gelasio Gelasio-*.ttf",
+                "install -Dm644 OFL.txt /app/share/licenses/br.com.brahm.Desk.Writer/fonts-gelasio"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/9228e69b160d79f33950e026293f6e13ba9780d0/fonts/ttf/Gelasio-Regular.ttf",
+                    "sha256": "48c797fbe0e07c48a18cb962e7bdfa23f19618327dddf54093265328dc9eb39d"
+                },
+                {
+                    "type": "file",
+                    "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/9228e69b160d79f33950e026293f6e13ba9780d0/fonts/ttf/Gelasio-Italic.ttf",
+                    "sha256": "1d8bda4ff258bb8251eae4f7d7500c8d97d084136192bb264bc2305168765d1b"
+                },
+                {
+                    "type": "file",
+                    "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/9228e69b160d79f33950e026293f6e13ba9780d0/fonts/ttf/Gelasio-Bold.ttf",
+                    "sha256": "e0ef3addf1acf35f5c6aef2be00d0a2c01363bf70a5950e16650976051a0c462"
+                },
+                {
+                    "type": "file",
+                    "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/9228e69b160d79f33950e026293f6e13ba9780d0/fonts/ttf/Gelasio-BoldItalic.ttf",
+                    "sha256": "aa87e21b46aef3dcb50a68dc6e1946f0c0a9819d067e4be6a98a6daa8f5b3c16"
+                },
+                {
+                    "type": "file",
+                    "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/9228e69b160d79f33950e026293f6e13ba9780d0/OFL.txt",
+                    "sha256": "b393cb01867c919b44381512120dc3e4c954c7b47e2035c405f3a324799a4d29"
+                }
+            ]
+        },
+        {
             "name": "dictionaries",
             "buildsystem": "simple",
             "build-commands": [

@@ -54,10 +54,10 @@ pub use read::read_streams;
 pub use text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
-    ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
-    TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
-    TextShadow, TextTransform, TocLevel,
+    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration, PageLayout,
+    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
+    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    TextSettings, TextShadow, TextTransform, TocLevel,
 };
 pub use units::{Color, Length};
 pub use write::{Streams, VERSION, write_streams};

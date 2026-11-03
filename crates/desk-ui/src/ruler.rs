@@ -9,7 +9,9 @@
 //! click on a stop changes its alignment, and dragging a stop off the
 //! ruler takes it away. Dragging the edge of a margin moves the margin of
 //! the page, and the indents with it; with Alt, the indents stay where
-//! they are on the page (FMT-18). The vertical ruler shows the top and
+//! they are on the page (FMT-18). The gaps between the columns of the
+//! layout are shaded, and dragging an edge of a column changes its width
+//! or the gap after it (EST-07). The vertical ruler shows the top and
 //! bottom margins. Both count in the units of the preferences.
 
 use std::cell::RefCell;
@@ -47,6 +49,10 @@ enum Marker {
     LeftMargin,
     /// The right margin of the page, at the right edge of the text.
     RightMargin,
+    /// The right edge of a column of the layout, by its index (EST-07).
+    ColumnEnd(usize),
+    /// The left edge of a column after the first, by its index.
+    ColumnStart(usize),
 }
 
 /// A marker being dragged.
@@ -68,6 +74,8 @@ struct Drag {
 
 struct State {
     setup: PageSetup,
+    /// The layout at the cursor, whose columns the ruler shows.
+    layout: desk_model::Layout,
     format: Option<ParaFormat>,
     preferences: Preferences,
     drag: Option<Drag>,
@@ -110,6 +118,7 @@ impl Ruler {
             view: view.clone(),
             state: Rc::new(RefCell::new(State {
                 setup: PageSetup::default(),
+                layout: desk_model::Layout::default(),
                 format: None,
                 preferences: preferences::get(),
                 drag: None,
@@ -141,11 +150,13 @@ impl Ruler {
         &self.area
     }
 
-    /// Shows the page setup and the format of the paragraph at the cursor.
-    pub fn show(&self, setup: PageSetup, format: &ParaFormat) {
+    /// Shows the page setup, the columns of the layout and the format of
+    /// the paragraph at the cursor.
+    pub fn show(&self, setup: PageSetup, layout: desk_model::Layout, format: &ParaFormat) {
         {
             let mut state = self.state.borrow_mut();
             state.setup = setup;
+            state.layout = layout;
             state.format = Some(format.clone());
         }
         self.area.queue_draw();
@@ -214,6 +225,22 @@ impl Ruler {
                 }
             }
             let _ = cr.fill();
+            // The gaps between the columns, lighter.
+            if !ruler.vertical {
+                ink(cr, 0.07);
+                let edges = column_edges(&setup, &state.layout);
+                for pair in edges.chunks(2) {
+                    if let [(Marker::ColumnEnd(_), a), (Marker::ColumnStart(_), b)] = pair
+                        && let (Some(a), Some(b)) = (
+                            ruler.to_pixels(text_start + a),
+                            ruler.to_pixels(text_start + b),
+                        )
+                    {
+                        band(cr, a, b);
+                    }
+                }
+                let _ = cr.fill();
+            }
 
             // The ticks, numbered from the origin.
             // Only the horizontal ruler counts from the middle.
@@ -321,12 +348,21 @@ impl Ruler {
                         let stop = format.tab_stops.stops()[index];
                         draw_tab(cr, x, across, stop.alignment);
                     }
-                    Marker::LeftMargin | Marker::RightMargin => {}
+                    Marker::LeftMargin
+                    | Marker::RightMargin
+                    | Marker::ColumnEnd(_)
+                    | Marker::ColumnStart(_) => {}
                 }
             }
             // A margin being dragged: a line where it goes.
             if let Some(Drag {
-                marker: Some(Marker::LeftMargin | Marker::RightMargin),
+                marker:
+                    Some(
+                        Marker::LeftMargin
+                        | Marker::RightMargin
+                        | Marker::ColumnEnd(_)
+                        | Marker::ColumnStart(_),
+                    ),
                 moved: true,
                 position,
                 ..
@@ -442,6 +478,52 @@ impl Ruler {
                     editor.set_margins(&tr("Margins"), setup, shift);
                     return;
                 }
+                (Some(Marker::ColumnEnd(index)), true) => {
+                    let (setup, layout) = {
+                        let state = ruler.state.borrow();
+                        (state.setup, state.layout)
+                    };
+                    let start = column_edges(&setup, &layout)
+                        .into_iter()
+                        .find(|(m, _)| *m == Marker::ColumnStart(index))
+                        .map_or(layout.left.to_pt(), |(_, p)| p);
+                    let start = if index == 0 {
+                        layout.left.to_pt()
+                    } else {
+                        start
+                    };
+                    let layout = crate::layout_pane::set_column(
+                        &setup,
+                        &layout,
+                        index,
+                        false,
+                        drag.position - start,
+                    );
+                    editor.set_layout(&tr("Columns"), layout);
+                    return;
+                }
+                (Some(Marker::ColumnStart(index)), true) => {
+                    let (setup, layout) = {
+                        let state = ruler.state.borrow();
+                        (state.setup, state.layout)
+                    };
+                    let Some(end) = column_edges(&setup, &layout)
+                        .into_iter()
+                        .find(|(m, _)| *m == Marker::ColumnEnd(index - 1))
+                        .map(|(_, p)| p)
+                    else {
+                        return;
+                    };
+                    let layout = crate::layout_pane::set_column(
+                        &setup,
+                        &layout,
+                        index - 1,
+                        true,
+                        drag.position - end,
+                    );
+                    editor.set_layout(&tr("Columns"), layout);
+                    return;
+                }
                 (Some(Marker::Right), true) => {
                     let setup = ruler.state.borrow().setup;
                     let width = setup.body_width();
@@ -501,7 +583,10 @@ impl Ruler {
             Marker::FirstLine => y < thickness / 3.0,
             Marker::Tab(_) => (thickness / 3.0..thickness * 2.0 / 3.0 + 2.0).contains(&y),
             Marker::Left | Marker::Right => y >= thickness / 2.0,
-            Marker::LeftMargin | Marker::RightMargin => true,
+            Marker::LeftMargin
+            | Marker::RightMargin
+            | Marker::ColumnEnd(_)
+            | Marker::ColumnStart(_) => true,
         };
         let near = |position: f64| {
             let at = self.to_pixels(text_start + position)?;
@@ -510,6 +595,7 @@ impl Ruler {
         };
         let margin = [(Marker::LeftMargin, 0.0), (Marker::RightMargin, width)]
             .into_iter()
+            .chain(column_edges(&state.setup, &state.layout))
             .filter_map(|(marker, position)| Some((marker, near(position)?)))
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(marker, _)| marker);
@@ -584,6 +670,25 @@ impl WeakRuler {
             state: self.state.upgrade()?,
         })
     }
+}
+
+/// The edges of the columns of a layout between the first and the last,
+/// in points from the left edge of the text: the end of each column but
+/// the last, each followed by the start of the next.
+fn column_edges(setup: &PageSetup, layout: &desk_model::Layout) -> Vec<(Marker, f64)> {
+    if layout.columns.count < 2 {
+        return Vec::new();
+    }
+    let left = layout.left.to_pt();
+    let spans = layout
+        .columns
+        .spans(crate::layout_pane::layout_width(setup, layout));
+    let mut out = Vec::new();
+    for (i, pair) in spans.windows(2).enumerate() {
+        out.push((Marker::ColumnEnd(i), left + pair[0].0 + pair[0].1));
+        out.push((Marker::ColumnStart(i + 1), left + pair[1].0));
+    }
+    out
 }
 
 /// The markers of a paragraph in text `width` points wide, and their

@@ -10,10 +10,10 @@ use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLIN
 use crate::text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, PageLayout, Paragraph,
-    ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
-    TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
-    TextShadow, TextTransform, TocLevel,
+    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration, PageLayout,
+    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
+    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    TextSettings, TextShadow, TextTransform, TocLevel,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -65,6 +65,14 @@ pub fn read_streams(
                     document.list_styles.push(list);
                 } else if let Some(section) = section_style(element) {
                     document.section_styles.push(section);
+                } else if element.name.is(TEXT, "notes-configuration") {
+                    let attr = |ns, name| element.attr(ns, name).map(str::to_owned);
+                    document.notes_configuration.push(NotesConfiguration {
+                        class: attr(TEXT, "note-class").unwrap_or_else(|| "footnote".into()),
+                        num_format: attr(STYLE, "num-format"),
+                        start_numbering_at: attr(TEXT, "start-numbering-at"),
+                        footnotes_position: attr(TEXT, "footnotes-position"),
+                    });
                 }
             }
         }
@@ -76,6 +84,14 @@ pub fn read_streams(
         }
         if let Some(master) = master_page(styles) {
             document.master = read_master(master);
+            let name = master.attr(STYLE, "name");
+            if let Some(masters) = styles.child(OFFICE, "master-styles") {
+                document.masters = masters
+                    .children_named(STYLE, "master-page")
+                    .filter(|m| m.attr(STYLE, "name") != name)
+                    .filter_map(|m| Some((m.attr(STYLE, "name")?.to_owned(), read_master(m))))
+                    .collect();
+            }
         }
     }
     if let Some(automatic) = content.child(OFFICE, "automatic-styles") {
@@ -136,6 +152,7 @@ fn toc_levels(body: &Element) -> Vec<TocLevel> {
                     .to_owned(),
                 page_number: template
                     .is_some_and(|t| t.child(TEXT, "index-entry-page-number").is_some()),
+                link: template.is_some_and(|t| t.child(TEXT, "index-entry-link-start").is_some()),
             });
         }
     }
@@ -164,6 +181,10 @@ impl Reader {
             parent: element.attr(STYLE, "parent-style-name").map(str::to_owned),
             next: element.attr(STYLE, "next-style-name").map(str::to_owned),
             list_style: element.attr(STYLE, "list-style-name").map(str::to_owned),
+            master_page: element
+                .attr(STYLE, "master-page-name")
+                .filter(|n| !n.is_empty())
+                .map(str::to_owned),
             properties: self.properties(element),
         })
     }
@@ -598,6 +619,8 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("NoteFormat") => out.note_format = Some(text.trim().to_owned()),
                 Some("NoteNumbering") => out.note_numbering = Some(text.trim().to_owned()),
                 Some("NoteGap") => out.note_gap = Some(text.trim().to_owned()),
+                Some("HeaderMargin") => out.header_margin = Some(text.trim().to_owned()),
+                Some("FooterMargin") => out.footer_margin = Some(text.trim().to_owned()),
                 Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
                 Some("NeverHyphenate") => {
                     out.never_hyphenate = text
@@ -1048,14 +1071,22 @@ impl SpanBuilder {
                 "line-break" => return self.literal(style, &LINE_BREAK.to_string()),
                 // The page number of another page is only its text.
                 "page-number" if e.attr(TEXT, "select-page").is_none_or(|p| p == "current") => {
-                    return self.field(style, e, Field::PageNumber);
+                    let num_format = e.attr(STYLE, "num-format").map(str::to_owned);
+                    return self.field(style, e, Field::PageNumber { num_format });
                 }
-                "page-count" => return self.field(style, e, Field::PageCount),
+                "page-count" => {
+                    let num_format = e.attr(STYLE, "num-format").map(str::to_owned);
+                    return self.field(style, e, Field::PageCount { num_format });
+                }
                 "date" => {
                     let pattern = e.attr(DESK, "pattern").map(str::to_owned);
-                    return self.field(style, e, Field::Date { pattern });
+                    let fixed = e.attr(TEXT, "fixed") == Some("true");
+                    return self.field(style, e, Field::Date { pattern, fixed });
                 }
-                "file-name" => return self.field(style, e, Field::FileName),
+                "file-name" => {
+                    let display = e.attr(TEXT, "display").unwrap_or("full").to_owned();
+                    return self.field(style, e, Field::FileName { display });
+                }
                 "note" => return self.note(style, e),
                 "a" => {
                     let outer = self.link.take();

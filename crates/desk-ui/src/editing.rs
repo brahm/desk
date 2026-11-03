@@ -56,21 +56,7 @@ pub enum FieldKind {
     FileName,
 }
 
-/// The pattern of the dates that Insert puts, in the symbols of Unicode,
-/// and the same in those of GLib.
-const DATE_PATTERN: (&str, &str) = ("d MMMM y", "%-d %B %Y");
-
-/// A field of today's date.
-pub fn today() -> Field {
-    let shown = glib::DateTime::now_local()
-        .and_then(|now| now.format(DATE_PATTERN.1))
-        .map(|s| s.to_string())
-        .unwrap_or_default();
-    Field::DateTime {
-        pattern: DATE_PATTERN.0.into(),
-        shown: shown.into(),
-    }
-}
+pub use crate::fields::today;
 
 /// Whether a paragraph is an item of a list: its list style has a label at
 /// its level.
@@ -289,6 +275,7 @@ pub fn default_toc(document: &Document) -> desk_model::TocSettings {
                 page_number: true,
             })
             .collect(),
+        page_links: true,
     }
 }
 
@@ -373,6 +360,11 @@ pub struct Format {
     pub layout: Layout,
     /// The section that the selection starts in.
     pub section: Section,
+    /// Whether that section is the first one of the document.
+    pub first_section: bool,
+    /// The section whose headers and footers the selection shows, by the
+    /// paragraph that starts it, or none for the first one's (EST-16).
+    pub headers_section: Option<desk_model::NodeId>,
     /// The headers and footers of the document.
     pub headers: desk_model::HeadersFooters,
     /// The note whose mark is at the cursor, or nearest to it in its
@@ -636,6 +628,9 @@ impl TextEditor {
     fn paste_fragment(&self, fragment: &desk_model::Fragment) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let result = self.state.borrow_mut().editor.edit("Paste", |edit| {
             let from = at_spot(edit.document(), start)?;
             let to = at_spot(edit.document(), end)?;
@@ -696,6 +691,9 @@ impl TextEditor {
     pub fn replace_selection(&self, name: &str, text: &str) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let typing = name == "Typing" && start == end;
         let result = {
             let mut state = self.state.borrow_mut();
@@ -793,6 +791,9 @@ impl TextEditor {
         } else {
             before.ordered()
         };
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Delete", |edit| {
@@ -813,6 +814,9 @@ impl TextEditor {
     fn split(&self) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let preferences = crate::preferences::get();
         let automatic = preferences.automatic_lists;
         let result = {
@@ -849,6 +853,9 @@ impl TextEditor {
     pub fn insert_break(&self, kind: BreakKind) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Insert Break", |edit| {
@@ -884,13 +891,13 @@ impl TextEditor {
         self.finish_edit(before, result);
     }
 
-    /// Sets the name of the file of the document, which fields of the file
-    /// name show.
+    /// Sets the file of the document, its path or only its name when it
+    /// has none, which fields of the file name show.
     pub fn set_file_name(&self, name: &str) {
         self.state.borrow_mut().file_name = name.to_owned();
     }
 
-    /// The name of the file of the document.
+    /// The file of the document: its path, or only its name.
     pub fn file_name(&self) -> String {
         self.state.borrow().file_name.clone()
     }
@@ -898,19 +905,112 @@ impl TextEditor {
     /// A field of the file name, or of today's date, as Insert makes them.
     pub fn new_field(&self, kind: FieldKind) -> Field {
         match kind {
-            FieldKind::PageNumber => Field::PageNumber,
-            FieldKind::PageCount => Field::PageCount,
+            FieldKind::PageNumber => Field::PAGE_NUMBER,
+            FieldKind::PageCount => Field::PAGE_COUNT,
             FieldKind::Date => today(),
             FieldKind::FileName => Field::FileName {
-                shown: self.file_name().into(),
+                shown: desk_model::file_shown(&self.file_name(), false, true).into(),
+                path: false,
+                extension: true,
             },
         }
+    }
+
+    /// The field at the cursor that has a format (EST-27): the one
+    /// selected, or just after or before the cursor. With the spot where
+    /// it starts.
+    pub fn field_at_cursor(&self) -> Option<(Spot, Field)> {
+        let state = self.state.borrow();
+        let (start, _) = state.selection.ordered();
+        let paragraph = state.editor.document().body().get(start.paragraph)?;
+        let mut offset = 0;
+        let mut before = None;
+        for run in paragraph.runs() {
+            let end = offset + run.len();
+            if let Some(Some(field)) = &run.attrs.field
+                && !matches!(field, Field::NoteMark { .. } | Field::PageOf { .. })
+            {
+                let found = (Spot::new(start.paragraph, offset), field.clone());
+                if offset <= start.offset && start.offset < end {
+                    return Some(found);
+                }
+                if end == start.offset {
+                    before = Some(found);
+                }
+            }
+            offset = end;
+        }
+        before
+    }
+
+    /// Selects the field under a point of the view, as a secondary click
+    /// on it does before its menu opens. Whether there was one.
+    pub fn select_field_at(&self, x: f64, y: f64) -> bool {
+        let Some(spot) = self.spot_at(x, y) else {
+            return false;
+        };
+        let (start, end) = self.selection().ordered();
+        // A click inside the selection keeps it.
+        if start != end && start <= spot && spot <= end {
+            return false;
+        }
+        self.select(Selection::cursor(spot));
+        match self.field_at_cursor() {
+            Some((at, _)) => {
+                self.select(Selection {
+                    anchor: at,
+                    focus: Spot::new(at.paragraph, at.offset + FIELD_CHARACTER.len_utf8()),
+                });
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Changes the field at the cursor, as the menu of a field does.
+    pub fn set_field_at_cursor(&self, field: Field) {
+        let Some((spot, old)) = self.field_at_cursor() else {
+            return;
+        };
+        if old == field {
+            return;
+        }
+        let file = self.file_name();
+        // A new format of a file name or date shows at once.
+        let field = field
+            .refreshed(&file, Some(&crate::fields::format_date))
+            .unwrap_or(field);
+        self.format_edit("Field Format", move |edit| {
+            let at = at_spot(edit.document(), spot)?;
+            let end =
+                desk_model::Position::new(at.paragraph, at.offset + FIELD_CHARACTER.len_utf8());
+            edit.set_character_attrs(
+                at,
+                end,
+                &CharAttrs {
+                    field: Some(Some(field)),
+                    ..CharAttrs::default()
+                },
+            )
+        });
+    }
+
+    /// Shows the file in the fields of the file name, as when the
+    /// document is saved under another name (EST-27).
+    pub fn refresh_fields(&self) {
+        let file = self.file_name();
+        self.format_edit("Update Fields", move |edit| {
+            edit.refresh_fields(&file, None)
+        });
     }
 
     /// Puts a field at the cursor, or in place of the selection (EST-27).
     pub fn insert_field(&self, field: Field) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let pending = self.state.borrow_mut().pending.take();
         let result = {
             let mut state = self.state.borrow_mut();
@@ -935,6 +1035,9 @@ impl TextEditor {
     pub fn insert_note(&self) {
         let before = self.selection();
         let (start, end) = before.ordered();
+        if self.toc_refuses(start, end) {
+            return;
+        }
         let pending = self.state.borrow_mut().pending.take();
         let result = {
             let mut state = self.state.borrow_mut();
@@ -1103,40 +1206,120 @@ impl TextEditor {
 
     /// Follows the link of the text at a spot when the links of the
     /// document are active: a bookmark of the document, or a page in the
-    /// browser. An entry of a table of contents goes to its heading.
-    /// Whether there was a link to follow.
+    /// browser. Whether there was a link to follow.
     fn follow_link(&self, spot: Spot) -> bool {
-        let (link, target) = {
+        let link = {
             let state = self.state.borrow();
             let document = state.editor.document();
             if document.text_settings().links_inactive {
                 return false;
             }
-            let target = document
-                .body()
-                .get(spot.paragraph)
-                .and_then(|p| p.attrs().toc_entry.flatten())
-                .and_then(|e| e.target)
-                .and_then(|t| document.body().index_of(t));
-            (link_at(document, spot).map(|(l, _)| l), target)
+            link_at(document, spot).map(|(l, _)| l)
         };
-        match (link, target) {
-            (Some(link), _) => {
+        match link {
+            Some(link) => {
                 self.open_link(&link);
                 true
             }
-            (None, Some(index)) => {
-                self.move_to(Spot::new(index, 0), false, false);
-                true
-            }
-            _ => false,
+            None => false,
         }
+    }
+
+    /// A click on an entry of a table of contents (EST-22, EST-23): on its
+    /// page number, when those are links, it goes to the heading;
+    /// elsewhere it updates the tables and selects the entries of its
+    /// level, which are formatted together. Whether the spot was an
+    /// entry.
+    fn click_toc_entry(&self, spot: Spot) -> bool {
+        let (target, style, follow) = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let Some(paragraph) = document.body().get(spot.paragraph) else {
+                return false;
+            };
+            let Some(entry) = paragraph.attrs().toc_entry.flatten() else {
+                return false;
+            };
+            let settings = document.text_settings();
+            let on_number = paragraph
+                .text()
+                .rfind('\t')
+                .is_some_and(|tab| spot.offset > tab);
+            let follow = settings.toc.page_links && !settings.links_inactive && on_number;
+            (entry.target, paragraph.style(), follow)
+        };
+        let heading = |this: &Self| {
+            let state = this.state.borrow();
+            let document = state.editor.document();
+            target.and_then(|t| document.body().index_of(t))
+        };
+        if follow && let Some(index) = heading(self) {
+            self.move_to(Spot::new(index, 0), false, false);
+            return true;
+        }
+        self.update_tables_of_contents();
+        let selections: Vec<Selection> = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let body = document.body();
+            // The entry again, which updating may have made anew.
+            let index = (0..body.len())
+                .find(|&i| {
+                    body.get(i).is_some_and(|p| {
+                        p.style() == style
+                            && p.attrs().toc_entry.flatten().map(|e| e.target) == Some(target)
+                    })
+                })
+                .unwrap_or(spot.paragraph.min(body.len().saturating_sub(1)));
+            document
+                .entries_of_level(index)
+                .into_iter()
+                .map(|i| Selection {
+                    anchor: Spot::new(i, 0),
+                    focus: Spot::new(i, body.get(i).map_or(0, |p| p.len())),
+                })
+                .collect()
+        };
+        let Some((first, rest)) = selections.split_first() else {
+            return true;
+        };
+        self.state.borrow_mut().typing = false;
+        self.select(*first);
+        self.state.borrow_mut().others = rest.to_vec();
+        self.select(*first);
+        true
+    }
+
+    /// Whether a change of the text from one spot to another would change
+    /// a table of contents, which only updating it changes; the bell
+    /// rings then (EST-22).
+    fn toc_refuses(&self, start: Spot, end: Spot) -> bool {
+        let refused = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            std::iter::once((start, end))
+                .chain(state.others.iter().map(|o| o.ordered()))
+                .any(|(a, b)| {
+                    document.toc_protects((a.paragraph, a.offset), (b.paragraph, b.offset))
+                })
+        };
+        if refused {
+            self.view.area().error_bell();
+        }
+        refused
     }
 
     /// Opens a link: a bookmark of the document, or a page in the browser.
     pub fn open_link(&self, link: &str) {
         if let Some(name) = link.strip_prefix('#') {
             self.go_to_bookmark(name);
+            return;
+        }
+        // Another document opens in the app, at its bookmark.
+        if let crate::links::Target::Document { .. } = crate::links::Target::parse(link) {
+            if let Some(root) = self.view.area().root() {
+                let _ = root.activate_action("win.open-linked", Some(&link.to_variant()));
+            }
             return;
         }
         let window = self.view.area().root().and_downcast::<gtk::Window>();
@@ -1299,6 +1482,7 @@ impl TextEditor {
                     settings.toc = default_toc(edit.document());
                     edit.set_text_settings(settings)?;
                 }
+                edit.add_toc_entry_styles()?;
                 edit.insert_table_of_contents(start.paragraph)?;
                 Ok(Some(Spot::new(start.paragraph, 0)))
             })
@@ -1356,10 +1540,41 @@ impl TextEditor {
     pub fn set_header_footer_text(&self, place: MarginPlace, text: &str) {
         let file_name = self.file_name();
         let text = text.to_owned();
+        let (start, _) = self.selection().ordered();
         self.format_edit("Header and Footer", move |edit| {
-            let old = edit.document().headers_footers().get(place).to_vec();
+            // Those of the section at the cursor (EST-16).
+            let section = edit.document().headers_section(start.paragraph);
+            let old = edit
+                .document()
+                .section_headers_footers(section)
+                .get(place)
+                .to_vec();
             let paragraphs = crate::headers_pane::paragraphs(edit, &text, &old, &file_name)?;
-            edit.set_header_footer(place, paragraphs)
+            edit.set_section_header_footer(section, place, paragraphs)
+        });
+    }
+
+    /// Puts the numbers of pages in the headers or footers, as Insert >
+    /// Auto Page Numbers (EST-27). `text` is the line, where `{page}` and
+    /// `{pages}` are the number of the page and of pages.
+    pub fn set_auto_page_numbers(&self, numbers: desk_model::AutoPageNumbers, text: &str) {
+        let file_name = self.file_name();
+        let text = text.to_owned();
+        let (start, _) = self.selection().ordered();
+        self.format_edit("Auto Page Numbers", move |edit| {
+            let at = start.paragraph;
+            let section = edit.document().headers_section(at);
+            let place = MarginPlace::new(numbers.kind, desk_model::MarginPages::Default);
+            let old = edit
+                .document()
+                .section_headers_footers(section)
+                .get(place)
+                .to_vec();
+            let mut line = crate::headers_pane::paragraphs(edit, &text, &old, &file_name)?;
+            let Some(line) = line.pop() else {
+                return Ok(());
+            };
+            edit.set_auto_page_numbers(at, numbers, &line)
         });
     }
 
@@ -1745,7 +1960,11 @@ impl TextEditor {
             setup: *document.page_setup(),
             layout: document.layout_at(start.paragraph).1,
             section: document.section_at(start.paragraph).1,
-            headers: document.headers_footers().clone(),
+            first_section: document.section_at(start.paragraph).0.is_none(),
+            headers_section: document.headers_section(start.paragraph),
+            headers: document
+                .section_headers_footers(document.headers_section(start.paragraph))
+                .clone(),
             note: note_at(document, start),
             link: link_at(document, start).map(|(link, _)| link),
             bookmarks: bookmarks(document)
@@ -2578,7 +2797,11 @@ impl TextEditor {
             }
             // A click on a link follows it, unless the document's links
             // are inactive (EST-25).
-            if presses == 1 && !shift && !control && this.follow_link(spot) {
+            if presses == 1
+                && !shift
+                && !control
+                && (this.click_toc_entry(spot) || this.follow_link(spot))
+            {
                 let mut state = this.state.borrow_mut();
                 state.adding = false;
                 state.drag_from = None;

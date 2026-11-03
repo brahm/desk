@@ -142,6 +142,7 @@ impl PageSetup {
                 first_page_different: false,
                 left_right_different: false,
                 start: SectionStart::AnyPage,
+                own_margins: false,
             },
             layout: Layout {
                 columns: Columns::ONE,
@@ -214,8 +215,11 @@ pub struct PagedFlow {
     pub page: PageSetup,
     /// The body text.
     pub body: TextFlow,
-    /// The headers and footers (EST-12, EST-19).
+    /// The headers and footers of the first section (EST-12, EST-19).
     pub margins: HeadersFooters,
+    /// The headers and footers of the later sections that have their own,
+    /// by the paragraph that starts each (EST-16).
+    pub section_margins: imbl::OrdMap<NodeId, HeadersFooters>,
     /// The footnotes or endnotes (EST-13).
     pub notes: Notes,
 }
@@ -307,6 +311,7 @@ impl Document {
                 page: PageSetup::default(),
                 body: TextFlow::new(Paragraph::new(first, body_style)),
                 margins: HeadersFooters::default(),
+                section_margins: imbl::OrdMap::new(),
                 notes: Notes::default(),
             }),
         }
@@ -357,11 +362,62 @@ impl Document {
         }
     }
 
-    /// The headers and footers.
+    /// The headers and footers of the first section.
     pub fn headers_footers(&self) -> &HeadersFooters {
         match &self.container {
             Container::Pages(flow) => &flow.margins,
         }
+    }
+
+    /// The headers and footers of a section, by the paragraph that starts
+    /// it, or of the first section with none. A section that has none yet
+    /// has empty ones.
+    pub fn section_headers_footers(&self, section: Option<NodeId>) -> &HeadersFooters {
+        static EMPTY: std::sync::LazyLock<HeadersFooters> =
+            std::sync::LazyLock::new(HeadersFooters::default);
+        match (&self.container, section) {
+            (Container::Pages(flow), None) => &flow.margins,
+            (Container::Pages(flow), Some(id)) => flow.section_margins.get(&id).unwrap_or(&EMPTY),
+        }
+    }
+
+    /// Every section that has headers and footers of its own, the first
+    /// one as none, with them.
+    pub fn all_headers_footers(&self) -> Vec<(Option<NodeId>, &HeadersFooters)> {
+        let Container::Pages(flow) = &self.container;
+        std::iter::once((None, &flow.margins))
+            .chain(flow.section_margins.iter().map(|(id, m)| (Some(*id), m)))
+            .collect()
+    }
+
+    /// The section whose headers and footers the paragraph at an index of
+    /// the body shows: the paragraph that starts the nearest section at or
+    /// before it with its own, or none for those of the first section
+    /// (EST-12, EST-16).
+    pub fn headers_section(&self, index: usize) -> Option<NodeId> {
+        let body = self.body();
+        for i in (0..=index.min(body.len().saturating_sub(1))).rev() {
+            let paragraph = body.get(i)?;
+            if let Some(Some(start)) = &paragraph.attrs().start
+                && let crate::Start::Section(section, _) = &**start
+                && section.own_margins
+            {
+                return Some(paragraph.id());
+            }
+        }
+        None
+    }
+
+    /// Whether the body holds a mark of a note.
+    pub fn has_note_mark(&self, note: NodeId) -> bool {
+        self.body().iter().any(|p| {
+            p.runs().any(|r| {
+                matches!(
+                    r.attrs.field,
+                    Some(Some(crate::Field::NoteMark { note: n })) if n == note
+                )
+            })
+        })
     }
 
     /// The notes.
@@ -547,9 +603,9 @@ impl Document {
                 if self.styles.is_referenced(style)
                     || self.body().iter().any(|p| p.uses_style(style))
                     || self
-                        .headers_footers()
-                        .paragraphs()
-                        .any(|p| p.uses_style(style))
+                        .all_headers_footers()
+                        .iter()
+                        .any(|(_, m)| m.paragraphs().any(|p| p.uses_style(style)))
                     || self.notes().paragraphs().any(|p| p.uses_style(style))
                     || self.text_settings().toc.uses(style)
                 {
@@ -563,7 +619,11 @@ impl Document {
                 let old = std::mem::replace(&mut flow.page, page);
                 Ok(Op::SetPageSetup { page: old })
             }
-            Op::SetHeaderFooter { place, paragraphs } => {
+            Op::SetHeaderFooter {
+                section,
+                place,
+                paragraphs,
+            } => {
                 for paragraph in &paragraphs {
                     self.styles
                         .check_family(paragraph.style(), StyleFamily::Paragraph)?;
@@ -574,8 +634,22 @@ impl Document {
                     self.ids.observe(paragraph.id());
                 }
                 let Container::Pages(flow) = &mut self.container;
-                let old = flow.margins.replace(place, paragraphs);
+                let old = match section {
+                    None => flow.margins.replace(place, paragraphs),
+                    Some(id) => {
+                        let mut margins =
+                            flow.section_margins.get(&id).cloned().unwrap_or_default();
+                        let old = margins.replace(place, paragraphs);
+                        if margins.is_empty() {
+                            flow.section_margins.remove(&id);
+                        } else {
+                            flow.section_margins.insert(id, margins);
+                        }
+                        old
+                    }
+                };
                 Ok(Op::SetHeaderFooter {
+                    section,
                     place,
                     paragraphs: old,
                 })

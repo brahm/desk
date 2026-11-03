@@ -149,6 +149,28 @@ impl Edit {
     /// where it was. When the text spans paragraphs, they join into the
     /// first one, which keeps its style.
     pub fn delete(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
+        // The notes whose marks go: those with no mark left go too
+        // (EST-13).
+        let mut marked: Vec<NodeId> = Vec::new();
+        for (id, range) in self.doc.paragraph_ranges(start, end)? {
+            for run in self.doc.paragraph(id)?.slice(range)? {
+                if let Some(Some(crate::Field::NoteMark { note })) = run.attrs.field
+                    && !marked.contains(&note)
+                {
+                    marked.push(note);
+                }
+            }
+        }
+        let at = self.delete_text(start, end)?;
+        for note in marked {
+            if self.doc.notes().get(note).is_some() && !self.doc.has_note_mark(note) {
+                self.set_note(note, None)?;
+            }
+        }
+        Ok(at)
+    }
+
+    fn delete_text(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
         let ranges = self.doc.paragraph_ranges(start, end)?;
         let (first, first_range) = ranges[0].clone();
         if ranges.len() == 1 {
@@ -249,6 +271,99 @@ impl Edit {
         })
     }
 
+    /// Shows the file of the document again in its file name fields and,
+    /// with `date`, today's date in the dates that update when the
+    /// document opens (EST-27): in the body, the headers and footers and
+    /// the notes.
+    pub fn refresh_fields(
+        &mut self,
+        file: &str,
+        date: Option<crate::header::DateWriter<'_>>,
+    ) -> Result<(), ModelError> {
+        let refresh = |paragraph: &Paragraph| -> Option<Paragraph> {
+            let mut changed = false;
+            let runs: Vec<Run> = paragraph
+                .runs()
+                .map(|run| {
+                    let mut run = run.clone();
+                    if let Some(Some(field)) = &run.attrs.field
+                        && let Some(new) = field.refreshed(file, date)
+                    {
+                        run.attrs.field = Some(Some(new));
+                        changed = true;
+                    }
+                    run
+                })
+                .collect();
+            changed.then(|| {
+                Paragraph::from_runs(
+                    paragraph.id(),
+                    paragraph.style(),
+                    paragraph.attrs().clone(),
+                    runs,
+                )
+                .ok()
+            })?
+        };
+        let body: Vec<(NodeId, usize)> = self
+            .doc
+            .body()
+            .iter()
+            .filter(|p| refresh(p).is_some())
+            .map(|p| (p.id(), p.len()))
+            .collect();
+        for (id, len) in body {
+            self.map_runs(Position::new(id, 0), Position::new(id, len), |run| {
+                if let Some(Some(field)) = &run.attrs.field
+                    && let Some(new) = field.refreshed(file, date)
+                {
+                    run.attrs.field = Some(Some(new));
+                }
+            })?;
+        }
+        let sections: Vec<Option<NodeId>> = self
+            .doc
+            .all_headers_footers()
+            .into_iter()
+            .map(|(s, _)| s)
+            .collect();
+        for section in sections {
+            for place in crate::MarginPlace::ALL {
+                let old = self
+                    .doc
+                    .section_headers_footers(section)
+                    .get(place)
+                    .to_vec();
+                if old.iter().any(|p| refresh(p).is_some()) {
+                    let new = old
+                        .iter()
+                        .map(|p| refresh(p).unwrap_or_else(|| p.clone()))
+                        .collect();
+                    self.set_section_header_footer(section, place, new)?;
+                }
+            }
+        }
+        let notes: Vec<crate::Note> = self.doc.notes().iter().cloned().collect();
+        for note in notes {
+            if note.paragraphs.iter().any(|p| refresh(p).is_some()) {
+                let paragraphs: Vec<Paragraph> = note
+                    .paragraphs
+                    .iter()
+                    .map(|p| refresh(p).unwrap_or_else(|| p.clone()))
+                    .collect();
+                let id = note.id;
+                self.set_note(
+                    id,
+                    Some(crate::Note {
+                        paragraphs: paragraphs.into(),
+                        ..note
+                    }),
+                )?;
+            }
+        }
+        Ok(())
+    }
+
     /// Removes the character attributes set on the text between two
     /// positions, so that it follows its styles again.
     pub fn clear_character_attrs(
@@ -338,14 +453,29 @@ impl Edit {
         Ok(())
     }
 
-    /// Sets the text of a header or a footer.
+    /// Sets the text of a header or a footer of the first section.
     pub fn set_header_footer(
         &mut self,
         place: crate::MarginPlace,
         paragraphs: Vec<crate::Paragraph>,
     ) -> Result<(), ModelError> {
-        if self.doc.headers_footers().get(place) != paragraphs.as_slice() {
-            self.apply(Op::SetHeaderFooter { place, paragraphs })?;
+        self.set_section_header_footer(None, place, paragraphs)
+    }
+
+    /// Sets the text of a header or a footer of a section, by the
+    /// paragraph that starts it, or of the first section with none.
+    pub fn set_section_header_footer(
+        &mut self,
+        section: Option<NodeId>,
+        place: crate::MarginPlace,
+        paragraphs: Vec<crate::Paragraph>,
+    ) -> Result<(), ModelError> {
+        if self.doc.section_headers_footers(section).get(place) != paragraphs.as_slice() {
+            self.apply(Op::SetHeaderFooter {
+                section,
+                place,
+                paragraphs,
+            })?;
         }
         Ok(())
     }

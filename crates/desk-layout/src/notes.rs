@@ -161,8 +161,9 @@ impl NotePlan {
                 )
             })
             .collect();
+        let room = crate::pages::MarginRoom::new(document, system);
         if self.refs.is_empty() {
-            return paginate_with_footnotes(setup, &body, system, sum, None);
+            return paginate_with_footnotes(setup, &body, system, sum, None, Some(&room));
         }
         let notes = self.note_texts(document, values, labels);
         let gap = self.settings.gap.to_pt() as f32;
@@ -203,10 +204,10 @@ impl NotePlan {
                     notes: laid,
                     gap,
                 });
-                paginate_with_footnotes(setup, &body, system, sum, Some(footnotes))
+                paginate_with_footnotes(setup, &body, system, sum, Some(footnotes), Some(&room))
             }
             NoteKind::DocumentEndnotes | NoteKind::SectionEndnotes => {
-                self.paginate_endnotes(document, body, notes, gap, system, setup, sum)
+                self.paginate_endnotes(document, body, notes, gap, system, setup, sum, &room)
             }
         }
     }
@@ -223,6 +224,7 @@ impl NotePlan {
         system: &mut TextSystem,
         setup: PageSetup,
         sum: bool,
+        room: &crate::pages::MarginRoom,
     ) -> DocumentLayout {
         let n = body.len();
         // Where the notes of each section go: before the paragraph that
@@ -283,7 +285,19 @@ impl NotePlan {
                 }
             }
         }
-        let mut layout = paginate_with_footnotes(setup, &flow, system, sum, None);
+        // The notes show the headers and footers of the paragraph before.
+        let mut key = None;
+        let keys = sources
+            .iter()
+            .map(|source| {
+                if let Ok(paragraph) = source {
+                    key = room.keys.get(*paragraph).copied().flatten();
+                }
+                key
+            })
+            .collect();
+        let room = room.with_keys(keys);
+        let mut layout = paginate_with_footnotes(setup, &flow, system, sum, None, Some(&room));
         for page in &mut layout.pages {
             let lines = std::mem::take(&mut page.lines);
             for mut line in lines {

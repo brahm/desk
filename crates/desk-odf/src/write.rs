@@ -92,6 +92,20 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for style in &document.list_styles {
         write_list_style(&mut w, style);
     }
+    for notes in &document.notes_configuration {
+        w.start("text:notes-configuration")
+            .attr("text:note-class", &notes.class);
+        if let Some(format) = &notes.num_format {
+            w.attr("style:num-format", format);
+        }
+        if let Some(at) = &notes.start_numbering_at {
+            w.attr("text:start-numbering-at", at);
+        }
+        if let Some(position) = &notes.footnotes_position {
+            w.attr("text:footnotes-position", position);
+        }
+        w.end();
+    }
     w.end();
     w.start("office:automatic-styles");
     for style in &document.master_styles {
@@ -99,24 +113,28 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     write_page_layout(&mut w, &document.page_layout);
     w.end();
-    w.start("office:master-styles")
-        .start("style:master-page")
-        .attr("style:name", "Standard")
-        .attr("style:page-layout-name", "pm1");
-    let master = &document.master;
-    for (name, part) in [
-        ("style:header", &master.header),
-        ("style:header-left", &master.header_left),
-        ("style:header-first", &master.header_first),
-        ("style:footer", &master.footer),
-        ("style:footer-left", &master.footer_left),
-        ("style:footer-first", &master.footer_first),
-    ] {
-        if let Some(part) = part {
-            write_header_footer(&mut w, name, part);
+    w.start("office:master-styles");
+    for (name, master) in std::iter::once(("Standard", &document.master))
+        .chain(document.masters.iter().map(|(n, m)| (n.as_str(), m)))
+    {
+        w.start("style:master-page")
+            .attr("style:name", name)
+            .attr("style:page-layout-name", "pm1");
+        for (name, part) in [
+            ("style:header", &master.header),
+            ("style:header-left", &master.header_left),
+            ("style:header-first", &master.header_first),
+            ("style:footer", &master.footer),
+            ("style:footer-left", &master.footer_left),
+            ("style:footer-first", &master.footer_first),
+        ] {
+            if let Some(part) = part {
+                write_header_footer(&mut w, name, part);
+            }
         }
+        w.end();
     }
-    w.end().end();
+    w.end();
     w.end();
     let styles = w.finish();
 
@@ -175,6 +193,8 @@ fn write_settings(document: &TextDocument) -> Option<String> {
             ("NoteFormat", &text.note_format),
             ("NoteNumbering", &text.note_numbering),
             ("NoteGap", &text.note_gap),
+            ("HeaderMargin", &text.header_margin),
+            ("FooterMargin", &text.footer_margin),
         ] {
             if let Some(value) = value {
                 config_item(&mut w, name, "string", value);
@@ -253,7 +273,8 @@ fn write_style(w: &mut Writer, style: &Style) {
         )
         .attr_opt("style:parent-style-name", style.parent.as_deref())
         .attr_opt("style:next-style-name", style.next.as_deref())
-        .attr_opt("style:list-style-name", style.list_style.as_deref());
+        .attr_opt("style:list-style-name", style.list_style.as_deref())
+        .attr_opt("style:master-page-name", style.master_page.as_deref());
     write_properties(w, &style.properties);
     w.end();
 }
@@ -395,7 +416,13 @@ fn start_toc(w: &mut Writer, number: usize, levels: &[TocLevel]) {
             w.start("text:index-entry-tab-stop")
                 .attr("style:type", "right")
                 .end();
+            if level.link {
+                w.start("text:index-entry-link-start").end();
+            }
             w.start("text:index-entry-page-number").end();
+            if level.link {
+                w.start("text:index-entry-link-end").end();
+            }
         }
         w.end();
     }
@@ -995,20 +1022,23 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
 
 fn write_field(w: &mut Writer, field: &Field, shown: &str) {
     match field {
-        Field::PageNumber => {
+        Field::PageNumber { num_format } => {
             w.start("text:page-number")
                 .attr("text:select-page", "current");
+            w.attr_opt("style:num-format", num_format.as_deref());
         }
-        Field::PageCount => {
+        Field::PageCount { num_format } => {
             w.start("text:page-count");
+            w.attr_opt("style:num-format", num_format.as_deref());
         }
-        Field::Date { pattern } => {
-            w.start("text:date").attr("text:fixed", "true");
+        Field::Date { pattern, fixed } => {
+            w.start("text:date")
+                .attr("text:fixed", if *fixed { "true" } else { "false" });
             w.attr_opt("desk:pattern", pattern.as_deref());
         }
-        Field::FileName => {
+        Field::FileName { display } => {
             w.start("text:file-name")
-                .attr("text:display", "name")
+                .attr("text:display", display)
                 .attr("text:fixed", "true");
         }
         Field::PageOf { name } => {

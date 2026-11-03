@@ -10,6 +10,7 @@ bus. It reads with PyGObject and the AT-SPI typelib (gir1.2-atspi-2.0)
 and types with xdotool.
 """
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -369,7 +370,134 @@ def main():
     finally:
         writer.terminate()
         writer.wait(timeout=10)
+    selections_and_colors(work)
     print("All UI tests passed.")
+
+
+def click(x, y, count=1, control=False):
+    """Clicks a point of the screen, holding Ctrl when asked."""
+    command = ["xdotool", "mousemove", "--sync", str(int(x)), str(int(y))]
+    if control:
+        command += ["keydown", "ctrl"]
+    command += ["click", "--repeat", str(count), "--delay", "60", "1"]
+    if control:
+        command += ["keyup", "ctrl"]
+    subprocess.run(command, check=True)
+    time.sleep(0.4)
+
+
+def styled(content, style, prop):
+    """Whether an automatic text style of content.xml sets a property."""
+    found = re.search(
+        rf'<style:style style:name="{style}"[^>]*>(.*?)</style:style>', content, re.S
+    )
+    return found is not None and prop in found.group(1)
+
+
+def span_style(content, text):
+    found = re.search(rf'<text:span text:style-name="([^"]+)">{text}</text:span>', content)
+    return found.group(1) if found else None
+
+
+def selections_and_colors(work):
+    """Ctrl and a click add a range to the selection, which formatting
+    changes together (TXT-03), and the eyedropper takes a color from the
+    screen through the portal (INT-16)."""
+    letter = work / "Selections.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    portal = subprocess.Popen(
+        [sys.executable, "-I", str(Path(__file__).parent / "helpers" / "fake_portal.py"), "1", "0", "0"],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    writer = None
+    try:
+        check("the portal is ready", portal.stdout.readline().strip() == "ready")
+        writer = subprocess.Popen([str(WRITER), str(letter)])
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "Selections.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Selections.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Selections.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        width, height = int(window["WIDTH"]), int(window["HEIGHT"])
+        origin = (int(window["X"]), int(window["Y"]))
+
+        def selected():
+            if Atspi.Text.get_n_selections(document) == 0:
+                caret = caret_of(document)
+                return caret, caret
+            selection = Atspi.Text.get_selection(document, 0)
+            return selection.start_offset, selection.end_offset
+
+        # The words of the line, found by double clicks across the middle
+        # of the window, which the page fills.
+        line = origin[1] + height // 2
+        start = len("US Letter, ")
+        first = last = None
+        for x in range(origin[0] + 10, origin[0] + width - 10, 8):
+            click(x, line, count=2)
+            got = selected()
+            if got == (0, 2) and first is None:
+                first = x
+            if got[0] == start and got[1] > start:
+                last = x
+                break
+        check("a double click selects a word", first is not None and last is not None)
+        click(first, line, count=2)
+        check("a double click selects the first word", selected() == (0, 2))
+        click(last, line, count=2, control=True)
+        check("Ctrl and a click add the next word", selected() == (start, start + len("landscape")))
+        press("ctrl+b")
+
+        # The eyedropper of the format bar colors the selection.
+        click(first, line, count=2)
+        picker = next(
+            n
+            for n in walk(app)
+            if n.get_role() == Atspi.Role.PUSH_BUTTON
+            and n.get_name() == "Pick a Color from the Screen"
+            and showing(n)
+        )
+        Atspi.Action.do_action(picker, 0)
+        time.sleep(1)
+        press("ctrl+s")
+
+        def saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    content = package.read("content.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return None
+            return content if span_style(content, "landscape") else None
+
+        content = wait_for("the saved file", saved)
+        us = span_style(content, "US")
+        check("both words are bold", us and styled(content, us, 'fo:font-weight="bold"'))
+        check(
+            "and the second too",
+            styled(content, span_style(content, "landscape"), 'fo:font-weight="bold"'),
+        )
+        check("the word between is not", span_style(content, "Letter,") is None)
+        # The first eyedropper of the bar is that of the color behind the
+        # text, or of the text.
+        check("the eyedropper colors the selection", styled(content, us, '="#ff0000"'))
+    finally:
+        if writer is not None:
+            writer.terminate()
+            writer.wait(timeout=10)
+        portal.terminate()
+        portal.wait(timeout=10)
 
 
 if __name__ == "__main__":

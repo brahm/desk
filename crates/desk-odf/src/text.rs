@@ -53,12 +53,32 @@ pub struct TextDocument {
     pub section_styles: Vec<SectionStyle>,
     /// The headers and footers of the master page.
     pub master: MasterPage,
+    /// The other master pages, by name, with the same page layout: the
+    /// headers and footers of later sections.
+    pub masters: Vec<(String, MasterPage)>,
     /// The automatic styles of `styles.xml`, which the paragraphs of the
     /// headers and footers name.
     pub master_styles: Vec<Style>,
     /// What the tables of contents list (`text:table-of-content-source`),
     /// level by level: those of the first table, written in each.
     pub toc_levels: Vec<TocLevel>,
+    /// How footnotes and endnotes are numbered and where they go
+    /// (`text:notes-configuration`), as other apps read them.
+    pub notes_configuration: Vec<NotesConfiguration>,
+}
+
+/// The configuration of the footnotes or the endnotes of a document
+/// (`text:notes-configuration`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct NotesConfiguration {
+    /// `text:note-class`: `footnote` or `endnote`.
+    pub class: String,
+    /// `style:num-format`, such as `1` or `i`.
+    pub num_format: Option<String>,
+    /// `text:start-numbering-at`: `document`, `chapter` or `page`.
+    pub start_numbering_at: Option<String>,
+    /// `text:footnotes-position`: `text`, `page`, `section` or `document`.
+    pub footnotes_position: Option<String>,
 }
 
 /// A level of a table of contents: the paragraphs of a style
@@ -72,6 +92,9 @@ pub struct TocLevel {
     pub entry: String,
     /// Whether the entries show a page number (`text:index-entry-page-number`).
     pub page_number: bool,
+    /// Whether the page number is a link to the heading
+    /// (`text:index-entry-link-start` and `text:index-entry-link-end`).
+    pub link: bool,
 }
 
 /// The headers and footers of a master page (`style:master-page`).
@@ -205,6 +228,12 @@ pub struct TextSettings {
     pub note_gap: Option<String>,
     /// Whether links do nothing when clicked.
     pub links_inactive: Option<bool>,
+    /// How far the header is from the top of the paper, as `36pt`, while
+    /// the pages show none, which ODF has no place for.
+    pub header_margin: Option<String>,
+    /// How far the footer is from the bottom of the paper, while the pages
+    /// show none.
+    pub footer_margin: Option<String>,
 }
 
 /// A list style (`text:list-style`).
@@ -349,6 +378,9 @@ pub struct Style {
     pub next: Option<String>,
     /// `style:list-style-name`, of a paragraph style: empty for no list.
     pub list_style: Option<String>,
+    /// `style:master-page-name`, of a paragraph style: the master page
+    /// that a paragraph of it starts, on a new page.
+    pub master_page: Option<String>,
     /// Properties of the properties elements.
     pub properties: Properties,
 }
@@ -773,17 +805,30 @@ pub struct Span {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Field {
     /// `text:page-number`, of the current page.
-    PageNumber,
+    PageNumber {
+        /// `style:num-format`: `1`, `i`, `I`, `a` or `A`.
+        num_format: Option<String>,
+    },
     /// `text:page-count`.
-    PageCount,
-    /// `text:date`, fixed at the date it shows. `desk:pattern` keeps the
-    /// pattern of the date in the symbols of Unicode.
+    PageCount {
+        /// `style:num-format`.
+        num_format: Option<String>,
+    },
+    /// `text:date`. `desk:pattern` keeps the pattern of the date in the
+    /// symbols of Unicode.
     Date {
         /// The pattern, as `EEEE, d MMMM y`.
         pattern: Option<String>,
+        /// `text:fixed`: whether it keeps the date it shows, rather than
+        /// showing the date the document is opened.
+        fixed: bool,
     },
     /// `text:file-name`, fixed at the name it shows.
-    FileName,
+    FileName {
+        /// `text:display`: `full`, `path`, `name` or
+        /// `name-and-extension`.
+        display: String,
+    },
     /// `text:bookmark-ref` with `text:reference-format="page"`: the
     /// number of the page of a bookmark, by its name.
     PageOf {

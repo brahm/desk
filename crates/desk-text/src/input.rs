@@ -498,7 +498,7 @@ mod tests {
     #[test]
     fn est_27_a_field_shows_its_value_whole() {
         let mut field = format(Capitalization::None);
-        field.field = Some(desk_model::Field::PageNumber);
+        field.field = Some(desk_model::Field::PAGE_NUMBER);
         let text = ParagraphText::from_runs_in(
             &TextSettings::default(),
             FieldValues {

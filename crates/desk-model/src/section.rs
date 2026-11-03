@@ -142,6 +142,11 @@ pub struct Section {
     pub left_right_different: bool,
     /// The page the section starts on.
     pub start: SectionStart,
+    /// Whether the section has headers and footers of its own, rather
+    /// than those of the section before: Pages' "Use previous headers and
+    /// footers" unchecked (EST-12, EST-16). The first section always has
+    /// its own.
+    pub own_margins: bool,
 }
 
 /// Where a new section or layout starts: at the paragraph that holds it.

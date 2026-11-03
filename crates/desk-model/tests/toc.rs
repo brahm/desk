@@ -42,6 +42,7 @@ fn est_22_est_23_a_table_lists_its_styles_and_updates() {
                     entry,
                     page_number: true,
                 }],
+                page_links: false,
             };
             edit.set_text_settings(settings)?;
             Ok((heading, entry, ids))
@@ -72,6 +73,16 @@ fn est_22_est_23_a_table_lists_its_styles_and_updates() {
         texts(document)[..2],
         ["Chapter one\t\u{fffc}", "Chapter two\t\u{fffc}"]
     );
+
+    // The entries of a level go together, and only updating changes
+    // their text; the whole table can be taken away.
+    assert_eq!(document.entries_of_level(1), [0, 1]);
+    assert!(document.entries_of_level(2).is_empty());
+    let end_of = |i: usize| document.body().get(i).unwrap().len();
+    assert!(document.toc_protects((0, 2), (0, 2)));
+    assert!(document.toc_protects((1, end_of(1)), (2, 0)));
+    assert!(!document.toc_protects((2, 0), (2, 3)));
+    assert!(!document.toc_protects((0, 0), (1, end_of(1))));
 
     // A changed heading is listed again once the table is updated.
     editor
@@ -114,4 +125,42 @@ fn est_22_est_23_a_table_lists_its_styles_and_updates() {
     // Undo brings the entries back.
     editor.undo().unwrap();
     assert_eq!(texts(editor.document())[1], "Chapter two!\t\u{fffc}");
+}
+
+#[test]
+fn est_23_entries_get_styles_with_a_tab_for_the_leader() {
+    use desk_model::{StyleFamily, TabAlignment};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let heading = edit.new_paragraph_style("Heading", start, start, true)?;
+            let default = edit.document().styles().default_paragraph();
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry: default,
+                    page_number: true,
+                }],
+                page_links: true,
+            };
+            edit.set_text_settings(settings)?;
+            edit.add_toc_entry_styles()
+        })
+        .unwrap();
+    let document = editor.document();
+    let styles = document.styles();
+    let entry = styles
+        .by_name(StyleFamily::Paragraph, "TOC Heading")
+        .expect("made");
+    assert_eq!(document.text_settings().toc.levels[0].entry, entry.id());
+    let format = styles.resolve_paragraph(entry.id(), &Default::default());
+    let stop = format.tab_stops.stops()[0];
+    assert_eq!(stop.alignment, TabAlignment::Right);
+    let page = document.page_setup();
+    assert_eq!(
+        stop.position,
+        page.width - page.margin_left - page.margin_right
+    );
 }

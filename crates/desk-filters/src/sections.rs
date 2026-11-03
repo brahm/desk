@@ -155,6 +155,8 @@ pub fn section(style: &odf::SectionStyle, first_number: Option<u32>) -> Option<S
         first_number,
         first_page_different: style.first_page_different.unwrap_or(false),
         left_right_different: style.left_right_different.unwrap_or(false),
+        // A master page of its own says so.
+        own_margins: false,
         start: match start {
             odf::SectionStart::Any => SectionStart::AnyPage,
             odf::SectionStart::Left => SectionStart::LeftPage,

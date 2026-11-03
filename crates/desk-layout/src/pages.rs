@@ -101,6 +101,10 @@ pub struct Page {
     /// The left and right margins of the page, which swap on left pages
     /// when pages face each other.
     pub margins: (f32, f32),
+    /// The top and bottom of the body on the page, from the top of the
+    /// paper: the top and bottom margins, unless the header or the footer
+    /// reaches past them and pushes the body away (EST-12).
+    pub body: (f32, f32),
     /// The lines on the page, from top to bottom and column by column.
     pub lines: Vec<PlacedLine>,
     /// The parts of paragraphs on the page that have a background or a
@@ -117,6 +121,13 @@ pub struct Page {
     /// The footnotes that the lines of the page refer to, as the body
     /// paragraph that refers to each and the index of the note.
     pub footnotes: Vec<(usize, usize)>,
+    /// The last footnote of the page when only its first lines fit on it:
+    /// the paragraph that refers to it, the note and how many of its lines
+    /// the page shows. The rest go on at the foot of the next page.
+    pub split_note: Option<(usize, usize, usize)>,
+    /// The rest of a footnote that began on the page before: the note and
+    /// its first line here, above the notes of the page.
+    pub carried_note: Option<(usize, usize)>,
     /// The left end of the short rule above the notes on the page, when
     /// there is one (EST-13).
     pub note_rule: Option<(f32, f32)>,
@@ -142,6 +153,14 @@ pub struct DocumentLayout {
     /// The sections that have pages, in order: [`Page::section`] is an
     /// index in it.
     pub sections: Vec<Section>,
+    /// The section whose headers and footers each section shows, by the
+    /// paragraph that starts it, or none for those of the first section
+    /// (EST-16).
+    pub section_margins: Vec<Option<desk_model::NodeId>>,
+    /// What the fields of each paragraph of the body show, when the
+    /// document has fields (EST-27); empty when it is laid out without
+    /// them.
+    pub field_values: Vec<FieldValues>,
 }
 
 impl DocumentLayout {
@@ -226,6 +245,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     place_margins(document, &mut layout, system);
+    layout.field_values = values;
     layout
 }
 
@@ -248,9 +268,6 @@ fn has_fields(paragraph: &Paragraph) -> bool {
 ///   face each other or not.
 pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &mut TextSystem) {
     let setup = layout.setup;
-    let styles = document.styles();
-    let settings = document.text_settings();
-    let margins = document.headers_footers();
     let pages = layout.pages.len() as u32;
     let height = setup.height.to_pt() as f32;
     for (index, page) in layout.pages.iter_mut().enumerate() {
@@ -260,6 +277,10 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
             .get(page.section)
             .copied()
             .unwrap_or(setup.section);
+        // The headers and footers of the section, or of the one before
+        // whose it uses (EST-12, EST-16).
+        let margins = document
+            .section_headers_footers(layout.section_margins.get(page.section).copied().flatten());
         let values = FieldValues {
             page: page.number,
             pages,
@@ -285,39 +306,9 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
             if paragraphs.iter().all(Paragraph::is_empty) {
                 continue;
             }
-            let items = styles.list_items(paragraphs.iter());
-            let mut lines = Vec::new();
-            let mut y = 0.0f32;
-            let mut after = 0.0f32;
-            for (i, paragraph) in paragraphs.iter().enumerate() {
-                let text = ParagraphText::new_in_document_with(
-                    styles,
-                    settings,
-                    paragraph,
-                    items[i].as_ref(),
-                    values.clone(),
-                );
-                let format = text.paragraph().clone();
-                let laid = system.layout(&text, &Column::new(width), 0.0).lines;
-                let Some(first) = laid.first() else {
-                    continue;
-                };
-                if i > 0 {
-                    y += after.max(format.space_before.to_pt() as f32);
-                }
-                let dy = y - first.top;
-                let mut bottom = y;
-                for (n, line) in laid.iter().enumerate() {
-                    bottom = dy + line.top + line.height;
-                    lines.push(PlacedLine {
-                        paragraph: i,
-                        index: n,
-                        line: line.clone(),
-                        origin: (page.margins.0, dy),
-                    });
-                }
-                y = bottom;
-                after = format.space_after.to_pt() as f32;
+            let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
+            for line in &mut lines {
+                line.origin.0 = page.margins.0;
             }
             let shift = match kind {
                 MarginKind::Header => setup.header_margin.to_pt() as f32,
@@ -334,6 +325,157 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
             page.margin_lines.extend(lines);
         }
     }
+}
+
+/// The room that the headers and footers of a document take on its pages,
+/// to push the body away from those that reach past the margins (EST-12).
+pub(crate) struct MarginRoom {
+    setup: PageSetup,
+    /// For each text laid out, the section whose headers and footers it
+    /// shows, by the paragraph that starts it.
+    pub keys: Vec<Option<desk_model::NodeId>>,
+    /// How far each header and footer of each such section reaches: the
+    /// bottom of a header, and from the bottom of the text of a footer to
+    /// its top, by the index of its place.
+    heights: HashMap<(Option<desk_model::NodeId>, usize), f32>,
+}
+
+impl MarginRoom {
+    /// The room of the headers and footers of a document, for its body.
+    pub fn new(document: &Document, system: &mut TextSystem) -> Self {
+        let setup = *document.page_setup();
+        let mut keys = Vec::with_capacity(document.body().len());
+        let mut current = None;
+        for paragraph in document.body().iter() {
+            if let Some(Some(start)) = &paragraph.attrs().start
+                && let Start::Section(section, _) = &**start
+                && section.own_margins
+            {
+                current = Some(paragraph.id());
+            }
+            keys.push(current);
+        }
+        let mut heights = HashMap::new();
+        let width = setup.body_width().to_pt() as f32;
+        for (key, margins) in document.all_headers_footers() {
+            for place in MarginPlace::ALL {
+                let shown = match place.kind {
+                    MarginKind::Header => setup.headers,
+                    MarginKind::Footer => setup.footers,
+                };
+                let paragraphs = margins.get(place);
+                if !shown || paragraphs.iter().all(Paragraph::is_empty) {
+                    continue;
+                }
+                let (lines, bottom) =
+                    margin_block(document, paragraphs, width, &FieldValues::default(), system);
+                let reach = match place.kind {
+                    MarginKind::Header => bottom,
+                    MarginKind::Footer => {
+                        let text_bottom = lines
+                            .last()
+                            .map_or(0.0, |l: &PlacedLine| l.origin.1 + l.line.text_bottom);
+                        let top = lines.first().map_or(0.0, |l| l.origin.1 + l.line.top);
+                        text_bottom - top
+                    }
+                };
+                heights.insert((key, place.index()), reach);
+            }
+        }
+        Self {
+            setup,
+            keys,
+            heights,
+        }
+    }
+
+    /// The same room, for texts that show the headers and footers of the
+    /// sections of these keys.
+    pub fn with_keys(&self, keys: Vec<Option<desk_model::NodeId>>) -> Self {
+        Self {
+            setup: self.setup,
+            keys,
+            heights: self.heights.clone(),
+        }
+    }
+
+    /// The top and bottom of the body of a page of a section.
+    fn body(
+        &self,
+        margins: Option<desk_model::NodeId>,
+        first_of_section: bool,
+        left: bool,
+        section: &Section,
+    ) -> (f32, f32) {
+        let setup = &self.setup;
+        let reach = |kind| {
+            let place = MarginPlace::of_page(
+                kind,
+                first_of_section,
+                left,
+                section.first_page_different,
+                section.left_right_different,
+            );
+            self.heights.get(&(margins, place.index())).copied()
+        };
+        let mut top = setup.margin_top.to_pt() as f32;
+        if let Some(h) = reach(MarginKind::Header) {
+            top = top.max(setup.header_margin.to_pt() as f32 + h);
+        }
+        let mut bottom = setup.margin_bottom.to_pt() as f32;
+        if let Some(h) = reach(MarginKind::Footer) {
+            bottom = bottom.max(setup.footer_margin.to_pt() as f32 + h);
+        }
+        (top, setup.height.to_pt() as f32 - bottom)
+    }
+}
+
+/// The lines of a header or a footer from the top of its first line, and
+/// the bottom of its last line.
+fn margin_block(
+    document: &Document,
+    paragraphs: &[Paragraph],
+    width: f32,
+    values: &FieldValues,
+    system: &mut TextSystem,
+) -> (Vec<PlacedLine>, f32) {
+    let styles = document.styles();
+    let settings = document.text_settings();
+    let items = styles.list_items(paragraphs.iter());
+    let mut lines = Vec::new();
+    let mut y = 0.0f32;
+    let mut after = 0.0f32;
+    for (i, paragraph) in paragraphs.iter().enumerate() {
+        let text = ParagraphText::new_in_document_with(
+            styles,
+            settings,
+            paragraph,
+            items[i].as_ref(),
+            values.clone(),
+        );
+        let format = text.paragraph().clone();
+        let laid = system.layout(&text, &Column::new(width), 0.0).lines;
+        let Some(first) = laid.first() else {
+            continue;
+        };
+        if i > 0 {
+            y += after.max(format.space_before.to_pt() as f32);
+        }
+        let dy = y - first.top;
+        let mut bottom = y;
+        for (n, line) in laid.iter().enumerate() {
+            bottom = dy + line.top + line.height;
+            lines.push(PlacedLine {
+                paragraph: i,
+                index: n,
+                line: line.clone(),
+                origin: (0.0, dy),
+            });
+        }
+        y = bottom;
+        after = format.space_after.to_pt() as f32;
+    }
+    (lines, y)
 }
 
 /// A paragraph laid out at the top of an endless column of one width.
@@ -473,7 +615,7 @@ pub fn paginate_texts_spaced(
     system: &mut TextSystem,
     sum: bool,
 ) -> DocumentLayout {
-    paginate_with_footnotes(setup, texts, system, sum, None)
+    paginate_with_footnotes(setup, texts, system, sum, None, None)
 }
 
 /// Lays out prepared paragraphs on pages with their footnotes, which take
@@ -484,6 +626,7 @@ pub(crate) fn paginate_with_footnotes(
     system: &mut TextSystem,
     sum: bool,
     footnotes: Option<Rc<Footnotes>>,
+    room: Option<&MarginRoom>,
 ) -> DocumentLayout {
     let mut layout = Paginator {
         setup,
@@ -494,6 +637,8 @@ pub(crate) fn paginate_with_footnotes(
         blocks: HashMap::new(),
         pages: Vec::new(),
         sections: Vec::new(),
+        section_margins: Vec::new(),
+        room,
     }
     .run();
     if let Some(footnotes) = footnotes {
@@ -535,42 +680,114 @@ impl Footnotes {
             .sum()
     }
 
+    /// How far the top of line `line` of a note is from the top of the
+    /// note; its height for the line after the last.
+    fn offset(&self, note: usize, line: usize) -> f32 {
+        let (lines, height) = &self.notes[note];
+        lines.get(line).map_or(*height, |(line, dy)| dy + line.top)
+    }
+
+    /// The lines of each note of a page, in order: the rest of the one
+    /// carried from the page before, then its own.
+    fn parts(&self, page: &Page) -> Vec<(usize, std::ops::Range<usize>)> {
+        let carried = page
+            .carried_note
+            .map(|(note, from)| (note, from..self.notes[note].0.len()));
+        carried
+            .into_iter()
+            .chain(page.footnotes.iter().map(|&(paragraph, note)| {
+                let end = match page.split_note {
+                    Some((p, n, lines)) if p == paragraph && n == note => lines,
+                    _ => self.notes[note].0.len(),
+                };
+                (note, 0..end)
+            }))
+            .collect()
+    }
+
     /// The room that the notes of a page take, with the rule above them.
     fn reserved(&self, page: &Page) -> f32 {
-        if page.footnotes.is_empty() {
+        let parts = self.parts(page);
+        if parts.is_empty() {
             return 0.0;
         }
-        page.footnotes
+        parts
             .iter()
-            .map(|&(_, note)| self.notes[note].1 + self.gap)
+            .map(|(note, lines)| {
+                self.offset(*note, lines.end) - self.offset(*note, lines.start) + self.gap
+            })
             .sum::<f32>()
             - self.gap
             + NOTE_SEPARATION
     }
 
+    /// When the notes of a line do not all fit in `room`, with the line,
+    /// whether they would with only the first lines of the last of them:
+    /// that note and how many of its lines fit. At least one line of it
+    /// must fit, and one line must go on to the next page.
+    fn split(
+        &self,
+        paragraph: usize,
+        line: &Line,
+        first: bool,
+        room: f32,
+    ) -> Option<(usize, usize)> {
+        let notes: Vec<usize> = self
+            .refs
+            .get(paragraph)?
+            .iter()
+            .filter(|(offset, _)| line.range.contains(offset))
+            .map(|&(_, note)| note)
+            .collect();
+        let (&last, before) = notes.split_last()?;
+        let mut used: f32 = before
+            .iter()
+            .enumerate()
+            .map(|(k, &note)| {
+                let above = if first && k == 0 {
+                    NOTE_SEPARATION
+                } else {
+                    self.gap
+                };
+                self.notes[note].1 + above
+            })
+            .sum();
+        used += if first && before.is_empty() {
+            NOTE_SEPARATION
+        } else {
+            self.gap
+        };
+        let count = self.notes[last].0.len();
+        let fit = (1..count)
+            .take_while(|&m| used + self.offset(last, m) <= room + TOLERANCE)
+            .last()?;
+        Some((last, fit))
+    }
+
     /// Puts the notes of each page at its foot, the last one on the bottom
     /// margin, under a short rule.
     fn place(&self, layout: &mut DocumentLayout) {
-        let setup = layout.setup;
-        let bottom = (setup.height - setup.margin_bottom).to_pt() as f32;
         for page in &mut layout.pages {
-            if page.footnotes.is_empty() {
+            let parts = self.parts(page);
+            if parts.is_empty() {
                 continue;
             }
+            let bottom = page.body.1;
             let mut y = bottom - self.reserved(page) + NOTE_SEPARATION;
             page.note_rule = Some((page.margins.0, y - NOTE_RULE_BELOW));
-            let notes: Vec<usize> = page.footnotes.iter().map(|&(_, n)| n).collect();
-            for note in notes {
-                let (lines, height) = &self.notes[note];
-                for (index, (line, dy)) in lines.iter().enumerate() {
+            for (note, range) in parts {
+                let lines = &self.notes[note].0;
+                let top = self.offset(note, range.start);
+                for index in range.clone() {
+                    let (line, dy) = &lines[index];
                     page.note_lines.push(PlacedLine {
                         paragraph: note,
                         index,
                         line: line.clone(),
-                        origin: (page.margins.0, y + dy),
+                        origin: (page.margins.0, y + dy - top),
                     });
                 }
-                y += height + self.gap;
+                y += self.offset(note, range.end) - top + self.gap;
             }
         }
     }
@@ -587,13 +804,13 @@ struct Paginator<'a> {
     pages: Vec<Page>,
     /// The sections that have pages, in order.
     sections: Vec<Section>,
+    /// The headers and footers that each section shows.
+    section_margins: Vec<Option<desk_model::NodeId>>,
+    /// The room the headers and footers take, when known.
+    room: Option<&'a MarginRoom>,
 }
 
 impl Paginator<'_> {
-    fn body(&self) -> f32 {
-        self.setup.body_height().to_pt() as f32
-    }
-
     fn top(&self) -> f32 {
         self.setup.margin_top.to_pt() as f32
     }
@@ -657,12 +874,28 @@ impl Paginator<'_> {
         } else {
             next
         };
+        let section = self.sections.last().copied().unwrap_or(self.setup.section);
+        let margins = self.section_margins.last().copied().flatten();
+        let carried_note = self
+            .pages
+            .last()
+            .and_then(|p| p.split_note)
+            .map(|(_, note, lines)| (note, lines));
+        let body = match self.room {
+            Some(room) => room.body(margins, first_of_section, index % 2 == 1, &section),
+            None => (
+                self.top(),
+                (self.setup.height - self.setup.margin_bottom).to_pt() as f32,
+            ),
+        };
         self.pages.push(Page {
             number,
             section: self.sections.len().saturating_sub(1),
             first_of_section,
             left: self.setup.facing_pages && index % 2 == 1,
             margins: self.margins(index),
+            body,
+            carried_note,
             ..Page::default()
         });
         index
@@ -717,7 +950,7 @@ impl Paginator<'_> {
     }
 
     /// The cursor at the start of a section, on the page it starts on.
-    fn start_section(&mut self, section: Section, layout: Layout) -> Cursor {
+    fn start_section(&mut self, paragraph: usize, section: Section, layout: Layout) -> Cursor {
         // A page left empty takes the section instead; when it was the
         // first of its section, that section has nothing else.
         if self.pages.last().is_some_and(|p| p.lines.is_empty())
@@ -725,6 +958,7 @@ impl Paginator<'_> {
             && page.first_of_section
         {
             self.sections.pop();
+            self.section_margins.pop();
         }
         let left = match section.start {
             SectionStart::AnyPage => None,
@@ -741,12 +975,17 @@ impl Paginator<'_> {
             self.add_page(false);
         }
         self.sections.push(section);
+        let margins = self
+            .room
+            .and_then(|r| r.keys.get(paragraph).copied().flatten());
+        self.section_margins.push(margins);
         self.new_page(layout, true, true)
     }
 
     fn run(mut self) -> DocumentLayout {
         let n = self.texts.len();
         self.sections.push(self.setup.section);
+        self.section_margins.push(None);
         let mut cursor = self.new_page(self.setup.layout, true, true);
         // Paragraphs that start a new column because a chain kept with the
         // next paragraph did not fit.
@@ -763,7 +1002,7 @@ impl Paginator<'_> {
             if !forced[i] {
                 match format.start.as_deref() {
                     Some(Start::Section(section, layout)) => {
-                        cursor = self.start_section(*section, *layout);
+                        cursor = self.start_section(i, *section, *layout);
                     }
                     Some(Start::Layout(layout)) => {
                         cursor = self.start_layout(cursor, *layout);
@@ -804,6 +1043,9 @@ impl Paginator<'_> {
                 page.lines.truncate(line_count);
                 page.blocks.retain(|b| b.paragraph < first);
                 page.footnotes.retain(|&(p, _)| p < first);
+                if page.split_note.is_some_and(|(p, _, _)| p >= first) {
+                    page.split_note = None;
+                }
                 cursor = saved;
                 i = first;
                 continue;
@@ -814,24 +1056,29 @@ impl Paginator<'_> {
             setup: self.setup,
             pages: self.pages,
             sections: self.sections,
+            section_margins: self.section_margins,
+            field_values: Vec::new(),
         }
     }
 
     /// Places paragraph `i` from a cursor, and returns the page and column
     /// where it starts and where it ends.
     fn place(&mut self, i: usize, cursor: &mut Cursor) -> ((usize, usize), (usize, usize)) {
-        let body = self.body();
-        let top = self.top();
         let sum = self.sum;
         let footnotes = self.footnotes.clone();
         let mut start = (cursor.page, cursor.column);
         let mut a = 0;
         loop {
+            // The body of the page, which a tall header or footer makes
+            // smaller.
+            let (top, bottom) = self.pages[cursor.page].body;
+            let body = bottom - top;
             let (x, width) = self.column(cursor.page, &cursor.region, cursor.column);
             let column_height = body - cursor.region.top;
             let reserved = footnotes
                 .as_ref()
                 .map_or(0.0, |n| n.reserved(&self.pages[cursor.page]));
+            let split_before = self.pages[cursor.page].split_note.is_some();
             let block = self.block(i, width);
             let n = block.lines.len();
             if a >= n {
@@ -851,22 +1098,44 @@ impl Paginator<'_> {
             let space = collapsed + above;
             let room = body - cursor.y - space;
             let rest = n - a;
+            let mut split: Option<(usize, usize, usize)> = None;
             let mut k = match &footnotes {
                 None => block.fitting(a, room),
                 Some(notes) => {
-                    // Each line takes the room of its notes too.
+                    // Each line takes the room of its notes too, or of
+                    // the first lines of its last note, whose rest goes
+                    // on the next page.
                     let room = room - reserved;
                     let mut taken = 0.0;
+                    let mut stop = false;
                     (a..n)
                         .take_while(|&b| {
+                            if stop {
+                                return false;
+                            }
                             let line = &block.lines[b];
-                            let cost = notes.cost(i, line, reserved == 0.0 && taken == 0.0);
-                            let fits = line.text_bottom - block.lines[a].top
-                                <= room - taken - cost + TOLERANCE;
+                            let first = reserved == 0.0 && taken == 0.0;
+                            let cost = notes.cost(i, line, first);
+                            let height = line.text_bottom - block.lines[a].top;
+                            if split_before && cost > 0.0 {
+                                return false;
+                            }
+                            let fits = height <= room - taken - cost + TOLERANCE;
                             if fits {
                                 taken += cost;
+                                return true;
                             }
-                            fits
+                            if height > room - taken + TOLERANCE {
+                                return false;
+                            }
+                            match notes.split(i, line, first, room - taken - height) {
+                                Some((note, lines)) => {
+                                    split = Some((b, note, lines));
+                                    stop = true;
+                                    true
+                                }
+                                None => false,
+                            }
                         })
                         .count()
                 }
@@ -931,6 +1200,11 @@ impl Paginator<'_> {
             };
             let space_after = format.space_after.to_pt() as f32;
             let page = &mut self.pages[cursor.page];
+            if let Some((line, note, lines)) = split
+                && line + 1 == a + k
+            {
+                page.split_note = Some((i, note, lines));
+            }
             if let Some(notes) = &footnotes {
                 for line in &lines {
                     for &(offset, note) in notes.refs.get(i).into_iter().flatten() {

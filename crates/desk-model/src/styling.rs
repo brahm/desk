@@ -16,7 +16,7 @@ use crate::id::NodeId;
 use crate::list::ListStyle;
 use crate::op::Op;
 use crate::style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId};
-use crate::text::Position;
+use crate::text::{Paragraph, Position};
 use crate::transaction::Edit;
 
 /// The style of some text, as Copy Style takes it, to paste over other
@@ -50,6 +50,9 @@ pub struct Fragment {
     pub whole_start: bool,
     /// The list styles that the paragraphs name.
     pub lists: Vec<ListStyle>,
+    /// The notes whose marks the text holds, which a paste copies as
+    /// notes of their own (EST-13).
+    pub notes: Vec<crate::Note>,
 }
 
 /// A paragraph of a [`Fragment`].
@@ -225,10 +228,19 @@ impl Document {
                 runs,
             });
         }
+        let notes = paragraphs
+            .iter()
+            .flat_map(|p: &FragmentParagraph| &p.runs)
+            .filter_map(|(_, _, attrs)| match attrs.field.clone().flatten() {
+                Some(crate::Field::NoteMark { note }) => self.notes().get(note).cloned(),
+                _ => None,
+            })
+            .collect();
         Ok(Fragment {
             paragraphs,
             whole_start: start.offset == 0,
             lists,
+            notes,
         })
     }
 
@@ -357,7 +369,7 @@ impl Edit {
         Ok(())
     }
 
-    fn put(&mut self, style: impl Into<Style>) -> Result<(), ModelError> {
+    pub(crate) fn put(&mut self, style: impl Into<Style>) -> Result<(), ModelError> {
         let mut style = style.into();
         // Breaks belong to paragraphs, never to styles.
         // Fields belong to the text.
@@ -790,6 +802,40 @@ impl Edit {
                 attrs.list_style = Some(lists.get(&list).copied());
             }
         };
+        // Each mark pasted has a note of its own, a copy of the one it
+        // was copied with (EST-13).
+        let mut notes: HashMap<NodeId, NodeId> = HashMap::new();
+        for note in &fragment.notes {
+            let id = self.new_id();
+            notes.insert(note.id, id);
+        }
+        for note in &fragment.notes {
+            let id = notes[&note.id];
+            let paragraphs = note
+                .paragraphs
+                .iter()
+                .map(|p| {
+                    let runs = p.runs().map(|run| {
+                        let mut run = run.clone();
+                        if let Some(Some(crate::Field::NoteMark { note: old })) = run.attrs.field
+                            && let Some(&new) = notes.get(&old)
+                        {
+                            run.attrs.field = Some(Some(crate::Field::NoteMark { note: new }));
+                        }
+                        run
+                    });
+                    Paragraph::from_runs(self.new_id(), p.style(), p.attrs().clone(), runs)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            self.set_note(
+                id,
+                Some(crate::Note {
+                    id,
+                    mark: note.mark.clone(),
+                    paragraphs: paragraphs.into(),
+                }),
+            )?;
+        }
         let mut position = at;
         for (i, source) in fragment.paragraphs.iter().enumerate() {
             let mut style = source.style.clone();
@@ -832,6 +878,12 @@ impl Edit {
                 } else {
                     run_attrs.clone()
                 };
+                let mut attrs = attrs;
+                if let Some(Some(crate::Field::NoteMark { note })) = attrs.field
+                    && let Some(&new) = notes.get(&note)
+                {
+                    attrs.field = Some(Some(crate::Field::NoteMark { note: new }));
+                }
                 runs.push(crate::text::Run::with_attrs(text, character_id, attrs));
             }
             let len: usize = source.runs.iter().map(|(t, _, _)| t.len()).sum();

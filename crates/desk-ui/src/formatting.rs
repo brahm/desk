@@ -177,6 +177,27 @@ impl FormatBar {
         }
         root.append(&alignments);
 
+        // Up to four columns of the layout at the cursor, as the toolbar
+        // of Pages offers them; the Inspector has more (EST-07).
+        let columns_menu = gtk::gio::Menu::new();
+        for (count, label) in [
+            (1, n_("1 Column")),
+            (2, n_("2 Columns")),
+            (3, n_("3 Columns")),
+            (4, n_("4 Columns")),
+        ] {
+            let item = gtk::gio::MenuItem::new(Some(&tr(label)), None);
+            item.set_action_and_target_value(Some("win.columns"), Some(&count.to_variant()));
+            columns_menu.append_item(&item);
+        }
+        let columns = gtk::MenuButton::builder()
+            .icon_name("view-dual-symbolic")
+            .menu_model(&columns_menu)
+            .tooltip_text(tr("Columns"))
+            .build();
+        labelled(&columns, &tr("Columns"));
+        root.append(&columns);
+
         let spacer = gtk::Box::builder().hexpand(true).build();
         root.append(&spacer);
         let inspector = gtk::ToggleButton::builder()
