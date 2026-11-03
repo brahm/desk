@@ -117,7 +117,7 @@
     <section id="roadmap" aria-labelledby="roadmap-title">
       <h2 id="roadmap-title">What comes next</h2>
       <div class="card">
-        <p class="card-intro">We are starting with Desk Writer, because the text engine is the hardest part and the other two apps depend on it. Its first five stages are done, and you can already try it in the nightly version. More will follow bit by bit as each stage is done.</p>
+        <p class="card-intro">We are starting with Desk Writer, because the text engine is the hardest part and the other two apps depend on it. Its first five stages are done, and you can already try it in beta. More will follow bit by bit as each stage is done.</p>
         <ol class="timeline">
           <li class="done">
             <h3>Foundation <span class="tag done">done</span></h3>
@@ -136,8 +136,8 @@
             <p>Opening, editing and saving formatted text in Desk Writer, with a screen reader too, shipped as a nightly Flatpak.</p>
           </li>
           <li class="current">
-            <h3>Styles, lists and document structure <span class="tag current">beta coming</span></h3>
-            <p>Styles, lists, spelling and grammar, sections, columns, headers and footers, footnotes, tables of contents, page thumbnails and the outline are done. The first beta is being prepared.</p>
+            <h3>Styles, lists and document structure <span class="tag done">beta</span></h3>
+            <p>Styles, lists, spelling and grammar, sections, columns, headers and footers, footnotes, tables of contents, page thumbnails and the outline, released as the first beta.</p>
           </li>
           <li>
             <h3>Objects, tables, formulas and charts</h3>
@@ -158,10 +158,10 @@
     <section id="install" aria-labelledby="install-title">
       <h2 id="install-title">Install</h2>
       <div class="card">
-        <p class="card-intro">Desk Writer has a test version, a Flatpak built every night from the latest code. Download <code>desk-writer-nightly.flatpak</code> from the <a href="https://github.com/brahm/desk/releases/tag/nightly">nightly release</a> and install it:</p>
-        <pre><code>flatpak install --user desk-writer-nightly.flatpak
-flatpak run br.com.brahm.Desk.Writer</code></pre>
-        <p class="card-note">It is a test version: keep a copy of the documents you open with it. The first beta will come from Desk's own Flatpak repository, and installing it will take adding the repository and installing the app. You can also build Desk from the <a href="https://github.com/brahm/desk#building">source code</a>.</p>
+        <p class="card-intro">Desk Writer is in beta, as a Flatpak from Desk's own repository. Add the repository and install the app:</p>
+        <pre><code>flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
+flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
+        <p class="card-note">Or open <a href="desk-writer-beta.flatpakref">desk-writer-beta.flatpakref</a> to install it with GNOME Software. It is a test version: keep a copy of the documents you open with it. For the version built every night from the latest code, use <code>//nightly</code> or <a href="desk-writer-nightly.flatpakref">desk-writer-nightly.flatpakref</a>. You can also build Desk from the <a href="https://github.com/brahm/desk#building">source code</a>.</p>
       </div>
     </section>
 
@@ -212,7 +212,7 @@ flatpak run br.com.brahm.Desk.Writer</code></pre>
       <ul class="boxed-list">
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-tag"/></svg></span>
-          <span class="row-text"><strong>Version</strong><span>Nightly test version of Desk Writer. The first beta is coming soon.</span></span>
+          <span class="row-text"><strong>Version</strong><span>Desk Writer beta, with nightly builds</span></span>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-license"/></svg></span>

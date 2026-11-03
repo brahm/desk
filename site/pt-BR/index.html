@@ -117,7 +117,7 @@
     <section id="roadmap" aria-labelledby="roadmap-title">
       <h2 id="roadmap-title">O que vem por aí</h2>
       <div class="card">
-        <p class="card-intro">Começamos pelo Desk Writer, porque o motor de texto é a parte mais difícil e os outros dois apps dependem dele. As cinco primeiras etapas dele estão prontas, e você já pode experimentar na versão noturna. O resto vai saindo aos poucos, conforme cada etapa fica pronta.</p>
+        <p class="card-intro">Começamos pelo Desk Writer, porque o motor de texto é a parte mais difícil e os outros dois apps dependem dele. As cinco primeiras etapas dele estão prontas, e você já pode experimentar o beta. O resto vai saindo aos poucos, conforme cada etapa fica pronta.</p>
         <ol class="timeline">
           <li class="done">
             <h3>Fundação <span class="tag done">pronto</span></h3>
@@ -136,8 +136,8 @@
             <p>Abrir, editar e salvar texto formatado no Desk Writer, inclusive com leitor de tela, distribuído como Flatpak noturno.</p>
           </li>
           <li class="current">
-            <h3>Estilos, listas e estrutura do documento <span class="tag current">beta chegando</span></h3>
-            <p>Estilos, listas, ortografia e gramática, seções, colunas, cabeçalhos e rodapés, notas, sumário, miniaturas das páginas e estrutura de tópicos estão prontos. O primeiro beta está sendo preparado.</p>
+            <h3>Estilos, listas e estrutura do documento <span class="tag done">beta</span></h3>
+            <p>Estilos, listas, ortografia e gramática, seções, colunas, cabeçalhos e rodapés, notas, sumário, miniaturas das páginas e estrutura de tópicos, lançados no primeiro beta.</p>
           </li>
           <li>
             <h3>Objetos, tabelas, fórmulas e gráficos</h3>
@@ -158,10 +158,10 @@
     <section id="install" aria-labelledby="install-title">
       <h2 id="install-title">Instalar</h2>
       <div class="card">
-        <p class="card-intro">O Desk Writer tem uma versão de testes, um Flatpak gerado toda noite a partir do código mais recente. Baixe o <code>desk-writer-nightly.flatpak</code> na <a href="https://github.com/brahm/desk/releases/tag/nightly">versão noturna</a> e instale:</p>
-        <pre><code>flatpak install --user desk-writer-nightly.flatpak
-flatpak run br.com.brahm.Desk.Writer</code></pre>
-        <p class="card-note">É uma versão de testes: guarde uma cópia dos documentos que abrir com ela. O primeiro beta vai sair pelo repositório Flatpak do próprio Desk, e vai bastar adicionar o repositório e instalar o aplicativo. Também dá para compilar o Desk a partir do <a href="https://github.com/brahm/desk#building">código-fonte</a>.</p>
+        <p class="card-intro">O Desk Writer está em beta, como Flatpak no repositório do próprio Desk. Adicione o repositório e instale o aplicativo:</p>
+        <pre><code>flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
+flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
+        <p class="card-note">Ou abra o <a href="../desk-writer-beta.flatpakref">desk-writer-beta.flatpakref</a> para instalar pelo GNOME Software. É uma versão de testes: guarde uma cópia dos documentos que abrir com ela. Para a versão gerada toda noite a partir do código mais recente, use <code>//nightly</code> ou o <a href="../desk-writer-nightly.flatpakref">desk-writer-nightly.flatpakref</a>. Também dá para compilar o Desk a partir do <a href="https://github.com/brahm/desk#building">código-fonte</a>.</p>
       </div>
     </section>
 
@@ -212,7 +212,7 @@ flatpak run br.com.brahm.Desk.Writer</code></pre>
       <ul class="boxed-list">
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-tag"/></svg></span>
-          <span class="row-text"><strong>Versão</strong><span>Versão noturna de testes do Desk Writer. O primeiro beta sai em breve.</span></span>
+          <span class="row-text"><strong>Versão</strong><span>Desk Writer beta, com versões noturnas</span></span>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-license"/></svg></span>

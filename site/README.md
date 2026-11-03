@@ -40,9 +40,37 @@ not use these paths, and `ci/build-site.sh` fails if they do:
 | `/flatpak/` | Reserved for anything else the repository needs, such as the public key |
 
 GitHub Pages replaces the whole site on each deployment, so the
-repository cannot be uploaded on its own. The workflow that builds the
-Flatpaks has to add it to the same artifact as the pages: it keeps the
-OSTree repository between runs (for example in a release or a branch of
-its own), updates it with the new builds, and copies it into `_site`
-before the upload step of the Website workflow. A site on GitHub Pages
-is limited to 1 GB, so the repository has to prune old nightly builds.
+repository cannot be uploaded on its own. The
+[Flatpak workflow](../.github/workflows/flatpak.yml) keeps it between
+runs as `flatpak-repo.tar`, an asset of the `flatpak-repo` release:
+after each build from `main` or from a beta tag, it unpacks the last
+copy, adds the build with `ci/flatpak-publish.sh`, uploads it again and
+runs the Website workflow, which unpacks it into `_site` before the
+upload step. Each branch keeps its last five builds, and the debug
+symbols stay out, so that the site stays under the 1 GB that GitHub
+Pages allows. After each deployment, the Website workflow installs the
+app from `desk.flatpakrepo`, as people do.
+
+The nightly branch is published every night. The beta branch is
+published when a tag such as `v0.5.0-beta1` is pushed, or when the
+Flatpak workflow is run by hand with the beta channel.
+
+### The signing key
+
+The repository is signed with a GPG key kept in the `FLATPAK_GPG_KEY`
+secret of the GitHub repository, as an armored private key with no
+passphrase. The workflow exports its public part into
+`flatpak/desk.gpg` and into the `GPGKey` of the `.flatpakrepo` and
+`.flatpakref` files. To create it, on a computer you trust:
+
+```sh
+export GNUPGHOME=$(mktemp -d)
+gpg --batch --passphrase '' --quick-gen-key "Desk Flatpak repository" rsa4096 sign never
+gpg --armor --export-secret-keys | gh secret set FLATPAK_GPG_KEY --repo brahm/desk
+gpg --armor --export-secret-keys > desk-flatpak-key.asc   # keep it offline
+rm -rf "$GNUPGHOME"
+```
+
+The key must not change once people have added the repository, since
+Flatpak would refuse the updates signed with a new one. Keep the copy
+offline, to put it back in the secret if it is lost.

@@ -1,0 +1,174 @@
+name: Flatpak
+
+# Builds Desk Writer as a Flatpak and checks that it installs. From main,
+# it publishes the build in the Flatpak repository of Desk, on the same
+# GitHub Pages site as the website (see site/README.md), in one of its
+# branches:
+#
+# - nightly, every night and when the build changes, also as the bundle
+#   of the "nightly" pre-release;
+# - beta, when a tag v*-beta* is pushed or the workflow is run by hand
+#   with the beta channel.
+#
+# The repository is signed with the GPG key in the FLATPAK_GPG_KEY
+# secret, an armored private key with no passphrase. It is kept between
+# runs as an asset of the "flatpak-repo" release, which the Website
+# workflow unpacks into the site.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Branch of the repository to publish to
+        type: choice
+        options: [nightly, beta]
+        default: nightly
+  push:
+    branches: [main]
+    tags: ["v*-beta*"]
+    paths:
+      - build-aux/flatpak/**
+      - data/*.desktop
+      - data/*.metainfo.xml
+      - ci/flatpak-publish.sh
+      - .github/workflows/flatpak.yml
+  pull_request:
+    paths:
+      - build-aux/flatpak/**
+      - data/*.desktop
+      - data/*.metainfo.xml
+      - ci/flatpak-publish.sh
+      - .github/workflows/flatpak.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CHANNEL: ${{ github.ref_type == 'tag' && 'beta' || inputs.channel || 'nightly' }}
+
+jobs:
+  flatpak:
+    name: Build and install the Flatpak
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the bundle
+        uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: desk-writer-${{ env.CHANNEL }}.flatpak
+          manifest-path: build-aux/flatpak/br.com.brahm.Desk.Writer.json
+          branch: ${{ env.CHANNEL }}
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
+      - name: Install the bundle
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive --assumeyes desk-writer-$CHANNEL.flatpak
+          flatpak info --user br.com.brahm.Desk.Writer//$CHANNEL
+          flatpak run --user --command=sh br.com.brahm.Desk.Writer//$CHANNEL -c 'test -x /app/bin/desk-writer && ls /app/share/applications /app/share/metainfo'
+          # The substitute fonts and the dictionaries come with the app.
+          flatpak run --user --command=sh br.com.brahm.Desk.Writer//$CHANNEL -c '
+            for family in "Liberation Sans" Carlito Caladea "TeX Gyre Heros" "Nimbus Sans" P052 "DejaVu Sans Mono"; do
+              fc-list : family | tr "," "\n" | grep -qx "$family" || { echo "missing font: $family"; exit 1; }
+            done
+            for file in hunspell/en_US.dic hunspell/en_GB.dic hunspell/pt_BR.dic hyphen/hyph_en_US.dic hyphen/hyph_pt_BR.dic; do
+              test -s "/app/share/$file" || { echo "missing: $file"; exit 1; }
+            done'
+      - name: Keep the bundle and the build repository
+        run: tar -cf build-repo.tar repo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desk-writer-flatpak
+          path: |
+            desk-writer-${{ env.CHANNEL }}.flatpak
+            build-repo.tar
+
+  nightly:
+    name: Publish the nightly pre-release
+    needs: flatpak
+    if: >-
+      github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
+      (inputs.channel || 'nightly') == 'nightly'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: desk-writer-flatpak
+      - name: Move the nightly tag and replace the bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag --force nightly
+          git push --force origin nightly
+          gh release view nightly >/dev/null 2>&1 ||
+            gh release create nightly --prerelease --title "Nightly" \
+              --notes "Desk Writer built from main every night. Install with: flatpak install --user desk-writer-nightly.flatpak"
+          gh release upload nightly desk-writer-nightly.flatpak --clobber
+
+  repository:
+    name: Publish in the Flatpak repository
+    needs: flatpak
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    # One update of the repository at a time, and never cancel one.
+    concurrency:
+      group: flatpak-repository
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: desk-writer-flatpak
+      - name: Install Flatpak and OSTree
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q flatpak ostree
+      - name: Import the signing key
+        env:
+          FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
+        run: |
+          if [ -z "$FLATPAK_GPG_KEY" ]; then
+            echo "::error::The FLATPAK_GPG_KEY secret is missing; see site/README.md"
+            exit 1
+          fi
+          printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --batch --import
+          key=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" { print $10; exit }')
+          echo "GPG_KEY=$key" >> "$GITHUB_ENV"
+      - name: Add the build to the repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -xf build-repo.tar
+          mkdir -p public
+          if gh release download flatpak-repo --pattern flatpak-repo.tar --dir . 2>/dev/null; then
+            tar -xf flatpak-repo.tar -C public
+          fi
+          ci/flatpak-publish.sh repo public "$CHANNEL" "$GPG_KEY"
+          tar -cf flatpak-repo.tar -C public .
+          du -sh public
+      - name: Keep the repository and publish the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view flatpak-repo >/dev/null 2>&1 ||
+            gh release create flatpak-repo --prerelease --title "Flatpak repository" \
+              --notes "The Flatpak repository of Desk, kept between builds and published at https://brahm.github.io/desk/repo/. Not for download: add it with flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo"
+          gh release upload flatpak-repo flatpak-repo.tar --clobber
+          gh workflow run pages.yml --ref main

@@ -47,16 +47,18 @@ first five phases of the plan, 97 of the 274 rows of its parity matrix):
 - `desk-convert` exports documents to PDF from the command line.
 
 Objects and page layout come next, then tables, formulas and charts.
-Desk Writer's test version is a nightly Flatpak, built from `main` every night:
+
+Desk Writer is in beta, in the Flatpak repository of Desk, which also
+has a nightly branch built from `main` every night:
 
 ```sh
-# Download desk-writer-nightly.flatpak from
-# https://github.com/brahm/desk/releases/tag/nightly, then:
-flatpak install --user desk-writer-nightly.flatpak
-flatpak run br.com.brahm.Desk.Writer
+flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
+flatpak install desk br.com.brahm.Desk.Writer//beta
+flatpak run br.com.brahm.Desk.Writer//beta
 ```
 
-A beta channel, in a Flatpak repository of its own, is on the way.
+Use `//nightly` in place of `//beta` for the nightly builds, which are
+also a bundle in the [nightly release](https://github.com/brahm/desk/releases/tag/nightly).
 
 Desk is built by one person working with Claude, Anthropic's AI, with
 the same engineering rigor expected of any team: every feature of the
@@ -163,7 +165,7 @@ to outlines, so the logo does not need the font to render.
 
 ## Contributing
 
-Every kind of help counts: trying the nightly version, reporting bugs, asking for the features you
+Every kind of help counts: trying the beta, reporting bugs, asking for the features you
 miss, sending old iWork documents for the test corpus, or sending code.
 Open an [issue](https://github.com/brahm/desk/issues) for any of these.
 Before you open a pull request, run `ci/check-all.sh`, which runs every
