@@ -451,7 +451,10 @@ impl TocGroup {
                 self.styles.remove(&row);
             }
             for (id, name) in &styles {
-                let row = adw::SwitchRow::builder().title(name).build();
+                // A style's name is text, not markup: "Header & Footer".
+                let row = adw::SwitchRow::builder()
+                    .title(gtk::glib::markup_escape_text(name))
+                    .build();
                 let number = gtk::ToggleButton::builder()
                     .label("#")
                     .tooltip_text(tr("Show Page Number"))

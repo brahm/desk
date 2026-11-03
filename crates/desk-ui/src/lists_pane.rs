@@ -174,7 +174,7 @@ impl ListsGroup {
     /// The bullets and numbering of the Inspector of a window.
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
         let group = adw::PreferencesGroup::builder()
-            .title(tr("Bullets & Numbering"))
+            .title(gtk::glib::markup_escape_text(&tr("Bullets & Numbering")))
             .build();
         let kind = adw::ComboRow::builder()
             .title(tr("List"))

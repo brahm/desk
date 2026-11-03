@@ -148,6 +148,10 @@ pub struct Preferences {
     /// Whether a misspelled word that the dictionary has one suggestion
     /// for is corrected as it is typed (TXT-07).
     pub accept_single_suggestion: bool,
+    /// Whether email and web addresses become links as they are typed
+    /// (TXT-07, EST-25). As in Pages, it belongs to the computer, not to
+    /// the document.
+    pub detect_links: bool,
     /// The zoom of a new window, in percent (INT-07).
     pub zoom: u32,
     /// The color of the invisible characters (INT-10).
@@ -155,6 +159,9 @@ pub struct Preferences {
     /// Whether the words and pages of the document show at the bottom of
     /// the window (DOC-20).
     pub show_counts: bool,
+    /// Whether a saved document holds a picture of its first page, which
+    /// file managers show (DOC-09).
+    pub include_preview: bool,
 }
 
 /// The color of invisible characters until it is changed.
@@ -184,9 +191,11 @@ impl Default for Preferences {
             check_spelling: true,
             proofread: false,
             accept_single_suggestion: false,
+            detect_links: true,
             zoom: 100,
             invisibles_color: INVISIBLES_COLOR,
             show_counts: true,
+            include_preview: true,
         }
     }
 }
@@ -194,6 +203,7 @@ impl Default for Preferences {
 const RULERS: &str = "rulers";
 const EDITING: &str = "editing";
 const WINDOW: &str = "window";
+const SAVING: &str = "saving";
 
 /// A color as `#rrggbb`, or `#rrggbbaa` when it is not opaque.
 fn color_key(color: Rgba) -> String {
@@ -242,6 +252,7 @@ impl Preferences {
         out.proofread = editing("proofread", out.proofread);
         out.accept_single_suggestion =
             editing("accept-single-suggestion", out.accept_single_suggestion);
+        out.detect_links = editing("detect-links", out.detect_links);
         if let Ok(zoom) = file.integer(RULERS, "zoom") {
             out.zoom = zoom.clamp(10, 1000) as u32;
         }
@@ -255,6 +266,9 @@ impl Preferences {
         out.show_counts = file
             .boolean(WINDOW, "show-counts")
             .unwrap_or(out.show_counts);
+        out.include_preview = file
+            .boolean(SAVING, "include-preview")
+            .unwrap_or(out.include_preview);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -291,6 +305,7 @@ impl Preferences {
             "accept-single-suggestion",
             self.accept_single_suggestion,
         );
+        file.set_boolean(EDITING, "detect-links", self.detect_links);
         file.set_integer(RULERS, "zoom", self.zoom as i32);
         file.set_string(
             WINDOW,
@@ -298,6 +313,7 @@ impl Preferences {
             &color_key(self.invisibles_color),
         );
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
+        file.set_boolean(SAVING, "include-preview", self.include_preview);
         let correct = &self.autocorrect;
         file.set_boolean(EDITING, "fix-capitalization", correct.capitalization);
         file.set_boolean(EDITING, "superscript-ordinals", correct.ordinals);
@@ -521,6 +537,12 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         |p, on| p.autocorrect.ordinals = on,
     ));
     correction.add(&switch(
+        &tr("Detect Email and Web Addresses"),
+        &tr("They become links as they are typed"),
+        current.detect_links,
+        |p, on| p.detect_links = on,
+    ));
+    correction.add(&switch(
         &tr("Use Spelling Suggestion"),
         &tr("A misspelled word with one suggestion is corrected"),
         current.accept_single_suggestion,
@@ -550,6 +572,12 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     invisibles.add_suffix(&color);
     invisibles.set_activatable_widget(Some(&color));
     window.add(&invisibles);
+    window.add(&switch(
+        &tr("Include Preview in Document"),
+        &tr("A picture of the first page, which file managers show"),
+        current.include_preview,
+        |p, on| p.include_preview = on,
+    ));
     let page = adw::PreferencesPage::builder()
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
@@ -681,6 +709,7 @@ mod tests {
                 ..AutoCorrect::default()
             },
             accept_single_suggestion: true,
+            detect_links: false,
             zoom: 150,
             invisibles_color: Rgba {
                 r: 200,
@@ -689,6 +718,7 @@ mod tests {
                 a: 128,
             },
             show_counts: false,
+            include_preview: false,
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -698,6 +728,8 @@ mod tests {
         assert!(!Preferences::read(&empty).percent);
         assert!(Preferences::read(&empty).automatic_lists);
         assert!(Preferences::read(&empty).show_counts);
+        assert!(Preferences::read(&empty).detect_links);
+        assert!(Preferences::read(&empty).include_preview);
         assert_eq!(Preferences::read(&empty).zoom, 100);
         assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
         assert_eq!(

@@ -308,6 +308,30 @@ def main():
         )
         check("quotes curl and (c) becomes a symbol (TXT-06, TXT-07)", True)
 
+        # With text selected, Check Spelling looks only in it (TXT-10).
+        type_text("qwzx vbnk plmo")
+        wait_for("the misspelled words", lambda: "vbnk plmo" in text_of(document))
+        press("ctrl+shift+Left", "ctrl+shift+Left")
+
+        def selected():
+            if Atspi.Text.get_n_selections(document) == 0:
+                return None
+            selection = Atspi.Text.get_selection(document, 0)
+            return text_of(document)[selection.start_offset : selection.end_offset]
+
+        wait_for("the last two words selected", lambda: selected() == "vbnk plmo")
+        press("ctrl+semicolon")
+        wait_for("the first mistake of the selection", lambda: selected() == "vbnk")
+        press("ctrl+semicolon")
+        wait_for("the next mistake of the selection", lambda: selected() == "plmo")
+        press("ctrl+semicolon")
+        time.sleep(0.5)
+        check(
+            "Check Spelling stays in the selected text (TXT-10)",
+            selected() == "plmo",
+        )
+        press("End")
+
         # The Search sidebar lists the matches as they are typed (TXT-13).
         press("ctrl+shift+f")
         results = wait_for(
