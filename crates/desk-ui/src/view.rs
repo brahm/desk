@@ -23,6 +23,9 @@ struct State {
     zoom: f64,
     /// One page to a row, or two side by side (INT-08).
     columns: usize,
+    /// Whether the pages face each other, which side by side makes
+    /// spreads (EST-11).
+    book: bool,
     /// Whether the zoom follows the size of the window (INT-08).
     fit: Option<geometry::Fit>,
     painter: Option<Painter>,
@@ -88,6 +91,7 @@ impl DocumentView {
             pages: Vec::new(),
             zoom: geometry::DEFAULT_ZOOM,
             columns: 1,
+            book: false,
             fit: None,
             painter: Painter::new().ok(),
             on_zoom: Vec::new(),
@@ -375,6 +379,14 @@ impl DocumentView {
         self.refit();
     }
 
+    /// Shows facing pages side by side as spreads (EST-11).
+    pub fn set_book(&self, book: bool) {
+        if self.state.borrow().book != book {
+            self.state.borrow_mut().book = book;
+            self.resize();
+        }
+    }
+
     /// How many pages show side by side.
     pub fn columns(&self) -> usize {
         self.state.borrow().columns
@@ -454,7 +466,8 @@ impl DocumentView {
     }
 
     fn layout(&self, area_width: f64) -> (Vec<PageRect>, f64, f64) {
-        geometry::place_pages(&self.sizes(), self.zoom(), area_width, self.columns())
+        let book = self.state.borrow().book;
+        geometry::place_pages(&self.sizes(), self.zoom(), area_width, self.columns(), book)
     }
 
     fn resize(&self) {
@@ -477,8 +490,13 @@ impl DocumentView {
                 .iter()
                 .map(|p| (f64::from(p.width), f64::from(p.height)))
                 .collect();
-            let (rects, _, _) =
-                geometry::place_pages(&sizes, state.zoom, f64::from(width), state.columns);
+            let (rects, _, _) = geometry::place_pages(
+                &sizes,
+                state.zoom,
+                f64::from(width),
+                state.columns,
+                state.book,
+            );
             let vadj = scrolled.vadjustment();
             let (top, bottom) = (vadj.value(), vadj.value() + vadj.page_size());
             let scale = state.zoom * PIXELS_PER_POINT;

@@ -1920,6 +1920,37 @@ impl TextEditor {
                 }
             }
             state.squiggle_skip = skipped;
+            // The headers, footers and notes not being edited too, and
+            // the body while one of them is.
+            let story = state.story.as_ref().map(|m| m.story);
+            if let Some(mode) = &state.story {
+                let main = mode.main.document();
+                for (index, paragraph) in main.body().iter().enumerate() {
+                    for mistake in crate::spelling::mistakes(
+                        main.styles(),
+                        paragraph,
+                        preferences.check_spelling,
+                        preferences.proofread,
+                    ) {
+                        let selection = Selection {
+                            anchor: Spot::new(index, mistake.range.start),
+                            focus: Spot::new(index, mistake.range.end),
+                        };
+                        let proofreading =
+                            matches!(mistake.kind, crate::spelling::MistakeKind::Proofreading(_));
+                        for span in text_nav::selection_rects(&mode.main_layout, &selection) {
+                            squiggles.push(crate::view::Squiggle { span, proofreading });
+                        }
+                    }
+                }
+            }
+            squiggles.extend(stories::story_squiggles(
+                Self::main_document(&state),
+                Self::main_layout(&state),
+                story,
+                preferences.check_spelling,
+                preferences.proofread,
+            ));
             squiggles
         };
         self.view.set_squiggles(squiggles);
@@ -2129,6 +2160,7 @@ impl TextEditor {
                 text,
             )
         };
+        self.view.set_book(self.facing_pages());
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
         self.view.access().set_text(text.clone());

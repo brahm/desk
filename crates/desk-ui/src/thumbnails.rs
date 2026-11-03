@@ -121,7 +121,13 @@ impl Thumbnails {
         let count = sections.iter().max().map_or(0, |m| m + 1);
         self.selected.borrow_mut().retain(|&s| s < count);
         let mut painter = desk_render::Painter::new().ok();
+        let facing = editor.facing_pages();
+        // A spread takes the width of one page alone.
+        let width = if facing { WIDTH / 2 - 2 } else { WIDTH };
         let mut frame: Option<(usize, gtk::Box)> = None;
+        // With facing pages, a left page and the right page after it are
+        // a spread side by side; the first page is a right page alone.
+        let mut spread: Option<gtk::Box> = None;
         for (index, page) in pages.iter().enumerate() {
             let section = sections.get(index).copied().unwrap_or(0);
             if frame.as_ref().is_none_or(|(s, _)| *s != section) {
@@ -129,6 +135,7 @@ impl Thumbnails {
                 self.list.append(&new);
                 self.frames.borrow_mut().push((section, new.clone()));
                 frame = Some((section, new));
+                spread = None;
             }
             let picture = gtk::Picture::builder()
                 .can_shrink(false)
@@ -137,7 +144,7 @@ impl Thumbnails {
                 .build();
             if let Some(png) = painter
                 .as_mut()
-                .and_then(|p| p.thumbnail_png(page, WIDTH).ok())
+                .and_then(|p| p.thumbnail_png(page, width).ok())
                 && let Ok(texture) = gdk::Texture::from_bytes(&glib::Bytes::from_owned(png))
             {
                 picture.set_paintable(Some(&texture));
@@ -158,8 +165,36 @@ impl Thumbnails {
             picture.set_alternative_text(Some(&name));
             item.update_property(&[gtk::accessible::Property::Label(&name)]);
             self.connect_page(&item, index, section);
-            if let Some((_, frame)) = &frame {
+            let Some((_, frame)) = &frame else {
+                continue;
+            };
+            if !facing {
                 frame.append(&item);
+                continue;
+            }
+            let right = index % 2 == 0;
+            let row = match spread.take() {
+                Some(row) if right => row,
+                _ => {
+                    let row = gtk::Box::builder()
+                        .orientation(gtk::Orientation::Horizontal)
+                        .spacing(4)
+                        .halign(gtk::Align::Center)
+                        .build();
+                    if right {
+                        row.append(
+                            &gtk::Box::builder()
+                                .width_request(i32::try_from(width).unwrap_or(0))
+                                .build(),
+                        );
+                    }
+                    frame.append(&row);
+                    row
+                }
+            };
+            row.append(&item);
+            if !right {
+                spread = Some(row);
             }
         }
         self.show_selection();

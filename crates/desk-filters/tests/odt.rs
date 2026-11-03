@@ -1667,7 +1667,7 @@ fn est_12_the_header_margin_is_kept_while_headers_are_off() {
 }
 
 #[test]
-fn int_08_the_view_is_kept_in_the_settings() {
+fn int_08_doc_16_the_view_is_kept_in_the_settings() {
     let mut document = Document::new_word_processing();
     assert_eq!(
         read_odt(&write_odt(&document).unwrap()).unwrap().view(),

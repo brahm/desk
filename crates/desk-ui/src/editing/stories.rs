@@ -87,6 +87,36 @@ pub fn story_layout(
     page: usize,
     copy: &Document,
 ) -> DocumentLayout {
+    story_layout_on(main, story, &[page], copy)
+}
+
+/// The document laid out with the lines of a story on every page that
+/// shows it, to mark its mistakes while the body is edited.
+fn story_layout_everywhere(main: &DocumentLayout, story: Story, copy: &Document) -> DocumentLayout {
+    let pages: Vec<usize> = match story {
+        Story::Note(_) => Vec::new(),
+        Story::Margin { section, place } => (0..main.pages.len())
+            .filter(|&i| {
+                let page = &main.pages[i];
+                let shown = match place.kind {
+                    MarginKind::Header => main.setup.headers,
+                    MarginKind::Footer => main.setup.footers,
+                };
+                shown
+                    && !page.blank
+                    && desk_layout::margin_of_page(main, i, place.kind) == (place, section)
+            })
+            .collect(),
+    };
+    story_layout_on(main, story, &pages, copy)
+}
+
+fn story_layout_on(
+    main: &DocumentLayout,
+    story: Story,
+    pages: &[usize],
+    copy: &Document,
+) -> DocumentLayout {
     let mut layout = main.clone();
     layout.field_values = Vec::new();
     for p in &mut layout.pages {
@@ -106,8 +136,8 @@ pub fn story_layout(
             }
         }
         Story::Margin { place, .. } => {
-            if page < layout.pages.len() {
-                let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+            let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+            for &page in pages.iter().filter(|&&p| p < main.pages.len()) {
                 let lines = crate::with_text_system(|system| {
                     desk_layout::margin_lines(copy, main, page, place.kind, &paragraphs, system)
                 });
@@ -116,6 +146,58 @@ pub fn story_layout(
         }
     }
     layout
+}
+
+/// The marks under the mistakes of the headers, footers and notes other
+/// than the one being edited, which show as those of the body do
+/// (TXT-10, TXT-11).
+pub(super) fn story_squiggles(
+    document: &Document,
+    layout: &DocumentLayout,
+    editing: Option<Story>,
+    spelling: bool,
+    proofreading: bool,
+) -> Vec<crate::view::Squiggle> {
+    let mut out = Vec::new();
+    if !spelling && !proofreading {
+        return out;
+    }
+    for (story, _) in story_pages(layout) {
+        if Some(story) == editing {
+            continue;
+        }
+        let paragraphs = document.story_paragraphs(story);
+        let mistakes: Vec<(usize, Vec<crate::spelling::Mistake>)> = paragraphs
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                (
+                    i,
+                    crate::spelling::mistakes(document.styles(), p, spelling, proofreading),
+                )
+            })
+            .filter(|(_, m)| !m.is_empty())
+            .collect();
+        if mistakes.is_empty() {
+            continue;
+        }
+        let copy = document.with_body(paragraphs);
+        let lines = story_layout_everywhere(layout, story, &copy);
+        for (index, list) in mistakes {
+            for mistake in list {
+                let selection = Selection {
+                    anchor: Spot::new(index, mistake.range.start),
+                    focus: Spot::new(index, mistake.range.end),
+                };
+                let proofreading =
+                    matches!(mistake.kind, crate::spelling::MistakeKind::Proofreading(_));
+                for span in crate::text_nav::selection_rects(&lines, &selection) {
+                    out.push(crate::view::Squiggle { span, proofreading });
+                }
+            }
+        }
+    }
+    out
 }
 
 /// The headers, footers and notes that the pages show, each with the
@@ -577,5 +659,45 @@ mod tests {
             .text()
             .to_string();
         assert_eq!(text, format!("{mark} "));
+    }
+
+    #[test]
+    fn txt_10_mistakes_in_a_header_are_marked_while_the_body_is_edited() {
+        if desk_lang::speller("en-US").is_none() {
+            return;
+        }
+        let mut document = Document::new_word_processing();
+        let header = Story::Margin {
+            section: None,
+            place: MarginPlace::new(MarginKind::Header, MarginPages::Default),
+        };
+        document
+            .transact("Header", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let english = desk_model::CharAttrs {
+                    language: Some(desk_model::Language::new("en-US")),
+                    ..desk_model::CharAttrs::default()
+                };
+                let id = edit.new_id();
+                let paragraph = Paragraph::from_runs(
+                    id,
+                    style,
+                    desk_model::ParaAttrs::default(),
+                    [desk_model::Run::with_attrs("We acheive", None, english)],
+                )?;
+                edit.set_story(header, vec![paragraph])
+            })
+            .unwrap();
+        let layout = crate::lay_out(&document);
+        let marks = story_squiggles(&document, &layout, None, true, false);
+        assert!(!marks.is_empty());
+        assert!(
+            marks
+                .iter()
+                .all(|m| m.span.y1 < f64::from(layout.pages[0].body.0) + 1.0)
+        );
+        // Not while the header itself is edited, whose marks come from
+        // its copy.
+        assert!(story_squiggles(&document, &layout, Some(header), true, false).is_empty());
     }
 }
