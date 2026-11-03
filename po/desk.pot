@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-03 00:24+0000\n"
+"POT-Creation-Date: 2026-11-03 02:08+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,9 +18,96 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: crates/desk-ui/src/area.rs:43 crates/desk-ui/src/formatting.rs:488
-#: crates/desk-ui/src/writing_tools.rs:114
+#: crates/desk-ui/src/area.rs:43 crates/desk-ui/src/formatting.rs:509
+#: crates/desk-ui/src/links_pane.rs:69 crates/desk-ui/src/writing_tools.rs:114
 msgid "Document"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:27
+msgid "Page {page}"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:28
+msgid "{page} of {pages}"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:29
+msgid "Page {page} of {pages}"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:51
+msgid "Auto Page Numbers"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:53 crates/desk-ui/src/headers_pane.rs:164
+msgid "Footer"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:53 crates/desk-ui/src/headers_pane.rs:161
+msgid "Header"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:53
+msgid "_Position"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:55
+msgid "_Alignment"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:57 crates/desk-ui/src/formatting.rs:465
+#: crates/desk-ui/src/tab_stops.rs:40
+msgid "Left"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:58 crates/desk-ui/src/formatting.rs:165
+#: crates/desk-ui/src/shortcuts.rs:77 crates/desk-ui/src/tab_stops.rs:41
+msgid "Center"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:59 crates/desk-ui/src/formatting.rs:466
+#: crates/desk-ui/src/tab_stops.rs:42
+msgid "Right"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:60
+msgid "Inside"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:61
+msgid "Outside"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:67
+msgid "_Format"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:72
+msgid "Include Number on _First Page"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:77
+msgid "_Apply To"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:78
+msgid "Current Section"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:78
+msgid "Entire Document"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:91
+#: crates/desk-ui/src/styles_drawer.rs:565
+#: crates/desk-ui/src/styles_drawer.rs:627
+#: crates/desk-ui/src/styles_drawer.rs:703 crates/desk-ui/src/window.rs:880
+#: crates/desk-ui/src/window.rs:1005 crates/desk-ui/src/window.rs:1034
+msgid "_Cancel"
+msgstr ""
+
+#: crates/desk-ui/src/auto_numbers.rs:92 crates/desk-ui/src/window.rs:2098
+msgid "_Insert"
 msgstr ""
 
 #: crates/desk-ui/src/bullet_pictures.rs:37
@@ -55,7 +142,8 @@ msgstr ""
 msgid "Arrow"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:1199 crates/desk-ui/src/links_pane.rs:163
+#: crates/desk-ui/src/editing.rs:1382 crates/desk-ui/src/links_pane.rs:70
+#: crates/desk-ui/src/links_pane.rs:261 crates/desk-ui/src/links_pane.rs:319
 msgid "Bookmark"
 msgstr ""
 
@@ -153,8 +241,8 @@ msgid "Line Width"
 msgstr ""
 
 #: crates/desk-ui/src/effects.rs:187 crates/desk-ui/src/fonts.rs:354
-#: crates/desk-ui/src/fonts.rs:355 crates/desk-ui/src/formatting.rs:440
-#: crates/desk-ui/src/formatting.rs:441 crates/desk-ui/src/preferences.rs:67
+#: crates/desk-ui/src/fonts.rs:355 crates/desk-ui/src/formatting.rs:461
+#: crates/desk-ui/src/formatting.rs:462 crates/desk-ui/src/preferences.rs:67
 msgid "Points"
 msgstr ""
 
@@ -492,21 +580,16 @@ msgid "Fonts"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:105 crates/desk-ui/src/formatting.rs:108
-#: crates/desk-ui/src/styles_drawer.rs:528 crates/desk-ui/src/window.rs:821
+#: crates/desk-ui/src/styles_drawer.rs:528 crates/desk-ui/src/window.rs:847
 msgid "Paragraph Style"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:112 crates/desk-ui/src/formatting.rs:238
+#: crates/desk-ui/src/formatting.rs:112 crates/desk-ui/src/formatting.rs:259
 msgid "Font"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:164
 msgid "Align Left"
-msgstr ""
-
-#: crates/desk-ui/src/formatting.rs:165 crates/desk-ui/src/shortcuts.rs:77
-#: crates/desk-ui/src/tab_stops.rs:41
-msgid "Center"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:166
@@ -517,136 +600,142 @@ msgstr ""
 msgid "Justify"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:185 crates/desk-ui/src/formatting.rs:187
+#: crates/desk-ui/src/formatting.rs:184
+msgid "1 Column"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:185
+msgid "2 Columns"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:186
+msgid "3 Columns"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:187
+msgid "4 Columns"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
+#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/ruler.rs:502
+#: crates/desk-ui/src/ruler.rs:524
+msgid "Columns"
+msgstr ""
+
+#: crates/desk-ui/src/formatting.rs:206 crates/desk-ui/src/formatting.rs:208
 #: crates/desk-ui/src/shortcuts.rs:80
 msgid "Inspector"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:439
+#: crates/desk-ui/src/formatting.rs:460
 msgid "Line Spacing"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:439 crates/desk-ui/src/writing_tools.rs:80
+#: crates/desk-ui/src/formatting.rs:460 crates/desk-ui/src/writing_tools.rs:80
 msgid "Lines"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:440
+#: crates/desk-ui/src/formatting.rs:461
 msgid "Before Paragraph"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:441
+#: crates/desk-ui/src/formatting.rs:462
 msgid "After Paragraph"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:443
+#: crates/desk-ui/src/formatting.rs:464
 msgid "First Line"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:444 crates/desk-ui/src/tab_stops.rs:40
-msgid "Left"
-msgstr ""
-
-#: crates/desk-ui/src/formatting.rs:445 crates/desk-ui/src/tab_stops.rs:42
-msgid "Right"
-msgstr ""
-
-#: crates/desk-ui/src/formatting.rs:456
+#: crates/desk-ui/src/formatting.rs:477
 msgid "Spacing"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:462
+#: crates/desk-ui/src/formatting.rs:483
 msgid "Indents"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:468
+#: crates/desk-ui/src/formatting.rs:489
 msgid "Hyphenate Words"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:469
+#: crates/desk-ui/src/formatting.rs:490
 msgid "At the ends of lines, in the language of the text"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:472
+#: crates/desk-ui/src/formatting.rs:493
 msgid "Hyphenation"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:476
+#: crates/desk-ui/src/formatting.rs:497
 msgid "Hyphenate the Document"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:477
+#: crates/desk-ui/src/formatting.rs:498
 msgid "In every paragraph that allows it"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:480
+#: crates/desk-ui/src/formatting.rs:501
 msgid "Use Ligatures"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:481
+#: crates/desk-ui/src/formatting.rs:502
 msgid "In the whole document"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:484
+#: crates/desk-ui/src/formatting.rs:505
 msgid "Facing Pages"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:485
+#: crates/desk-ui/src/formatting.rs:506
 msgid "Left and right pages swap their margins, as in a book"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:156
-msgid "Header"
-msgstr ""
-
-#: crates/desk-ui/src/headers_pane.rs:157
+#: crates/desk-ui/src/headers_pane.rs:162
 msgid "First Page Header"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:158
+#: crates/desk-ui/src/headers_pane.rs:163
 msgid "Left Page Header"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:159
-msgid "Footer"
-msgstr ""
-
-#: crates/desk-ui/src/headers_pane.rs:160
+#: crates/desk-ui/src/headers_pane.rs:165
 msgid "First Page Footer"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:161
+#: crates/desk-ui/src/headers_pane.rs:166
 msgid "Left Page Footer"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:168
+#: crates/desk-ui/src/headers_pane.rs:173
 msgid "Headers"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:169
+#: crates/desk-ui/src/headers_pane.rs:174
 msgid "Footers"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:171
+#: crates/desk-ui/src/headers_pane.rs:176
 msgid "Header Margin"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:172
+#: crates/desk-ui/src/headers_pane.rs:177
 msgid "From the top of the paper"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:174
+#: crates/desk-ui/src/headers_pane.rs:179
 msgid "Footer Margin"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:175
+#: crates/desk-ui/src/headers_pane.rs:180
 msgid "From the bottom of the paper"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:177
+#: crates/desk-ui/src/headers_pane.rs:182
 msgid "Headers and Footers"
 msgstr ""
 
-#: crates/desk-ui/src/headers_pane.rs:179
+#: crates/desk-ui/src/headers_pane.rs:184
 msgid ""
 "Fields: {page} for the page number, {pages} for the page count, {date} and "
 "{file}"
@@ -684,219 +773,287 @@ msgstr ""
 msgid "Other Size"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:146
+#: crates/desk-ui/src/layout_pane.rs:217
 msgid "Paper"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:149
+#: crates/desk-ui/src/layout_pane.rs:220
 msgid "Landscape"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:150
+#: crates/desk-ui/src/layout_pane.rs:221
 msgid "Top Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:151
+#: crates/desk-ui/src/layout_pane.rs:222
 msgid "Bottom Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:152 crates/desk-ui/src/layout_pane.rs:371
+#: crates/desk-ui/src/layout_pane.rs:223 crates/desk-ui/src/layout_pane.rs:525
 msgid "Left Page Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:153 crates/desk-ui/src/layout_pane.rs:371
+#: crates/desk-ui/src/layout_pane.rs:224 crates/desk-ui/src/layout_pane.rs:525
 msgid "Right Page Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:154
+#: crates/desk-ui/src/layout_pane.rs:225
 msgid "Page"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:160
-msgid "Columns"
-msgstr ""
-
-#: crates/desk-ui/src/layout_pane.rs:161
+#: crates/desk-ui/src/layout_pane.rs:232
 msgid "Gap Between Columns"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:162
+#: crates/desk-ui/src/layout_pane.rs:234
+msgid "Equal Column Width"
+msgstr ""
+
+#: crates/desk-ui/src/layout_pane.rs:238
+msgid "Column Widths"
+msgstr ""
+
+#: crates/desk-ui/src/layout_pane.rs:244
+msgid "Column {n}"
+msgstr ""
+
+#: crates/desk-ui/src/layout_pane.rs:248
+msgid "Gap After Column {n}"
+msgstr ""
+
+#: crates/desk-ui/src/layout_pane.rs:253
 msgid "Before Layout"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:163
+#: crates/desk-ui/src/layout_pane.rs:254
 msgid "After Layout"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:164
+#: crates/desk-ui/src/layout_pane.rs:255
 msgid "Left Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:165
+#: crates/desk-ui/src/layout_pane.rs:256
 msgid "Right Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:167
+#: crates/desk-ui/src/layout_pane.rs:258
 msgid "Layout"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:168
+#: crates/desk-ui/src/layout_pane.rs:259
 msgid "The columns and margins of the layout at the cursor"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:174
+#: crates/desk-ui/src/layout_pane.rs:269
 msgid "Section Starts On"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:176
+#: crates/desk-ui/src/layout_pane.rs:271
 msgid "Any Page"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:177
+#: crates/desk-ui/src/layout_pane.rs:272
 msgid "Left Page"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:178
+#: crates/desk-ui/src/layout_pane.rs:273
 msgid "Right Page"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:182
+#: crates/desk-ui/src/layout_pane.rs:277
 msgid "Continue Page Numbers"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:183
+#: crates/desk-ui/src/layout_pane.rs:278
 msgid "From the section before"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:185
+#: crates/desk-ui/src/layout_pane.rs:280
 msgid "Start Page Numbers At"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:187
+#: crates/desk-ui/src/layout_pane.rs:282
 msgid "Different First Page"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:188
+#: crates/desk-ui/src/layout_pane.rs:283
 msgid "With a header and footer of its own"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:191
+#: crates/desk-ui/src/layout_pane.rs:286
 msgid "Different Left and Right Pages"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:192
+#: crates/desk-ui/src/layout_pane.rs:287
 msgid "Left pages have a header and footer of their own"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:195
+#: crates/desk-ui/src/layout_pane.rs:290
+msgid "Use Previous Headers and Footers"
+msgstr ""
+
+#: crates/desk-ui/src/layout_pane.rs:291
+msgid "Those of the section before, rather than its own"
+msgstr ""
+
+#: crates/desk-ui/src/layout_pane.rs:295
 msgid "Section"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:369
+#: crates/desk-ui/src/layout_pane.rs:523
 msgid "Inside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/layout_pane.rs:369
+#: crates/desk-ui/src/layout_pane.rs:523
 msgid "Outside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:221
+#: crates/desk-ui/src/lib.rs:224
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:224
+#: crates/desk-ui/src/lib.rs:227
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:227
+#: crates/desk-ui/src/lib.rs:230
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:410 crates/desk-ui/src/window.rs:178
+#: crates/desk-ui/src/lib.rs:413 crates/desk-ui/src/window.rs:182
 msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:432
+#: crates/desk-ui/src/lib.rs:435
 msgid "All Documents"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:52
-msgid "Link at the Cursor"
-msgstr ""
-
-#: crates/desk-ui/src/links_pane.rs:55
-msgid "Follow Link"
-msgstr ""
-
-#: crates/desk-ui/src/links_pane.rs:56
-msgid "Remove Link"
-msgstr ""
-
-#: crates/desk-ui/src/links_pane.rs:60
-msgid "Make Links Inactive"
-msgstr ""
-
-#: crates/desk-ui/src/links_pane.rs:62
-msgid "A click puts the cursor in a link instead of following it"
-msgstr ""
-
-#: crates/desk-ui/src/links_pane.rs:66
-msgid "Hyperlinks"
+#: crates/desk-ui/src/links_pane.rs:67
+msgid "Webpage"
 msgstr ""
 
 #: crates/desk-ui/src/links_pane.rs:68
+msgid "Email Message"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:74
+msgid "Link To"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:77
+msgid "Follow Link"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:78
+msgid "Remove Link"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:82 crates/desk-ui/src/links_pane.rs:262
+msgid "Address"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:85 crates/desk-ui/src/links_pane.rs:300
+msgid "Choose Document"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:88 crates/desk-ui/src/links_pane.rs:259
+msgid "Subject"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:92
+msgid "Make Links Inactive"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:94
+msgid "A click puts the cursor in a link instead of following it"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:98
+msgid "Hyperlinks"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:100
 msgid ""
 "Insert ▸ Hyperlink links the selection. A link to a bookmark starts with #."
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:74
+#: crates/desk-ui/src/links_pane.rs:108
 msgid "Bookmarks"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:76
+#: crates/desk-ui/src/links_pane.rs:110
 msgid ""
 "Insert ▸ Bookmark marks the selection. An empty name takes a bookmark away."
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:167
+#: crates/desk-ui/src/links_pane.rs:113
+msgid "By Name"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:113
+msgid "By Page"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:115 crates/desk-ui/src/links_pane.rs:116
+msgid "Sort Bookmarks"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:259
+msgid "To"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:260
+msgid "Bookmark in the Document"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:260
+msgid "File"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:323
 msgid "Go to Bookmark"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:168
+#: crates/desk-ui/src/links_pane.rs:324
 msgid "Remove Bookmark"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:212
-msgid "Page Numbers"
+#: crates/desk-ui/src/links_pane.rs:370
+msgid "Make Page Numbers Links"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:216
+#: crates/desk-ui/src/links_pane.rs:374
 msgid "Styles to Include"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:219
+#: crates/desk-ui/src/links_pane.rs:377
 msgid "Update Now"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:223
+#: crates/desk-ui/src/links_pane.rs:381
 msgid "Table of Contents"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:225
+#: crates/desk-ui/src/links_pane.rs:383
 msgid "Insert ▸ Table of Contents adds one before the paragraph of the cursor."
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:301
+#: crates/desk-ui/src/links_pane.rs:437
+msgid "Show Page Number"
+msgstr ""
+
+#: crates/desk-ui/src/links_pane.rs:480
 msgid "Headings, once a table is inserted"
 msgstr ""
 
-#: crates/desk-ui/src/links_pane.rs:303
+#: crates/desk-ui/src/links_pane.rs:482
 msgid "{n} styles"
 msgstr ""
 
@@ -1237,25 +1394,25 @@ msgstr ""
 msgid "Document Info"
 msgstr ""
 
-#: crates/desk-ui/src/ruler.rs:103
+#: crates/desk-ui/src/ruler.rs:111
 msgid "Vertical Ruler"
 msgstr ""
 
-#: crates/desk-ui/src/ruler.rs:105
+#: crates/desk-ui/src/ruler.rs:113
 msgid "Ruler"
 msgstr ""
 
-#: crates/desk-ui/src/ruler.rs:410 crates/desk-ui/src/ruler.rs:420
-#: crates/desk-ui/src/ruler.rs:487 crates/desk-ui/src/tab_stops.rs:337
+#: crates/desk-ui/src/ruler.rs:446 crates/desk-ui/src/ruler.rs:456
+#: crates/desk-ui/src/ruler.rs:569 crates/desk-ui/src/tab_stops.rs:337
 msgid "Tab Stops"
 msgstr ""
 
-#: crates/desk-ui/src/ruler.rs:423 crates/desk-ui/src/ruler.rs:430
-#: crates/desk-ui/src/ruler.rs:449
+#: crates/desk-ui/src/ruler.rs:459 crates/desk-ui/src/ruler.rs:466
+#: crates/desk-ui/src/ruler.rs:531
 msgid "Indent"
 msgstr ""
 
-#: crates/desk-ui/src/ruler.rs:442
+#: crates/desk-ui/src/ruler.rs:478
 msgid "Margins"
 msgstr ""
 
@@ -1267,7 +1424,7 @@ msgstr ""
 msgid "Open a document"
 msgstr ""
 
-#: crates/desk-ui/src/shortcuts.rs:20 crates/desk-ui/src/window.rs:695
+#: crates/desk-ui/src/shortcuts.rs:20 crates/desk-ui/src/window.rs:720
 msgid "Save"
 msgstr ""
 
@@ -1578,7 +1735,7 @@ msgstr ""
 msgid "New _List Style from Selection…"
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:215 crates/desk-ui/src/window.rs:1787
+#: crates/desk-ui/src/styles_drawer.rs:215 crates/desk-ui/src/window.rs:2103
 msgid "_Import Styles…"
 msgstr ""
 
@@ -1630,15 +1787,15 @@ msgstr ""
 msgid "Another style is already named “{name}”."
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:513 crates/desk-ui/src/window.rs:642
+#: crates/desk-ui/src/styles_drawer.rs:513 crates/desk-ui/src/window.rs:663
 msgid "_Close"
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:529 crates/desk-ui/src/window.rs:822
+#: crates/desk-ui/src/styles_drawer.rs:529 crates/desk-ui/src/window.rs:848
 msgid "Character Style"
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:533 crates/desk-ui/src/window.rs:823
+#: crates/desk-ui/src/styles_drawer.rs:533 crates/desk-ui/src/window.rs:849
 msgid "List Style"
 msgstr ""
 
@@ -1660,13 +1817,6 @@ msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:560
 msgid "Apply This New Style on Creation"
-msgstr ""
-
-#: crates/desk-ui/src/styles_drawer.rs:565
-#: crates/desk-ui/src/styles_drawer.rs:627
-#: crates/desk-ui/src/styles_drawer.rs:703 crates/desk-ui/src/window.rs:854
-#: crates/desk-ui/src/window.rs:927 crates/desk-ui/src/window.rs:956
-msgid "_Cancel"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:566
@@ -1809,7 +1959,7 @@ msgstr ""
 msgid "Replace {font}"
 msgstr ""
 
-#: crates/desk-ui/src/warnings.rs:81 crates/desk-ui/src/window.rs:1592
+#: crates/desk-ui/src/warnings.rs:81 crates/desk-ui/src/window.rs:1828
 msgid "_Copy"
 msgstr ""
 
@@ -1821,360 +1971,388 @@ msgstr ""
 msgid "{document} opened with these changes. Saving it keeps them."
 msgstr ""
 
-#: crates/desk-ui/src/warnings.rs:123 crates/desk-ui/src/window.rs:194
-#: crates/desk-ui/src/window.rs:198
+#: crates/desk-ui/src/warnings.rs:123 crates/desk-ui/src/window.rs:198
+#: crates/desk-ui/src/window.rs:202
 msgid "Document Warnings"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:168 crates/desk-ui/src/window.rs:182
+#: crates/desk-ui/src/window.rs:172 crates/desk-ui/src/window.rs:186
 msgid "Main Menu"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:175
+#: crates/desk-ui/src/window.rs:179
 msgid "_Open"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:186 crates/desk-ui/src/window.rs:190
+#: crates/desk-ui/src/window.rs:190 crates/desk-ui/src/window.rs:194
 msgid "Leave Fullscreen"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:207
+#: crates/desk-ui/src/window.rs:211
 msgid "Open an OpenDocument text or a Pages document to edit it."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:210
+#: crates/desk-ui/src/window.rs:214
 msgid "_Open a Document…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:219
+#: crates/desk-ui/src/window.rs:223
 msgid ""
 "This app is at an early stage of development and cannot open documents yet."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:231
+#: crates/desk-ui/src/window.rs:235
 msgid "Zoom"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:467 crates/desk-ui/src/window.rs:788
+#: crates/desk-ui/src/window.rs:480 crates/desk-ui/src/window.rs:814
 msgid "Cannot open {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:666
+#: crates/desk-ui/src/window.rs:691
 msgid "Cannot save {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:711
+#: crates/desk-ui/src/window.rs:736
 msgid "Save a Copy"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:774 crates/desk-ui/src/window.rs:798
-#: crates/desk-ui/src/window.rs:874
+#: crates/desk-ui/src/window.rs:800 crates/desk-ui/src/window.rs:824
+#: crates/desk-ui/src/window.rs:900
 msgid "Import Styles"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:799
+#: crates/desk-ui/src/window.rs:825
 msgid "Choose the styles of “{name}” to import."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:839
+#: crates/desk-ui/src/window.rs:865
 msgid "Replace Duplicates"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:840
+#: crates/desk-ui/src/window.rs:866
 msgid "Styles with the same names take the imported ones"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:855
+#: crates/desk-ui/src/window.rs:881
 msgid "_Import"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:877
+#: crates/desk-ui/src/window.rs:903
 msgid "Cannot Import the Styles"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:921
+#: crates/desk-ui/src/window.rs:932
+msgid "Cannot Follow Link"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:933
+msgid "Save this document first: the link names a file from its folder."
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:999
 msgid "Revert to Saved?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:923
+#: crates/desk-ui/src/window.rs:1001
 msgid "The changes made to “{name}” since it was last saved will be lost."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:928
+#: crates/desk-ui/src/window.rs:1006
 msgid "_Revert"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:950
+#: crates/desk-ui/src/window.rs:1028
 msgid "Save Changes?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:952
+#: crates/desk-ui/src/window.rs:1030
 msgid ""
 "“{name}” has changes that are not saved. If you close it without saving, "
 "they are lost."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:957
+#: crates/desk-ui/src/window.rs:1035
 msgid "_Don’t Save"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:958 crates/desk-ui/src/window.rs:1764
+#: crates/desk-ui/src/window.rs:1036 crates/desk-ui/src/window.rs:2080
 msgid "_Save"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1591
+#: crates/desk-ui/src/window.rs:1827
 msgid "Cu_t"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1593
+#: crates/desk-ui/src/window.rs:1829
 msgid "_Paste"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1595
+#: crates/desk-ui/src/window.rs:1831
 msgid "Paste and _Match Style"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1598
+#: crates/desk-ui/src/window.rs:1834
 msgid "Select _All"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1601
+#: crates/desk-ui/src/window.rs:1837
 msgid "_Bold"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1602
+#: crates/desk-ui/src/window.rs:1838
 msgid "_Italic"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1603
+#: crates/desk-ui/src/window.rs:1839
 msgid "_Underline"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1606 crates/desk-ui/src/window.rs:1785
+#: crates/desk-ui/src/window.rs:1842 crates/desk-ui/src/window.rs:2101
 msgid "Copy St_yle"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1607 crates/desk-ui/src/window.rs:1786
+#: crates/desk-ui/src/window.rs:1843 crates/desk-ui/src/window.rs:2102
 msgid "Paste Sty_le"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1610 crates/desk-ui/src/window.rs:1780
+#: crates/desk-ui/src/window.rs:1846 crates/desk-ui/src/window.rs:2096
 msgid "_Writing Tools"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1694
+#: crates/desk-ui/src/window.rs:1942
 msgid "No Guesses Found"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1698
+#: crates/desk-ui/src/window.rs:1946
 msgid "Delete"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1708
+#: crates/desk-ui/src/window.rs:1956
 msgid "_Ignore Spelling"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1709
+#: crates/desk-ui/src/window.rs:1957
 msgid "_Learn Spelling"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1727
+#: crates/desk-ui/src/window.rs:1975
 msgid "Never _Hyphenate"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1729
+#: crates/desk-ui/src/window.rs:1977
 msgid "Allow _Hyphenation"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1757
+#: crates/desk-ui/src/window.rs:2011
+msgid "Number _Format"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:2028
+msgid "Date and Time _Format"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:2030
+msgid "_Automatically Update on Open"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:2040
+msgid "Show _Directory Path"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:2044
+msgid "Always Show File_name Extension"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:2073
 msgid "_New Window"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1759
+#: crates/desk-ui/src/window.rs:2075
 msgid "_Open…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1765
+#: crates/desk-ui/src/window.rs:2081
 msgid "Save _As…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1766
+#: crates/desk-ui/src/window.rs:2082
 msgid "Save a _Copy…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1767
+#: crates/desk-ui/src/window.rs:2083
 msgid "_Duplicate"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1768
+#: crates/desk-ui/src/window.rs:2084
 msgid "_Revert to Saved"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1771
+#: crates/desk-ui/src/window.rs:2087
 msgid "Show _Fonts"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1772
+#: crates/desk-ui/src/window.rs:2088
 msgid "Show _Styles Drawer"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1773
+#: crates/desk-ui/src/window.rs:2089
 msgid "Show _Ruler"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1774
+#: crates/desk-ui/src/window.rs:2090
 msgid "_Fullscreen"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1775
+#: crates/desk-ui/src/window.rs:2091
 msgid "Document _Info"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1778
+#: crates/desk-ui/src/window.rs:2094
 msgid "_Find & Replace…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1779
+#: crates/desk-ui/src/window.rs:2095
 msgid "_Search…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1781
+#: crates/desk-ui/src/window.rs:2097
 msgid "Spe_lling and Grammar"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1782
-msgid "_Insert"
-msgstr ""
-
-#: crates/desk-ui/src/window.rs:1791
+#: crates/desk-ui/src/window.rs:2107
 msgid "C_lose"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1792
+#: crates/desk-ui/src/window.rs:2108
 msgid "Close _All Windows"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1795
+#: crates/desk-ui/src/window.rs:2111
 msgid "_Preferences"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1797
+#: crates/desk-ui/src/window.rs:2113
 msgid "_Keyboard Shortcuts"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1801
+#: crates/desk-ui/src/window.rs:2117
 msgid "_About {app}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1813
+#: crates/desk-ui/src/window.rs:2129
 msgid "_Page Break"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1814
+#: crates/desk-ui/src/window.rs:2130
 msgid "_Column Break"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1815
+#: crates/desk-ui/src/window.rs:2131
 msgid "_Layout Break"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1817
+#: crates/desk-ui/src/window.rs:2133
 msgid "_Section Break"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1821
+#: crates/desk-ui/src/window.rs:2138
+msgid "_Auto Page Numbers…"
+msgstr ""
+
+#: crates/desk-ui/src/window.rs:2141
 msgid "Page _Number"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1822
+#: crates/desk-ui/src/window.rs:2142
 msgid "Page Co_unt"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1823
+#: crates/desk-ui/src/window.rs:2143
 msgid "_Date"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1824
+#: crates/desk-ui/src/window.rs:2144
 msgid "_File Name"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1826
+#: crates/desk-ui/src/window.rs:2146
 msgid "Foot_note"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1827
+#: crates/desk-ui/src/window.rs:2147
 msgid "Ne_xt Note"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1828
+#: crates/desk-ui/src/window.rs:2148
 msgid "Pre_vious Note"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1830
+#: crates/desk-ui/src/window.rs:2150
 msgid "_Table of Contents"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1832
+#: crates/desk-ui/src/window.rs:2152
 msgid "Update Table of C_ontents"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1835
+#: crates/desk-ui/src/window.rs:2155
 msgid "_Hyperlink"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1836
+#: crates/desk-ui/src/window.rs:2156
 msgid "_Bookmark"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1849
+#: crates/desk-ui/src/window.rs:2169
 msgid "Show _Spelling and Grammar"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1852
+#: crates/desk-ui/src/window.rs:2172
 msgid "_Check Document Now"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1855
+#: crates/desk-ui/src/window.rs:2175
 msgid "Check Spelling While _Typing"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1859
+#: crates/desk-ui/src/window.rs:2179
 msgid "Check _Grammar While Typing"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1870
+#: crates/desk-ui/src/window.rs:2190
 msgid "Look Up in _Dictionary and Thesaurus"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1873
+#: crates/desk-ui/src/window.rs:2193
 msgid "Search the _Web"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1875
+#: crates/desk-ui/src/window.rs:2195
 msgid "Search in Wi_kipedia"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1878
+#: crates/desk-ui/src/window.rs:2198
 msgid "Show _Statistics"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1884
+#: crates/desk-ui/src/window.rs:2204
 msgid "{n} word"
 msgid_plural "{n} words"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/window.rs:1885
+#: crates/desk-ui/src/window.rs:2205
 msgid "{n} page"
 msgid_plural "{n} pages"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/window.rs:1917
+#: crates/desk-ui/src/window.rs:2237
 msgid "Fit _Width"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1918
+#: crates/desk-ui/src/window.rs:2238
 msgid "Fit _Page"
 msgstr ""
 

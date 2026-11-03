@@ -60,8 +60,10 @@ it, as each license requires.
 | DejaVu Sans, Sans Mono | Menlo (built from DejaVu Sans Mono), and in style Verdana, Lucida Grande and Monaco | Bitstream Vera license and public domain | <https://dejavu-fonts.github.io> (Debian: `fonts-dejavu-core`) |
 
 `ci/setup-env.sh` installs the packaged ones, which the tests use. The
-Flatpak bundles them all but Gelasio, which no distribution packages,
-from the Ubuntu 24.04 packages, whose checksums the signed archive index
-gives; their copyright files go to `/app/share/licenses`. It bundles the
+Flatpak bundles them from the Ubuntu 24.04 packages, whose checksums the
+signed archive index gives, and their copyright files go to
+`/app/share/licenses`. Gelasio, which no distribution packages, comes
+from its own repository, at the commit that Google Fonts names for it,
+with its license. It bundles the
 Hunspell dictionaries and hyphenation patterns of American and British
 English and Brazilian Portuguese the same way.
