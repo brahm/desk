@@ -872,3 +872,66 @@ fn obj_01_objects_move_with_their_paragraph() {
         "{lines:?}"
     );
 }
+
+/// A document with a text box of many words, as the text box asks.
+fn with_text_box(columns: u8, vertical: desk_model::VerticalAlignment, words: usize) -> Document {
+    use desk_model::{Frame, Object, ObjectKind, ParaAttrs, Paragraph, Run, TextBox};
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Box", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let text = vec!["word"; words].join(" ");
+            let paragraph = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                [Run::new(&text)],
+            )?;
+            let mut text = TextBox::new(std::sync::Arc::from([paragraph]), Length::from_points(5));
+            text.columns = columns;
+            text.vertical = vertical;
+            let id = edit.new_id();
+            let mut object = Object::new(
+                id,
+                ObjectKind::TextBox(text),
+                Frame::from_pt(100.0, 100.0, 300.0, 200.0),
+            );
+            object.wrap = desk_model::Wrap::Through;
+            edit.add_object(object)
+        })
+        .unwrap();
+    document
+}
+
+#[test]
+fn obj_13_text_boxes_flow_through_columns_and_sit_where_asked() {
+    use desk_model::VerticalAlignment;
+    let mut system = TextSystem::new();
+    // Enough text to fill one column and go on in the next.
+    let layout = paginate(&with_text_box(2, VerticalAlignment::Top, 150), &mut system);
+    let lines = &layout.pages[0].objects[0].lines;
+    let lefts: Vec<f32> = lines.iter().map(|l| l.origin.0).collect();
+    // Two columns of (290 - 18) / 2 = 136 points, 154 apart.
+    assert!(
+        lefts.contains(&105.0) && lefts.contains(&259.0),
+        "{lefts:?}"
+    );
+    let second = lines.iter().find(|l| l.origin.0 == 259.0).unwrap();
+    assert!((second.top() - 105.0).abs() < 0.01);
+    assert!(
+        lines
+            .iter()
+            .all(|l| l.bottom() <= 295.01 || l.origin.0 == 259.0)
+    );
+    // A short text in the middle and at the bottom of the box.
+    let top = paginate(&with_text_box(1, VerticalAlignment::Top, 3), &mut system);
+    let line = &top.pages[0].objects[0].lines[0];
+    assert!((line.top() - 105.0).abs() < 0.01);
+    let height = line.bottom() - line.top();
+    let middle = paginate(&with_text_box(1, VerticalAlignment::Middle, 3), &mut system);
+    let line = &middle.pages[0].objects[0].lines[0];
+    assert!((line.top() - (105.0 + (190.0 - height) / 2.0)).abs() < 0.01);
+    let bottom = paginate(&with_text_box(1, VerticalAlignment::Bottom, 3), &mut system);
+    let line = &bottom.pages[0].objects[0].lines[0];
+    assert!((line.bottom() - 295.0).abs() < 0.01);
+}

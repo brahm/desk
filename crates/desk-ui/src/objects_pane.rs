@@ -10,7 +10,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use desk_model::{Frame, Length, Wrap};
+use desk_model::{Frame, Length, VerticalAlignment, Wrap};
 
 use crate::editing::{Format, ObjectInfo};
 use crate::formatting::EditorOf;
@@ -45,6 +45,12 @@ pub struct ObjectGroups {
     wrap: adw::ComboRow,
     margin: adw::SpinRow,
     locked: adw::SwitchRow,
+    /// The room between the frame of a text box and its text (OBJ-13).
+    inset: adw::SpinRow,
+    /// Where the text of a text box sits, and its columns.
+    text_group: adw::PreferencesGroup,
+    vertical: adw::ComboRow,
+    columns: adw::SpinRow,
     units: Cell<Units>,
     updating: Cell<bool>,
 }
@@ -132,10 +138,26 @@ impl ObjectGroups {
             .title(tr("Locked"))
             .subtitle(tr("Cannot be moved, resized or deleted"))
             .build();
+        let inset = spin(&tr("Inset"), 0.0, 1584.0);
         let wrap_group = adw::PreferencesGroup::builder().title(tr("Wrap")).build();
         wrap_group.add(&wrap);
         wrap_group.add(&margin);
         wrap_group.add(&locked);
+        let vertical_names = [tr("Top"), tr("Middle"), tr("Bottom")];
+        let vertical_names: Vec<&str> = vertical_names.iter().map(String::as_str).collect();
+        let vertical = adw::ComboRow::builder()
+            .title(tr("Vertical Alignment"))
+            .model(&gtk::StringList::new(&vertical_names))
+            .build();
+        let columns =
+            adw::SpinRow::with_range(1.0, f64::from(desk_model::MAX_TEXT_BOX_COLUMNS), 1.0);
+        columns.set_title(&tr("Columns"));
+        let text_group = adw::PreferencesGroup::builder()
+            .title(tr("Text Box"))
+            .build();
+        text_group.add(&inset);
+        text_group.add(&vertical);
+        text_group.add(&columns);
 
         let this = Rc::new(Self {
             metrics,
@@ -149,6 +171,10 @@ impl ObjectGroups {
             wrap,
             margin,
             locked,
+            inset,
+            text_group,
+            vertical,
+            columns,
             units: Cell::new(units),
             updating: Cell::new(false),
         });
@@ -218,6 +244,58 @@ impl ObjectGroups {
             }
         });
         let weak = Rc::downgrade(&this);
+        let inset_editor = editor.clone();
+        this.inset.connect_value_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let inset = tab_stops::from_units(row.value(), this.units.get());
+            if let Some(editor) = inset_editor() {
+                editor.set_object("Inset", |object| {
+                    if let desk_model::ObjectKind::TextBox(text) = &mut object.kind {
+                        text.inset = inset;
+                    }
+                });
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let vertical_editor = editor.clone();
+        this.vertical.connect_selected_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let vertical = match row.selected() {
+                1 => VerticalAlignment::Middle,
+                2 => VerticalAlignment::Bottom,
+                _ => VerticalAlignment::Top,
+            };
+            if let Some(editor) = vertical_editor() {
+                editor.set_object("Vertical Alignment", |object| {
+                    if let desk_model::ObjectKind::TextBox(text) = &mut object.kind {
+                        text.vertical = vertical;
+                    }
+                });
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let columns_editor = editor.clone();
+        this.columns.connect_value_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let columns = row.value().round() as u8;
+            if let Some(editor) = columns_editor() {
+                editor.set_object("Columns", |object| {
+                    if let desk_model::ObjectKind::TextBox(text) = &mut object.kind {
+                        text.columns = columns;
+                    }
+                });
+            }
+        });
+        let weak = Rc::downgrade(&this);
         this.locked.connect_active_notify(move |row| {
             let Some(this) = weak.upgrade() else { return };
             if this.updating.get() {
@@ -231,8 +309,8 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 2] {
-        [&self.metrics, &self.wrap_group]
+    pub fn groups(&self) -> [&adw::PreferencesGroup; 3] {
+        [&self.metrics, &self.wrap_group, &self.text_group]
     }
 
     /// The frame on the page that a row asks for, with the other side
@@ -271,6 +349,7 @@ impl ObjectGroups {
             tab_stops::set_units(row, units, 0.0, LARGEST);
         }
         tab_stops::set_units(&self.margin, units, 0.0, 1584.0);
+        tab_stops::set_units(&self.inset, units, 0.0, 1584.0);
         self.updating.set(false);
     }
 
@@ -278,6 +357,7 @@ impl ObjectGroups {
     pub fn show(&self, info: Option<&ObjectInfo>) {
         self.metrics.set_visible(info.is_some());
         self.wrap_group.set_visible(info.is_some());
+        self.text_group.set_visible(false);
         let Some(info) = info else {
             return;
         };
@@ -314,6 +394,23 @@ impl ObjectGroups {
         );
         self.wrap.set_sensitive(editable);
         self.margin.set_sensitive(editable);
+        match &info.object.kind {
+            desk_model::ObjectKind::TextBox(text) => {
+                self.text_group.set_visible(true);
+                self.text_group.set_sensitive(editable);
+                set(&self.inset, tab_stops::in_units(text.inset, units));
+                let index = match text.vertical {
+                    VerticalAlignment::Top => 0,
+                    VerticalAlignment::Middle => 1,
+                    VerticalAlignment::Bottom => 2,
+                };
+                if self.vertical.selected() != index {
+                    self.vertical.set_selected(index);
+                }
+                set(&self.columns, f64::from(text.columns));
+            }
+            _ => self.text_group.set_visible(false),
+        }
         if self.locked.is_active() != info.object.locked {
             self.locked.set_active(info.object.locked);
         }

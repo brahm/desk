@@ -1787,12 +1787,13 @@ fn with_objects() -> Document {
                 },
                 [Run::new("In a "), Run::with_attrs("box", None, bold)],
             )?;
+            let mut text_box = TextBox::new(Arc::from([paragraph]), Length::from_points(4));
+            text_box.vertical = desk_model::VerticalAlignment::Middle;
+            text_box.columns = 2;
+            text_box.column_gap = Length::from_points(9);
             let mut text = Object::new(
                 edit.new_id(),
-                ObjectKind::TextBox(TextBox {
-                    paragraphs: Arc::from([paragraph]),
-                    inset: Length::from_points(4),
-                }),
+                ObjectKind::TextBox(text_box),
                 Frame::from_pt(300.0, 400.0, 120.0, 60.0),
             );
             text.wrap = Wrap::AboveAndBelow;

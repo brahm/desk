@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-04 13:06+0000\n"
+"POT-Creation-Date: 2026-11-04 13:35+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -151,7 +151,7 @@ msgstr "Seta"
 msgid "Bookmark"
 msgstr "Marcador"
 
-#: crates/desk-ui/src/editing/objects.rs:762 crates/desk-ui/src/fonts.rs:346
+#: crates/desk-ui/src/editing/objects.rs:763 crates/desk-ui/src/fonts.rs:346
 #: crates/desk-ui/src/outline_view.rs:321
 msgid "Text"
 msgstr "Texto"
@@ -636,7 +636,8 @@ msgid "4 Columns"
 msgstr "4 colunas"
 
 #: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
-#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/ruler.rs:502
+#: crates/desk-ui/src/layout_pane.rs:231
+#: crates/desk-ui/src/objects_pane.rs:154 crates/desk-ui/src/ruler.rs:502
 #: crates/desk-ui/src/ruler.rs:524
 msgid "Columns"
 msgstr "Colunas"
@@ -1266,97 +1267,121 @@ msgstr ""
 "Inserir ▸ Nota de rodapé adiciona uma nota no cursor. O texto dela é editado"
 " aqui."
 
-#: crates/desk-ui/src/objects_pane.rs:68
+#: crates/desk-ui/src/objects_pane.rs:74
 msgid "X"
 msgstr "X"
 
-#: crates/desk-ui/src/objects_pane.rs:69
+#: crates/desk-ui/src/objects_pane.rs:75
 msgid "Y"
 msgstr "Y"
 
-#: crates/desk-ui/src/objects_pane.rs:70
+#: crates/desk-ui/src/objects_pane.rs:76
 msgid "Width"
 msgstr "Largura"
 
-#: crates/desk-ui/src/objects_pane.rs:71
+#: crates/desk-ui/src/objects_pane.rs:77
 msgid "Height"
 msgstr "Altura"
 
-#: crates/desk-ui/src/objects_pane.rs:73
+#: crates/desk-ui/src/objects_pane.rs:79
 msgid "Constrain Proportions"
 msgstr "Manter proporções"
 
-#: crates/desk-ui/src/objects_pane.rs:75
+#: crates/desk-ui/src/objects_pane.rs:81
 msgid "Rotate"
 msgstr "Girar"
 
-#: crates/desk-ui/src/objects_pane.rs:76
+#: crates/desk-ui/src/objects_pane.rs:82
 msgid "Degrees, counterclockwise"
 msgstr "Graus, no sentido anti-horário"
 
-#: crates/desk-ui/src/objects_pane.rs:85
+#: crates/desk-ui/src/objects_pane.rs:91
 msgid "Flip Horizontally"
 msgstr "Espelhar horizontalmente"
 
-#: crates/desk-ui/src/objects_pane.rs:90
+#: crates/desk-ui/src/objects_pane.rs:96
 msgid "Flip Vertically"
 msgstr "Espelhar verticalmente"
 
-#: crates/desk-ui/src/objects_pane.rs:103
+#: crates/desk-ui/src/objects_pane.rs:109
 msgid "Flip"
 msgstr "Espelhar"
 
-#: crates/desk-ui/src/objects_pane.rs:106
+#: crates/desk-ui/src/objects_pane.rs:112
 msgid "Metrics"
 msgstr "Métricas"
 
-#: crates/desk-ui/src/objects_pane.rs:116
+#: crates/desk-ui/src/objects_pane.rs:122
 msgid "Both Sides"
 msgstr "Dos dois lados"
 
-#: crates/desk-ui/src/objects_pane.rs:117
+#: crates/desk-ui/src/objects_pane.rs:123
 msgid "Largest Side"
 msgstr "Do lado maior"
 
-#: crates/desk-ui/src/objects_pane.rs:118
+#: crates/desk-ui/src/objects_pane.rs:124
 msgid "Left Side"
 msgstr "Do lado esquerdo"
 
-#: crates/desk-ui/src/objects_pane.rs:119
+#: crates/desk-ui/src/objects_pane.rs:125
 msgid "Right Side"
 msgstr "Do lado direito"
 
-#: crates/desk-ui/src/objects_pane.rs:120
+#: crates/desk-ui/src/objects_pane.rs:126
 msgid "Above and Below"
 msgstr "Acima e abaixo"
 
-#: crates/desk-ui/src/objects_pane.rs:121
+#: crates/desk-ui/src/objects_pane.rs:127
 msgid "In Front of the Text"
 msgstr "Na frente do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:122
+#: crates/desk-ui/src/objects_pane.rs:128
 msgid "Behind the Text"
 msgstr "Atrás do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:127
+#: crates/desk-ui/src/objects_pane.rs:133
 msgid "Text Wrap"
 msgstr "Ajuste do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:130
+#: crates/desk-ui/src/objects_pane.rs:136
 msgid "Extra Space"
 msgstr "Espaço extra"
 
-#: crates/desk-ui/src/objects_pane.rs:132
+#: crates/desk-ui/src/objects_pane.rs:138
 msgid "Locked"
 msgstr "Travado"
 
-#: crates/desk-ui/src/objects_pane.rs:133
+#: crates/desk-ui/src/objects_pane.rs:139
 msgid "Cannot be moved, resized or deleted"
 msgstr "Não pode ser movido, redimensionado nem apagado"
 
-#: crates/desk-ui/src/objects_pane.rs:135
+#: crates/desk-ui/src/objects_pane.rs:141
+msgid "Inset"
+msgstr "Margem interna"
+
+#: crates/desk-ui/src/objects_pane.rs:142
 msgid "Wrap"
 msgstr "Ajuste"
+
+#: crates/desk-ui/src/objects_pane.rs:146
+msgid "Bottom"
+msgstr "Base"
+
+#: crates/desk-ui/src/objects_pane.rs:146
+msgid "Middle"
+msgstr "Meio"
+
+#: crates/desk-ui/src/objects_pane.rs:146
+msgid "Top"
+msgstr "Topo"
+
+#: crates/desk-ui/src/objects_pane.rs:149
+msgid "Vertical Alignment"
+msgstr "Alinhamento vertical"
+
+#: crates/desk-ui/src/objects_pane.rs:156
+msgid "Text Box"
+msgstr "Caixa de texto"
 
 #: crates/desk-ui/src/outline_view.rs:59 crates/desk-ui/src/outline_view.rs:60
 msgid "Visible Levels"

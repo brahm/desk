@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use desk_model::{Anchor, Document, Object, ObjectKind, Wrap};
+use desk_model::{Anchor, Document, Object, ObjectKind, VerticalAlignment, Wrap};
 use desk_text::{Column, LineSpace, ParagraphText, TextSystem};
 
 use crate::pages::{DocumentLayout, PlacedLine};
@@ -322,15 +322,52 @@ fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut Tex
     let ObjectKind::TextBox(text) = &placed.object.kind else {
         return;
     };
-    let inset = text.inset.to_pt() as f32;
-    let width = (placed.width - 2.0 * inset).max(1.0);
+    let paragraphs = text.paragraphs.clone();
+    placed.lines = text_box_lines(document, placed, &paragraphs, system);
+}
+
+/// The lines of paragraphs laid out in a text box placed on a page, as if
+/// it were not rotated, with the styles of a document: those of the text
+/// box, or those being edited in it (OBJ-13).
+pub fn text_box_lines(
+    document: &Document,
+    placed: &PlacedObject,
+    paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
+) -> Vec<PlacedLine> {
+    let (inset, vertical, columns, gap) = match &placed.object.kind {
+        ObjectKind::TextBox(text) => (
+            text.inset.to_pt() as f32,
+            text.vertical,
+            usize::from(text.columns.max(1)),
+            text.column_gap.to_pt() as f32,
+        ),
+        _ => (0.0, VerticalAlignment::Top, 1, 0.0),
+    };
+    let inner = (placed.width - 2.0 * inset).max(1.0);
+    let height = (placed.height - 2.0 * inset).max(1.0);
+    let gaps = gap * (columns - 1) as f32;
+    // Columns narrower than a few characters are not columns any more.
+    let columns = if (inner - gaps) / columns as f32 >= desk_text::MIN_SEGMENT_WIDTH {
+        columns
+    } else {
+        1
+    };
+    let gaps = if columns > 1 { gaps } else { 0.0 };
+    let width = ((inner - gaps) / columns as f32).max(1.0);
     let styles = document.styles();
     let settings = document.text_settings();
-    let items = styles.list_items(text.paragraphs.iter());
+    let items = styles.list_items(paragraphs.iter());
+    let left = placed.x + inset;
+    let top = placed.y + inset;
     let mut lines = Vec::new();
-    let mut y = placed.y + inset;
+    // Where the next line goes: its column and its top, from the top of
+    // the column.
+    let mut column = 0;
+    let mut y = 0.0f32;
     let mut after = 0.0f32;
-    for (i, paragraph) in text.paragraphs.iter().enumerate() {
+    let mut lowest = 0.0f32;
+    for (i, paragraph) in paragraphs.iter().enumerate() {
         let text = ParagraphText::new_in_document_with(
             styles,
             settings,
@@ -339,24 +376,48 @@ fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut Tex
             Default::default(),
         );
         let format = text.paragraph();
-        if i > 0 {
+        if i > 0 && y > 0.0 {
             y += after.max(format.space_before.to_pt() as f32);
         }
         after = format.space_after.to_pt() as f32;
         let laid = system.layout(&text, &Column::new(width), 0.0).lines;
-        let mut bottom = y;
+        let first_top = laid.first().map_or(0.0, |l| l.top);
+        // The lines of the paragraph keep their spacing from its first.
+        let mut start = y - first_top;
         for (n, line) in laid.into_iter().enumerate() {
-            bottom = y + line.top + line.height;
+            let mut line_top = start + line.top;
+            let bottom = line_top + line.height;
+            // A line that does not fit goes to the top of the next column,
+            // unless it is the first of its column or the last column.
+            if bottom > height && line_top > 0.0 && column + 1 < columns {
+                column += 1;
+                start = -line.top;
+                line_top = 0.0;
+            }
+            let x = left + column as f32 * (width + gap);
+            y = line_top + line.height;
+            lowest = lowest.max(y);
             lines.push(PlacedLine {
                 paragraph: i,
                 index: n,
                 line,
-                origin: (placed.x + inset, y),
+                origin: (x, top + start),
             });
         }
-        y = bottom;
     }
-    placed.lines = lines;
+    // Text that does not fill the box sits where its alignment says.
+    let room = (height - lowest).max(0.0);
+    let shift = match vertical {
+        VerticalAlignment::Top => 0.0,
+        VerticalAlignment::Middle => room / 2.0,
+        VerticalAlignment::Bottom => room,
+    };
+    if shift > 0.0 {
+        for line in &mut lines {
+            line.origin.1 += shift;
+        }
+    }
+    lines
 }
 
 /// How far a point is from a segment.
