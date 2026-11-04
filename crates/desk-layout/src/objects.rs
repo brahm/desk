@@ -95,6 +95,47 @@ impl PlacedObject {
         (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
     }
 
+    /// A point of the page in the frame's own coordinates: from its top
+    /// left corner, as if it were not rotated.
+    pub fn to_frame(&self, x: f32, y: f32) -> (f32, f32) {
+        let (cx, cy) = self.center();
+        let (sin, cos) = self.angle().sin_cos();
+        let (dx, dy) = (x - cx, y - cy);
+        // The page has y going down, so a counterclockwise rotation by a
+        // is undone by turning the point clockwise on the screen.
+        let fx = dx * cos - dy * sin;
+        let fy = dx * sin + dy * cos;
+        (fx + self.width / 2.0, fy + self.height / 2.0)
+    }
+
+    /// A point of the frame, from its top left corner as if it were not
+    /// rotated, on the page.
+    pub fn to_page(&self, fx: f32, fy: f32) -> (f32, f32) {
+        let (cx, cy) = self.center();
+        let (sin, cos) = self.angle().sin_cos();
+        let (dx, dy) = (fx - self.width / 2.0, fy - self.height / 2.0);
+        (cx + dx * cos + dy * sin, cy - dx * sin + dy * cos)
+    }
+
+    /// Whether a point of the page is on the object, or within
+    /// `tolerance` of a line (OBJ-03). A shape is hit anywhere in its
+    /// frame, as Pages selects it.
+    pub fn contains(&self, x: f32, y: f32, tolerance: f32) -> bool {
+        let (fx, fy) = self.to_frame(x, y);
+        if let ObjectKind::Shape(desk_model::Shape::Line { rising }) = &self.object.kind {
+            let (y0, y1) = if *rising {
+                (self.height, 0.0)
+            } else {
+                (0.0, self.height)
+            };
+            return distance_to_segment((fx, fy), (0.0, y0), (self.width, y1)) <= tolerance;
+        }
+        fx >= -tolerance
+            && fy >= -tolerance
+            && fx <= self.width + tolerance
+            && fy <= self.height + tolerance
+    }
+
     /// The room the object takes from the text, if it takes any.
     pub(crate) fn exclusion(&self) -> Option<Exclusion> {
         if matches!(self.object.wrap, Wrap::Through | Wrap::Behind) {
@@ -318,6 +359,39 @@ fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut Tex
     placed.lines = lines;
 }
 
+/// How far a point is from a segment.
+fn distance_to_segment(p: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let length = dx * dx + dy * dy;
+    let t = if length == 0.0 {
+        0.0
+    } else {
+        (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / length).clamp(0.0, 1.0)
+    };
+    let (x, y) = (a.0 + t * dx, a.1 + t * dy);
+    ((p.0 - x).powi(2) + (p.1 - y).powi(2)).sqrt()
+}
+
+/// The frontmost object on a page under a point, by its index among the
+/// objects of the page, if any is (OBJ-03). Objects behind the text are
+/// found only when `behind` is set, as Pages selects them only when
+/// nothing else is under the pointer.
+pub fn object_at(
+    objects: &[PlacedObject],
+    x: f32,
+    y: f32,
+    tolerance: f32,
+    behind: bool,
+) -> Option<usize> {
+    objects
+        .iter()
+        .enumerate()
+        .rev()
+        .filter(|(_, o)| behind || o.object.wrap != Wrap::Behind)
+        .find(|(_, o)| o.contains(x, y, tolerance))
+        .map(|(i, _)| i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,5 +455,39 @@ mod tests {
         let (x0, y0, x1, y1) = placed.bounds();
         assert!((x0 - 125.0).abs() < 0.01 && (x1 - 175.0).abs() < 0.01);
         assert!((y0 - 75.0).abs() < 0.01 && (y1 - 175.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn obj_03_objects_are_hit_where_they_are_drawn() {
+        use desk_model::{Frame, NodeId, Shape};
+        let shape = |id: u64, shape: Shape, rotation: i32| {
+            let mut object = Object::new(
+                NodeId::new(id).unwrap(),
+                ObjectKind::Shape(shape),
+                Frame::from_pt(100.0, 100.0, 100.0, 20.0),
+            );
+            object.rotation = rotation;
+            PlacedObject::new(&object, None, 0.0)
+        };
+        let flat = shape(1, Shape::Rectangle, 0);
+        assert!(flat.contains(190.0, 115.0, 0.0));
+        assert!(!flat.contains(150.0, 150.0, 0.0));
+        // Turned a quarter, it stands from 60 to 160 down the page.
+        let standing = shape(2, Shape::Rectangle, 9000);
+        assert!(standing.contains(150.0, 150.0, 0.0));
+        assert!(!standing.contains(190.0, 115.0, 0.0));
+        let (fx, fy) = standing.to_frame(150.0, 65.0);
+        let (px, py) = standing.to_page(fx, fy);
+        assert!((px - 150.0).abs() < 1e-3 && (py - 65.0).abs() < 1e-3);
+        // Counterclockwise: the right end of the frame goes to the top.
+        assert!(fx > 90.0 && (fy - 10.0).abs() < 1e-3);
+        // A line is hit near it, not anywhere in its frame.
+        let line = shape(3, Shape::Line { rising: false }, 0);
+        assert!(line.contains(150.0, 111.0, 2.0));
+        assert!(!line.contains(110.0, 118.0, 2.0));
+        let objects = [flat, line];
+        assert_eq!(object_at(&objects, 150.0, 110.0, 2.0, false), Some(1));
+        assert_eq!(object_at(&objects, 110.0, 118.0, 2.0, false), Some(0));
+        assert_eq!(object_at(&objects, 10.0, 10.0, 2.0, false), None);
     }
 }

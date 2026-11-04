@@ -56,6 +56,7 @@ mod id;
 mod list;
 mod note;
 mod object;
+mod object_edit;
 mod op;
 mod outline;
 mod picture;
@@ -97,6 +98,7 @@ pub use object::{
     Anchor, Fill, Frame, GraphicStyle, Object, ObjectKind, Objects, POLYGON_SCALE, Shape, Stroke,
     TextBox, Wrap,
 };
+pub use object_edit::{Distribution, Layer, ObjectAlignment, reframed, translated, union};
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::Picture;

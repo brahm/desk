@@ -18,11 +18,12 @@ extract() {
     local copies output
     copies=$(mktemp -d)
     output=$(realpath "$1")
-    for file in crates/desk-ui/src/*.rs crates/desk-writer/src/*.rs \
-        crates/desk-tables/src/*.rs crates/desk-slides/src/*.rs; do
+    local file
+    while IFS= read -r -d '' file; do
         mkdir -p "$copies/$(dirname "$file")"
         sed -E "s/'(static|[a-z])\b([^']|$)/\2/g" "$file" >"$copies/$file"
-    done
+    done < <(find crates/desk-ui/src crates/desk-writer/src crates/desk-tables/src \
+        crates/desk-slides/src -name '*.rs' -print0 | sort -z)
     (
         cd "$copies"
         find crates -name '*.rs' -print0 | sort -z | xargs -0 \

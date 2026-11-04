@@ -29,11 +29,13 @@ use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
 mod navigate;
+mod objects;
 mod outline;
 mod sections;
 mod stories;
 
 pub use navigate::Navigate;
+pub use objects::{NewShape, ObjectInfo};
 pub use outline::OutlineRow;
 pub use sections::has_sections_clip;
 
@@ -408,6 +410,13 @@ struct State {
     /// The header, footer or note being edited on the page, while the
     /// editor edits a copy of it (EST-12, EST-13).
     story: Option<stories::StoryMode>,
+    /// The objects selected, from back to front, rather than text
+    /// (OBJ-03).
+    objects: Vec<desk_model::NodeId>,
+    /// A drag of objects in progress.
+    object_drag: Option<objects::ObjectDrag>,
+    /// The guides it snaps to.
+    guides: Vec<crate::view::Guide>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -450,6 +459,8 @@ pub struct Format {
     pub link: Option<Arc<str>>,
     /// The names of the bookmarks of the document, in order (EST-26).
     pub bookmarks: Vec<Arc<str>>,
+    /// The selected objects, when objects are selected (OBJ-03).
+    pub object: Option<ObjectInfo>,
 }
 
 /// Edits the document of a window.
@@ -519,6 +530,9 @@ impl TextEditor {
                 squiggle_skip: None,
                 file_name: String::new(),
                 story: None,
+                objects: Vec::new(),
+                object_drag: None,
+                guides: Vec::new(),
             })),
         };
         this.show_pages();
@@ -2234,6 +2248,7 @@ impl TextEditor {
                 .into_iter()
                 .map(|(name, _, _)| name)
                 .collect(),
+            object: self.object_info(),
         }
     }
 
@@ -2778,7 +2793,8 @@ impl TextEditor {
             self.update_squiggles();
         }
         self.selection_changed();
-        if let Some(caret) = caret {
+        self.show_objects();
+        if let Some(caret) = caret.filter(|_| !self.has_selected_objects()) {
             self.view.scroll_to(&caret);
             if let Some((x, y)) = self.view.to_area(caret.page, caret.x, caret.top) {
                 let (_, bottom) = self
@@ -2956,7 +2972,7 @@ impl TextEditor {
                 this.leave_story(None);
                 return glib::Propagation::Stop;
             }
-            if this.handle_key(key, modifiers) {
+            if this.object_key(key, modifiers) || this.handle_key(key, modifiers) {
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed
@@ -2990,6 +3006,10 @@ impl TextEditor {
                 return Default::default();
             };
             this.view.set_preedit("");
+            // Typing with objects selected does not reach the text.
+            if this.has_selected_objects() {
+                return;
+            }
             this.replace_selection("Typing", text);
         });
         let weak = self.downgrade();
@@ -3054,6 +3074,12 @@ impl TextEditor {
                 return Default::default();
             };
             this.view.area().grab_focus();
+            // A click on an object selects it, or on a handle of one
+            // starts resizing it (OBJ-03).
+            if this.press_object(presses, x, y, gesture.current_event_state()) {
+                this.state.borrow_mut().drag_from = None;
+                return;
+            }
             // A click in a header, footer or note puts the cursor there,
             // and a click in the body takes it back (EST-12, EST-13).
             if !gesture
@@ -3159,6 +3185,10 @@ impl TextEditor {
             let Some((x, y)) = gesture.start_point() else {
                 return;
             };
+            if this.dragging_objects() {
+                this.drag_objects(x + dx, y + dy, gesture.current_event_state());
+                return;
+            }
             let label_drag = this.state.borrow().label_drag;
             if let Some((from, moved)) = label_drag {
                 // A level for each step of the indent of a level.
@@ -3184,6 +3214,7 @@ impl TextEditor {
             let Some(this) = weak.upgrade() else {
                 return Default::default();
             };
+            this.end_object_drag();
             let mut state = this.state.borrow_mut();
             state.drag_from = None;
             state.label_drag = None;

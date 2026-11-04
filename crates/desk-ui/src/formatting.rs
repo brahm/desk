@@ -389,6 +389,8 @@ pub struct Inspector {
     toc: Rc<crate::links_pane::TocGroup>,
     lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
+    /// The Metrics and Wrap inspectors of the selected objects.
+    objects: Rc<crate::objects_pane::ObjectGroups>,
     /// The units of the indents, those of the rulers.
     units: Cell<Units>,
     /// The paragraph format shown, to show again in other units.
@@ -472,6 +474,7 @@ impl Inspector {
         let notes = crate::notes_pane::NotesGroup::new(editor.clone(), units);
         let links = crate::links_pane::LinksGroup::new(editor.clone());
         let toc = crate::links_pane::TocGroup::new(editor.clone());
+        let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
 
         let spacing = adw::PreferencesGroup::builder()
             .title(tr("Spacing"))
@@ -519,6 +522,9 @@ impl Inspector {
             .margin_start(12)
             .margin_end(12)
             .build();
+        for group in objects.groups() {
+            content.append(group);
+        }
         content.append(&spacing);
         content.append(&indents);
         content.append(&hyphenation);
@@ -563,6 +569,7 @@ impl Inspector {
             toc,
             lists,
             effects,
+            objects,
             units: Cell::new(units),
             shown: RefCell::new(None),
             updating: Cell::new(false),
@@ -668,6 +675,7 @@ impl Inspector {
         self.layouts.set_units(units);
         self.headers.set_units(units);
         self.notes.set_units(units);
+        self.objects.set_units(units);
         let shown = self.shown.borrow().clone();
         if let Some(format) = shown {
             self.show(&format);
@@ -677,6 +685,7 @@ impl Inspector {
     /// Shows the formatting at the selection.
     pub fn show(&self, format: &Format) {
         *self.shown.borrow_mut() = Some(format.clone());
+        self.objects.show_format(format);
         self.updating.set(true);
         let paragraph = &format.paragraph;
         let set = |row: &adw::SpinRow, value: f64| {

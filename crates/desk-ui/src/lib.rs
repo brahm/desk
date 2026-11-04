@@ -33,6 +33,7 @@ mod links;
 mod links_pane;
 mod lists_pane;
 mod notes_pane;
+mod objects_pane;
 mod outline_view;
 mod preferences;
 mod properties;
@@ -301,6 +302,9 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.spelling", &["<Control>colon"]),
             ("win.show-help-overlay", &["<Control>question"]),
         ] {
+            app.set_accels_for_action(action, keys);
+        }
+        for (action, keys) in window::OBJECT_ACCELS {
             app.set_accels_for_action(action, keys);
         }
         app.set_accels_for_action("win.zoom('in')", &["<Control>plus", "<Control>equal"]);
