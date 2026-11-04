@@ -103,7 +103,7 @@ pub use object::{
 pub use object_edit::{Distribution, Layer, ObjectAlignment, reframed, translated, union};
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
-pub use picture::Picture;
+pub use picture::{Picture, PictureFormat};
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 pub use story::Story;
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};

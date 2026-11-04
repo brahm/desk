@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-04 20:50+0000\n"
+"POT-Creation-Date: 2026-11-04 21:40+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -142,6 +142,11 @@ msgstr ""
 #: crates/desk-ui/src/bullet_pictures.rs:44
 #: crates/desk-ui/src/graphic_pane.rs:121
 msgid "Arrow"
+msgstr ""
+
+#: crates/desk-ui/src/bullet_pictures.rs:162
+#: crates/desk-ui/src/lists_pane.rs:467
+msgid "Images"
 msgstr ""
 
 #: crates/desk-ui/src/editing.rs:1572 crates/desk-ui/src/links_pane.rs:70
@@ -829,11 +834,7 @@ msgstr ""
 msgid "Graphic"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:339 crates/desk-ui/src/lists_pane.rs:467
-msgid "Images"
-msgstr ""
-
-#: crates/desk-ui/src/graphic_pane.rs:344
+#: crates/desk-ui/src/graphic_pane.rs:340
 msgid "Choose an Image to Fill With"
 msgstr ""
 
@@ -2524,6 +2525,7 @@ msgid "Go to Page"
 msgstr ""
 
 #: crates/desk-ui/src/window.rs:581 crates/desk-ui/src/window.rs:961
+#: crates/desk-ui/src/window/objects.rs:154
 msgid "Cannot open {name}"
 msgstr ""
 
@@ -2914,115 +2916,127 @@ msgstr ""
 msgid "_Two Pages"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:128
-msgid "_Text Box"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:130
-msgid "Lin_ked Text Box"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:135
-msgid "_Rectangle"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:136
-msgid "Rounded Re_ctangle"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:137
-msgid "_Oval"
-msgstr ""
-
 #: crates/desk-ui/src/window/objects.rs:138
-msgid "Tr_iangle"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:139
-msgid "_Line"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:143
-msgid "_Shape"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:150
-msgid "Bring to _Front"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:151
-msgid "Bring _Forward"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:152
-msgid "Send _Backward"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:153
-msgid "Send to Bac_k"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:156
-msgid "_Left"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:157
-msgid "_Center"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:158
-msgid "_Right"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:159
-msgid "_Top"
+msgid "Choose an Image"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:160
-msgid "_Middle"
+msgid "The file is not an image that Desk can read."
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:161
-msgid "_Bottom"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:167
-msgid "_Horizontally"
+#: crates/desk-ui/src/window/objects.rs:170
+msgid "C_hoose…"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:171
-msgid "_Vertically"
+msgid "_Text Box"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:175
-msgid "_Align Objects"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:176
-msgid "_Distribute Objects"
-msgstr ""
-
-#: crates/desk-ui/src/window/objects.rs:177
-msgid "Flip _Horizontally"
+#: crates/desk-ui/src/window/objects.rs:173
+msgid "Lin_ked Text Box"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:178
-msgid "Flip _Vertically"
+msgid "_Rectangle"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:179
+msgid "Rounded Re_ctangle"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:180
-msgid "_Group"
+msgid "_Oval"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:181
-msgid "_Ungroup"
+msgid "Tr_iangle"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:182
+msgid "_Line"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:186
+msgid "_Shape"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:193
+msgid "Bring to _Front"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:194
+msgid "Bring _Forward"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:195
+msgid "Send _Backward"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:196
+msgid "Send to Bac_k"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:199
+msgid "_Left"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:200
+msgid "_Center"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:201
+msgid "_Right"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:202
+msgid "_Top"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:203
+msgid "_Middle"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:204
+msgid "_Bottom"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:210
+msgid "_Horizontally"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:214
+msgid "_Vertically"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:218
+msgid "_Align Objects"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:219
+msgid "_Distribute Objects"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:220
+msgid "Flip _Horizontally"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:221
+msgid "Flip _Vertically"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:223
+msgid "_Group"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:224
+msgid "_Ungroup"
+msgstr ""
+
+#: crates/desk-ui/src/window/objects.rs:225
 msgid "_Lock"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:183
+#: crates/desk-ui/src/window/objects.rs:226
 msgid "U_nlock"
 msgstr ""
 

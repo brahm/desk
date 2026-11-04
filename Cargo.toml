@@ -58,6 +58,12 @@ zip = { version = "9.2.0", default-features = false, features = ["deflate-flate2
 # them as TIFF.
 png = "0.18.1"
 tiff = { version = "0.11.3", default-features = false, features = ["deflate", "lzw"] }
+# The images of documents: JPEG as it came, GIF as PNG, and PDF drawn as
+# it is by Poppler, which comes with GNOME.
+gif = { version = "0.14.2", default-features = false, features = ["std"] }
+glib = "0.22.10"
+poppler-rs = { version = "0.26.0", features = ["v0_82"] }
+zune-jpeg = "0.5.15"
 
 desk-anim = { path = "crates/desk-anim" }
 desk-chart = { path = "crates/desk-chart" }

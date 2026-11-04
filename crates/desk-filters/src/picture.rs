@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Pictures from other formats as the PNG that the model keeps (LST-03):
-//! PNG as it is, and TIFF, which Pages saves image bullets in, converted.
+//! Pictures from other formats as the model keeps them (LST-03, OBJ-01):
+//! PNG, JPEG and PDF as they are, and TIFF, which Pages saves image
+//! bullets in, and GIF, converted to PNG.
 
 use std::io::Cursor;
 
@@ -18,16 +19,62 @@ pub fn picture(bytes: &[u8]) -> Option<Picture> {
     picture_within(bytes, MAX_SIDE)
 }
 
-/// A picture from the bytes of a PNG or TIFF file, a TIFF one scaled down
-/// to fit `max_side`, or `None` when they are neither or cannot be read.
+/// A picture from the bytes of a PNG, JPEG, PDF, TIFF or GIF file, a TIFF
+/// or GIF one scaled down to fit `max_side`, or `None` when they are none
+/// of those or cannot be read.
 pub fn picture_within(bytes: &[u8], max_side: u32) -> Option<Picture> {
     if let Some(picture) = Picture::from_png(bytes.to_vec()) {
         return Some(picture);
     }
+    if bytes.starts_with(&[0xFF, 0xD8]) {
+        return Picture::from_jpeg(bytes.to_vec());
+    }
+    if bytes.starts_with(b"%PDF-") {
+        return from_pdf(bytes);
+    }
     if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
         return from_tiff(bytes, max_side.max(1));
     }
+    if bytes.starts_with(b"GIF8") {
+        return from_gif(bytes, max_side.max(1));
+    }
     None
+}
+
+/// The first page of a PDF file, measured by Poppler.
+fn from_pdf(bytes: &[u8]) -> Option<Picture> {
+    let data = glib::Bytes::from(bytes);
+    let document = poppler::Document::from_bytes(&data, None).ok()?;
+    let (width, height) = document.page(0)?.size();
+    Picture::from_pdf(bytes.to_vec(), width, height)
+}
+
+/// The first frame of a GIF file as 8-bit RGBA, scaled down to fit
+/// `max_side`, in PNG.
+fn from_gif(bytes: &[u8], max_side: u32) -> Option<Picture> {
+    let mut options = gif::DecodeOptions::new();
+    options.set_color_output(gif::ColorOutput::RGBA);
+    let mut decoder = options.read_info(Cursor::new(bytes)).ok()?;
+    let (width, height) = (u32::from(decoder.width()), u32::from(decoder.height()));
+    if width == 0 || height == 0 {
+        return None;
+    }
+    // The frame is drawn on a clear screen of the size of the file.
+    let frame = decoder.read_next_frame().ok()??;
+    let mut rgba = vec![0u8; (width * height * 4) as usize];
+    let (fw, fh) = (u32::from(frame.width), u32::from(frame.height));
+    let (left, top) = (u32::from(frame.left), u32::from(frame.top));
+    for y in 0..fh.min(height.saturating_sub(top)) {
+        for x in 0..fw.min(width.saturating_sub(left)) {
+            let from = ((y * fw + x) * 4) as usize;
+            let to = (((y + top) * width + x + left) * 4) as usize;
+            if let Some(pixel) = frame.buffer.get(from..from + 4) {
+                rgba[to..to + 4].copy_from_slice(pixel);
+            }
+        }
+    }
+    let (rgba, width, height) = scaled(&rgba, width, height, max_side);
+    encode(&rgba, width, height)
 }
 
 /// The pixels of a TIFF file as 8-bit RGBA, scaled down to fit
@@ -142,7 +189,7 @@ mod tests {
         let large = picture_of(&tiff(600, 300));
         assert_eq!((large.width(), large.height()), (200, 100));
         // PNG stays as it is.
-        let again = super::picture(large.png()).unwrap();
+        let again = super::picture(large.data()).unwrap();
         assert_eq!(again, large);
         assert!(super::picture(b"not a picture").is_none());
     }

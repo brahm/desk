@@ -15,7 +15,8 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::tr;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 15] = [
+pub(super) const OBJECT_ACTIONS: [&str; 16] = [
+    "insert-picture",
     "insert-shape",
     "insert-text-box",
     "add-linked-text-box",
@@ -34,7 +35,8 @@ pub(super) const OBJECT_ACTIONS: [&str; 15] = [
 ];
 
 /// The keys of the Arrange menu.
-pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 8] = [
+pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 9] = [
+    ("win.insert-picture", &["<Control><Shift>v"]),
     ("win.bring-to-front", &["<Control><Shift>bracketright"]),
     ("win.bring-forward", &["<Control>bracketright"]),
     ("win.send-backward", &["<Control>bracketleft"]),
@@ -76,6 +78,14 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+        let weak = Rc::downgrade(self);
+        let action = gio::SimpleAction::new("insert-picture", None);
+        action.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.choose_picture();
+            }
+        });
+        self.window.add_action(&action);
         let with_string: [(&str, ChoiceAction); 3] = [
             ("insert-shape", |e, value| {
                 let shape = match value {
@@ -120,11 +130,44 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
     }
+
+    /// Asks for an image or a PDF, and puts it on the page (OBJ-01).
+    fn choose_picture(self: &Rc<Self>) {
+        let filters = crate::bullet_pictures::document_picture_filters();
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Choose an Image"))
+            .modal(true)
+            .filters(&filters)
+            .build();
+        let weak = Rc::downgrade(self);
+        dialog.open(Some(&self.window), gio::Cancellable::NONE, move |result| {
+            let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
+                return;
+            };
+            match crate::bullet_pictures::document_picture_from_file(&file) {
+                Some(picture) => {
+                    if let Some(editor) = this.editor() {
+                        editor.insert_picture(picture);
+                    }
+                }
+                None => this.alert(
+                    &tr("Cannot open {name}").replace(
+                        "{name}",
+                        &file
+                            .basename()
+                            .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
+                    ),
+                    &tr("The file is not an image that Desk can read."),
+                ),
+            }
+        });
+    }
 }
 
 /// The shapes and the text box of the Insert menu (OBJ-08, OBJ-13).
 pub(super) fn shapes_menu() -> gio::Menu {
     let menu = gio::Menu::new();
+    menu.append(Some(&tr("C_hoose…")), Some("win.insert-picture"));
     menu.append(Some(&tr("_Text Box")), Some("win.insert-text-box"));
     menu.append(
         Some(&tr("Lin_ked Text Box")),
