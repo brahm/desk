@@ -39,6 +39,7 @@ fn root(w: &mut Writer, name: &'static str) {
         .attr("xmlns:text", ns::TEXT)
         .attr("xmlns:fo", ns::FO)
         .attr("xmlns:svg", ns::SVG)
+        .attr("xmlns:draw", ns::DRAW)
         .attr("xmlns:meta", ns::META)
         .attr("xmlns:dc", ns::DC)
         .attr("xmlns:xlink", ns::XLINK)
@@ -74,6 +75,9 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     w.end();
     w.start("office:body").start("office:text");
+    for object in &document.page_objects {
+        crate::draw::write_draw_object(&mut w, object, &write_paragraph);
+    }
     write_body(&mut w, &document.body, &document.toc_levels);
     w.end().end().end();
     let content = w.finish();
@@ -251,6 +255,7 @@ fn write_settings(document: &TextDocument) -> Option<String> {
             Family::Paragraph => "paragraph",
             Family::Text => "text",
             Family::List => "list",
+            Family::Graphic => "graphic",
         };
         w.start("config:config-item")
             .attr("config:name", &format!("F{}", shortcut.key))
@@ -294,6 +299,7 @@ fn write_style(w: &mut Writer, style: &Style) {
             "style:family",
             match style.family {
                 Family::Paragraph => "paragraph",
+                Family::Graphic => "graphic",
                 // List styles are written as `text:list-style`.
                 Family::Text | Family::List => "text",
             },
@@ -580,6 +586,7 @@ fn write_properties(w: &mut Writer, properties: &Properties) {
         text_attrs(w, &properties.text);
         w.end();
     }
+    crate::draw::write_graphic_properties(w, &properties.graphic);
 }
 
 fn len(w: &mut Writer, name: &str, value: Option<Length>) {
@@ -1001,6 +1008,9 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
     w.attr_opt("text:style-name", paragraph.style.as_deref());
     for mark in &paragraph.marks {
         w.start("text:bookmark").attr("text:name", mark).end();
+    }
+    for object in &paragraph.frames {
+        crate::draw::write_draw_object(w, object, &write_paragraph);
     }
     let mut text = TextWriter { after_space: true };
     let mut link: Option<&str> = None;

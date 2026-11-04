@@ -82,6 +82,14 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
             crate::text::ListLabel::Image { href, .. } => Some(href.clone()),
             _ => None,
         })
+        .chain(
+            document
+                .page_objects
+                .iter()
+                .chain(document.body.iter().flat_map(|p| &p.frames))
+                .flat_map(|o| o.hrefs())
+                .map(str::to_owned),
+        )
         .filter(|href| !href.contains("://") && !href.starts_with('/'))
         .collect();
     hrefs.sort();

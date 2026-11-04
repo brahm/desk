@@ -497,6 +497,31 @@ impl Edit {
         Ok(())
     }
 
+    /// Puts an object at a place from the back, among the objects of the
+    /// document (OBJ-01).
+    pub fn insert_object(&mut self, index: usize, object: crate::Object) -> Result<(), ModelError> {
+        self.apply(Op::InsertObject { index, object })
+    }
+
+    /// Puts an object in front of the others.
+    pub fn add_object(&mut self, object: crate::Object) -> Result<(), ModelError> {
+        let index = self.doc.objects().len();
+        self.insert_object(index, object)
+    }
+
+    /// Removes an object.
+    pub fn remove_object(&mut self, id: crate::NodeId) -> Result<(), ModelError> {
+        self.apply(Op::RemoveObject { object: id })
+    }
+
+    /// Replaces an object with another with the same identifier.
+    pub fn replace_object(&mut self, object: crate::Object) -> Result<(), ModelError> {
+        if self.doc.objects().get(object.id) != Some(&object) {
+            self.apply(Op::ReplaceObject { object })?;
+        }
+        Ok(())
+    }
+
     /// Sets the settings of the text of the whole document.
     pub fn set_text_settings(&mut self, settings: TextSettings) -> Result<(), ModelError> {
         if &settings != self.doc.text_settings() {

@@ -96,6 +96,7 @@ fn full_document() -> TextDocument {
                 country: Some("BR".into()),
                 ..TextProperties::default()
             },
+            ..Default::default()
         },
         styles: vec![
             Style {
@@ -133,6 +134,7 @@ fn full_document() -> TextDocument {
                         ..ParagraphProperties::default()
                     },
                     text: TextProperties::default(),
+                    ..Default::default()
                 },
                 ..Style::default()
             },
@@ -162,6 +164,7 @@ fn full_document() -> TextDocument {
                         desk_hyphenate: Some(true),
                         ..TextProperties::default()
                     },
+                    ..Default::default()
                 },
             },
             Style {
@@ -312,6 +315,7 @@ fn full_document() -> TextDocument {
                         "*",
                     ),
                 ],
+                ..Default::default()
             },
             Paragraph {
                 style: Some("P1".into()),
@@ -519,6 +523,7 @@ fn full_document() -> TextDocument {
             columns: Some(2),
             outline: Some(true),
         },
+        ..Default::default()
     }
 }
 

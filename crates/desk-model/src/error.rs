@@ -18,6 +18,8 @@ pub enum ModelError {
     UnknownParagraph(NodeId),
     /// No style has this identifier.
     UnknownStyle(StyleId),
+    /// No object has this identifier.
+    UnknownObject(NodeId),
     /// The style is not of the family the change needs.
     WrongStyleFamily {
         /// The style.
@@ -64,6 +66,7 @@ impl fmt::Display for ModelError {
         match self {
             Self::UnknownParagraph(id) => write!(f, "no paragraph has the identifier {id}"),
             Self::UnknownStyle(id) => write!(f, "no style has the identifier {id}"),
+            Self::UnknownObject(id) => write!(f, "no object has the identifier {id}"),
             Self::WrongStyleFamily { style, expected } => {
                 write!(f, "style {style} is not a {expected:?} style")
             }

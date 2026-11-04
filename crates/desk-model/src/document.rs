@@ -9,6 +9,7 @@ use crate::error::ModelError;
 use crate::header::HeadersFooters;
 use crate::id::{IdAllocator, NodeId};
 use crate::note::{Note, NoteSettings, Notes};
+use crate::object::{Object, Objects};
 use crate::op::Op;
 use crate::section::{Columns, Layout, Section, SectionStart};
 use crate::style::{ParagraphStyle, Style, StyleFamily, StyleId, Styles};
@@ -246,6 +247,8 @@ pub struct PagedFlow {
     pub section_margins: imbl::OrdMap<NodeId, HeadersFooters>,
     /// The footnotes or endnotes (EST-13).
     pub notes: Notes,
+    /// The objects on the pages, from back to front (OBJ-01).
+    pub objects: Objects,
 }
 
 /// Where the content of a document lives. Each app has its own container
@@ -254,8 +257,8 @@ pub struct PagedFlow {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Container {
-    /// Desk Writer: a paged flow of text. Sections, page layout documents
-    /// and page objects come in later phases.
+    /// Desk Writer: a paged flow of text, with objects on its pages. Page
+    /// layout documents come later in this phase.
     Pages(PagedFlow),
     // Desk Tables adds sheets, and Desk Slides adds slides and master
     // slides, as further variants.
@@ -341,6 +344,7 @@ impl Document {
                 margins: HeadersFooters::default(),
                 section_margins: imbl::OrdMap::new(),
                 notes: Notes::default(),
+                objects: Objects::default(),
             }),
         }
     }
@@ -469,6 +473,36 @@ impl Document {
         match &self.container {
             Container::Pages(flow) => &flow.notes,
         }
+    }
+
+    /// The objects on the pages, from back to front.
+    pub fn objects(&self) -> &Objects {
+        match &self.container {
+            Container::Pages(flow) => &flow.objects,
+        }
+    }
+
+    /// Checks the styles of an object's text and that none of its
+    /// identifiers is in use elsewhere than in `replacing`.
+    fn check_object(&self, object: &Object, replacing: Option<&Object>) -> Result<(), ModelError> {
+        for paragraph in object.paragraphs() {
+            self.styles
+                .check_family(paragraph.style(), StyleFamily::Paragraph)?;
+            self.check_list_style(paragraph.attrs())?;
+            self.check_runs_styles(paragraph.runs())?;
+        }
+        let ids = object.ids();
+        let mut seen = std::collections::HashSet::new();
+        let kept: Vec<NodeId> = replacing.map(Object::ids).unwrap_or_default();
+        for id in ids {
+            let elsewhere = !kept.contains(&id)
+                && (self.objects().iter().any(|o| o.ids().contains(&id))
+                    || self.body().paragraph(id).is_some());
+            if !seen.insert(id) || elsewhere {
+                return Err(ModelError::DuplicateId(id));
+            }
+        }
+        Ok(())
     }
 
     /// A paragraph by identifier.
@@ -655,6 +689,7 @@ impl Document {
                         .iter()
                         .any(|(_, m)| m.paragraphs().any(|p| p.uses_style(style)))
                     || self.notes().paragraphs().any(|p| p.uses_style(style))
+                    || self.objects().paragraphs().any(|p| p.uses_style(style))
                     || self.text_settings().toc.uses(style)
                 {
                     return Err(ModelError::StyleInUse(style));
@@ -721,6 +756,43 @@ impl Document {
                 let Container::Pages(flow) = &mut self.container;
                 let old: Option<Note> = flow.notes.replace(id, note);
                 Ok(Op::SetNote { id, note: old })
+            }
+            Op::InsertObject { index, object } => {
+                let len = self.objects().len();
+                if index > len {
+                    return Err(ModelError::IndexOutOfBounds { index, len });
+                }
+                self.check_object(&object, None)?;
+                for id in object.ids() {
+                    self.ids.observe(id);
+                }
+                let id = object.id;
+                let Container::Pages(flow) = &mut self.container;
+                flow.objects.insert(index, object);
+                Ok(Op::RemoveObject { object: id })
+            }
+            Op::RemoveObject { object } => {
+                let index = self
+                    .objects()
+                    .index_of(object)
+                    .ok_or(ModelError::UnknownObject(object))?;
+                let Container::Pages(flow) = &mut self.container;
+                let object = flow.objects.remove(index);
+                Ok(Op::InsertObject { index, object })
+            }
+            Op::ReplaceObject { object } => {
+                let index = self
+                    .objects()
+                    .index_of(object.id)
+                    .ok_or(ModelError::UnknownObject(object.id))?;
+                let old = self.objects().iter().nth(index).cloned();
+                self.check_object(&object, old.as_ref())?;
+                for id in object.ids() {
+                    self.ids.observe(id);
+                }
+                let Container::Pages(flow) = &mut self.container;
+                let old = flow.objects.set(index, object);
+                Ok(Op::ReplaceObject { object: old })
             }
             Op::SetMetadata { metadata } => {
                 let old = std::mem::replace(&mut self.metadata, metadata);

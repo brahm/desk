@@ -166,6 +166,13 @@ pub fn caret(layout: &DocumentLayout, spot: Spot) -> Option<CaretRect> {
     })
 }
 
+/// How far `x` is from the space a line was given, across the page.
+fn across(line: &PlacedLine, x: f32) -> f32 {
+    let left = line.origin.0 + line.line.x;
+    let right = left + line.line.width;
+    (left - x).max(x - right).max(0.0)
+}
+
 /// The spot nearest to a point of a page, in points.
 pub fn hit(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Spot> {
     let lines = &layout.pages.get(page)?.lines;
@@ -180,7 +187,11 @@ pub fn hit(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Spot>
                 0.0
             }
         };
-        distance(a).total_cmp(&distance(b))
+        // Beside a wrapped object, a line has pieces on one height: the
+        // nearest across.
+        distance(a)
+            .total_cmp(&distance(b))
+            .then(across(a, x).total_cmp(&across(b, x)))
     })?;
     Some(Spot::new(
         line.paragraph,
@@ -415,12 +426,33 @@ pub fn move_line(layout: &DocumentLayout, spot: Spot, goal: f64, down: bool, lin
     else {
         return spot;
     };
-    let target = if down {
-        (index + lines).min(all.len() - 1)
-    } else {
-        index.saturating_sub(lines)
+    // Lines beside a wrapped object are pieces of one row: a step goes
+    // to the next row, and to its piece nearest the goal.
+    let same_row = |a: (usize, &PlacedLine), b: (usize, &PlacedLine)| {
+        a.0 == b.0 && (a.1.top() - b.1.top()).abs() < 0.01
     };
-    if target == index {
+    let mut target = index;
+    for _ in 0..lines {
+        let row = all[target];
+        let mut next = target;
+        if down {
+            while next + 1 < all.len() && same_row(all[next], row) {
+                next += 1;
+            }
+            if same_row(all[next], row) {
+                break;
+            }
+        } else {
+            while next > 0 && same_row(all[next], row) {
+                next -= 1;
+            }
+            if same_row(all[next], row) {
+                break;
+            }
+        }
+        target = next;
+    }
+    if same_row(all[target], all[index]) {
         // At the first or last line: to the start or the end.
         return if down {
             Spot::new(current.paragraph, current.line.range.end)
@@ -428,7 +460,21 @@ pub fn move_line(layout: &DocumentLayout, spot: Spot, goal: f64, down: bool, lin
             Spot::new(current.paragraph, current.line.range.start)
         };
     }
-    let (_, line) = all[target];
+    let (first, last) = {
+        let (mut first, mut last) = (target, target);
+        while first > 0 && same_row(all[first - 1], all[target]) {
+            first -= 1;
+        }
+        while last + 1 < all.len() && same_row(all[last + 1], all[target]) {
+            last += 1;
+        }
+        (first, last)
+    };
+    let (_, line) = all[first..=last]
+        .iter()
+        .copied()
+        .min_by(|a, b| across(a.1, goal as f32).total_cmp(&across(b.1, goal as f32)))
+        .unwrap_or(all[target]);
     let offset = line.line.offset_at(goal as f32 - line.origin.0);
     Spot::new(line.paragraph, offset)
 }
@@ -655,6 +701,43 @@ mod tests {
         assert_eq!(hit(&layout, 0, 0.0, 0.0), Some(Spot::new(0, 0)));
         let last = hit(&layout, 0, 1000.0, 399.0).unwrap();
         assert_eq!(last, Spot::new(1, 5));
+    }
+
+    #[test]
+    fn obj_17_clicks_and_arrows_beside_a_wrapped_object() {
+        use desk_model::{Frame, Object, ObjectKind, Shape};
+        let mut editor = Editor::new(document(&[&TEXT.repeat(4)]));
+        editor
+            .edit("Shape", |edit| {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(120.0, 60.0, 60.0, 80.0),
+                );
+                object.wrap_margin = Length::ZERO;
+                edit.add_object(object)
+            })
+            .unwrap();
+        let doc = editor.into_document();
+        let layout = laid_out(&doc);
+        let lines = &layout.pages[0].lines;
+        // A row with a piece on each side of the object.
+        let left = lines
+            .iter()
+            .position(|l| l.top() > 70.0 && l.origin.0 + l.line.x < 100.0)
+            .unwrap();
+        let (a, b) = (&lines[left], &lines[left + 1]);
+        assert!((a.top() - b.top()).abs() < 0.01);
+        // A click on the right piece lands in it.
+        let x = b.origin.0 + b.line.x + 5.0;
+        let spot = hit(&layout, 0, f64::from(x), f64::from(b.top() + 2.0)).unwrap();
+        assert!(b.line.range.contains(&spot.offset), "{spot:?}");
+        // Down from the left piece goes to the next row, on its left.
+        let start = Spot::new(0, a.line.range.start + 1);
+        let goal = caret(&layout, start).unwrap().x;
+        let down = move_line(&layout, start, goal, true, 1);
+        let rect = caret(&layout, down).unwrap();
+        assert!(f64::from(b.top()) < rect.top && rect.x < 120.0, "{rect:?}");
     }
 
     #[test]

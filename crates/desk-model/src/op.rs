@@ -10,6 +10,7 @@ use crate::format::ParaAttrs;
 use crate::header::MarginPlace;
 use crate::id::NodeId;
 use crate::note::Note;
+use crate::object::Object;
 use crate::style::{Style, StyleId};
 use crate::text::{Paragraph, Run};
 
@@ -20,8 +21,8 @@ use crate::text::{Paragraph, Run};
 /// edits, such as splitting a paragraph, are sequences of operations in a
 /// [`Transaction`].
 ///
-/// Operations on objects and table cells join this list in later phases,
-/// so that undo and tracked changes cover them in the same way.
+/// Operations on table cells join this list in later phases, so that
+/// undo and tracked changes cover them in the same way.
 ///
 /// [`Document::apply`]: crate::Document::apply
 /// [`Transaction`]: crate::Transaction
@@ -91,6 +92,24 @@ pub enum Op {
         id: NodeId,
         /// The note; none to remove it.
         note: Option<Note>,
+    },
+    /// Puts an object among the objects of the document (OBJ-01).
+    InsertObject {
+        /// Its place from the back.
+        index: usize,
+        /// The object.
+        object: Object,
+    },
+    /// Removes an object.
+    RemoveObject {
+        /// The object.
+        object: NodeId,
+    },
+    /// Replaces an object with another with the same identifier, as when
+    /// it is moved, resized or formatted.
+    ReplaceObject {
+        /// The object.
+        object: Object,
     },
     /// Sets the information about the document.
     SetMetadata {

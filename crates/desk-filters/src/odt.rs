@@ -28,6 +28,8 @@ use desk_odf as odf;
 
 use crate::sections;
 
+mod objects;
+
 /// The ODF name of the default paragraph style.
 const DEFAULT_STYLE: &str = "Standard";
 
@@ -1041,7 +1043,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .find(|s| s.family == style.family && s.style == style.name)
                 .map(|s| s.key);
             let built: Style = match style.family {
-                odf::Family::List => continue,
+                odf::Family::List | odf::Family::Graphic => continue,
                 odf::Family::Paragraph => ParagraphStyle {
                     id,
                     name: names[&id].as_str().into(),
@@ -1444,6 +1446,19 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
     }
 
     document.apply(Op::SetPageSetup { page: setup })?;
+
+    // The objects, once the body and the pages they go on are there.
+    objects::import_objects(source, &mut document, &mut |document, paragraph| {
+        import_paragraph(
+            source,
+            document,
+            &ids,
+            default,
+            paragraph,
+            relative,
+            &Marks::new(),
+        )
+    })?;
 
     let text = &source.text_settings;
     document.apply(Op::SetTextSettings {
@@ -2147,6 +2162,7 @@ fn export_margins(
                             false,
                         ),
                         text: odf::TextProperties::default(),
+                        ..Default::default()
                     },
                 )
             };
@@ -2162,6 +2178,7 @@ fn export_margins(
                         &attrs,
                         &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
                     ),
+                    ..Default::default()
                 };
                 // A text style without a parent names none.
                 Some(match named {
@@ -2348,6 +2365,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                             &styles.resolve_character(p.id, None, &CharAttrs::default()),
                         )
                     },
+                    ..Default::default()
                 },
             },
             Style::Character(c) => odf::Style {
@@ -2364,6 +2382,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         &c.character,
                         &styles.resolve_character(default, Some(c.id), &CharAttrs::default()),
                     ),
+                    ..Default::default()
                 },
             },
         });
@@ -2388,6 +2407,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             odf::Family::Paragraph => "P",
             odf::Family::Text => "T",
             odf::Family::List => "L",
+            odf::Family::Graphic => "gr",
         };
         let count = automatic.iter().filter(|s| s.family == family).count();
         let name = format!("{prefix}{}", count + 1);
@@ -2501,6 +2521,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                             ..odf::TextProperties::default()
                         }
                     },
+                    ..Default::default()
                 },
             )
         };
@@ -2525,6 +2546,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                             &attrs,
                             &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
                         ),
+                        ..Default::default()
                     },
                 ))
             }
@@ -2586,6 +2608,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .collect(),
             toc: paragraph.attrs().toc_entry.flatten().is_some(),
             spans,
+            frames: Vec::new(),
         });
     }
     // The text of each note, in the note that the body holds (EST-13).
@@ -2610,6 +2633,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                             false,
                         ),
                         text: odf::TextProperties::default(),
+                        ..Default::default()
                     },
                 )
             };
@@ -2629,6 +2653,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                             &attrs,
                             &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
                         ),
+                        ..Default::default()
                     },
                 ))
             });
@@ -2666,6 +2691,15 @@ pub fn export(document: &Document) -> odf::TextDocument {
         automatic.push(own);
         paragraph.style = Some(name);
     }
+    objects::export_objects(
+        &mut objects::Exporter {
+            document,
+            names: &names,
+            automatic: &mut automatic,
+            pictures: &mut pictures,
+        },
+        &mut out,
+    );
     out.automatic_styles = automatic;
     out.section_styles = section_styles;
     export_margins(document, &names, &mut out);

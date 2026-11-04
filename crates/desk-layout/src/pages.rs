@@ -12,6 +12,8 @@ use desk_model::{
 };
 use desk_text::{Column, FieldValues, Line, ParagraphText, TextSystem};
 
+use crate::objects::{Floating, Piece, Place, PlacedObject, WrapSpace, in_the_way};
+
 /// How much a line may stick out of the bottom of the body and still
 /// count as fitting, to absorb rounding.
 const TOLERANCE: f32 = 0.01;
@@ -143,6 +145,8 @@ pub struct Page {
     /// The left end of the short rule above the notes on the page, when
     /// there is one (EST-13).
     pub note_rule: Option<(f32, f32)>,
+    /// The floating objects on the page, from back to front (OBJ-01).
+    pub objects: Vec<PlacedObject>,
 }
 
 /// The length of the rule above notes, as Pages draws it.
@@ -260,6 +264,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     place_margins(document, &mut layout, system);
+    crate::objects::place_object_text(document, &mut layout, system);
     layout.field_values = values;
     layout.notes = plan.note_ids();
     layout
@@ -391,6 +396,8 @@ pub(crate) struct MarginRoom {
     /// bottom of a header, and from the bottom of the text of a footer to
     /// its top, by the index of its place.
     heights: HashMap<(Option<desk_model::NodeId>, usize), f32>,
+    /// The floating objects, with the texts they move with.
+    pub floats: std::sync::Arc<Vec<Floating>>,
 }
 
 impl MarginRoom {
@@ -439,6 +446,7 @@ impl MarginRoom {
             setup,
             keys,
             heights,
+            floats: crate::objects::floating(document),
         }
     }
 
@@ -449,6 +457,7 @@ impl MarginRoom {
             setup: self.setup,
             keys,
             heights: self.heights.clone(),
+            floats: self.floats.clone(),
         }
     }
 
@@ -538,16 +547,6 @@ struct Block {
 }
 
 impl Block {
-    /// The space that the rule above takes, if there is one.
-    fn above(&self) -> f32 {
-        let border = &self.format.border;
-        if border.sides.above() {
-            border.space().to_pt() as f32
-        } else {
-            0.0
-        }
-    }
-
     /// The space that the rule below takes, if there is one.
     fn below(&self) -> f32 {
         let border = &self.format.border;
@@ -563,15 +562,24 @@ impl Block {
         if a >= b {
             return 0.0;
         }
-        let last = &self.lines[b - 1];
-        last.top + last.height - self.lines[a].top
+        self.height_from(a, b, self.lines[a].top)
     }
 
-    /// How many lines from `a` on fit in `room`: as in Pages, a line fits
-    /// when its text does, without the leading below it.
-    fn fitting(&self, a: usize, room: f32) -> usize {
+    /// The height of lines `a..b` from `base`, where line `a` would start
+    /// without an object above it.
+    fn height_from(&self, a: usize, b: usize, base: f32) -> f32 {
+        if a >= b {
+            return 0.0;
+        }
+        let last = &self.lines[b - 1];
+        last.top + last.height - base
+    }
+
+    /// How many lines from `a` on fit in `room` below `base`: as in Pages,
+    /// a line fits when its text does, without the leading below it.
+    fn fitting(&self, a: usize, base: f32, room: f32) -> usize {
         (a..self.lines.len())
-            .take_while(|&b| self.lines[b].text_bottom - self.lines[a].top <= room + TOLERANCE)
+            .take_while(|&b| self.lines[b].text_bottom - base <= room + TOLERANCE)
             .count()
     }
 }
@@ -688,6 +696,7 @@ pub(crate) fn paginate_with_footnotes(
         sum,
         footnotes: footnotes.clone(),
         blocks: HashMap::new(),
+        floats: room.map(|r| r.floats.clone()).unwrap_or_default(),
         pages: Vec::new(),
         sections: Vec::new(),
         section_margins: Vec::new(),
@@ -867,7 +876,9 @@ struct Paginator<'a> {
     sum: bool,
     footnotes: Option<Rc<Footnotes>>,
     /// The paragraphs laid out so far, by index and column width.
-    blocks: HashMap<(usize, u32), Block>,
+    blocks: HashMap<(usize, u32), Rc<Block>>,
+    /// The floating objects.
+    floats: std::sync::Arc<Vec<Floating>>,
     pages: Vec<Page>,
     /// The sections that have pages, in order.
     sections: Vec<Section>,
@@ -912,20 +923,42 @@ impl Paginator<'_> {
     }
 
     /// The paragraph laid out in a column of a width.
-    fn block(&mut self, index: usize, width: f32) -> &Block {
+    fn block(&mut self, index: usize, width: f32) -> Rc<Block> {
         let key = (index, width.to_bits());
         if !self.blocks.contains_key(&key) {
             let text = &self.texts[index];
             let lines = self.system.layout(text, &Column::new(width), 0.0).lines;
             self.blocks.insert(
                 key,
-                Block {
+                Rc::new(Block {
                     format: text.paragraph().clone(),
                     lines,
-                },
+                }),
             );
         }
-        &self.blocks[&key]
+        self.blocks[&key].clone()
+    }
+
+    /// The paragraph laid out in a column of a width, part by part around
+    /// the objects on the pages it is on.
+    fn wrapped_block(&mut self, index: usize, width: f32, pieces: &[Piece]) -> Rc<Block> {
+        let text = &self.texts[index];
+        let space = WrapSpace { width, pieces };
+        let lines = self.system.layout(text, &space, 0.0).lines;
+        Rc::new(Block {
+            format: text.paragraph().clone(),
+            lines,
+        })
+    }
+
+    /// The objects that move with paragraph `paragraph`, placed with the
+    /// top of the paragraph at `top` on the page.
+    fn anchored(&self, paragraph: usize, top: f32) -> Vec<PlacedObject> {
+        self.floats
+            .iter()
+            .filter(|f| f.anchor == Place::Paragraph(paragraph))
+            .map(|f| PlacedObject::new(&f.object, Some(paragraph), top))
+            .collect()
     }
 
     /// Adds a page of the last section, numbered after the page before or
@@ -964,6 +997,12 @@ impl Paginator<'_> {
             }
             _ => None,
         };
+        let objects = self
+            .floats
+            .iter()
+            .filter(|f| f.anchor == Place::Page(index))
+            .map(|f| PlacedObject::new(&f.object, None, 0.0))
+            .collect();
         self.pages.push(Page {
             number,
             section: self.sections.len().saturating_sub(1),
@@ -972,6 +1011,7 @@ impl Paginator<'_> {
             margins: self.margins(index),
             body,
             carried_note,
+            objects,
             ..Page::default()
         });
         index
@@ -1119,6 +1159,8 @@ impl Paginator<'_> {
                 let page = &mut self.pages[saved.page];
                 page.lines.truncate(line_count);
                 page.blocks.retain(|b| b.paragraph < first);
+                page.objects
+                    .retain(|o| o.paragraph.is_none_or(|p| p < first));
                 page.footnotes.retain(|&(p, _)| p < first);
                 if page.split_note.is_some_and(|(p, _, _)| p >= first) {
                     page.split_note = None;
@@ -1128,6 +1170,30 @@ impl Paginator<'_> {
                 continue;
             }
             i += 1;
+        }
+        // Objects on pages past the last go on the last.
+        let count = self.pages.len();
+        let past: Vec<PlacedObject> = self
+            .floats
+            .iter()
+            .filter(|f| matches!(f.anchor, Place::Page(p) if p >= count))
+            .map(|f| PlacedObject::new(&f.object, None, 0.0))
+            .collect();
+        if let Some(last) = self.pages.last_mut() {
+            last.objects.extend(past);
+        }
+        // From back to front, as the document keeps them.
+        if !self.floats.is_empty() {
+            let order: HashMap<desk_model::NodeId, usize> = self
+                .floats
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.object.id, i))
+                .collect();
+            for page in &mut self.pages {
+                page.objects
+                    .sort_by_key(|o| order.get(&o.object.id).copied());
+            }
         }
         DocumentLayout {
             setup: self.setup,
@@ -1146,6 +1212,10 @@ impl Paginator<'_> {
         let footnotes = self.footnotes.clone();
         let mut start = (cursor.page, cursor.column);
         let mut a = 0;
+        // The parts of the paragraph so far, around the objects of their
+        // pages, and the lines as last laid out.
+        let mut pieces: Vec<Piece> = Vec::new();
+        let mut laid: Option<Rc<Block>> = None;
         loop {
             // The body of the page, which a tall header or footer makes
             // smaller.
@@ -1158,13 +1228,8 @@ impl Paginator<'_> {
                 .map_or(0.0, |n| n.reserved(&self.pages[cursor.page]));
             let split_before = self.pages[cursor.page].split_note.is_some();
             let carries = self.pages[cursor.page].carried_note.is_some();
-            let block = self.block(i, width);
-            let n = block.lines.len();
-            if a >= n {
-                break;
-            }
-            let format = &block.format;
             let at_top = cursor.empty;
+            let format = self.texts[i].paragraph();
             let before = format.space_before.to_pt() as f32;
             let collapsed = if a > 0 || at_top {
                 0.0
@@ -1173,13 +1238,58 @@ impl Paginator<'_> {
             } else {
                 cursor.after.max(before)
             };
-            let above = if a == 0 { block.above() } else { 0.0 };
+            let above = if a == 0 && format.border.sides.above() {
+                format.border.space().to_pt() as f32
+            } else {
+                0.0
+            };
             let space = collapsed + above;
+            // Where line `a` would start, and where the top of the
+            // paragraph is on the page for it to start there.
+            if laid.as_ref().is_some_and(|b| a >= b.lines.len()) {
+                break;
+            }
+            let base = match (&laid, a) {
+                (Some(block), a) if a > 0 => block.lines[a].top,
+                _ => 0.0,
+            };
+            let origin = top + cursor.y + space - base;
+            // The objects that move with the paragraph go where it starts.
+            let anchored = if a == 0 {
+                self.anchored(i, origin)
+            } else {
+                Vec::new()
+            };
+            let exclusions: Vec<_> = self.pages[cursor.page]
+                .objects
+                .iter()
+                .chain(&anchored)
+                .filter_map(PlacedObject::exclusion)
+                .filter(|e| in_the_way(e, x, x + width, top + cursor.y))
+                .collect();
+            pieces.retain(|p| p.from < base);
+            pieces.push(Piece {
+                from: if a == 0 { f32::NEG_INFINITY } else { base },
+                left: x,
+                origin,
+                exclusions,
+            });
+            let block = if pieces.iter().all(|p| p.exclusions.is_empty()) {
+                self.block(i, width)
+            } else {
+                self.wrapped_block(i, width, &pieces)
+            };
+            laid = Some(block.clone());
+            let n = block.lines.len();
+            if a >= n {
+                break;
+            }
+            let format = &block.format;
             let room = body - cursor.y - space;
             let rest = n - a;
             let mut split: Option<(usize, usize, usize)> = None;
             let mut k = match &footnotes {
-                None => block.fitting(a, room),
+                None => block.fitting(a, base, room),
                 Some(notes) => {
                     // Each line takes the room of its notes too, or of
                     // the first lines of its last note, whose rest goes
@@ -1195,7 +1305,7 @@ impl Paginator<'_> {
                             let line = &block.lines[b];
                             let first = reserved == 0.0 && taken == 0.0;
                             let cost = notes.cost(i, line, first);
-                            let height = line.text_bottom - block.lines[a].top;
+                            let height = line.text_bottom - base;
                             if split_before && cost > 0.0 {
                                 return false;
                             }
@@ -1252,6 +1362,10 @@ impl Paginator<'_> {
                 }
             }
             if k == 0 {
+                if a == 0 {
+                    pieces.clear();
+                    laid = None;
+                }
                 *cursor = self.next_column(*cursor);
                 continue;
             }
@@ -1259,7 +1373,7 @@ impl Paginator<'_> {
             if a == 0 {
                 start = (cursor.page, cursor.column);
             }
-            let dy = top + cursor.y + space - block.lines[a].top;
+            let dy = origin;
             let lines: Vec<PlacedLine> = block.lines[a..a + k]
                 .iter()
                 .enumerate()
@@ -1272,7 +1386,7 @@ impl Paginator<'_> {
                 .collect();
             let last = a + k == n;
             let below = if last { block.below() } else { 0.0 };
-            let height = block.height(a, a + k);
+            let height = block.height_from(a, a + k, base);
             let placed = PlacedBlock {
                 paragraph: i,
                 top: top + cursor.y + collapsed,
@@ -1303,6 +1417,7 @@ impl Paginator<'_> {
                 }
             }
             page.lines.extend(lines);
+            page.objects.extend(anchored);
             if placed.is_visible() {
                 page.blocks.push(placed);
             }

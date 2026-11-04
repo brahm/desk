@@ -306,7 +306,28 @@ impl NotePlan {
                 key
             })
             .collect();
-        let room = room.with_keys(keys);
+        let mut room = room.with_keys(keys);
+        // The objects move with the paragraphs of the body where they are
+        // in the flow.
+        let flow_index: HashMap<usize, usize> = sources
+            .iter()
+            .enumerate()
+            .filter_map(|(j, source)| source.as_ref().ok().map(|&p| (p, j)))
+            .collect();
+        room.floats = Arc::new(
+            room.floats
+                .iter()
+                .map(|f| crate::objects::Floating {
+                    anchor: match f.anchor {
+                        crate::objects::Place::Paragraph(p) => flow_index
+                            .get(&p)
+                            .map_or(f.anchor, |&j| crate::objects::Place::Paragraph(j)),
+                        page => page,
+                    },
+                    ..f.clone()
+                })
+                .collect(),
+        );
         let mut layout = paginate_with_footnotes(setup, &flow, system, sum, None, Some(&room));
         for page in &mut layout.pages {
             let lines = std::mem::take(&mut page.lines);
@@ -324,6 +345,11 @@ impl NotePlan {
                         page.note_lines.push(line);
                         page.note_parts.push(part);
                     }
+                }
+            }
+            for object in &mut page.objects {
+                if let Some(Ok(paragraph)) = object.paragraph.map(|p| sources[p]) {
+                    object.paragraph = Some(paragraph);
                 }
             }
             page.blocks

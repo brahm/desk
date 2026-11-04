@@ -8,8 +8,9 @@
 //! Desk Tables.
 //!
 //! For now it lays out the body of a word processing document on pages:
-//! margins, the space between paragraphs, page breaks and the rules that
-//! keep lines and paragraphs together.
+//! margins, the space between paragraphs, page breaks, the rules that
+//! keep lines and paragraphs together, and the floating objects that the
+//! text goes around.
 //!
 //! ```no_run
 //! use desk_layout::paginate;
@@ -22,7 +23,10 @@
 //! ```
 
 mod notes;
+mod objects;
 mod pages;
+
+pub use objects::{PlacedObject, place_object_text};
 
 pub use pages::{
     DocumentLayout, NOTE_RULE_LENGTH, NOTE_RULE_WIDTH, Page, PlacedBlock, PlacedLine, margin_lines,

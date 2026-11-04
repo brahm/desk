@@ -767,3 +767,108 @@ fn est_13_a_footnote_that_fits_a_page_moves_whole_with_its_mark() {
     assert_eq!(second.note_lines.len(), note_lines);
     assert!(second.carried_note.is_none() && first.split_note.is_none());
 }
+
+/// A document of one long paragraph on pages of [`setup`], with an object.
+fn with_object(wrap: desk_model::Wrap, anchor: Option<usize>) -> Document {
+    use desk_model::{Editor, Frame, Object, ObjectKind, Shape};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "First paragraph.")?;
+            let at = edit.split_paragraph(at)?;
+            let second = at.paragraph;
+            edit.insert_text(at, &"words of text that wrap ".repeat(40))?;
+            edit.set_page_setup(setup(400.0))?;
+            let mut object = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(100.0, 60.0, 70.0, 60.0),
+            );
+            object.wrap = wrap;
+            object.wrap_margin = Length::ZERO;
+            if anchor.is_some() {
+                object.anchor = desk_model::Anchor::Paragraph(second);
+                object.frame.y = Length::from_points(10);
+            }
+            edit.add_object(object)
+        })
+        .unwrap();
+    editor.document().clone()
+}
+
+/// The left and right of the text of each line on the first page beside
+/// heights from `y0` to `y1`.
+fn beside(layout: &DocumentLayout, y0: f32, y1: f32) -> Vec<(f32, f32)> {
+    layout.pages[0]
+        .lines
+        .iter()
+        .filter(|l| l.bottom() > y0 && l.top() < y1)
+        .map(|l| {
+            let x = l.origin.0 + l.line.x;
+            (x, x + l.line.advance)
+        })
+        .collect()
+}
+
+#[test]
+fn obj_17_text_goes_around_a_floating_object() {
+    let mut system = TextSystem::new();
+    let document = with_object(desk_model::Wrap::Both, None);
+    let layout = paginate(&document, &mut system);
+    assert_eq!(layout.pages[0].objects.len(), 1);
+    let lines = beside(&layout, 60.0, 120.0);
+    assert!(!lines.is_empty());
+    // Every piece beside the object keeps out of it, and there are pieces
+    // on both of its sides.
+    assert!(
+        lines.iter().all(|&(a, b)| b <= 100.5 || a >= 169.5),
+        "{lines:?}"
+    );
+    assert!(lines.iter().any(|&(_, b)| b <= 100.5));
+    assert!(lines.iter().any(|&(a, _)| a >= 169.5));
+
+    // Only on its right: nothing on the left.
+    let layout = paginate(&with_object(desk_model::Wrap::Right, None), &mut system);
+    let lines = beside(&layout, 60.0, 120.0);
+    assert!(
+        !lines.is_empty() && lines.iter().all(|&(a, _)| a >= 169.5),
+        "{lines:?}"
+    );
+
+    // Above and below: no line beside it.
+    let layout = paginate(
+        &with_object(desk_model::Wrap::AboveAndBelow, None),
+        &mut system,
+    );
+    assert!(beside(&layout, 60.5, 119.5).is_empty());
+
+    // Through it: the lines as without it.
+    let mut document = with_object(desk_model::Wrap::Through, None);
+    let through = paginate(&document, &mut system).pages[0].lines.len();
+    let id = document.objects().iter().next().unwrap().id;
+    document
+        .apply(desk_model::Op::RemoveObject { object: id })
+        .unwrap();
+    assert_eq!(
+        through,
+        paginate(&document, &mut system).pages[0].lines.len()
+    );
+}
+
+#[test]
+fn obj_01_objects_move_with_their_paragraph() {
+    let mut system = TextSystem::new();
+    let layout = paginate(&with_object(desk_model::Wrap::Both, Some(1)), &mut system);
+    let page = &layout.pages[0];
+    let object = &page.objects[0];
+    assert_eq!(object.paragraph, Some(1));
+    let first = page.lines.iter().find(|l| l.paragraph == 1).unwrap();
+    assert!((object.y - (first.top() + 10.0)).abs() < 0.01);
+    // Its own paragraph goes around it.
+    let lines = beside(&layout, object.y, object.y + object.height);
+    assert!(
+        lines.iter().all(|&(a, b)| b <= 100.5 || a >= 169.5),
+        "{lines:?}"
+    );
+}
