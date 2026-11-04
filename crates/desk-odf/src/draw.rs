@@ -19,6 +19,15 @@ pub struct GraphicProperties {
     /// `draw:fill-gradient-name`: the gradient that fills it, when
     /// `draw:fill` is `gradient`.
     pub fill_gradient_name: Option<String>,
+    /// `draw:fill-image-name`: the picture that fills it, when
+    /// `draw:fill` is `bitmap`.
+    pub fill_image_name: Option<String>,
+    /// `style:repeat`: how the picture fills, `no-repeat`, `repeat` or
+    /// `stretch`.
+    pub repeat: Option<String>,
+    /// `desk:fill-image-mode`: `scale-to-fill` or `scale-to-fit`, the
+    /// ways of Pages to size a picture that ODF has no value for.
+    pub fill_image_mode: Option<String>,
     /// `draw:stroke`: `none`, `solid` or `dash`.
     pub stroke: Option<String>,
     /// `svg:stroke-color`.
@@ -101,6 +110,36 @@ pub struct Gradient {
     /// `draw:border`, in percent: how much of the way at each end has the
     /// color of that end.
     pub border: Option<f64>,
+}
+
+/// A picture that graphic styles fill with (`draw:fill-image`, in
+/// `office:styles`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FillImage {
+    /// `draw:name`.
+    pub name: String,
+    /// `xlink:href`: the path of the picture in the package.
+    pub href: String,
+}
+
+pub(crate) fn fill_image(e: &Element) -> Option<FillImage> {
+    if !e.name.is(DRAW, "fill-image") {
+        return None;
+    }
+    Some(FillImage {
+        name: e.attr(DRAW, "name")?.to_owned(),
+        href: e.attr(XLINK, "href")?.to_owned(),
+    })
+}
+
+pub(crate) fn write_fill_image(w: &mut Writer, image: &FillImage) {
+    w.start("draw:fill-image")
+        .attr("draw:name", &image.name)
+        .attr("xlink:href", &image.href)
+        .attr("xlink:type", "simple")
+        .attr("xlink:show", "embed")
+        .attr("xlink:actuate", "onLoad")
+        .end();
 }
 
 /// A shape drawn at an end of a line (`draw:marker`, in
@@ -334,6 +373,9 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         fill: text(DRAW, "fill"),
         fill_color: e.attr(DRAW, "fill-color").and_then(Color::parse),
         fill_gradient_name: text(DRAW, "fill-gradient-name"),
+        fill_image_name: text(DRAW, "fill-image-name"),
+        repeat: text(STYLE, "repeat"),
+        fill_image_mode: text(DESK, "fill-image-mode"),
         stroke: text(DRAW, "stroke"),
         stroke_color: e.attr(SVG, "stroke-color").and_then(Color::parse),
         stroke_width: length(SVG, "stroke-width"),
@@ -381,6 +423,9 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
         w.attr("draw:fill-color", &color.to_string());
     }
     w.attr_opt("draw:fill-gradient-name", g.fill_gradient_name.as_deref());
+    w.attr_opt("draw:fill-image-name", g.fill_image_name.as_deref());
+    w.attr_opt("style:repeat", g.repeat.as_deref());
+    w.attr_opt("desk:fill-image-mode", g.fill_image_mode.as_deref());
     w.attr_opt("draw:stroke", g.stroke.as_deref());
     if let Some(color) = g.stroke_color {
         w.attr("svg:stroke-color", &color.to_string());

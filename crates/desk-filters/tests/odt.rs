@@ -1793,6 +1793,16 @@ fn with_objects() -> Document {
             });
             line.wrap = Wrap::Through;
             edit.add_object(line)?;
+            let mut tiled = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(200.0, 20.0, 60.0, 40.0),
+            );
+            tiled.style.fill = Some(Fill::Image {
+                picture: Picture::from_png(pixel_png()).unwrap(),
+                mode: desk_model::ImageFill::ScaleToFit,
+            });
+            edit.add_object(tiled)?;
             let bold = CharAttrs {
                 weight: Some(FontWeight::BOLD),
                 ..CharAttrs::default()
@@ -1938,7 +1948,7 @@ fn obj_01_obj_08_obj_13_objects_are_kept_in_odt() {
     let read = read_odt(&bytes).unwrap();
     assert_eq!(objects(&read), objects(&document));
     // The formatting of the text of a text box is kept.
-    let desk_model::ObjectKind::TextBox(text) = &read.objects().iter().nth(3).unwrap().kind else {
+    let desk_model::ObjectKind::TextBox(text) = &read.objects().iter().nth(4).unwrap().kind else {
         panic!("a text box");
     };
     let paragraph = &text.paragraphs[0];

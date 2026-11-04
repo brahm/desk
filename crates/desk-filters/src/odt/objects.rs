@@ -14,9 +14,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use desk_model::{
-    Anchor, Document, FIELD_CHARACTER, Field, Fill, Frame, Length, MAX_TEXT_BOX_COLUMNS, NodeId,
-    Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Shape, Stroke, TextBox,
-    VerticalAlignment, Wrap,
+    Anchor, Document, FIELD_CHARACTER, Field, Fill, Frame, ImageFill, Length, MAX_TEXT_BOX_COLUMNS,
+    NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Shape, Stroke,
+    TextBox, VerticalAlignment, Wrap,
 };
 use desk_odf as odf;
 
@@ -61,6 +61,9 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             stroke_width,
             stroke_style,
             fill_gradient_name,
+            fill_image_name,
+            repeat,
+            fill_image_mode,
             marker_start,
             marker_start_width,
             marker_end,
@@ -482,7 +485,30 @@ fn import_one(
         .as_deref()
         .filter(|_| g.fill.as_deref() == Some("gradient"))
         .and_then(|name| source.gradients.iter().find(|d| d.name == name));
-    if let Some(gradient) = gradient {
+    let image = g
+        .fill_image_name
+        .as_deref()
+        .filter(|_| g.fill.as_deref() == Some("bitmap"))
+        .and_then(|name| source.fill_images.iter().find(|i| i.name == name))
+        .and_then(|image| {
+            let path = image.href.strip_prefix("./").unwrap_or(&image.href);
+            source
+                .pictures
+                .iter()
+                .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
+                .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
+        });
+    if let Some(picture) = image {
+        let mode = match (g.fill_image_mode.as_deref(), g.repeat.as_deref()) {
+            (Some("scale-to-fill"), _) => ImageFill::ScaleToFill,
+            (Some("scale-to-fit"), _) => ImageFill::ScaleToFit,
+            (_, Some("no-repeat")) => ImageFill::OriginalSize,
+            (_, Some("stretch")) => ImageFill::Stretch,
+            // ODF repeats a picture unless it says otherwise.
+            _ => ImageFill::Tile,
+        };
+        style.fill = Some(Fill::Image { picture, mode });
+    } else if let Some(gradient) = gradient {
         style.fill = Some(model_gradient(gradient));
     } else if filled && let Some(color) = g.fill_color {
         style.fill = Some(Fill::Color(rgba(color)));
@@ -702,6 +728,8 @@ pub(super) struct Exporter<'a> {
     pub gradients: Vec<odf::Gradient>,
     /// The markers at the ends of their lines.
     pub markers: Vec<odf::Marker>,
+    /// The pictures that the objects fill with.
+    pub fill_images: Vec<odf::FillImage>,
 }
 
 impl Exporter<'_> {
@@ -753,6 +781,20 @@ impl Exporter<'_> {
         self.gradients.push(odf::Gradient {
             name: name.clone(),
             ..gradient
+        });
+        name
+    }
+
+    /// The name of the fill image of a picture of the package, added when
+    /// there is none yet.
+    fn fill_image(&mut self, href: String) -> String {
+        if let Some(existing) = self.fill_images.iter().find(|i| i.href == href) {
+            return existing.name.clone();
+        }
+        let name = format!("Image_{}", self.fill_images.len() + 1);
+        self.fill_images.push(odf::FillImage {
+            name: name.clone(),
+            href,
         });
         name
     }
@@ -842,12 +884,26 @@ impl Exporter<'_> {
         let (w, h) = (frame.width.to_pt(), frame.height.to_pt());
         let mut g = odf::GraphicProperties::default();
         let style = &object.style;
-        match style.fill {
-            Some(Fill::Color(color)) => {
+        match &style.fill {
+            Some(Fill::Image { picture, mode }) => {
+                g.fill = Some("bitmap".into());
+                let href = self.picture(picture);
+                g.fill_image_name = Some(self.fill_image(href));
+                let (repeat, extension) = match mode {
+                    ImageFill::ScaleToFill => ("stretch", Some("scale-to-fill")),
+                    ImageFill::ScaleToFit => ("stretch", Some("scale-to-fit")),
+                    ImageFill::Stretch => ("stretch", None),
+                    ImageFill::OriginalSize => ("no-repeat", None),
+                    ImageFill::Tile => ("repeat", None),
+                };
+                g.repeat = Some(repeat.into());
+                g.fill_image_mode = extension.map(Into::into);
+            }
+            &Some(Fill::Color(color)) => {
                 g.fill = Some("solid".into());
                 g.fill_color = Some(odf_color(color));
             }
-            Some(Fill::Gradient { from, to, angle }) => {
+            &Some(Fill::Gradient { from, to, angle }) => {
                 g.fill = Some("gradient".into());
                 g.fill_color = Some(odf_color(from));
                 g.fill_gradient_name = Some(self.gradient(odf_gradient(from, to, angle)));
@@ -1118,4 +1174,5 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     }
     out.gradients = std::mem::take(&mut exporter.gradients);
     out.markers = std::mem::take(&mut exporter.markers);
+    out.fill_images = std::mem::take(&mut exporter.fill_images);
 }
