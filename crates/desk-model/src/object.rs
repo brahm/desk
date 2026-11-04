@@ -283,6 +283,10 @@ pub enum Anchor {
     /// objects: the frame is measured from the left of the paper and the
     /// top of the first line of the paragraph, on the page it starts on.
     Paragraph(NodeId),
+    /// In the line of the text of the body, as a character, where its
+    /// mark is (see [`crate::Field::ObjectMark`]); the frame gives only its
+    /// size, and the text does not wrap around it (OBJ-01).
+    InText,
 }
 
 /// How the text of the body goes around an object (OBJ-17).

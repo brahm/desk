@@ -1737,12 +1737,14 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
             path: matches!(display.as_str(), "full" | "path"),
             extension: matches!(display.as_str(), "full" | "name-and-extension"),
         },
-        // Notes and page references are read on their own.
-        odf::Field::Note(_) | odf::Field::PageOf { .. } => Field::FileName {
-            shown: shown.into(),
-            path: false,
-            extension: true,
-        },
+        // Notes, page references and objects are read on their own.
+        odf::Field::Note(_) | odf::Field::PageOf { .. } | odf::Field::Object(_) => {
+            Field::FileName {
+                shown: shown.into(),
+                path: false,
+                extension: true,
+            }
+        }
     }
 }
 
@@ -1791,8 +1793,9 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
                 shown.to_string(),
             )
         }
-        // The body exports notes and page references on their own.
-        Field::NoteMark { .. } | Field::PageOf { .. } => (
+        // The body exports notes, page references and objects on their
+        // own.
+        Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => (
             odf::Field::FileName {
                 display: "name".to_owned(),
             },
@@ -1883,6 +1886,18 @@ fn import_paragraph(
         }
         if let Some(bookmark) = &span.bookmark {
             run_attrs.bookmark = Some(Some(bookmark.as_str().into()));
+        }
+        if let Some(odf::Field::Object(_)) = &span.field {
+            // The object itself comes with the other objects, by the
+            // identifier of its mark.
+            let object = document.new_id();
+            run_attrs.field = Some(Some(Field::ObjectMark { object }));
+            runs.push(Run::with_attrs(
+                &FIELD_CHARACTER.to_string(),
+                run_style,
+                run_attrs,
+            ));
+            continue;
         }
         if let Some(odf::Field::PageOf { name }) = &span.field {
             // A reference to a bookmark that is not at a paragraph of the
@@ -2035,6 +2050,18 @@ fn export_spans(
                         style: name.clone(),
                         text: "1".to_owned(),
                         field: name_of.map(|name| odf::Field::PageOf { name: name.clone() }),
+                        ..odf::Span::default()
+                    });
+                }
+            }
+            Some(Some(Field::ObjectMark { object })) => {
+                // In the body, where the object is written in its place;
+                // elsewhere, Desk has no objects in the text.
+                if notes.is_some() {
+                    let mut placeholder = odf::DrawObject::new(odf::DrawKind::Group(Vec::new()));
+                    placeholder.name = Some(objects::inline_placeholder(*object));
+                    spans.push(odf::Span {
+                        field: Some(odf::Field::Object(Box::new(placeholder))),
                         ..odf::Span::default()
                     });
                 }

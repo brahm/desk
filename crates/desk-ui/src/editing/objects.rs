@@ -605,6 +605,66 @@ impl TextEditor {
         }
     }
 
+    /// Puts the selected objects in the line of the text, or takes them
+    /// out of it to float where they are drawn (OBJ-01). An object goes in
+    /// the text where its top left corner is, or at the cursor when no
+    /// text is there.
+    pub fn set_objects_inline(&self, inline: bool) {
+        let placed: Vec<(NodeId, usize, f32, f32, Anchor)> = {
+            let state = self.state.borrow();
+            self.selected_objects()
+                .into_iter()
+                .filter_map(|id| {
+                    find(&state.layout, id).map(|(page, o)| (id, page, o.x, o.y, o.object.anchor))
+                })
+                .collect()
+        };
+        let mut targets = Vec::new();
+        {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let cursor = super::at_spot(document, state.selection.ordered().0).ok();
+            for &(id, page, x, y, anchor) in &placed {
+                if inline == (anchor == Anchor::InText) {
+                    continue;
+                }
+                let at = if inline {
+                    crate::text_nav::hit(&state.layout, page, f64::from(x), f64::from(y))
+                        .and_then(|spot| super::at_spot(document, spot).ok())
+                        .or(cursor)
+                } else {
+                    None
+                };
+                targets.push((id, page, x, y, at));
+            }
+        }
+        if targets.is_empty() {
+            return;
+        }
+        let name = if inline { "Inline" } else { "Floating" };
+        self.arrange_objects(name, |edit, _| {
+            for (id, page, x, y, at) in targets {
+                match at {
+                    Some(at) => edit.put_object_in_text(id, at)?,
+                    None if !inline => {
+                        let Some(object) = edit.document().objects().get(id) else {
+                            continue;
+                        };
+                        let f = object.frame;
+                        let frame = Frame {
+                            x: Length::from_pt(f64::from(x)),
+                            y: Length::from_pt(f64::from(y)),
+                            ..f
+                        };
+                        edit.float_object(id, Anchor::Page(page as u32), frame)?;
+                    }
+                    None => {}
+                }
+            }
+            Ok(None)
+        });
+    }
+
     /// Moves the selected objects in front of others or behind them.
     pub fn layer_objects(&self, layer: Layer) {
         let name = match layer {
@@ -1168,6 +1228,39 @@ impl TextEditor {
             DragKind::Resize(_) => "Resize",
             DragKind::Rotate => "Rotate",
         };
+        // An object in the text moves to the place in the text where it
+        // is dropped (OBJ-01).
+        let dropped = match (&drag.kind, &drag.objects[..], &drag.preview[..]) {
+            (DragKind::Move, [(_, original)], [placement])
+                if original.object.anchor == Anchor::InText =>
+            {
+                let x = drag.start.0 + placement.x - original.x;
+                let y = drag.start.1 + placement.y - original.y;
+                let state = self.state.borrow();
+                crate::text_nav::hit(&state.layout, placement.page, f64::from(x), f64::from(y))
+                    .and_then(|spot| super::at_spot(state.editor.document(), spot).ok())
+                    .map(|at| (original.object.id, at))
+            }
+            _ => None,
+        };
+        if let Some((id, at)) = dropped {
+            self.arrange_objects(name, |edit, _| {
+                edit.put_object_in_text(id, at)?;
+                Ok(None)
+            });
+            self.show_objects();
+            return;
+        }
+        let changed: Vec<Object> = changed
+            .into_iter()
+            .map(|mut object| {
+                // Only the size of an object in the text is its own.
+                if drag.kind == DragKind::Move && object.anchor == Anchor::InText {
+                    object = self.object_by_id(object.id);
+                }
+                object
+            })
+            .collect();
         self.arrange_objects(name, |edit, _| {
             for object in changed {
                 edit.replace_object(object)?;

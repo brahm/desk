@@ -1065,6 +1065,10 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
 
 fn write_field(w: &mut Writer, field: &Field, shown: &str) {
     match field {
+        Field::Object(object) => {
+            crate::draw::write_draw_object(w, object, &write_paragraph);
+            return;
+        }
         Field::PageNumber { num_format } => {
             w.start("text:page-number")
                 .attr("text:select-page", "current");

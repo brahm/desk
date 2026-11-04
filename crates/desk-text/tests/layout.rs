@@ -843,3 +843,46 @@ fn est_22_a_field_after_a_right_tab_moves_with_it() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn obj_01_an_object_in_the_text_takes_its_room_in_the_line() {
+    let mut system = TextSystem::new();
+    let object = desk_model::NodeId::new(99).unwrap();
+    let mark = CharFormat {
+        field: Some(desk_model::Field::ObjectMark { object }),
+        ..sans()
+    };
+    let sizes = std::collections::HashMap::from([(
+        object,
+        (Length::from_points(50), Length::from_points(40)),
+    )]);
+    let lay_with = |system: &mut TextSystem, values: desk_text::FieldValues| {
+        let text = ParagraphText::from_runs_in(
+            &TextSettings::default(),
+            values,
+            ParaFormat::default(),
+            sans(),
+            [("ab", sans()), ("\u{fffc}", mark.clone()), ("cd", sans())],
+        );
+        system.layout(&text, &Column::new(200.0), 0.0)
+    };
+    let plain = lay_with(&mut system, desk_text::FieldValues::default());
+    let layout = lay_with(
+        &mut system,
+        desk_text::FieldValues {
+            objects: Some(Arc::new(sizes)),
+            ..desk_text::FieldValues::default()
+        },
+    );
+    let (line, without) = (&layout.lines[0], &plain.lines[0]);
+    assert_eq!(layout.lines.len(), 1);
+    // As wide as the object, between "ab" and "cd".
+    let before = line.caret_x(2);
+    let after = line.caret_x(2 + '\u{fffc}'.len_utf8());
+    assert!((after - before - 50.0).abs() < 0.1, "{before} {after}");
+    assert!((line.advance - without.advance - 50.0).abs() < 0.1);
+    // As tall: the object stands on the baseline.
+    assert!((line.baseline - line.top - 40.0).abs() < 0.01, "{line:?}");
+    let under = without.height - (without.baseline - without.top);
+    assert!((line.height - 40.0 - under).abs() < 0.01, "{}", line.height);
+}

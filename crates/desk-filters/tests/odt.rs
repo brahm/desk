@@ -1871,6 +1871,7 @@ fn objects(document: &Document) -> Vec<String> {
         let anchor = match o.anchor {
             desk_model::Anchor::Paragraph(id) => format!("paragraph {:?}", index(id)),
             desk_model::Anchor::Page(page) => format!("page {page}"),
+            desk_model::Anchor::InText => "in the text".to_owned(),
         };
         let kind = match &o.kind {
             desk_model::ObjectKind::TextBox(t) => format!(
@@ -1997,4 +1998,93 @@ fn obj_08_shapes_of_other_programs_are_read() {
     assert!((center_x - (margin + 1.5 * cm)).abs() < 0.01, "{center_x}");
     assert!((center_y - 2.0 * cm).abs() < 0.01, "{center_y}");
     let _ = export(&document);
+}
+
+#[test]
+fn obj_01_objects_in_the_text_are_kept_in_odt() {
+    use desk_model::{FIELD_CHARACTER, Frame, Object, Picture, Position, Shape};
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let (image, oval) = editor
+        .edit("Inline", |edit| {
+            let at = edit.insert_text(start, "ab cd")?;
+            let image = Object::new(
+                edit.new_id(),
+                desk_model::ObjectKind::Image(Picture::from_png(pixel_png()).unwrap()),
+                Frame::from_pt(0.0, 0.0, 40.0, 30.0),
+            );
+            let oval = Object::new(
+                edit.new_id(),
+                Shape::Ellipse.into(),
+                Frame::from_pt(0.0, 0.0, 20.0, 10.0),
+            );
+            let (i, o) = (image.id, oval.id);
+            edit.insert_object_in_text(at, oval)?;
+            edit.insert_object_in_text(Position::new(at.paragraph, 2), image)?;
+            Ok((i, o))
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let bytes = write_odt(&document).unwrap();
+    keep("obj-inline.odt", &bytes);
+    let exported = export(&document);
+    let inline: Vec<&odf::DrawObject> = exported.body[0]
+        .spans
+        .iter()
+        .filter_map(|s| match &s.field {
+            Some(odf::Field::Object(o)) => Some(o.as_ref()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(inline.len(), 2);
+    assert!(
+        inline
+            .iter()
+            .all(|o| o.anchor.as_deref() == Some("as-char") && o.name.is_none())
+    );
+    assert!(exported.body[0].frames.is_empty());
+    let read = read_odt(&bytes).unwrap();
+    let paragraph = read.body().get(0).unwrap();
+    let mark = FIELD_CHARACTER;
+    assert_eq!(paragraph.text(), format!("ab{mark} cd{mark}"));
+    let marks = read.object_marks();
+    assert_eq!(marks.len(), 2);
+    let mut by_offset: Vec<(usize, &desk_model::Object)> = marks
+        .iter()
+        .map(|(id, at)| (at.offset, read.objects().get(*id).unwrap()))
+        .collect();
+    by_offset.sort_by_key(|(offset, _)| *offset);
+    let original = |id| document.objects().get(id).unwrap();
+    for ((_, read), id) in by_offset.iter().zip([image, oval]) {
+        assert_eq!(read.anchor, desk_model::Anchor::InText);
+        assert_eq!(read.kind, original(id).kind);
+        assert_eq!(read.frame, original(id).frame);
+    }
+}
+
+#[test]
+fn obj_01_objects_in_the_text_of_other_programs_are_read() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+ <office:body><office:text>
+  <text:p>One <text:span><draw:rect text:anchor-type="as-char" svg:width="1in" svg:height="0.5in"/></text:span> two<draw:frame text:anchor-type="as-char" svg:width="1in" svg:height="1in"><draw:image xlink:href="Pictures/missing.png" xmlns:xlink="http://www.w3.org/1999/xlink"/></draw:frame></text:p>
+ </office:text></office:body>
+</office:document-content>"##;
+    let source = odf::read_streams(content, None, None).unwrap();
+    let document = import(&source).unwrap();
+    // The picture that is not in the package is left out, mark and all.
+    assert_eq!(document.objects().len(), 1);
+    let object = document.objects().iter().next().unwrap();
+    assert_eq!(object.anchor, desk_model::Anchor::InText);
+    assert_eq!(object.frame.width, Length::from_points(72));
+    let paragraph = document.body().get(0).unwrap();
+    assert_eq!(
+        paragraph.text(),
+        format!("One {} two", desk_model::FIELD_CHARACTER)
+    );
+    assert_eq!(document.object_mark(object.id).map(|p| p.offset), Some(4));
 }

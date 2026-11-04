@@ -86,7 +86,7 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
             document
                 .page_objects
                 .iter()
-                .chain(document.body.iter().flat_map(|p| &p.frames))
+                .chain(document.body.iter().flat_map(|p| p.objects()))
                 .flat_map(|o| o.hrefs())
                 .map(str::to_owned),
         )

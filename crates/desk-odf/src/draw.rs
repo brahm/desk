@@ -131,12 +131,12 @@ impl DrawObject {
             _ if !self.text.is_empty() => self
                 .text
                 .iter()
-                .flat_map(|p| &p.frames)
+                .flat_map(Paragraph::objects)
                 .flat_map(Self::hrefs)
                 .collect(),
             DrawKind::TextBox { paragraphs, .. } => paragraphs
                 .iter()
-                .flat_map(|p| &p.frames)
+                .flat_map(Paragraph::objects)
                 .flat_map(Self::hrefs)
                 .collect(),
             _ => Vec::new(),

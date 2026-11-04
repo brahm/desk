@@ -197,6 +197,10 @@ pub struct ParagraphLayout {
     pub bottom: f32,
 }
 
+/// The size of the space that stands for an object in the text, small
+/// enough for the width of the space to be nothing beside the object's.
+const OBJECT_FONT_SIZE: f32 = 0.01;
+
 /// The fonts and scratch space for laying out text. Make one and keep it:
 /// loading the system fonts is the slow part.
 pub struct TextSystem {
@@ -324,6 +328,17 @@ impl TextSystem {
             }
             builder.push(StyleProperty::Brush(range.format), range.range.clone());
         }
+        // An object in the text is a tiny space, spaced out to its
+        // width (OBJ-01).
+        for range in &text.ranges {
+            if let Some((width, _)) = text.object_box(range.format) {
+                builder.push(
+                    StyleProperty::FontSize(OBJECT_FONT_SIZE),
+                    range.range.clone(),
+                );
+                builder.push(StyleProperty::LetterSpacing(width), range.range.clone());
+            }
+        }
         // A place where a word may break draws nothing, so tracking adds
         // no space there.
         for (at, _) in text.text().match_indices(SOFT_HYPHEN) {
@@ -378,8 +393,18 @@ impl TextSystem {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                     let run = glyph_run.run();
                     runs.push((run.font().clone(), run.font_size()));
-                    let format = &text.formats()[glyph_run.style().brush as usize];
-                    boxes.push(run_box(format, run.font_size(), run.font_metrics()));
+                    let brush = glyph_run.style().brush;
+                    let format = &text.formats()[brush as usize];
+                    boxes.push(match text.object_box(brush) {
+                        // An object stands on the baseline.
+                        Some((_, height)) => RunBox {
+                            over: height,
+                            under: 0.0,
+                            leading: 0.0,
+                            descent: 0.0,
+                        },
+                        None => run_box(format, run.font_size(), run.font_metrics()),
+                    });
                     for cluster in run.clusters() {
                         clusters.push(Cluster {
                             start: cluster.text_range().start,

@@ -2354,7 +2354,7 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
                 Some("win.field-file-extension"),
             );
         }
-        Field::NoteMark { .. } | Field::PageOf { .. } => {}
+        Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => {}
     }
 }
 

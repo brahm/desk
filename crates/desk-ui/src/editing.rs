@@ -1102,7 +1102,10 @@ impl TextEditor {
         for run in paragraph.runs() {
             let end = offset + run.len();
             if let Some(Some(field)) = &run.attrs.field
-                && !matches!(field, Field::NoteMark { .. } | Field::PageOf { .. })
+                && !matches!(
+                    field,
+                    Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. }
+                )
             {
                 let found = (Spot::new(start.paragraph, offset), field.clone());
                 if offset <= start.offset && start.offset < end {
