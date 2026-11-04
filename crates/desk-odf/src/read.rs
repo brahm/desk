@@ -65,6 +65,10 @@ pub fn read_streams(
                     document.list_styles.push(list);
                 } else if let Some(section) = section_style(element) {
                     document.section_styles.push(section);
+                } else if let Some(gradient) = crate::draw::gradient(element) {
+                    document.gradients.push(gradient);
+                } else if let Some(marker) = crate::draw::marker(element) {
+                    document.markers.push(marker);
                 } else if element.name.is(TEXT, "notes-configuration") {
                     let attr = |ns, name| element.attr(ns, name).map(str::to_owned);
                     document.notes_configuration.push(NotesConfiguration {

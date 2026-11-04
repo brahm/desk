@@ -47,7 +47,7 @@ mod units;
 mod write;
 mod xml;
 
-pub use draw::{DrawKind, DrawObject, GraphicProperties, parse_transform};
+pub use draw::{DrawKind, DrawObject, Gradient, GraphicProperties, Marker, parse_transform};
 pub use error::OdfError;
 pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,

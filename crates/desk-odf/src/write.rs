@@ -96,6 +96,12 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for style in &document.list_styles {
         write_list_style(&mut w, style);
     }
+    for gradient in &document.gradients {
+        crate::draw::write_gradient(&mut w, gradient);
+    }
+    for marker in &document.markers {
+        crate::draw::write_marker(&mut w, marker);
+    }
     for notes in &document.notes_configuration {
         w.start("text:notes-configuration")
             .attr("text:note-class", &notes.class);

@@ -31,5 +31,8 @@ pub const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 /// `config:`, in `settings.xml`.
 pub const CONFIG: &str = "urn:oasis:names:tc:opendocument:xmlns:config:1.0";
 
+/// `loext:`, the extensions of LibreOffice, as the blur of a shadow.
+pub const LOEXT: &str = "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
+
 /// `xlink:`, for the links to pictures in the package.
 pub const XLINK: &str = "http://www.w3.org/1999/xlink";
