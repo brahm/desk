@@ -1077,10 +1077,35 @@ def chosen_picture(work):
             ),
         )
         check("Insert, Choose… asks for an image", True)
-        time.sleep(1)
-        # A path typed in the dialog opens its location entry.
-        type_text(str(photo))
-        time.sleep(0.5)
+
+        def location():
+            # The entry of the dialog that takes a path, once it has the
+            # keyboard.
+            try:
+                return next(
+                    (
+                        n
+                        for n in walk(app)
+                        if n.get_role() == Atspi.Role.TEXT
+                        and n.get_state_set().contains(Atspi.StateType.EDITABLE)
+                        and n.get_state_set().contains(Atspi.StateType.FOCUSED)
+                        and showing(n)
+                    ),
+                    None,
+                )
+            except GLib.GError:
+                return None
+
+        # The dialog takes the keyboard from the display, which has no
+        # window manager to give it.
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Choose an Image", "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+l")
+        entry = wait_for("the location entry of the dialog", location)
+        Atspi.EditableText.set_text_contents(entry, str(photo))
+        wait_for("the path in the dialog", lambda: text_of(entry) == str(photo))
         press("Return")
         time.sleep(1)
 
