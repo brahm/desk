@@ -107,6 +107,12 @@ pub enum ObjectKind {
     Group(Arc<[Object]>),
 }
 
+impl From<Shape> for ObjectKind {
+    fn from(shape: Shape) -> Self {
+        Self::Shape(shape)
+    }
+}
+
 /// The outline of a shape, scaled to its frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]

@@ -438,6 +438,7 @@ def main():
         writer.wait(timeout=10)
     selections_and_colors(work)
     header_on_the_page(work)
+    objects_on_the_page(work)
     print("All UI tests passed.")
 
 
@@ -642,6 +643,92 @@ def header_on_the_page(work):
             lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
         )
         check("F9 shows the page thumbnails (INT-19)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def points(length):
+    """A length of ODF in points."""
+    found = re.fullmatch(r"(-?[0-9.]+)(pt|in|cm|mm)", length)
+    value, unit = float(found.group(1)), found.group(2)
+    return value * {"pt": 1.0, "in": 72.0, "cm": 72 / 2.54, "mm": 72 / 25.4}[unit]
+
+
+def objects_on_the_page(work):
+    """A click selects a shape on the page, which the arrows move and
+    Delete removes, with Undo, and typing leaves the text alone while it
+    is selected (OBJ-03)."""
+    letter = work / "Objects.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    with zipfile.ZipFile(letter) as package:
+        files = {name: package.read(name) for name in package.namelist()}
+    # A large rectangle in the middle of the page, under the middle of the
+    # window.
+    files["content.xml"] = files["content.xml"].replace(
+        b"<office:text>",
+        b'<office:text><draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="120pt" svg:width="600pt" svg:height="400pt"/>',
+        1,
+    )
+    with zipfile.ZipFile(letter, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for name, data in files.items():
+            package.writestr(name, data, zipfile.ZIP_DEFLATED)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+
+    def saved_rect(present=True):
+        try:
+            with zipfile.ZipFile(letter) as package:
+                content = package.read("content.xml").decode()
+        except (zipfile.BadZipFile, KeyError, OSError):
+            return None
+        found = re.search(r"<draw:rect [^>]*>", content)
+        if present:
+            return found.group(0) if found else None
+        return found is None
+
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "Objects.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Objects.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Objects.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        click(
+            int(window["X"]) + int(window["WIDTH"]) // 2,
+            int(window["Y"]) + int(window["HEIGHT"]) // 2,
+        )
+        type_text("zz")
+        time.sleep(0.5)
+        check(
+            "typing leaves the text alone while a shape is selected",
+            text_of(document) == "US Letter, landscape\n",
+        )
+        press("shift+Right", "shift+Down", "ctrl+s")
+        rect = wait_for(
+            "the moved shape in the saved file",
+            lambda: (lambda r: r if r and 'svg:x="96pt"' not in r else None)(saved_rect()),
+        )
+        x = points(re.search(r'svg:x="([^"]+)"', rect).group(1))
+        y = points(re.search(r'svg:y="([^"]+)"', rect).group(1))
+        check("Shift and the arrows move the shape by ten points (OBJ-03)", (round(x), round(y)) == (106, 130))
+        press("Delete", "ctrl+s")
+        wait_for("the file without the shape", lambda: saved_rect(False))
+        check("Delete removes the selected shape", True)
+        press("ctrl+z", "ctrl+s")
+        wait_for("the shape back in the file", saved_rect)
+        check("Undo brings it back", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

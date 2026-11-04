@@ -28,6 +28,10 @@ use crate::view::DocumentView;
 use crate::writing_tools::{self, Lookup};
 use crate::{AppInfo, Opener};
 
+pub(crate) use objects::OBJECT_ACCELS;
+
+mod objects;
+
 /// How far from the top of the screen the pointer brings the header bar
 /// back in full screen, in pixels.
 const REVEAL_EDGE: f64 = 4.0;
@@ -754,7 +758,7 @@ impl DocumentWindow {
         ] {
             self.enable(action, enabled);
         }
-        for action in DOCUMENT_ACTIONS {
+        for action in DOCUMENT_ACTIONS.iter().chain(&objects::OBJECT_ACTIONS) {
             self.enable(action, has_document);
         }
     }
@@ -1667,6 +1671,7 @@ impl DocumentWindow {
         self.window.add_action(&paste_style);
 
         self.add_find_actions();
+        self.add_object_actions();
         self.add_spelling_actions();
 
         for (name, kind) in [
@@ -2403,6 +2408,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
         find.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
         find.append_submenu(Some(&tr("_Insert")), &insert_menu());
+        find.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
         find.append(
             Some(&tr("Special _Characters…")),
             Some("win.special-characters"),
@@ -2476,6 +2482,7 @@ fn insert_menu() -> gio::Menu {
     menu.append_section(None, &fields);
     menu.append_section(None, &notes);
     menu.append_section(None, &structure);
+    menu.append_section(None, &objects::shapes_menu());
     menu
 }
 

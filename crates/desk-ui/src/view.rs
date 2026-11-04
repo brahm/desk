@@ -45,6 +45,36 @@ struct State {
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
+    /// The outlines and handles of the selected objects (OBJ-03).
+    objects: Vec<ObjectMark>,
+    /// The alignment guides that a drag of objects snaps to (OBJ-05).
+    guides: Vec<Guide>,
+}
+
+/// A selected object, drawn over the pages: its outline and its handles,
+/// in points on its page.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ObjectMark {
+    /// The page it is on.
+    pub page: usize,
+    /// The corners of its frame, rotated, in order around it; a line has
+    /// two.
+    pub outline: Vec<(f64, f64)>,
+    /// Where its handles are.
+    pub handles: Vec<(f64, f64)>,
+    /// Whether it is locked, which its handles show.
+    pub locked: bool,
+}
+
+/// An alignment guide, from one point of a page to another.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Guide {
+    /// The page it is on.
+    pub page: usize,
+    /// Where it starts.
+    pub from: (f64, f64),
+    /// Where it ends.
+    pub to: (f64, f64),
 }
 
 /// A line under text that the spelling checker or the proofreader marks.
@@ -102,6 +132,8 @@ impl DocumentView {
             invisibles: Vec::new(),
             invisibles_color: crate::preferences::INVISIBLES_COLOR,
             backdrop: None,
+            objects: Vec::new(),
+            guides: Vec::new(),
             squiggles: Vec::new(),
         }));
         let view = Self {
@@ -161,6 +193,19 @@ impl DocumentView {
             state.selection = selection;
             state.caret = caret;
             state.caret_on = true;
+        }
+        self.area.queue_draw();
+    }
+
+    /// Sets the selected objects and the guides drawn over the pages.
+    pub fn set_object_marks(&self, objects: Vec<ObjectMark>, guides: Vec<Guide>) {
+        {
+            let mut state = self.state.borrow_mut();
+            if state.objects == objects && state.guides == guides {
+                return;
+            }
+            state.objects = objects;
+            state.guides = guides;
         }
         self.area.queue_draw();
     }
@@ -663,10 +708,11 @@ fn draw_marks(
         );
     }
     cr.fill().ok();
+    draw_objects(cr, state, page, rect, scale);
     let Some(caret) = state.caret.filter(|c| c.page == page) else {
         return;
     };
-    if !focused || !state.caret_on || !state.selection.is_empty() {
+    if !focused || !state.caret_on || !state.selection.is_empty() || !state.objects.is_empty() {
         return;
     }
     cr.set_source_rgb(0.0, 0.0, 0.0);
@@ -675,6 +721,58 @@ fn draw_marks(
     cr.move_to(x, rect.y + caret.top * scale);
     cr.line_to(x, rect.y + caret.bottom * scale);
     cr.stroke().ok();
+}
+
+/// The selected objects, with their outline in the accent color and
+/// white handles, or grey crosses when they are locked, as Pages draws
+/// them; and the guides, in yellow.
+fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
+    let at = |(x, y): (f64, f64)| (rect.x + x * scale, rect.y + y * scale);
+    cr.save().ok();
+    cr.set_line_width(1.0);
+    cr.set_source_rgb(0.96, 0.76, 0.07);
+    for guide in state.guides.iter().filter(|g| g.page == page) {
+        let (x0, y0) = at(guide.from);
+        let (x1, y1) = at(guide.to);
+        cr.move_to(x0.round() + 0.5, y0.round() + 0.5);
+        cr.line_to(x1.round() + 0.5, y1.round() + 0.5);
+    }
+    cr.stroke().ok();
+    for mark in state.objects.iter().filter(|m| m.page == page) {
+        cr.set_source_rgb(0.21, 0.52, 0.89);
+        for (i, &point) in mark.outline.iter().enumerate() {
+            let (x, y) = at(point);
+            if i == 0 {
+                cr.move_to(x, y);
+            } else {
+                cr.line_to(x, y);
+            }
+        }
+        if mark.outline.len() > 2 {
+            cr.close_path();
+        }
+        cr.stroke().ok();
+        const HALF: f64 = 3.5;
+        for &point in &mark.handles {
+            let (x, y) = at(point);
+            let (x, y) = (x.round() + 0.5, y.round() + 0.5);
+            if mark.locked {
+                cr.set_source_rgb(0.45, 0.45, 0.45);
+                cr.move_to(x - HALF, y - HALF);
+                cr.line_to(x + HALF, y + HALF);
+                cr.move_to(x + HALF, y - HALF);
+                cr.line_to(x - HALF, y + HALF);
+                cr.stroke().ok();
+            } else {
+                cr.rectangle(x - HALF, y - HALF, 2.0 * HALF, 2.0 * HALF);
+                cr.set_source_rgb(1.0, 1.0, 1.0);
+                cr.fill_preserve().ok();
+                cr.set_source_rgb(0.21, 0.52, 0.89);
+                cr.stroke().ok();
+            }
+        }
+    }
+    cr.restore().ok();
 }
 
 /// The dashed lines under misspelled words, in red, and mistakes, in

@@ -93,6 +93,22 @@ const SECTIONS: &[Section] = &[
         ],
     ),
     (
+        n_("Arranging"),
+        true,
+        &[
+            ("<Control><Shift>bracketright", n_("Bring to front")),
+            ("<Control>bracketright", n_("Bring forward")),
+            ("<Control>bracketleft", n_("Send backward")),
+            ("<Control><Shift>bracketleft", n_("Send to back")),
+            ("<Control><Alt>g", n_("Group")),
+            ("<Control><Shift><Alt>g", n_("Ungroup")),
+            ("<Control><Alt>l", n_("Lock")),
+            ("<Control><Shift><Alt>l", n_("Unlock")),
+            ("Left Right Up Down", n_("Nudge the selected objects")),
+            ("Escape", n_("Deselect the objects")),
+        ],
+    ),
+    (
         n_("Finding"),
         true,
         &[
