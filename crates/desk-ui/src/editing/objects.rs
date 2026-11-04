@@ -808,6 +808,89 @@ impl TextEditor {
         }
     }
 
+    /// Adds a text box linked after the last of those linked with the
+    /// selected text box, or the one being edited, below it on its page
+    /// or on the next page, so that its text goes on there (OBJ-13).
+    pub fn add_linked_text_box(&self) {
+        let from = match self.story() {
+            Some(Story::TextBox(id)) => Some(id),
+            _ => match self.selected_objects()[..] {
+                [id] => Some(id),
+                _ => None,
+            },
+        };
+        let Some(from) = from else {
+            return;
+        };
+        self.leave_story(None);
+        let (last, page, height) = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            if !matches!(
+                document.objects().get(from).map(|o| &o.kind),
+                Some(ObjectKind::TextBox(_))
+            ) {
+                return;
+            }
+            let chain = document.text_box_chain(document.text_box_head(from));
+            let last = *chain.last().unwrap_or(&from);
+            let Some((page, _)) = find(&state.layout, last) else {
+                return;
+            };
+            let Some(object) = document.objects().get(last).cloned() else {
+                return;
+            };
+            (object, page, state.layout.setup.height)
+        };
+        let selection = self.selection();
+        let result = self
+            .state
+            .borrow_mut()
+            .editor
+            .edit("Add Linked Text Box", |edit| {
+                let mut object = last.clone();
+                object.id = edit.new_id();
+                let ObjectKind::TextBox(text) = &mut object.kind else {
+                    return Ok(None);
+                };
+                let style = text
+                    .paragraphs
+                    .first()
+                    .map(Paragraph::style)
+                    .unwrap_or_else(|| edit.document().styles().default_paragraph());
+                text.paragraphs = Arc::from([Paragraph::new(edit.new_id(), style)]);
+                text.next = None;
+                object.locked = false;
+                let f = last.frame;
+                let below = f.y + f.height + Length::from_points(18);
+                if matches!(last.anchor, Anchor::Page(_)) && below + f.height > height {
+                    // No room below: the next page, where it was on this one.
+                    object.anchor = Anchor::Page(page as u32 + 1);
+                } else {
+                    object.frame.y = below;
+                }
+                let id = object.id;
+                edit.add_object(object)?;
+                edit.link_text_box(last.id, id)?;
+                Ok(Some(id))
+            });
+        match result {
+            Ok(Some(id)) => {
+                {
+                    let mut state = self.state.borrow_mut();
+                    let action = state.next_action;
+                    state.next_action += 1;
+                    state.undo.push((selection, selection, action));
+                    state.redo.clear();
+                    state.objects = vec![id];
+                }
+                self.after_change(selection);
+            }
+            Ok(None) => {}
+            Err(error) => gtk::glib::g_warning!("desk", "cannot link: {error}"),
+        }
+    }
+
     /// Answers a press on the pages: on a handle of a selected object, it
     /// starts resizing or rotating it; on an object, it selects it and
     /// starts moving it. Elsewhere the objects are deselected, and the
@@ -866,7 +949,8 @@ impl TextEditor {
             return false;
         };
         // A click in the text box being edited is a click in its text.
-        if self.story() == Some(Story::TextBox(id)) {
+        let head = Self::main_document(&self.state.borrow()).text_box_head(id);
+        if self.story() == Some(Story::TextBox(head)) {
             return false;
         }
         if presses > 1 {
@@ -905,6 +989,7 @@ impl TextEditor {
             state.guides.clear();
         }
         self.show_objects();
+        let id = Self::main_document(&self.state.borrow()).text_box_head(id);
         self.enter_story(Story::TextBox(id), page, None);
         if self.story() != Some(Story::TextBox(id)) {
             return;

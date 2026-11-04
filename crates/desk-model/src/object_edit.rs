@@ -220,12 +220,111 @@ impl Edit {
         Ok(())
     }
 
-    /// Removes objects, leaving the locked ones.
+    /// Removes objects, leaving the locked ones. A linked text box
+    /// leaves the boxes before and after it linked to each other, and the
+    /// first of linked boxes leaves its text to the next (OBJ-13).
     pub fn delete_objects(&mut self, ids: &[NodeId]) -> Result<(), ModelError> {
         for object in self.unlocked(ids)? {
+            if let ObjectKind::TextBox(text) = &object.kind {
+                self.unlink_text_box(object.id, text)?;
+            }
             self.remove_object(object.id)?;
         }
         Ok(())
+    }
+
+    /// Takes a text box out of the boxes it is linked with.
+    fn unlink_text_box(
+        &mut self,
+        id: NodeId,
+        text: &crate::object::TextBox,
+    ) -> Result<(), ModelError> {
+        let before = self
+            .document()
+            .objects()
+            .iter()
+            .find_map(|o| match &o.kind {
+                ObjectKind::TextBox(t) if t.next == Some(id) => Some(o.clone()),
+                _ => None,
+            });
+        match before {
+            Some(mut before) => {
+                if let ObjectKind::TextBox(t) = &mut before.kind {
+                    t.next = text.next;
+                }
+                self.replace_object(before)
+            }
+            None => {
+                let Some(next) = text.next else {
+                    return Ok(());
+                };
+                let Some(mut after) = self.document().objects().get(next).cloned() else {
+                    return Ok(());
+                };
+                if let ObjectKind::TextBox(t) = &mut after.kind {
+                    // The paragraphs change boxes, so the box about to
+                    // go gives them up first.
+                    let mut emptied = self.object(id)?.clone();
+                    if let ObjectKind::TextBox(e) = &mut emptied.kind {
+                        let style = text
+                            .paragraphs
+                            .first()
+                            .map(crate::text::Paragraph::style)
+                            .unwrap_or_else(|| self.document().styles().default_paragraph());
+                        let empty = crate::text::Paragraph::new(self.new_id(), style);
+                        e.paragraphs = std::sync::Arc::from([empty]);
+                        e.next = None;
+                    }
+                    self.replace_object(emptied)?;
+                    t.paragraphs = text.paragraphs.clone();
+                }
+                self.replace_object(after)
+            }
+        }
+    }
+
+    /// Links a text box after the last of the boxes linked from another,
+    /// so that the text that does not fit goes on in it (OBJ-13). Its own
+    /// text is added at the end of theirs.
+    pub fn link_text_box(&mut self, from: NodeId, to: NodeId) -> Result<(), ModelError> {
+        let head = self.document().text_box_head(from);
+        let chain = self.document().text_box_chain(head);
+        if chain.contains(&to) || self.document().text_box_head(to) != to {
+            return Ok(());
+        }
+        let last = *chain.last().unwrap_or(&head);
+        let mut moved = self.object(to)?.clone();
+        let ObjectKind::TextBox(added) = &mut moved.kind else {
+            return Ok(());
+        };
+        let text: Vec<crate::text::Paragraph> = added
+            .paragraphs
+            .iter()
+            .filter(|p| !p.is_empty())
+            .cloned()
+            .collect();
+        let style = added
+            .paragraphs
+            .first()
+            .map(crate::text::Paragraph::style)
+            .unwrap_or_else(|| self.document().styles().default_paragraph());
+        added.paragraphs =
+            std::sync::Arc::from([crate::text::Paragraph::new(self.new_id(), style)]);
+        self.replace_object(moved)?;
+        if !text.is_empty() {
+            let mut first = self.object(head)?.clone();
+            if let ObjectKind::TextBox(t) = &mut first.kind {
+                let mut all = t.paragraphs.to_vec();
+                all.extend(text);
+                t.paragraphs = all.into();
+            }
+            self.replace_object(first)?;
+        }
+        let mut end = self.object(last)?.clone();
+        if let ObjectKind::TextBox(t) = &mut end.kind {
+            t.next = Some(to);
+        }
+        self.replace_object(end)
     }
 
     /// Moves objects in front of others or behind them, keeping their
@@ -552,5 +651,64 @@ mod tests {
         assert_eq!(frame(&editor, a).1, 15.0);
         assert_eq!(frame(&editor, c).1, 97.5);
         assert_eq!(frame(&editor, d).1, 200.0);
+    }
+
+    #[test]
+    fn obj_13_text_boxes_are_linked_and_unlinked() {
+        use crate::object::TextBox;
+        use crate::story::Story;
+        use crate::text::{Paragraph, Run};
+        let mut editor = Editor::new(Document::new_word_processing());
+        let boxes: Vec<NodeId> = ["One", "Two", ""]
+            .iter()
+            .map(|text| {
+                editor
+                    .edit("Add", |e| {
+                        let style = e.document().styles().default_paragraph();
+                        let paragraph = Paragraph::from_runs(
+                            e.new_id(),
+                            style,
+                            crate::ParaAttrs::default(),
+                            [Run::new(text)],
+                        )?;
+                        let id = e.new_id();
+                        e.add_object(Object::new(
+                            id,
+                            ObjectKind::TextBox(TextBox::new(
+                                Arc::from([paragraph]),
+                                Length::from_points(4),
+                            )),
+                            Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                        ))?;
+                        Ok(id)
+                    })
+                    .unwrap()
+            })
+            .collect();
+        let [a, b, c] = boxes[..] else { unreachable!() };
+        editor.edit("Link", |e| e.link_text_box(a, b)).unwrap();
+        editor.edit("Link", |e| e.link_text_box(b, c)).unwrap();
+        let document = editor.document();
+        assert_eq!(document.text_box_chain(a), vec![a, b, c]);
+        assert_eq!(document.text_box_head(c), a);
+        // The text of b went to the end of that of a.
+        let text: Vec<String> = document
+            .story_paragraphs(Story::TextBox(c))
+            .iter()
+            .map(|p| p.text().to_string())
+            .collect();
+        assert_eq!(text, vec!["One", "Two"]);
+        assert_eq!(document.text_box_stories(), vec![Story::TextBox(a)]);
+        // Linking again, or in a circle, changes nothing.
+        editor.edit("Link", |e| e.link_text_box(c, a)).unwrap();
+        assert_eq!(editor.document().text_box_chain(a), vec![a, b, c]);
+        // Without the box in the middle, the others stay linked; without
+        // the first, its text goes on in the next.
+        editor.edit("Delete", |e| e.delete_objects(&[b])).unwrap();
+        assert_eq!(editor.document().text_box_chain(a), vec![a, c]);
+        editor.edit("Delete", |e| e.delete_objects(&[a])).unwrap();
+        let document = editor.document();
+        assert_eq!(document.text_box_chain(c), vec![c]);
+        assert_eq!(document.story_paragraphs(Story::TextBox(c)).len(), 2);
     }
 }

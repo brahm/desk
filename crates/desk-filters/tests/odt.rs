@@ -1797,7 +1797,18 @@ fn with_objects() -> Document {
                 Frame::from_pt(300.0, 400.0, 120.0, 60.0),
             );
             text.wrap = Wrap::AboveAndBelow;
+            let first_box = text.id;
             edit.add_object(text)?;
+            let style = edit.document().styles().default_paragraph();
+            let empty = Paragraph::new(edit.new_id(), style);
+            let linked = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox::new(Arc::from([empty]), Length::from_points(4))),
+                Frame::from_pt(300.0, 500.0, 120.0, 60.0),
+            );
+            let linked_id = linked.id;
+            edit.add_object(linked)?;
+            edit.link_text_box(first_box, linked_id)?;
             let picture = Picture::from_png(pixel_png()).unwrap();
             let mut image = Object::new(
                 edit.new_id(),
@@ -1831,7 +1842,13 @@ fn with_objects() -> Document {
 /// The objects of a document without their identifiers, with the
 /// paragraphs they move with by index and the text of text boxes.
 fn objects(document: &Document) -> Vec<String> {
-    let index = |id| document.body().iter().position(|p| p.id() == id);
+    let index = |id| {
+        document
+            .body()
+            .iter()
+            .position(|p| p.id() == id)
+            .or_else(|| document.objects().index_of(id).map(|i| 1000 + i))
+    };
     fn strip(
         o: &desk_model::Object,
         index: &dyn Fn(desk_model::NodeId) -> Option<usize>,
@@ -1843,9 +1860,13 @@ fn objects(document: &Document) -> Vec<String> {
         };
         let kind = match &o.kind {
             desk_model::ObjectKind::TextBox(t) => format!(
-                "text {:?} inset {:?}",
+                "text {:?} inset {:?} {:?} columns {} gap {:?} next {:?}",
                 t.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>(),
-                t.inset
+                t.inset,
+                t.vertical,
+                t.columns,
+                t.column_gap,
+                t.next.map(index),
             ),
             desk_model::ObjectKind::Group(g) => {
                 format!(

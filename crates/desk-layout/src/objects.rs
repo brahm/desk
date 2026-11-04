@@ -308,9 +308,39 @@ pub fn place_object_text(
     layout: &mut DocumentLayout,
     system: &mut TextSystem,
 ) {
-    for page in &mut layout.pages {
-        for placed in &mut page.objects {
-            lay_out_text(document, placed, system);
+    // Where each object is placed, to find the boxes linked to a first.
+    let mut at: HashMap<desk_model::NodeId, (usize, usize)> = HashMap::new();
+    for (p, page) in layout.pages.iter().enumerate() {
+        for (i, placed) in page.objects.iter().enumerate() {
+            at.insert(placed.object.id, (p, i));
+        }
+    }
+    for p in 0..layout.pages.len() {
+        for i in 0..layout.pages[p].objects.len() {
+            let placed = &layout.pages[p].objects[i];
+            let id = placed.object.id;
+            let ObjectKind::TextBox(text) = &placed.object.kind else {
+                lay_out_text(document, &mut layout.pages[p].objects[i], system);
+                continue;
+            };
+            if document.objects().get(id).is_none() || document.text_box_head(id) != id {
+                continue;
+            }
+            let paragraphs = text.paragraphs.clone();
+            let chain: Vec<(usize, usize)> = document
+                .text_box_chain(id)
+                .iter()
+                .filter_map(|b| at.get(b).copied())
+                .collect();
+            let boxes: Vec<PlacedObject> = chain
+                .iter()
+                .map(|&(p, i)| layout.pages[p].objects[i].clone())
+                .collect();
+            let refs: Vec<&PlacedObject> = boxes.iter().collect();
+            let flowed = flow_text_boxes(document, &refs, &paragraphs, system);
+            for ((p, i), lines) in chain.into_iter().zip(flowed) {
+                layout.pages[p].objects[i].lines = lines;
+            }
         }
     }
 }
@@ -335,6 +365,20 @@ pub fn text_box_lines(
     paragraphs: &[desk_model::Paragraph],
     system: &mut TextSystem,
 ) -> Vec<PlacedLine> {
+    flow_text_boxes(document, &[placed], paragraphs, system)
+        .pop()
+        .unwrap_or_default()
+}
+
+/// The room of a text box for its text: its columns, each by its left,
+/// top and width, the height of each, and where the text sits.
+struct BoxRoom {
+    columns: Vec<(f32, f32, f32)>,
+    height: f32,
+    vertical: VerticalAlignment,
+}
+
+fn box_room(placed: &PlacedObject) -> BoxRoom {
     let (inset, vertical, columns, gap) = match &placed.object.kind {
         ObjectKind::TextBox(text) => (
             text.inset.to_pt() as f32,
@@ -355,18 +399,45 @@ pub fn text_box_lines(
     };
     let gaps = if columns > 1 { gaps } else { 0.0 };
     let width = ((inner - gaps) / columns as f32).max(1.0);
+    let left = placed.x + inset;
+    let top = placed.y + inset;
+    BoxRoom {
+        columns: (0..columns)
+            .map(|c| (left + c as f32 * (width + gap), top, width))
+            .collect(),
+        height,
+        vertical,
+    }
+}
+
+/// The lines of paragraphs laid out through linked text boxes, in order:
+/// each line goes in the next column, or the next box, when it does not
+/// fit, and the last column of the last box takes what is left (OBJ-13).
+pub fn flow_text_boxes(
+    document: &Document,
+    boxes: &[&PlacedObject],
+    paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
+) -> Vec<Vec<PlacedLine>> {
+    let rooms: Vec<BoxRoom> = boxes.iter().map(|b| box_room(b)).collect();
+    let slots: Vec<(usize, (f32, f32, f32))> = rooms
+        .iter()
+        .enumerate()
+        .flat_map(|(b, room)| room.columns.iter().map(move |c| (b, *c)))
+        .collect();
+    let mut out: Vec<Vec<PlacedLine>> = vec![Vec::new(); boxes.len()];
+    if slots.is_empty() {
+        return out;
+    }
     let styles = document.styles();
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
-    let left = placed.x + inset;
-    let top = placed.y + inset;
-    let mut lines = Vec::new();
-    // Where the next line goes: its column and its top, from the top of
-    // the column.
-    let mut column = 0;
+    // Where the next line goes: its slot, and its top from the top of the
+    // column.
+    let mut slot = 0;
     let mut y = 0.0f32;
     let mut after = 0.0f32;
-    let mut lowest = 0.0f32;
+    let mut lowest = vec![0.0f32; boxes.len()];
     for (i, paragraph) in paragraphs.iter().enumerate() {
         let text = ParagraphText::new_in_document_with(
             styles,
@@ -380,6 +451,9 @@ pub fn text_box_lines(
             y += after.max(format.space_before.to_pt() as f32);
         }
         after = format.space_after.to_pt() as f32;
+        // Linked boxes may have columns of other widths; the paragraph is
+        // laid out at the width of the column it starts in.
+        let width = slots[slot].1.2;
         let laid = system.layout(&text, &Column::new(width), 0.0).lines;
         let first_top = laid.first().map_or(0.0, |l| l.top);
         // The lines of the paragraph keep their spacing from its first.
@@ -389,15 +463,16 @@ pub fn text_box_lines(
             let bottom = line_top + line.height;
             // A line that does not fit goes to the top of the next column,
             // unless it is the first of its column or the last column.
-            if bottom > height && line_top > 0.0 && column + 1 < columns {
-                column += 1;
+            let height = rooms[slots[slot].0].height;
+            if bottom > height && line_top > 0.0 && slot + 1 < slots.len() {
+                slot += 1;
                 start = -line.top;
                 line_top = 0.0;
             }
-            let x = left + column as f32 * (width + gap);
+            let (b, (x, top, _)) = slots[slot];
             y = line_top + line.height;
-            lowest = lowest.max(y);
-            lines.push(PlacedLine {
+            lowest[b] = lowest[b].max(y);
+            out[b].push(PlacedLine {
                 paragraph: i,
                 index: n,
                 line,
@@ -405,19 +480,21 @@ pub fn text_box_lines(
             });
         }
     }
-    // Text that does not fill the box sits where its alignment says.
-    let room = (height - lowest).max(0.0);
-    let shift = match vertical {
-        VerticalAlignment::Top => 0.0,
-        VerticalAlignment::Middle => room / 2.0,
-        VerticalAlignment::Bottom => room,
-    };
-    if shift > 0.0 {
-        for line in &mut lines {
-            line.origin.1 += shift;
+    // Text that does not fill a box sits where its alignment says.
+    for (b, lines) in out.iter_mut().enumerate() {
+        let room = (rooms[b].height - lowest[b]).max(0.0);
+        let shift = match rooms[b].vertical {
+            VerticalAlignment::Top => 0.0,
+            VerticalAlignment::Middle => room / 2.0,
+            VerticalAlignment::Bottom => room,
+        };
+        if shift > 0.0 {
+            for line in lines {
+                line.origin.1 += shift;
+            }
         }
     }
-    lines
+    out
 }
 
 /// How far a point is from a segment.

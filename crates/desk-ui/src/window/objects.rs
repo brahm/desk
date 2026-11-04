@@ -15,9 +15,10 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::tr;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 14] = [
+pub(super) const OBJECT_ACTIONS: [&str; 15] = [
     "insert-shape",
     "insert-text-box",
+    "add-linked-text-box",
     "bring-to-front",
     "bring-forward",
     "send-backward",
@@ -51,8 +52,9 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 11] = [
+        let simple: [(&str, EditorAction); 12] = [
             ("insert-text-box", |e| e.insert_shape(NewShape::TextBox)),
+            ("add-linked-text-box", TextEditor::add_linked_text_box),
             ("bring-to-front", |e| e.layer_objects(Layer::Front)),
             ("bring-forward", |e| e.layer_objects(Layer::Forward)),
             ("send-backward", |e| e.layer_objects(Layer::Backward)),
@@ -124,6 +126,10 @@ impl DocumentWindow {
 pub(super) fn shapes_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("_Text Box")), Some("win.insert-text-box"));
+    menu.append(
+        Some(&tr("Lin_ked Text Box")),
+        Some("win.add-linked-text-box"),
+    );
     let shapes = gio::Menu::new();
     for (label, value) in [
         (tr("_Rectangle"), "rectangle"),
