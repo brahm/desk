@@ -83,6 +83,10 @@ pub struct DrawObject {
     pub transform: Option<String>,
     /// `draw:z-index`.
     pub z_index: Option<u32>,
+    /// The paragraphs of the text inside a shape, as `text:p` and
+    /// `text:h` children of a `draw:rect`, `draw:ellipse`,
+    /// `draw:polygon` or `draw:custom-shape`.
+    pub text: Vec<Paragraph>,
 }
 
 /// Every number read is finite, so equality is reflexive.
@@ -103,7 +107,19 @@ impl DrawObject {
             height: None,
             transform: None,
             z_index: None,
+            text: Vec::new(),
         }
+    }
+
+    /// Whether it is a shape that holds text of its own.
+    pub fn holds_text(&self) -> bool {
+        matches!(
+            self.kind,
+            DrawKind::Rect { .. }
+                | DrawKind::Ellipse
+                | DrawKind::Polygon { .. }
+                | DrawKind::CustomShape { .. }
+        )
     }
 
     /// The pictures of the package that it and the objects of a group
@@ -112,6 +128,12 @@ impl DrawObject {
         match &self.kind {
             DrawKind::Image { href } => vec![href.as_str()],
             DrawKind::Group(objects) => objects.iter().flat_map(Self::hrefs).collect(),
+            _ if !self.text.is_empty() => self
+                .text
+                .iter()
+                .flat_map(|p| &p.frames)
+                .flat_map(Self::hrefs)
+                .collect(),
             DrawKind::TextBox { paragraphs, .. } => paragraphs
                 .iter()
                 .flat_map(|p| &p.frames)
@@ -363,6 +385,21 @@ fn draw_object_at(
     // A text box takes its height from its text when it has only the
     // least height.
     let height = length(SVG, "height").or_else(|| length(FO, "min-height"));
+    let shape = matches!(
+        kind,
+        DrawKind::Rect { .. }
+            | DrawKind::Ellipse
+            | DrawKind::Polygon { .. }
+            | DrawKind::CustomShape { .. }
+    );
+    let text = if shape {
+        e.elements()
+            .filter(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
+            .map(paragraph)
+            .collect()
+    } else {
+        Vec::new()
+    };
     Some(DrawObject {
         kind,
         style: e.attr(DRAW, "style-name").map(str::to_owned),
@@ -377,6 +414,7 @@ fn draw_object_at(
         height,
         transform: e.attr(DRAW, "transform").map(str::to_owned),
         z_index: e.attr(DRAW, "z-index").and_then(|n| n.trim().parse().ok()),
+        text,
     })
 }
 
@@ -444,6 +482,10 @@ pub(crate) fn write_draw_object(
             w.attr("draw:points", &points.join(" "));
         }
         DrawKind::CustomShape { shape } => {
+            // The text comes before the geometry.
+            for p in &object.text {
+                paragraph(w, p);
+            }
             w.start("draw:enhanced-geometry")
                 .attr("draw:type", shape)
                 .end();
@@ -471,6 +513,11 @@ pub(crate) fn write_draw_object(
     if let DrawKind::Group(objects) = &object.kind {
         for child in objects {
             write_draw_object(w, child, paragraph);
+        }
+    }
+    if object.holds_text() && !matches!(object.kind, DrawKind::CustomShape { .. }) {
+        for p in &object.text {
+            paragraph(w, p);
         }
     }
     w.end();

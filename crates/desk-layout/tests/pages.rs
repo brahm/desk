@@ -970,3 +970,35 @@ fn obj_13_text_goes_on_in_linked_boxes() {
     assert_eq!(two[0].paragraph, 0);
     assert_eq!(two[0].index, one.last().unwrap().index + 1);
 }
+
+#[test]
+fn obj_08_text_sits_in_the_middle_of_a_shape() {
+    use desk_model::{Frame, Object, ParaAttrs, Paragraph, Run, TextBox};
+    let mut system = TextSystem::new();
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Oval", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let paragraph =
+                Paragraph::from_runs(edit.new_id(), style, ParaAttrs::default(), [Run::new("Hi")])?;
+            let id = edit.new_id();
+            let mut object = Object::new(
+                id,
+                desk_model::Shape::Ellipse.into(),
+                Frame::from_pt(100.0, 100.0, 200.0, 100.0),
+            );
+            object.text = Some(TextBox::in_shape(Arc::from([paragraph])));
+            object.wrap = desk_model::Wrap::Through;
+            edit.add_object(object)
+        })
+        .unwrap();
+    let layout = paginate(&document, &mut system);
+    let lines = &layout.pages[0].objects[0].lines;
+    assert_eq!(lines.len(), 1);
+    // In the rectangle inside the oval, and in the middle from top to
+    // bottom.
+    let side = (1.0 - std::f32::consts::FRAC_1_SQRT_2) / 2.0;
+    assert!((lines[0].origin.0 - (104.0 + 200.0 * side)).abs() < 0.01);
+    let middle = (lines[0].top() + lines[0].bottom()) / 2.0;
+    assert!((middle - 150.0).abs() < 0.01, "{middle}");
+}

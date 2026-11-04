@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use desk_model::{Anchor, Document, Object, ObjectKind, VerticalAlignment, Wrap};
+use desk_model::{Anchor, Document, Object, ObjectKind, Shape, VerticalAlignment, Wrap};
 use desk_text::{Column, LineSpace, ParagraphText, TextSystem};
 
 use crate::pages::{DocumentLayout, PlacedLine};
@@ -349,7 +349,7 @@ fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut Tex
     for child in &mut placed.children {
         lay_out_text(document, child, system);
     }
-    let ObjectKind::TextBox(text) = &placed.object.kind else {
+    let Some(text) = placed.object.text_box() else {
         return;
     };
     let paragraphs = text.paragraphs.clone();
@@ -379,17 +379,26 @@ struct BoxRoom {
 }
 
 fn box_room(placed: &PlacedObject) -> BoxRoom {
-    let (inset, vertical, columns, gap) = match &placed.object.kind {
-        ObjectKind::TextBox(text) => (
+    let (inset, vertical, columns, gap) = match placed.object.text_box() {
+        Some(text) => (
             text.inset.to_pt() as f32,
             text.vertical,
             usize::from(text.columns.max(1)),
             text.column_gap.to_pt() as f32,
         ),
-        _ => (0.0, VerticalAlignment::Top, 1, 0.0),
+        // The text about to be typed in a shape.
+        None if placed.object.holds_text() => (4.0, VerticalAlignment::Middle, 1, 0.0),
+        None => (0.0, VerticalAlignment::Top, 1, 0.0),
     };
-    let inner = (placed.width - 2.0 * inset).max(1.0);
-    let height = (placed.height - 2.0 * inset).max(1.0);
+    // The text of an oval goes in the rectangle inside it.
+    let (inset_x, inset_y) = if matches!(placed.object.kind, ObjectKind::Shape(Shape::Ellipse)) {
+        let side = (1.0 - std::f32::consts::FRAC_1_SQRT_2) / 2.0;
+        (inset + placed.width * side, inset + placed.height * side)
+    } else {
+        (inset, inset)
+    };
+    let inner = (placed.width - 2.0 * inset_x).max(1.0);
+    let height = (placed.height - 2.0 * inset_y).max(1.0);
     let gaps = gap * (columns - 1) as f32;
     // Columns narrower than a few characters are not columns any more.
     let columns = if (inner - gaps) / columns as f32 >= desk_text::MIN_SEGMENT_WIDTH {
@@ -399,8 +408,8 @@ fn box_room(placed: &PlacedObject) -> BoxRoom {
     };
     let gaps = if columns > 1 { gaps } else { 0.0 };
     let width = ((inner - gaps) / columns as f32).max(1.0);
-    let left = placed.x + inset;
-    let top = placed.y + inset;
+    let left = placed.x + inset_x;
+    let top = placed.y + inset_y;
     BoxRoom {
         columns: (0..columns)
             .map(|c| (left + c as f32 * (width + gap), top, width))

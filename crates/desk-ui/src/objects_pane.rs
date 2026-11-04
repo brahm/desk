@@ -253,7 +253,7 @@ impl ObjectGroups {
             let inset = tab_stops::from_units(row.value(), this.units.get());
             if let Some(editor) = inset_editor() {
                 editor.set_object("Inset", |object| {
-                    if let desk_model::ObjectKind::TextBox(text) = &mut object.kind {
+                    if let Some(text) = text_of(object) {
                         text.inset = inset;
                     }
                 });
@@ -273,7 +273,7 @@ impl ObjectGroups {
             };
             if let Some(editor) = vertical_editor() {
                 editor.set_object("Vertical Alignment", |object| {
-                    if let desk_model::ObjectKind::TextBox(text) = &mut object.kind {
+                    if let Some(text) = text_of(object) {
                         text.vertical = vertical;
                     }
                 });
@@ -289,7 +289,7 @@ impl ObjectGroups {
             let columns = row.value().round() as u8;
             if let Some(editor) = columns_editor() {
                 editor.set_object("Columns", |object| {
-                    if let desk_model::ObjectKind::TextBox(text) = &mut object.kind {
+                    if let Some(text) = text_of(object) {
                         text.columns = columns;
                     }
                 });
@@ -394,8 +394,13 @@ impl ObjectGroups {
         );
         self.wrap.set_sensitive(editable);
         self.margin.set_sensitive(editable);
-        match &info.object.kind {
-            desk_model::ObjectKind::TextBox(text) => {
+        let shape_text = desk_model::TextBox::in_shape(std::sync::Arc::from([]));
+        let text = info
+            .object
+            .text_box()
+            .or_else(|| info.object.holds_text().then_some(&shape_text));
+        match text {
+            Some(text) => {
                 self.text_group.set_visible(true);
                 self.text_group.set_sensitive(editable);
                 set(&self.inset, tab_stops::in_units(text.inset, units));
@@ -409,7 +414,7 @@ impl ObjectGroups {
                 }
                 set(&self.columns, f64::from(text.columns));
             }
-            _ => self.text_group.set_visible(false),
+            None => self.text_group.set_visible(false),
         }
         if self.locked.is_active() != info.object.locked {
             self.locked.set_active(info.object.locked);
@@ -421,4 +426,13 @@ impl ObjectGroups {
     pub fn show_format(&self, format: &Format) {
         self.show(format.object.as_ref());
     }
+}
+
+/// The text of a text box or a shape, set up for a shape that has none
+/// yet, to change how it is laid out.
+fn text_of(object: &mut desk_model::Object) -> Option<&mut desk_model::TextBox> {
+    if object.text_box().is_none() && object.holds_text() {
+        object.text = Some(desk_model::TextBox::in_shape(std::sync::Arc::from([])));
+    }
+    object.text_box_mut()
 }

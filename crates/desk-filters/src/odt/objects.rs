@@ -402,6 +402,29 @@ fn import_one(
     let mirror = g.mirror.as_deref().unwrap_or_default();
     built.flip_horizontal = mirror.contains("horizontal");
     built.flip_vertical = mirror.contains("vertical");
+    if built.holds_text() && !object.text.is_empty() && built.text_box().is_none() {
+        // The text of a shape, in its middle unless it says otherwise.
+        let mut paragraphs = Vec::with_capacity(object.text.len());
+        for p in &object.text {
+            paragraphs.push(paragraph(document, p)?);
+        }
+        let mut text = TextBox::in_shape(Arc::from(paragraphs));
+        if let Some(padding) = g.padding {
+            text.inset = length(padding);
+        }
+        if let Some(count) = g.column_count {
+            text.columns = count.clamp(1, u32::from(MAX_TEXT_BOX_COLUMNS)) as u8;
+        }
+        if let Some(gap) = g.column_gap {
+            text.column_gap = length(gap);
+        }
+        text.vertical = match g.textarea_vertical_align.as_deref() {
+            Some("top") => VerticalAlignment::Top,
+            Some("bottom") => VerticalAlignment::Bottom,
+            _ => VerticalAlignment::Middle,
+        };
+        built.text = Some(text);
+    }
     Ok(Some(built))
 }
 
@@ -705,6 +728,29 @@ impl Exporter<'_> {
                 corner_radius: None,
             },
         };
+        let mut text = Vec::new();
+        if let (ObjectKind::Shape(_), Some(inside)) = (&object.kind, object.text_box())
+            && !inside.paragraphs.is_empty()
+        {
+            g.padding = Some(odf_length(inside.inset));
+            g.textarea_vertical_align = Some(
+                match inside.vertical {
+                    VerticalAlignment::Top => "top",
+                    VerticalAlignment::Middle => "middle",
+                    VerticalAlignment::Bottom => "bottom",
+                }
+                .into(),
+            );
+            if inside.columns > 1 {
+                g.column_count = Some(u32::from(inside.columns));
+                g.column_gap = Some(odf_length(inside.column_gap));
+            }
+            text = inside
+                .paragraphs
+                .iter()
+                .map(|p| self.paragraph(p))
+                .collect();
+        }
         let style = self.style(
             "gr",
             odf::Family::Graphic,
@@ -717,6 +763,7 @@ impl Exporter<'_> {
         let linked = matches!(&kind, odf::DrawKind::TextBox { .. });
         let mut out = odf::DrawObject::new(kind);
         out.style = Some(style);
+        out.text = text;
         if linked {
             // Named, for the boxes linked to it to name it.
             out.name = Some(text_box_name(object.id));

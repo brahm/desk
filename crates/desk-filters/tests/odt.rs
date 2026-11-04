@@ -1761,6 +1761,16 @@ fn with_objects() -> Document {
             );
             ellipse.anchor = Anchor::Paragraph(second);
             ellipse.wrap = Wrap::Behind;
+            let typed = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                [Run::new("In an oval")],
+            )?;
+            let mut inside = TextBox::in_shape(Arc::from([typed]));
+            inside.vertical = desk_model::VerticalAlignment::Bottom;
+            inside.inset = Length::from_points(2);
+            ellipse.text = Some(inside);
             edit.add_object(ellipse)?;
             let mut line = Object::new(
                 edit.new_id(),
@@ -1817,11 +1827,15 @@ fn with_objects() -> Document {
             );
             image.wrap = Wrap::Largest;
             edit.add_object(image)?;
-            let triangle = Object::new(
+            let mut triangle = Object::new(
                 edit.new_id(),
                 ObjectKind::Shape(Shape::triangle()),
                 Frame::from_pt(100.0, 5.0, 20.0, 20.0),
             );
+            let style = edit.document().styles().default_paragraph();
+            let typed =
+                Paragraph::from_runs(edit.new_id(), style, ParaAttrs::default(), [Run::new("Up")])?;
+            triangle.text = Some(TextBox::in_shape(Arc::from([typed])));
             let circle = Object::new(
                 edit.new_id(),
                 ObjectKind::Shape(Shape::Ellipse),
@@ -1876,6 +1890,16 @@ fn objects(document: &Document) -> Vec<String> {
             }
             other => format!("{other:?}"),
         };
+        let text = o.text.take().map(|t| {
+            format!(
+                "with text {:?} inset {:?} {:?} columns {}",
+                t.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>(),
+                t.inset,
+                t.vertical,
+                t.columns,
+            )
+        });
+        let kind = format!("{kind} {text:?}");
         o.id = desk_model::NodeId::new(1).unwrap();
         o.kind = desk_model::ObjectKind::Shape(desk_model::Shape::Rectangle);
         o.anchor = desk_model::Anchor::Page(0);
@@ -1934,6 +1958,7 @@ fn obj_08_shapes_of_other_programs_are_read() {
   <text:p>Text<draw:custom-shape text:anchor-type="paragraph" draw:z-index="0" draw:style-name="gr1"
      svg:width="2cm" svg:height="1cm" svg:x="1cm" svg:y="0.5cm"
      draw:transform="rotate (1.5707963267949) translate (1cm 3cm)">
+    <text:p>Peak</text:p>
     <draw:enhanced-geometry draw:type="isosceles-triangle"/>
    </draw:custom-shape></text:p>
  </office:text></office:body>
@@ -1950,6 +1975,11 @@ fn obj_08_shapes_of_other_programs_are_read() {
         desk_model::Anchor::Paragraph(document.body().get(0).unwrap().id())
     );
     assert_eq!(object.rotation, 9000);
+    // Its text is in its middle.
+    let text = object.text_box().unwrap();
+    assert_eq!(text.paragraphs[0].text(), "Peak");
+    assert_eq!(text.vertical, desk_model::VerticalAlignment::Middle);
+    assert_eq!(document.body().get(0).unwrap().text(), "Text");
     assert_eq!(
         object.style.fill,
         Some(desk_model::Fill::Color(Rgba::rgb(0x72, 0x9f, 0xcf)))

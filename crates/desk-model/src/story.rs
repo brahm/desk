@@ -5,11 +5,13 @@
 //! its notes and its text boxes, which are edited on the page as the body
 //! is (EST-12, EST-13, OBJ-13).
 
+use std::sync::Arc;
+
 use crate::document::Document;
 use crate::error::ModelError;
 use crate::header::MarginPlace;
 use crate::id::NodeId;
-use crate::object::ObjectKind;
+use crate::object::{Object, ObjectKind, TextBox};
 use crate::op::Op;
 use crate::text::{Paragraph, TextFlow};
 use crate::transaction::Edit;
@@ -46,10 +48,11 @@ impl Document {
             }
             Story::TextBox(id) => {
                 let head = self.text_box_head(id);
-                match self.objects().get(head).map(|o| &o.kind) {
-                    Some(ObjectKind::TextBox(text)) => text.paragraphs.to_vec(),
-                    _ => Vec::new(),
-                }
+                self.objects()
+                    .get(head)
+                    .and_then(Object::text_box)
+                    .map(|text| text.paragraphs.to_vec())
+                    .unwrap_or_default()
             }
         }
     }
@@ -95,11 +98,12 @@ impl Document {
         chain
     }
 
-    /// The text boxes of the document, from back to front, as stories.
+    /// The text boxes of the document, and the shapes with text, from
+    /// back to front, as stories.
     pub fn text_box_stories(&self) -> Vec<Story> {
         self.objects()
             .iter()
-            .filter(|o| matches!(o.kind, ObjectKind::TextBox(_)))
+            .filter(|o| o.text_box().is_some())
             .filter(|o| self.text_box_head(o.id) == o.id)
             .map(|o| Story::TextBox(o.id))
             .collect()
@@ -157,13 +161,29 @@ impl Edit {
                     .get(id)
                     .cloned()
                     .ok_or(ModelError::UnknownObject(id))?;
-                let ObjectKind::TextBox(text) = &mut object.kind else {
+                if !object.holds_text() {
                     return Err(ModelError::UnknownObject(id));
-                };
+                }
                 if paragraphs.is_empty() {
                     return Ok(());
                 }
-                text.paragraphs = paragraphs.into();
+                let shape = !matches!(object.kind, ObjectKind::TextBox(_));
+                if shape && paragraphs.iter().all(Paragraph::is_empty) {
+                    // A shape left with no text has no paragraphs, and
+                    // keeps how its text would be set.
+                    match object.text.as_mut() {
+                        Some(text) if !text.paragraphs.is_empty() => {
+                            text.paragraphs = Arc::from([]);
+                        }
+                        _ => return Ok(()),
+                    }
+                } else {
+                    match object.text_box_mut() {
+                        Some(text) => text.paragraphs = paragraphs.into(),
+                        // The first text typed in a shape.
+                        None => object.text = Some(TextBox::in_shape(paragraphs.into())),
+                    }
+                }
                 self.replace_object(object)
             }
         }
@@ -246,5 +266,62 @@ mod tests {
         assert_eq!(count, 3);
         assert_eq!(document.body().get(0).unwrap().text(), "A dog");
         assert_eq!(document.story_paragraphs(header)[0].text(), "dog and dog");
+    }
+
+    #[test]
+    fn obj_08_text_is_typed_in_shapes_but_not_in_lines() {
+        use crate::object::{Frame, Shape, VerticalAlignment};
+        let mut document = Document::new_word_processing();
+        let ((shape, line), _) = document
+            .transact("Shapes", |edit| {
+                let (shape, line) = (edit.new_id(), edit.new_id());
+                let frame = Frame::from_pt(10.0, 10.0, 100.0, 50.0);
+                edit.add_object(Object::new(shape, Shape::Ellipse.into(), frame))?;
+                let rising = Shape::Line { rising: false };
+                edit.add_object(Object::new(line, rising.into(), frame))?;
+                Ok((shape, line))
+            })
+            .unwrap();
+        assert!(document.story_paragraphs(Story::TextBox(shape)).is_empty());
+        assert_eq!(document.text_box_stories(), []);
+        let paragraph = |edit: &mut Edit| {
+            let id = edit.new_id();
+            let style = edit.document().styles().default_paragraph();
+            Paragraph::from_runs(
+                id,
+                style,
+                crate::ParaAttrs::default(),
+                [crate::Run::new("Hello")],
+            )
+        };
+        document
+            .transact("Type", |edit| {
+                let p = paragraph(edit)?;
+                edit.set_story(Story::TextBox(shape), vec![p])
+            })
+            .unwrap();
+        let object = document.objects().get(shape).unwrap();
+        let text = object.text_box().unwrap();
+        assert_eq!(text.vertical, VerticalAlignment::Middle);
+        assert_eq!(object.ids().len(), 2);
+        assert_eq!(
+            document.story_paragraphs(Story::TextBox(shape))[0].text(),
+            "Hello"
+        );
+        assert_eq!(document.text_box_stories(), [Story::TextBox(shape)]);
+        document
+            .transact("Clear", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let empty = Paragraph::new(edit.new_id(), style);
+                edit.set_story(Story::TextBox(shape), vec![empty])
+            })
+            .unwrap();
+        let text = document.objects().get(shape).unwrap().text.as_ref();
+        assert!(text.unwrap().paragraphs.is_empty());
+        let result = document.transact("Type", |edit| {
+            let p = paragraph(edit)?;
+            edit.set_story(Story::TextBox(line), vec![p])
+        });
+        assert_eq!(result.err(), Some(ModelError::UnknownObject(line)));
     }
 }
