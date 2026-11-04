@@ -40,6 +40,7 @@ mod picture_pane;
 mod preferences;
 mod properties;
 mod ruler;
+mod shape_pane;
 mod shortcuts;
 mod spelling;
 mod spelling_window;

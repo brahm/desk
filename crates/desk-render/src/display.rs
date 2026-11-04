@@ -5,8 +5,7 @@
 
 use desk_layout::{DocumentLayout, Page, PlacedBlock, PlacedLine, PlacedObject};
 use desk_model::{
-    BorderSides, Fill, ImageFill, LineEnd, LineStyle, ObjectKind, POLYGON_SCALE, Picture, Rgba,
-    Shape, Wrap,
+    BorderSides, Fill, ImageFill, LineEnd, LineStyle, ObjectKind, Picture, Rgba, Shape, Wrap,
 };
 use desk_text::FontData;
 
@@ -788,67 +787,27 @@ const KAPPA: f32 = 0.552_284_8;
 
 /// The path of a shape in a frame.
 pub fn shape_path(shape: &Shape, x: f32, y: f32, w: f32, h: f32) -> Vec<PathOp> {
-    use PathOp::{Close, Curve, Line, Move};
-    match shape {
-        Shape::Rectangle => vec![
-            Move(x, y),
-            Line(x + w, y),
-            Line(x + w, y + h),
-            Line(x, y + h),
-            Close,
-        ],
-        Shape::RoundedRectangle { radius } => {
-            let r = (radius.to_pt() as f32).clamp(0.0, w.min(h) / 2.0);
-            let k = r * (1.0 - KAPPA);
-            let (x1, y1) = (x + w, y + h);
-            vec![
-                Move(x + r, y),
-                Line(x1 - r, y),
-                Curve(x1 - k, y, x1, y + k, x1, y + r),
-                Line(x1, y1 - r),
-                Curve(x1, y1 - k, x1 - k, y1, x1 - r, y1),
-                Line(x + r, y1),
-                Curve(x + k, y1, x, y1 - k, x, y1 - r),
-                Line(x, y + r),
-                Curve(x, y + k, x + k, y, x + r, y),
-                Close,
-            ]
-        }
-        Shape::Ellipse => {
-            let (rx, ry) = (w / 2.0, h / 2.0);
-            let (cx, cy) = (x + rx, y + ry);
-            let (kx, ky) = (rx * KAPPA, ry * KAPPA);
-            vec![
-                Move(cx + rx, cy),
-                Curve(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry),
-                Curve(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy),
-                Curve(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry),
-                Curve(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy),
-                Close,
-            ]
-        }
-        Shape::Polygon(points) => {
-            let scale = POLYGON_SCALE as f32;
-            let mut path: Vec<PathOp> = points
-                .iter()
-                .enumerate()
-                .map(|(i, &(px, py))| {
-                    let (px, py) = (x + w * px as f32 / scale, y + h * py as f32 / scale);
-                    if i == 0 { Move(px, py) } else { Line(px, py) }
-                })
-                .collect();
-            if !path.is_empty() {
-                path.push(Close);
+    use desk_model::PathSegment;
+    let at = |px: f64, py: f64| (x + px as f32, y + py as f32);
+    shape
+        .outline(f64::from(w), f64::from(h))
+        .into_iter()
+        .map(|segment| match segment {
+            PathSegment::Move(px, py) => {
+                let (px, py) = at(px, py);
+                PathOp::Move(px, py)
             }
-            path
-        }
-        Shape::Line { rising } => {
-            if *rising {
-                vec![Move(x, y + h), Line(x + w, y)]
-            } else {
-                vec![Move(x, y), Line(x + w, y + h)]
+            PathSegment::Line(px, py) => {
+                let (px, py) = at(px, py);
+                PathOp::Line(px, py)
             }
-        }
-        _ => shape_path(&Shape::Rectangle, x, y, w, h),
-    }
+            PathSegment::Curve(ax, ay, bx, by, cx, cy) => {
+                let (ax, ay) = at(ax, ay);
+                let (bx, by) = at(bx, by);
+                let (cx, cy) = at(cx, cy);
+                PathOp::Curve(ax, ay, bx, by, cx, cy)
+            }
+            PathSegment::Close => PathOp::Close,
+        })
+        .collect()
 }

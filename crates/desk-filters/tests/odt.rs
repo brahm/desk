@@ -2310,3 +2310,98 @@ fn obj_01_gif_pictures_become_png() {
     assert_eq!(picture.format(), desk_model::PictureFormat::Png);
     assert_eq!((picture.width(), picture.height()), (4, 2));
 }
+
+#[test]
+fn obj_08_obj_11_parametric_shapes_keep_their_settings_in_odt() {
+    use desk_model::{Frame, Length, Object, ObjectKind, Shape};
+    let shapes = [
+        Shape::Star {
+            points: 7,
+            inner: 4_500,
+        },
+        Shape::RegularPolygon { sides: 6 },
+        Shape::Arrow {
+            double: false,
+            head: 3_000,
+            tail: 6_000,
+        },
+        Shape::arrow(true),
+        Shape::Balloon {
+            radius: Length::from_points(8),
+            body: 7_000,
+            tip: 8_000,
+        },
+        Shape::balloon(false),
+    ];
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Shapes", |edit| {
+            for (i, shape) in shapes.iter().enumerate() {
+                let id = edit.new_id();
+                edit.add_object(Object::new(
+                    id,
+                    shape.clone().into(),
+                    Frame::from_pt(60.0 * i as f64, 0.0, 50.0, 40.0),
+                ))?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let bytes = write_odt(&document).unwrap();
+    keep("obj-parametric-shapes.odt", &bytes);
+    // Other programs draw them by their path.
+    let exported = export(&document);
+    let star = &exported.page_objects[0];
+    let odf::DrawKind::CustomShape {
+        shape,
+        path,
+        view_box,
+        ..
+    } = &star.kind
+    else {
+        panic!("{:?}", star.kind);
+    };
+    assert_eq!(shape, "non-primitive");
+    assert_eq!(*view_box, Some((0.0, 0.0, 5000.0, 4000.0)));
+    let path = path.as_deref().unwrap();
+    assert!(
+        path.starts_with("M 2500 0 L ") && path.ends_with(" Z N"),
+        "{path}"
+    );
+    assert_eq!(path.matches('L').count(), 13, "{path}");
+    let read = read_odt(&bytes).unwrap();
+    let kinds: Vec<ObjectKind> = read.objects().iter().map(|o| o.kind.clone()).collect();
+    let expected: Vec<ObjectKind> = shapes.into_iter().map(ObjectKind::from).collect();
+    assert_eq!(kinds, expected);
+}
+
+#[test]
+fn obj_08_the_shapes_of_other_programs_become_those_of_desk() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+<office:body><office:text>
+<draw:custom-shape text:anchor-type="page" text:anchor-page-number="1" svg:x="1in" svg:y="1in" svg:width="1in" svg:height="1in"><draw:enhanced-geometry draw:type="star8"/></draw:custom-shape>
+<draw:custom-shape text:anchor-type="page" text:anchor-page-number="1" svg:x="3in" svg:y="1in" svg:width="1in" svg:height="1in"><draw:enhanced-geometry draw:type="left-right-arrow"/></draw:custom-shape>
+<draw:custom-shape text:anchor-type="page" text:anchor-page-number="1" svg:x="5in" svg:y="1in" svg:width="1in" svg:height="1in"><draw:enhanced-geometry draw:type="round-rectangular-callout"/></draw:custom-shape>
+<text:p/>
+</office:text></office:body></office:document-content>"##;
+    let document = import(&desk_odf::read_streams(content, None, None).unwrap()).unwrap();
+    let kinds: Vec<desk_model::ObjectKind> =
+        document.objects().iter().map(|o| o.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        [
+            desk_model::Shape::Star {
+                points: 8,
+                inner: 5_000
+            },
+            desk_model::Shape::arrow(true),
+            desk_model::Shape::balloon(true),
+        ]
+        .map(desk_model::ObjectKind::from)
+    );
+}

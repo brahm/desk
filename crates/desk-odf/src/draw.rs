@@ -366,6 +366,15 @@ pub enum DrawKind {
     CustomShape {
         /// The type.
         shape: String,
+        /// `svg:viewBox` of the geometry: the units of its path, as left,
+        /// top, width and height.
+        view_box: Option<(f64, f64, f64, f64)>,
+        /// `draw:enhanced-path`: the outline, in the units of the view
+        /// box, in the commands of ODF (`M`, `L`, `C`, `Z`, `N`).
+        path: Option<String>,
+        /// `desk:shape`: the kind and settings of a shape of Desk, which
+        /// the path draws for other programs.
+        desk_shape: Option<String>,
     },
     /// `draw:frame` with a `draw:image`.
     Image {
@@ -601,13 +610,19 @@ fn draw_object_at(
                 view_box,
             }
         }
-        "custom-shape" => DrawKind::CustomShape {
-            shape: e
-                .child(DRAW, "enhanced-geometry")
-                .and_then(|g| g.attr(DRAW, "type"))
-                .unwrap_or("rectangle")
-                .to_owned(),
-        },
+        "custom-shape" => {
+            let geometry = e.child(DRAW, "enhanced-geometry");
+            let attr = |ns, name| geometry.and_then(|g| g.attr(ns, name));
+            DrawKind::CustomShape {
+                shape: attr(DRAW, "type").unwrap_or("rectangle").to_owned(),
+                view_box: match numbers(attr(SVG, "viewBox").unwrap_or_default())[..] {
+                    [x, y, w, h] => Some((x, y, w, h)),
+                    _ => None,
+                },
+                path: attr(DRAW, "enhanced-path").map(str::to_owned),
+                desk_shape: attr(DESK, "shape").map(str::to_owned),
+            }
+        }
         "frame" => {
             if let Some(image) = e.child(DRAW, "image") {
                 DrawKind::Image {
@@ -732,14 +747,25 @@ pub(crate) fn write_draw_object(
                 .collect();
             w.attr("draw:points", &points.join(" "));
         }
-        DrawKind::CustomShape { shape } => {
+        DrawKind::CustomShape {
+            shape,
+            view_box,
+            path,
+            desk_shape,
+        } => {
             // The text comes before the geometry.
             for p in &object.text {
                 paragraph(w, p);
             }
-            w.start("draw:enhanced-geometry")
-                .attr("draw:type", shape)
-                .end();
+            w.start("draw:enhanced-geometry");
+            if let Some((x, y, width, height)) = view_box {
+                let numbers = [x, y, width, height].map(|n| decimal(*n));
+                w.attr("svg:viewBox", &numbers.join(" "));
+            }
+            w.attr("draw:type", shape);
+            w.attr_opt("draw:enhanced-path", path.as_deref());
+            w.attr_opt("desk:shape", desk_shape.as_deref());
+            w.end();
         }
         DrawKind::Image { href } => {
             w.start("draw:image")

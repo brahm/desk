@@ -358,6 +358,82 @@ fn model_picture_settings(
     settings
 }
 
+/// A shape of Desk that ODF has no element for, as a custom shape that
+/// other programs draw by its path, with its settings for Desk (OBJ-11).
+fn parametric_shape(shape: &Shape, w: f64, h: f64) -> odf::DrawKind {
+    use desk_model::PathSegment;
+    // The path in hundredths of a point, which keeps it exact enough.
+    let n = |v: f64| format!("{}", (v * 100.0).round() as i64);
+    let path: Vec<String> = shape
+        .outline(w, h)
+        .into_iter()
+        .map(|segment| match segment {
+            PathSegment::Move(x, y) => format!("M {} {}", n(x), n(y)),
+            PathSegment::Line(x, y) => format!("L {} {}", n(x), n(y)),
+            PathSegment::Curve(ax, ay, bx, by, cx, cy) => format!(
+                "C {} {} {} {} {} {}",
+                n(ax),
+                n(ay),
+                n(bx),
+                n(by),
+                n(cx),
+                n(cy)
+            ),
+            PathSegment::Close => "Z".to_owned(),
+        })
+        .chain(["N".to_owned()])
+        .collect();
+    let settings = match *shape {
+        Shape::Star { points, inner } => format!("star {points} {inner}"),
+        Shape::RegularPolygon { sides } => format!("polygon {sides}"),
+        Shape::Arrow { double, head, tail } => {
+            format!(
+                "{} {head} {tail}",
+                if double { "double-arrow" } else { "arrow" }
+            )
+        }
+        Shape::Balloon { radius, body, tip } => {
+            format!("balloon {} {body} {tip}", radius.to_pt())
+        }
+        _ => String::new(),
+    };
+    odf::DrawKind::CustomShape {
+        shape: "non-primitive".into(),
+        view_box: Some((0.0, 0.0, (w * 100.0).round(), (h * 100.0).round())),
+        path: Some(path.join(" ")),
+        desk_shape: Some(settings),
+    }
+}
+
+/// The shape that `desk:shape` gives, or none when it is not one.
+fn desk_shape_of(settings: &str) -> Option<Shape> {
+    let mut words = settings.split_whitespace();
+    let kind = words.next()?;
+    let numbers: Vec<f64> = words.map(str::parse).collect::<Result<_, _>>().ok()?;
+    let count = |v: f64| v.clamp(3.0, f64::from(desk_model::MAX_SHAPE_SIDES)) as u8;
+    let part = |v: f64| v.clamp(0.0, f64::from(POLYGON_SCALE)) as u16;
+    Some(match (kind, &numbers[..]) {
+        ("star", &[points, inner]) => Shape::Star {
+            points: count(points),
+            inner: part(inner),
+        },
+        ("polygon", &[sides]) => Shape::RegularPolygon {
+            sides: count(sides),
+        },
+        ("arrow" | "double-arrow", &[head, tail]) => Shape::Arrow {
+            double: kind == "double-arrow",
+            head: part(head),
+            tail: part(tail),
+        },
+        ("balloon", &[radius, body, tip]) => Shape::Balloon {
+            radius: Length::from_pt(radius.clamp(0.0, 10_000.0)),
+            body: part(body),
+            tip: part(tip),
+        },
+        _ => return None,
+    })
+}
+
 /// A predefined shape of other programs, as near as Desk has one.
 fn custom_shape(shape: &str) -> Shape {
     let s = POLYGON_SCALE;
@@ -368,6 +444,15 @@ fn custom_shape(shape: &str) -> Shape {
             radius: Length::from_points(9),
         },
         "isosceles-triangle" => Shape::triangle(),
+        "star4" | "star5" | "star6" | "star8" | "star12" | "star24" => Shape::Star {
+            points: shape[4..].parse().unwrap_or(5),
+            inner: if shape == "star5" { 3_820 } else { 5_000 },
+        },
+        "octagon" => Shape::RegularPolygon { sides: 8 },
+        "right-arrow" => Shape::arrow(false),
+        "left-right-arrow" => Shape::arrow(true),
+        "round-rectangular-callout" => Shape::balloon(true),
+        "rectangular-callout" => Shape::balloon(false),
         "right-triangle" => polygon(&[(0, 0), (s, s), (0, s)]),
         "diamond" => polygon(&[(s / 2, 0), (s, s / 2), (s / 2, s), (0, s / 2)]),
         "pentagon" => polygon(&[(s / 2, 0), (s, 3_820), (8_090, s), (1_910, s), (0, 3_820)]),
@@ -379,42 +464,6 @@ fn custom_shape(shape: &str) -> Shape {
             (2_500, s),
             (0, s / 2),
         ]),
-        "right-arrow" => polygon(&[
-            (0, 2_500),
-            (6_500, 2_500),
-            (6_500, 0),
-            (s, s / 2),
-            (6_500, s),
-            (6_500, 7_500),
-            (0, 7_500),
-        ]),
-        "left-right-arrow" => polygon(&[
-            (0, s / 2),
-            (2_500, 0),
-            (2_500, 2_500),
-            (7_500, 2_500),
-            (7_500, 0),
-            (s, s / 2),
-            (7_500, s),
-            (7_500, 7_500),
-            (2_500, 7_500),
-            (2_500, s),
-        ]),
-        "star5" => {
-            // Five points, and the inner corners between them.
-            let points: Vec<(i32, i32)> = (0..10)
-                .map(|i| {
-                    let r = if i % 2 == 0 { 0.5 } else { 0.19 };
-                    let a = std::f64::consts::PI * (i as f64 / 5.0 - 0.5);
-                    let k = f64::from(s);
-                    (
-                        ((0.5 + r * a.cos()) * k).round() as i32,
-                        ((0.5 + r * a.sin()) * k).round() as i32,
-                    )
-                })
-                .collect();
-            Shape::Polygon(Arc::from(points))
-        }
         _ => Shape::Rectangle,
     }
 }
@@ -479,7 +528,14 @@ fn kind(
             }
             ObjectKind::Shape(Shape::Polygon(Arc::from(points)))
         }
-        odf::DrawKind::CustomShape { shape } => ObjectKind::Shape(custom_shape(shape)),
+        odf::DrawKind::CustomShape {
+            shape, desk_shape, ..
+        } => ObjectKind::Shape(
+            desk_shape
+                .as_deref()
+                .and_then(desk_shape_of)
+                .unwrap_or_else(|| custom_shape(shape)),
+        ),
         odf::DrawKind::Image { href } => {
             let path = href.strip_prefix("./").unwrap_or(href);
             let Some(picture) = source
@@ -1184,6 +1240,12 @@ impl Exporter<'_> {
                     y2: odf::Length(y2),
                 }
             }
+            ObjectKind::Shape(
+                shape @ (Shape::Star { .. }
+                | Shape::RegularPolygon { .. }
+                | Shape::Arrow { .. }
+                | Shape::Balloon { .. }),
+            ) => parametric_shape(shape, w, h),
             ObjectKind::Image(picture) => odf::DrawKind::Image {
                 href: self.picture(picture),
             },

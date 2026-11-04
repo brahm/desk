@@ -62,6 +62,7 @@ mod op;
 mod outline;
 mod picture;
 mod section;
+mod shape_path;
 mod story;
 mod style;
 mod styling;
@@ -96,7 +97,7 @@ pub use list::{
 };
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
-    Adjustments, AlphaSeed, Anchor, Fill, Frame, GraphicStyle, ImageFill, LineEnd,
+    Adjustments, AlphaSeed, Anchor, Fill, Frame, GraphicStyle, ImageFill, LineEnd, MAX_SHAPE_SIDES,
     MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE,
     PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
@@ -105,6 +106,7 @@ pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::{Picture, PictureFormat};
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
+pub use shape_path::PathSegment;
 pub use story::Story;
 pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
 pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides};

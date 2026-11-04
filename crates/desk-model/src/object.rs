@@ -257,9 +257,86 @@ pub enum Shape {
         /// Whether it goes from the bottom left to the top right.
         rising: bool,
     },
+    /// A star filling the frame (OBJ-08, OBJ-11).
+    Star {
+        /// How many points it has, from 3 to [`MAX_SHAPE_SIDES`].
+        points: u8,
+        /// How far its inner corners are from the middle, in parts of
+        /// [`POLYGON_SCALE`] of the outer radius.
+        inner: u16,
+    },
+    /// A polygon with equal sides filling the frame.
+    RegularPolygon {
+        /// How many sides it has, from 3 to [`MAX_SHAPE_SIDES`].
+        sides: u8,
+    },
+    /// An arrow pointing right, or both ways.
+    Arrow {
+        /// Whether it has a head at both ends.
+        double: bool,
+        /// How long each head is, in parts of [`POLYGON_SCALE`] of the
+        /// width of the frame.
+        head: u16,
+        /// How thick the tail is, in parts of [`POLYGON_SCALE`] of the
+        /// height of the frame.
+        tail: u16,
+    },
+    /// A speech balloon: a rectangle, with round corners for a quote
+    /// bubble or square ones for a callout, and a tail to the bottom of
+    /// the frame.
+    Balloon {
+        /// The radius of the corners.
+        radius: Length,
+        /// How tall the body is, in parts of [`POLYGON_SCALE`] of the
+        /// height of the frame; the tail takes the rest.
+        body: u16,
+        /// Where the point of the tail is, in parts of [`POLYGON_SCALE`]
+        /// of the width of the frame.
+        tip: u16,
+    },
 }
 
+/// The most points of a star and sides of a polygon.
+pub const MAX_SHAPE_SIDES: u8 = 32;
+
 impl Shape {
+    /// The star of Pages: five points.
+    pub fn star() -> Self {
+        Self::Star {
+            points: 5,
+            inner: 3_820,
+        }
+    }
+
+    /// The polygon of Pages: five sides.
+    pub fn regular_polygon() -> Self {
+        Self::RegularPolygon { sides: 5 }
+    }
+
+    /// The arrow of Pages, to the right, or both ways.
+    pub fn arrow(double: bool) -> Self {
+        Self::Arrow {
+            double,
+            head: if double { 3_000 } else { 4_000 },
+            tail: 5_000,
+        }
+    }
+
+    /// The quote bubble of Pages, or with square corners its callout.
+    pub fn balloon(rounded: bool) -> Self {
+        Self::Balloon {
+            radius: Length::from_points(if rounded { 12 } else { 0 }),
+            body: 7_500,
+            tip: 2_000,
+        }
+    }
+
+    /// The outline of the shape in a frame of `width` by `height` points,
+    /// from its top left corner.
+    pub fn outline(&self, width: f64, height: f64) -> Vec<crate::PathSegment> {
+        crate::shape_path::outline(self, width, height)
+    }
+
     /// A triangle with its point at the top middle.
     pub fn triangle() -> Self {
         Self::Polygon(Arc::from(
