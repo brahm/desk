@@ -61,16 +61,28 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v5
+      # The image comes with the GNOME runtimes installed in its layers.
+      # When Flathub has a newer version, flatpak-builder updates them,
+      # and overlayfs refuses to rename the directories of a lower layer
+      # ("Invalid cross-device link"). A copy puts them in the container's
+      # own layer, where the update can rename them.
+      - name: Let Flatpak update the runtimes of the image
+        run: |
+          for dir in /var/lib/flatpak "$HOME/.local/share/flatpak" /root/.local/share/flatpak; do
+            if [ -d "$dir/repo" ]; then
+              cp -a "$dir" "$dir.copy"
+              rm -rf "$dir"
+              mv "$dir.copy" "$dir"
+              echo "Copied $dir"
+            fi
+          done
       - name: Build the bundle
         uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
         with:
           bundle: desk-writer-${{ env.CHANNEL }}.flatpak
           manifest-path: build-aux/flatpak/br.com.brahm.Desk.Writer.json
           branch: ${{ env.CHANNEL }}
-          # A restored cache makes flatpak-builder fail to update the
-          # SDK ("Invalid cross-device link") whenever the runtime has a
-          # new version since, so each build starts clean.
-          restore-cache: false
+          cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
       - name: Install the bundle
         run: |
