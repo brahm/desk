@@ -13,7 +13,9 @@
 //! in the body, or Esc, takes the cursor back there.
 
 use desk_layout::DocumentLayout;
-use desk_model::{Document, Editor, Field, MarginKind, NodeId, Paragraph, Story, StyleFamily};
+use desk_model::{
+    Document, Editor, Field, MarginKind, NodeId, ObjectKind, Paragraph, Story, StyleFamily,
+};
 
 use super::{Selection, Spot, State, TextEditor};
 
@@ -46,6 +48,7 @@ impl StoryMode {
                 MarginKind::Header => "Edit Header",
                 MarginKind::Footer => "Edit Footer",
             },
+            Story::TextBox(_) => "Edit Text Box",
         }
     }
 }
@@ -54,8 +57,12 @@ impl StoryMode {
 /// laid out, if any: the lines of a note, or the space above and below
 /// the body of a page that shows headers or footers.
 pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Story> {
-    let _ = x;
     let p = layout.pages.get(page)?;
+    if let Some(index) = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true)
+        && let ObjectKind::TextBox(_) = p.objects[index].object.kind
+    {
+        return Some(Story::TextBox(p.objects[index].object.id));
+    }
     for line in &p.note_lines {
         let (top, bottom) = (f64::from(line.top()), f64::from(line.bottom()));
         if (top - 1.0..=bottom + 1.0).contains(&y)
@@ -95,6 +102,7 @@ pub fn story_layout(
 fn story_layout_everywhere(main: &DocumentLayout, story: Story, copy: &Document) -> DocumentLayout {
     let pages: Vec<usize> = match story {
         Story::Note(_) => Vec::new(),
+        Story::TextBox(id) => text_box_page(main, id).into_iter().collect(),
         Story::Margin { section, place } => (0..main.pages.len())
             .filter(|&i| {
                 let page = &main.pages[i];
@@ -144,8 +152,26 @@ fn story_layout_on(
                 layout.pages[page].lines = lines;
             }
         }
+        Story::TextBox(id) => {
+            let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+            for &page in pages.iter().filter(|&&p| p < main.pages.len()) {
+                if let Some(placed) = main.pages[page].objects.iter().find(|o| o.object.id == id) {
+                    layout.pages[page].lines = crate::with_text_system(|system| {
+                        desk_layout::text_box_lines(copy, placed, &paragraphs, system)
+                    });
+                }
+            }
+        }
     }
     layout
+}
+
+/// The page a text box is on.
+fn text_box_page(layout: &DocumentLayout, id: NodeId) -> Option<usize> {
+    layout
+        .pages
+        .iter()
+        .position(|p| p.objects.iter().any(|o| o.object.id == id))
 }
 
 /// The marks under the mistakes of the headers, footers and notes other
@@ -225,6 +251,11 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
         }
         if !page.blank && layout.setup.footers {
             add(margin(MarginKind::Footer), index);
+        }
+        for object in &page.objects {
+            if let ObjectKind::TextBox(_) = object.object.kind {
+                add(Story::TextBox(object.object.id), index);
+            }
         }
     }
     out
@@ -344,7 +375,7 @@ impl TextEditor {
                 self.leave_story(back.map(Selection::cursor));
                 true
             }
-            Some(Story::Margin { .. }) => false,
+            Some(Story::Margin { .. } | Story::TextBox(_)) => false,
         }
     }
 
@@ -514,6 +545,10 @@ fn story_copy_ok(document: &Document, story: Story) -> bool {
     match story {
         Story::Note(id) => document.notes().get(id).is_some(),
         Story::Margin { .. } => true,
+        Story::TextBox(id) => matches!(
+            document.objects().get(id).map(|o| &o.kind),
+            Some(ObjectKind::TextBox(_))
+        ),
     }
 }
 
@@ -567,6 +602,68 @@ mod tests {
         let line = &edited.pages[0].lines[0];
         assert!(line.top() < page.body.0);
         assert_eq!(line.paragraph, 0);
+    }
+
+    #[test]
+    fn obj_13_a_text_box_is_edited_in_a_copy_and_written_back() {
+        use desk_model::{Frame, Object, Run, TextBox};
+        use std::sync::Arc;
+        let mut editor = Editor::new(Document::new_word_processing());
+        let id = editor
+            .edit("Insert Text Box", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let paragraph = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    desk_model::ParaAttrs::default(),
+                    [Run::new("Box")],
+                )?;
+                let id = edit.new_id();
+                edit.add_object(Object::new(
+                    id,
+                    ObjectKind::TextBox(TextBox::new(
+                        Arc::from([paragraph]),
+                        desk_model::Length::from_points(4),
+                    )),
+                    Frame::from_pt(300.0, 400.0, 150.0, 60.0),
+                ))?;
+                Ok(id)
+            })
+            .unwrap();
+        let document = editor.document().clone();
+        let story = Story::TextBox(id);
+        let layout = crate::lay_out(&document);
+        assert_eq!(story_at(&layout, 0, 320.0, 420.0), Some(story));
+        assert_eq!(story_at(&layout, 0, 100.0, 420.0), None);
+        assert!(story_pages(&layout).contains(&(story, 0)));
+        // The copy holds the text of the box in its body, laid out in
+        // the box, inside its inset.
+        let copy = story_copy(&document, story);
+        assert_eq!(copy.body().get(0).unwrap().text(), "Box");
+        let edited = story_layout(&layout, story, 0, &copy);
+        let line = &edited.pages[0].lines[0];
+        assert_eq!(edited.pages[0].lines.len(), 1);
+        assert_eq!(line.origin, (304.0, 404.0));
+        // Text typed in the copy goes back to the box.
+        let mut sub = Editor::new(copy);
+        let end = {
+            let p = sub.document().body().get(0).unwrap();
+            desk_model::Position::new(p.id(), p.len())
+        };
+        sub.edit("Typing", |edit| edit.insert_text(end, "ed").map(|_| ()))
+            .unwrap();
+        let paragraphs: Vec<Paragraph> = sub.document().body().iter().cloned().collect();
+        editor
+            .edit("Edit Text Box", |edit| edit.set_story(story, paragraphs))
+            .unwrap();
+        assert_eq!(editor.document().story_paragraphs(story)[0].text(), "Boxed");
+        // Find goes through the text boxes too.
+        let query = desk_model::Query::new("boxed");
+        let found = editor
+            .document()
+            .find_everywhere(&query, &editor.document().text_box_stories());
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].story, Some(story));
     }
 
     #[test]

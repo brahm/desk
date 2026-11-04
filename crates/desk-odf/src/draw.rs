@@ -49,6 +49,13 @@ pub struct GraphicProperties {
     pub vertical_pos: Option<String>,
     /// `style:vertical-rel`, as `page` or `paragraph`.
     pub vertical_rel: Option<String>,
+    /// `draw:textarea-vertical-align`: `top`, `middle`, `bottom` or
+    /// `justify`, where the text of a text box sits.
+    pub textarea_vertical_align: Option<String>,
+    /// `fo:column-count` of `style:columns`: the columns of a text box.
+    pub column_count: Option<u32>,
+    /// `fo:column-gap` of `style:columns`.
+    pub column_gap: Option<Length>,
 }
 
 /// A drawing object.
@@ -185,6 +192,15 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         horizontal_rel: text(STYLE, "horizontal-rel"),
         vertical_pos: text(STYLE, "vertical-pos"),
         vertical_rel: text(STYLE, "vertical-rel"),
+        textarea_vertical_align: text(DRAW, "textarea-vertical-align"),
+        column_count: e
+            .child(STYLE, "columns")
+            .and_then(|c| c.attr(FO, "column-count"))
+            .and_then(|n| n.parse().ok()),
+        column_gap: e
+            .child(STYLE, "columns")
+            .and_then(|c| c.attr(FO, "column-gap"))
+            .and_then(Length::parse),
     }
 }
 
@@ -230,6 +246,18 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     w.attr_opt("style:horizontal-rel", g.horizontal_rel.as_deref());
     w.attr_opt("style:vertical-pos", g.vertical_pos.as_deref());
     w.attr_opt("style:vertical-rel", g.vertical_rel.as_deref());
+    w.attr_opt(
+        "draw:textarea-vertical-align",
+        g.textarea_vertical_align.as_deref(),
+    );
+    if let Some(count) = g.column_count.filter(|&n| n > 1) {
+        w.start("style:columns");
+        w.attr("fo:column-count", &count.to_string());
+        if let Some(gap) = g.column_gap {
+            w.attr("fo:column-gap", &gap.to_string());
+        }
+        w.end();
+    }
     w.end();
 }
 

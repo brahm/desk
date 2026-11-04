@@ -15,8 +15,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use desk_model::{
-    Anchor, Document, Fill, Frame, Length, NodeId, Object, ObjectKind, Op, POLYGON_SCALE,
-    PageSetup, ParaAttrs, Paragraph, Shape, Stroke, TextBox, Wrap,
+    Anchor, Document, Fill, Frame, Length, MAX_TEXT_BOX_COLUMNS, NodeId, Object, ObjectKind, Op,
+    POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Shape, Stroke, TextBox, VerticalAlignment,
+    Wrap,
 };
 use desk_odf as odf;
 
@@ -70,7 +71,10 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             horizontal_pos,
             horizontal_rel,
             vertical_pos,
-            vertical_rel
+            vertical_rel,
+            textarea_vertical_align,
+            column_count,
+            column_gap
         );
     }
     out
@@ -219,10 +223,10 @@ fn kind(
                 let style = document.styles().default_paragraph();
                 built.push(Paragraph::new(document.new_id(), style));
             }
-            ObjectKind::TextBox(TextBox {
-                paragraphs: Arc::from(built),
-                inset: padding.map_or(Length::ZERO, length),
-            })
+            ObjectKind::TextBox(TextBox::new(
+                Arc::from(built),
+                padding.map_or(Length::ZERO, length),
+            ))
         }
         odf::DrawKind::Group(objects) => {
             let mut children = Vec::new();
@@ -286,9 +290,22 @@ fn import_one(
     depth: usize,
 ) -> Result<Option<Object>, FilterError> {
     let g = graphic(source, object.style.as_deref());
-    let Some(kind) = kind(source, document, object, paragraph, g.padding, setup, depth)? else {
+    let Some(mut kind) = kind(source, document, object, paragraph, g.padding, setup, depth)? else {
         return Ok(None);
     };
+    if let ObjectKind::TextBox(text) = &mut kind {
+        text.vertical = match g.textarea_vertical_align.as_deref() {
+            Some("middle") => VerticalAlignment::Middle,
+            Some("bottom") => VerticalAlignment::Bottom,
+            _ => VerticalAlignment::Top,
+        };
+        if let Some(count) = g.column_count {
+            text.columns = count.clamp(1, u32::from(MAX_TEXT_BOX_COLUMNS)) as u8;
+        }
+        if let Some(gap) = g.column_gap {
+            text.column_gap = length(gap);
+        }
+    }
     let (mut x, mut y, w, h, rotation) = placement(object);
     let anchor_type = object.anchor.as_deref().unwrap_or("paragraph");
     let model_anchor = match (anchor_type, anchor) {
@@ -627,6 +644,15 @@ impl Exporter<'_> {
             },
             ObjectKind::TextBox(text) => {
                 g.padding = Some(odf_length(text.inset));
+                g.textarea_vertical_align = match text.vertical {
+                    VerticalAlignment::Top => None,
+                    VerticalAlignment::Middle => Some("middle".into()),
+                    VerticalAlignment::Bottom => Some("bottom".into()),
+                };
+                if text.columns > 1 {
+                    g.column_count = Some(u32::from(text.columns));
+                    g.column_gap = Some(odf_length(text.column_gap));
+                }
                 odf::DrawKind::TextBox {
                     paragraphs: text.paragraphs.iter().map(|p| self.paragraph(p)).collect(),
                 }

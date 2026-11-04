@@ -1,14 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The texts of a document besides its body: its headers and footers and
-//! its notes, which are edited on the page as the body is (EST-12,
-//! EST-13).
+//! The texts of a document besides its body: its headers and footers,
+//! its notes and its text boxes, which are edited on the page as the body
+//! is (EST-12, EST-13, OBJ-13).
 
 use crate::document::Document;
 use crate::error::ModelError;
 use crate::header::MarginPlace;
 use crate::id::NodeId;
+use crate::object::ObjectKind;
 use crate::op::Op;
 use crate::text::{Paragraph, TextFlow};
 use crate::transaction::Edit;
@@ -26,6 +27,9 @@ pub enum Story {
         /// Which header or footer.
         place: MarginPlace,
     },
+    /// The text of a text box on the pages, by the identifier of the
+    /// object (OBJ-13).
+    TextBox(NodeId),
 }
 
 impl Document {
@@ -40,7 +44,20 @@ impl Document {
             Story::Margin { section, place } => {
                 self.section_headers_footers(section).get(place).to_vec()
             }
+            Story::TextBox(id) => match self.objects().get(id).map(|o| &o.kind) {
+                Some(ObjectKind::TextBox(text)) => text.paragraphs.to_vec(),
+                _ => Vec::new(),
+            },
         }
+    }
+
+    /// The text boxes of the document, from back to front, as stories.
+    pub fn text_box_stories(&self) -> Vec<Story> {
+        self.objects()
+            .iter()
+            .filter(|o| matches!(o.kind, ObjectKind::TextBox(_)))
+            .map(|o| Story::TextBox(o.id))
+            .collect()
     }
 
     /// The same document with other paragraphs in its body, to edit the
@@ -86,6 +103,22 @@ impl Edit {
                     paragraphs
                 };
                 self.set_section_header_footer(section, place, paragraphs)
+            }
+            Story::TextBox(id) => {
+                let mut object = self
+                    .document()
+                    .objects()
+                    .get(id)
+                    .cloned()
+                    .ok_or(ModelError::UnknownObject(id))?;
+                let ObjectKind::TextBox(text) = &mut object.kind else {
+                    return Err(ModelError::UnknownObject(id));
+                };
+                if paragraphs.is_empty() {
+                    return Ok(());
+                }
+                text.paragraphs = paragraphs.into();
+                self.replace_object(object)
             }
         }
     }

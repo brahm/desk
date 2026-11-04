@@ -20,7 +20,8 @@ use std::sync::Arc;
 use desk_layout::{DocumentLayout, PlacedObject, object_at};
 use desk_model::{
     Anchor, Distribution, Edit, Fill, Frame, Layer, Length, ModelError, NodeId, Object,
-    ObjectAlignment, ObjectKind, ParaAttrs, Paragraph, Rgba, Run, Shape, Stroke, TextBox, Wrap,
+    ObjectAlignment, ObjectKind, ParaAttrs, Paragraph, Rgba, Run, Shape, Story, Stroke, TextBox,
+    Wrap,
 };
 use gtk::gdk;
 
@@ -762,10 +763,10 @@ impl TextEditor {
                         [Run::new(&crate::i18n::tr("Text"))],
                     )?;
                     (
-                        ObjectKind::TextBox(TextBox {
-                            paragraphs: Arc::from([paragraph]),
-                            inset: Length::from_points(4),
-                        }),
+                        ObjectKind::TextBox(TextBox::new(
+                            Arc::from([paragraph]),
+                            Length::from_points(4),
+                        )),
                         None,
                         None,
                     )
@@ -792,6 +793,16 @@ impl TextEditor {
                     state.objects = vec![id];
                 }
                 self.after_change(selection);
+                if shape == NewShape::TextBox {
+                    // A new text box is edited at once, with its text
+                    // selected, so that typing replaces it.
+                    self.edit_text_box(id, page, None);
+                    let end = self.selection().focus;
+                    self.select(super::Selection {
+                        anchor: super::Spot::new(0, 0),
+                        focus: end,
+                    });
+                }
             }
             Err(error) => gtk::glib::g_warning!("desk", "cannot insert: {error}"),
         }
@@ -854,7 +865,16 @@ impl TextEditor {
             }
             return false;
         };
+        // A click in the text box being edited is a click in its text.
+        if self.story() == Some(Story::TextBox(id)) {
+            return false;
+        }
         if presses > 1 {
+            // A double click on a text box edits its text (OBJ-13).
+            let text_box = matches!(self.object_by_id(id).kind, ObjectKind::TextBox(_));
+            if text_box {
+                self.edit_text_box(id, page, Some((x, y)));
+            }
             return true;
         }
         self.leave_story(None);
@@ -873,6 +893,27 @@ impl TextEditor {
             self.start_object_drag(DragKind::Move, page, (px, py), self.selected_objects());
         }
         true
+    }
+
+    /// Puts the cursor in the text of a text box: where a point of the
+    /// view is, or at its end (OBJ-13).
+    pub(super) fn edit_text_box(&self, id: NodeId, page: usize, at: Option<(f64, f64)>) {
+        {
+            let mut state = self.state.borrow_mut();
+            state.objects.clear();
+            state.object_drag = None;
+            state.guides.clear();
+        }
+        self.show_objects();
+        self.enter_story(Story::TextBox(id), page, None);
+        if self.story() != Some(Story::TextBox(id)) {
+            return;
+        }
+        if let Some((x, y)) = at
+            && let Some(spot) = self.spot_at(x, y)
+        {
+            self.select(super::Selection::cursor(spot));
+        }
     }
 
     fn object_by_id(&self, id: NodeId) -> Object {
@@ -1075,6 +1116,23 @@ impl TextEditor {
             gdk::Key::Down | gdk::Key::KP_Down => nudge(0.0, step),
             gdk::Key::Delete | gdk::Key::KP_Delete | gdk::Key::BackSpace => self.delete_objects(),
             gdk::Key::Escape => self.select_objects(Vec::new()),
+            // Return edits the text of a selected text box (OBJ-13).
+            gdk::Key::Return | gdk::Key::KP_Enter => {
+                let ids = self.selected_objects();
+                let found = match ids[..] {
+                    [id] => find(&self.state.borrow().layout, id).map(|(page, placed)| {
+                        (
+                            id,
+                            page,
+                            matches!(placed.object.kind, ObjectKind::TextBox(_)),
+                        )
+                    }),
+                    _ => None,
+                };
+                if let Some((id, page, true)) = found {
+                    self.edit_text_box(id, page, None);
+                }
+            }
             // Other keys do nothing while objects are selected, rather
             // than typing in the text that is not in sight.
             _ => return !modifiers.contains(gdk::ModifierType::CONTROL_MASK),

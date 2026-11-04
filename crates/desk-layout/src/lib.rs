@@ -26,7 +26,7 @@ mod notes;
 mod objects;
 mod pages;
 
-pub use objects::{PlacedObject, object_at, place_object_text};
+pub use objects::{PlacedObject, object_at, place_object_text, text_box_lines};
 
 pub use pages::{
     DocumentLayout, NOTE_RULE_LENGTH, NOTE_RULE_WIDTH, Page, PlacedBlock, PlacedLine, margin_lines,

@@ -245,10 +245,7 @@ fn obj_08_obj_13_objects_are_painted_rotated_and_faded() {
             )?;
             let mut text = Object::new(
                 edit.new_id(),
-                ObjectKind::TextBox(TextBox {
-                    paragraphs: Arc::from([paragraph]),
-                    inset: Length::from_points(4),
-                }),
+                ObjectKind::TextBox(TextBox::new(Arc::from([paragraph]), Length::from_points(4))),
                 Frame::from_pt(20.0, 120.0, 100.0, 40.0),
             );
             text.wrap = Wrap::Through;

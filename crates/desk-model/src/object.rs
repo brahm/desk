@@ -159,7 +159,43 @@ pub struct TextBox {
     pub paragraphs: Arc<[Paragraph]>,
     /// The room between the frame and the text, on every side.
     pub inset: Length,
+    /// Where the text sits in the frame, from top to bottom, when it
+    /// does not fill it.
+    pub vertical: VerticalAlignment,
+    /// How many columns the text flows through, from 1.
+    pub columns: u8,
+    /// The room between two columns.
+    pub column_gap: Length,
 }
+
+impl TextBox {
+    /// A text box with paragraphs, an inset, its text at the top and one
+    /// column.
+    pub fn new(paragraphs: Arc<[Paragraph]>, inset: Length) -> Self {
+        Self {
+            paragraphs,
+            inset,
+            vertical: VerticalAlignment::Top,
+            columns: 1,
+            column_gap: Length::from_points(18),
+        }
+    }
+}
+
+/// Where the text of a text box sits, from top to bottom (OBJ-13).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum VerticalAlignment {
+    /// At the top.
+    #[default]
+    Top,
+    /// In the middle.
+    Middle,
+    /// At the bottom.
+    Bottom,
+}
+
+/// The most columns a text box has, as Pages allows.
+pub const MAX_TEXT_BOX_COLUMNS: u8 = 10;
 
 /// A rectangle on the page, from its top left corner.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -369,10 +405,7 @@ mod tests {
             let id = edit.new_id();
             let paragraph =
                 Paragraph::from_runs(first, body, ParaAttrs::default(), [Run::new("x")])?;
-            let text = TextBox {
-                paragraphs: Arc::from([paragraph]),
-                inset: Length::from_points(4),
-            };
+            let text = TextBox::new(Arc::from([paragraph]), Length::from_points(4));
             edit.add_object(Object::new(id, ObjectKind::TextBox(text), Frame::default()))
         });
         // The paragraph of the body already has that identifier.
@@ -382,10 +415,7 @@ mod tests {
                 let (id, p) = (edit.new_id(), edit.new_id());
                 let paragraph =
                     Paragraph::from_runs(p, body, ParaAttrs::default(), [Run::new("x")])?;
-                let text = TextBox {
-                    paragraphs: Arc::from([paragraph]),
-                    inset: Length::from_points(4),
-                };
+                let text = TextBox::new(Arc::from([paragraph]), Length::from_points(4));
                 let object = Object::new(id, ObjectKind::TextBox(text), Frame::default());
                 edit.add_object(object.clone())?;
                 Ok(object)
