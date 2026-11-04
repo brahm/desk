@@ -1748,9 +1748,13 @@ fn with_objects() -> Document {
             square.wrap_margin = Length::from_points(6);
             square.style.fill = Some(Fill::Color(Rgba::rgb(200, 10, 20)));
             square.style.stroke = Some(Stroke {
-                color: Rgba::rgb(0, 0, 255),
-                width: Length::from_points(2),
                 style: BorderStyle::Dashed,
+                ..Stroke::new(Rgba::rgb(0, 0, 255), Length::from_points(2))
+            });
+            square.style.shadow = Some(desk_model::ObjectShadow {
+                color: Rgba::rgb(0, 80, 0),
+                opacity: 50,
+                ..desk_model::ObjectShadow::default()
             });
             square.style.opacity = 80;
             edit.add_object(square)?;
@@ -1761,6 +1765,11 @@ fn with_objects() -> Document {
             );
             ellipse.anchor = Anchor::Paragraph(second);
             ellipse.wrap = Wrap::Behind;
+            ellipse.style.fill = Some(Fill::Gradient {
+                from: Rgba::rgb(255, 200, 0),
+                to: Rgba::rgb(0, 0, 120),
+                angle: 4500,
+            });
             let typed = Paragraph::from_runs(
                 edit.new_id(),
                 style,
@@ -1778,9 +1787,9 @@ fn with_objects() -> Document {
                 Frame::from_pt(10.0, 20.0, 100.0, 50.0),
             );
             line.style.stroke = Some(Stroke {
-                color: Rgba::BLACK,
-                width: Length::from_points(1),
-                style: BorderStyle::Solid,
+                start: desk_model::LineEnd::Circle,
+                end: desk_model::LineEnd::Arrow,
+                ..Stroke::new(Rgba::BLACK, Length::from_points(1))
             });
             line.wrap = Wrap::Through;
             edit.add_object(line)?;
@@ -1998,6 +2007,68 @@ fn obj_08_shapes_of_other_programs_are_read() {
     assert!((center_x - (margin + 1.5 * cm)).abs() < 0.01, "{center_x}");
     assert!((center_y - 2.0 * cm).abs() < 0.01, "{center_y}");
     let _ = export(&document);
+}
+
+#[test]
+fn obj_09_obj_10_obj_11_effects_of_other_programs_are_read() {
+    let ns = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+  xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"
+  office:version="1.3""#;
+    let styles = format!(
+        r##"<office:document-styles {ns}><office:styles>
+  <draw:gradient draw:name="Sunrise" draw:style="linear" draw:start-color="#ff0000"
+    draw:end-color="#0000ff" draw:angle="90deg" draw:border="0%"/>
+  <draw:marker draw:name="Line_20_Arrow" svg:viewBox="0 0 10 10" svg:d="M0 0h10v10z"/>
+  <draw:marker draw:name="Circle" svg:viewBox="0 0 10 10" svg:d="M0 0h10v10z"/>
+ </office:styles></office:document-styles>"##
+    );
+    let content = format!(
+        r##"<office:document-content {ns}>
+ <office:automatic-styles>
+  <style:style style:name="gr1" style:family="graphic">
+   <style:graphic-properties draw:fill="gradient" draw:fill-gradient-name="Sunrise"
+     draw:shadow="visible" draw:shadow-offset-x="3pt" draw:shadow-offset-y="-3pt"
+     draw:shadow-color="#808080" draw:shadow-opacity="40%" loext:shadow-blur="2pt"/>
+  </style:style>
+  <style:style style:name="gr2" style:family="graphic">
+   <style:graphic-properties draw:stroke="solid" draw:marker-start="Circle"
+     draw:marker-end="Line_20_Arrow"/>
+  </style:style>
+ </office:automatic-styles>
+ <office:body><office:text>
+  <text:p>Text<draw:rect text:anchor-type="paragraph" draw:style-name="gr1"
+     svg:width="2cm" svg:height="1cm" svg:x="1cm" svg:y="0.5cm"/><draw:line
+     text:anchor-type="paragraph" draw:style-name="gr2"
+     svg:x1="0cm" svg:y1="0cm" svg:x2="2cm" svg:y2="1cm"/></text:p>
+ </office:text></office:body>
+</office:document-content>"##
+    );
+    let source = odf::read_streams(&content, Some(&styles), None).unwrap();
+    let document = import(&source).unwrap();
+    let mut objects = document.objects().iter();
+    let rect = objects.next().unwrap();
+    // ODF turns a gradient from going down; at a quarter, it goes right.
+    assert_eq!(
+        rect.style.fill,
+        Some(desk_model::Fill::Gradient {
+            from: Rgba::rgb(255, 0, 0),
+            to: Rgba::rgb(0, 0, 255),
+            angle: 0,
+        })
+    );
+    let shadow = rect.style.shadow.unwrap();
+    assert_eq!(shadow.color, Rgba::rgb(0x80, 0x80, 0x80));
+    assert_eq!(shadow.opacity, 40);
+    assert_eq!(shadow.angle, 4500);
+    assert_eq!(shadow.offset, Length::from_pt(4.2));
+    assert_eq!(shadow.blur, Length::from_points(2));
+    let line = objects.next().unwrap().style.stroke.unwrap();
+    assert_eq!(line.start, desk_model::LineEnd::Circle);
+    assert_eq!(line.end, desk_model::LineEnd::OpenArrow);
 }
 
 #[test]

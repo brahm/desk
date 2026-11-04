@@ -71,6 +71,10 @@ pub struct TextDocument {
     /// The drawing objects outside any paragraph, as those anchored to
     /// pages, written before the first paragraph.
     pub page_objects: Vec<crate::draw::DrawObject>,
+    /// The gradients that graphic styles fill with, by name.
+    pub gradients: Vec<crate::draw::Gradient>,
+    /// The markers at the ends of lines, by name.
+    pub markers: Vec<crate::draw::Marker>,
 }
 
 /// The configuration of the footnotes or the endnotes of a document

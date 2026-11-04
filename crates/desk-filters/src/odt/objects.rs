@@ -60,6 +60,17 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             stroke_color,
             stroke_width,
             stroke_style,
+            fill_gradient_name,
+            marker_start,
+            marker_start_width,
+            marker_end,
+            marker_end_width,
+            shadow,
+            shadow_offset_x,
+            shadow_offset_y,
+            shadow_color,
+            shadow_opacity,
+            shadow_blur,
             opacity,
             wrap,
             run_through,
@@ -77,6 +88,113 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
         );
     }
     out
+}
+
+/// A gradient of ODF as Desk fills with it: along a line, from one
+/// color to the other (OBJ-09). Other kinds of gradients are taken as
+/// along a line.
+fn model_gradient(gradient: &odf::Gradient) -> Fill {
+    // ODF turns its gradient counterclockwise from going down; Desk
+    // measures the way it goes counterclockwise from going right.
+    let angle = ((gradient.angle + 270.0) * 100.0).round() as i64;
+    Fill::Gradient {
+        from: gradient.start_color.map_or(desk_model::Rgba::BLACK, rgba),
+        to: gradient.end_color.map_or(desk_model::Rgba::WHITE, rgba),
+        angle: angle.rem_euclid(36000) as i32,
+    }
+}
+
+/// The gradient of ODF that fills as Desk does, without its name.
+fn odf_gradient(from: desk_model::Rgba, to: desk_model::Rgba, angle: i32) -> odf::Gradient {
+    odf::Gradient {
+        name: String::new(),
+        style: "linear".into(),
+        start_color: Some(odf_color(from)),
+        end_color: Some(odf_color(to)),
+        angle: (f64::from(angle) / 100.0 - 270.0).rem_euclid(360.0),
+        border: Some(0.0),
+    }
+}
+
+/// The end of a line that a marker of ODF draws, by its name, as near as
+/// Desk has one (OBJ-10).
+fn line_end(marker: Option<&str>) -> desk_model::LineEnd {
+    use desk_model::LineEnd;
+    // Names in styles write a space as `_20_`.
+    let Some(name) = marker
+        .map(|n| n.replace("_20_", " ").to_lowercase())
+        .filter(|n| !n.is_empty())
+    else {
+        return LineEnd::None;
+    };
+    if name.contains("open") || name.contains("line arrow") {
+        LineEnd::OpenArrow
+    } else if name.contains("circle") {
+        LineEnd::Circle
+    } else if name.contains("square") || name.contains("diamond") {
+        LineEnd::Square
+    } else if name.contains("bar") || name.contains("dimension") || name.contains("short") {
+        LineEnd::Bar
+    } else {
+        LineEnd::Arrow
+    }
+}
+
+/// The marker that Desk writes for an end of a line, with its shape.
+fn marker(end: desk_model::LineEnd) -> Option<odf::Marker> {
+    use desk_model::LineEnd;
+    let (name, view_box, d) = match end {
+        LineEnd::None => return None,
+        LineEnd::Arrow => ("Arrow", "0 0 20 30", "M10 0l-10 30h20z"),
+        LineEnd::OpenArrow => (
+            "Open_20_Arrow",
+            "0 0 20 20",
+            "M10 0l10 18-3 2-7-13-7 13-3-2z",
+        ),
+        LineEnd::Circle => (
+            "Circle",
+            "0 0 20 20",
+            "M0 10a10 10 0 1 0 20 0a10 10 0 1 0-20 0z",
+        ),
+        LineEnd::Square => ("Square", "0 0 20 20", "M0 0h20v20h-20z"),
+        LineEnd::Bar => ("Bar", "0 0 20 4", "M0 0h20v4h-20z"),
+    };
+    Some(odf::Marker {
+        name: name.into(),
+        view_box: view_box.into(),
+        d: d.into(),
+    })
+}
+
+/// The shadow of an object from the properties of its graphic style
+/// (OBJ-11): its offset as a distance and a direction, in whole degrees
+/// and tenths of a point.
+fn model_shadow(g: &odf::GraphicProperties) -> desk_model::ObjectShadow {
+    let default = desk_model::ObjectShadow::default();
+    let (dx, dy) = match (g.shadow_offset_x, g.shadow_offset_y) {
+        (None, None) => default.offset_xy(),
+        (x, y) => (
+            x.map_or(0.0, |x| length(x).to_pt()),
+            y.map_or(0.0, |y| length(y).to_pt()),
+        ),
+    };
+    let offset = ((dx.hypot(dy) * 10.0).round() / 10.0).min(1000.0);
+    let angle = if offset > 0.0 {
+        ((-dy).atan2(dx).to_degrees().round() as i32).rem_euclid(360) * 100
+    } else {
+        default.angle
+    };
+    desk_model::ObjectShadow {
+        color: g.shadow_color.map_or(desk_model::Rgba::BLACK, rgba),
+        angle,
+        offset: Length::from_pt(offset),
+        blur: g.shadow_blur.map_or(Length::ZERO, |b| {
+            Length::from_pt((length(b).to_pt() * 10.0).round() / 10.0)
+        }),
+        opacity: g
+            .shadow_opacity
+            .map_or(100, |o| o.round().clamp(0.0, 100.0) as u8),
+    }
 }
 
 /// A predefined shape of other programs, as near as Desk has one.
@@ -359,7 +477,14 @@ fn import_one(
         Some(_) => true,
         None => g.fill_color.is_some(),
     };
-    if filled && let Some(color) = g.fill_color {
+    let gradient = g
+        .fill_gradient_name
+        .as_deref()
+        .filter(|_| g.fill.as_deref() == Some("gradient"))
+        .and_then(|name| source.gradients.iter().find(|d| d.name == name));
+    if let Some(gradient) = gradient {
+        style.fill = Some(model_gradient(gradient));
+    } else if filled && let Some(color) = g.fill_color {
         style.fill = Some(Fill::Color(rgba(color)));
     }
     let stroked = match g.stroke.as_deref() {
@@ -380,7 +505,12 @@ fn import_one(
                 (Some("dash"), _) => desk_model::BorderStyle::Dashed,
                 _ => desk_model::BorderStyle::Solid,
             },
+            start: line_end(g.marker_start.as_deref()),
+            end: line_end(g.marker_end.as_deref()),
         });
+    }
+    if g.shadow.as_deref() == Some("visible") {
+        style.shadow = Some(model_shadow(&g));
     }
     if let Some(opacity) = g.opacity {
         style.opacity = opacity.round().clamp(0.0, 100.0) as u8;
@@ -568,6 +698,10 @@ pub(super) struct Exporter<'a> {
     pub names: &'a HashMap<desk_model::StyleId, String>,
     pub automatic: &'a mut Vec<odf::Style>,
     pub pictures: &'a mut Vec<(String, Vec<u8>)>,
+    /// The gradients that the objects fill with.
+    pub gradients: Vec<odf::Gradient>,
+    /// The markers at the ends of their lines.
+    pub markers: Vec<odf::Marker>,
 }
 
 impl Exporter<'_> {
@@ -602,6 +736,33 @@ impl Exporter<'_> {
             ..odf::Style::default()
         });
         name
+    }
+
+    /// The name of a gradient like this one, added when there is none
+    /// yet.
+    fn gradient(&mut self, gradient: odf::Gradient) -> String {
+        if let Some(existing) = self.gradients.iter().find(|g| {
+            odf::Gradient {
+                name: String::new(),
+                ..(*g).clone()
+            } == gradient
+        }) {
+            return existing.name.clone();
+        }
+        let name = format!("Gradient_{}", self.gradients.len() + 1);
+        self.gradients.push(odf::Gradient {
+            name: name.clone(),
+            ..gradient
+        });
+        name
+    }
+
+    /// The name of a marker, added when it is not there yet.
+    fn marker(&mut self, marker: odf::Marker) -> String {
+        if !self.markers.iter().any(|m| m.name == marker.name) {
+            self.markers.push(marker.clone());
+        }
+        marker.name
     }
 
     /// A paragraph of a text box, with automatic styles for what is set
@@ -686,6 +847,11 @@ impl Exporter<'_> {
                 g.fill = Some("solid".into());
                 g.fill_color = Some(odf_color(color));
             }
+            Some(Fill::Gradient { from, to, angle }) => {
+                g.fill = Some("gradient".into());
+                g.fill_color = Some(odf_color(from));
+                g.fill_gradient_name = Some(self.gradient(odf_gradient(from, to, angle)));
+            }
             _ => g.fill = Some("none".into()),
         }
         match style.stroke {
@@ -705,11 +871,30 @@ impl Exporter<'_> {
                     desk_model::BorderStyle::Dashed => Some("dashed".into()),
                     desk_model::BorderStyle::Dotted => Some("dotted".into()),
                 };
+                // As wide as the ends that Desk draws.
+                let size = odf_length(Length::from_pt((stroke.width.to_pt() * 3.0).max(6.0)));
+                if let Some(m) = marker(stroke.start) {
+                    g.marker_start = Some(self.marker(m));
+                    g.marker_start_width = Some(size);
+                }
+                if let Some(m) = marker(stroke.end) {
+                    g.marker_end = Some(self.marker(m));
+                    g.marker_end_width = Some(size);
+                }
             }
             None => g.stroke = Some("none".into()),
         }
         if style.opacity < 100 {
             g.opacity = Some(f64::from(style.opacity));
+        }
+        if let Some(shadow) = style.shadow {
+            let (dx, dy) = shadow.offset_xy();
+            g.shadow = Some("visible".into());
+            g.shadow_offset_x = Some(odf_length(Length::from_pt(dx)));
+            g.shadow_offset_y = Some(odf_length(Length::from_pt(dy)));
+            g.shadow_color = Some(odf_color(shadow.color));
+            g.shadow_opacity = Some(f64::from(shadow.opacity));
+            g.shadow_blur = Some(odf_length(shadow.blur));
         }
         let (wrap, through) = match object.wrap {
             Wrap::Both => ("parallel", None),
@@ -931,4 +1116,6 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
             None => out.page_objects.push(drawn),
         }
     }
+    out.gradients = std::mem::take(&mut exporter.gradients);
+    out.markers = std::mem::take(&mut exporter.markers);
 }

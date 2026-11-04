@@ -31,4 +31,4 @@ mod display;
 pub use cairo;
 
 pub use backend::{Painter, RenderError};
-pub use display::{DisplayList, Item, PathOp, PathStroke, PlacedGlyph, shape_path};
+pub use display::{DisplayList, Item, Paint, PathOp, PathStroke, PlacedGlyph, shape_path};

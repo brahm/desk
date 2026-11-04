@@ -737,6 +737,45 @@ impl TextEditor {
         });
     }
 
+    /// Changes the style of the selected objects but the locked ones, and
+    /// of the objects of the selected groups, as the Graphic inspector
+    /// asks (OBJ-09, OBJ-10, OBJ-11). `change` learns whether the object
+    /// is a line.
+    pub fn style_objects(&self, name: &str, change: impl Fn(&mut desk_model::GraphicStyle, bool)) {
+        fn restyle(object: &mut Object, change: &dyn Fn(&mut desk_model::GraphicStyle, bool)) {
+            if let ObjectKind::Group(members) = &object.kind {
+                let members: Vec<Object> = members
+                    .iter()
+                    .map(|m| {
+                        let mut m = m.clone();
+                        restyle(&mut m, change);
+                        m
+                    })
+                    .collect();
+                object.kind = ObjectKind::Group(members.into());
+            } else {
+                let line = matches!(object.kind, ObjectKind::Shape(Shape::Line { .. }));
+                change(&mut object.style, line);
+            }
+        }
+        self.arrange_objects(name, |edit, ids| {
+            for &id in ids {
+                let Some(object) = edit.document().objects().get(id).cloned() else {
+                    continue;
+                };
+                if object.locked {
+                    continue;
+                }
+                let mut changed = object.clone();
+                restyle(&mut changed, &change);
+                if changed != object {
+                    edit.replace_object(changed)?;
+                }
+            }
+            Ok(None)
+        });
+    }
+
     /// Changes the first selected object as the inspectors ask: its frame
     /// on its page, in points, its rotation, its wrap and its margin.
     pub fn set_object(&self, name: &str, change: impl FnOnce(&mut Object)) {
@@ -794,11 +833,7 @@ impl TextEditor {
         let selection = self.selection();
         let result = self.state.borrow_mut().editor.edit(name, |edit| {
             let id = edit.new_id();
-            let line = Stroke {
-                color: Rgba::BLACK,
-                width: Length::from_points(1),
-                style: desk_model::BorderStyle::Solid,
-            };
+            let line = Stroke::new(Rgba::BLACK, Length::from_points(1));
             // The blue that the shapes of Pages are filled with.
             let blue = Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8));
             let (kind, fill, stroke) = match shape {

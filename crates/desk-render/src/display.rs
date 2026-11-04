@@ -4,7 +4,9 @@
 //! The display list: what a page draws, in page coordinates.
 
 use desk_layout::{DocumentLayout, Page, PlacedBlock, PlacedLine, PlacedObject};
-use desk_model::{BorderSides, Fill, LineStyle, ObjectKind, POLYGON_SCALE, Rgba, Shape, Wrap};
+use desk_model::{
+    BorderSides, Fill, LineEnd, LineStyle, ObjectKind, POLYGON_SCALE, Rgba, Shape, Wrap,
+};
 use desk_text::FontData;
 
 /// One glyph, placed on the page.
@@ -86,8 +88,8 @@ pub enum Item {
     Path {
         /// The path.
         path: Vec<PathOp>,
-        /// The color inside it; none when it is not filled.
-        fill: Option<Rgba>,
+        /// What fills it; none when it is not filled.
+        fill: Option<Paint>,
         /// The line along it; none when it is not outlined.
         stroke: Option<PathStroke>,
     },
@@ -102,6 +104,18 @@ pub enum Item {
         /// The items, from back to front.
         items: Vec<Item>,
     },
+    /// The blurred shadow that items cast, offset from them, without the
+    /// items themselves (OBJ-11).
+    CastShadow {
+        /// The items that cast it.
+        items: Vec<Item>,
+        /// How far it falls right and down.
+        offset: (f32, f32),
+        /// The radius of the blur.
+        blur: f32,
+        /// The color, with the opacity of the shadow.
+        color: Rgba,
+    },
     /// A filled rectangle, as for underlines and strikethroughs.
     Rect {
         /// The left edge.
@@ -114,6 +128,25 @@ pub enum Item {
         height: f32,
         /// The color.
         color: Rgba,
+    },
+}
+
+/// What fills a path.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Paint {
+    /// One color.
+    Color(Rgba),
+    /// A color that turns into another along a line, from its start to
+    /// its end, and stays the same across it (OBJ-09).
+    Linear {
+        /// Where the first color is.
+        start: (f32, f32),
+        /// Where the second color is.
+        end: (f32, f32),
+        /// The color at the start.
+        from: Rgba,
+        /// The color at the end.
+        to: Rgba,
     },
 }
 
@@ -386,8 +419,22 @@ fn object_item(placed: &PlacedObject) -> Item {
     let mut list = DisplayList::default();
     let style = &object.style;
     let fill = style.fill.map(|fill| match fill {
-        Fill::Color(color) => color,
-        _ => Rgba::BLACK,
+        Fill::Color(color) => Paint::Color(color),
+        Fill::Gradient { from, to, angle } => {
+            // Across the frame, through its center, as far as its corners
+            // reach along the way it goes.
+            let a = (angle as f32 / 100.0).to_radians();
+            let (dx, dy) = (a.cos(), -a.sin());
+            let half = (w * dx.abs() + h * dy.abs()) / 2.0;
+            let (cx, cy) = (x + w / 2.0, y + h / 2.0);
+            Paint::Linear {
+                start: (cx - dx * half, cy - dy * half),
+                end: (cx + dx * half, cy + dy * half),
+                from,
+                to,
+            }
+        }
+        _ => Paint::Color(Rgba::BLACK),
     });
     let stroke = style.stroke.map(|stroke| {
         let width = stroke.width.to_pt() as f32;
@@ -404,11 +451,22 @@ fn object_item(placed: &PlacedObject) -> Item {
     });
     let mut flips = true;
     match &object.kind {
+        ObjectKind::Shape(Shape::Line { rising }) => {
+            let (y0, y1) = if *rising { (y + h, y) } else { (y, y + h) };
+            if let (Some(stroke), Some(model)) = (stroke, style.stroke) {
+                list.items.extend(line_items(
+                    (x, y0),
+                    (x + w, y1),
+                    stroke,
+                    model.start,
+                    model.end,
+                ));
+            }
+        }
         ObjectKind::Shape(shape) => {
-            let line = matches!(shape, Shape::Line { .. });
             let path = Item::Path {
                 path: shape_path(shape, x, y, w, h),
-                fill: if line { None } else { fill },
+                fill,
                 stroke,
             };
             if placed.lines.is_empty() {
@@ -484,11 +542,156 @@ fn object_item(placed: &PlacedObject) -> Item {
         cx - (xx * cx + xy * cy),
         cy - (yx * cx + yy * cy),
     ];
-    Item::Group {
+    let opacity = f32::from(style.opacity.min(100)) / 100.0;
+    let Some(shadow) = style.shadow else {
+        return Item::Group {
+            transform,
+            opacity,
+            items: list.items,
+        };
+    };
+    // The shadow falls on the page the same way however the object is
+    // turned, and fades with it.
+    let object = Item::Group {
         transform,
-        opacity: f32::from(style.opacity.min(100)) / 100.0,
+        opacity: 1.0,
         items: list.items,
+    };
+    let (dx, dy) = shadow.offset_xy();
+    let mut color = shadow.color;
+    color.a = (u16::from(color.a) * u16::from(shadow.opacity.min(100)) / 100) as u8;
+    Item::Group {
+        transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        opacity,
+        items: vec![
+            Item::CastShadow {
+                items: vec![object.clone()],
+                offset: (dx as f32, dy as f32),
+                blur: shadow.blur.to_pt() as f32,
+                color,
+            },
+            object,
+        ],
     }
+}
+
+/// The items that draw a line from one point to another with its ends
+/// (OBJ-10): the line stops short of a filled arrowhead, which ends where
+/// the line would.
+fn line_items(
+    from: (f32, f32),
+    to: (f32, f32),
+    stroke: PathStroke,
+    start: LineEnd,
+    end: LineEnd,
+) -> Vec<Item> {
+    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+    let length = (dx * dx + dy * dy).sqrt();
+    let (ux, uy) = if length > 0.0 {
+        (dx / length, dy / length)
+    } else {
+        (1.0, 0.0)
+    };
+    // As large as Pages draws them beside a line of a width.
+    let size = (stroke.width * 3.0).max(6.0);
+    let mut items = Vec::new();
+    let mut ends = |at: (f32, f32), dir: (f32, f32), kind: LineEnd| -> (f32, f32) {
+        use PathOp::{Close, Curve, Line, Move};
+        let (px, py) = (-dir.1, dir.0);
+        let back = |d: f32| (at.0 - dir.0 * d, at.1 - dir.1 * d);
+        let filled = |path| Item::Path {
+            path,
+            fill: Some(Paint::Color(stroke.color)),
+            stroke: None,
+        };
+        let plain = PathStroke {
+            dashes: Vec::new(),
+            ..stroke.clone()
+        };
+        match kind {
+            LineEnd::None => at,
+            LineEnd::Arrow => {
+                let base = back(size * 1.5);
+                items.push(filled(vec![
+                    Move(at.0, at.1),
+                    Line(base.0 + px * size / 2.0, base.1 + py * size / 2.0),
+                    Line(base.0 - px * size / 2.0, base.1 - py * size / 2.0),
+                    Close,
+                ]));
+                back(size * 1.5 - stroke.width / 2.0)
+            }
+            LineEnd::OpenArrow => {
+                let base = back(size * 1.5);
+                items.push(Item::Path {
+                    path: vec![
+                        Move(base.0 + px * size / 2.0, base.1 + py * size / 2.0),
+                        Line(at.0, at.1),
+                        Line(base.0 - px * size / 2.0, base.1 - py * size / 2.0),
+                    ],
+                    fill: None,
+                    stroke: Some(plain),
+                });
+                at
+            }
+            LineEnd::Circle => {
+                let r = size / 2.0;
+                let k = r * KAPPA;
+                let (cx, cy) = at;
+                items.push(filled(vec![
+                    Move(cx + r, cy),
+                    Curve(cx + r, cy + k, cx + k, cy + r, cx, cy + r),
+                    Curve(cx - k, cy + r, cx - r, cy + k, cx - r, cy),
+                    Curve(cx - r, cy - k, cx - k, cy - r, cx, cy - r),
+                    Curve(cx + k, cy - r, cx + r, cy - k, cx + r, cy),
+                    Close,
+                ]));
+                at
+            }
+            LineEnd::Square => {
+                let r = size / 2.0;
+                let corner = |a: f32, b: f32| {
+                    (
+                        at.0 + dir.0 * r * a + px * r * b,
+                        at.1 + dir.1 * r * a + py * r * b,
+                    )
+                };
+                let points = [
+                    corner(1.0, 1.0),
+                    corner(-1.0, 1.0),
+                    corner(-1.0, -1.0),
+                    corner(1.0, -1.0),
+                ];
+                items.push(filled(vec![
+                    Move(points[0].0, points[0].1),
+                    Line(points[1].0, points[1].1),
+                    Line(points[2].0, points[2].1),
+                    Line(points[3].0, points[3].1),
+                    Close,
+                ]));
+                at
+            }
+            LineEnd::Bar => {
+                items.push(Item::Path {
+                    path: vec![
+                        Move(at.0 + px * size / 2.0, at.1 + py * size / 2.0),
+                        Line(at.0 - px * size / 2.0, at.1 - py * size / 2.0),
+                    ],
+                    fill: None,
+                    stroke: Some(plain),
+                });
+                at
+            }
+        }
+    };
+    let a = ends(from, (-ux, -uy), start);
+    let b = ends(to, (ux, uy), end);
+    let mut out = vec![Item::Path {
+        path: vec![PathOp::Move(a.0, a.1), PathOp::Line(b.0, b.1)],
+        fill: None,
+        stroke: Some(stroke),
+    }];
+    out.extend(items);
+    out
 }
 
 /// How far the control points of a Bézier curve that draws a quarter of a

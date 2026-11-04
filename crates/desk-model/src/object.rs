@@ -310,7 +310,8 @@ pub enum Wrap {
     Behind,
 }
 
-/// How an object is filled and outlined.
+/// How an object is filled and outlined, as the Graphic inspector of
+/// Pages sets it (OBJ-09, OBJ-10).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphicStyle {
     /// What fills its inside; nothing when none.
@@ -319,6 +320,8 @@ pub struct GraphicStyle {
     pub stroke: Option<Stroke>,
     /// How opaque the whole object is, in percent.
     pub opacity: u8,
+    /// The shadow it casts on the page; none when it casts none.
+    pub shadow: Option<ObjectShadow>,
 }
 
 impl Default for GraphicStyle {
@@ -327,6 +330,7 @@ impl Default for GraphicStyle {
             fill: None,
             stroke: None,
             opacity: 100,
+            shadow: None,
         }
     }
 }
@@ -337,6 +341,18 @@ impl Default for GraphicStyle {
 pub enum Fill {
     /// One color.
     Color(Rgba),
+    /// A color that turns into another along a straight line across the
+    /// object (OBJ-09).
+    Gradient {
+        /// The color where it starts.
+        from: Rgba,
+        /// The color where it ends.
+        to: Rgba,
+        /// Which way it goes, in hundredths of a degree counterclockwise
+        /// from left to right, as Pages measures it: 9000 goes from the
+        /// bottom up.
+        angle: i32,
+    },
 }
 
 /// The line around an object.
@@ -348,6 +364,80 @@ pub struct Stroke {
     pub width: Length,
     /// How it is drawn.
     pub style: BorderStyle,
+    /// What the start of a line ends in (OBJ-10).
+    pub start: LineEnd,
+    /// What the end of a line ends in.
+    pub end: LineEnd,
+}
+
+impl Stroke {
+    /// A solid line of a color and width, with plain ends.
+    pub fn new(color: Rgba, width: Length) -> Self {
+        Self {
+            color,
+            width,
+            style: BorderStyle::Solid,
+            start: LineEnd::None,
+            end: LineEnd::None,
+        }
+    }
+}
+
+/// What an end of a line ends in, as the endpoints of Pages (OBJ-10).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum LineEnd {
+    /// Nothing: the line stops there.
+    #[default]
+    None,
+    /// A filled arrowhead.
+    Arrow,
+    /// An arrowhead of two strokes.
+    OpenArrow,
+    /// A filled circle.
+    Circle,
+    /// A filled square.
+    Square,
+    /// A short bar across the line.
+    Bar,
+}
+
+/// The shadow an object casts, as the Graphic inspector of Pages sets it
+/// (OBJ-11).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ObjectShadow {
+    /// The color.
+    pub color: Rgba,
+    /// Which way it falls from the object, in hundredths of a degree
+    /// counterclockwise from the right: 31500 is down and to the right.
+    pub angle: i32,
+    /// How far it falls.
+    pub offset: Length,
+    /// How blurred it is.
+    pub blur: Length,
+    /// How opaque it is, in percent.
+    pub opacity: u8,
+}
+
+impl Default for ObjectShadow {
+    /// The shadow of Pages: black, down and to the right.
+    fn default() -> Self {
+        Self {
+            color: Rgba::BLACK,
+            angle: 31_500,
+            offset: Length::from_points(5),
+            blur: Length::from_points(4),
+            opacity: 75,
+        }
+    }
+}
+
+impl ObjectShadow {
+    /// How far the shadow falls right and down, in points.
+    pub fn offset_xy(&self) -> (f64, f64) {
+        let angle = (f64::from(self.angle) / 100.0).to_radians();
+        let offset = self.offset.to_pt();
+        (offset * angle.cos(), -offset * angle.sin())
+    }
 }
 
 /// The objects of a document, from back to front.

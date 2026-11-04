@@ -53,6 +53,8 @@ pub struct ObjectGroups {
     text_group: adw::PreferencesGroup,
     vertical: adw::ComboRow,
     columns: adw::SpinRow,
+    /// What fills the objects, their lines and their shadows.
+    graphic: Rc<crate::graphic_pane::GraphicGroup>,
     units: Cell<Units>,
     updating: Cell<bool>,
 }
@@ -183,6 +185,7 @@ impl ObjectGroups {
             text_group,
             vertical,
             columns,
+            graphic: crate::graphic_pane::GraphicGroup::new(editor.clone()),
             units: Cell::new(units),
             updating: Cell::new(false),
         });
@@ -328,8 +331,13 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 3] {
-        [&self.metrics, &self.wrap_group, &self.text_group]
+    pub fn groups(&self) -> [&adw::PreferencesGroup; 4] {
+        [
+            &self.metrics,
+            self.graphic.group(),
+            &self.wrap_group,
+            &self.text_group,
+        ]
     }
 
     /// The frame on the page that a row asks for, with the other side
@@ -377,6 +385,7 @@ impl ObjectGroups {
         self.metrics.set_visible(info.is_some());
         self.wrap_group.set_visible(info.is_some());
         self.text_group.set_visible(false);
+        self.graphic.show(info);
         let Some(info) = info else {
             return;
         };

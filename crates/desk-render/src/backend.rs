@@ -15,7 +15,7 @@ use cairo::{
 use desk_model::{Metadata, Rgba};
 use desk_text::FontData;
 
-use crate::display::{DisplayList, Item, PathOp};
+use crate::display::{DisplayList, Item, Paint, PathOp};
 
 /// Why drawing or writing failed.
 #[derive(Debug)]
@@ -263,8 +263,8 @@ impl Painter {
                             PathOp::Close => cr.close_path(),
                         }
                     }
-                    if let Some(color) = fill {
-                        set_color(cr, *color);
+                    if let Some(paint) = fill {
+                        set_paint(cr, paint)?;
                         if stroke.is_some() {
                             cr.fill_preserve()?;
                         } else {
@@ -284,6 +284,12 @@ impl Painter {
                     }
                     cr.new_path();
                 }
+                Item::CastShadow {
+                    items,
+                    offset,
+                    blur,
+                    color,
+                } => self.paint_cast_shadow(cr, items, *offset, *blur, *color)?,
                 Item::Group {
                     transform,
                     opacity,
@@ -307,6 +313,74 @@ impl Painter {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Paints the blurred shadow that items cast: their shape, in one
+    /// color, blurred and moved by the offset (OBJ-11).
+    fn paint_cast_shadow(
+        &mut self,
+        cr: &Context,
+        items: &[Item],
+        offset: (f32, f32),
+        blur: f32,
+        color: Rgba,
+    ) -> Result<(), RenderError> {
+        if color.a == 0 {
+            return Ok(());
+        }
+        // Where the items draw, in the coordinates of the context.
+        let recording = cairo::RecordingSurface::create(cairo::Content::Alpha, None)?;
+        {
+            let rc = Context::new(&recording)?;
+            self.paint_items(&rc, items)?;
+        }
+        let (ix, iy, iw, ih) = recording.ink_extents();
+        if iw <= 0.0 || ih <= 0.0 {
+            return Ok(());
+        }
+        let (sx, sy) = cr.user_to_device_distance(1.0, 1.0)?;
+        let scale = sx
+            .abs()
+            .max(sy.abs())
+            .clamp(SHADOW_MIN_SCALE, SHADOW_MAX_SCALE)
+            // A large object gets fewer pixels for its shadow.
+            .min(SHADOW_MAX_SIDE as f64 / iw.max(ih))
+            .max(f64::MIN_POSITIVE);
+        let sigma = f64::from(blur.max(0.0)) / 2.0 * scale;
+        let radius = (((4.0 * sigma * sigma + 1.0).sqrt() - 1.0) / 2.0).round() as usize;
+        // Room for the blur on every side.
+        let margin = (3 * radius + 1) as f64 / scale;
+        let (x0, y0) = (ix - margin, iy - margin);
+        let width = ((iw + 2.0 * margin) * scale).ceil() as i32;
+        let height = ((ih + 2.0 * margin) * scale).ceil() as i32;
+        if width > 2 * SHADOW_MAX_SIDE || height > 2 * SHADOW_MAX_SIDE {
+            return Ok(());
+        }
+        let mut mask = cairo::ImageSurface::create(cairo::Format::A8, width.max(1), height.max(1))?;
+        {
+            let mc = Context::new(&mask)?;
+            mc.scale(scale, scale);
+            mc.translate(-x0, -y0);
+            mc.set_source_surface(&recording, 0.0, 0.0)?;
+            mc.paint()?;
+        }
+        mask.flush();
+        let stride = mask.stride() as usize;
+        if radius > 0 {
+            let (w, h) = (width.max(1) as usize, height.max(1) as usize);
+            let mut data = mask
+                .data()
+                .map_err(|_| RenderError::Cairo(cairo::Error::SurfaceFinished))?;
+            box_blur(&mut data, w, h, stride, radius);
+        }
+        mask.mark_dirty();
+        cr.save()?;
+        set_color(cr, color);
+        cr.translate(x0 + f64::from(offset.0), y0 + f64::from(offset.1));
+        cr.scale(1.0 / scale, 1.0 / scale);
+        cr.mask_surface(&mask, 0.0, 0.0)?;
+        cr.restore()?;
         Ok(())
     }
 
@@ -409,6 +483,9 @@ fn cairo_glyphs(glyphs: &[crate::display::PlacedGlyph]) -> Vec<cairo::Glyph> {
 const SHADOW_MIN_SCALE: f64 = 4.0;
 /// The most, so that a shadow at a high zoom stays small.
 const SHADOW_MAX_SCALE: f64 = 8.0;
+/// The most pixels along a side of the shadow of an object, before its
+/// blur.
+const SHADOW_MAX_SIDE: i32 = 4096;
 
 /// Paints the shadow of glyphs, in the font set on the context: the
 /// glyphs drawn into a mask, blurred and moved by `offset`, and painted in
@@ -503,6 +580,36 @@ fn blur_line(line: &[u8], radius: usize, mut out: impl FnMut(usize, u8)) {
         out(i as usize, ((sum + window / 2) / window) as u8);
         sum = sum + at(i + r + 1) - at(i - r);
     }
+}
+
+fn set_paint(cr: &Context, paint: &Paint) -> Result<(), RenderError> {
+    match *paint {
+        Paint::Color(color) => set_color(cr, color),
+        Paint::Linear {
+            start,
+            end,
+            from,
+            to,
+        } => {
+            let gradient = cairo::LinearGradient::new(
+                f64::from(start.0),
+                f64::from(start.1),
+                f64::from(end.0),
+                f64::from(end.1),
+            );
+            for (at, color) in [(0.0, from), (1.0, to)] {
+                gradient.add_color_stop_rgba(
+                    at,
+                    f64::from(color.r) / 255.0,
+                    f64::from(color.g) / 255.0,
+                    f64::from(color.b) / 255.0,
+                    f64::from(color.a) / 255.0,
+                );
+            }
+            cr.set_source(&gradient)?;
+        }
+    }
+    Ok(())
 }
 
 fn set_color(cr: &Context, color: Rgba) {

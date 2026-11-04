@@ -341,3 +341,84 @@ fn obj_08_the_text_of_a_flipped_shape_is_not_mirrored() {
             .any(|i| matches!(i, Item::Glyphs { text, .. } if text == "Hi"))
     );
 }
+
+#[test]
+fn obj_09_obj_10_obj_11_gradients_line_ends_and_shadows_are_painted() {
+    use desk_model::{
+        Document, Editor, Fill, Frame, LineEnd, Object, ObjectKind, ObjectShadow, Shape, Stroke,
+        Wrap,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            // Red on the left, blue on the right.
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(20.0, 20.0, 100.0, 40.0),
+            );
+            square.style.fill = Some(Fill::Gradient {
+                from: Rgba::rgb(255, 0, 0),
+                to: Rgba::rgb(0, 0, 255),
+                angle: 0,
+            });
+            // Its shadow falls 10 points right and down, unblurred.
+            square.style.shadow = Some(ObjectShadow {
+                color: Rgba::BLACK,
+                angle: 31500,
+                offset: Length::from_pt(10.0 * std::f64::consts::SQRT_2),
+                blur: Length::ZERO,
+                opacity: 100,
+            });
+            square.wrap = Wrap::Through;
+            edit.add_object(square)?;
+            let mut line = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Line { rising: false }),
+                Frame::from_pt(20.0, 150.0, 150.0, 0.0),
+            );
+            line.style.stroke = Some(Stroke {
+                end: LineEnd::Arrow,
+                ..Stroke::new(Rgba::BLACK, Length::from_points(2))
+            });
+            line.wrap = Wrap::Through;
+            edit.add_object(line)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    let (r, _, b) = pixel(22, 40);
+    assert!(r > 240 && b < 15, "red at the left: {r} {b}");
+    let (r, _, b) = pixel(118, 40);
+    assert!(r < 15 && b > 240, "blue at the right: {r} {b}");
+    let (r, _, b) = pixel(70, 40);
+    assert!(
+        (100..=155).contains(&r) && (100..=155).contains(&b),
+        "{r} {b}"
+    );
+    // The shadow shows below and right of the square, not above it.
+    assert_eq!(pixel(125, 65), (0, 0, 0));
+    assert_eq!(pixel(15, 15), (255, 255, 255));
+    // The arrow is wider than the line near its end.
+    assert_eq!(pixel(162, 148), (0, 0, 0));
+    assert_eq!(pixel(100, 148), (255, 255, 255));
+}
