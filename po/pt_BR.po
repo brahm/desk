@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-04 19:55+0000\n"
+"POT-Creation-Date: 2026-11-04 20:50+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -146,13 +146,13 @@ msgstr "Quadrado azul"
 msgid "Arrow"
 msgstr "Seta"
 
-#: crates/desk-ui/src/editing.rs:1568 crates/desk-ui/src/links_pane.rs:70
+#: crates/desk-ui/src/editing.rs:1572 crates/desk-ui/src/links_pane.rs:70
 #: crates/desk-ui/src/links_pane.rs:278 crates/desk-ui/src/links_pane.rs:339
 #: crates/desk-ui/src/window.rs:2556
 msgid "Bookmark"
 msgstr "Marcador"
 
-#: crates/desk-ui/src/editing/objects.rs:858 crates/desk-ui/src/fonts.rs:346
+#: crates/desk-ui/src/editing/objects.rs:1030 crates/desk-ui/src/fonts.rs:346
 #: crates/desk-ui/src/outline_view.rs:321
 msgid "Text"
 msgstr "Texto"
@@ -208,7 +208,7 @@ msgstr "Tracejada"
 msgid "Dotted"
 msgstr "Pontilhada"
 
-#: crates/desk-ui/src/effects.rs:87 crates/desk-ui/src/picture_pane.rs:83
+#: crates/desk-ui/src/effects.rs:87
 msgid "Color"
 msgstr "Cor"
 
@@ -775,7 +775,7 @@ msgid "Choose…"
 msgstr "Escolher…"
 
 #: crates/desk-ui/src/graphic_pane.rs:149 crates/desk-ui/src/lists_pane.rs:195
-#: crates/desk-ui/src/picture_pane.rs:118
+#: crates/desk-ui/src/picture_pane.rs:121
 msgid "Image"
 msgstr "Imagem"
 
@@ -1549,87 +1549,83 @@ msgstr "Mostrar ou ocultar os subtópicos"
 msgid "Topic, level {n}"
 msgstr "Tópico, nível {n}"
 
-#: crates/desk-ui/src/picture_pane.rs:69
+#: crates/desk-ui/src/picture_pane.rs:70
 msgid "Mask"
 msgstr "Máscara"
 
-#: crates/desk-ui/src/picture_pane.rs:70
+#: crates/desk-ui/src/picture_pane.rs:71
 msgid "Shows only the part of the picture inside its frame"
 msgstr "Mostra só a parte da imagem dentro da moldura"
 
-#: crates/desk-ui/src/picture_pane.rs:72
+#: crates/desk-ui/src/picture_pane.rs:73
 msgid "Picture Size"
 msgstr "Escala da imagem"
 
-#: crates/desk-ui/src/picture_pane.rs:73
+#: crates/desk-ui/src/picture_pane.rs:74
 msgid "Percent of the frame"
 msgstr "Porcentagem da moldura"
 
-#: crates/desk-ui/src/picture_pane.rs:74
+#: crates/desk-ui/src/picture_pane.rs:75
 msgid "Picture Left"
 msgstr "Imagem à esquerda"
 
-#: crates/desk-ui/src/picture_pane.rs:75 crates/desk-ui/src/picture_pane.rs:77
+#: crates/desk-ui/src/picture_pane.rs:76 crates/desk-ui/src/picture_pane.rs:78
 msgid "Points from the frame"
 msgstr "Pontos a partir da moldura"
 
-#: crates/desk-ui/src/picture_pane.rs:76
+#: crates/desk-ui/src/picture_pane.rs:77
 msgid "Picture Top"
 msgstr "Imagem acima"
 
-#: crates/desk-ui/src/picture_pane.rs:79
+#: crates/desk-ui/src/picture_pane.rs:80
+msgid "Take Out a Color"
+msgstr "Retirar uma cor"
+
+#: crates/desk-ui/src/picture_pane.rs:83 crates/desk-ui/src/picture_pane.rs:93
+msgid "Click a color in the picture, and drag to take out more or less"
+msgstr "Clique numa cor da imagem e arraste para retirar mais ou menos"
+
+#: crates/desk-ui/src/picture_pane.rs:87
+msgid "Restore Colors"
+msgstr "Restaurar cores"
+
+#: crates/desk-ui/src/picture_pane.rs:91
 msgid "Instant Alpha"
 msgstr "Alfa Instantâneo"
 
-#: crates/desk-ui/src/picture_pane.rs:80
-msgid "Takes a color out of the picture"
-msgstr "Retira uma cor da imagem"
-
-#: crates/desk-ui/src/picture_pane.rs:87 crates/desk-ui/src/picture_pane.rs:89
-msgid "Color to Take Out"
-msgstr "Cor a retirar"
-
-#: crates/desk-ui/src/picture_pane.rs:93
-msgid "Tolerance"
-msgstr "Tolerância"
-
-#: crates/desk-ui/src/picture_pane.rs:94
-msgid "How near a color takes it out too"
-msgstr "Quão próxima uma cor precisa estar para sair também"
-
-#: crates/desk-ui/src/picture_pane.rs:96
+#: crates/desk-ui/src/picture_pane.rs:99
 msgid "Brightness"
 msgstr "Brilho"
 
-#: crates/desk-ui/src/picture_pane.rs:97
+#: crates/desk-ui/src/picture_pane.rs:100
 msgid "Contrast"
 msgstr "Contraste"
 
-#: crates/desk-ui/src/picture_pane.rs:98
+#: crates/desk-ui/src/picture_pane.rs:101
 msgid "Saturation"
 msgstr "Saturação"
 
-#: crates/desk-ui/src/picture_pane.rs:99
+#: crates/desk-ui/src/picture_pane.rs:102
 msgid "Exposure"
 msgstr "Exposição"
 
-#: crates/desk-ui/src/picture_pane.rs:100
+#: crates/desk-ui/src/picture_pane.rs:103
 msgid "Temperature"
 msgstr "Temperatura"
 
-#: crates/desk-ui/src/picture_pane.rs:101
+#: crates/desk-ui/src/picture_pane.rs:104
 msgid "Tint"
 msgstr "Matiz"
 
-#: crates/desk-ui/src/picture_pane.rs:105
+#: crates/desk-ui/src/picture_pane.rs:108
 msgid "Reset Image"
 msgstr "Redefinir imagem"
 
-#: crates/desk-ui/src/picture_pane.rs:109
+#: crates/desk-ui/src/picture_pane.rs:112
 msgid "Reduce File Size"
 msgstr "Reduzir tamanho do arquivo"
 
-#: crates/desk-ui/src/picture_pane.rs:112
+#: crates/desk-ui/src/picture_pane.rs:115
 msgid "Keeps only the part of the picture that shows, at the size it is shown"
 msgstr "Mantém só a parte visível da imagem, no tamanho em que aparece"
 
@@ -3176,6 +3172,18 @@ msgid "Left out {what}, in {n} paragraph."
 msgid_plural "Left out {what}, in {n} paragraphs."
 msgstr[0] "Não importado: {what}, em {n} parágrafo."
 msgstr[1] "Não importado: {what}, em {n} parágrafos."
+
+#~ msgid "Takes a color out of the picture"
+#~ msgstr "Retira uma cor da imagem"
+
+#~ msgid "Color to Take Out"
+#~ msgstr "Cor a retirar"
+
+#~ msgid "Tolerance"
+#~ msgstr "Tolerância"
+
+#~ msgid "How near a color takes it out too"
+#~ msgstr "Quão próxima uma cor precisa estar para sair também"
 
 #~ msgid "the color and width of lines through and under text"
 #~ msgstr "a cor e a espessura das linhas sobre e sob o texto"

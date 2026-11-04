@@ -389,6 +389,9 @@ struct State {
     /// A drag of the label of a list item (LST-02): where it started on
     /// its page, and how many levels it has moved the item.
     label_drag: Option<(f64, i32)>,
+    /// The picture that clicks take colors out of, while Instant Alpha
+    /// is on (OBJ-05), and whether a press on it is being dragged.
+    alpha_pick: Option<(desk_model::NodeId, bool)>,
     /// Whether the last action was typing at the cursor, which the next
     /// letter typed continues as one step of the history.
     typing: bool,
@@ -519,6 +522,7 @@ impl TextEditor {
                 unit: Unit::Character,
                 drag_from: None,
                 label_drag: None,
+                alpha_pick: None,
                 typing: false,
                 pending: None,
                 on_select: Vec::new(),
@@ -2971,6 +2975,10 @@ impl TextEditor {
             };
             // Esc takes the cursor from a header, footer or note back to
             // the body.
+            if key == gdk::Key::Escape && this.instant_alpha_on() {
+                this.stop_instant_alpha();
+                return glib::Propagation::Stop;
+            }
             if key == gdk::Key::Escape && this.story().is_some() {
                 this.leave_story(None);
                 return glib::Propagation::Stop;
@@ -3077,6 +3085,12 @@ impl TextEditor {
                 return Default::default();
             };
             this.view.area().grab_focus();
+            // While Instant Alpha is on, a click on the picture takes out
+            // the color under it (OBJ-05).
+            if this.press_alpha(x, y) {
+                this.state.borrow_mut().drag_from = None;
+                return;
+            }
             // A click on an object selects it, or on a handle of one
             // starts resizing it (OBJ-03).
             if this.press_object(presses, x, y, gesture.current_event_state()) {
@@ -3188,6 +3202,9 @@ impl TextEditor {
             let Some((x, y)) = gesture.start_point() else {
                 return;
             };
+            if this.drag_alpha(dx, dy) {
+                return;
+            }
             if this.dragging_objects() {
                 this.drag_objects(x + dx, y + dy, gesture.current_event_state());
                 return;
@@ -3218,6 +3235,7 @@ impl TextEditor {
                 return Default::default();
             };
             this.end_object_drag();
+            this.end_alpha_drag();
             let mut state = this.state.borrow_mut();
             state.drag_from = None;
             state.label_drag = None;

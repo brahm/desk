@@ -1847,10 +1847,18 @@ fn with_objects() -> Document {
             image.wrap = Wrap::Largest;
             image.picture = desk_model::PictureSettings {
                 mask: Some(Frame::from_pt(-10.0, -20.0, 120.0, 100.0)),
-                alpha: Some(desk_model::InstantAlpha {
-                    color: Rgba::rgb(255, 255, 255),
-                    tolerance: 25,
-                }),
+                alpha: Arc::from([
+                    desk_model::AlphaSeed {
+                        x: 0,
+                        y: 0,
+                        tolerance: 25,
+                    },
+                    desk_model::AlphaSeed {
+                        x: 10_000,
+                        y: 5_000,
+                        tolerance: 40,
+                    },
+                ]),
                 adjust: desk_model::Adjustments {
                     brightness: 10,
                     contrast: -20,

@@ -138,12 +138,12 @@ impl Painter {
     fn adjusted_picture(
         &mut self,
         picture: &desk_model::Picture,
-        alpha: Option<desk_model::InstantAlpha>,
+        alpha: &[desk_model::AlphaSeed],
         adjust: desk_model::Adjustments,
     ) -> Option<cairo::ImageSurface> {
         let key = AdjustedKey {
             picture: picture.clone(),
-            alpha,
+            alpha: alpha.to_vec(),
             adjust,
         };
         if let Some((_, surface)) = self.adjusted.iter().find(|(k, _)| *k == key) {
@@ -362,7 +362,7 @@ impl Painter {
                     adjust,
                     rect,
                 } => {
-                    let Some(surface) = self.adjusted_picture(picture, *alpha, *adjust) else {
+                    let Some(surface) = self.adjusted_picture(picture, alpha, *adjust) else {
                         continue;
                     };
                     paint_surface(cr, &surface, *rect)?;
@@ -677,7 +677,7 @@ fn blur_line(line: &[u8], radius: usize, mut out: impl FnMut(usize, u8)) {
 #[derive(PartialEq)]
 struct AdjustedKey {
     picture: desk_model::Picture,
-    alpha: Option<desk_model::InstantAlpha>,
+    alpha: Vec<desk_model::AlphaSeed>,
     adjust: desk_model::Adjustments,
 }
 
@@ -700,11 +700,11 @@ fn paint_surface(
     Ok(())
 }
 
-/// A copy of a picture with the colors near one taken out, and the
-/// others adjusted.
+/// A copy of a picture with the regions that Instant Alpha clicked taken
+/// out, and its colors adjusted (OBJ-05, OBJ-06).
 pub fn adjusted_surface(
     source: &cairo::ImageSurface,
-    alpha: Option<desk_model::InstantAlpha>,
+    alpha: &[desk_model::AlphaSeed],
     adjust: desk_model::Adjustments,
 ) -> Result<cairo::ImageSurface, RenderError> {
     let (width, height) = (source.width(), source.height());
@@ -716,56 +716,110 @@ pub fn adjusted_surface(
     }
     surface.flush();
     let stride = surface.stride() as usize;
+    let (w, h) = (width as usize, height as usize);
     {
         let mut data = surface
             .data()
             .map_err(|_| RenderError::Cairo(cairo::Error::SurfaceFinished))?;
-        let key = alpha.map(|a| {
-            (
-                [a.color.r, a.color.g, a.color.b].map(|v| f32::from(v) / 255.0),
-                f32::from(a.tolerance.min(100)) / 100.0,
-            )
-        });
-        for row in 0..height as usize {
-            for pixel in data[row * stride..][..width as usize * 4]
-                .as_chunks_mut::<4>()
-                .0
-            {
-                // Premultiplied BGRA, as Cairo keeps it in memory on
-                // little-endian machines.
-                let a = f32::from(pixel[3]) / 255.0;
-                if a <= 0.0 {
-                    continue;
-                }
-                let mut rgb = [pixel[2], pixel[1], pixel[0]].map(|v| f32::from(v) / 255.0 / a);
-                let mut a = a;
-                if let Some((color, tolerance)) = key {
-                    let distance = ((rgb[0] - color[0]).powi(2)
-                        + (rgb[1] - color[1]).powi(2)
-                        + (rgb[2] - color[2]).powi(2))
-                    .sqrt()
-                        / 3f32.sqrt();
-                    // The color and those near it go; the edge fades.
-                    let edge = 0.04;
-                    if distance <= tolerance {
-                        a = 0.0;
-                    } else if distance < tolerance + edge {
-                        a *= (distance - tolerance) / edge;
-                    }
-                }
-                if !adjust.is_none() {
-                    rgb = adjust.apply(rgb);
-                }
-                let byte = |v: f32| (v.clamp(0.0, 1.0) * a * 255.0).round() as u8;
-                pixel[0] = byte(rgb[2]);
-                pixel[1] = byte(rgb[1]);
-                pixel[2] = byte(rgb[0]);
-                pixel[3] = (a * 255.0).round() as u8;
+        // Straight colors and opacity, from premultiplied BGRA as Cairo
+        // keeps it in memory on little-endian machines.
+        let mut pixels: Vec<([f32; 3], f32)> = Vec::with_capacity(w * h);
+        for row in 0..h {
+            for p in data[row * stride..][..w * 4].as_chunks::<4>().0 {
+                let a = f32::from(p[3]) / 255.0;
+                let rgb = if a > 0.0 {
+                    [p[2], p[1], p[0]].map(|v| (f32::from(v) / 255.0 / a).min(1.0))
+                } else {
+                    [0.0; 3]
+                };
+                pixels.push((rgb, a));
             }
+        }
+        let keep = instant_alpha(&pixels, w, h, alpha);
+        for (i, (rgb, a)) in pixels.into_iter().enumerate() {
+            let a = a * keep[i];
+            let rgb = if adjust.is_none() {
+                rgb
+            } else {
+                adjust.apply(rgb)
+            };
+            let byte = |v: f32| (v.clamp(0.0, 1.0) * a * 255.0).round() as u8;
+            let pixel = &mut data[(i / w) * stride + (i % w) * 4..][..4];
+            pixel[0] = byte(rgb[2]);
+            pixel[1] = byte(rgb[1]);
+            pixel[2] = byte(rgb[0]);
+            pixel[3] = (a * 255.0).round() as u8;
         }
     }
     surface.mark_dirty();
     Ok(surface)
+}
+
+/// How much of each pixel Instant Alpha keeps, from 0 to 1: each click
+/// takes out the pixels joined to it whose colors stay near the one under
+/// it, and fades the pixels just past them.
+fn instant_alpha(
+    pixels: &[([f32; 3], f32)],
+    width: usize,
+    height: usize,
+    seeds: &[desk_model::AlphaSeed],
+) -> Vec<f32> {
+    let mut keep = vec![1.0f32; pixels.len()];
+    if width == 0 || height == 0 {
+        return keep;
+    }
+    let scale = f32::from(desk_model::AlphaSeed::SCALE);
+    let mut seen = vec![false; pixels.len()];
+    let mut stack = Vec::new();
+    for seed in seeds {
+        let x = ((f32::from(seed.x) / scale * width as f32) as usize).min(width - 1);
+        let y = ((f32::from(seed.y) / scale * height as f32) as usize).min(height - 1);
+        let (color, _) = pixels[y * width + x];
+        let tolerance = f32::from(seed.tolerance.min(100)) / 100.0;
+        // How far past the tolerance a color still fades.
+        let edge = 0.04;
+        let distance = |i: usize| {
+            let (c, _) = pixels[i];
+            ((c[0] - color[0]).powi(2) + (c[1] - color[1]).powi(2) + (c[2] - color[2]).powi(2))
+                .sqrt()
+                / 3f32.sqrt()
+        };
+        seen.iter_mut().for_each(|s| *s = false);
+        stack.clear();
+        stack.push(y * width + x);
+        seen[y * width + x] = true;
+        while let Some(i) = stack.pop() {
+            let d = distance(i);
+            if d > tolerance {
+                // Just past the region: faded, and not gone through.
+                if d < tolerance + edge {
+                    keep[i] = keep[i].min((d - tolerance) / edge);
+                }
+                continue;
+            }
+            keep[i] = 0.0;
+            let (px, py) = (i % width, i / width);
+            let mut visit = |j: usize| {
+                if !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if px > 0 {
+                visit(i - 1);
+            }
+            if px + 1 < width {
+                visit(i + 1);
+            }
+            if py > 0 {
+                visit(i - width);
+            }
+            if py + 1 < height {
+                visit(i + width);
+            }
+        }
+    }
+    keep
 }
 
 fn set_paint(cr: &Context, paint: &Paint) -> Result<(), RenderError> {

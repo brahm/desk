@@ -78,7 +78,7 @@ pub enum Item {
         /// The picture.
         picture: desk_model::Picture,
         /// The color taken out of it.
-        alpha: Option<desk_model::InstantAlpha>,
+        alpha: std::sync::Arc<[desk_model::AlphaSeed]>,
         /// The changes of its colors.
         adjust: desk_model::Adjustments,
         /// The left edge, top edge, width and height.
@@ -558,10 +558,10 @@ fn object_item(placed: &PlacedObject) -> Item {
                     m.height.to_pt() as f32,
                 )
             });
-            let image = if settings.alpha.is_some() || !settings.adjust.is_none() {
+            let image = if !settings.alpha.is_empty() || !settings.adjust.is_none() {
                 Item::AdjustedImage {
                     picture: picture.clone(),
-                    alpha: settings.alpha,
+                    alpha: settings.alpha.clone(),
                     adjust: settings.adjust,
                     rect,
                 }

@@ -58,27 +58,39 @@ pub struct Object {
     pub picture: PictureSettings,
 }
 
-/// How a picture shows in its frame: masked, with a color taken out, and
+/// How a picture shows in its frame: masked, with colors taken out, and
 /// adjusted, as Pages does it to an image.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PictureSettings {
     /// Where the whole picture lies, from the top left corner of the
     /// frame, when the frame masks it: only the part inside the frame
     /// shows (OBJ-04). None when the picture fills its frame.
     pub mask: Option<Frame>,
-    /// The color that Instant Alpha took out of the picture (OBJ-05).
-    pub alpha: Option<InstantAlpha>,
+    /// Where Instant Alpha was clicked, in order: each click takes out
+    /// the color under it and the colors near it around it (OBJ-05).
+    pub alpha: Arc<[AlphaSeed]>,
     /// The changes of Adjust Image (OBJ-06).
     pub adjust: Adjustments,
 }
 
-/// A color taken out of a picture, with the colors near it.
+/// A click of Instant Alpha on a picture: the region of the color under
+/// it, as far as the colors stay near it, is taken out (OBJ-05).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct InstantAlpha {
-    /// The color.
-    pub color: Rgba,
-    /// How far a color may be from it and still go, from 0 to 100.
+pub struct AlphaSeed {
+    /// Where across the picture, in ten-thousandths of its width.
+    pub x: u16,
+    /// Where down the picture, in ten-thousandths of its height.
+    pub y: u16,
+    /// How far a color may be from the one clicked and still go, from 0
+    /// to 100, as dragging after the click sets it.
     pub tolerance: u8,
+}
+
+impl AlphaSeed {
+    /// The most that `x` and `y` count: the far edge of the picture.
+    pub const SCALE: u16 = 10_000;
+    /// The tolerance of a click before any drag.
+    pub const TOLERANCE: u8 = 20;
 }
 
 /// The changes of the Adjust Image window, each from -100 to 100 with 0

@@ -492,7 +492,7 @@ fn obj_09_pictures_fill_objects_as_their_mode_says() {
 #[test]
 fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
     use desk_model::{
-        Adjustments, Document, Editor, Frame, InstantAlpha, Object, ObjectKind, Picture,
+        Adjustments, AlphaSeed, Document, Editor, Frame, Object, ObjectKind, Picture,
         PictureSettings, Wrap,
     };
     // Left half white, right half red, twenty pixels square.
@@ -512,6 +512,21 @@ fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
         png
     };
     let picture = Picture::from_png(png).unwrap();
+    // White, red and white again, in three columns of ten pixels.
+    let striped = {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 30, 10).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.paint().unwrap();
+            cr.set_source_rgb(1.0, 0.0, 0.0);
+            cr.rectangle(10.0, 0.0, 10.0, 10.0);
+            cr.fill().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        Picture::from_png(png).unwrap()
+    };
     let mut editor = Editor::new(Document::new_word_processing());
     editor
         .edit("Objects", |edit| {
@@ -520,16 +535,18 @@ fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
                 height: Length::from_points(200),
                 ..PageSetup::default()
             })?;
-            // The white is taken out, over a page painted blue below.
+            // A click on the white on the left takes it out, over a page
+            // painted blue below, and not the white past the red.
             let mut keyed = Object::new(
                 edit.new_id(),
-                ObjectKind::Image(picture.clone()),
-                Frame::from_pt(20.0, 20.0, 40.0, 40.0),
+                ObjectKind::Image(striped.clone()),
+                Frame::from_pt(20.0, 20.0, 60.0, 20.0),
             );
-            keyed.picture.alpha = Some(InstantAlpha {
-                color: Rgba::WHITE,
-                tolerance: 10,
-            });
+            keyed.picture.alpha = std::sync::Arc::from([AlphaSeed {
+                x: 1_000,
+                y: 5_000,
+                tolerance: AlphaSeed::TOLERANCE,
+            }]);
             keyed.wrap = Wrap::Through;
             edit.add_object(keyed)?;
             // Masked to its right half, twice as large, and darker.
@@ -567,8 +584,9 @@ fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
         (p[2], p[1], p[0])
     };
     // The page shows through where the white was taken out.
-    assert_eq!(pixel(25, 40), (0, 0, 255));
-    assert_eq!(pixel(55, 40), (255, 0, 0));
+    assert_eq!(pixel(25, 30), (0, 0, 255));
+    assert_eq!(pixel(50, 30), (255, 0, 0));
+    assert_eq!(pixel(75, 30), (255, 255, 255));
     // The mask shows only red, darkened, and nothing left of the frame.
     let (r, g, b) = pixel(120, 140);
     assert!((170..=210).contains(&r) && g < 10 && b < 10, "{r} {g} {b}");

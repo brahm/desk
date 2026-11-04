@@ -42,8 +42,9 @@ pub struct GraphicProperties {
     /// from -100 to 100: brightness, contrast, saturation, exposure,
     /// temperature and tint.
     pub image_adjust: Option<String>,
-    /// `desk:instant-alpha`: the color taken out of a picture and how
-    /// far others may be from it, as `#rrggbb 30`.
+    /// `desk:instant-alpha`: where Instant Alpha clicked a picture, in
+    /// order, each as `x y tolerance` with `x` and `y` in ten-thousandths
+    /// of its width and height, separated by commas.
     pub instant_alpha: Option<String>,
     /// `draw:stroke`: `none`, `solid` or `dash`.
     pub stroke: Option<String>,

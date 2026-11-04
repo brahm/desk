@@ -8,10 +8,10 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use desk_model::{Adjustments, Frame, InstantAlpha, ObjectKind, Rgba};
+use desk_model::{Adjustments, Frame, ObjectKind};
 
 use crate::editing::ObjectInfo;
-use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
+use crate::formatting::EditorOf;
 use crate::i18n::tr;
 
 /// The Image group of the Inspector.
@@ -21,10 +21,11 @@ pub struct PictureGroup {
     scale: adw::SpinRow,
     left: adw::SpinRow,
     top: adw::SpinRow,
-    alpha: adw::SwitchRow,
-    alpha_color: gtk::ColorDialogButton,
-    alpha_color_row: adw::ActionRow,
-    tolerance: adw::SpinRow,
+    /// Turns Instant Alpha on and off for clicks on the picture.
+    alpha: gtk::ToggleButton,
+    /// Puts back the colors that Instant Alpha took out.
+    restore: gtk::Button,
+    editor: EditorOf,
     adjust: [adw::SpinRow; 6],
     reset: gtk::Button,
     reduce: gtk::Button,
@@ -75,23 +76,25 @@ impl PictureGroup {
         left.set_subtitle(&tr("Points from the frame"));
         let top = spin(&tr("Picture Top"), -10_000.0, 10_000.0);
         top.set_subtitle(&tr("Points from the frame"));
-        let alpha = adw::SwitchRow::builder()
-            .title(tr("Instant Alpha"))
-            .subtitle(tr("Takes a color out of the picture"))
+        let alpha = gtk::ToggleButton::builder()
+            .label(tr("Take Out a Color"))
+            .valign(gtk::Align::Center)
+            .tooltip_text(tr(
+                "Click a color in the picture, and drag to take out more or less",
+            ))
             .build();
-        let alpha_color = gtk::ColorDialogButton::builder()
-            .dialog(&gtk::ColorDialog::builder().title(tr("Color")).build())
-            .rgba(&to_gdk(Rgba::WHITE))
+        let restore = gtk::Button::builder()
+            .label(tr("Restore Colors"))
             .valign(gtk::Align::Center)
             .build();
-        labelled(&alpha_color, &tr("Color to Take Out"));
-        let alpha_color_row = adw::ActionRow::builder()
-            .title(tr("Color to Take Out"))
+        let alpha_row = adw::ActionRow::builder()
+            .title(tr("Instant Alpha"))
+            .subtitle(tr(
+                "Click a color in the picture, and drag to take out more or less",
+            ))
             .build();
-        alpha_color_row.add_suffix(&crate::eyedropper::button(&alpha_color));
-        alpha_color_row.add_suffix(&alpha_color);
-        let tolerance = spin(&tr("Tolerance"), 0.0, 100.0);
-        tolerance.set_subtitle(&tr("How near a color takes it out too"));
+        alpha_row.add_suffix(&restore);
+        alpha_row.add_suffix(&alpha);
         let adjust = [
             tr("Brightness"),
             tr("Contrast"),
@@ -120,9 +123,7 @@ impl PictureGroup {
         group.add(&scale);
         group.add(&left);
         group.add(&top);
-        group.add(&alpha);
-        group.add(&alpha_color_row);
-        group.add(&tolerance);
+        group.add(&alpha_row);
         for row in &adjust {
             group.add(row);
         }
@@ -134,9 +135,8 @@ impl PictureGroup {
             left,
             top,
             alpha,
-            alpha_color,
-            alpha_color_row,
-            tolerance,
+            restore,
+            editor: editor.clone(),
             adjust,
             reset,
             reduce,
@@ -215,30 +215,30 @@ impl PictureGroup {
                 }
             });
         }
-        let alpha_changed = {
-            let weak = Rc::downgrade(&this);
-            let editor = editor.clone();
-            move || {
-                let Some(this) = weak.upgrade() else { return };
-                if this.updating.get() {
-                    return;
-                }
-                let alpha = this.alpha.is_active().then(|| InstantAlpha {
-                    color: from_gdk(&this.alpha_color.rgba()),
-                    tolerance: this.tolerance.value().round().clamp(0.0, 100.0) as u8,
-                });
-                this.show_rows();
-                if let Some(editor) = editor() {
-                    editor.set_object("Instant Alpha", |object| object.picture.alpha = alpha);
-                }
+        let weak = Rc::downgrade(&this);
+        let alpha_editor = editor.clone();
+        this.alpha.connect_toggled(move |button| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
             }
-        };
-        let on = alpha_changed.clone();
-        this.alpha.connect_active_notify(move |_| on());
-        let on = alpha_changed.clone();
-        this.alpha_color.connect_rgba_notify(move |_| on());
-        let on = alpha_changed;
-        this.tolerance.connect_value_notify(move |_| on());
+            let Some(editor) = alpha_editor() else { return };
+            if button.is_active() {
+                if !editor.start_instant_alpha() {
+                    button.set_active(false);
+                }
+            } else {
+                editor.stop_instant_alpha();
+            }
+        });
+        let restore_editor = editor.clone();
+        this.restore.connect_clicked(move |_| {
+            if let Some(editor) = restore_editor() {
+                editor.set_object("Restore Colors", |object| {
+                    object.picture.alpha = std::sync::Arc::from([]);
+                });
+            }
+        });
         for row in &this.adjust {
             let weak = Rc::downgrade(&this);
             let editor = editor.clone();
@@ -258,7 +258,7 @@ impl PictureGroup {
             if let Some(editor) = reset_editor() {
                 editor.set_object("Reset Image", |object| {
                     object.picture.adjust = Adjustments::default();
-                    object.picture.alpha = None;
+                    object.picture.alpha = std::sync::Arc::from([]);
                 });
             }
         });
@@ -291,9 +291,6 @@ impl PictureGroup {
         for row in [&self.scale, &self.left, &self.top] {
             row.set_visible(masked);
         }
-        let alpha = self.alpha.is_active();
-        self.alpha_color_row.set_visible(alpha);
-        self.tolerance.set_visible(alpha);
     }
 
     /// Shows the selected picture, or hides the group when no picture is
@@ -301,6 +298,11 @@ impl PictureGroup {
     pub fn show(&self, info: Option<&ObjectInfo>) {
         let Some(info) = info.filter(|i| matches!(i.object.kind, ObjectKind::Image(_))) else {
             self.group.set_visible(false);
+            if self.alpha.is_active() {
+                self.updating.set(true);
+                self.alpha.set_active(false);
+                self.updating.set(false);
+            }
             return;
         };
         self.group.set_visible(true);
@@ -328,18 +330,11 @@ impl PictureGroup {
             set(&self.left, -mask.x.to_pt());
             set(&self.top, -mask.y.to_pt());
         }
-        if self.alpha.is_active() != settings.alpha.is_some() {
-            self.alpha.set_active(settings.alpha.is_some());
+        let picking = (self.editor)().is_some_and(|e| e.instant_alpha_on());
+        if self.alpha.is_active() != picking {
+            self.alpha.set_active(picking);
         }
-        if let Some(alpha) = settings.alpha {
-            let color = to_gdk(alpha.color);
-            if self.alpha_color.rgba() != color {
-                self.alpha_color.set_rgba(&color);
-            }
-            set(&self.tolerance, f64::from(alpha.tolerance));
-        } else {
-            set(&self.tolerance, 20.0);
-        }
+        self.restore.set_sensitive(!settings.alpha.is_empty());
         let a = settings.adjust;
         for (row, value) in self.adjust.iter().zip([
             a.brightness,

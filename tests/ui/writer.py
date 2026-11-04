@@ -1002,8 +1002,8 @@ def shadow_of_a_shape(work):
 
 
 def instant_alpha_of_a_picture(work):
-    """The Image group of the Inspector takes a color out of a selected
-    picture, which is saved with it (OBJ-05)."""
+    """Instant Alpha takes out the color clicked in a selected picture,
+    and the click is saved with it (OBJ-05)."""
     picture = (
         b'<draw:frame text:anchor-type="page" text:anchor-page-number="1" '
         b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
@@ -1016,15 +1016,38 @@ def instant_alpha_of_a_picture(work):
         {"Pictures/gray.png": png(16, 16, (128, 128, 128))},
     )
     try:
-        toggle_switch_row(app, "Instant Alpha", "the Image group of the Inspector")
-        check("a selected picture shows whether a color is taken out of it", True)
+        button = wait_for(
+            "the Image group of the Inspector",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_name() == "Take Out a Color" and showing(n)
+                ),
+                None,
+            ),
+        )
+        check("a selected picture offers Instant Alpha", True)
+        Atspi.Action.do_action(button, 0)
+        time.sleep(0.5)
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Alpha.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        click(
+            int(window["X"]) + int(window["WIDTH"]) // 3,
+            int(window["Y"]) + int(window["HEIGHT"]) * 3 // 4,
+        )
         time.sleep(1)
         press("ctrl+s")
         wait_for(
-            "the saved Instant Alpha",
-            lambda: saved_content(letter, r'desk:instant-alpha="#ffffff 20"'),
+            "the saved click of Instant Alpha",
+            lambda: saved_content(letter, r'desk:instant-alpha="\d+ \d+ 20"'),
         )
-        check("the color taken out of the picture is saved (OBJ-05)", True)
+        check("the color clicked in the picture is taken out and saved (OBJ-05)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

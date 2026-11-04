@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-04 19:55+0000\n"
+"POT-Creation-Date: 2026-11-04 20:50+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -144,13 +144,13 @@ msgstr ""
 msgid "Arrow"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:1568 crates/desk-ui/src/links_pane.rs:70
+#: crates/desk-ui/src/editing.rs:1572 crates/desk-ui/src/links_pane.rs:70
 #: crates/desk-ui/src/links_pane.rs:278 crates/desk-ui/src/links_pane.rs:339
 #: crates/desk-ui/src/window.rs:2556
 msgid "Bookmark"
 msgstr ""
 
-#: crates/desk-ui/src/editing/objects.rs:858 crates/desk-ui/src/fonts.rs:346
+#: crates/desk-ui/src/editing/objects.rs:1030 crates/desk-ui/src/fonts.rs:346
 #: crates/desk-ui/src/outline_view.rs:321
 msgid "Text"
 msgstr ""
@@ -206,7 +206,7 @@ msgstr ""
 msgid "Dotted"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:87 crates/desk-ui/src/picture_pane.rs:83
+#: crates/desk-ui/src/effects.rs:87
 msgid "Color"
 msgstr ""
 
@@ -772,7 +772,7 @@ msgid "Choose…"
 msgstr ""
 
 #: crates/desk-ui/src/graphic_pane.rs:149 crates/desk-ui/src/lists_pane.rs:195
-#: crates/desk-ui/src/picture_pane.rs:118
+#: crates/desk-ui/src/picture_pane.rs:121
 msgid "Image"
 msgstr ""
 
@@ -1532,87 +1532,83 @@ msgstr ""
 msgid "Topic, level {n}"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:69
+#: crates/desk-ui/src/picture_pane.rs:70
 msgid "Mask"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:70
+#: crates/desk-ui/src/picture_pane.rs:71
 msgid "Shows only the part of the picture inside its frame"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:72
+#: crates/desk-ui/src/picture_pane.rs:73
 msgid "Picture Size"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:73
+#: crates/desk-ui/src/picture_pane.rs:74
 msgid "Percent of the frame"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:74
+#: crates/desk-ui/src/picture_pane.rs:75
 msgid "Picture Left"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:75 crates/desk-ui/src/picture_pane.rs:77
+#: crates/desk-ui/src/picture_pane.rs:76 crates/desk-ui/src/picture_pane.rs:78
 msgid "Points from the frame"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:76
+#: crates/desk-ui/src/picture_pane.rs:77
 msgid "Picture Top"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:79
+#: crates/desk-ui/src/picture_pane.rs:80
+msgid "Take Out a Color"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:83 crates/desk-ui/src/picture_pane.rs:93
+msgid "Click a color in the picture, and drag to take out more or less"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:87
+msgid "Restore Colors"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:91
 msgid "Instant Alpha"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:80
-msgid "Takes a color out of the picture"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:87 crates/desk-ui/src/picture_pane.rs:89
-msgid "Color to Take Out"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:93
-msgid "Tolerance"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:94
-msgid "How near a color takes it out too"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:96
+#: crates/desk-ui/src/picture_pane.rs:99
 msgid "Brightness"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:97
+#: crates/desk-ui/src/picture_pane.rs:100
 msgid "Contrast"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:98
+#: crates/desk-ui/src/picture_pane.rs:101
 msgid "Saturation"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:99
+#: crates/desk-ui/src/picture_pane.rs:102
 msgid "Exposure"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:100
+#: crates/desk-ui/src/picture_pane.rs:103
 msgid "Temperature"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:101
+#: crates/desk-ui/src/picture_pane.rs:104
 msgid "Tint"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:105
+#: crates/desk-ui/src/picture_pane.rs:108
 msgid "Reset Image"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:109
+#: crates/desk-ui/src/picture_pane.rs:112
 msgid "Reduce File Size"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:112
+#: crates/desk-ui/src/picture_pane.rs:115
 msgid "Keeps only the part of the picture that shows, at the size it is shown"
 msgstr ""
 

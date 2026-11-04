@@ -249,8 +249,13 @@ fn odf_picture_settings(
             ));
         }
     }
-    if let Some(alpha) = settings.alpha {
-        g.instant_alpha = Some(format!("{} {}", odf_color(alpha.color), alpha.tolerance));
+    if !settings.alpha.is_empty() {
+        let seeds: Vec<String> = settings
+            .alpha
+            .iter()
+            .map(|s| format!("{} {} {}", s.x, s.y, s.tolerance))
+            .collect();
+        g.instant_alpha = Some(seeds.join(", "));
     }
     let a = settings.adjust;
     if !a.is_none() {
@@ -306,14 +311,27 @@ fn model_picture_settings(
             settings.mask = Some(Frame::from_pt(-left * sx, -top * sy, nw * sx, nh * sy));
         }
     }
-    if let Some((color, tolerance)) = g.instant_alpha.as_deref().and_then(|v| v.split_once(' '))
-        && let (Some(color), Ok(tolerance)) =
-            (odf::Color::parse(color), tolerance.trim().parse::<u8>())
-    {
-        settings.alpha = Some(desk_model::InstantAlpha {
-            color: rgba(color),
-            tolerance: tolerance.min(100),
-        });
+    if let Some(value) = g.instant_alpha.as_deref() {
+        let scale = desk_model::AlphaSeed::SCALE;
+        settings.alpha = value
+            .split(',')
+            .filter_map(|seed| {
+                let numbers: Vec<u16> = seed
+                    .split_whitespace()
+                    .map(|n| n.parse().ok())
+                    .collect::<Option<_>>()?;
+                let &[x, y, tolerance] = numbers.as_slice() else {
+                    return None;
+                };
+                Some(desk_model::AlphaSeed {
+                    x: x.min(scale),
+                    y: y.min(scale),
+                    tolerance: tolerance.min(100) as u8,
+                })
+            })
+            // Against hostile files.
+            .take(256)
+            .collect();
     }
     let unit = |v: f64| v.round().clamp(-100.0, 100.0) as i8;
     let numbers: Option<Vec<i8>> = g.image_adjust.as_deref().and_then(|v| {
@@ -1342,7 +1360,7 @@ mod tests {
         assert_eq!(settings.mask, Some(Frame::from_pt(-6.0, -3.0, 12.0, 12.0)));
         assert_eq!(settings.adjust.brightness, 20);
         assert_eq!(settings.adjust.contrast, -10);
-        assert_eq!(settings.alpha, None);
+        assert!(settings.alpha.is_empty());
     }
 
     /// A PNG of a size, in one color.
