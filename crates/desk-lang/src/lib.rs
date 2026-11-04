@@ -17,6 +17,7 @@
 //!
 //! Dictionaries load once, when first needed, and stay for every document.
 
+mod charset;
 mod dictionaries;
 mod hyphen;
 mod proofread;
@@ -57,9 +58,9 @@ pub fn speller(language: &str) -> Option<Arc<Speller>> {
         .or_insert_with(|| {
             let dic = find(Kind::Spelling, language)?;
             let aff = dic.with_extension("aff");
-            let dic = std::fs::read_to_string(dic).ok()?;
-            let aff = std::fs::read_to_string(aff).ok()?;
-            Speller::new(&aff, &dic).map(Arc::new)
+            let dic = std::fs::read(dic).ok()?;
+            let aff = std::fs::read(aff).ok()?;
+            Speller::from_bytes(&aff, &dic).map(Arc::new)
         })
         .clone()
 }

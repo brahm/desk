@@ -95,7 +95,7 @@ jobs:
             for family in "Liberation Sans" Carlito Caladea "TeX Gyre Heros" "Nimbus Sans" P052 "DejaVu Sans Mono"; do
               fc-list : family | tr "," "\n" | grep -qx "$family" || { echo "missing font: $family"; exit 1; }
             done
-            for file in hunspell/en_US.dic hunspell/en_GB.dic hunspell/pt_BR.dic hyphen/hyph_en_US.dic hyphen/hyph_pt_BR.dic; do
+            for file in hunspell/en_US.dic hunspell/en_GB.dic hunspell/pt_BR.dic hunspell/de_DE.dic hunspell/el_GR.dic hunspell/fa-IR.dic hunspell/sr_Latn_RS.dic hyphen/hyph_en_US.dic hyphen/hyph_pt_BR.dic hyphen/hyph_sl_SI.dic; do
               test -s "/app/share/$file" || { echo "missing: $file"; exit 1; }
             done'
       - name: Keep the bundle and the build repository

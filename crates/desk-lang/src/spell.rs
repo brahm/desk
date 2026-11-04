@@ -7,6 +7,8 @@ use std::ops::Range;
 
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::charset;
+
 /// A spelling dictionary.
 pub struct Speller {
     dictionary: spellbook::Dictionary,
@@ -28,6 +30,18 @@ impl Speller {
             .map(|dictionary| Self { dictionary })
     }
 
+    /// A dictionary from the bytes of its `.aff` and `.dic` files, in the
+    /// encoding that the `SET` line of the `.aff` file names: many
+    /// dictionaries of the system are in ISO 8859, as Greek, Polish,
+    /// Slovenian and Norwegian are in Debian and Ubuntu.
+    pub fn from_bytes(aff: &[u8], dic: &[u8]) -> Option<Self> {
+        let encoding = declared_encoding(aff);
+        Self::new(
+            &charset::decode(aff, encoding),
+            &charset::decode(dic, encoding),
+        )
+    }
+
     /// Whether a word is spelled right.
     pub fn check(&self, word: &str) -> bool {
         self.dictionary.check(word)
@@ -40,6 +54,18 @@ impl Speller {
         self.dictionary.suggest(word, &mut out);
         out
     }
+}
+
+/// The encoding that the `SET` line of an `.aff` file names, UTF-8 when
+/// there is none or it is unknown.
+fn declared_encoding(aff: &[u8]) -> &'static encoding_rs::Encoding {
+    aff.split(|&b| b == b'\n')
+        .find_map(|line| line.strip_prefix(b"SET"))
+        .and_then(|rest| {
+            let rest = String::from_utf8_lossy(rest);
+            charset::named(rest.split_whitespace().next()?)
+        })
+        .unwrap_or(encoding_rs::UTF_8)
 }
 
 /// The words of a text that a spelling checker looks at, by their byte
@@ -89,6 +115,26 @@ mod tests {
             .map(|r| &text[r])
             .collect();
         assert_eq!(wrong, ["The", "dont", "bark"]);
+    }
+
+    #[test]
+    fn dictionaries_in_iso_8859_are_decoded() {
+        // "łódź" and "żółw" in ISO 8859-2.
+        let aff = b"SET ISO8859-2\nSFX S Y 1\nSFX S 0 s .\n";
+        let dic = b"2\n\xb3\xf3d\xbc\n\xbf\xf3\xb3w\n";
+        let speller = Speller::from_bytes(aff, dic).unwrap();
+        assert!(speller.check("\u{142}\u{f3}d\u{17a}"));
+        assert!(speller.check("\u{17c}\u{f3}\u{142}w"));
+        assert!(!speller.check("lodz"));
+    }
+
+    #[test]
+    fn stray_bytes_in_a_utf8_dictionary_are_replaced() {
+        // A comment in Latin-1 in a dictionary that says it is UTF-8.
+        let aff = b"# by L\xe1szl\xf3\nSET UTF-8\nSFX S Y 1\nSFX S 0 s .\n";
+        let dic = "1\nma\u{e7}\u{e3}/S\n".as_bytes();
+        let speller = Speller::from_bytes(aff, dic).unwrap();
+        assert!(speller.check("ma\u{e7}\u{e3}s"));
     }
 
     #[test]
