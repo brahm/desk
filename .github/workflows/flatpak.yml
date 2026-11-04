@@ -67,7 +67,10 @@ jobs:
           bundle: desk-writer-${{ env.CHANNEL }}.flatpak
           manifest-path: build-aux/flatpak/br.com.brahm.Desk.Writer.json
           branch: ${{ env.CHANNEL }}
-          cache-key: flatpak-builder-${{ github.sha }}
+          # A restored cache makes flatpak-builder fail to update the
+          # SDK ("Invalid cross-device link") whenever the runtime has a
+          # new version since, so each build starts clean.
+          restore-cache: false
           upload-artifact: false
       - name: Install the bundle
         run: |
