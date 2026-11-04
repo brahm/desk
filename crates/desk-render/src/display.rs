@@ -72,6 +72,26 @@ pub enum Item {
         /// a solid line.
         dashes: Vec<f32>,
     },
+    /// A picture with a color taken out or adjusted, scaled into a
+    /// rectangle (OBJ-05, OBJ-06).
+    AdjustedImage {
+        /// The picture.
+        picture: desk_model::Picture,
+        /// The color taken out of it.
+        alpha: std::sync::Arc<[desk_model::AlphaSeed]>,
+        /// The changes of its colors.
+        adjust: desk_model::Adjustments,
+        /// The left edge, top edge, width and height.
+        rect: (f32, f32, f32, f32),
+    },
+    /// Items drawn only inside a rectangle, as a picture inside its mask
+    /// (OBJ-04).
+    Clipped {
+        /// The left edge, top edge, width and height.
+        rect: (f32, f32, f32, f32),
+        /// The items.
+        items: Vec<Item>,
+    },
     /// A picture, as an image bullet (LST-03), scaled into a rectangle.
     Image {
         /// The picture.
@@ -527,12 +547,40 @@ fn object_item(placed: &PlacedObject) -> Item {
             }
         }
         ObjectKind::Image(picture) => {
-            list.items.push(Item::Image {
-                picture: picture.clone(),
-                x,
-                y,
-                width: w,
-                height: h,
+            let settings = &object.picture;
+            // Where the whole picture lies; the frame shows a part of it
+            // when it masks it.
+            let rect = settings.mask.map_or((x, y, w, h), |m| {
+                (
+                    x + m.x.to_pt() as f32,
+                    y + m.y.to_pt() as f32,
+                    m.width.to_pt() as f32,
+                    m.height.to_pt() as f32,
+                )
+            });
+            let image = if !settings.alpha.is_empty() || !settings.adjust.is_none() {
+                Item::AdjustedImage {
+                    picture: picture.clone(),
+                    alpha: settings.alpha.clone(),
+                    adjust: settings.adjust,
+                    rect,
+                }
+            } else {
+                Item::Image {
+                    picture: picture.clone(),
+                    x: rect.0,
+                    y: rect.1,
+                    width: rect.2,
+                    height: rect.3,
+                }
+            };
+            list.items.push(if settings.mask.is_some() {
+                Item::Clipped {
+                    rect: (x, y, w, h),
+                    items: vec![image],
+                }
+            } else {
+                image
             });
             if stroke.is_some() {
                 list.items.push(Item::Path {

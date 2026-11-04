@@ -53,6 +53,90 @@ pub struct Object {
     /// a line; none until some is typed. Its `next` is always none, as
     /// shapes are not linked.
     pub text: Option<TextBox>,
+    /// How a picture is masked and adjusted; the defaults for any other
+    /// object (OBJ-04, OBJ-05, OBJ-06).
+    pub picture: PictureSettings,
+}
+
+/// How a picture shows in its frame: masked, with colors taken out, and
+/// adjusted, as Pages does it to an image.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct PictureSettings {
+    /// Where the whole picture lies, from the top left corner of the
+    /// frame, when the frame masks it: only the part inside the frame
+    /// shows (OBJ-04). None when the picture fills its frame.
+    pub mask: Option<Frame>,
+    /// Where Instant Alpha was clicked, in order: each click takes out
+    /// the color under it and the colors near it around it (OBJ-05).
+    pub alpha: Arc<[AlphaSeed]>,
+    /// The changes of Adjust Image (OBJ-06).
+    pub adjust: Adjustments,
+}
+
+/// A click of Instant Alpha on a picture: the region of the color under
+/// it, as far as the colors stay near it, is taken out (OBJ-05).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AlphaSeed {
+    /// Where across the picture, in ten-thousandths of its width.
+    pub x: u16,
+    /// Where down the picture, in ten-thousandths of its height.
+    pub y: u16,
+    /// How far a color may be from the one clicked and still go, from 0
+    /// to 100, as dragging after the click sets it.
+    pub tolerance: u8,
+}
+
+impl AlphaSeed {
+    /// The most that `x` and `y` count: the far edge of the picture.
+    pub const SCALE: u16 = 10_000;
+    /// The tolerance of a click before any drag.
+    pub const TOLERANCE: u8 = 20;
+}
+
+/// The changes of the Adjust Image window, each from -100 to 100 with 0
+/// for none.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Adjustments {
+    /// Lighter or darker.
+    pub brightness: i8,
+    /// More or less different between light and dark.
+    pub contrast: i8,
+    /// More or less colorful.
+    pub saturation: i8,
+    /// As if exposed longer or shorter.
+    pub exposure: i8,
+    /// Warmer or cooler.
+    pub temperature: i8,
+    /// More magenta or more green.
+    pub tint: i8,
+}
+
+impl Adjustments {
+    /// Whether nothing is changed.
+    pub fn is_none(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// The color of a pixel, adjusted, in straight (not premultiplied)
+    /// red, green and blue from 0 to 1.
+    pub fn apply(&self, [r, g, b]: [f32; 3]) -> [f32; 3] {
+        let unit = |v: i8| f32::from(v) / 100.0;
+        let exposure = 2f32.powf(unit(self.exposure) * 2.0);
+        let (warm, tint) = (unit(self.temperature) * 0.15, unit(self.tint) * 0.15);
+        let mut rgb = [
+            r * exposure + warm + tint * 0.5,
+            g * exposure - tint,
+            b * exposure - warm + tint * 0.5,
+        ];
+        let brightness = unit(self.brightness) * 0.5;
+        let contrast = 1.0 + unit(self.contrast);
+        for v in &mut rgb {
+            *v = (*v - 0.5) * contrast + 0.5 + brightness;
+        }
+        let gray = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        let saturation = 1.0 + unit(self.saturation);
+        rgb.map(|v| (gray + (v - gray) * saturation).clamp(0.0, 1.0))
+    }
 }
 
 impl Object {
@@ -72,6 +156,7 @@ impl Object {
             wrap_margin: Length::from_points(12),
             locked: false,
             text: None,
+            picture: PictureSettings::default(),
         }
     }
 

@@ -737,6 +737,178 @@ impl TextEditor {
         });
     }
 
+    /// Turns on Instant Alpha for the selected picture (OBJ-05): clicks
+    /// on it take colors out, and a drag after a click takes out more or
+    /// less. Returns whether it is on.
+    pub fn start_instant_alpha(&self) -> bool {
+        let Some(info) = self.object_info() else {
+            return false;
+        };
+        if info.count != 1
+            || info.object.locked
+            || !matches!(info.object.kind, ObjectKind::Image(_))
+        {
+            return false;
+        }
+        self.state.borrow_mut().alpha_pick = Some((info.object.id, false));
+        gtk::prelude::WidgetExt::set_cursor_from_name(self.view.area(), Some("crosshair"));
+        self.changed();
+        true
+    }
+
+    /// Turns Instant Alpha off.
+    pub fn stop_instant_alpha(&self) {
+        if self.state.borrow_mut().alpha_pick.take().is_some() {
+            gtk::prelude::WidgetExt::set_cursor_from_name(self.view.area(), None);
+            self.changed();
+        }
+    }
+
+    /// Whether Instant Alpha is on.
+    pub fn instant_alpha_on(&self) -> bool {
+        self.state.borrow().alpha_pick.is_some()
+    }
+
+    /// Where a point of the view is on the picture that Instant Alpha is
+    /// on, in ten-thousandths of its width and height; none off it.
+    fn alpha_point(&self, x: f64, y: f64) -> Option<(NodeId, u16, u16)> {
+        let (id, _) = self.state.borrow().alpha_pick?;
+        let (page, px, py) = self.view.page_at(x, y)?;
+        let state = self.state.borrow();
+        let (on, placed) = find(&state.layout, id)?;
+        if on != page {
+            return None;
+        }
+        let object = &placed.object;
+        let (w, h) = (f64::from(placed.width), f64::from(placed.height));
+        // From the page into the frame, turned back and unflipped.
+        let (cx, cy) = (f64::from(placed.x) + w / 2.0, f64::from(placed.y) + h / 2.0);
+        let (dx, dy) = (px - cx, py - cy);
+        let a = (f64::from(object.rotation) / 100.0).to_radians();
+        let (mut lx, mut ly) = (dx * a.cos() - dy * a.sin(), dx * a.sin() + dy * a.cos());
+        if object.flip_horizontal {
+            lx = -lx;
+        }
+        if object.flip_vertical {
+            ly = -ly;
+        }
+        let (lx, ly) = (lx + w / 2.0, ly + h / 2.0);
+        if !(0.0..=w).contains(&lx) || !(0.0..=h).contains(&ly) {
+            return None;
+        }
+        let (mx, my, mw, mh) = object.picture.mask.map_or((0.0, 0.0, w, h), |m| {
+            (m.x.to_pt(), m.y.to_pt(), m.width.to_pt(), m.height.to_pt())
+        });
+        if mw <= 0.0 || mh <= 0.0 {
+            return None;
+        }
+        let scale = f64::from(desk_model::AlphaSeed::SCALE);
+        let fx = ((lx - mx) / mw).clamp(0.0, 1.0);
+        let fy = ((ly - my) / mh).clamp(0.0, 1.0);
+        Some((id, (fx * scale).round() as u16, (fy * scale).round() as u16))
+    }
+
+    /// Changes the clicks of Instant Alpha on a picture, as one step of
+    /// the history, or as part of the last when `continuing`.
+    fn edit_alpha(
+        &self,
+        id: NodeId,
+        continuing: bool,
+        change: impl FnOnce(&mut Vec<desk_model::AlphaSeed>),
+    ) {
+        let selection = self.selection();
+        let depth = self.state.borrow().editor.undo_depth();
+        let edits = |edit: &mut desk_model::Edit| {
+            let Some(mut object) = edit.document().objects().get(id).cloned() else {
+                return Ok(());
+            };
+            let mut seeds = object.picture.alpha.to_vec();
+            change(&mut seeds);
+            object.picture.alpha = seeds.into();
+            edit.replace_object(object)
+        };
+        let result = {
+            let mut state = self.state.borrow_mut();
+            if continuing {
+                state
+                    .editor
+                    .edit_continuing("Instant Alpha", edits)
+                    .map(|_| ())
+            } else {
+                state.editor.edit("Instant Alpha", edits)
+            }
+        };
+        if let Err(error) = result {
+            gtk::glib::g_warning!("desk", "cannot take the color out: {error}");
+            return;
+        }
+        if self.state.borrow().editor.undo_depth() > depth {
+            let mut state = self.state.borrow_mut();
+            let action = state.next_action;
+            state.next_action += 1;
+            state.undo.push((selection, selection, action));
+            state.redo.clear();
+        }
+        self.after_change(selection);
+    }
+
+    /// A press while Instant Alpha is on: on the picture, it takes out
+    /// the color under it; anywhere else, it turns Instant Alpha off.
+    /// Returns whether the press is used.
+    pub(super) fn press_alpha(&self, x: f64, y: f64) -> bool {
+        if !self.instant_alpha_on() {
+            return false;
+        }
+        let Some((id, px, py)) = self.alpha_point(x, y) else {
+            self.stop_instant_alpha();
+            return false;
+        };
+        self.state.borrow_mut().alpha_pick = Some((id, true));
+        self.edit_alpha(id, false, |seeds| {
+            seeds.push(desk_model::AlphaSeed {
+                x: px,
+                y: py,
+                tolerance: desk_model::AlphaSeed::TOLERANCE,
+            });
+        });
+        true
+    }
+
+    /// A drag after a press of Instant Alpha: the farther it goes, the
+    /// more colors near the one clicked go too, as in Pages. Returns
+    /// whether the drag is used.
+    pub(super) fn drag_alpha(&self, dx: f64, dy: f64) -> bool {
+        let Some((id, true)) = self.state.borrow().alpha_pick else {
+            return false;
+        };
+        let tolerance = (f64::from(desk_model::AlphaSeed::TOLERANCE) + dx.hypot(dy) / 2.0)
+            .clamp(0.0, 100.0)
+            .round() as u8;
+        let last = self
+            .state
+            .borrow()
+            .editor
+            .document()
+            .objects()
+            .get(id)
+            .and_then(|o| o.picture.alpha.last().copied());
+        if last.is_some_and(|l| l.tolerance != tolerance) {
+            self.edit_alpha(id, true, |seeds| {
+                if let Some(last) = seeds.last_mut() {
+                    last.tolerance = tolerance;
+                }
+            });
+        }
+        true
+    }
+
+    /// The end of a drag of Instant Alpha.
+    pub(super) fn end_alpha_drag(&self) {
+        if let Some((_, pressed)) = &mut self.state.borrow_mut().alpha_pick {
+            *pressed = false;
+        }
+    }
+
     /// Changes the style of the selected objects but the locked ones, and
     /// of the objects of the selected groups, as the Graphic inspector
     /// asks (OBJ-09, OBJ-10, OBJ-11). `change` learns whether the object

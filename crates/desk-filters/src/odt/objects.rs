@@ -64,6 +64,12 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             fill_image_name,
             repeat,
             fill_image_mode,
+            clip,
+            luminance,
+            contrast,
+            mask,
+            image_adjust,
+            instant_alpha,
             marker_start,
             marker_start_width,
             marker_end,
@@ -198,6 +204,158 @@ fn model_shadow(g: &odf::GraphicProperties) -> desk_model::ObjectShadow {
             .shadow_opacity
             .map_or(100, |o| o.round().clamp(0.0, 100.0) as u8),
     }
+}
+
+/// The size of a picture as other programs take it when it says none: a
+/// pixel to three quarters of a point, at 96 pixels an inch.
+fn natural_size(picture: &desk_model::Picture) -> (f64, f64) {
+    (
+        f64::from(picture.width()) * 0.75,
+        f64::from(picture.height()) * 0.75,
+    )
+}
+
+/// How a picture is masked and adjusted, as ODF writes it: `fo:clip`,
+/// `draw:luminance` and `draw:contrast` for other programs, and the
+/// `desk:` attributes that keep it exactly (OBJ-04, OBJ-05, OBJ-06).
+fn odf_picture_settings(
+    g: &mut odf::GraphicProperties,
+    object: &Object,
+    picture: &desk_model::Picture,
+) {
+    let settings = &object.picture;
+    if let Some(mask) = settings.mask {
+        let (w, h) = (mask.width.to_pt(), mask.height.to_pt());
+        if w > 0.0 && h > 0.0 {
+            let (nw, nh) = natural_size(picture);
+            let (fw, fh) = (object.frame.width.to_pt(), object.frame.height.to_pt());
+            let (x, y) = (-mask.x.to_pt(), -mask.y.to_pt());
+            let cut = |part: f64, whole: f64, natural: f64| {
+                odf_length(Length::from_pt((part / whole * natural).max(0.0)))
+            };
+            g.clip = Some(format!(
+                "rect({}, {}, {}, {})",
+                cut(y, h, nh),
+                cut(w - x - fw, w, nw),
+                cut(h - y - fh, h, nh),
+                cut(x, w, nw),
+            ));
+            g.mask = Some(format!(
+                "{} {} {} {}",
+                odf_length(mask.x),
+                odf_length(mask.y),
+                odf_length(mask.width),
+                odf_length(mask.height)
+            ));
+        }
+    }
+    if !settings.alpha.is_empty() {
+        let seeds: Vec<String> = settings
+            .alpha
+            .iter()
+            .map(|s| format!("{} {} {}", s.x, s.y, s.tolerance))
+            .collect();
+        g.instant_alpha = Some(seeds.join(", "));
+    }
+    let a = settings.adjust;
+    if !a.is_none() {
+        if a.brightness != 0 {
+            g.luminance = Some(f64::from(a.brightness));
+        }
+        if a.contrast != 0 {
+            g.contrast = Some(f64::from(a.contrast));
+        }
+        g.image_adjust = Some(format!(
+            "{} {} {} {} {} {}",
+            a.brightness, a.contrast, a.saturation, a.exposure, a.temperature, a.tint
+        ));
+    }
+}
+
+/// How a picture is masked and adjusted, from the properties of its style.
+fn model_picture_settings(
+    g: &odf::GraphicProperties,
+    picture: &desk_model::Picture,
+    frame: Frame,
+) -> desk_model::PictureSettings {
+    let mut settings = desk_model::PictureSettings::default();
+    let lengths = |value: &str| -> Option<Vec<f64>> {
+        value
+            .split(|c: char| c.is_whitespace() || c == ',')
+            .filter(|s| !s.is_empty())
+            .map(|s| odf::Length::parse(s).map(|l| length(l).to_pt()))
+            .collect()
+    };
+    let mask = g.mask.as_deref().and_then(lengths).filter(|v| v.len() == 4);
+    if let Some(m) = mask {
+        if m[2] > 0.0 && m[3] > 0.0 && m.iter().all(|v| v.abs() < 1e5) {
+            settings.mask = Some(Frame::from_pt(m[0], m[1], m[2], m[3]));
+        }
+    } else if let Some(clip) = g
+        .clip
+        .as_deref()
+        .and_then(|c| c.trim().strip_prefix("rect(")?.strip_suffix(')'))
+        .and_then(lengths)
+        .filter(|v| v.len() == 4)
+    {
+        // What is cut from the picture at its own size, top, right,
+        // bottom and left; the frame shows the rest.
+        let (nw, nh) = natural_size(picture);
+        let (top, right, bottom, left) = (clip[0], clip[1], clip[2], clip[3]);
+        let (shown_w, shown_h) = (nw - left - right, nh - top - bottom);
+        if shown_w > 0.0 && shown_h > 0.0 && clip.iter().any(|v| *v > 0.0) {
+            let (sx, sy) = (
+                frame.width.to_pt() / shown_w,
+                frame.height.to_pt() / shown_h,
+            );
+            settings.mask = Some(Frame::from_pt(-left * sx, -top * sy, nw * sx, nh * sy));
+        }
+    }
+    if let Some(value) = g.instant_alpha.as_deref() {
+        let scale = desk_model::AlphaSeed::SCALE;
+        settings.alpha = value
+            .split(',')
+            .filter_map(|seed| {
+                let numbers: Vec<u16> = seed
+                    .split_whitespace()
+                    .map(|n| n.parse().ok())
+                    .collect::<Option<_>>()?;
+                let &[x, y, tolerance] = numbers.as_slice() else {
+                    return None;
+                };
+                Some(desk_model::AlphaSeed {
+                    x: x.min(scale),
+                    y: y.min(scale),
+                    tolerance: tolerance.min(100) as u8,
+                })
+            })
+            // Against hostile files.
+            .take(256)
+            .collect();
+    }
+    let unit = |v: f64| v.round().clamp(-100.0, 100.0) as i8;
+    let numbers: Option<Vec<i8>> = g.image_adjust.as_deref().and_then(|v| {
+        v.split_whitespace()
+            .map(|n| n.parse::<f64>().ok().filter(|n| n.is_finite()).map(unit))
+            .collect()
+    });
+    match numbers {
+        Some(n) if n.len() == 6 => {
+            settings.adjust = desk_model::Adjustments {
+                brightness: n[0],
+                contrast: n[1],
+                saturation: n[2],
+                exposure: n[3],
+                temperature: n[4],
+                tint: n[5],
+            };
+        }
+        _ => {
+            settings.adjust.brightness = g.luminance.map_or(0, unit);
+            settings.adjust.contrast = g.contrast.map_or(0, unit);
+        }
+    }
+    settings
 }
 
 /// A predefined shape of other programs, as near as Desk has one.
@@ -534,6 +692,9 @@ fn import_one(
             start: line_end(g.marker_start.as_deref()),
             end: line_end(g.marker_end.as_deref()),
         });
+    }
+    if let ObjectKind::Image(picture) = &built.kind {
+        built.picture = model_picture_settings(&g, picture, frame);
     }
     if g.shadow.as_deref() == Some("visible") {
         style.shadow = Some(model_shadow(&g));
@@ -967,6 +1128,9 @@ impl Exporter<'_> {
         if object.locked {
             g.protect = Some("position size".into());
         }
+        if let ObjectKind::Image(picture) = &object.kind {
+            odf_picture_settings(&mut g, object, picture);
+        }
         let mirror: Vec<&str> = [
             (object.flip_horizontal, "horizontal"),
             (object.flip_vertical, "vertical"),
@@ -1175,4 +1339,40 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     out.gradients = std::mem::take(&mut exporter.gradients);
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn obj_04_obj_06_masks_and_adjustments_of_other_programs_are_read() {
+        // Eight pixels square: six points at 96 pixels an inch.
+        let picture = crate::picture::picture_within(&png(8, 8), MAX_SIDE).unwrap();
+        let g = odf::GraphicProperties {
+            clip: Some("rect(1.5pt, 0pt, 1.5pt, 3pt)".into()),
+            luminance: Some(20.0),
+            contrast: Some(-10.0),
+            ..odf::GraphicProperties::default()
+        };
+        // The frame shows three points by three of it, at twice its size.
+        let settings = model_picture_settings(&g, &picture, Frame::from_pt(0.0, 0.0, 6.0, 6.0));
+        assert_eq!(settings.mask, Some(Frame::from_pt(-6.0, -3.0, 12.0, 12.0)));
+        assert_eq!(settings.adjust.brightness, 20);
+        assert_eq!(settings.adjust.contrast, -10);
+        assert!(settings.alpha.is_empty());
+    }
+
+    /// A PNG of a size, in one color.
+    fn png(width: u32, height: u32) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let mut encoder = png::Encoder::new(&mut bytes, width, height);
+        encoder.set_color(png::ColorType::Rgb);
+        let mut writer = encoder.write_header().unwrap();
+        writer
+            .write_image_data(&vec![200; (width * height * 3) as usize])
+            .unwrap();
+        drop(writer);
+        bytes
+    }
 }

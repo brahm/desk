@@ -443,6 +443,7 @@ def main():
     text_in_a_shape(work)
     object_in_the_text(work)
     shadow_of_a_shape(work)
+    instant_alpha_of_a_picture(work)
     print("All UI tests passed.")
 
 
@@ -866,20 +867,42 @@ def text_in_a_shape(work):
         writer.wait(timeout=10)
 
 
-def open_with_a_shape(work, name):
+SHAPE = (
+    b'<draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+    b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt"/>'
+)
+
+
+def png(width, height, rgb):
+    """A PNG of one color."""
+    import struct
+    import zlib
+
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    rows = b"".join(b"\0" + bytes(rgb) * width for _ in range(height))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+def open_with_a_shape(work, name, shape=SHAPE, extra=None):
     """Opens a copy of the fixture with a shape over its text, shows the
     Inspector and selects the shape; returns the process, the app on the
-    accessibility bus and the file."""
+    accessibility bus and the file. `extra` adds files to the package."""
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
     with zipfile.ZipFile(letter) as package:
         files = {n: package.read(n) for n in package.namelist()}
     files["content.xml"] = files["content.xml"].replace(
-        b"<office:text>",
-        b'<office:text><draw:rect text:anchor-type="page" text:anchor-page-number="1" '
-        b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt"/>',
-        1,
+        b"<office:text>", b"<office:text>" + shape, 1
     )
+    files.update(extra or {})
     with zipfile.ZipFile(letter, "w") as package:
         package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
         for n, data in files.items():
@@ -973,6 +996,58 @@ def shadow_of_a_shape(work):
             lambda: saved_content(letter, r'draw:shadow="visible"'),
         )
         check("the shadow of the shape is saved (OBJ-11)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def instant_alpha_of_a_picture(work):
+    """Instant Alpha takes out the color clicked in a selected picture,
+    and the click is saved with it (OBJ-05)."""
+    picture = (
+        b'<draw:frame text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
+        b'<draw:image xlink:href="Pictures/gray.png" xlink:type="simple"/></draw:frame>'
+    )
+    writer, app, letter = open_with_a_shape(
+        work,
+        "Alpha.odt",
+        picture,
+        {"Pictures/gray.png": png(16, 16, (128, 128, 128))},
+    )
+    try:
+        button = wait_for(
+            "the Image group of the Inspector",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_name() == "Take Out a Color" and showing(n)
+                ),
+                None,
+            ),
+        )
+        check("a selected picture offers Instant Alpha", True)
+        Atspi.Action.do_action(button, 0)
+        time.sleep(0.5)
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Alpha.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        click(
+            int(window["X"]) + int(window["WIDTH"]) // 3,
+            int(window["Y"]) + int(window["HEIGHT"]) * 3 // 4,
+        )
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved click of Instant Alpha",
+            lambda: saved_content(letter, r'desk:instant-alpha="\d+ \d+ 20"'),
+        )
+        check("the color clicked in the picture is taken out and saved (OBJ-05)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

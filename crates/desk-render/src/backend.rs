@@ -64,6 +64,8 @@ pub struct Painter {
     faces: HashMap<(u64, u32), FontFace>,
     /// The pictures decoded so far.
     pictures: Vec<(desk_model::Picture, cairo::ImageSurface)>,
+    /// The pictures with their colors changed, by what changed them.
+    adjusted: Vec<(AdjustedKey, cairo::ImageSurface)>,
 }
 
 impl Painter {
@@ -73,6 +75,7 @@ impl Painter {
             library: freetype::Library::init()?,
             faces: HashMap::new(),
             pictures: Vec::new(),
+            adjusted: Vec::new(),
         })
     }
 
@@ -128,6 +131,31 @@ impl Painter {
         });
         cr.set_source(&pattern)?;
         Ok(())
+    }
+
+    /// A picture with a color taken out and its colors adjusted
+    /// (OBJ-05, OBJ-06), made once.
+    fn adjusted_picture(
+        &mut self,
+        picture: &desk_model::Picture,
+        alpha: &[desk_model::AlphaSeed],
+        adjust: desk_model::Adjustments,
+    ) -> Option<cairo::ImageSurface> {
+        let key = AdjustedKey {
+            picture: picture.clone(),
+            alpha: alpha.to_vec(),
+            adjust,
+        };
+        if let Some((_, surface)) = self.adjusted.iter().find(|(k, _)| *k == key) {
+            return Some(surface.clone());
+        }
+        let source = self.picture(picture)?;
+        let surface = adjusted_surface(&source, alpha, adjust).ok()?;
+        if self.adjusted.len() > 16 {
+            self.adjusted.clear();
+        }
+        self.adjusted.push((key, surface.clone()));
+        Some(surface)
     }
 
     fn face(&mut self, font: &FontData) -> Result<FontFace, RenderError> {
@@ -327,6 +355,25 @@ impl Painter {
                         cr.set_dash(&[], 0.0);
                     }
                     cr.new_path();
+                }
+                Item::AdjustedImage {
+                    picture,
+                    alpha,
+                    adjust,
+                    rect,
+                } => {
+                    let Some(surface) = self.adjusted_picture(picture, alpha, *adjust) else {
+                        continue;
+                    };
+                    paint_surface(cr, &surface, *rect)?;
+                }
+                Item::Clipped { rect, items } => {
+                    cr.save()?;
+                    let (x, y, w, h) = *rect;
+                    cr.rectangle(f64::from(x), f64::from(y), f64::from(w), f64::from(h));
+                    cr.clip();
+                    self.paint_items(cr, items)?;
+                    cr.restore()?;
                 }
                 Item::CastShadow {
                     items,
@@ -626,6 +673,155 @@ fn blur_line(line: &[u8], radius: usize, mut out: impl FnMut(usize, u8)) {
     }
 }
 
+/// What a picture was changed by.
+#[derive(PartialEq)]
+struct AdjustedKey {
+    picture: desk_model::Picture,
+    alpha: Vec<desk_model::AlphaSeed>,
+    adjust: desk_model::Adjustments,
+}
+
+/// Paints a surface scaled into a rectangle.
+fn paint_surface(
+    cr: &Context,
+    surface: &cairo::ImageSurface,
+    (x, y, width, height): (f32, f32, f32, f32),
+) -> Result<(), RenderError> {
+    cr.save()?;
+    cr.translate(f64::from(x), f64::from(y));
+    cr.scale(
+        f64::from(width) / f64::from(surface.width().max(1)),
+        f64::from(height) / f64::from(surface.height().max(1)),
+    );
+    cr.set_source_surface(surface, 0.0, 0.0)?;
+    cr.source().set_filter(cairo::Filter::Good);
+    cr.paint()?;
+    cr.restore()?;
+    Ok(())
+}
+
+/// A copy of a picture with the regions that Instant Alpha clicked taken
+/// out, and its colors adjusted (OBJ-05, OBJ-06).
+pub fn adjusted_surface(
+    source: &cairo::ImageSurface,
+    alpha: &[desk_model::AlphaSeed],
+    adjust: desk_model::Adjustments,
+) -> Result<cairo::ImageSurface, RenderError> {
+    let (width, height) = (source.width(), source.height());
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height)?;
+    {
+        let cr = Context::new(&surface)?;
+        cr.set_source_surface(source, 0.0, 0.0)?;
+        cr.paint()?;
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let (w, h) = (width as usize, height as usize);
+    {
+        let mut data = surface
+            .data()
+            .map_err(|_| RenderError::Cairo(cairo::Error::SurfaceFinished))?;
+        // Straight colors and opacity, from premultiplied BGRA as Cairo
+        // keeps it in memory on little-endian machines.
+        let mut pixels: Vec<([f32; 3], f32)> = Vec::with_capacity(w * h);
+        for row in 0..h {
+            for p in data[row * stride..][..w * 4].as_chunks::<4>().0 {
+                let a = f32::from(p[3]) / 255.0;
+                let rgb = if a > 0.0 {
+                    [p[2], p[1], p[0]].map(|v| (f32::from(v) / 255.0 / a).min(1.0))
+                } else {
+                    [0.0; 3]
+                };
+                pixels.push((rgb, a));
+            }
+        }
+        let keep = instant_alpha(&pixels, w, h, alpha);
+        for (i, (rgb, a)) in pixels.into_iter().enumerate() {
+            let a = a * keep[i];
+            let rgb = if adjust.is_none() {
+                rgb
+            } else {
+                adjust.apply(rgb)
+            };
+            let byte = |v: f32| (v.clamp(0.0, 1.0) * a * 255.0).round() as u8;
+            let pixel = &mut data[(i / w) * stride + (i % w) * 4..][..4];
+            pixel[0] = byte(rgb[2]);
+            pixel[1] = byte(rgb[1]);
+            pixel[2] = byte(rgb[0]);
+            pixel[3] = (a * 255.0).round() as u8;
+        }
+    }
+    surface.mark_dirty();
+    Ok(surface)
+}
+
+/// How much of each pixel Instant Alpha keeps, from 0 to 1: each click
+/// takes out the pixels joined to it whose colors stay near the one under
+/// it, and fades the pixels just past them.
+fn instant_alpha(
+    pixels: &[([f32; 3], f32)],
+    width: usize,
+    height: usize,
+    seeds: &[desk_model::AlphaSeed],
+) -> Vec<f32> {
+    let mut keep = vec![1.0f32; pixels.len()];
+    if width == 0 || height == 0 {
+        return keep;
+    }
+    let scale = f32::from(desk_model::AlphaSeed::SCALE);
+    let mut seen = vec![false; pixels.len()];
+    let mut stack = Vec::new();
+    for seed in seeds {
+        let x = ((f32::from(seed.x) / scale * width as f32) as usize).min(width - 1);
+        let y = ((f32::from(seed.y) / scale * height as f32) as usize).min(height - 1);
+        let (color, _) = pixels[y * width + x];
+        let tolerance = f32::from(seed.tolerance.min(100)) / 100.0;
+        // How far past the tolerance a color still fades.
+        let edge = 0.04;
+        let distance = |i: usize| {
+            let (c, _) = pixels[i];
+            ((c[0] - color[0]).powi(2) + (c[1] - color[1]).powi(2) + (c[2] - color[2]).powi(2))
+                .sqrt()
+                / 3f32.sqrt()
+        };
+        seen.iter_mut().for_each(|s| *s = false);
+        stack.clear();
+        stack.push(y * width + x);
+        seen[y * width + x] = true;
+        while let Some(i) = stack.pop() {
+            let d = distance(i);
+            if d > tolerance {
+                // Just past the region: faded, and not gone through.
+                if d < tolerance + edge {
+                    keep[i] = keep[i].min((d - tolerance) / edge);
+                }
+                continue;
+            }
+            keep[i] = 0.0;
+            let (px, py) = (i % width, i / width);
+            let mut visit = |j: usize| {
+                if !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if px > 0 {
+                visit(i - 1);
+            }
+            if px + 1 < width {
+                visit(i + 1);
+            }
+            if py > 0 {
+                visit(i - width);
+            }
+            if py + 1 < height {
+                visit(i + width);
+            }
+        }
+    }
+    keep
+}
+
 fn set_paint(cr: &Context, paint: &Paint) -> Result<(), RenderError> {
     match paint.clone() {
         Paint::Color(color) => set_color(cr, color),
@@ -665,4 +861,51 @@ fn set_color(cr: &Context, color: Rgba) {
         f64::from(color.b) / 255.0,
         f64::from(color.a) / 255.0,
     );
+}
+
+/// A picture made smaller for its place, as Reduce File Size does
+/// (OBJ-06): only the part that its mask shows, at two pixels a point of
+/// its frame, and never larger than it was. `mask` is where the whole
+/// picture lies from the top left corner of a frame of `size`, in points.
+/// None when it would not be smaller.
+pub fn reduced_picture(
+    picture: &desk_model::Picture,
+    mask: Option<desk_model::Frame>,
+    size: (f64, f64),
+) -> Option<desk_model::Picture> {
+    let source =
+        cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.png())).ok()?;
+    let (pw, ph) = (f64::from(source.width()), f64::from(source.height()));
+    let (fw, fh) = size;
+    if fw <= 0.0 || fh <= 0.0 {
+        return None;
+    }
+    // Where the whole picture lies, in points from the corner of the frame.
+    let (mx, my, mw, mh) = mask.map_or((0.0, 0.0, fw, fh), |m| {
+        (m.x.to_pt(), m.y.to_pt(), m.width.to_pt(), m.height.to_pt())
+    });
+    if mw <= 0.0 || mh <= 0.0 {
+        return None;
+    }
+    // The pixels of the picture that the frame shows, and as many as it
+    // needs.
+    let (shown_w, shown_h) = (fw / mw * pw, fh / mh * ph);
+    let width = (fw * 2.0).min(shown_w).ceil().max(1.0) as i32;
+    let height = (fh * 2.0).min(shown_h).ceil().max(1.0) as i32;
+    if f64::from(width) * f64::from(height) >= pw * ph * 0.95 {
+        return None;
+    }
+    let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).ok()?;
+    {
+        let cr = Context::new(&surface).ok()?;
+        cr.scale(f64::from(width) / fw, f64::from(height) / fh);
+        cr.translate(mx, my);
+        cr.scale(mw / pw, mh / ph);
+        cr.set_source_surface(&source, 0.0, 0.0).ok()?;
+        cr.source().set_filter(cairo::Filter::Best);
+        cr.paint().ok()?;
+    }
+    let mut png = Vec::new();
+    surface.write_to_png(&mut png).ok()?;
+    desk_model::Picture::from_png(png)
 }

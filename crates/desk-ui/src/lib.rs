@@ -36,6 +36,7 @@ mod lists_pane;
 mod notes_pane;
 mod objects_pane;
 mod outline_view;
+mod picture_pane;
 mod preferences;
 mod properties;
 mod ruler;

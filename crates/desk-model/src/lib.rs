@@ -96,9 +96,9 @@ pub use list::{
 };
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
-    Anchor, Fill, Frame, GraphicStyle, ImageFill, LineEnd, MAX_TEXT_BOX_COLUMNS, Object,
-    ObjectKind, ObjectShadow, Objects, POLYGON_SCALE, Shape, Stroke, TextBox, VerticalAlignment,
-    Wrap,
+    Adjustments, AlphaSeed, Anchor, Fill, Frame, GraphicStyle, ImageFill, LineEnd,
+    MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE,
+    PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
 pub use object_edit::{Distribution, Layer, ObjectAlignment, reframed, translated, union};
 pub use op::Op;

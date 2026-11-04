@@ -1845,6 +1845,29 @@ fn with_objects() -> Document {
                 Frame::from_pt(50.0, 600.0, 80.0, 80.0),
             );
             image.wrap = Wrap::Largest;
+            image.picture = desk_model::PictureSettings {
+                mask: Some(Frame::from_pt(-10.0, -20.0, 120.0, 100.0)),
+                alpha: Arc::from([
+                    desk_model::AlphaSeed {
+                        x: 0,
+                        y: 0,
+                        tolerance: 25,
+                    },
+                    desk_model::AlphaSeed {
+                        x: 10_000,
+                        y: 5_000,
+                        tolerance: 40,
+                    },
+                ]),
+                adjust: desk_model::Adjustments {
+                    brightness: 10,
+                    contrast: -20,
+                    saturation: 30,
+                    exposure: -5,
+                    temperature: 40,
+                    tint: -50,
+                },
+            };
             edit.add_object(image)?;
             let mut triangle = Object::new(
                 edit.new_id(),

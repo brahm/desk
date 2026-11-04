@@ -55,6 +55,8 @@ pub struct ObjectGroups {
     columns: adw::SpinRow,
     /// What fills the objects, their lines and their shadows.
     graphic: Rc<crate::graphic_pane::GraphicGroup>,
+    /// The mask, Instant Alpha and adjustments of a picture.
+    picture: Rc<crate::picture_pane::PictureGroup>,
     units: Cell<Units>,
     updating: Cell<bool>,
 }
@@ -186,6 +188,7 @@ impl ObjectGroups {
             vertical,
             columns,
             graphic: crate::graphic_pane::GraphicGroup::new(editor.clone()),
+            picture: crate::picture_pane::PictureGroup::new(editor.clone()),
             units: Cell::new(units),
             updating: Cell::new(false),
         });
@@ -331,9 +334,10 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 4] {
+    pub fn groups(&self) -> [&adw::PreferencesGroup; 5] {
         [
             &self.metrics,
+            self.picture.group(),
             self.graphic.group(),
             &self.wrap_group,
             &self.text_group,
@@ -386,6 +390,7 @@ impl ObjectGroups {
         self.wrap_group.set_visible(info.is_some());
         self.text_group.set_visible(false);
         self.graphic.show(info);
+        self.picture.show(info);
         let Some(info) = info else {
             return;
         };
