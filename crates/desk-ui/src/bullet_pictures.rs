@@ -139,9 +139,38 @@ pub fn picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
     Picture::from_png(texture.save_to_png_bytes().to_vec())
 }
 
+/// The picture of an image file for a document: PNG, JPEG and PDF as
+/// they are, so that photographs stay small and PDF stays sharp, and any
+/// other format that GTK reads as PNG (OBJ-01).
+pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
+    let (bytes, _) = file.load_contents(gtk::gio::Cancellable::NONE).ok()?;
+    let bytes: &[u8] = &bytes;
+    if bytes.starts_with(b"%PDF-") {
+        let (width, height) = desk_render::pdf_size(bytes)?;
+        return Picture::from_pdf(bytes.to_vec(), width, height);
+    }
+    Picture::from_bytes(bytes.to_vec())
+        // A JPEG that the renderer cannot decode is taken as GTK reads it.
+        .filter(|p| desk_render::picture_surface(p).is_some())
+        .or_else(|| picture_from_file(file))
+}
+
+/// The filter of the dialogs that choose a picture for a document: the
+/// formats that GTK reads, and PDF.
+pub fn document_picture_filters() -> gtk::gio::ListStore {
+    let filter = gtk::FileFilter::new();
+    filter.set_name(Some(&crate::i18n::tr("Images")));
+    filter.add_pixbuf_formats();
+    filter.add_mime_type("application/pdf");
+    filter.add_suffix("pdf");
+    let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+    filters.append(&filter);
+    filters
+}
+
 /// A small image of a picture, for menus.
 pub fn texture(picture: &Picture) -> Option<gtk::gdk::Texture> {
-    gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(picture.png())).ok()
+    gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(picture.data())).ok()
 }
 
 #[cfg(test)]

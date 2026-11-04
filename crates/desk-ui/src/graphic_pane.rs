@@ -335,16 +335,11 @@ impl GraphicGroup {
 
     /// Asks for an image file, and fills with its picture.
     fn choose_picture(self: &Rc<Self>) {
-        let filter = gtk::FileFilter::new();
-        filter.set_name(Some(&tr("Images")));
-        filter.add_pixbuf_formats();
-        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
-        filters.append(&filter);
+        let filters = crate::bullet_pictures::document_picture_filters();
         let dialog = gtk::FileDialog::builder()
             .title(tr("Choose an Image to Fill With"))
             .modal(true)
             .filters(&filters)
-            .default_filter(&filter)
             .build();
         let parent = self.group.root().and_downcast::<gtk::Window>();
         let weak = Rc::downgrade(self);
@@ -355,7 +350,7 @@ impl GraphicGroup {
                 let Some(this) = weak.upgrade() else { return };
                 let picture = result
                     .ok()
-                    .and_then(|file| crate::bullet_pictures::picture_from_file(&file));
+                    .and_then(|file| crate::bullet_pictures::document_picture_from_file(&file));
                 match picture {
                     Some(picture) => {
                         *this.picture.borrow_mut() = Some(picture);

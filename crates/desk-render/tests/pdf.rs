@@ -610,3 +610,84 @@ fn obj_06_a_reduced_picture_keeps_what_shows() {
     // At its full size it is not made smaller.
     assert!(desk_render::reduced_picture(&picture, None, (400.0, 400.0)).is_none());
 }
+
+#[test]
+fn obj_01_jpeg_and_pdf_pictures_are_drawn() {
+    use desk_model::Picture;
+    // Sixteen pixels by eight, red on the left and blue on the right.
+    let jpeg = Picture::from_jpeg(include_bytes!("two-colors.jpg").to_vec()).unwrap();
+    assert_eq!((jpeg.width(), jpeg.height()), (16, 8));
+    // A page of forty points by twenty, filled in green, as lines.
+    let pdf = {
+        let surface = cairo::PdfSurface::for_stream(40.0, 20.0, Vec::<u8>::new()).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(0.0, 0.6, 0.0);
+            cr.paint().unwrap();
+        }
+        *surface
+            .finish_output_stream()
+            .unwrap()
+            .downcast::<Vec<u8>>()
+            .unwrap()
+    };
+    let (w, h) = desk_render::pdf_size(&pdf).unwrap();
+    assert_eq!((w.round(), h.round()), (40.0, 20.0));
+    let pdf = Picture::from_pdf(pdf, w, h).unwrap();
+    let list = DisplayList {
+        width: 200.0,
+        height: 100.0,
+        items: vec![
+            Item::Image {
+                picture: jpeg,
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+            Item::Image {
+                picture: pdf,
+                x: 100.0,
+                y: 50.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        ],
+    };
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 100).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, &list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    // BGRA in memory on little-endian machines.
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..3];
+        (p[2], p[1], p[0])
+    };
+    let (r, g, b) = pixel(20, 20);
+    assert!(r > 180 && g < 80 && b < 80, "{:?}", (r, g, b));
+    let (r, g, b) = pixel(60, 20);
+    assert!(r < 80 && g < 80 && b > 180, "{:?}", (r, g, b));
+    let (r, g, b) = pixel(140, 70);
+    assert!(
+        r < 30 && (140..=165).contains(&g) && b < 30,
+        "{:?}",
+        (r, g, b)
+    );
+    // Outside the pictures, the page stays white.
+    assert_eq!(pixel(150, 20), (255, 255, 255));
+
+    // In a PDF, the JPEG keeps its bytes and the PDF page stays lines.
+    let out = Painter::new()
+        .unwrap()
+        .pdf_bytes(&[list], &Metadata::default())
+        .unwrap();
+    let images = poppler("pdfimages", &["-list"], &out);
+    assert!(images.lines().any(|l| l.contains("jpeg")), "{images}");
+    assert_eq!(images.lines().count(), 3, "{images}");
+}

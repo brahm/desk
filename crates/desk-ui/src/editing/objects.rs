@@ -1051,15 +1051,7 @@ impl TextEditor {
         });
         match result {
             Ok(id) => {
-                {
-                    let mut state = self.state.borrow_mut();
-                    let action = state.next_action;
-                    state.next_action += 1;
-                    state.undo.push((selection, selection, action));
-                    state.redo.clear();
-                    state.objects = vec![id];
-                }
-                self.after_change(selection);
+                self.select_new_object(selection, id);
                 if shape == NewShape::TextBox {
                     // A new text box is edited at once, with its text
                     // selected, so that typing replaces it.
@@ -1071,6 +1063,49 @@ impl TextEditor {
                     });
                 }
             }
+            Err(error) => gtk::glib::g_warning!("desk", "cannot insert: {error}"),
+        }
+    }
+
+    /// Records the step that added an object, and selects it.
+    fn select_new_object(&self, selection: super::Selection, id: NodeId) {
+        {
+            let mut state = self.state.borrow_mut();
+            let action = state.next_action;
+            state.next_action += 1;
+            state.undo.push((selection, selection, action));
+            state.redo.clear();
+            state.objects = vec![id];
+        }
+        self.after_change(selection);
+    }
+
+    /// Puts a picture in the middle of the page in sight, in front of the
+    /// others, and selects it: at its size at 72 pixels to the inch, or a
+    /// PDF at its size, made smaller to fit inside the margins (OBJ-01).
+    pub fn insert_picture(&self, picture: desk_model::Picture) {
+        let page = self.view.current_page().unwrap_or(0);
+        let frame = {
+            let state = self.state.borrow();
+            let setup = &state.layout.setup;
+            let (width, height) = (setup.width.to_pt(), setup.height.to_pt());
+            let room_w = (width - setup.margin_left.to_pt() - setup.margin_right.to_pt()).max(36.0);
+            let room_h =
+                (height - setup.margin_top.to_pt() - setup.margin_bottom.to_pt()).max(36.0);
+            let (w, h) = picture_size(&picture, (room_w, room_h));
+            Frame::from_pt((width - w) / 2.0, (height - h) / 2.0, w, h)
+        };
+        self.leave_story(None);
+        let selection = self.selection();
+        let result = self.state.borrow_mut().editor.edit("Insert Image", |edit| {
+            let id = edit.new_id();
+            let mut object = Object::new(id, ObjectKind::Image(picture), frame);
+            object.anchor = Anchor::Page(page as u32);
+            edit.add_object(object)?;
+            Ok(id)
+        });
+        match result {
+            Ok(id) => self.select_new_object(selection, id),
             Err(error) => gtk::glib::g_warning!("desk", "cannot insert: {error}"),
         }
     }
@@ -1522,6 +1557,14 @@ impl TextEditor {
     }
 }
 
+/// The size that a new picture takes, in points: a pixel to a point, or a
+/// PDF at its size, kept in proportion to fit `room`.
+fn picture_size(picture: &desk_model::Picture, room: (f64, f64)) -> (f64, f64) {
+    let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
+    let fit = (room.0 / w).min(room.1 / h).min(1.0);
+    (w * fit, h * fit)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1653,5 +1696,17 @@ mod tests {
         assert_eq!(hit(&layout, 0, 350.0, 420.0, 2.0), Some(front));
         assert_eq!(hit(&layout, 0, 10.0, 700.0, 2.0), Some(back));
         assert_eq!(hit(&layout, 0, tx, ty, 2.0), None);
+    }
+
+    #[test]
+    fn obj_01_a_new_picture_takes_a_point_a_pixel_within_the_margins() {
+        let png = |w: u32, h: u32| {
+            let mut bytes = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+            bytes.extend_from_slice(&w.to_be_bytes());
+            bytes.extend_from_slice(&h.to_be_bytes());
+            desk_model::Picture::from_png(bytes).unwrap()
+        };
+        assert_eq!(picture_size(&png(200, 100), (468.0, 648.0)), (200.0, 100.0));
+        assert_eq!(picture_size(&png(936, 200), (468.0, 648.0)), (468.0, 100.0));
     }
 }

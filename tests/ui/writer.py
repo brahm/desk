@@ -10,6 +10,7 @@ bus. It reads with PyGObject and the AT-SPI typelib (gir1.2-atspi-2.0)
 and types with xdotool.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -21,7 +22,7 @@ from pathlib import Path
 import gi
 
 gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi  # noqa: E402
+from gi.repository import Atspi, GLib  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WRITER = ROOT / "target" / "debug" / "desk-writer"
@@ -444,6 +445,7 @@ def main():
     object_in_the_text(work)
     shadow_of_a_shape(work)
     instant_alpha_of_a_picture(work)
+    chosen_picture(work)
     print("All UI tests passed.")
 
 
@@ -1048,6 +1050,60 @@ def instant_alpha_of_a_picture(work):
             lambda: saved_content(letter, r'desk:instant-alpha="\d+ \d+ 20"'),
         )
         check("the color clicked in the picture is taken out and saved (OBJ-05)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def chosen_picture(work):
+    """Insert, Choose… puts a photograph on the page, and it is saved as
+    the JPEG it came as (OBJ-01)."""
+    photo = work / "photo.jpg"
+    photo.write_bytes((ROOT / "crates" / "desk-render" / "tests" / "two-colors.jpg").read_bytes())
+    # The dialog of GTK, which is on the accessibility bus with the app,
+    # and not the one of a portal.
+    os.environ["GDK_DEBUG"] = "no-portals"
+    try:
+        writer, app, letter = open_with_a_shape(work, "Photo.odt")
+    finally:
+        del os.environ["GDK_DEBUG"]
+    try:
+        press("Escape", "ctrl+shift+v")
+        wait_for(
+            "the dialog that chooses an image",
+            lambda: next(
+                (n for n in walk(app) if n.get_name() == "Choose an Image" and showing(n)),
+                None,
+            ),
+        )
+        check("Insert, Choose… asks for an image", True)
+        time.sleep(1)
+        # A path typed in the dialog opens its location entry.
+        type_text(str(photo))
+        time.sleep(0.5)
+        press("Return")
+        time.sleep(1)
+
+        def image_group():
+            try:
+                return next(
+                    (n for n in walk(app) if n.get_name() == "Take Out a Color" and showing(n)),
+                    None,
+                )
+            except GLib.GError:
+                # A part of the dialog that closed while it was walked.
+                return None
+
+        wait_for("the Image group of the Inspector", image_group)
+        check("the chosen picture is on the page and selected", True)
+        press("ctrl+s")
+        wait_for(
+            "the saved photograph",
+            lambda: saved_content(letter, r'xlink:href="Pictures/object\d+\.jpg"'),
+        )
+        with zipfile.ZipFile(letter) as package:
+            name = next(n for n in package.namelist() if n.endswith(".jpg"))
+            check("the photograph is saved as it came", package.read(name) == photo.read_bytes())
     finally:
         writer.terminate()
         writer.wait(timeout=10)

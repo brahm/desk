@@ -1022,11 +1022,15 @@ impl Exporter<'_> {
 
     /// The path of a picture in the package, added when it is not there.
     fn picture(&mut self, picture: &desk_model::Picture) -> String {
-        if let Some((href, _)) = self.pictures.iter().find(|(_, b)| b == picture.png()) {
+        if let Some((href, _)) = self.pictures.iter().find(|(_, b)| b == picture.data()) {
             return href.clone();
         }
-        let href = format!("Pictures/object{}.png", self.pictures.len() + 1);
-        self.pictures.push((href.clone(), picture.png().to_vec()));
+        let href = format!(
+            "Pictures/object{}.{}",
+            self.pictures.len() + 1,
+            picture.format().extension()
+        );
+        self.pictures.push((href.clone(), picture.data().to_vec()));
         href
     }
 

@@ -88,8 +88,7 @@ impl Painter {
         {
             return Some(surface.clone());
         }
-        let surface =
-            cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.png())).ok()?;
+        let surface = picture_surface(picture)?;
         // A bound on the memory of long sessions.
         if self.pictures.len() > 64 {
             self.pictures.clear();
@@ -279,6 +278,10 @@ impl Painter {
                     width,
                     height,
                 } => {
+                    if picture.format() == desk_model::PictureFormat::Pdf {
+                        paint_pdf(cr, picture, (*x, *y, *width, *height))?;
+                        continue;
+                    }
                     let Some(surface) = self.picture(picture) else {
                         continue;
                     };
@@ -873,8 +876,11 @@ pub fn reduced_picture(
     mask: Option<desk_model::Frame>,
     size: (f64, f64),
 ) -> Option<desk_model::Picture> {
-    let source =
-        cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.png())).ok()?;
+    // A PDF stays as it is, which is as sharp and about as small.
+    if picture.format() == desk_model::PictureFormat::Pdf {
+        return None;
+    }
+    let source = picture_surface(picture)?;
     let (pw, ph) = (f64::from(source.width()), f64::from(source.height()));
     let (fw, fh) = size;
     if fw <= 0.0 || fh <= 0.0 {
@@ -907,5 +913,126 @@ pub fn reduced_picture(
     }
     let mut png = Vec::new();
     surface.write_to_png(&mut png).ok()?;
+    // A photograph in JPEG can be smaller than the fewer pixels in PNG.
+    if png.len() >= picture.data().len() {
+        return None;
+    }
     desk_model::Picture::from_png(png)
+}
+
+/// The largest side of a picture decoded to draw, in pixels.
+const MAX_DECODED_SIDE: f64 = 8192.0;
+
+/// The pixels of a picture, to draw: PNG and JPEG decoded, and the first
+/// page of a PDF drawn at two pixels a point.
+pub fn picture_surface(picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
+    use desk_model::PictureFormat;
+    match picture.format() {
+        PictureFormat::Png => {
+            cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.data())).ok()
+        }
+        PictureFormat::Jpeg => jpeg_surface(picture.shared_data()),
+        PictureFormat::Pdf => {
+            let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
+            let scale = 2.0f64.min(MAX_DECODED_SIDE / w.max(h)).max(1e-3);
+            let width = (w * scale).ceil().max(1.0) as i32;
+            let height = (h * scale).ceil().max(1.0) as i32;
+            let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).ok()?;
+            {
+                let cr = Context::new(&surface).ok()?;
+                cr.scale(scale, scale);
+                pdf_page(picture.data())?.render(&cr);
+            }
+            surface.flush();
+            Some(surface)
+        }
+    }
+}
+
+/// The first page of a PDF.
+fn pdf_page(data: &[u8]) -> Option<poppler::Page> {
+    let bytes = cairo::glib::Bytes::from(data);
+    let document = poppler::Document::from_bytes(&bytes, None).ok()?;
+    document.page(0)
+}
+
+/// The size of the first page of a PDF, in points.
+pub fn pdf_size(data: &[u8]) -> Option<(f64, f64)> {
+    let (width, height) = pdf_page(data)?.size();
+    (width.is_finite() && height.is_finite() && width >= 1.0 && height >= 1.0)
+        .then_some((width, height))
+}
+
+/// Draws the first page of a PDF into a rectangle, as lines and text, so
+/// that it stays sharp on screen and in a PDF.
+fn paint_pdf(
+    cr: &Context,
+    picture: &desk_model::Picture,
+    (x, y, width, height): (f32, f32, f32, f32),
+) -> Result<(), RenderError> {
+    let Some(page) = pdf_page(picture.data()) else {
+        return Ok(());
+    };
+    let (pw, ph) = page.size();
+    if pw <= 0.0 || ph <= 0.0 {
+        return Ok(());
+    }
+    cr.save()?;
+    cr.rectangle(
+        f64::from(x),
+        f64::from(y),
+        f64::from(width),
+        f64::from(height),
+    );
+    cr.clip();
+    cr.translate(f64::from(x), f64::from(y));
+    cr.scale(f64::from(width) / pw, f64::from(height) / ph);
+    page.render(cr);
+    cr.restore()?;
+    Ok(())
+}
+
+/// The pixels of a JPEG file, with the file kept on the surface so that a
+/// PDF embeds it as it is.
+fn jpeg_surface(data: std::sync::Arc<[u8]>) -> Option<cairo::ImageSurface> {
+    use zune_jpeg::JpegDecoder;
+    use zune_jpeg::zune_core::bytestream::ZCursor;
+    use zune_jpeg::zune_core::colorspace::ColorSpace;
+    use zune_jpeg::zune_core::options::DecoderOptions;
+    let options = DecoderOptions::default()
+        .jpeg_set_out_colorspace(ColorSpace::RGB)
+        .set_max_width(MAX_DECODED_SIDE as usize)
+        .set_max_height(MAX_DECODED_SIDE as usize);
+    let mut decoder = JpegDecoder::new_with_options(ZCursor::new(&data[..]), options);
+    let pixels = decoder.decode().ok()?;
+    let info = decoder.info()?;
+    let (width, height) = (usize::from(info.width), usize::from(info.height));
+    if width == 0 || height == 0 || pixels.len() < width * height * 3 {
+        return None;
+    }
+    let mut surface =
+        cairo::ImageSurface::create(cairo::Format::Rgb24, width as i32, height as i32).ok()?;
+    let stride = surface.stride() as usize;
+    {
+        let mut out = surface.data().ok()?;
+        for row in 0..height {
+            for (x, rgb) in pixels[row * width * 3..][..width * 3]
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .enumerate()
+            {
+                // BGRX in memory on little-endian machines.
+                let at = row * stride + x * 4;
+                out[at] = rgb[2];
+                out[at + 1] = rgb[1];
+                out[at + 2] = rgb[0];
+                out[at + 3] = 255;
+            }
+        }
+    }
+    surface.mark_dirty();
+    // Cairo writes the JPEG itself into a PDF, rather than its pixels.
+    let _ = surface.set_mime_data("image/jpeg", data);
+    Some(surface)
 }

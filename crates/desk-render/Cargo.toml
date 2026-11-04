@@ -9,6 +9,8 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+poppler-rs.workspace = true
+zune-jpeg.workspace = true
 cairo-rs.workspace = true
 desk-layout.workspace = true
 desk-model.workspace = true

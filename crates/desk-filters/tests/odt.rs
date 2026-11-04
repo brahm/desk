@@ -2192,3 +2192,121 @@ fn obj_01_objects_in_the_text_of_other_programs_are_read() {
     );
     assert_eq!(document.object_mark(object.id).map(|p| p.offset), Some(4));
 }
+
+/// A PDF of one page of `width` by `height` points, filled in one color.
+fn one_page_pdf(width: u32, height: u32) -> Vec<u8> {
+    let content = format!("0 0.5 0 rg 0 0 {width} {height} re f");
+    let objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Contents 4 0 R >>"),
+        format!(
+            "<< /Length {} >>\nstream\n{content}\nendstream",
+            content.len()
+        ),
+    ];
+    let mut pdf = b"%PDF-1.4\n".to_vec();
+    let mut offsets = Vec::new();
+    for (i, object) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.extend_from_slice(format!("{} 0 obj\n{object}\nendobj\n", i + 1).as_bytes());
+    }
+    let xref = pdf.len();
+    pdf.extend_from_slice(
+        format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes(),
+    );
+    for offset in offsets {
+        pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+    }
+    pdf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
+    pdf
+}
+
+#[test]
+fn obj_01_jpeg_and_pdf_pictures_keep_their_format_in_odt() {
+    use desk_model::{Frame, Object, ObjectKind, Picture, PictureFormat};
+    // SOI, an APP0 of four bytes, then SOF0 of 17 by 9 pixels.
+    let mut jpeg = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0, 0];
+    jpeg.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 8, 0, 9, 0, 17, 3]);
+    let jpeg = Picture::from_jpeg(jpeg).unwrap();
+    let pdf = desk_filters::picture::picture_within(&one_page_pdf(30, 20), 256).unwrap();
+    assert_eq!(pdf.format(), PictureFormat::Pdf);
+    assert_eq!((pdf.width(), pdf.height()), (30, 20));
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Pictures", |edit| {
+            for (picture, x) in [(jpeg.clone(), 0.0), (pdf.clone(), 100.0)] {
+                let id = edit.new_id();
+                edit.add_object(Object::new(
+                    id,
+                    ObjectKind::Image(picture),
+                    Frame::from_pt(x, 0.0, 60.0, 40.0),
+                ))?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let bytes = write_odt(&document).unwrap();
+    keep("obj-formats.odt", &bytes);
+    // Each is kept as it came, with its extension and media type.
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let names: Vec<String> = archive
+        .file_names()
+        .filter_map(|n| n.ok().map(|n| n.into_owned()))
+        .collect();
+    assert!(
+        names.contains(&"Pictures/object1.jpg".to_owned()),
+        "{names:?}"
+    );
+    assert!(
+        names.contains(&"Pictures/object2.pdf".to_owned()),
+        "{names:?}"
+    );
+    let mut manifest = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("META-INF/manifest.xml").unwrap(),
+        &mut manifest,
+    )
+    .unwrap();
+    assert!(
+        manifest.contains(
+            r#"manifest:full-path="Pictures/object1.jpg" manifest:media-type="image/jpeg""#
+        )
+    );
+    assert!(manifest.contains(
+        r#"manifest:full-path="Pictures/object2.pdf" manifest:media-type="application/pdf""#
+    ));
+    let read = read_odt(&bytes).unwrap();
+    let pictures: Vec<Picture> = read
+        .objects()
+        .iter()
+        .filter_map(|o| match &o.kind {
+            ObjectKind::Image(p) => Some(p.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(pictures, [jpeg, pdf]);
+    assert_eq!(pictures[1].format(), PictureFormat::Pdf);
+}
+
+#[test]
+fn obj_01_gif_pictures_become_png() {
+    let mut gif = Vec::new();
+    {
+        let mut encoder = gif::Encoder::new(&mut gif, 4, 2, &[0, 200, 0, 255, 255, 255]).unwrap();
+        let mut frame = gif::Frame::default();
+        (frame.width, frame.height) = (4, 2);
+        frame.buffer = std::borrow::Cow::Borrowed(&[0, 0, 0, 0, 1, 1, 1, 1]);
+        encoder.write_frame(&frame).unwrap();
+    }
+    let picture = desk_filters::picture::picture_within(&gif, 256).unwrap();
+    assert_eq!(picture.format(), desk_model::PictureFormat::Png);
+    assert_eq!((picture.width(), picture.height()), (4, 2));
+}

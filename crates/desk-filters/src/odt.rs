@@ -829,11 +829,15 @@ fn odf_list_style(
             let label = match &level.label {
                 ListLabel::None => number("", "", "", false),
                 ListLabel::Image(picture) => {
-                    let href = match pictures.iter().find(|(_, b)| b == picture.png()) {
+                    let href = match pictures.iter().find(|(_, b)| b == picture.data()) {
                         Some((href, _)) => href.clone(),
                         None => {
-                            let href = format!("Pictures/bullet{}.png", pictures.len() + 1);
-                            pictures.push((href.clone(), picture.png().to_vec()));
+                            let href = format!(
+                                "Pictures/bullet{}.{}",
+                                pictures.len() + 1,
+                                picture.format().extension()
+                            );
+                            pictures.push((href.clone(), picture.data().to_vec()));
                             href
                         }
                     };
