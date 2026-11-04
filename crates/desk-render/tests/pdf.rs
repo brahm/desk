@@ -296,3 +296,48 @@ fn obj_08_obj_13_objects_are_painted_rotated_and_faded() {
         "the point stands above the frame"
     );
 }
+
+#[test]
+fn obj_08_the_text_of_a_flipped_shape_is_not_mirrored() {
+    use desk_model::{Document, Editor, Frame, Object, Paragraph, Run, Shape, TextBox, Wrap};
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Shape", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let paragraph = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                desk_model::ParaAttrs::default(),
+                [Run::new("Hi")],
+            )?;
+            let mut shape = Object::new(
+                edit.new_id(),
+                Shape::triangle().into(),
+                Frame::from_pt(100.0, 100.0, 100.0, 100.0),
+            );
+            shape.text = Some(TextBox::in_shape(Arc::from([paragraph])));
+            shape.flip_vertical = true;
+            shape.wrap = Wrap::Through;
+            edit.add_object(shape)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let Some(Item::Group {
+        transform, items, ..
+    }) = list.items.last()
+    else {
+        panic!("the shape is the last item");
+    };
+    // Not flipped as a whole: only the shape inside is.
+    assert_eq!(transform[3], 1.0);
+    let Some(Item::Group { transform, .. }) = items.first() else {
+        panic!("the shape is drawn first");
+    };
+    assert_eq!(transform[3], -1.0);
+    assert!(
+        items
+            .iter()
+            .any(|i| matches!(i, Item::Glyphs { text, .. } if text == "Hi"))
+    );
+}

@@ -440,6 +440,7 @@ def main():
     header_on_the_page(work)
     objects_on_the_page(work)
     text_box_on_the_page(work)
+    text_in_a_shape(work)
     print("All UI tests passed.")
 
 
@@ -795,6 +796,69 @@ def text_box_on_the_page(work):
 
         wait_for("the saved text box", saved)
         check("the text typed in the box is saved in it", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def text_in_a_shape(work):
+    """A double click on a shape puts the cursor in it, and what is typed
+    is kept as the text of the shape (OBJ-08)."""
+    letter = work / "Shape.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    with zipfile.ZipFile(letter) as package:
+        files = {name: package.read(name) for name in package.namelist()}
+    files["content.xml"] = files["content.xml"].replace(
+        b"<office:text>",
+        b'<office:text><draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="120pt" svg:width="600pt" svg:height="400pt"/>',
+        1,
+    )
+    with zipfile.ZipFile(letter, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for name, data in files.items():
+            package.writestr(name, data, zipfile.ZIP_DEFLATED)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "Shape.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Shape.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Shape.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        click(
+            int(window["X"]) + int(window["WIDTH"]) // 2,
+            int(window["Y"]) + int(window["HEIGHT"]) // 2,
+            count=2,
+        )
+        wait_for("the empty text of the shape", lambda: text_of(document) == "\n")
+        check("a double click on a shape edits its text (OBJ-08)", True)
+        type_text("Forma")
+        wait_for("the typed text in the shape", lambda: text_of(document) == "Forma\n")
+        press("Escape")
+        wait_for("the body again", lambda: text_of(document) == "US Letter, landscape\n")
+        press("ctrl+s")
+
+        def saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    content = package.read("content.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return False
+            return re.search(r"<draw:rect[^>]*>.*Forma.*</draw:rect>", content, re.S)
+
+        wait_for("the saved shape", saved)
+        check("the text typed in the shape is saved in it", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

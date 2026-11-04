@@ -49,6 +49,10 @@ pub struct Object {
     pub wrap_margin: Length,
     /// Whether it cannot be moved, resized or deleted until unlocked.
     pub locked: bool,
+    /// The text inside a shape, as Pages lets one type in any shape but
+    /// a line; none until some is typed. Its `next` is always none, as
+    /// shapes are not linked.
+    pub text: Option<TextBox>,
 }
 
 impl Object {
@@ -67,16 +71,48 @@ impl Object {
             wrap: Wrap::Both,
             wrap_margin: Length::from_points(12),
             locked: false,
+            text: None,
         }
     }
 
-    /// The paragraphs of its text, if it is a text box, and those of the
-    /// objects of a group.
+    /// Whether text can be typed in it: a text box, or a shape but a
+    /// line.
+    pub fn holds_text(&self) -> bool {
+        match &self.kind {
+            ObjectKind::TextBox(_) => true,
+            ObjectKind::Shape(shape) => !matches!(shape, Shape::Line { .. }),
+            _ => false,
+        }
+    }
+
+    /// Its text: that of a text box, or the text typed in a shape.
+    pub fn text_box(&self) -> Option<&TextBox> {
+        match &self.kind {
+            ObjectKind::TextBox(text) => Some(text),
+            _ if self.holds_text() => self.text.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Its text, to change it.
+    pub fn text_box_mut(&mut self) -> Option<&mut TextBox> {
+        let holds = self.holds_text();
+        match &mut self.kind {
+            ObjectKind::TextBox(text) => Some(text),
+            _ if holds => self.text.as_mut(),
+            _ => None,
+        }
+    }
+
+    /// The paragraphs of its text, if it is a text box or a shape with
+    /// text, and those of the objects of a group.
     pub fn paragraphs(&self) -> Box<dyn Iterator<Item = &Paragraph> + '_> {
         match &self.kind {
-            ObjectKind::TextBox(text) => Box::new(text.paragraphs.iter()),
             ObjectKind::Group(objects) => Box::new(objects.iter().flat_map(Self::paragraphs)),
-            _ => Box::new(std::iter::empty()),
+            _ => match self.text_box() {
+                Some(text) => Box::new(text.paragraphs.iter()),
+                None => Box::new(std::iter::empty()),
+            },
         }
     }
 
@@ -84,10 +120,10 @@ impl Object {
     /// paragraphs, and those of the objects of a group.
     pub fn ids(&self) -> Vec<NodeId> {
         let mut ids = vec![self.id];
-        if let ObjectKind::Group(objects) = &self.kind {
-            ids.extend(objects.iter().flat_map(Self::ids));
+        match &self.kind {
+            ObjectKind::Group(objects) => ids.extend(objects.iter().flat_map(Self::ids)),
+            _ => ids.extend(self.paragraphs().map(Paragraph::id)),
         }
-        ids.extend(self.paragraphs().map(Paragraph::id));
         ids
     }
 }
@@ -174,6 +210,15 @@ pub struct TextBox {
 }
 
 impl TextBox {
+    /// The text of a shape: in the middle of it, with the inset of
+    /// Pages.
+    pub fn in_shape(paragraphs: Arc<[Paragraph]>) -> Self {
+        Self {
+            vertical: VerticalAlignment::Middle,
+            ..Self::new(paragraphs, Length::from_points(4))
+        }
+    }
+
     /// A text box with paragraphs, an inset, its text at the top and one
     /// column.
     pub fn new(paragraphs: Arc<[Paragraph]>, inset: Length) -> Self {

@@ -406,11 +406,27 @@ fn object_item(placed: &PlacedObject) -> Item {
     match &object.kind {
         ObjectKind::Shape(shape) => {
             let line = matches!(shape, Shape::Line { .. });
-            list.items.push(Item::Path {
+            let path = Item::Path {
                 path: shape_path(shape, x, y, w, h),
                 fill: if line { None } else { fill },
                 stroke,
-            });
+            };
+            if placed.lines.is_empty() {
+                list.items.push(path);
+            } else {
+                // The shape is flipped around its center, and its text
+                // is not (OBJ-08).
+                flips = false;
+                let (cx, cy) = placed.center();
+                let sx = if object.flip_horizontal { -1.0 } else { 1.0 };
+                let sy = if object.flip_vertical { -1.0 } else { 1.0 };
+                list.items.push(Item::Group {
+                    transform: [sx, 0.0, 0.0, sy, cx - sx * cx, cy - sy * cy],
+                    opacity: 1.0,
+                    items: vec![path],
+                });
+                list.lines(placed.lines.iter());
+            }
         }
         ObjectKind::Image(picture) => {
             list.items.push(Item::Image {

@@ -954,9 +954,9 @@ impl TextEditor {
             return false;
         }
         if presses > 1 {
-            // A double click on a text box edits its text (OBJ-13).
-            let text_box = matches!(self.object_by_id(id).kind, ObjectKind::TextBox(_));
-            if text_box {
+            // A double click on a text box or a shape edits its text
+            // (OBJ-08, OBJ-13).
+            if self.object_by_id(id).holds_text() {
                 self.edit_text_box(id, page, Some((x, y)));
             }
             return true;
@@ -1201,17 +1201,13 @@ impl TextEditor {
             gdk::Key::Down | gdk::Key::KP_Down => nudge(0.0, step),
             gdk::Key::Delete | gdk::Key::KP_Delete | gdk::Key::BackSpace => self.delete_objects(),
             gdk::Key::Escape => self.select_objects(Vec::new()),
-            // Return edits the text of a selected text box (OBJ-13).
+            // Return edits the text of a selected text box or shape
+            // (OBJ-08, OBJ-13).
             gdk::Key::Return | gdk::Key::KP_Enter => {
                 let ids = self.selected_objects();
                 let found = match ids[..] {
-                    [id] => find(&self.state.borrow().layout, id).map(|(page, placed)| {
-                        (
-                            id,
-                            page,
-                            matches!(placed.object.kind, ObjectKind::TextBox(_)),
-                        )
-                    }),
+                    [id] => find(&self.state.borrow().layout, id)
+                        .map(|(page, placed)| (id, page, placed.object.holds_text())),
                     _ => None,
                 };
                 if let Some((id, page, true)) = found {

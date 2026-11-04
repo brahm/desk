@@ -14,7 +14,8 @@
 
 use desk_layout::DocumentLayout;
 use desk_model::{
-    Document, Editor, Field, MarginKind, NodeId, ObjectKind, Paragraph, Story, StyleFamily,
+    Alignment, Document, Editor, Field, MarginKind, NodeId, Object, ObjectKind, ParaAttrs,
+    Paragraph, Story, StyleFamily,
 };
 
 use super::{Selection, Spot, State, TextEditor};
@@ -59,7 +60,7 @@ impl StoryMode {
 pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Story> {
     let p = layout.pages.get(page)?;
     if let Some(index) = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true)
-        && let ObjectKind::TextBox(_) = p.objects[index].object.kind
+        && p.objects[index].object.holds_text()
     {
         return Some(Story::TextBox(text_box_head(
             layout,
@@ -292,7 +293,7 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
             add(margin(MarginKind::Footer), index);
         }
         for object in &page.objects {
-            if let ObjectKind::TextBox(_) = object.object.kind {
+            if object.object.text_box().is_some() {
                 add(
                     Story::TextBox(text_box_head(layout, object.object.id)),
                     index,
@@ -312,6 +313,18 @@ fn story_copy(document: &Document, story: Story) -> Document {
     }
     let mut document = document.clone();
     let styles = document.styles();
+    if let Story::TextBox(_) = story {
+        // The first text of a shape, centered as in Pages.
+        let style = styles.default_paragraph();
+        let attrs = ParaAttrs {
+            alignment: Some(Alignment::Center),
+            ..ParaAttrs::default()
+        };
+        let id = document.new_id();
+        let paragraph = Paragraph::from_runs(id, style, attrs, [])
+            .unwrap_or_else(|_| Paragraph::new(id, style));
+        return document.with_body(vec![paragraph]);
+    }
     let style = ["Header & Footer", "Header", "Footer"]
         .iter()
         .find_map(|name| styles.by_name(StyleFamily::Paragraph, name))
@@ -587,10 +600,7 @@ fn story_copy_ok(document: &Document, story: Story) -> bool {
     match story {
         Story::Note(id) => document.notes().get(id).is_some(),
         Story::Margin { .. } => true,
-        Story::TextBox(id) => matches!(
-            document.objects().get(id).map(|o| &o.kind),
-            Some(ObjectKind::TextBox(_))
-        ),
+        Story::TextBox(id) => document.objects().get(id).is_some_and(Object::holds_text),
     }
 }
 
@@ -747,6 +757,50 @@ mod tests {
         let lines = &edited.pages[0].lines;
         assert!(lines.iter().any(|l| l.top() < 460.0));
         assert!(lines.iter().any(|l| l.top() >= 504.0));
+    }
+
+    #[test]
+    fn obj_08_text_is_typed_in_the_middle_of_a_shape() {
+        use desk_model::{Frame, Object, Shape};
+        let mut editor = Editor::new(Document::new_word_processing());
+        let id = editor
+            .edit("Insert Shape", |edit| {
+                let id = edit.new_id();
+                let mut shape = Object::new(
+                    id,
+                    Shape::Rectangle.into(),
+                    Frame::from_pt(300.0, 400.0, 150.0, 60.0),
+                );
+                shape.wrap = desk_model::Wrap::Through;
+                edit.add_object(shape)?;
+                Ok(id)
+            })
+            .unwrap();
+        let document = editor.document().clone();
+        let story = Story::TextBox(id);
+        let layout = crate::lay_out(&document);
+        // A shape with no text is not searched, but can be typed in.
+        assert_eq!(story_at(&layout, 0, 320.0, 420.0), Some(story));
+        assert!(!story_pages(&layout).contains(&(story, 0)));
+        assert!(story_copy_ok(&document, story));
+        let copy = story_copy(&document, story);
+        let first = copy.body().get(0).unwrap();
+        assert_eq!(first.attrs().alignment, Some(Alignment::Center));
+        let at = desk_model::Position::new(first.id(), 0);
+        let mut sub = Editor::new(copy);
+        sub.edit("Typing", |edit| edit.insert_text(at, "Hi").map(|_| ()))
+            .unwrap();
+        let paragraphs: Vec<Paragraph> = sub.document().body().iter().cloned().collect();
+        let edited = story_layout(&layout, story, 0, sub.document());
+        let line = &edited.pages[0].lines[0];
+        // In the middle of the shape, from top to bottom.
+        assert!(((line.top() + line.bottom()) / 2.0 - 430.0).abs() < 0.01);
+        editor
+            .edit("Edit Text", |edit| edit.set_story(story, paragraphs))
+            .unwrap();
+        let layout = crate::lay_out(editor.document());
+        assert!(story_pages(&layout).contains(&(story, 0)));
+        assert_eq!(layout.pages[0].objects[0].lines.len(), 1);
     }
 
     #[test]
