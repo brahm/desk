@@ -464,6 +464,9 @@
         {
             "name": "poppler",
             "buildsystem": "cmake-ninja",
+            "build-options": {
+                "cxxflags": "-include climits"
+            },
             "config-opts": [
                 "-DCMAKE_BUILD_TYPE=Release",
                 "-DENABLE_GLIB=ON",
