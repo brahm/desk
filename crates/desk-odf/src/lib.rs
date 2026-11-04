@@ -37,6 +37,7 @@
 
 #![forbid(unsafe_code)]
 
+mod draw;
 mod error;
 pub mod ns;
 mod package;
@@ -46,6 +47,7 @@ mod units;
 mod write;
 mod xml;
 
+pub use draw::{DrawKind, DrawObject, GraphicProperties, parse_transform};
 pub use error::OdfError;
 pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,

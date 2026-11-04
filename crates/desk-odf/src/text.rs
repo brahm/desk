@@ -68,6 +68,9 @@ pub struct TextDocument {
     /// How footnotes and endnotes are numbered and where they go
     /// (`text:notes-configuration`), as other apps read them.
     pub notes_configuration: Vec<NotesConfiguration>,
+    /// The drawing objects outside any paragraph, as those anchored to
+    /// pages, written before the first paragraph.
+    pub page_objects: Vec<crate::draw::DrawObject>,
 }
 
 /// The configuration of the footnotes or the endnotes of a document
@@ -386,6 +389,8 @@ pub enum Family {
     Text,
     /// A list style (`text:list-style`), which is not a `style:style`.
     List,
+    /// A graphic style, for drawing objects.
+    Graphic,
 }
 
 /// A style.
@@ -424,6 +429,8 @@ pub struct Properties {
     pub paragraph: ParagraphProperties,
     /// `style:text-properties`.
     pub text: TextProperties,
+    /// `style:graphic-properties`, of a graphic style.
+    pub graphic: crate::draw::GraphicProperties,
 }
 
 /// A line under or through text.
@@ -780,6 +787,9 @@ pub struct Paragraph {
     pub toc: bool,
     /// The text, in spans of one style each.
     pub spans: Vec<Span>,
+    /// The drawing objects anchored to the paragraph or in its text,
+    /// written at its start.
+    pub frames: Vec<crate::draw::DrawObject>,
 }
 
 /// Where a paragraph is in a list.

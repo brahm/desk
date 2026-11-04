@@ -15,18 +15,24 @@ pub const MAX_SIDE: u32 = 256;
 /// A picture from the bytes of a PNG or TIFF file, or `None` when they are
 /// neither or cannot be read.
 pub fn picture(bytes: &[u8]) -> Option<Picture> {
+    picture_within(bytes, MAX_SIDE)
+}
+
+/// A picture from the bytes of a PNG or TIFF file, a TIFF one scaled down
+/// to fit `max_side`, or `None` when they are neither or cannot be read.
+pub fn picture_within(bytes: &[u8], max_side: u32) -> Option<Picture> {
     if let Some(picture) = Picture::from_png(bytes.to_vec()) {
         return Some(picture);
     }
     if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
-        return from_tiff(bytes);
+        return from_tiff(bytes, max_side.max(1));
     }
     None
 }
 
 /// The pixels of a TIFF file as 8-bit RGBA, scaled down to fit
-/// [`MAX_SIDE`], in PNG.
-fn from_tiff(bytes: &[u8]) -> Option<Picture> {
+/// `max_side`, in PNG.
+fn from_tiff(bytes: &[u8], max_side: u32) -> Option<Picture> {
     use tiff::ColorType;
     use tiff::decoder::{Decoder, DecodingResult};
     let mut decoder = Decoder::new(Cursor::new(bytes)).ok()?;
@@ -59,14 +65,14 @@ fn from_tiff(bytes: &[u8]) -> Option<Picture> {
             _ => [p[0], p[1], p[2], p[3]],
         })
         .collect();
-    let (rgba, width, height) = scaled(&rgba, width, height);
+    let (rgba, width, height) = scaled(&rgba, width, height, max_side);
     encode(&rgba, width, height)
 }
 
 /// RGBA pixels scaled down by a whole factor, averaging each square, so
-/// that the larger side fits [`MAX_SIDE`].
-fn scaled(rgba: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {
-    let factor = width.max(height).div_ceil(MAX_SIDE).max(1);
+/// that the larger side fits `max_side`.
+fn scaled(rgba: &[u8], width: u32, height: u32, max_side: u32) -> (Vec<u8>, u32, u32) {
+    let factor = width.max(height).div_ceil(max_side).max(1);
     if factor == 1 {
         return (rgba.to_vec(), width, height);
     }

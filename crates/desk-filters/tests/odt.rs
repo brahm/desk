@@ -472,6 +472,7 @@ fn foreign() -> odf::TextDocument {
                         font_weight: Some(700),
                         ..odf::TextProperties::default()
                     },
+                    ..Default::default()
                 },
                 ..odf::Style::default()
             },
@@ -515,6 +516,7 @@ fn foreign() -> odf::TextDocument {
                         ..odf::Span::default()
                     },
                 ],
+                ..Default::default()
             },
             odf::Paragraph {
                 style: Some("A".into()),
@@ -524,6 +526,7 @@ fn foreign() -> odf::TextDocument {
                 marks: Vec::new(),
                 toc: false,
                 spans: vec![],
+                ..Default::default()
             },
         ],
         ..odf::TextDocument::default()
@@ -1700,4 +1703,246 @@ fn int_08_doc_16_the_view_is_kept_in_the_settings() {
         assert_eq!(odf.columns, Some(if view.two_pages { 2 } else { 1 }));
         assert_eq!(read_odt(&bytes).unwrap().view(), Some(view));
     }
+}
+
+/// A PNG of one pixel.
+fn pixel_png() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+        encoder.set_color(png::ColorType::Rgba);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&[10, 20, 30, 255]).unwrap();
+    }
+    bytes
+}
+
+/// A document with objects of every kind, fixed on pages and moving with
+/// paragraphs.
+fn with_objects() -> Document {
+    use desk_model::{
+        Anchor, Fill, Frame, Object, ObjectKind, Picture, Shape, Stroke, TextBox, Wrap,
+    };
+    use std::sync::Arc;
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Objects", |edit| {
+            let at = edit.insert_text(start, "First")?;
+            let at = edit.split_paragraph(at)?;
+            let second = at.paragraph;
+            edit.insert_text(at, "Second")?;
+            let style = edit.document().styles().default_paragraph();
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::RoundedRectangle {
+                    radius: Length::from_points(5),
+                }),
+                Frame::from_pt(100.0, 200.0, 50.0, 30.0),
+            );
+            square.anchor = Anchor::Page(1);
+            square.rotation = 3000;
+            square.flip_horizontal = true;
+            square.locked = true;
+            square.wrap = Wrap::Left;
+            square.wrap_margin = Length::from_points(6);
+            square.style.fill = Some(Fill::Color(Rgba::rgb(200, 10, 20)));
+            square.style.stroke = Some(Stroke {
+                color: Rgba::rgb(0, 0, 255),
+                width: Length::from_points(2),
+                style: BorderStyle::Dashed,
+            });
+            square.style.opacity = 80;
+            edit.add_object(square)?;
+            let mut ellipse = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(90.0, 12.0, 40.0, 40.0),
+            );
+            ellipse.anchor = Anchor::Paragraph(second);
+            ellipse.wrap = Wrap::Behind;
+            edit.add_object(ellipse)?;
+            let mut line = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Line { rising: true }),
+                Frame::from_pt(10.0, 20.0, 100.0, 50.0),
+            );
+            line.style.stroke = Some(Stroke {
+                color: Rgba::BLACK,
+                width: Length::from_points(1),
+                style: BorderStyle::Solid,
+            });
+            line.wrap = Wrap::Through;
+            edit.add_object(line)?;
+            let bold = CharAttrs {
+                weight: Some(FontWeight::BOLD),
+                ..CharAttrs::default()
+            };
+            let paragraph = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs {
+                    alignment: Some(Alignment::Center),
+                    ..ParaAttrs::default()
+                },
+                [Run::new("In a "), Run::with_attrs("box", None, bold)],
+            )?;
+            let mut text = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox {
+                    paragraphs: Arc::from([paragraph]),
+                    inset: Length::from_points(4),
+                }),
+                Frame::from_pt(300.0, 400.0, 120.0, 60.0),
+            );
+            text.wrap = Wrap::AboveAndBelow;
+            edit.add_object(text)?;
+            let picture = Picture::from_png(pixel_png()).unwrap();
+            let mut image = Object::new(
+                edit.new_id(),
+                ObjectKind::Image(picture),
+                Frame::from_pt(50.0, 600.0, 80.0, 80.0),
+            );
+            image.wrap = Wrap::Largest;
+            edit.add_object(image)?;
+            let triangle = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::triangle()),
+                Frame::from_pt(100.0, 5.0, 20.0, 20.0),
+            );
+            let circle = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(130.0, 5.0, 20.0, 20.0),
+            );
+            let mut group = Object::new(
+                edit.new_id(),
+                ObjectKind::Group(Arc::from([triangle, circle])),
+                Frame::from_pt(100.0, 5.0, 50.0, 20.0),
+            );
+            group.anchor = Anchor::Paragraph(second);
+            edit.add_object(group)
+        })
+        .unwrap();
+    editor.document().clone()
+}
+
+/// The objects of a document without their identifiers, with the
+/// paragraphs they move with by index and the text of text boxes.
+fn objects(document: &Document) -> Vec<String> {
+    let index = |id| document.body().iter().position(|p| p.id() == id);
+    fn strip(
+        o: &desk_model::Object,
+        index: &dyn Fn(desk_model::NodeId) -> Option<usize>,
+    ) -> String {
+        let mut o = o.clone();
+        let anchor = match o.anchor {
+            desk_model::Anchor::Paragraph(id) => format!("paragraph {:?}", index(id)),
+            desk_model::Anchor::Page(page) => format!("page {page}"),
+        };
+        let kind = match &o.kind {
+            desk_model::ObjectKind::TextBox(t) => format!(
+                "text {:?} inset {:?}",
+                t.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>(),
+                t.inset
+            ),
+            desk_model::ObjectKind::Group(g) => {
+                format!(
+                    "group {:?}",
+                    g.iter().map(|o| strip(o, index)).collect::<Vec<_>>()
+                )
+            }
+            other => format!("{other:?}"),
+        };
+        o.id = desk_model::NodeId::new(1).unwrap();
+        o.kind = desk_model::ObjectKind::Shape(desk_model::Shape::Rectangle);
+        o.anchor = desk_model::Anchor::Page(0);
+        // Positions to a hundredth of a point, as ODF writes thousandths.
+        let round = |l: Length| Length::from_pt((l.to_pt() * 100.0).round() / 100.0);
+        o.frame = desk_model::Frame {
+            x: round(o.frame.x),
+            y: round(o.frame.y),
+            width: round(o.frame.width),
+            height: round(o.frame.height),
+        };
+        format!("{kind} {anchor} {o:?}")
+    }
+    document
+        .objects()
+        .iter()
+        .map(|o| strip(o, &index))
+        .collect()
+}
+
+#[test]
+fn obj_01_obj_08_obj_13_objects_are_kept_in_odt() {
+    let document = with_objects();
+    let bytes = write_odt(&document).unwrap();
+    keep("obj-objects.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(objects(&read), objects(&document));
+    // The formatting of the text of a text box is kept.
+    let desk_model::ObjectKind::TextBox(text) = &read.objects().iter().nth(3).unwrap().kind else {
+        panic!("a text box");
+    };
+    let paragraph = &text.paragraphs[0];
+    assert_eq!(paragraph.attrs().alignment, Some(Alignment::Center));
+    assert_eq!(
+        paragraph.runs().last().unwrap().attrs.weight,
+        Some(FontWeight::BOLD)
+    );
+}
+
+#[test]
+fn obj_08_shapes_of_other_programs_are_read() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+ <office:automatic-styles>
+  <style:style style:name="gr1" style:family="graphic">
+   <style:graphic-properties draw:fill="solid" draw:fill-color="#729fcf" svg:stroke-color="#3465a4"
+     style:wrap="dynamic" style:horizontal-rel="paragraph"/>
+  </style:style>
+ </office:automatic-styles>
+ <office:body><office:text>
+  <text:p>Text<draw:custom-shape text:anchor-type="paragraph" draw:z-index="0" draw:style-name="gr1"
+     svg:width="2cm" svg:height="1cm" svg:x="1cm" svg:y="0.5cm"
+     draw:transform="rotate (1.5707963267949) translate (1cm 3cm)">
+    <draw:enhanced-geometry draw:type="isosceles-triangle"/>
+   </draw:custom-shape></text:p>
+ </office:text></office:body>
+</office:document-content>"##;
+    let source = odf::read_streams(content, None, None).unwrap();
+    let document = import(&source).unwrap();
+    let object = document.objects().iter().next().unwrap();
+    assert_eq!(
+        object.kind,
+        desk_model::ObjectKind::Shape(desk_model::Shape::triangle())
+    );
+    assert_eq!(
+        object.anchor,
+        desk_model::Anchor::Paragraph(document.body().get(0).unwrap().id())
+    );
+    assert_eq!(object.rotation, 9000);
+    assert_eq!(
+        object.style.fill,
+        Some(desk_model::Fill::Color(Rgba::rgb(0x72, 0x9f, 0xcf)))
+    );
+    assert_eq!(
+        object.style.stroke.unwrap().color,
+        Rgba::rgb(0x34, 0x65, 0xa4)
+    );
+    // Turned a quarter about its corner at (1cm, 3cm) from the margin,
+    // its center is a centimeter right and below.
+    let cm = 72.0 / 2.54;
+    let margin = document.page_setup().margin_left.to_pt();
+    let center_x = object.frame.x.to_pt() + 1.0 * cm;
+    let center_y = object.frame.y.to_pt() + 0.5 * cm;
+    assert!((center_x - (margin + 1.5 * cm)).abs() < 0.01, "{center_x}");
+    assert!((center_y - 2.0 * cm).abs() < 0.01, "{center_y}");
+    let _ = export(&document);
 }

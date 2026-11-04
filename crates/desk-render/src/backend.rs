@@ -15,7 +15,7 @@ use cairo::{
 use desk_model::{Metadata, Rgba};
 use desk_text::FontData;
 
-use crate::display::{DisplayList, Item};
+use crate::display::{DisplayList, Item, PathOp};
 
 /// Why drawing or writing failed.
 #[derive(Debug)]
@@ -123,7 +123,11 @@ impl Painter {
         options.set_hint_style(HintStyle::None);
         options.set_hint_metrics(HintMetrics::Off);
         cr.set_font_options(&options);
-        for item in &list.items {
+        self.paint_items(cr, &list.items)
+    }
+
+    fn paint_items(&mut self, cr: &Context, items: &[Item]) -> Result<(), RenderError> {
+        for item in items {
             match item {
                 Item::Glyphs {
                     font,
@@ -241,6 +245,65 @@ impl Painter {
                         f64::from(*height),
                     );
                     cr.fill()?;
+                }
+                Item::Path { path, fill, stroke } => {
+                    cr.new_path();
+                    for op in path {
+                        match *op {
+                            PathOp::Move(x, y) => cr.move_to(f64::from(x), f64::from(y)),
+                            PathOp::Line(x, y) => cr.line_to(f64::from(x), f64::from(y)),
+                            PathOp::Curve(x1, y1, x2, y2, x, y) => cr.curve_to(
+                                f64::from(x1),
+                                f64::from(y1),
+                                f64::from(x2),
+                                f64::from(y2),
+                                f64::from(x),
+                                f64::from(y),
+                            ),
+                            PathOp::Close => cr.close_path(),
+                        }
+                    }
+                    if let Some(color) = fill {
+                        set_color(cr, *color);
+                        if stroke.is_some() {
+                            cr.fill_preserve()?;
+                        } else {
+                            cr.fill()?;
+                        }
+                    }
+                    if let Some(stroke) = stroke {
+                        set_color(cr, stroke.color);
+                        cr.set_line_width(f64::from(stroke.width));
+                        cr.set_line_cap(cairo::LineCap::Butt);
+                        cr.set_line_join(cairo::LineJoin::Miter);
+                        let dashes: Vec<f64> =
+                            stroke.dashes.iter().map(|&d| f64::from(d)).collect();
+                        cr.set_dash(&dashes, 0.0);
+                        cr.stroke()?;
+                        cr.set_dash(&[], 0.0);
+                    }
+                    cr.new_path();
+                }
+                Item::Group {
+                    transform,
+                    opacity,
+                    items,
+                } => {
+                    if *opacity <= 0.0 {
+                        continue;
+                    }
+                    let [xx, yx, xy, yy, x0, y0] = transform.map(f64::from);
+                    cr.save()?;
+                    cr.transform(Matrix::new(xx, yx, xy, yy, x0, y0));
+                    if *opacity < 1.0 {
+                        cr.push_group();
+                        self.paint_items(cr, items)?;
+                        cr.pop_group_to_source()?;
+                        cr.paint_with_alpha(f64::from(*opacity))?;
+                    } else {
+                        self.paint_items(cr, items)?;
+                    }
+                    cr.restore()?;
                 }
             }
         }

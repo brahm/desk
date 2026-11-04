@@ -204,3 +204,98 @@ fn doc_09_a_thumbnail_is_a_png_that_fits_its_square() {
     assert_eq!(image.height(), 256);
     assert_eq!(image.width(), 181);
 }
+
+#[test]
+fn obj_08_obj_13_objects_are_painted_rotated_and_faded() {
+    use desk_model::{
+        Document, Editor, Fill, Frame, Object, ObjectKind, Paragraph, Run, Shape, TextBox, Wrap,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            let mut ellipse = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(20.0, 20.0, 60.0, 60.0),
+            );
+            ellipse.style.fill = Some(Fill::Color(Rgba::rgb(0, 0, 255)));
+            ellipse.wrap = Wrap::Through;
+            edit.add_object(ellipse)?;
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(120.0, 20.0, 40.0, 40.0),
+            );
+            square.style.fill = Some(Fill::Color(Rgba::rgb(255, 0, 0)));
+            square.style.opacity = 50;
+            square.rotation = 4500;
+            square.wrap = Wrap::Through;
+            edit.add_object(square)?;
+            let style = edit.document().styles().default_paragraph();
+            let paragraph = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                desk_model::ParaAttrs::default(),
+                [Run::new("Box")],
+            )?;
+            let mut text = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox {
+                    paragraphs: Arc::from([paragraph]),
+                    inset: Length::from_points(4),
+                }),
+                Frame::from_pt(20.0, 120.0, 100.0, 40.0),
+            );
+            text.wrap = Wrap::Through;
+            edit.add_object(text)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    // The text of the box is drawn inside its group.
+    let Some(Item::Group { items, .. }) = list.items.last() else {
+        panic!("the text box is the last item");
+    };
+    assert!(
+        items
+            .iter()
+            .any(|i| matches!(i, Item::Glyphs { text, .. } if text == "Box"))
+    );
+
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    // BGRA in memory on little-endian machines.
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    assert_eq!(pixel(50, 50), (0, 0, 255));
+    // The corner of the frame is outside the ellipse.
+    assert_eq!(pixel(22, 22), (255, 255, 255));
+    // Half red over white, and turned on its point: the corner of its
+    // frame is left white.
+    let (r, g, b) = pixel(140, 40);
+    assert!(
+        r == 255 && (120..=135).contains(&g) && (120..=135).contains(&b),
+        "{r} {g} {b}"
+    );
+    assert_eq!(pixel(122, 22), (255, 255, 255));
+    assert_ne!(
+        pixel(140, 15),
+        (255, 255, 255),
+        "the point stands above the frame"
+    );
+}

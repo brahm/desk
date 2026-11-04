@@ -109,7 +109,13 @@ pub fn read_streams(
         .child(OFFICE, "body")
         .and_then(|body| body.child(OFFICE, "text"))
     {
-        collect_paragraphs(text, None, None, &mut document.body);
+        collect_paragraphs(
+            text,
+            None,
+            None,
+            &mut document.body,
+            &mut document.page_objects,
+        );
         document.toc_levels = toc_levels(text);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
@@ -172,6 +178,7 @@ impl Reader {
         let family = match element.attr(STYLE, "family")? {
             "paragraph" => Family::Paragraph,
             "text" => Family::Text,
+            "graphic" => Family::Graphic,
             _ => return None,
         };
         Some(Style {
@@ -276,6 +283,10 @@ impl Reader {
             text: element
                 .child(STYLE, "text-properties")
                 .map(|e| self.text_properties(e))
+                .unwrap_or_default(),
+            graphic: element
+                .child(STYLE, "graphic-properties")
+                .map(crate::draw::graphic_properties)
                 .unwrap_or_default(),
         }
     }
@@ -743,7 +754,8 @@ fn read_master(master: &Element) -> MasterPage {
     let part = |name: &str| {
         master.child(STYLE, name).map(|e| {
             let mut paragraphs = Vec::new();
-            collect_paragraphs(e, None, None, &mut paragraphs);
+            // Objects in headers and footers are not read yet.
+            collect_paragraphs(e, None, None, &mut paragraphs, &mut Vec::new());
             HeaderFooter {
                 display: e.attr(STYLE, "display") != Some("false"),
                 paragraphs,
@@ -897,6 +909,7 @@ fn collect_paragraphs(
     list: Option<&InList>,
     section: Option<&str>,
     out: &mut Vec<Paragraph>,
+    objects: &mut Vec<crate::draw::DrawObject>,
 ) {
     // After a section inside this element, the next paragraph goes back
     // to the section of the element.
@@ -906,7 +919,7 @@ fn collect_paragraphs(
         if name.is(TEXT, "section") {
             let style = child.attr(TEXT, "style-name").unwrap_or_default();
             let first = out.len();
-            collect_paragraphs(child, list, Some(style), out);
+            collect_paragraphs(child, list, Some(style), out, objects);
             // The innermost section that starts at a paragraph names it.
             if let Some(p) = out.get_mut(first)
                 && p.section.is_none()
@@ -962,7 +975,7 @@ fn collect_paragraphs(
                     header: item.name.is(TEXT, "list-header"),
                     ..inner.clone()
                 };
-                collect_paragraphs(item, Some(&item_list), section, out);
+                collect_paragraphs(item, Some(&item_list), section, out, objects);
             }
         } else if name.is(TEXT, "table-of-content") {
             // The entries, after the title of the table if it has one.
@@ -973,14 +986,17 @@ fn collect_paragraphs(
                         paragraph.toc = true;
                         out.push(paragraph);
                     } else {
-                        collect_paragraphs(part, list, section, out);
+                        collect_paragraphs(part, list, section, out, objects);
                     }
                 }
             }
-        } else if name.ns == DRAW || name.is(OFFICE, "annotation") {
-            // Frames and comments are not part of the text flow.
+        } else if name.ns == DRAW {
+            // Objects outside paragraphs, as those anchored to pages.
+            objects.extend(crate::draw::draw_object(child, &paragraph));
+        } else if name.is(OFFICE, "annotation") {
+            // Comments are not part of the text flow.
         } else {
-            collect_paragraphs(child, list, section, out);
+            collect_paragraphs(child, list, section, out, objects);
         }
         if resume && let Some(p) = out.get_mut(first) {
             if p.section.is_none() {
@@ -1002,6 +1018,8 @@ struct SpanBuilder {
     bookmark: Option<String>,
     /// The bookmarks of one point met.
     marks: Vec<String>,
+    /// The drawing objects met.
+    frames: Vec<crate::draw::DrawObject>,
 }
 
 impl SpanBuilder {
@@ -1172,7 +1190,11 @@ impl SpanBuilder {
                 _ => {}
             }
         }
-        if name.ns == DRAW || name.is(OFFICE, "annotation") || name.is(OFFICE, "annotation-end") {
+        if name.ns == DRAW {
+            self.frames.extend(crate::draw::draw_object(e, &paragraph));
+            return;
+        }
+        if name.is(OFFICE, "annotation") || name.is(OFFICE, "annotation-end") {
             return;
         }
         // Links, fields and anything else: their text.
@@ -1187,6 +1209,7 @@ fn paragraph(e: &Element) -> Paragraph {
         link: None,
         bookmark: None,
         marks: Vec::new(),
+        frames: Vec::new(),
     };
     builder.content(e, None);
     Paragraph {
@@ -1201,5 +1224,6 @@ fn paragraph(e: &Element) -> Paragraph {
         marks: builder.marks,
         toc: false,
         spans: builder.spans,
+        frames: builder.frames,
     }
 }

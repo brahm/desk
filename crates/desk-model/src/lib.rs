@@ -12,7 +12,8 @@
 //!
 //! - A [`Document`] has [`Metadata`], [`Styles`] and a [`Container`], the
 //!   part that each app defines. Desk Writer's container is a
-//!   [`PagedFlow`]: a [`PageSetup`] and a body [`TextFlow`].
+//!   [`PagedFlow`]: a [`PageSetup`], a body [`TextFlow`] and the
+//!   [`Objects`] on the pages.
 //! - A [`TextFlow`] is a sequence of [`Paragraph`]s, and a paragraph holds
 //!   its text as [`Run`]s with the same formatting. Flows know nothing
 //!   about pages, so text boxes, slides and table cells reuse them.
@@ -54,6 +55,7 @@ mod header;
 mod id;
 mod list;
 mod note;
+mod object;
 mod op;
 mod outline;
 mod picture;
@@ -91,6 +93,10 @@ pub use list::{
     Numbering, detect_marker,
 };
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
+pub use object::{
+    Anchor, Fill, Frame, GraphicStyle, Object, ObjectKind, Objects, POLYGON_SCALE, Shape, Stroke,
+    TextBox, Wrap,
+};
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::Picture;

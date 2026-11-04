@@ -7,9 +7,9 @@
 //! back end paints on screen, for printing and into PDF files. Shadows,
 //! reflections and the other object effects are part of the display list.
 //!
-//! For now the display list holds glyphs and rectangles, enough for the
-//! text of a word processing document, and the back end writes it as PDF
-//! with the fonts embedded.
+//! For now the display list holds glyphs, rectangles, pictures, paths and
+//! groups, enough for the text and the objects of a word processing
+//! document, and the back end writes it as PDF with the fonts embedded.
 //!
 //! ```no_run
 //! use desk_layout::paginate;
@@ -31,4 +31,4 @@ mod display;
 pub use cairo;
 
 pub use backend::{Painter, RenderError};
-pub use display::{DisplayList, Item, PlacedGlyph};
+pub use display::{DisplayList, Item, PathOp, PathStroke, PlacedGlyph, shape_path};
