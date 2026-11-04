@@ -441,6 +441,7 @@ def main():
     objects_on_the_page(work)
     text_box_on_the_page(work)
     text_in_a_shape(work)
+    object_in_the_text(work)
     print("All UI tests passed.")
 
 
@@ -859,6 +860,73 @@ def text_in_a_shape(work):
 
         wait_for("the saved shape", saved)
         check("the text typed in the shape is saved in it", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def object_in_the_text(work):
+    """The Inspector puts a selected shape in the line of the text, and it
+    is saved there (OBJ-01)."""
+    letter = work / "Inline.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    with zipfile.ZipFile(letter) as package:
+        files = {name: package.read(name) for name in package.namelist()}
+    files["content.xml"] = files["content.xml"].replace(
+        b"<office:text>",
+        b'<office:text><draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt"/>',
+        1,
+    )
+    with zipfile.ZipFile(letter, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for name, data in files.items():
+            package.writestr(name, data, zipfile.ZIP_DEFLATED)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "Inline.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Inline.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Inline.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        press("ctrl+alt+i")
+        click(
+            int(window["X"]) + int(window["WIDTH"]) // 3,
+            int(window["Y"]) + int(window["HEIGHT"]) * 3 // 4,
+        )
+        switch = wait_for(
+            "the Wrap group of the Inspector",
+            lambda: (lambda n: n if showing(n) else None)(find_named(app, "Inline with Text")),
+        )
+        check("a selected shape shows whether it is in the text", True)
+        toggle = next(
+            node for node in walk(switch) if node.get_role() == Atspi.Role.CHECK_BOX
+        )
+        Atspi.Action.do_action(toggle, 0)
+        time.sleep(1)
+        press("ctrl+s")
+
+        def saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    content = package.read("content.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return False
+            return re.search(r"<text:p[^>]*>[^<]*<draw:rect[^>]*as-char", content)
+
+        wait_for("the saved shape in the text", saved)
+        check("the shape put in the text is saved in the line (OBJ-01)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

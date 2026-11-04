@@ -1002,3 +1002,37 @@ fn obj_08_text_sits_in_the_middle_of_a_shape() {
     let middle = (lines[0].top() + lines[0].bottom()) / 2.0;
     assert!((middle - 150.0).abs() < 0.01, "{middle}");
 }
+
+#[test]
+fn obj_01_an_object_in_the_text_stands_on_its_line() {
+    use desk_model::{Frame, Object, Position};
+    let mut system = TextSystem::new();
+    let mut document = Document::new_word_processing();
+    let id = document
+        .transact("Inline", |edit| {
+            let start = edit.document().start();
+            let at = edit.insert_text(start, "Before after")?;
+            let object = Object::new(
+                edit.new_id(),
+                desk_model::Shape::Rectangle.into(),
+                Frame::from_pt(0.0, 0.0, 60.0, 50.0),
+            );
+            let id = object.id;
+            edit.insert_object_in_text(Position::new(at.paragraph, 7), object)?;
+            Ok(id)
+        })
+        .unwrap()
+        .0;
+    let layout = paginate(&document, &mut system);
+    let page = &layout.pages[0];
+    assert_eq!(page.objects.len(), 1);
+    let placed = &page.objects[0];
+    assert_eq!(placed.object.id, id);
+    let line = &page.lines[0];
+    // Where the mark is, on the baseline of the line, which is as tall
+    // as the object.
+    assert!((placed.x - (line.origin.0 + line.line.caret_x(7))).abs() < 0.01);
+    assert!((placed.y + placed.height - line.baseline()).abs() < 0.01);
+    assert!(line.line.baseline - line.line.top >= 50.0 - 0.01);
+    assert_eq!(layout.pages[0].lines.len(), 1);
+}

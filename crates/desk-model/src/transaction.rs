@@ -157,16 +157,21 @@ impl Edit {
         // The notes whose marks go: those with no mark left go too
         // (EST-13).
         let mut marked: Vec<NodeId> = Vec::new();
+        // And the objects in the text whose marks go (OBJ-01).
+        let mut objects: Vec<NodeId> = Vec::new();
         for (id, range) in self.doc.paragraph_ranges(start, end)? {
             for run in self.doc.paragraph(id)?.slice(range)? {
-                if let Some(Some(crate::Field::NoteMark { note })) = run.attrs.field
-                    && !marked.contains(&note)
-                {
-                    marked.push(note);
+                match run.attrs.field {
+                    Some(Some(crate::Field::NoteMark { note })) if !marked.contains(&note) => {
+                        marked.push(note);
+                    }
+                    Some(Some(crate::Field::ObjectMark { object })) => objects.push(object),
+                    _ => {}
                 }
             }
         }
         let at = self.delete_text(start, end)?;
+        self.remove_unmarked_objects(&objects)?;
         for note in marked {
             if self.doc.notes().get(note).is_some() && !self.doc.has_note_mark(note) {
                 self.set_note(note, None)?;

@@ -222,9 +222,11 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     let sum = settings.spacing == ParagraphSpacing::Sum;
     let plan = crate::notes::NotePlan::new(document);
     let labels = plan.labels(document, None);
+    let objects = crate::objects::inline_sizes(document);
     let mut values: Vec<FieldValues> = vec![
         FieldValues {
             notes: Some(labels.clone()),
+            objects: objects.clone(),
             ..FieldValues::default()
         };
         document.body().len()
@@ -259,11 +261,13 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
                 pages,
                 notes: Some(labels.clone()),
                 pages_of: Some(pages_of.clone()),
+                objects: objects.clone(),
             };
         }
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     place_margins(document, &mut layout, system);
+    crate::objects::place_inline_objects(document, &mut layout);
     crate::objects::place_object_text(document, &mut layout, system);
     layout.field_values = values;
     layout.notes = plan.note_ids();
@@ -272,7 +276,14 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
 
 /// Whether a paragraph has a field.
 fn has_fields(paragraph: &Paragraph) -> bool {
-    paragraph.runs().any(|run| run.attrs.field.is_some())
+    paragraph.runs().any(|run| {
+        // The marks of objects show the same on every page.
+        run.attrs.field.is_some()
+            && !matches!(
+                run.attrs.field,
+                Some(Some(desk_model::Field::ObjectMark { .. }))
+            )
+    })
 }
 
 /// Lays out the header and the footer of each page (EST-12, EST-19).
@@ -364,6 +375,7 @@ pub fn margin_lines(
         pages: layout.pages.len() as u32,
         notes: None,
         pages_of: None,
+        objects: None,
     };
     let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
     let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);

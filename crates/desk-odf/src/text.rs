@@ -792,6 +792,18 @@ pub struct Paragraph {
     pub frames: Vec<crate::draw::DrawObject>,
 }
 
+impl Paragraph {
+    /// Its drawing objects: those anchored to it, and those in its text.
+    pub fn objects(&self) -> impl Iterator<Item = &crate::draw::DrawObject> {
+        self.frames
+            .iter()
+            .chain(self.spans.iter().filter_map(|s| match &s.field {
+                Some(Field::Object(object)) => Some(&**object),
+                _ => None,
+            }))
+    }
+}
+
 /// Where a paragraph is in a list.
 ///
 /// Neighbors with the same list style are written in one `text:list`, with
@@ -875,6 +887,9 @@ pub enum Field {
     /// `text:note`, a footnote or an endnote where the text refers to it.
     /// The text of the span is that of its `text:note-citation`.
     Note(Box<Note>),
+    /// A drawing object in the line of the text, anchored `as-char`; the
+    /// text of the span is empty.
+    Object(Box<crate::draw::DrawObject>),
 }
 
 /// A footnote or an endnote (`text:note`).

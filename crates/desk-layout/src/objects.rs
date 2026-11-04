@@ -185,6 +185,8 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
     Arc::new(
         objects
             .iter()
+            // Objects in the text are placed with their lines.
+            .filter(|object| object.anchor != Anchor::InText)
             .map(|object| Floating {
                 object: object.clone(),
                 anchor: match object.anchor {
@@ -192,6 +194,7 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
                     Anchor::Paragraph(id) => indexes
                         .get(&id)
                         .map_or(Place::Page(0), |&i| Place::Paragraph(i)),
+                    Anchor::InText => Place::Page(0),
                 },
             })
             .collect(),
@@ -298,6 +301,66 @@ fn free_segments(piece: &Piece, width: f32, top: f32, height: f32) -> Vec<(f32, 
 /// below `top` on its page.
 pub(crate) fn in_the_way(e: &Exclusion, left: f32, right: f32, top: f32) -> bool {
     e.y1 > top && e.x1 > left && e.x0 < right
+}
+
+/// The width and height of the objects in the text of a document, by
+/// object, for the marks that hold their places (OBJ-01); none when it has
+/// none.
+pub(crate) fn inline_sizes(
+    document: &Document,
+) -> Option<Arc<HashMap<desk_model::NodeId, (desk_model::Length, desk_model::Length)>>> {
+    let sizes: HashMap<_, _> = document
+        .objects()
+        .iter()
+        .filter(|o| o.anchor == Anchor::InText)
+        .map(|o| (o.id, (o.frame.width, o.frame.height)))
+        .collect();
+    (!sizes.is_empty()).then(|| Arc::new(sizes))
+}
+
+/// Puts the objects in the text on the pages, where the lines put their
+/// marks: from the left of the mark, standing on the baseline (OBJ-01).
+pub fn place_inline_objects(document: &Document, layout: &mut DocumentLayout) {
+    if inline_sizes(document).is_none() {
+        return;
+    }
+    let indexes: HashMap<desk_model::NodeId, usize> = document
+        .body()
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.id(), i))
+        .collect();
+    // The marks of each paragraph, by index: their offsets and objects.
+    let mut marks: HashMap<usize, Vec<(usize, &Object)>> = HashMap::new();
+    for (id, at) in document.object_marks() {
+        if let (Some(&paragraph), Some(object)) =
+            (indexes.get(&at.paragraph), document.objects().get(id))
+            && object.anchor == Anchor::InText
+        {
+            marks
+                .entry(paragraph)
+                .or_default()
+                .push((at.offset, object));
+        }
+    }
+    for page in &mut layout.pages {
+        let mut placed = Vec::new();
+        for line in &page.lines {
+            let Some(found) = marks.get(&line.paragraph) else {
+                continue;
+            };
+            for &(offset, object) in found {
+                if !line.line.range.contains(&offset) {
+                    continue;
+                }
+                let mut at = PlacedObject::new(object, Some(line.paragraph), 0.0);
+                at.x = line.origin.0 + line.line.caret_x(offset);
+                at.y = line.baseline() - at.height;
+                placed.push(at);
+            }
+        }
+        page.objects.extend(placed);
+    }
 }
 
 /// Lays out the text of the text boxes on the pages of a layout (OBJ-13):

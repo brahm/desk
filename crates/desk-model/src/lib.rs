@@ -53,6 +53,7 @@ mod find;
 mod format;
 mod header;
 mod id;
+mod inline;
 mod list;
 mod note;
 mod object;

@@ -53,6 +53,9 @@ pub struct Fragment {
     /// The notes whose marks the text holds, which a paste copies as
     /// notes of their own (EST-13).
     pub notes: Vec<crate::Note>,
+    /// The objects in the text whose marks the text holds, which a paste
+    /// copies as objects of their own (OBJ-01).
+    pub objects: Vec<crate::Object>,
 }
 
 /// A paragraph of a [`Fragment`].
@@ -236,11 +239,20 @@ impl Document {
                 _ => None,
             })
             .collect();
+        let objects = paragraphs
+            .iter()
+            .flat_map(|p: &FragmentParagraph| &p.runs)
+            .filter_map(|(_, _, attrs)| match attrs.field.clone().flatten() {
+                Some(crate::Field::ObjectMark { object }) => self.objects().get(object).cloned(),
+                _ => None,
+            })
+            .collect();
         Ok(Fragment {
             paragraphs,
             whole_start: start.offset == 0,
             lists,
             notes,
+            objects,
         })
     }
 
@@ -836,6 +848,14 @@ impl Edit {
                 }),
             )?;
         }
+        // And each object in the text, a copy of the one it was copied
+        // with (OBJ-01).
+        let mut objects: HashMap<NodeId, NodeId> = HashMap::new();
+        for object in &fragment.objects {
+            let copy = self.renumbered_object(object)?;
+            objects.insert(object.id, copy.id);
+            self.add_object(copy)?;
+        }
         let mut position = at;
         for (i, source) in fragment.paragraphs.iter().enumerate() {
             let mut style = source.style.clone();
@@ -879,14 +899,24 @@ impl Edit {
                     run_attrs.clone()
                 };
                 let mut attrs = attrs;
-                if let Some(Some(crate::Field::NoteMark { note })) = attrs.field
-                    && let Some(&new) = notes.get(&note)
-                {
-                    attrs.field = Some(Some(crate::Field::NoteMark { note: new }));
+                match attrs.field {
+                    Some(Some(crate::Field::NoteMark { note })) => {
+                        if let Some(&new) = notes.get(&note) {
+                            attrs.field = Some(Some(crate::Field::NoteMark { note: new }));
+                        }
+                    }
+                    Some(Some(crate::Field::ObjectMark { object })) => {
+                        // A mark copied without its object is left out.
+                        let Some(&new) = objects.get(&object) else {
+                            continue;
+                        };
+                        attrs.field = Some(Some(crate::Field::ObjectMark { object: new }));
+                    }
+                    _ => {}
                 }
                 runs.push(crate::text::Run::with_attrs(text, character_id, attrs));
             }
-            let len: usize = source.runs.iter().map(|(t, _, _)| t.len()).sum();
+            let len: usize = runs.iter().map(crate::text::Run::len).sum();
             if len > 0 {
                 self.apply(Op::ReplaceText {
                     paragraph: position.paragraph,

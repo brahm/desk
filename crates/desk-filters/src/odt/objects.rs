@@ -7,17 +7,16 @@
 //! An object fixed on a page is a drawing object anchored to that page,
 //! measured from the corner of the paper; one that moves with a paragraph
 //! is anchored to it, measured from the left of the text and the top of
-//! the paragraph. Objects in the text (`as-char`) are read as moving with
-//! their paragraph, with the text above and below them, until Desk has
-//! inline objects.
+//! the paragraph. An object in the text is anchored `as-char` where its
+//! mark is, standing on the baseline.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use desk_model::{
-    Anchor, Document, Fill, Frame, Length, MAX_TEXT_BOX_COLUMNS, NodeId, Object, ObjectKind, Op,
-    POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Shape, Stroke, TextBox, VerticalAlignment,
-    Wrap,
+    Anchor, Document, FIELD_CHARACTER, Field, Fill, Frame, Length, MAX_TEXT_BOX_COLUMNS, NodeId,
+    Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Shape, Stroke, TextBox,
+    VerticalAlignment, Wrap,
 };
 use desk_odf as odf;
 
@@ -325,6 +324,7 @@ fn import_one(
                 y += top;
             }
         }
+        Anchor::InText => {}
         Anchor::Paragraph(_) => {
             // From the edge of the paper, or from the margin.
             if !h_rel.starts_with("page") || h_rel.starts_with("page-content") {
@@ -428,6 +428,75 @@ fn import_one(
     Ok(Some(built))
 }
 
+/// Adds the objects in the text of the body, each with the identifier
+/// that its mark names, and takes out the marks of those that Desk cannot
+/// hold (OBJ-01).
+fn import_inline_objects(
+    source: &odf::TextDocument,
+    document: &mut Document,
+    setup: &PageSetup,
+    paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
+) -> Result<(), FilterError> {
+    for (index, p) in source.body.iter().enumerate() {
+        let inline: Vec<&odf::DrawObject> = p
+            .spans
+            .iter()
+            .filter_map(|s| match &s.field {
+                Some(odf::Field::Object(o)) => Some(&**o),
+                _ => None,
+            })
+            .collect();
+        if inline.is_empty() {
+            continue;
+        }
+        let Some(model) = document.body().get(index).cloned() else {
+            continue;
+        };
+        // The marks of the paragraph, in order, as the spans were read.
+        let mut marks = Vec::new();
+        let mut offset = 0;
+        for run in model.runs() {
+            if let Some(Some(Field::ObjectMark { object })) = &run.attrs.field {
+                marks.push((offset, *object));
+            }
+            offset += run.len();
+        }
+        let mut gone = Vec::new();
+        for (object, &(offset, id)) in inline.into_iter().zip(&marks) {
+            match import_one(source, document, object, None, setup, paragraph, 0)? {
+                Some(mut built) => {
+                    built.id = id;
+                    built.anchor = Anchor::InText;
+                    built.frame.x = Length::ZERO;
+                    built.frame.y = Length::ZERO;
+                    built.rotation = 0;
+                    built.wrap = Wrap::Both;
+                    let index = document.objects().len();
+                    document.apply(Op::InsertObject {
+                        index,
+                        object: built,
+                    })?;
+                }
+                None => gone.push(offset),
+            }
+        }
+        for offset in gone.into_iter().rev() {
+            document.apply(Op::ReplaceText {
+                paragraph: model.id(),
+                range: offset..offset + FIELD_CHARACTER.len_utf8(),
+                runs: Vec::new(),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// The name that holds the place of an object in the text while the
+/// objects are written.
+pub(super) fn inline_placeholder(id: NodeId) -> String {
+    format!("desk-inline-{id}")
+}
+
 /// The `draw:name` of a text box, which the boxes linked to it name.
 fn text_box_name(id: NodeId) -> String {
     format!("Text Box {id}")
@@ -447,6 +516,7 @@ pub(super) fn import_objects(
     for (index, p) in source.body.iter().enumerate() {
         found.extend(p.frames.iter().map(|o| (o, ids.get(index).copied())));
     }
+    import_inline_objects(source, document, &setup, paragraph)?;
     found.sort_by_key(|(o, _)| o.z_index.unwrap_or(u32::MAX));
     // The frames by name, and the text boxes that go on in another.
     let mut names: HashMap<&str, NodeId> = HashMap::new();
@@ -671,10 +741,16 @@ impl Exporter<'_> {
         } else {
             "paragraph"
         };
-        g.horizontal_pos = Some("from-left".into());
-        g.horizontal_rel = Some(rel.into());
-        g.vertical_pos = Some("from-top".into());
-        g.vertical_rel = Some(rel.into());
+        if anchor == "as-char" {
+            // Standing on the baseline, as a character.
+            g.vertical_pos = Some("top".into());
+            g.vertical_rel = Some("baseline".into());
+        } else {
+            g.horizontal_pos = Some("from-left".into());
+            g.horizontal_rel = Some(rel.into());
+            g.vertical_pos = Some("from-top".into());
+            g.vertical_rel = Some(rel.into());
+        }
         let kind = match &object.kind {
             ObjectKind::Shape(Shape::Rectangle) => odf::DrawKind::Rect {
                 corner_radius: None,
@@ -803,15 +879,51 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
         .map(|(i, p)| (p.id(), i))
         .collect();
     let left = document.page_setup().margin_left.to_pt();
+    // Where the marks of the objects in the text were written.
+    let mut placeholders: HashMap<String, &mut odf::Span> = out
+        .body
+        .iter_mut()
+        .flat_map(|p| p.spans.iter_mut())
+        .filter_map(|span| match &span.field {
+            Some(odf::Field::Object(o)) => o.name.clone().map(|name| (name, span)),
+            _ => None,
+        })
+        .collect();
+    let mut floating = Vec::new();
     for (z, object) in document.objects().iter().enumerate() {
+        if object.anchor == Anchor::InText {
+            // In the line of the text, where its mark is (OBJ-01).
+            if let Some(span) = placeholders.remove(&inline_placeholder(object.id)) {
+                let mut drawn = exporter.object(object, "as-char", None, 0.0);
+                drawn.x = None;
+                drawn.y = None;
+                drawn.z_index = Some(z as u32);
+                span.field = Some(odf::Field::Object(Box::new(drawn)));
+            }
+            continue;
+        }
+        floating.push((z, object));
+    }
+    // A mark without its object is left out.
+    let stray: Vec<String> = placeholders.into_keys().collect();
+    for paragraph in &mut out.body {
+        paragraph.spans.retain(|span| match &span.field {
+            Some(odf::Field::Object(o)) => o.name.as_ref().is_none_or(|n| !stray.contains(n)),
+            _ => true,
+        });
+    }
+    for (z, object) in floating {
         let at = match object.anchor {
             Anchor::Paragraph(id) => indexes.get(&id).copied(),
-            Anchor::Page(_) => None,
+            Anchor::Page(_) | Anchor::InText => None,
         };
         let mut drawn = match (object.anchor, at) {
             (Anchor::Paragraph(_), Some(_)) => exporter.object(object, "paragraph", None, left),
             (Anchor::Page(page), _) => exporter.object(object, "page", Some(page), 0.0),
-            (Anchor::Paragraph(_), None) => exporter.object(object, "page", Some(0), 0.0),
+            (Anchor::Paragraph(_) | Anchor::InText, None) => {
+                exporter.object(object, "page", Some(0), 0.0)
+            }
+            (Anchor::InText, Some(_)) => continue,
         };
         drawn.z_index = Some(z as u32);
         match at.and_then(|i| out.body.get_mut(i)) {

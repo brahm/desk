@@ -228,6 +228,9 @@ impl Edit {
             if let ObjectKind::TextBox(text) = &object.kind {
                 self.unlink_text_box(object.id, text)?;
             }
+            if let Some(mark) = self.document().object_mark(object.id) {
+                self.remove_mark(mark)?;
+            }
             self.remove_object(object.id)?;
         }
         Ok(())
@@ -381,7 +384,8 @@ impl Edit {
             return Ok(None);
         }
         let anchor = members[0].anchor;
-        if members.iter().any(|o| o.anchor != anchor) {
+        // Objects in the text are each a character of it.
+        if anchor == Anchor::InText || members.iter().any(|o| o.anchor != anchor) {
             return Ok(None);
         }
         let objects = self.document().objects();
@@ -411,6 +415,9 @@ impl Edit {
             let ObjectKind::Group(members) = &group.kind else {
                 continue;
             };
+            if group.anchor == Anchor::InText {
+                continue;
+            }
             let index = self.document().objects().index_of(group.id).unwrap_or(0);
             self.remove_object(group.id)?;
             for (i, member) in members.iter().enumerate() {

@@ -45,6 +45,8 @@ pub struct ObjectGroups {
     wrap: adw::ComboRow,
     margin: adw::SpinRow,
     locked: adw::SwitchRow,
+    /// Whether the object is in the line of the text (OBJ-01).
+    inline: adw::SwitchRow,
     /// The room between the frame of a text box and its text (OBJ-13).
     inset: adw::SpinRow,
     /// Where the text of a text box sits, and its columns.
@@ -139,7 +141,12 @@ impl ObjectGroups {
             .subtitle(tr("Cannot be moved, resized or deleted"))
             .build();
         let inset = spin(&tr("Inset"), 0.0, 1584.0);
+        let inline = adw::SwitchRow::builder()
+            .title(tr("Inline with Text"))
+            .subtitle(tr("Moves with the text, as a character"))
+            .build();
         let wrap_group = adw::PreferencesGroup::builder().title(tr("Wrap")).build();
+        wrap_group.add(&inline);
         wrap_group.add(&wrap);
         wrap_group.add(&margin);
         wrap_group.add(&locked);
@@ -171,6 +178,7 @@ impl ObjectGroups {
             wrap,
             margin,
             locked,
+            inline,
             inset,
             text_group,
             vertical,
@@ -296,6 +304,17 @@ impl ObjectGroups {
             }
         });
         let weak = Rc::downgrade(&this);
+        let inline_editor = editor.clone();
+        this.inline.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            if let Some(editor) = inline_editor() {
+                editor.set_objects_inline(row.is_active());
+            }
+        });
+        let weak = Rc::downgrade(&this);
         this.locked.connect_active_notify(move |row| {
             let Some(this) = weak.upgrade() else { return };
             if this.updating.get() {
@@ -392,8 +411,17 @@ impl ObjectGroups {
             &self.margin,
             tab_stops::in_units(info.object.wrap_margin, units),
         );
-        self.wrap.set_sensitive(editable);
-        self.margin.set_sensitive(editable);
+        // An object in the text stands where the text puts it, and the
+        // text does not go around it.
+        let inline = info.object.anchor == desk_model::Anchor::InText;
+        if self.inline.is_active() != inline {
+            self.inline.set_active(inline);
+        }
+        self.inline.set_sensitive(editable);
+        self.x.set_sensitive(editable && !inline);
+        self.y.set_sensitive(editable && !inline);
+        self.wrap.set_sensitive(editable && !inline);
+        self.margin.set_sensitive(editable && !inline);
         let shape_text = desk_model::TextBox::in_shape(std::sync::Arc::from([]));
         let text = info
             .object

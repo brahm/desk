@@ -1191,7 +1191,21 @@ impl SpanBuilder {
             }
         }
         if name.ns == DRAW {
-            self.frames.extend(crate::draw::draw_object(e, &paragraph));
+            match crate::draw::draw_object(e, &paragraph) {
+                Some(object) if object.anchor.as_deref() == Some("as-char") => {
+                    // In the line of the text, where it is.
+                    self.spans.push(Span {
+                        style: style.map(str::to_owned),
+                        text: String::new(),
+                        field: Some(Field::Object(Box::new(object))),
+                        link: self.link.clone(),
+                        bookmark: self.bookmark.clone(),
+                    });
+                    self.collapse = false;
+                }
+                Some(object) => self.frames.push(object),
+                None => {}
+            }
             return;
         }
         if name.is(OFFICE, "annotation") || name.is(OFFICE, "annotation-end") {

@@ -97,6 +97,10 @@ pub struct FieldValues {
     /// The numbers of the pages that paragraphs of the body start on, by
     /// paragraph (EST-22).
     pub pages_of: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, u32>>>,
+    /// The width and height of the objects in the text, by object
+    /// (OBJ-01): the mark of one that is not here shows nothing.
+    pub objects:
+        Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, (Length, Length)>>>,
 }
 
 impl Default for FieldValues {
@@ -106,6 +110,7 @@ impl Default for FieldValues {
             pages: 1,
             notes: None,
             pages_of: None,
+            objects: None,
         }
     }
 }
@@ -124,10 +129,27 @@ impl FieldValues {
                 .as_ref()
                 .and_then(|p| p.get(paragraph))
                 .map_or_else(|| "1".to_owned(), u32::to_string),
+            desk_model::Field::ObjectMark { object } => {
+                if self.object_size(*object).is_some() {
+                    OBJECT_CHARACTER.to_string()
+                } else {
+                    String::new()
+                }
+            }
             other => other.text(self.page, self.pages),
         }
     }
+
+    /// The width and height of an object in the text, in points.
+    pub fn object_size(&self, object: desk_model::NodeId) -> Option<(f32, f32)> {
+        let (w, h) = self.objects.as_ref()?.get(&object)?;
+        Some((w.to_pt() as f32, h.to_pt() as f32))
+    }
 }
+
+/// The character that stands for an object in the laid out text: a space
+/// that does not break, made as wide as the object.
+pub(crate) const OBJECT_CHARACTER: char = '\u{a0}';
 
 /// A paragraph ready for layout: its text with capitalization applied, its
 /// character formats and its paragraph format.
@@ -141,6 +163,9 @@ pub struct ParagraphText {
     pub(crate) ranges: Vec<StyledRange>,
     paragraph: ParaFormat,
     label: Option<Label>,
+    /// The objects in the text: the format of the mark of each, which is
+    /// its own, and its width and height (OBJ-01).
+    pub(crate) objects: Vec<(u32, f32, f32)>,
 }
 
 impl ParagraphText {
@@ -297,6 +322,7 @@ impl ParagraphText {
             ranges: Vec::new(),
             paragraph,
             label: None,
+            objects: Vec::new(),
         };
         let mut model_offset = 0;
         let mut transformed = false;
@@ -336,6 +362,12 @@ impl ParagraphText {
                     out.offsets.push((start, model_offset));
                     if !shown.is_empty() {
                         out.push_range(start..out.text.len(), index, false);
+                    }
+                    if let desk_model::Field::ObjectMark { object } = field
+                        && let Some((w, h)) = values.object_size(*object)
+                        && !shown.is_empty()
+                    {
+                        out.objects.push((index, w, h));
                     }
                     model_offset += c.len_utf8();
                     transformed = true;
@@ -413,6 +445,15 @@ impl ParagraphText {
     /// The text as it is laid out, with capitalization applied.
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// The width and height of the object whose mark has a format, if
+    /// one has it.
+    pub(crate) fn object_box(&self, format: u32) -> Option<(f32, f32)> {
+        self.objects
+            .iter()
+            .find(|(f, _, _)| *f == format)
+            .map(|&(_, w, h)| (w, h))
     }
 
     /// The paragraph format.
@@ -506,6 +547,7 @@ mod tests {
                 pages: 20,
                 notes: None,
                 pages_of: None,
+                objects: None,
             },
             ParaFormat::default(),
             CharFormat::default(),

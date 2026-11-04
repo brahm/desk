@@ -68,6 +68,13 @@ pub enum Field {
         /// The paragraph.
         paragraph: NodeId,
     },
+    /// The place of an object in the line of the text, as Pages puts an
+    /// inline object (OBJ-01): the object, anchored in the text, is drawn
+    /// there, as a character as large as its frame.
+    ObjectMark {
+        /// The object.
+        object: NodeId,
+    },
 }
 
 impl Field {
@@ -89,7 +96,7 @@ impl Field {
             Self::DateTime { shown, .. } | Self::FileName { shown, .. } => shown.to_string(),
             // Layout numbers the notes, and knows the pages of
             // paragraphs.
-            Self::NoteMark { .. } | Self::PageOf { .. } => String::new(),
+            Self::NoteMark { .. } | Self::PageOf { .. } | Self::ObjectMark { .. } => String::new(),
         }
     }
 }
