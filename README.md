@@ -179,7 +179,8 @@ language of the desktop. To translate Desk into another language, add
 its code to `po/LINGUAS`, run `ci/update-translations.sh` to create its
 catalog from `po/desk.pot`, and translate it with a PO editor such as
 Gtranslator or Poedit. Run the script again when the strings of the code
-change.
+change. [po/LANGUAGES.md](po/LANGUAGES.md) lists the languages that Desk
+will support, and when.
 
 ## Website
 

@@ -117,7 +117,8 @@
             "buildsystem": "simple",
             "build-commands": [
                 "for deb in *.deb; do bsdtar -xOf \"$deb\" 'data.tar.*' | bsdtar -xf -; done",
-                "install -Dm644 -t /app/share/hunspell usr/share/hunspell/*.aff usr/share/hunspell/*.dic",
+                "mkdir -p /app/share/hunspell",
+                "cp -P usr/share/hunspell/*.aff usr/share/hunspell/*.dic /app/share/hunspell/",
                 "mkdir -p /app/share/hyphen",
                 "cp -P usr/share/hyphen/*.dic /app/share/hyphen/",
                 "for doc in usr/share/doc/*/copyright; do install -Dm644 \"$doc\" /app/share/licenses/br.com.brahm.Desk.Writer/$(basename $(dirname \"$doc\")); done"
@@ -125,8 +126,33 @@
             "sources": [
                 {
                     "type": "file",
-                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/scowl/hunspell-en-us_2020.12.07-2_all.deb",
-                    "sha256": "d231c94b54792215038a4f719c562deafe8efe0a7710c0c7218974cab513330c"
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-be/hunspell-be_0.60-1build1_all.deb",
+                    "sha256": "016d2ed53200a65706e442817b24a36be011e8277d05c3087bcefe96cfbfe1f7"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-bg_25.2.3-1build1_all.deb",
+                    "sha256": "352a951ea8597374247b2362a269ee4b5746f238db3afec9bf85cae42d2e9496"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-ca/hunspell-ca_3.0.9+repack1-3build1_all.deb",
+                    "sha256": "b5df7e050cccaf62331bb7bb304d0587ad34cc2412e22e1cae28d85770e6768c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-cs_25.2.3-1build1_all.deb",
+                    "sha256": "6dcd4a3adac54ac5344a14ebdea669170b740ba358a6c0a2e2470c3d5dc9c118"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/i/igerman98/hunspell-de-de_20161207-16_all.deb",
+                    "sha256": "8f8f69e918f143102bfb090aa9d0833ef44154a5cdaf8992da91815adb46275e"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-el_25.2.3-1build1_all.deb",
+                    "sha256": "db64d32a0e4d999183feb6f2efb3409af32abb042a77c931cd4f3bdc9eb04aa0"
                 },
                 {
                     "type": "file",
@@ -135,8 +161,188 @@
                 },
                 {
                     "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/scowl/hunspell-en-us_2020.12.07-2_all.deb",
+                    "sha256": "d231c94b54792215038a4f719c562deafe8efe0a7710c0c7218974cab513330c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-eo_25.2.3-1build1_all.deb",
+                    "sha256": "1cf33ca6cf9306e666bebd333d70639c45c206e79ec47318d66983488a7169a4"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-es_25.2.3-1build1_all.deb",
+                    "sha256": "030067ed8959ab1e04a8fd5efaedd356573f130e2f2043f4a5007df66e1f3f79"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-eu/hunspell-eu_5.4.10-3_all.deb",
+                    "sha256": "7f6ef3cb7a2076e91688f96dea1c60f89bce9e5950e81ecccb1bc9014e835d38"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-fa_26.8.0.3-1_all.deb",
+                    "sha256": "1e71b2623cc57a29c606e20b1e7f7c46afc3f49caf2bfce304954bb43e2af20c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-fr/hunspell-fr-classical_7.7-1_all.deb",
+                    "sha256": "94757a80075a860084aaa609c31c9e261c1cf766d7358297f7320dcec9fe70fa"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-gl_25.2.3-1build1_all.deb",
+                    "sha256": "ea4b2d2e809c8ddbf3ddcac22757c3e58743e0c9ed9950745f020a569311e719"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-he_25.2.3-1build1_all.deb",
+                    "sha256": "96b707cb98c2643b1f1245d346bca6de85241f7e00c8cbde162435c21d1900da"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-hi_25.2.3-1build1_all.deb",
+                    "sha256": "be35f48c3bab6d9d709fb884f7ef2a03704c8b7d64dbb73cc15162a3d350abb6"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-hr_25.2.3-1build1_all.deb",
+                    "sha256": "e099dcad99e4b7cade2654558e9ba6af96eaf725057a262e146956616fcbcfba"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-hu_25.2.3-1build1_all.deb",
+                    "sha256": "684ada06727d1dd844d277b63808ba5fc3964b867b912c335b06cf9eef26dc9a"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-id_25.2.3-1build1_all.deb",
+                    "sha256": "05b1d7fa511740ad072dbd1bcaec81790b34aad2e55b7a55c011db9c68aec306"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-it_25.2.3-1build1_all.deb",
+                    "sha256": "284cd69aa5afa68cd21fe6316a741785d96ca2f7f20ee081ec3ee47d673fedfe"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-kk/hunspell-kk_1.1.2-2build1_all.deb",
+                    "sha256": "9a29c4b87b4014a60e2d22a9c0617d67c10ca8b4418f5027cca583556da292b3"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-dict-ko/hunspell-ko_0.7.94-2build1_all.deb",
+                    "sha256": "dcea9b6d519732d9018ffd496733f83d157612bbb0e1e6952da4b602324d7842"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-lt_25.2.3-1build1_all.deb",
+                    "sha256": "c63c0b51bc0b4cdb564f944c7667ef57aff27a688be237e2435c65c105dc02df"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-lv/hunspell-lv_1.4.0-5build1_all.deb",
+                    "sha256": "ef53fdcf830201e83a31ba586640109de407db9e8bd28a09746aa27980fa8a18"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/d/dutch/hunspell-nl_2.20.19+1-3_all.deb",
+                    "sha256": "7db116047a60a4d592524ad257da6a5227babe7de9b6c6ffcd83c569a67e1758"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-no_25.2.3-1build1_all.deb",
+                    "sha256": "f9db0961598187cf9f2fe4047872106740e00ace1db44ab30fe9ad11cd777f35"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-oc_25.2.3-1build1_all.deb",
+                    "sha256": "f3445ed528b5c1eecfc1625a211039bbd9ffbf318158aafe5e4b31a6957f265c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-pa_26.8.0.3-1_all.deb",
+                    "sha256": "7d4c8374be6cc354c195b885de0e88fe56bf194c3e0153c1df93e0bbb3aaff9b"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-pl_25.2.3-1build1_all.deb",
+                    "sha256": "25e0bf9468fba6c4a2642da8d4e0c0265fd3fcb268cfc69d13f98e24192586ec"
+                },
+                {
+                    "type": "file",
                     "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-pt-br_24.2.1-1_all.deb",
                     "sha256": "69a66b415faa240c5ec64a151562800b6e820a3c2e50dafb391246f98af36485"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-pt-pt_25.2.3-1build1_all.deb",
+                    "sha256": "5dc54fc6b3caf5254aad4ec638718114e035730dc63f3d150e17427fd9d5041a"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-ro_25.2.3-1build1_all.deb",
+                    "sha256": "3f441358d8a538a2f738c3769f114a35738e8d6912383cada2b5e9f5d5cc60e6"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-ru_25.2.3-1build1_all.deb",
+                    "sha256": "bdd6e9998e730d005777ff9aeef9088efd327903b5d211465d34d975b6c74b80"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-sk_25.2.3-1build1_all.deb",
+                    "sha256": "18f50e0010a7081bf87e572acc9002b185a7701ef8faccac7e80ab9f2e75fedb"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-sl_25.2.3-1build1_all.deb",
+                    "sha256": "9c41eb52142da9e6234702aa9c03ea90426c2e1b7cead1eed356dcfddc4cc000"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-sr_25.2.3-1build1_all.deb",
+                    "sha256": "f4b08413dfb29c56c73d8194b8f2e9396e8a73e44761d2568ae2830c8325afba"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-sv_25.2.3-1build1_all.deb",
+                    "sha256": "66310e8904405336e1058a6022bb5d9ef7a8473ac1b07d7f6207ff9916509684"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hunspell-uk_25.2.3-1build1_all.deb",
+                    "sha256": "33afc9a1b64619ebe5877c9b12d4f5aae0a424f4af497245e3271898d0ef7860"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-be_25.2.3-1build1_all.deb",
+                    "sha256": "9c573ed04d0034c8fa19c6e5f2ec8ab2667dc43286c946c89e74b8031e1efb3c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-bg_25.2.3-1build1_all.deb",
+                    "sha256": "7106d917dca52e5606d4b09853459993e591f3206c0cf3954bf170f8502929d6"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-ca_25.2.3-1build1_all.deb",
+                    "sha256": "a832a669f1b1b395be7ae019ded1268d78d5aa13233ad82f58fe66c3e2685cf6"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-cs_25.2.3-1build1_all.deb",
+                    "sha256": "a2f912f90debfe3dec2e5f44a4354eaba1bf6a768a57af87679099930b2aa5d7"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-de_25.2.3-1build1_all.deb",
+                    "sha256": "742a95fd4fce89ff13b01560f573fb99245b1692337236a0de672b67ae35f4c0"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-el_25.2.3-1build1_all.deb",
+                    "sha256": "2f92f8db319b130742fcd27deb402f9cd538d02cb8dc13233f04d168a936559d"
                 },
                 {
                     "type": "file",
@@ -145,8 +351,113 @@
                 },
                 {
                     "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-eo_25.2.3-1build1_all.deb",
+                    "sha256": "fbe91abe615e84467ad92c20997d6b16f5019ebcbfbf8026cf03e4516594c969"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-es_25.2.3-1build1_all.deb",
+                    "sha256": "d78775e6bcbd63abf6de53d820f10f958b84c2f24a5aa532ed53bf17d6bfbe47"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-fr_25.2.3-1build1_all.deb",
+                    "sha256": "b7198fe1910dcb904b2719aa53cb0bd761f27e7f81a3752939cb60ad369de038"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-gl_25.2.3-1build1_all.deb",
+                    "sha256": "885ffa2a6d572120eda022f4120231396b5c73d96770afc7e77469ae828ebf56"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-hr_25.2.3-1build1_all.deb",
+                    "sha256": "aed06f3b5436d208c29ede14432027862b37b6f7f04ae2bc1182fa93e46b0605"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-hu_25.2.3-1build1_all.deb",
+                    "sha256": "b298ddf6754a4ce187d366e84b8f207583b9f99648be580dcb58bcf5b053c80c"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-id_25.2.3-1build1_all.deb",
+                    "sha256": "8cfb1d8fca67be2446d84741c309a8130364f851b544c96814b7833941dbfa70"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-it_25.2.3-1build1_all.deb",
+                    "sha256": "4c6208bcc2870ed7211fc75ad6e979717f8b325bc7f401fac7bffd23d945e562"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-lt_25.2.3-1build1_all.deb",
+                    "sha256": "1bc26bb3dd09922125340f474ac0a4bde3b3e9a91442b8631fd34429870f945b"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hunspell-lv/hyphen-lv_1.4.0-5build1_all.deb",
+                    "sha256": "d973c8e2bcf007bf9bf291d1d36e3da595703d39c5741702b025275302b9be0e"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-nl_25.2.3-1build1_all.deb",
+                    "sha256": "907c4a1845a54faa7899c0fe8910454a250212eda991a19ce7545ec6884f52ca"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-no_25.2.3-1build1_all.deb",
+                    "sha256": "9e06a104dba0616e51fc97bef0f591ce8db2a49e0c4f858a0fa1f839a06195f1"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/o/openoffice.org-hyphenation-pl/hyphen-pl_3.0a-4.4build1_all.deb",
+                    "sha256": "14f872a3fa0a7d0076cfb7b5b54a362f61f458a73a4bf0ebb2f32297249a28a4"
+                },
+                {
+                    "type": "file",
                     "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-pt-br_24.2.1-1_all.deb",
                     "sha256": "8dd169aa223bc789b733f06c1b5ced358de57b02ceffd0e2acbb49a2c876e218"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-pt-pt_25.2.3-1build1_all.deb",
+                    "sha256": "d5d642c1c3d76b175e278ba33d7213dff9012b55f90245f5aec9e157fa1f8111"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-ro_25.2.3-1build1_all.deb",
+                    "sha256": "72e19be9f71b5baa743b8415ab577c86ed36c87201016c31dd5b2390ee082061"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/h/hyphen-ru/hyphen-ru_20030310-1ubuntu4_all.deb",
+                    "sha256": "17047a6ae60e80ba4b90df1cb8255c8490fd269a581dc855b8111edd7f9b1855"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-sk_25.2.3-1build1_all.deb",
+                    "sha256": "dd44a99e07a1e6647bcc9ab2ef3b72997f0f90935ea9f1ae18c211f6fd4b81a6"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-sl_25.2.3-1build1_all.deb",
+                    "sha256": "a52025cb27903382be31715d80ecbeb1fdc7e820be280a8c317904a82257ea64"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-sr_25.2.3-1build1_all.deb",
+                    "sha256": "970fe780a0bd46025f16d6446dedd0ac336ab36b295ca7754268e3d0bb578ceb"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-sv_25.2.3-1build1_all.deb",
+                    "sha256": "8e7847d1e9c9de520e50b74b6a81d6229d96fea6b4d835174db2345266b83157"
+                },
+                {
+                    "type": "file",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libr/libreoffice-dictionaries/hyphen-uk_25.2.3-1build1_all.deb",
+                    "sha256": "0f57387163c040415cc224b139b3a7b807bbc68205003898372dd799be5321b4"
                 }
             ]
         },

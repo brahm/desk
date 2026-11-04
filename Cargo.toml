@@ -29,6 +29,8 @@ unicode-segmentation = "1.13.3"
 
 # Spelling with the Hunspell dictionaries of the system, in desk-lang.
 spellbook = "0.4.2"
+# The encodings of the dictionaries that are not in UTF-8, by their SET line.
+encoding_rs = "0.8.35"
 
 # Text layout, as decided by the proof of concept in experiments/text-engine.
 # icu_segmenter and skrifa are pinned to the versions Parley itself uses.

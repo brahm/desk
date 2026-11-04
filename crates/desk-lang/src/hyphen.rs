@@ -4,7 +4,7 @@
 //! Hyphenation with Liang's patterns, from the files of LibreOffice
 //! (TXT-09).
 //!
-//! A file starts with its character set, `UTF-8` or `ISO8859-1`, may set
+//! A file starts with its character set, as `UTF-8` or `ISO8859-2`, may set
 //! how many letters a word keeps before and after a hyphen, and lists
 //! patterns such as `.ad4der`: the letters, with a digit between two of
 //! them where a break is allowed (odd) or forbidden (even). Each place in
@@ -31,15 +31,8 @@ pub struct Patterns {
 /// The text of a file in its character set.
 fn decode(data: &[u8]) -> Option<String> {
     let first = data.split(|b| *b == b'\n').next()?;
-    let charset = String::from_utf8_lossy(first).trim().to_ascii_uppercase();
-    let data = data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data);
-    match charset.trim_start_matches('\u{feff}') {
-        "UTF-8" | "UTF8" => String::from_utf8(data.to_vec()).ok(),
-        "ISO8859-1" | "ISO-8859-1" | "LATIN1" => {
-            Some(data.iter().map(|&b| char::from(b)).collect())
-        }
-        _ => None,
-    }
+    let encoding = crate::charset::named(&String::from_utf8_lossy(first))?;
+    Some(crate::charset::decode(data, encoding))
 }
 
 impl Patterns {
@@ -179,12 +172,15 @@ mod tests {
     }
 
     #[test]
-    fn latin_1_files_are_read() {
+    fn files_in_iso_8859_are_read() {
         let mut data = b"ISO8859-1\n1\xe7a\n".to_vec();
         data.extend_from_slice(b"a1b\n");
         let patterns = Patterns::parse(&data).unwrap();
         assert_eq!(breaks(&patterns, "aaçaab"), "aa-çaab");
-        assert!(Patterns::parse(b"KOI8-R\na1b\n").is_none());
+        // "š" in ISO 8859-2, as in the Slovenian patterns.
+        let patterns = Patterns::parse(b"ISO8859-2\n1\xb9a\n").unwrap();
+        assert_eq!(breaks(&patterns, "aašaa"), "aa-šaa");
+        assert!(Patterns::parse(b"NONSENSE\na1b\n").is_none());
     }
 
     #[test]
