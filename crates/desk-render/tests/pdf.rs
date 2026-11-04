@@ -488,3 +488,107 @@ fn obj_09_pictures_fill_objects_as_their_mode_says() {
     assert_eq!(pixel(25, 140), (255, 0, 0));
     assert_eq!(pixel(115, 155), (255, 0, 0));
 }
+
+#[test]
+fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
+    use desk_model::{
+        Adjustments, Document, Editor, Frame, InstantAlpha, Object, ObjectKind, Picture,
+        PictureSettings, Wrap,
+    };
+    // Left half white, right half red, twenty pixels square.
+    let png = {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 20, 20).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.rectangle(0.0, 0.0, 10.0, 20.0);
+            cr.fill().unwrap();
+            cr.set_source_rgb(1.0, 0.0, 0.0);
+            cr.rectangle(10.0, 0.0, 10.0, 20.0);
+            cr.fill().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        png
+    };
+    let picture = Picture::from_png(png).unwrap();
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            // The white is taken out, over a page painted blue below.
+            let mut keyed = Object::new(
+                edit.new_id(),
+                ObjectKind::Image(picture.clone()),
+                Frame::from_pt(20.0, 20.0, 40.0, 40.0),
+            );
+            keyed.picture.alpha = Some(InstantAlpha {
+                color: Rgba::WHITE,
+                tolerance: 10,
+            });
+            keyed.wrap = Wrap::Through;
+            edit.add_object(keyed)?;
+            // Masked to its right half, twice as large, and darker.
+            let mut masked = Object::new(
+                edit.new_id(),
+                ObjectKind::Image(picture.clone()),
+                Frame::from_pt(100.0, 100.0, 40.0, 80.0),
+            );
+            masked.picture = PictureSettings {
+                mask: Some(Frame::from_pt(-40.0, 0.0, 80.0, 80.0)),
+                adjust: Adjustments {
+                    brightness: -50,
+                    ..Adjustments::default()
+                },
+                ..PictureSettings::default()
+            };
+            masked.wrap = Wrap::Through;
+            edit.add_object(masked)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(0.0, 0.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    // The page shows through where the white was taken out.
+    assert_eq!(pixel(25, 40), (0, 0, 255));
+    assert_eq!(pixel(55, 40), (255, 0, 0));
+    // The mask shows only red, darkened, and nothing left of the frame.
+    let (r, g, b) = pixel(120, 140);
+    assert!((170..=210).contains(&r) && g < 10 && b < 10, "{r} {g} {b}");
+    assert_eq!(pixel(90, 140), (0, 0, 255));
+}
+
+#[test]
+fn obj_06_a_reduced_picture_keeps_what_shows() {
+    use desk_model::{Frame, Picture};
+    let png = {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 400, 400).unwrap();
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        png
+    };
+    let picture = Picture::from_png(png).unwrap();
+    // Shown at 50 points, a quarter of it masked: 100 pixels square.
+    let mask = Frame::from_pt(-50.0, -50.0, 200.0, 200.0);
+    let reduced = desk_render::reduced_picture(&picture, Some(mask), (50.0, 50.0)).unwrap();
+    assert_eq!((reduced.width(), reduced.height()), (100, 100));
+    // At its full size it is not made smaller.
+    assert!(desk_render::reduced_picture(&picture, None, (400.0, 400.0)).is_none());
+}

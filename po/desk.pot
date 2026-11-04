@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-04 19:39+0000\n"
+"POT-Creation-Date: 2026-11-04 19:55+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -206,7 +206,7 @@ msgstr ""
 msgid "Dotted"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:87
+#: crates/desk-ui/src/effects.rs:87 crates/desk-ui/src/picture_pane.rs:83
 msgid "Color"
 msgstr ""
 
@@ -641,7 +641,7 @@ msgid "4 Columns"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
-#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:163
+#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:165
 #: crates/desk-ui/src/ruler.rs:502 crates/desk-ui/src/ruler.rs:524
 msgid "Columns"
 msgstr ""
@@ -772,6 +772,7 @@ msgid "Choose…"
 msgstr ""
 
 #: crates/desk-ui/src/graphic_pane.rs:149 crates/desk-ui/src/lists_pane.rs:195
+#: crates/desk-ui/src/picture_pane.rs:118
 msgid "Image"
 msgstr ""
 
@@ -792,7 +793,7 @@ msgid "Gradient Angle"
 msgstr ""
 
 #: crates/desk-ui/src/graphic_pane.rs:156
-#: crates/desk-ui/src/graphic_pane.rs:171 crates/desk-ui/src/objects_pane.rs:86
+#: crates/desk-ui/src/graphic_pane.rs:171 crates/desk-ui/src/objects_pane.rs:88
 msgid "Degrees, counterclockwise"
 msgstr ""
 
@@ -1055,29 +1056,29 @@ msgstr ""
 msgid "Outside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:233
+#: crates/desk-ui/src/lib.rs:234
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:236
+#: crates/desk-ui/src/lib.rs:237
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:239
+#: crates/desk-ui/src/lib.rs:240
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:431 crates/desk-ui/src/window.rs:196
+#: crates/desk-ui/src/lib.rs:432 crates/desk-ui/src/window.rs:196
 msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:453
+#: crates/desk-ui/src/lib.rs:454
 msgid "All Documents"
 msgstr ""
 
@@ -1371,123 +1372,123 @@ msgstr ""
 msgid "Insert ▸ Footnote adds a note at the cursor. Its text is edited here."
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:78
+#: crates/desk-ui/src/objects_pane.rs:80
 msgid "X"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:79
+#: crates/desk-ui/src/objects_pane.rs:81
 msgid "Y"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:80
+#: crates/desk-ui/src/objects_pane.rs:82
 msgid "Width"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:81
+#: crates/desk-ui/src/objects_pane.rs:83
 msgid "Height"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:83
+#: crates/desk-ui/src/objects_pane.rs:85
 msgid "Constrain Proportions"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:85
+#: crates/desk-ui/src/objects_pane.rs:87
 msgid "Rotate"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:95
+#: crates/desk-ui/src/objects_pane.rs:97
 msgid "Flip Horizontally"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:100
+#: crates/desk-ui/src/objects_pane.rs:102
 msgid "Flip Vertically"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:113
+#: crates/desk-ui/src/objects_pane.rs:115
 msgid "Flip"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:116
+#: crates/desk-ui/src/objects_pane.rs:118
 msgid "Metrics"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:126
+#: crates/desk-ui/src/objects_pane.rs:128
 msgid "Both Sides"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:127
+#: crates/desk-ui/src/objects_pane.rs:129
 msgid "Largest Side"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:128
+#: crates/desk-ui/src/objects_pane.rs:130
 msgid "Left Side"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:129
+#: crates/desk-ui/src/objects_pane.rs:131
 msgid "Right Side"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:130
+#: crates/desk-ui/src/objects_pane.rs:132
 msgid "Above and Below"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:131
+#: crates/desk-ui/src/objects_pane.rs:133
 msgid "In Front of the Text"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:132
+#: crates/desk-ui/src/objects_pane.rs:134
 msgid "Behind the Text"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:137
+#: crates/desk-ui/src/objects_pane.rs:139
 msgid "Text Wrap"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:140
+#: crates/desk-ui/src/objects_pane.rs:142
 msgid "Extra Space"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:142
+#: crates/desk-ui/src/objects_pane.rs:144
 msgid "Locked"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:143
+#: crates/desk-ui/src/objects_pane.rs:145
 msgid "Cannot be moved, resized or deleted"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:145
+#: crates/desk-ui/src/objects_pane.rs:147
 msgid "Inset"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:147
+#: crates/desk-ui/src/objects_pane.rs:149
 msgid "Inline with Text"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:148
+#: crates/desk-ui/src/objects_pane.rs:150
 msgid "Moves with the text, as a character"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:150
+#: crates/desk-ui/src/objects_pane.rs:152
 msgid "Wrap"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:155
+#: crates/desk-ui/src/objects_pane.rs:157
 msgid "Bottom"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:155
+#: crates/desk-ui/src/objects_pane.rs:157
 msgid "Middle"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:155
+#: crates/desk-ui/src/objects_pane.rs:157
 msgid "Top"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:158
+#: crates/desk-ui/src/objects_pane.rs:160
 msgid "Vertical Alignment"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:165
+#: crates/desk-ui/src/objects_pane.rs:167
 msgid "Text Box"
 msgstr ""
 
@@ -1529,6 +1530,90 @@ msgstr ""
 
 #: crates/desk-ui/src/outline_view.rs:320
 msgid "Topic, level {n}"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:69
+msgid "Mask"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:70
+msgid "Shows only the part of the picture inside its frame"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:72
+msgid "Picture Size"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:73
+msgid "Percent of the frame"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:74
+msgid "Picture Left"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:75 crates/desk-ui/src/picture_pane.rs:77
+msgid "Points from the frame"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:76
+msgid "Picture Top"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:79
+msgid "Instant Alpha"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:80
+msgid "Takes a color out of the picture"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:87 crates/desk-ui/src/picture_pane.rs:89
+msgid "Color to Take Out"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:93
+msgid "Tolerance"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:94
+msgid "How near a color takes it out too"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:96
+msgid "Brightness"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:97
+msgid "Contrast"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:98
+msgid "Saturation"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:99
+msgid "Exposure"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:100
+msgid "Temperature"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:101
+msgid "Tint"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:105
+msgid "Reset Image"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:109
+msgid "Reduce File Size"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:112
+msgid "Keeps only the part of the picture that shows, at the size it is shown"
 msgstr ""
 
 #: crates/desk-ui/src/preferences.rs:65

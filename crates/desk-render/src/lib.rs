@@ -30,5 +30,5 @@ mod display;
 /// The Cairo bindings, for painting on a context of one's own.
 pub use cairo;
 
-pub use backend::{Painter, RenderError};
+pub use backend::{Painter, RenderError, adjusted_surface, reduced_picture};
 pub use display::{DisplayList, Item, Paint, PathOp, PathStroke, PlacedGlyph, shape_path};

@@ -73,6 +73,26 @@ pub fn reframed(object: &Object, frame: Frame) -> Object {
     let mut changed = object.clone();
     let old = object.frame;
     changed.frame = frame;
+    // A masked picture grows and shrinks with its mask (OBJ-04).
+    if let Some(mask) = object.picture.mask {
+        let scale = |from: Length, to: Length| {
+            if from.millipoints() == 0 {
+                1.0
+            } else {
+                to.to_pt() / from.to_pt()
+            }
+        };
+        let (sx, sy) = (
+            scale(old.width, frame.width),
+            scale(old.height, frame.height),
+        );
+        changed.picture.mask = Some(Frame::from_pt(
+            mask.x.to_pt() * sx,
+            mask.y.to_pt() * sy,
+            mask.width.to_pt() * sx,
+            mask.height.to_pt() * sy,
+        ));
+    }
     if let ObjectKind::Group(objects) = &object.kind {
         let scale = |from: Length, to: Length| {
             if from.millipoints() == 0 {

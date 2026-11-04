@@ -28,6 +28,23 @@ pub struct GraphicProperties {
     /// `desk:fill-image-mode`: `scale-to-fill` or `scale-to-fit`, the
     /// ways of Pages to size a picture that ODF has no value for.
     pub fill_image_mode: Option<String>,
+    /// `fo:clip`: the part of a picture that shows, as
+    /// `rect(top, right, bottom, left)` cut from its own size.
+    pub clip: Option<String>,
+    /// `draw:luminance`, in percent: how much lighter a picture is.
+    pub luminance: Option<f64>,
+    /// `draw:contrast`, in percent.
+    pub contrast: Option<f64>,
+    /// `desk:mask`: where the whole picture lies from the top left corner
+    /// of its frame, as `x y width height` in points.
+    pub mask: Option<String>,
+    /// `desk:image-adjust`: the changes of Adjust Image, as six numbers
+    /// from -100 to 100: brightness, contrast, saturation, exposure,
+    /// temperature and tint.
+    pub image_adjust: Option<String>,
+    /// `desk:instant-alpha`: the color taken out of a picture and how
+    /// far others may be from it, as `#rrggbb 30`.
+    pub instant_alpha: Option<String>,
     /// `draw:stroke`: `none`, `solid` or `dash`.
     pub stroke: Option<String>,
     /// `svg:stroke-color`.
@@ -376,6 +393,12 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         fill_image_name: text(DRAW, "fill-image-name"),
         repeat: text(STYLE, "repeat"),
         fill_image_mode: text(DESK, "fill-image-mode"),
+        clip: text(FO, "clip"),
+        luminance: e.attr(DRAW, "luminance").and_then(parse_percent),
+        contrast: e.attr(DRAW, "contrast").and_then(parse_percent),
+        mask: text(DESK, "mask"),
+        image_adjust: text(DESK, "image-adjust"),
+        instant_alpha: text(DESK, "instant-alpha"),
         stroke: text(DRAW, "stroke"),
         stroke_color: e.attr(SVG, "stroke-color").and_then(Color::parse),
         stroke_width: length(SVG, "stroke-width"),
@@ -426,6 +449,18 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     w.attr_opt("draw:fill-image-name", g.fill_image_name.as_deref());
     w.attr_opt("style:repeat", g.repeat.as_deref());
     w.attr_opt("desk:fill-image-mode", g.fill_image_mode.as_deref());
+    w.attr_opt("fo:clip", g.clip.as_deref());
+    for (name, value) in [
+        ("draw:luminance", g.luminance),
+        ("draw:contrast", g.contrast),
+    ] {
+        if let Some(value) = value {
+            w.attr(name, &format!("{}%", decimal(value)));
+        }
+    }
+    w.attr_opt("desk:mask", g.mask.as_deref());
+    w.attr_opt("desk:image-adjust", g.image_adjust.as_deref());
+    w.attr_opt("desk:instant-alpha", g.instant_alpha.as_deref());
     w.attr_opt("draw:stroke", g.stroke.as_deref());
     if let Some(color) = g.stroke_color {
         w.attr("svg:stroke-color", &color.to_string());
