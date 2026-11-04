@@ -61,7 +61,10 @@ pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<
     if let Some(index) = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true)
         && let ObjectKind::TextBox(_) = p.objects[index].object.kind
     {
-        return Some(Story::TextBox(p.objects[index].object.id));
+        return Some(Story::TextBox(text_box_head(
+            layout,
+            p.objects[index].object.id,
+        )));
     }
     for line in &p.note_lines {
         let (top, bottom) = (f64::from(line.top()), f64::from(line.bottom()));
@@ -153,17 +156,53 @@ fn story_layout_on(
             }
         }
         Story::TextBox(id) => {
+            // Every box linked with it shows its lines, wherever it is.
+            let _ = pages;
             let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
-            for &page in pages.iter().filter(|&&p| p < main.pages.len()) {
-                if let Some(placed) = main.pages[page].objects.iter().find(|o| o.object.id == id) {
-                    layout.pages[page].lines = crate::with_text_system(|system| {
-                        desk_layout::text_box_lines(copy, placed, &paragraphs, system)
-                    });
-                }
+            let chain = copy.text_box_chain(copy.text_box_head(id));
+            let boxes: Vec<(usize, &desk_layout::PlacedObject)> = chain
+                .iter()
+                .filter_map(|b| {
+                    main.pages.iter().enumerate().find_map(|(p, page)| {
+                        page.objects
+                            .iter()
+                            .find(|o| o.object.id == *b)
+                            .map(|o| (p, o))
+                    })
+                })
+                .collect();
+            let refs: Vec<&desk_layout::PlacedObject> = boxes.iter().map(|(_, o)| *o).collect();
+            let flowed = crate::with_text_system(|system| {
+                desk_layout::flow_text_boxes(copy, &refs, &paragraphs, system)
+            });
+            for ((page, _), lines) in boxes.iter().zip(flowed) {
+                layout.pages[*page].lines.extend(lines);
             }
         }
     }
     layout
+}
+
+/// The first of the text boxes linked with one, as the layout has them.
+fn text_box_head(layout: &DocumentLayout, id: NodeId) -> NodeId {
+    let before = |of: NodeId| {
+        layout
+            .pages
+            .iter()
+            .flat_map(|page| &page.objects)
+            .find(|o| matches!(&o.object.kind, ObjectKind::TextBox(t) if t.next == Some(of)))
+            .map(|o| o.object.id)
+    };
+    let mut head = id;
+    let mut seen = vec![id];
+    while let Some(earlier) = before(head) {
+        if seen.contains(&earlier) {
+            break;
+        }
+        seen.push(earlier);
+        head = earlier;
+    }
+    head
 }
 
 /// The page a text box is on.
@@ -254,7 +293,10 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
         }
         for object in &page.objects {
             if let ObjectKind::TextBox(_) = object.object.kind {
-                add(Story::TextBox(object.object.id), index);
+                add(
+                    Story::TextBox(text_box_head(layout, object.object.id)),
+                    index,
+                );
             }
         }
     }
@@ -664,6 +706,47 @@ mod tests {
             .find_everywhere(&query, &editor.document().text_box_stories());
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].story, Some(story));
+
+        // A box linked after it is edited as the same text, whose lines
+        // go on in it.
+        let linked = editor
+            .edit("Add Linked Text Box", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let empty = Paragraph::new(edit.new_id(), style);
+                let linked = edit.new_id();
+                edit.add_object(Object::new(
+                    linked,
+                    ObjectKind::TextBox(TextBox::new(
+                        Arc::from([empty]),
+                        desk_model::Length::from_points(4),
+                    )),
+                    Frame::from_pt(300.0, 500.0, 150.0, 60.0),
+                ))?;
+                edit.link_text_box(id, linked)?;
+                // Enough text for both boxes.
+                let mut paragraphs = edit.document().story_paragraphs(story);
+                let style = paragraphs[0].style();
+                for _ in 0..4 {
+                    paragraphs.push(Paragraph::from_runs(
+                        edit.new_id(),
+                        style,
+                        desk_model::ParaAttrs::default(),
+                        [Run::new("More text")],
+                    )?);
+                }
+                edit.set_story(story, paragraphs)?;
+                Ok(linked)
+            })
+            .unwrap();
+        let document = editor.document().clone();
+        let layout = crate::lay_out(&document);
+        assert_eq!(story_at(&layout, 0, 320.0, 520.0), Some(story));
+        assert!(!story_pages(&layout).contains(&(Story::TextBox(linked), 0)));
+        let copy = story_copy(&document, story);
+        let edited = story_layout(&layout, story, 0, &copy);
+        let lines = &edited.pages[0].lines;
+        assert!(lines.iter().any(|l| l.top() < 460.0));
+        assert!(lines.iter().any(|l| l.top() >= 504.0));
     }
 
     #[test]

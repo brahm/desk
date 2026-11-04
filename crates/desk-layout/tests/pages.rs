@@ -935,3 +935,38 @@ fn obj_13_text_boxes_flow_through_columns_and_sit_where_asked() {
     let line = &bottom.pages[0].objects[0].lines[0];
     assert!((line.bottom() - 295.0).abs() < 0.01);
 }
+
+#[test]
+fn obj_13_text_goes_on_in_linked_boxes() {
+    let mut system = TextSystem::new();
+    let mut document = with_text_box(1, desk_model::VerticalAlignment::Top, 150);
+    let first = document.objects().iter().next().unwrap().id;
+    document
+        .transact("Link", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let empty = desk_model::Paragraph::new(edit.new_id(), style);
+            let id = edit.new_id();
+            let mut object = desk_model::Object::new(
+                id,
+                desk_model::ObjectKind::TextBox(desk_model::TextBox::new(
+                    Arc::from([empty]),
+                    Length::from_points(5),
+                )),
+                desk_model::Frame::from_pt(100.0, 400.0, 300.0, 200.0),
+            );
+            object.wrap = desk_model::Wrap::Through;
+            edit.add_object(object)?;
+            edit.link_text_box(first, id)
+        })
+        .unwrap();
+    let layout = paginate(&document, &mut system);
+    let objects = &layout.pages[0].objects;
+    let (one, two) = (&objects[0].lines, &objects[1].lines);
+    assert!(!one.is_empty() && !two.is_empty());
+    // The first box is full, and the second goes on from its top with the
+    // lines that follow.
+    assert!(one.iter().all(|l| l.bottom() <= 295.01));
+    assert!((two[0].top() - 405.0).abs() < 0.01);
+    assert_eq!(two[0].paragraph, 0);
+    assert_eq!(two[0].index, one.last().unwrap().index + 1);
+}

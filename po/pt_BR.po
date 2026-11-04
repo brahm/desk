@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-04 13:35+0000\n"
+"POT-Creation-Date: 2026-11-04 15:00+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -2738,111 +2738,115 @@ msgstr "_Uma página"
 msgid "_Two Pages"
 msgstr "_Duas páginas"
 
-#: crates/desk-ui/src/window/objects.rs:126
+#: crates/desk-ui/src/window/objects.rs:128
 msgid "_Text Box"
 msgstr "_Caixa de texto"
 
-#: crates/desk-ui/src/window/objects.rs:129
+#: crates/desk-ui/src/window/objects.rs:130
+msgid "Lin_ked Text Box"
+msgstr "Caixa de texto _ligada"
+
+#: crates/desk-ui/src/window/objects.rs:135
 msgid "_Rectangle"
 msgstr "_Retângulo"
 
-#: crates/desk-ui/src/window/objects.rs:130
+#: crates/desk-ui/src/window/objects.rs:136
 msgid "Rounded Re_ctangle"
 msgstr "Retângulo a_rredondado"
 
-#: crates/desk-ui/src/window/objects.rs:131
+#: crates/desk-ui/src/window/objects.rs:137
 msgid "_Oval"
 msgstr "_Oval"
 
-#: crates/desk-ui/src/window/objects.rs:132
+#: crates/desk-ui/src/window/objects.rs:138
 msgid "Tr_iangle"
 msgstr "_Triângulo"
 
-#: crates/desk-ui/src/window/objects.rs:133
+#: crates/desk-ui/src/window/objects.rs:139
 msgid "_Line"
 msgstr "_Linha"
 
-#: crates/desk-ui/src/window/objects.rs:137
+#: crates/desk-ui/src/window/objects.rs:143
 msgid "_Shape"
 msgstr "_Forma"
 
-#: crates/desk-ui/src/window/objects.rs:144
+#: crates/desk-ui/src/window/objects.rs:150
 msgid "Bring to _Front"
 msgstr "Trazer para a _frente"
 
-#: crates/desk-ui/src/window/objects.rs:145
+#: crates/desk-ui/src/window/objects.rs:151
 msgid "Bring _Forward"
 msgstr "Trazer uma _camada para a frente"
 
-#: crates/desk-ui/src/window/objects.rs:146
+#: crates/desk-ui/src/window/objects.rs:152
 msgid "Send _Backward"
 msgstr "Enviar uma ca_mada para trás"
 
-#: crates/desk-ui/src/window/objects.rs:147
+#: crates/desk-ui/src/window/objects.rs:153
 msgid "Send to Bac_k"
 msgstr "Enviar para _trás"
 
-#: crates/desk-ui/src/window/objects.rs:150
+#: crates/desk-ui/src/window/objects.rs:156
 msgid "_Left"
 msgstr "_Esquerda"
 
-#: crates/desk-ui/src/window/objects.rs:151
+#: crates/desk-ui/src/window/objects.rs:157
 msgid "_Center"
 msgstr "_Centro"
 
-#: crates/desk-ui/src/window/objects.rs:152
+#: crates/desk-ui/src/window/objects.rs:158
 msgid "_Right"
 msgstr "_Direita"
 
-#: crates/desk-ui/src/window/objects.rs:153
+#: crates/desk-ui/src/window/objects.rs:159
 msgid "_Top"
 msgstr "_Topo"
 
-#: crates/desk-ui/src/window/objects.rs:154
+#: crates/desk-ui/src/window/objects.rs:160
 msgid "_Middle"
 msgstr "_Meio"
 
-#: crates/desk-ui/src/window/objects.rs:155
+#: crates/desk-ui/src/window/objects.rs:161
 msgid "_Bottom"
 msgstr "_Base"
 
-#: crates/desk-ui/src/window/objects.rs:161
+#: crates/desk-ui/src/window/objects.rs:167
 msgid "_Horizontally"
 msgstr "_Horizontalmente"
 
-#: crates/desk-ui/src/window/objects.rs:165
+#: crates/desk-ui/src/window/objects.rs:171
 msgid "_Vertically"
 msgstr "_Verticalmente"
 
-#: crates/desk-ui/src/window/objects.rs:169
+#: crates/desk-ui/src/window/objects.rs:175
 msgid "_Align Objects"
 msgstr "_Alinhar objetos"
 
-#: crates/desk-ui/src/window/objects.rs:170
+#: crates/desk-ui/src/window/objects.rs:176
 msgid "_Distribute Objects"
 msgstr "_Distribuir objetos"
 
-#: crates/desk-ui/src/window/objects.rs:171
+#: crates/desk-ui/src/window/objects.rs:177
 msgid "Flip _Horizontally"
 msgstr "Espelhar _horizontalmente"
 
-#: crates/desk-ui/src/window/objects.rs:172
+#: crates/desk-ui/src/window/objects.rs:178
 msgid "Flip _Vertically"
 msgstr "Espelhar _verticalmente"
 
-#: crates/desk-ui/src/window/objects.rs:174
+#: crates/desk-ui/src/window/objects.rs:180
 msgid "_Group"
 msgstr "A_grupar"
 
-#: crates/desk-ui/src/window/objects.rs:175
+#: crates/desk-ui/src/window/objects.rs:181
 msgid "_Ungroup"
 msgstr "Desagr_upar"
 
-#: crates/desk-ui/src/window/objects.rs:176
+#: crates/desk-ui/src/window/objects.rs:182
 msgid "_Lock"
 msgstr "T_ravar"
 
-#: crates/desk-ui/src/window/objects.rs:177
+#: crates/desk-ui/src/window/objects.rs:183
 msgid "U_nlock"
 msgstr "Destra_var"
 

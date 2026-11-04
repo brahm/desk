@@ -44,11 +44,55 @@ impl Document {
             Story::Margin { section, place } => {
                 self.section_headers_footers(section).get(place).to_vec()
             }
-            Story::TextBox(id) => match self.objects().get(id).map(|o| &o.kind) {
-                Some(ObjectKind::TextBox(text)) => text.paragraphs.to_vec(),
-                _ => Vec::new(),
-            },
+            Story::TextBox(id) => {
+                let head = self.text_box_head(id);
+                match self.objects().get(head).map(|o| &o.kind) {
+                    Some(ObjectKind::TextBox(text)) => text.paragraphs.to_vec(),
+                    _ => Vec::new(),
+                }
+            }
         }
+    }
+
+    /// The text box whose text a text box shows: the first of the boxes
+    /// linked to it, or itself (OBJ-13).
+    pub fn text_box_head(&self, id: NodeId) -> NodeId {
+        let mut head = id;
+        let mut seen = vec![id];
+        while let Some(before) = self
+            .objects()
+            .iter()
+            .find(|o| matches!(&o.kind, ObjectKind::TextBox(t) if t.next == Some(head)))
+        {
+            if seen.contains(&before.id) {
+                break;
+            }
+            seen.push(before.id);
+            head = before.id;
+        }
+        head
+    }
+
+    /// The text boxes linked from one, in order, starting with it.
+    pub fn text_box_chain(&self, head: NodeId) -> Vec<NodeId> {
+        let mut chain = vec![head];
+        let mut at = head;
+        while let Some(ObjectKind::TextBox(text)) = self.objects().get(at).map(|o| &o.kind) {
+            match text.next {
+                Some(next)
+                    if !chain.contains(&next)
+                        && matches!(
+                            self.objects().get(next).map(|o| &o.kind),
+                            Some(ObjectKind::TextBox(_))
+                        ) =>
+                {
+                    chain.push(next);
+                    at = next;
+                }
+                _ => break,
+            }
+        }
+        chain
     }
 
     /// The text boxes of the document, from back to front, as stories.
@@ -56,6 +100,7 @@ impl Document {
         self.objects()
             .iter()
             .filter(|o| matches!(o.kind, ObjectKind::TextBox(_)))
+            .filter(|o| self.text_box_head(o.id) == o.id)
             .map(|o| Story::TextBox(o.id))
             .collect()
     }
@@ -105,6 +150,7 @@ impl Edit {
                 self.set_section_header_footer(section, place, paragraphs)
             }
             Story::TextBox(id) => {
+                let id = self.document().text_box_head(id);
                 let mut object = self
                     .document()
                     .objects()

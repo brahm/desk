@@ -166,6 +166,11 @@ pub struct TextBox {
     pub columns: u8,
     /// The room between two columns.
     pub column_gap: Length,
+    /// The text box that the text goes on in when it does not fit, as
+    /// linked text boxes of Pages (OBJ-13). The text of linked boxes is
+    /// all in the first of them; the paragraphs of the others are left
+    /// empty.
+    pub next: Option<NodeId>,
 }
 
 impl TextBox {
@@ -178,6 +183,7 @@ impl TextBox {
             vertical: VerticalAlignment::Top,
             columns: 1,
             column_gap: Length::from_points(18),
+            next: None,
         }
     }
 }

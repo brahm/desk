@@ -214,7 +214,7 @@ fn kind(
             };
             ObjectKind::Image(picture)
         }
-        odf::DrawKind::TextBox { paragraphs } => {
+        odf::DrawKind::TextBox { paragraphs, .. } => {
             let mut built = Vec::with_capacity(paragraphs.len());
             for p in paragraphs {
                 built.push(paragraph(document, p)?);
@@ -405,6 +405,11 @@ fn import_one(
     Ok(Some(built))
 }
 
+/// The `draw:name` of a text box, which the boxes linked to it name.
+fn text_box_name(id: NodeId) -> String {
+    format!("Text Box {id}")
+}
+
 /// Adds the drawing objects of an ODF document to a document whose body
 /// has its paragraphs, in the order of their `draw:z-index`.
 pub(super) fn import_objects(
@@ -420,13 +425,45 @@ pub(super) fn import_objects(
         found.extend(p.frames.iter().map(|o| (o, ids.get(index).copied())));
     }
     found.sort_by_key(|(o, _)| o.z_index.unwrap_or(u32::MAX));
+    // The frames by name, and the text boxes that go on in another.
+    let mut names: HashMap<&str, NodeId> = HashMap::new();
+    let mut links: Vec<(NodeId, &str)> = Vec::new();
     for (object, anchor) in found {
         if let Some(built) = import_one(source, document, object, anchor, &setup, paragraph, 0)? {
+            if let Some(name) = &object.name {
+                names.insert(name, built.id);
+            }
+            if let odf::DrawKind::TextBox {
+                chain_next: Some(next),
+                ..
+            } = &object.kind
+            {
+                links.push((built.id, next));
+            }
             let index = document.objects().len();
             document.apply(Op::InsertObject {
                 index,
                 object: built,
             })?;
+        }
+    }
+    for (id, next) in links {
+        let Some(&next) = names.get(next) else {
+            continue;
+        };
+        let Some(mut object) = document.objects().get(id).cloned() else {
+            continue;
+        };
+        let next_is_box = matches!(
+            document.objects().get(next).map(|o| &o.kind),
+            Some(ObjectKind::TextBox(_))
+        );
+        if let ObjectKind::TextBox(text) = &mut object.kind
+            && next_is_box
+            && next != id
+        {
+            text.next = Some(next);
+            document.apply(Op::ReplaceObject { object })?;
         }
     }
     Ok(())
@@ -655,6 +692,7 @@ impl Exporter<'_> {
                 }
                 odf::DrawKind::TextBox {
                     paragraphs: text.paragraphs.iter().map(|p| self.paragraph(p)).collect(),
+                    chain_next: text.next.map(text_box_name),
                 }
             }
             ObjectKind::Group(objects) => odf::DrawKind::Group(
@@ -676,8 +714,13 @@ impl Exporter<'_> {
                 ..Default::default()
             },
         );
+        let linked = matches!(&kind, odf::DrawKind::TextBox { .. });
         let mut out = odf::DrawObject::new(kind);
         out.style = Some(style);
+        if linked {
+            // Named, for the boxes linked to it to name it.
+            out.name = Some(text_box_name(object.id));
+        }
         out.anchor = page.map(|_| "page").or(Some(anchor)).map(str::to_owned);
         out.anchor_page = page.map(|p| p + 1);
         out.width = Some(odf::Length(w));

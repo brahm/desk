@@ -112,7 +112,7 @@ impl DrawObject {
         match &self.kind {
             DrawKind::Image { href } => vec![href.as_str()],
             DrawKind::Group(objects) => objects.iter().flat_map(Self::hrefs).collect(),
-            DrawKind::TextBox { paragraphs } => paragraphs
+            DrawKind::TextBox { paragraphs, .. } => paragraphs
                 .iter()
                 .flat_map(|p| &p.frames)
                 .flat_map(Self::hrefs)
@@ -166,6 +166,9 @@ pub enum DrawKind {
     TextBox {
         /// The text.
         paragraphs: Vec<Paragraph>,
+        /// `draw:chain-next-name`: the `draw:name` of the frame that the
+        /// text goes on in.
+        chain_next: Option<String>,
     },
     /// `draw:g`.
     Group(Vec<DrawObject>),
@@ -345,6 +348,7 @@ fn draw_object_at(
                         .filter(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
                         .map(paragraph)
                         .collect(),
+                    chain_next: text.attr(DRAW, "chain-next-name").map(str::to_owned),
                 }
             }
         }
@@ -452,8 +456,12 @@ pub(crate) fn write_draw_object(
                 .attr("xlink:actuate", "onLoad")
                 .end();
         }
-        DrawKind::TextBox { paragraphs } => {
+        DrawKind::TextBox {
+            paragraphs,
+            chain_next,
+        } => {
             w.start("draw:text-box");
+            w.attr_opt("draw:chain-next-name", chain_next.as_deref());
             for p in paragraphs {
                 paragraph(w, p);
             }
