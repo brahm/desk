@@ -90,6 +90,7 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
                 .flat_map(|o| o.hrefs())
                 .map(str::to_owned),
         )
+        .chain(document.fill_images.iter().map(|i| i.href.clone()))
         .filter(|href| !href.contains("://") && !href.starts_with('/'))
         .collect();
     hrefs.sort();

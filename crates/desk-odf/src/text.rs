@@ -75,6 +75,8 @@ pub struct TextDocument {
     pub gradients: Vec<crate::draw::Gradient>,
     /// The markers at the ends of lines, by name.
     pub markers: Vec<crate::draw::Marker>,
+    /// The pictures that graphic styles fill with, by name.
+    pub fill_images: Vec<crate::draw::FillImage>,
 }
 
 /// The configuration of the footnotes or the endnotes of a document

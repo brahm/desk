@@ -5,12 +5,13 @@
 //! OBJ-10, OBJ-11, OBJ-12): what fills them, the line around them and at
 //! the ends of a line, their shadow and how opaque they are.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{
-    BorderStyle, Fill, GraphicStyle, Length, LineEnd, ObjectKind, ObjectShadow, Rgba, Shape, Stroke,
+    BorderStyle, Fill, GraphicStyle, ImageFill, Length, LineEnd, ObjectKind, ObjectShadow, Picture,
+    Rgba, Shape, Stroke,
 };
 
 use crate::editing::ObjectInfo;
@@ -27,6 +28,26 @@ const LINE_ENDS: [LineEnd; 6] = [
     LineEnd::Bar,
 ];
 
+/// How a picture fills, in the order of its list.
+const IMAGE_FILLS: [ImageFill; 5] = [
+    ImageFill::ScaleToFill,
+    ImageFill::ScaleToFit,
+    ImageFill::Stretch,
+    ImageFill::OriginalSize,
+    ImageFill::Tile,
+];
+
+/// The name of a way to fill with a picture, as its list shows it.
+fn image_fill_name(mode: ImageFill) -> String {
+    match mode {
+        ImageFill::ScaleToFill => tr("Scale to Fill"),
+        ImageFill::ScaleToFit => tr("Scale to Fit"),
+        ImageFill::Stretch => tr("Stretch"),
+        ImageFill::OriginalSize => tr("Original Size"),
+        ImageFill::Tile => tr("Tile"),
+    }
+}
+
 /// The styles of a line, after "None" in its list.
 const STROKES: [BorderStyle; 3] = [BorderStyle::Solid, BorderStyle::Dashed, BorderStyle::Dotted];
 
@@ -39,6 +60,13 @@ pub struct GraphicGroup {
     fill: adw::ComboRow,
     fill_color: gtk::ColorDialogButton,
     fill_color_row: adw::ActionRow,
+    image_row: adw::ActionRow,
+    image_button: gtk::Button,
+    image_mode: adw::ComboRow,
+    /// The picture that fills, or that an image fill would fill with.
+    picture: RefCell<Option<Picture>>,
+    /// Sets the fill after a picture is chosen.
+    on_picture: RefCell<Option<Rc<dyn Fn()>>>,
     gradient_end: gtk::ColorDialogButton,
     gradient_end_row: adw::ActionRow,
     gradient_angle: adw::SpinRow,
@@ -107,8 +135,21 @@ impl GraphicGroup {
     pub fn new(editor: EditorOf) -> Rc<Self> {
         let fill = combo(
             &tr("Fill"),
-            &[tr("None"), tr("Color Fill"), tr("Gradient Fill")],
+            &[
+                tr("None"),
+                tr("Color Fill"),
+                tr("Gradient Fill"),
+                tr("Image Fill"),
+            ],
         );
+        let image_button = gtk::Button::builder()
+            .label(tr("Choose…"))
+            .valign(gtk::Align::Center)
+            .build();
+        let image_row = adw::ActionRow::builder().title(tr("Image")).build();
+        image_row.add_suffix(&image_button);
+        let modes: Vec<String> = IMAGE_FILLS.iter().map(|m| image_fill_name(*m)).collect();
+        let image_mode = combo(&tr("Image Size"), &modes);
         let (fill_color_row, fill_color) = color_row(&tr("Fill Color"));
         let (gradient_end_row, gradient_end) = color_row(&tr("Gradient End Color"));
         let gradient_angle = spin(&tr("Gradient Angle"), 0.0, 359.0, 1.0);
@@ -142,6 +183,8 @@ impl GraphicGroup {
         for row in [
             fill.upcast_ref::<gtk::Widget>(),
             fill_color_row.upcast_ref(),
+            image_row.upcast_ref(),
+            image_mode.upcast_ref(),
             gradient_end_row.upcast_ref(),
             gradient_angle.upcast_ref(),
             stroke.upcast_ref(),
@@ -164,6 +207,11 @@ impl GraphicGroup {
             fill,
             fill_color,
             fill_color_row,
+            image_row,
+            image_button,
+            image_mode,
+            picture: RefCell::new(None),
+            on_picture: RefCell::new(None),
             gradient_end,
             gradient_end_row,
             gradient_angle,
@@ -195,6 +243,14 @@ impl GraphicGroup {
                     return;
                 }
                 let Some(editor) = editor() else { return };
+                if matches!(part, Part::Fill)
+                    && this.fill.selected() == 3
+                    && this.picture.borrow().is_none()
+                {
+                    // An image fill begins with an image.
+                    this.choose_picture();
+                    return;
+                }
                 let fill = this.fill_value();
                 let stroke = this.stroke_value();
                 let shadow = this.shadow_value();
@@ -202,7 +258,7 @@ impl GraphicGroup {
                 editor.style_objects(name, move |style, line| match part {
                     Part::Fill => {
                         if !line {
-                            style.fill = fill;
+                            style.fill.clone_from(&fill);
                         }
                     }
                     Part::Stroke => {
@@ -223,6 +279,17 @@ impl GraphicGroup {
         let on = changed.clone();
         this.fill
             .connect_selected_notify(move |_| on("Fill", Part::Fill));
+        let on = changed.clone();
+        this.image_mode
+            .connect_selected_notify(move |_| on("Fill", Part::Fill));
+        let on = changed.clone();
+        *this.on_picture.borrow_mut() = Some(Rc::new(move || on("Fill", Part::Fill)));
+        let weak = Rc::downgrade(&this);
+        this.image_button.connect_clicked(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.choose_picture();
+            }
+        });
         for button in [&this.fill_color, &this.gradient_end] {
             let on = changed.clone();
             button.connect_rgba_notify(move |_| on("Fill", Part::Fill));
@@ -266,6 +333,44 @@ impl GraphicGroup {
         &self.group
     }
 
+    /// Asks for an image file, and fills with its picture.
+    fn choose_picture(self: &Rc<Self>) {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&tr("Images")));
+        filter.add_pixbuf_formats();
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Choose an Image to Fill With"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+        let parent = self.group.root().and_downcast::<gtk::Window>();
+        let weak = Rc::downgrade(self);
+        dialog.open(
+            parent.as_ref(),
+            gtk::gio::Cancellable::NONE,
+            move |result| {
+                let Some(this) = weak.upgrade() else { return };
+                let picture = result
+                    .ok()
+                    .and_then(|file| crate::bullet_pictures::picture_from_file(&file));
+                match picture {
+                    Some(picture) => {
+                        *this.picture.borrow_mut() = Some(picture);
+                        let on = this.on_picture.borrow().clone();
+                        if let Some(on) = on {
+                            on();
+                        }
+                    }
+                    // Nothing chosen: the rows show the fill there is.
+                    None => this.show_rows(),
+                }
+            },
+        );
+    }
+
     /// The fill that the rows ask for.
     fn fill_value(&self) -> Option<Fill> {
         let from = from_gdk(&self.fill_color.rgba());
@@ -275,6 +380,13 @@ impl GraphicGroup {
                 from,
                 to: from_gdk(&self.gradient_end.rgba()),
                 angle: (self.gradient_angle.value() * 100.0).round() as i32,
+            }),
+            3 => self.picture.borrow().clone().map(|picture| Fill::Image {
+                picture,
+                mode: IMAGE_FILLS
+                    .get(self.image_mode.selected() as usize)
+                    .copied()
+                    .unwrap_or_default(),
             }),
             _ => None,
         }
@@ -315,8 +427,11 @@ impl GraphicGroup {
     /// Shows the rows that the choices of the others call for.
     fn show_rows(&self) {
         let fill = self.fill.selected();
-        let filled = self.fill.is_visible() && fill > 0;
-        self.fill_color_row.set_visible(filled);
+        let shown = self.fill.is_visible();
+        self.fill_color_row
+            .set_visible(shown && (fill == 1 || fill == 2));
+        self.image_row.set_visible(shown && fill == 3);
+        self.image_mode.set_visible(shown && fill == 3);
         self.gradient_end_row
             .set_visible(self.fill.is_visible() && fill == 2);
         self.gradient_angle
@@ -368,7 +483,10 @@ impl GraphicGroup {
                 row.set_selected(index);
             }
         };
-        match style.fill {
+        if !matches!(style.fill, Some(Fill::Image { .. })) {
+            *self.picture.borrow_mut() = None;
+        }
+        match style.fill.clone() {
             Some(Fill::Color(color)) => {
                 select(&self.fill, 1);
                 set_color(&self.fill_color, color);
@@ -378,6 +496,12 @@ impl GraphicGroup {
                 set_color(&self.fill_color, from);
                 set_color(&self.gradient_end, to);
                 set(&self.gradient_angle, f64::from(angle) / 100.0);
+            }
+            Some(Fill::Image { picture, mode }) => {
+                select(&self.fill, 3);
+                *self.picture.borrow_mut() = Some(picture);
+                let index = IMAGE_FILLS.iter().position(|m| *m == mode).unwrap_or(0);
+                select(&self.image_mode, index as u32);
             }
             _ => {
                 select(&self.fill, 0);

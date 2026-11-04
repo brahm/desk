@@ -95,6 +95,41 @@ impl Painter {
         Some(surface)
     }
 
+    /// Sets a picture as the source, over a rectangle of the page, or
+    /// repeated from it.
+    fn set_picture(
+        &mut self,
+        cr: &Context,
+        picture: &desk_model::Picture,
+        rect: (f32, f32, f32, f32),
+        tile: bool,
+    ) -> Result<(), RenderError> {
+        let Some(surface) = self.picture(picture) else {
+            cr.set_source_rgba(0.0, 0.0, 0.0, 0.0);
+            return Ok(());
+        };
+        let (x, y, w, h) = rect;
+        let pattern = cairo::SurfacePattern::create(&surface);
+        let (sw, sh) = (
+            f64::from(surface.width().max(1)),
+            f64::from(surface.height().max(1)),
+        );
+        let (w, h) = (f64::from(w).max(1e-3), f64::from(h).max(1e-3));
+        // From the page to the pixels of the picture.
+        let mut matrix = Matrix::identity();
+        matrix.scale(sw / w, sh / h);
+        matrix.translate(-f64::from(x), -f64::from(y));
+        pattern.set_matrix(matrix);
+        pattern.set_filter(cairo::Filter::Good);
+        pattern.set_extend(if tile {
+            cairo::Extend::Repeat
+        } else {
+            cairo::Extend::None
+        });
+        cr.set_source(&pattern)?;
+        Ok(())
+    }
+
     fn face(&mut self, font: &FontData) -> Result<FontFace, RenderError> {
         let key = (font.data.id(), font.index);
         if let Some(face) = self.faces.get(&key) {
@@ -264,7 +299,16 @@ impl Painter {
                         }
                     }
                     if let Some(paint) = fill {
-                        set_paint(cr, paint)?;
+                        if let Paint::Image {
+                            picture,
+                            rect,
+                            tile,
+                        } = paint
+                        {
+                            self.set_picture(cr, picture, *rect, *tile)?;
+                        } else {
+                            set_paint(cr, paint)?;
+                        }
                         if stroke.is_some() {
                             cr.fill_preserve()?;
                         } else {
@@ -583,8 +627,10 @@ fn blur_line(line: &[u8], radius: usize, mut out: impl FnMut(usize, u8)) {
 }
 
 fn set_paint(cr: &Context, paint: &Paint) -> Result<(), RenderError> {
-    match *paint {
+    match paint.clone() {
         Paint::Color(color) => set_color(cr, color),
+        // The painter sets a picture, from its surfaces.
+        Paint::Image { .. } => {}
         Paint::Linear {
             start,
             end,

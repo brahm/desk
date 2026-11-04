@@ -422,3 +422,69 @@ fn obj_09_obj_10_obj_11_gradients_line_ends_and_shadows_are_painted() {
     assert_eq!(pixel(162, 148), (0, 0, 0));
     assert_eq!(pixel(100, 148), (255, 255, 255));
 }
+
+#[test]
+fn obj_09_pictures_fill_objects_as_their_mode_says() {
+    use desk_model::{
+        Document, Editor, Fill, Frame, ImageFill, Object, ObjectKind, Picture, Shape, Wrap,
+    };
+    // A red picture, ten pixels square.
+    let png = {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 10, 10).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(1.0, 0.0, 0.0);
+            cr.paint().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        png
+    };
+    let picture = Picture::from_png(png).unwrap();
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            for (y, mode) in [(20.0, ImageFill::ScaleToFit), (120.0, ImageFill::Tile)] {
+                let mut square = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(20.0, y, 100.0, 40.0),
+                );
+                square.style.fill = Some(Fill::Image {
+                    picture: picture.clone(),
+                    mode,
+                });
+                square.wrap = Wrap::Through;
+                edit.add_object(square)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    // Fitted, it is as tall as the square and in its middle.
+    assert_eq!(pixel(70, 40), (255, 0, 0));
+    assert_eq!(pixel(25, 40), (255, 255, 255));
+    // Tiled, it fills it all.
+    assert_eq!(pixel(25, 140), (255, 0, 0));
+    assert_eq!(pixel(115, 155), (255, 0, 0));
+}

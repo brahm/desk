@@ -69,6 +69,8 @@ pub fn read_streams(
                     document.gradients.push(gradient);
                 } else if let Some(marker) = crate::draw::marker(element) {
                     document.markers.push(marker);
+                } else if let Some(image) = crate::draw::fill_image(element) {
+                    document.fill_images.push(image);
                 } else if element.name.is(TEXT, "notes-configuration") {
                     let attr = |ns, name| element.attr(ns, name).map(str::to_owned);
                     document.notes_configuration.push(NotesConfiguration {

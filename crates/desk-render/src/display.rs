@@ -5,7 +5,8 @@
 
 use desk_layout::{DocumentLayout, Page, PlacedBlock, PlacedLine, PlacedObject};
 use desk_model::{
-    BorderSides, Fill, LineEnd, LineStyle, ObjectKind, POLYGON_SCALE, Rgba, Shape, Wrap,
+    BorderSides, Fill, ImageFill, LineEnd, LineStyle, ObjectKind, POLYGON_SCALE, Picture, Rgba,
+    Shape, Wrap,
 };
 use desk_text::FontData;
 
@@ -132,7 +133,7 @@ pub enum Item {
 }
 
 /// What fills a path.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Paint {
     /// One color.
     Color(Rgba),
@@ -148,6 +149,44 @@ pub enum Paint {
         /// The color at the end.
         to: Rgba,
     },
+    /// A picture, at a place and size, and over and over from there when
+    /// it tiles (OBJ-09).
+    Image {
+        /// The picture.
+        picture: Picture,
+        /// Where one copy of it is: left, top, width and height.
+        rect: (f32, f32, f32, f32),
+        /// Whether it repeats beyond that rectangle.
+        tile: bool,
+    },
+}
+
+/// Where a picture that fills a frame lies, as the mode sizes it, a pixel
+/// to a point at its own size (OBJ-09).
+fn image_paint(picture: Picture, mode: ImageFill, frame: (f32, f32, f32, f32)) -> Paint {
+    let (x, y, w, h) = frame;
+    let (pw, ph) = (picture.width() as f32, picture.height() as f32);
+    let centered =
+        |width: f32, height: f32| (x + (w - width) / 2.0, y + (h - height) / 2.0, width, height);
+    let (rect, tile) = match mode {
+        ImageFill::Stretch => ((x, y, w, h), false),
+        ImageFill::ScaleToFill | ImageFill::ScaleToFit => {
+            let (sx, sy) = (w / pw, h / ph);
+            let scale = if mode == ImageFill::ScaleToFill {
+                sx.max(sy)
+            } else {
+                sx.min(sy)
+            };
+            (centered(pw * scale, ph * scale), false)
+        }
+        ImageFill::OriginalSize => (centered(pw, ph), false),
+        ImageFill::Tile => ((x, y, pw, ph), true),
+    };
+    Paint::Image {
+        picture,
+        rect,
+        tile,
+    }
 }
 
 /// One step of a path.
@@ -418,7 +457,7 @@ fn object_item(placed: &PlacedObject) -> Item {
     let (x, y, w, h) = (placed.x, placed.y, placed.width, placed.height);
     let mut list = DisplayList::default();
     let style = &object.style;
-    let fill = style.fill.map(|fill| match fill {
+    let fill = style.fill.clone().map(|fill| match fill {
         Fill::Color(color) => Paint::Color(color),
         Fill::Gradient { from, to, angle } => {
             // Across the frame, through its center, as far as its corners
@@ -434,6 +473,7 @@ fn object_item(placed: &PlacedObject) -> Item {
                 to,
             }
         }
+        Fill::Image { picture, mode } => image_paint(picture, mode, (x, y, w, h)),
         _ => Paint::Color(Rgba::BLACK),
     });
     let stroke = style.stroke.map(|stroke| {

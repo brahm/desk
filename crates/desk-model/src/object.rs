@@ -336,7 +336,7 @@ impl Default for GraphicStyle {
 }
 
 /// What fills an object.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Fill {
     /// One color.
@@ -353,6 +353,31 @@ pub enum Fill {
         /// bottom up.
         angle: i32,
     },
+    /// A picture, sized to the object as the mode says (OBJ-09).
+    Image {
+        /// The picture.
+        picture: Picture,
+        /// How it is sized to the object.
+        mode: ImageFill,
+    },
+}
+
+/// How a picture fills an object, as the Graphic inspector of Pages
+/// offers it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ImageFill {
+    /// As large as the object, on the side that leaves none of it empty,
+    /// and cut on the other.
+    #[default]
+    ScaleToFill,
+    /// As large as the object, on the side that shows all of the picture.
+    ScaleToFit,
+    /// To the size of the object, out of its proportions.
+    Stretch,
+    /// At its own size, in the middle of the object.
+    OriginalSize,
+    /// At its own size, over and over from the top left corner.
+    Tile,
 }
 
 /// The line around an object.

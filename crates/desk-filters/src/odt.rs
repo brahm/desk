@@ -2726,6 +2726,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             pictures: &mut pictures,
             gradients: Vec::new(),
             markers: Vec::new(),
+            fill_images: Vec::new(),
         },
         &mut out,
     );

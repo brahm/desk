@@ -102,6 +102,9 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for marker in &document.markers {
         crate::draw::write_marker(&mut w, marker);
     }
+    for image in &document.fill_images {
+        crate::draw::write_fill_image(&mut w, image);
+    }
     for notes in &document.notes_configuration {
         w.start("text:notes-configuration")
             .attr("text:note-class", &notes.class);
