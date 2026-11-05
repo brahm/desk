@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 use desk_model::{
     Anchor, Document, FIELD_CHARACTER, Field, Fill, Frame, ImageFill, Length, MAX_TEXT_BOX_COLUMNS,
-    NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Shape, Stroke,
-    TextBox, VerticalAlignment, Wrap,
+    Media, NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Repeat,
+    Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
 use desk_odf as odf;
 
@@ -658,6 +658,68 @@ fn kind(
             };
             ObjectKind::Image(picture)
         }
+        odf::DrawKind::Media {
+            href,
+            params,
+            poster,
+            start,
+            stop,
+            poster_time,
+            repeat,
+            duration,
+            ..
+        } => {
+            let file = |href: &str| {
+                let path = href.strip_prefix("./").unwrap_or(href).to_owned();
+                source
+                    .pictures
+                    .iter()
+                    .find(move |(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
+                    .map(|(_, bytes)| bytes)
+            };
+            let Some(mut media) = file(href).and_then(|bytes| Media::from_bytes(bytes.clone()))
+            else {
+                return Ok(None);
+            };
+            media.poster = poster
+                .as_deref()
+                .and_then(file)
+                .and_then(|bytes| crate::picture::picture_within(bytes, MAX_SIDE));
+            let param = |name: &str| {
+                params
+                    .iter()
+                    .find(|(n, _)| n.eq_ignore_ascii_case(name))
+                    .map(|(_, v)| v.as_str())
+            };
+            let millis = |seconds: &Option<String>| {
+                seconds
+                    .as_deref()
+                    .and_then(|s| s.trim().parse::<f64>().ok())
+                    .filter(|s| s.is_finite() && *s >= 0.0)
+                    .map(|s| (s * 1000.0).round().min(f64::from(u32::MAX)) as u32)
+            };
+            media.start = millis(start).unwrap_or(0);
+            media.stop = millis(stop);
+            media.poster_time = millis(poster_time).unwrap_or(0);
+            media.duration = millis(duration);
+            media.repeat = match (repeat.as_deref(), param("Loop")) {
+                (Some("loop"), _) => Repeat::Loop,
+                (Some("back-and-forth"), _) => Repeat::BackAndForth,
+                (Some(_), _) => Repeat::None,
+                (None, Some("true")) => Repeat::Loop,
+                _ => Repeat::None,
+            };
+            // Other programs keep the volume in decibels.
+            let decibels = param("VolumeDB").and_then(|v| v.trim().parse::<f64>().ok());
+            media.volume = match (param("Mute"), decibels) {
+                (Some("true"), _) => 0,
+                (_, Some(db)) if db.is_finite() => {
+                    (10f64.powf(db / 20.0) * 100.0).round().clamp(0.0, 100.0) as u8
+                }
+                _ => 100,
+            };
+            ObjectKind::Media(media)
+        }
         odf::DrawKind::TextBox { paragraphs, .. } => {
             let mut built = Vec::with_capacity(paragraphs.len());
             for p in paragraphs {
@@ -1013,6 +1075,12 @@ pub(super) fn inline_placeholder(id: NodeId) -> String {
     format!("desk-inline-{id}")
 }
 
+/// Milliseconds as seconds, with up to three decimals.
+fn odf_seconds(ms: u32) -> String {
+    let text = format!("{:.3}", f64::from(ms) / 1000.0);
+    text.trim_end_matches('0').trim_end_matches('.').to_owned()
+}
+
 /// The `xml:id` of an object that a connector joins.
 fn shape_id(id: NodeId) -> String {
     format!("desk-object-{id}")
@@ -1257,6 +1325,21 @@ impl Exporter<'_> {
         }
     }
 
+    /// The path of a movie or a sound in the package, added when it is
+    /// not there.
+    fn media(&mut self, media: &Media) -> String {
+        if let Some((href, _)) = self.pictures.iter().find(|(_, b)| b == media.data()) {
+            return href.clone();
+        }
+        let href = format!(
+            "Media/object{}.{}",
+            self.pictures.len() + 1,
+            media.format().extension()
+        );
+        self.pictures.push((href.clone(), media.data().to_vec()));
+        href
+    }
+
     /// The path of a picture in the package, added when it is not there.
     fn picture(&mut self, picture: &desk_model::Picture) -> String {
         if let Some((href, _)) = self.pictures.iter().find(|(_, b)| b == picture.data()) {
@@ -1467,6 +1550,34 @@ impl Exporter<'_> {
             ObjectKind::Image(picture) => odf::DrawKind::Image {
                 href: self.picture(picture),
             },
+            ObjectKind::Media(media) => {
+                let seconds = odf_seconds;
+                let mut params = vec![(
+                    "Loop".to_owned(),
+                    (media.repeat != Repeat::None).to_string(),
+                )];
+                params.push(("Mute".to_owned(), (media.volume == 0).to_string()));
+                if media.volume > 0 {
+                    let db = 20.0 * (f64::from(media.volume.min(100)) / 100.0).log10();
+                    params.push(("VolumeDB".to_owned(), format!("{}", db.round() as i32)));
+                }
+                odf::DrawKind::Media {
+                    href: self.media(media),
+                    // As other programs know a movie or a sound to play.
+                    mime_type: Some("application/vnd.sun.star.media".into()),
+                    params,
+                    poster: media.poster.as_ref().map(|p| self.picture(p)),
+                    start: (media.start > 0).then(|| seconds(media.start)),
+                    stop: media.stop.map(seconds),
+                    poster_time: (media.poster_time > 0).then(|| seconds(media.poster_time)),
+                    repeat: match media.repeat {
+                        Repeat::None => None,
+                        Repeat::Loop => Some("loop".into()),
+                        Repeat::BackAndForth => Some("back-and-forth".into()),
+                    },
+                    duration: media.duration.map(seconds),
+                }
+            }
             ObjectKind::TextBox(text) => {
                 g.padding = Some(odf_length(text.inset));
                 g.textarea_vertical_align = match text.vertical {

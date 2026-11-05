@@ -335,7 +335,7 @@ impl GraphicGroup {
 
     /// Asks for an image file, and fills with its picture.
     fn choose_picture(self: &Rc<Self>) {
-        let filters = crate::bullet_pictures::document_picture_filters();
+        let filters = crate::bullet_pictures::document_picture_filters(false);
         let dialog = gtk::FileDialog::builder()
             .title(tr("Choose an Image to Fill With"))
             .modal(true)

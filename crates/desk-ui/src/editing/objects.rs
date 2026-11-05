@@ -1330,6 +1330,10 @@ impl TextEditor {
             return false;
         }
         if presses > 1 {
+            // A double click on a movie or a sound plays it (OBJ-19).
+            if self.play_media(id) {
+                return true;
+            }
             // A double click on a text box or a shape edits its text
             // (OBJ-08, OBJ-13).
             if self.object_by_id(id).holds_text() {

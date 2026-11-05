@@ -178,6 +178,14 @@ fn picture_type(path: &str) -> &'static str {
         Some("svg") => "image/svg+xml",
         Some("tif" | "tiff") => "image/tiff",
         Some("pdf") => "application/pdf",
+        Some("mov") => "video/quicktime",
+        Some("mp4") => "video/mp4",
+        Some("m4a") => "audio/mp4",
+        Some("mp3") => "audio/mpeg",
+        Some("aif" | "aiff") => "audio/aiff",
+        Some("wav") => "audio/wav",
+        Some("ogg") => "application/ogg",
+        Some("webm") => "video/webm",
         _ => "application/octet-stream",
     }
 }

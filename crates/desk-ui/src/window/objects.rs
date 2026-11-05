@@ -152,11 +152,12 @@ impl DocumentWindow {
         }
     }
 
-    /// Asks for an image or a PDF, and puts it on the page (OBJ-01).
+    /// Asks for an image, a PDF, a movie or a sound, and puts it on the
+    /// page (OBJ-01, OBJ-18).
     fn choose_picture(self: &Rc<Self>) {
-        let filters = crate::bullet_pictures::document_picture_filters();
+        let filters = crate::bullet_pictures::document_picture_filters(true);
         let dialog = gtk::FileDialog::builder()
-            .title(tr("Choose an Image"))
+            .title(tr("Choose an Image, Movie or Sound"))
             .modal(true)
             .filters(&filters)
             .build();
@@ -165,6 +166,19 @@ impl DocumentWindow {
             let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
                 return;
             };
+            if let Some(media) = crate::bullet_pictures::media_from_file(&file) {
+                // A movie stands for itself with its first frame.
+                let weak = Rc::downgrade(&this);
+                crate::media::probe(&media.clone(), 0, move |poster, duration| {
+                    let mut media = media;
+                    media.poster = poster;
+                    media.duration = duration;
+                    if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                        editor.insert_media(media);
+                    }
+                });
+                return;
+            }
             match crate::bullet_pictures::document_picture_from_file(&file) {
                 Some(picture) => {
                     if let Some(editor) = this.editor() {
@@ -178,7 +192,7 @@ impl DocumentWindow {
                             .basename()
                             .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
                     ),
-                    &tr("The file is not an image that Desk can read."),
+                    &tr("The file is not an image, movie or sound that Desk can read."),
                 ),
             }
         });

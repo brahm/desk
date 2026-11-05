@@ -33,6 +33,8 @@ mod layout_pane;
 mod links;
 mod links_pane;
 mod lists_pane;
+mod media;
+mod media_pane;
 mod notes_pane;
 mod objects_pane;
 mod outline_view;
@@ -333,6 +335,8 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         }
     });
 
+    // The files written for playing movies and sounds go with the app.
+    app.connect_shutdown(|_| media::clean_up());
     app.run()
 }
 

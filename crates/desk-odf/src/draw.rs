@@ -319,6 +319,9 @@ impl DrawObject {
     pub fn hrefs(&self) -> Vec<&str> {
         match &self.kind {
             DrawKind::Image { href } => vec![href.as_str()],
+            DrawKind::Media { href, poster, .. } => std::iter::once(href.as_str())
+                .chain(poster.as_deref())
+                .collect(),
             DrawKind::Group(objects) => objects.iter().flat_map(Self::hrefs).collect(),
             _ if !self.text.is_empty() => self
                 .text
@@ -410,6 +413,32 @@ pub enum DrawKind {
     Image {
         /// `xlink:href`: the path of the picture in the package.
         href: String,
+    },
+    /// `draw:frame` with a `draw:plugin` that plays a movie or a sound,
+    /// and the `draw:image` that stands for it.
+    Media {
+        /// `xlink:href` of the plugin: the path of the file in the
+        /// package.
+        href: String,
+        /// `draw:mime-type`.
+        mime_type: Option<String>,
+        /// The `draw:param` children, by `draw:name` and `draw:value`, as
+        /// `Loop` and `VolumeDB`.
+        params: Vec<(String, String)>,
+        /// `xlink:href` of the image: the poster frame.
+        poster: Option<String>,
+        /// `desk:media-start`, `desk:media-stop`, `desk:poster-time` and
+        /// `desk:repeat`: where it starts and stops and the poster frame
+        /// was taken, in seconds, and how it repeats, as Desk plays it.
+        start: Option<String>,
+        /// See `start`.
+        stop: Option<String>,
+        /// See `start`.
+        poster_time: Option<String>,
+        /// See `start`.
+        repeat: Option<String>,
+        /// `desk:duration`: how long it lasts, in seconds, as Desk found.
+        duration: Option<String>,
     },
     /// `draw:frame` with a `draw:text-box`.
     TextBox {
@@ -677,7 +706,31 @@ fn draw_object_at(
             }
         }
         "frame" => {
-            if let Some(image) = e.child(DRAW, "image") {
+            if let Some(plugin) = e.child(DRAW, "plugin") {
+                let text = |ns, name| plugin.attr(ns, name).map(str::to_owned);
+                DrawKind::Media {
+                    href: plugin.attr(XLINK, "href")?.to_owned(),
+                    mime_type: text(DRAW, "mime-type"),
+                    params: plugin
+                        .children_named(DRAW, "param")
+                        .filter_map(|p| {
+                            Some((
+                                p.attr(DRAW, "name")?.to_owned(),
+                                p.attr(DRAW, "value").unwrap_or_default().to_owned(),
+                            ))
+                        })
+                        .collect(),
+                    poster: e
+                        .child(DRAW, "image")
+                        .and_then(|i| i.attr(XLINK, "href"))
+                        .map(str::to_owned),
+                    start: text(DESK, "media-start"),
+                    stop: text(DESK, "media-stop"),
+                    poster_time: text(DESK, "poster-time"),
+                    repeat: text(DESK, "repeat"),
+                    duration: text(DESK, "duration"),
+                }
+            } else if let Some(image) = e.child(DRAW, "image") {
                 DrawKind::Image {
                     href: image.attr(XLINK, "href")?.to_owned(),
                 }
@@ -755,7 +808,7 @@ pub(crate) fn write_draw_object(
         DrawKind::Connector { .. } => "draw:connector",
         DrawKind::Polygon { .. } => "draw:polygon",
         DrawKind::CustomShape { .. } => "draw:custom-shape",
-        DrawKind::Image { .. } | DrawKind::TextBox { .. } => "draw:frame",
+        DrawKind::Image { .. } | DrawKind::Media { .. } | DrawKind::TextBox { .. } => "draw:frame",
         DrawKind::Group(_) => "draw:g",
     };
     w.start(name);
@@ -867,6 +920,49 @@ pub(crate) fn write_draw_object(
                 .attr("xlink:show", "embed")
                 .attr("xlink:actuate", "onLoad")
                 .end();
+        }
+        DrawKind::Media {
+            href,
+            mime_type,
+            params,
+            poster,
+            start,
+            stop,
+            poster_time,
+            repeat,
+            duration,
+        } => {
+            w.start("draw:plugin")
+                .attr("xlink:href", href)
+                .attr("xlink:type", "simple")
+                .attr("xlink:show", "embed")
+                .attr("xlink:actuate", "onLoad");
+            w.attr_opt("draw:mime-type", mime_type.as_deref());
+            for (name, value) in [
+                ("desk:media-start", start),
+                ("desk:media-stop", stop),
+                ("desk:poster-time", poster_time),
+                ("desk:repeat", repeat),
+                ("desk:duration", duration),
+            ] {
+                w.attr_opt(name, value.as_deref());
+            }
+            for (name, value) in params {
+                w.start("draw:param")
+                    .attr("draw:name", name)
+                    .attr("draw:value", value)
+                    .end();
+            }
+            w.end();
+            // What other programs show for it, and print.
+            if let Some(poster) = poster {
+                w.start("draw:image")
+                    .attr("xlink:href", poster)
+                    .attr("xlink:type", "simple")
+                    .attr("xlink:show", "embed")
+                    .attr("xlink:actuate", "onLoad")
+                    .end();
+            }
         }
         DrawKind::TextBox {
             paragraphs,

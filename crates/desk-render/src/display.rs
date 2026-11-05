@@ -621,6 +621,25 @@ fn object_item(placed: &PlacedObject) -> Item {
         ObjectKind::Group(_) => {
             list.items.extend(placed.children.iter().map(object_item));
         }
+        ObjectKind::Media(media) => {
+            match &media.poster {
+                Some(poster) if !media.is_sound() => list.items.push(Item::Image {
+                    picture: poster.clone(),
+                    x,
+                    y,
+                    width: w,
+                    height: h,
+                }),
+                _ => list.items.extend(media_icon(media.is_sound(), x, y, w, h)),
+            }
+            if stroke.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill: None,
+                    stroke,
+                });
+            }
+        }
         _ => {}
     }
     // Rotated counterclockwise around the center, and flipped, on a page
@@ -808,6 +827,80 @@ fn line_items(
     }];
     out.extend(items);
     out
+}
+
+/// What stands for a movie without a poster frame, or for a sound: a dark
+/// frame with a triangle to play it, or a speaker (OBJ-18).
+fn media_icon(sound: bool, x: f32, y: f32, w: f32, h: f32) -> Vec<Item> {
+    use PathOp::{Close, Line, Move};
+    let filled = |path, color| Item::Path {
+        path,
+        fill: Some(Paint::Color(color)),
+        stroke: None,
+    };
+    let (cx, cy) = (x + w / 2.0, y + h / 2.0);
+    let side = w.min(h);
+    if sound {
+        // A speaker with its cone to the right, in the middle.
+        let s = side * 0.8;
+        let (l, t) = (cx - s / 2.0, cy - s / 2.0);
+        let gray = Rgba::rgb(0x55, 0x55, 0x55);
+        return vec![
+            filled(
+                vec![
+                    Move(l + s * 0.1, t + s * 0.35),
+                    Line(l + s * 0.35, t + s * 0.35),
+                    Line(l + s * 0.65, t + s * 0.1),
+                    Line(l + s * 0.65, t + s * 0.9),
+                    Line(l + s * 0.35, t + s * 0.65),
+                    Line(l + s * 0.1, t + s * 0.65),
+                    Close,
+                ],
+                gray,
+            ),
+            Item::Path {
+                path: vec![
+                    Move(l + s * 0.75, t + s * 0.3),
+                    PathOp::Curve(
+                        l + s * 0.85,
+                        t + s * 0.4,
+                        l + s * 0.85,
+                        t + s * 0.6,
+                        l + s * 0.75,
+                        t + s * 0.7,
+                    ),
+                ],
+                fill: None,
+                stroke: Some(PathStroke {
+                    width: (s * 0.06).max(1.0),
+                    color: gray,
+                    dashes: Vec::new(),
+                }),
+            },
+        ];
+    }
+    let r = side * 0.18;
+    vec![
+        filled(
+            vec![
+                Move(x, y),
+                Line(x + w, y),
+                Line(x + w, y + h),
+                Line(x, y + h),
+                Close,
+            ],
+            Rgba::rgb(0x2b, 0x2b, 0x2b),
+        ),
+        filled(
+            vec![
+                Move(cx - r * 0.6, cy - r),
+                Line(cx + r, cy),
+                Line(cx - r * 0.6, cy + r),
+                Close,
+            ],
+            Rgba::rgb(0xee, 0xee, 0xee),
+        ),
+    ]
 }
 
 /// How far the control points of a Bézier curve that draws a quarter of a

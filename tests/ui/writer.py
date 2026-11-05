@@ -446,6 +446,7 @@ def main():
     shadow_of_a_shape(work)
     instant_alpha_of_a_picture(work)
     chosen_picture(work)
+    chosen_movie(work)
     points_of_a_star(work)
     drawn_with_the_pen(work)
     editable_shape(work)
@@ -1059,71 +1060,97 @@ def instant_alpha_of_a_picture(work):
         writer.wait(timeout=10)
 
 
+CHOOSE = "Choose an Image, Movie or Sound"
+
+
+def choose_file(app, path):
+    """Asks Insert, Choose… for a file and picks it in the dialog."""
+    press("Escape", "ctrl+shift+v")
+    wait_for(
+        "the dialog that chooses an image",
+        lambda: next(
+            (n for n in walk(app) if n.get_name() == CHOOSE and showing(n)),
+            None,
+        ),
+    )
+
+    def location():
+        # The entry of the dialog that takes a path, once it has the
+        # keyboard.
+        try:
+            return next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.TEXT
+                    and n.get_state_set().contains(Atspi.StateType.EDITABLE)
+                    and n.get_state_set().contains(Atspi.StateType.FOCUSED)
+                    and showing(n)
+                ),
+                None,
+            )
+        except GLib.GError:
+            return None
+
+    # The dialog takes the keyboard from the display, which has no window
+    # manager to give it.
+    subprocess.run(
+        ["xdotool", "search", "--sync", "--name", CHOOSE, "windowfocus", "--sync"],
+        check=True,
+    )
+    press("ctrl+l")
+    entry = wait_for("the location entry of the dialog", location)
+    Atspi.EditableText.set_text_contents(entry, str(path))
+    wait_for("the path in the dialog", lambda: text_of(entry) == str(path))
+
+    def open_button():
+        # Open of the dialog, and not of the window; Return would search
+        # the recent files when the dialog shows them.
+        try:
+            for n in walk(app):
+                if n.get_role() == Atspi.Role.PUSH_BUTTON and n.get_name() == "Open":
+                    up = n.get_parent()
+                    while up is not None and up.get_name() != CHOOSE:
+                        up = up.get_parent()
+                    if up is not None:
+                        return n
+        except GLib.GError:
+            pass
+        return None
+
+    wait_for("the Open button of the dialog", open_button).do_action(0)
+    time.sleep(1)
+
+
+def showing_named(app, name):
+    """The node of a name that shows, if there is one."""
+    try:
+        return next((n for n in walk(app) if n.get_name() == name and showing(n)), None)
+    except GLib.GError:
+        # A part of a dialog that closed while it was walked.
+        return None
+
+
+def opened_without_portals(work, name):
+    """Opens a document with a shape, with the file dialog of GTK, which is
+    on the accessibility bus with the app, and not the one of a portal."""
+    os.environ["GDK_DEBUG"] = "no-portals"
+    try:
+        return open_with_a_shape(work, name)
+    finally:
+        del os.environ["GDK_DEBUG"]
+
+
 def chosen_picture(work):
     """Insert, Choose… puts a photograph on the page, and it is saved as
     the JPEG it came as (OBJ-01)."""
     photo = work / "photo.jpg"
     photo.write_bytes((ROOT / "crates" / "desk-render" / "tests" / "two-colors.jpg").read_bytes())
-    # The dialog of GTK, which is on the accessibility bus with the app,
-    # and not the one of a portal.
-    os.environ["GDK_DEBUG"] = "no-portals"
+    writer, app, letter = opened_without_portals(work, "Photo.odt")
     try:
-        writer, app, letter = open_with_a_shape(work, "Photo.odt")
-    finally:
-        del os.environ["GDK_DEBUG"]
-    try:
-        press("Escape", "ctrl+shift+v")
-        wait_for(
-            "the dialog that chooses an image",
-            lambda: next(
-                (n for n in walk(app) if n.get_name() == "Choose an Image" and showing(n)),
-                None,
-            ),
-        )
+        choose_file(app, photo)
         check("Insert, Choose… asks for an image", True)
-
-        def location():
-            # The entry of the dialog that takes a path, once it has the
-            # keyboard.
-            try:
-                return next(
-                    (
-                        n
-                        for n in walk(app)
-                        if n.get_role() == Atspi.Role.TEXT
-                        and n.get_state_set().contains(Atspi.StateType.EDITABLE)
-                        and n.get_state_set().contains(Atspi.StateType.FOCUSED)
-                        and showing(n)
-                    ),
-                    None,
-                )
-            except GLib.GError:
-                return None
-
-        # The dialog takes the keyboard from the display, which has no
-        # window manager to give it.
-        subprocess.run(
-            ["xdotool", "search", "--sync", "--name", "Choose an Image", "windowfocus", "--sync"],
-            check=True,
-        )
-        press("ctrl+l")
-        entry = wait_for("the location entry of the dialog", location)
-        Atspi.EditableText.set_text_contents(entry, str(photo))
-        wait_for("the path in the dialog", lambda: text_of(entry) == str(photo))
-        press("Return")
-        time.sleep(1)
-
-        def image_group():
-            try:
-                return next(
-                    (n for n in walk(app) if n.get_name() == "Take Out a Color" and showing(n)),
-                    None,
-                )
-            except GLib.GError:
-                # A part of the dialog that closed while it was walked.
-                return None
-
-        wait_for("the Image group of the Inspector", image_group)
+        wait_for("the Image group of the Inspector", lambda: showing_named(app, "Take Out a Color"))
         check("the chosen picture is on the page and selected", True)
         press("ctrl+s")
         wait_for(
@@ -1133,6 +1160,37 @@ def chosen_picture(work):
         with zipfile.ZipFile(letter) as package:
             name = next(n for n in package.namelist() if n.endswith(".jpg"))
             check("the photograph is saved as it came", package.read(name) == photo.read_bytes())
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def chosen_movie(work):
+    """Insert, Choose… puts a movie on the page with its first frame as its
+    poster, and it is saved with it (OBJ-18, OBJ-19)."""
+    movie = work / "movie.mp4"
+    movie.write_bytes((ROOT / "tests" / "ui" / "fixtures" / "movie.mp4").read_bytes())
+    writer, app, letter = opened_without_portals(work, "Movie.odt")
+    try:
+        choose_file(app, movie)
+        wait_for("the Movie and Sound group of the Inspector", lambda: showing_named(app, "Poster Frame"))
+        check("the chosen movie is on the page and selected (OBJ-18)", True)
+        press("ctrl+s")
+        wait_for(
+            "the saved movie",
+            lambda: saved_content(letter, r'<draw:plugin xlink:href="Media/object\d+\.mp4"'),
+        )
+        with zipfile.ZipFile(letter) as package:
+            name = next(n for n in package.namelist() if n.endswith(".mp4"))
+            check("the movie is saved as it came", package.read(name) == movie.read_bytes())
+        check(
+            "its first frame is saved as its poster (OBJ-19)",
+            saved_content(letter, r'</draw:plugin><draw:image xlink:href="Pictures/object\d+\.png"'),
+        )
+        play = wait_for("the Play button of the Inspector", lambda: showing_named(app, "Play"))
+        play.do_action(0)
+        wait_for("the window that plays the movie", lambda: showing_named(app, "Movie"))
+        check("the Inspector plays the movie (OBJ-19)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

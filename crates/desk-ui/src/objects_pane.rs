@@ -59,6 +59,8 @@ pub struct ObjectGroups {
     picture: Rc<crate::picture_pane::PictureGroup>,
     /// The corners, points, sides, heads and tails of a shape.
     shape: Rc<crate::shape_pane::ShapeGroup>,
+    /// How a movie or a sound plays (OBJ-19).
+    media: Rc<crate::media_pane::MediaGroup>,
     units: Cell<Units>,
     updating: Cell<bool>,
 }
@@ -192,6 +194,7 @@ impl ObjectGroups {
             graphic: crate::graphic_pane::GraphicGroup::new(editor.clone()),
             picture: crate::picture_pane::PictureGroup::new(editor.clone()),
             shape: crate::shape_pane::ShapeGroup::new(editor.clone()),
+            media: crate::media_pane::MediaGroup::new(editor.clone()),
             units: Cell::new(units),
             updating: Cell::new(false),
         });
@@ -337,11 +340,12 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 6] {
+    pub fn groups(&self) -> [&adw::PreferencesGroup; 7] {
         [
             &self.metrics,
             self.shape.group(),
             self.picture.group(),
+            self.media.group(),
             self.graphic.group(),
             &self.wrap_group,
             &self.text_group,
@@ -396,6 +400,7 @@ impl ObjectGroups {
         self.graphic.show(info);
         self.picture.show(info);
         self.shape.show(info);
+        self.media.show(info);
         let Some(info) = info else {
             return;
         };

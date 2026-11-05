@@ -2566,3 +2566,68 @@ fn obj_31_connectors_of_other_programs_join_their_shapes() {
         ((144.0, 108.0), (288.0, 108.0))
     );
 }
+
+#[test]
+fn obj_18_obj_19_movies_and_sounds_are_kept_in_odt_with_how_they_play() {
+    use desk_model::{Anchor, Frame, Media, Object, ObjectKind, Picture, Repeat};
+    let mut mov = vec![0, 0, 0, 20];
+    mov.extend(b"ftypqt  \0\0\0\0qt  moov");
+    let mut movie = Media::from_bytes(mov).unwrap();
+    movie.poster = Picture::from_png(pixel_png());
+    movie.duration = Some(12_000);
+    movie.start = 1_500;
+    movie.stop = Some(9_250);
+    movie.poster_time = 2_000;
+    movie.repeat = Repeat::BackAndForth;
+    movie.volume = 50;
+    let mut sound = Media::from_bytes(b"ID3\x04\0\0\0\0\0\0sound".to_vec()).unwrap();
+    sound.repeat = Repeat::Loop;
+    sound.volume = 0;
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Media", |edit| {
+            for (i, media) in [&movie, &sound].into_iter().enumerate() {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Media(media.clone()),
+                    Frame::from_pt(72.0, 72.0 + 200.0 * i as f64, 160.0, 120.0),
+                );
+                object.anchor = Anchor::Page(0);
+                edit.add_object(object)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("obj-media.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let kinds: Vec<ObjectKind> = read.objects().iter().map(|o| o.kind.clone()).collect();
+    assert_eq!(kinds, [ObjectKind::Media(movie), ObjectKind::Media(sound)]);
+}
+
+#[test]
+fn obj_18_movies_of_other_programs_are_read() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+<office:body><office:text>
+<draw:frame text:anchor-type="page" text:anchor-page-number="1" svg:x="1in" svg:y="1in" svg:width="2in" svg:height="1in"><draw:plugin xlink:href="Media/song.mp3" draw:mime-type="application/vnd.sun.star.media"><draw:param draw:name="Loop" draw:value="true"/><draw:param draw:name="VolumeDB" draw:value="-6"/></draw:plugin></draw:frame>
+<text:p/>
+</office:text></office:body></office:document-content>"##;
+    let mut source = desk_odf::read_streams(content, None, None).unwrap();
+    source
+        .pictures
+        .push(("Media/song.mp3".into(), b"ID3\x04\0\0\0\0\0\0".to_vec()));
+    let document = import(&source).unwrap();
+    let desk_model::ObjectKind::Media(media) = &document.objects().iter().next().unwrap().kind
+    else {
+        panic!();
+    };
+    assert_eq!(
+        (media.repeat, media.volume, media.is_sound()),
+        (desk_model::Repeat::Loop, 50, true)
+    );
+}

@@ -691,3 +691,67 @@ fn obj_01_jpeg_and_pdf_pictures_are_drawn() {
     assert!(images.lines().any(|l| l.contains("jpeg")), "{images}");
     assert_eq!(images.lines().count(), 3, "{images}");
 }
+
+#[test]
+fn obj_18_movies_show_their_poster_and_sounds_a_speaker() {
+    use desk_model::{Document, Editor, Frame, Media, Object, ObjectKind, Picture, Wrap};
+    let poster = {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 4, 3).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(0.0, 1.0, 0.0);
+            cr.paint().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        Picture::from_png(png).unwrap()
+    };
+    let mut mov = vec![0, 0, 0, 20];
+    mov.extend(b"ftypqt  ");
+    let mut movie = Media::from_bytes(mov.clone()).unwrap();
+    movie.poster = Some(poster);
+    let blank = Media::from_bytes(mov).unwrap();
+    let sound = Media::from_bytes(b"ID3\x04\0\0\0\0\0\0".to_vec()).unwrap();
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Media", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            for (media, x, y) in [(movie, 0.0, 0.0), (blank, 100.0, 0.0), (sound, 0.0, 100.0)] {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Media(media),
+                    Frame::from_pt(x, y, 80.0, 80.0),
+                );
+                object.wrap = Wrap::Through;
+                edit.add_object(object)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    // The poster, a dark frame with a light triangle, and a gray speaker.
+    assert_eq!(pixel(40, 40), (0, 255, 0));
+    assert_eq!(pixel(105, 5), (0x2b, 0x2b, 0x2b));
+    assert_eq!(pixel(140, 40), (0xee, 0xee, 0xee));
+    assert_eq!(pixel(30, 140), (0x55, 0x55, 0x55));
+    assert_eq!(pixel(5, 105), (255, 255, 255));
+}
