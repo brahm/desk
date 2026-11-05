@@ -165,7 +165,7 @@ impl Object {
     pub fn holds_text(&self) -> bool {
         match &self.kind {
             ObjectKind::TextBox(_) => true,
-            ObjectKind::Shape(shape) => !matches!(shape, Shape::Line { .. }),
+            ObjectKind::Shape(shape) => !shape.is_line(),
             _ => false,
         }
     }
@@ -302,6 +302,9 @@ pub enum Shape {
         /// Whether the last point joins the first.
         closed: bool,
     },
+    /// A connection line, which joins two objects and follows them
+    /// (OBJ-31).
+    Connection(crate::Connection),
 }
 
 /// A point of a shape drawn with the pen, in parts of [`POLYGON_SCALE`]
@@ -372,6 +375,12 @@ impl Shape {
     /// from its top left corner.
     pub fn outline(&self, width: f64, height: f64) -> Vec<crate::PathSegment> {
         crate::shape_path::outline(self, width, height)
+    }
+
+    /// Whether it is a line, straight or a connection line, which has
+    /// ends and no inside.
+    pub fn is_line(&self) -> bool {
+        matches!(self, Self::Line { .. } | Self::Connection(_))
     }
 
     /// A triangle with its point at the top middle.

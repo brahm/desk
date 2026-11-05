@@ -355,7 +355,7 @@ impl TextEditor {
         let ObjectKind::Shape(shape) = &object.kind else {
             return false;
         };
-        if info.count != 1 || object.locked || matches!(shape, Shape::Line { .. }) {
+        if info.count != 1 || object.locked || shape.is_line() {
             return false;
         }
         if !matches!(shape, Shape::Path { .. }) {
@@ -710,7 +710,7 @@ impl TextEditor {
         let ObjectKind::Shape(shape) = &object.kind else {
             return;
         };
-        if object.locked || matches!(shape, Shape::Line { .. }) {
+        if object.locked || shape.is_line() {
             return;
         }
         let (w, h) = (object.frame.width.to_pt(), object.frame.height.to_pt());

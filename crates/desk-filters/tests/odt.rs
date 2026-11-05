@@ -2483,3 +2483,86 @@ fn obj_09_paths_of_other_programs_are_read() {
         })]
     );
 }
+
+#[test]
+fn obj_31_connection_lines_keep_the_shapes_they_join_in_odt() {
+    use desk_model::{Anchor, Frame, Length, Object, ObjectKind, Shape};
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Connect", |edit| {
+            let mut ends = Vec::new();
+            for (i, shape) in [Shape::Rectangle, Shape::Ellipse].into_iter().enumerate() {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    shape.into(),
+                    Frame::from_pt(72.0 + 216.0 * i as f64, 72.0, 72.0, 72.0),
+                );
+                object.anchor = Anchor::Page(0);
+                ends.push(object.clone());
+                edit.add_object(object)?;
+            }
+            let (frame, mut line) = desk_model::connect(&ends[0], &ends[1]).unwrap();
+            line.bend = Length::from_points(-20);
+            let mut object = Object::new(edit.new_id(), Shape::Connection(line).into(), frame);
+            object.anchor = Anchor::Page(0);
+            object.style.fill = None;
+            edit.add_object(object)
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let bytes = write_odt(&document).unwrap();
+    keep("obj-connection.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let objects: Vec<&Object> = read.objects().iter().collect();
+    let ObjectKind::Shape(Shape::Connection(line)) = &objects[2].kind else {
+        panic!("{:?}", objects[2].kind);
+    };
+    assert_eq!(
+        (line.start, line.end, line.bend),
+        (
+            Some(objects[0].id),
+            Some(objects[1].id),
+            Length::from_points(-20)
+        )
+    );
+    let ends = |o: &Object| {
+        let ObjectKind::Shape(Shape::Connection(c)) = &o.kind else {
+            panic!();
+        };
+        let ((ax, ay), (bx, by)) = c.ends_on(&o.frame);
+        [ax, ay, bx, by].map(|v| v.round() as i64)
+    };
+    assert_eq!(
+        ends(objects[2]),
+        ends(&document.objects().iter().nth(2).unwrap().clone())
+    );
+}
+
+#[test]
+fn obj_31_connectors_of_other_programs_join_their_shapes() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+<office:body><office:text>
+<draw:rect xml:id="id1" draw:id="id1" text:anchor-type="page" text:anchor-page-number="1" svg:x="1in" svg:y="1in" svg:width="1in" svg:height="1in"/>
+<draw:ellipse draw:id="id2" text:anchor-type="page" text:anchor-page-number="1" svg:x="4in" svg:y="1in" svg:width="1in" svg:height="1in"/>
+<draw:connector draw:type="standard" text:anchor-type="page" text:anchor-page-number="1" draw:start-shape="id1" draw:end-shape="id2" svg:x1="2in" svg:y1="1.5in" svg:x2="4in" svg:y2="1.5in"/>
+<text:p/>
+</office:text></office:body></office:document-content>"##;
+    let document = import(&desk_odf::read_streams(content, None, None).unwrap()).unwrap();
+    let objects: Vec<&desk_model::Object> = document.objects().iter().collect();
+    let desk_model::ObjectKind::Shape(desk_model::Shape::Connection(line)) = &objects[2].kind
+    else {
+        panic!("{:?}", objects[2].kind);
+    };
+    assert_eq!(
+        (line.start, line.end),
+        (Some(objects[0].id), Some(objects[1].id))
+    );
+    assert_eq!(
+        line.ends_on(&objects[2].frame),
+        ((144.0, 108.0), (288.0, 108.0))
+    );
+}

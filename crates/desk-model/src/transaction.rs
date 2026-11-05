@@ -558,6 +558,7 @@ impl Document {
             inverse: Vec::new(),
         };
         let value = edits(&mut edit)?;
+        edit.follow_connections()?;
         *self = edit.doc;
         let transaction = Transaction {
             name: name.into(),

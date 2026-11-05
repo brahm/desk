@@ -156,6 +156,11 @@ impl Edit {
             renumber(self, &mut text)?;
             *copy.text_box_mut().expect("it has text") = text;
         }
+        // A copy of a connection line joins nothing until it is joined.
+        if let crate::ObjectKind::Shape(crate::Shape::Connection(line)) = &mut copy.kind {
+            line.start = None;
+            line.end = None;
+        }
         if let crate::ObjectKind::Group(members) = &copy.kind {
             let members = members
                 .iter()

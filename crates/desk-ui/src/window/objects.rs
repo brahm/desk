@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The shapes and text boxes of the Insert menu, and the Arrange menu of
-//! Pages, for the selected objects (OBJ-03 to OBJ-08, OBJ-13).
+//! The shapes, text boxes and connection lines of the Insert menu, and
+//! the Arrange menu of Pages, for the selected objects (OBJ-03 to OBJ-08,
+//! OBJ-13, OBJ-31).
 
 use std::rc::Rc;
 
@@ -15,8 +16,9 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::tr;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 20] = [
+pub(super) const OBJECT_ACTIONS: [&str; 21] = [
     "insert-picture",
+    "insert-connection",
     "draw-with-pen",
     "make-editable",
     "smooth-path",
@@ -58,8 +60,9 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 16] = [
+        let simple: [(&str, EditorAction); 17] = [
             ("insert-text-box", |e| e.insert_shape(NewShape::TextBox)),
+            ("insert-connection", TextEditor::insert_connection),
             ("draw-with-pen", TextEditor::start_pen),
             ("make-editable", |e| {
                 e.make_editable();
@@ -211,6 +214,8 @@ pub(super) fn shapes_menu() -> gio::Menu {
     }
     shapes.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
     menu.append_submenu(Some(&tr("_Shape")), &shapes);
+    // Joins the two selected objects (OBJ-31).
+    menu.append(Some(&tr("Connection L_ine")), Some("win.insert-connection"));
     menu
 }
 

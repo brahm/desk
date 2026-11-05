@@ -187,6 +187,7 @@ pub(crate) fn outline(shape: &Shape, w: f64, h: f64) -> Vec<PathSegment> {
             }
             path
         }
+        Shape::Connection(connection) => crate::connection::outline(connection, w, h),
         Shape::Balloon { radius, body, tip } => {
             let body_h = h * part(*body).clamp(0.1, 1.0);
             let r = radius.to_pt().clamp(0.0, w.min(body_h) / 2.0);

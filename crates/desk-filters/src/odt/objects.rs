@@ -592,6 +592,12 @@ fn kind(
                 rising: left.1.0 > right.1.0,
             })
         }
+        odf::DrawKind::Connector { .. } => {
+            let Some((_, line)) = connector_line(object) else {
+                return Ok(None);
+            };
+            ObjectKind::Shape(Shape::Connection(line))
+        }
         odf::DrawKind::Polygon { points, view_box } => {
             let (x, y, w, h) = view_box.unwrap_or_else(|| {
                 let xs = points.iter().map(|p| p.0);
@@ -685,10 +691,43 @@ fn kind(
     }))
 }
 
+/// The line of a connector, as it joins nothing yet, with its frame, or
+/// none for another object.
+fn connector_line(object: &odf::DrawObject) -> Option<(Frame, desk_model::Connection)> {
+    let odf::DrawKind::Connector {
+        x1,
+        y1,
+        x2,
+        y2,
+        bend,
+        ..
+    } = &object.kind
+    else {
+        return None;
+    };
+    let bend = bend.map_or(Length::ZERO, length);
+    Some(desk_model::Connection::between(
+        (x1.0, y1.0),
+        (x2.0, y2.0),
+        bend,
+        None,
+        None,
+    ))
+}
+
 /// The frame and rotation of an object, as it says them: its position
 /// and size, or the box of a line, and the rotation and translation of
 /// its transform, about its corner.
 fn placement(object: &odf::DrawObject) -> (f64, f64, f64, f64, i32) {
+    if let Some((frame, _)) = connector_line(object) {
+        return (
+            frame.x.to_pt(),
+            frame.y.to_pt(),
+            frame.width.to_pt(),
+            frame.height.to_pt(),
+            0,
+        );
+    }
     if let odf::DrawKind::Line { x1, y1, x2, y2 } = &object.kind {
         return (
             x1.0.min(x2.0),
@@ -974,6 +1013,11 @@ pub(super) fn inline_placeholder(id: NodeId) -> String {
     format!("desk-inline-{id}")
 }
 
+/// The `xml:id` of an object that a connector joins.
+fn shape_id(id: NodeId) -> String {
+    format!("desk-object-{id}")
+}
+
 /// The `draw:name` of a text box, which the boxes linked to it name.
 fn text_box_name(id: NodeId) -> String {
     format!("Text Box {id}")
@@ -998,10 +1042,24 @@ pub(super) fn import_objects(
     // The frames by name, and the text boxes that go on in another.
     let mut names: HashMap<&str, NodeId> = HashMap::new();
     let mut links: Vec<(NodeId, &str)> = Vec::new();
+    // The shapes by id, and the connectors that join them (OBJ-31).
+    let mut shapes: HashMap<&str, NodeId> = HashMap::new();
+    let mut connectors: Vec<(NodeId, Option<&str>, Option<&str>)> = Vec::new();
     for (object, anchor) in found {
         if let Some(built) = import_one(source, document, object, anchor, &setup, paragraph, 0)? {
             if let Some(name) = &object.name {
                 names.insert(name, built.id);
+            }
+            if let Some(id) = &object.id {
+                shapes.insert(id, built.id);
+            }
+            if let odf::DrawKind::Connector {
+                start_shape,
+                end_shape,
+                ..
+            } = &object.kind
+            {
+                connectors.push((built.id, start_shape.as_deref(), end_shape.as_deref()));
             }
             if let odf::DrawKind::TextBox {
                 chain_next: Some(next),
@@ -1033,6 +1091,25 @@ pub(super) fn import_objects(
             && next != id
         {
             text.next = Some(next);
+            document.apply(Op::ReplaceObject { object })?;
+        }
+    }
+    for (id, start, end) in connectors {
+        let Some(mut object) = document.objects().get(id).cloned() else {
+            continue;
+        };
+        let joined = |name: Option<&str>| {
+            let other = *shapes.get(name?)?;
+            let target = document.objects().get(other)?;
+            (other != id && target.anchor == object.anchor && target.anchor != Anchor::InText)
+                .then_some(other)
+        };
+        let (start, end) = (joined(start), joined(end));
+        if let ObjectKind::Shape(Shape::Connection(line)) = &mut object.kind
+            && (start.is_some() || end.is_some())
+        {
+            line.start = start;
+            line.end = end;
             document.apply(Op::ReplaceObject { object })?;
         }
     }
@@ -1344,6 +1421,42 @@ impl Exporter<'_> {
                     y2: odf::Length(y2),
                 }
             }
+            ObjectKind::Shape(Shape::Connection(line)) => {
+                let (a, b) = line.ends_in(w, h);
+                let joined = |end: Option<NodeId>| {
+                    end.filter(|id| self.document.objects().get(*id).is_some())
+                        .map(shape_id)
+                };
+                let bent = line.bend != Length::ZERO;
+                // The way it goes, in hundredths of a point on the page,
+                // as ODF wants a path beside its ends.
+                let unit = |v: f64| (v * 100.0).round();
+                let (start, end) = ((x + a.0, y + a.1), (x + b.0, y + b.1));
+                let way = match desk_model::bent_controls(start, end, line.bend.to_pt()) {
+                    Some((c1, c2)) => format!(
+                        "C {} {} {} {} {} {}",
+                        unit(c1.0),
+                        unit(c1.1),
+                        unit(c2.0),
+                        unit(c2.1),
+                        unit(end.0),
+                        unit(end.1)
+                    ),
+                    None => format!("L {} {}", unit(end.0), unit(end.1)),
+                };
+                odf::DrawKind::Connector {
+                    view_box: Some((unit(x), unit(y), unit(w).max(1.0), unit(h).max(1.0))),
+                    path: Some(format!("M {} {} {way}", unit(start.0), unit(start.1))),
+                    x1: odf::Length(x + a.0),
+                    y1: odf::Length(y + a.1),
+                    x2: odf::Length(x + b.0),
+                    y2: odf::Length(y + b.1),
+                    start_shape: joined(line.start),
+                    end_shape: joined(line.end),
+                    line_type: Some(if bent { "curve" } else { "line" }.into()),
+                    bend: bent.then(|| odf_length(line.bend)),
+                }
+            }
             ObjectKind::Shape(
                 shape @ (Shape::Star { .. }
                 | Shape::RegularPolygon { .. }
@@ -1419,6 +1532,13 @@ impl Exporter<'_> {
         if linked {
             // Named, for the boxes linked to it to name it.
             out.name = Some(text_box_name(object.id));
+        }
+        if self.document.objects().iter().any(|line| {
+            matches!(&line.kind, ObjectKind::Shape(Shape::Connection(c))
+                if c.start == Some(object.id) || c.end == Some(object.id))
+        }) {
+            // With an id, for the connectors that join it to name it.
+            out.id = Some(shape_id(object.id));
         }
         out.anchor = page.map(|_| "page").or(Some(anchor)).map(str::to_owned);
         out.anchor_page = page.map(|p| p + 1);

@@ -516,6 +516,23 @@ fn object_item(placed: &PlacedObject) -> Item {
                 list.items.extend(line_items(
                     (x, y0),
                     (x + w, y1),
+                    None,
+                    stroke,
+                    model.start,
+                    model.end,
+                ));
+            }
+        }
+        ObjectKind::Shape(Shape::Connection(line)) => {
+            let (a, b) = line.ends_in(f64::from(w), f64::from(h));
+            let at = |(px, py): (f64, f64)| (x + px as f32, y + py as f32);
+            let controls =
+                desk_model::bent_controls(a, b, line.bend.to_pt()).map(|(c1, c2)| (at(c1), at(c2)));
+            if let (Some(stroke), Some(model)) = (stroke, style.stroke) {
+                list.items.extend(line_items(
+                    at(a),
+                    at(b),
+                    controls,
                     stroke,
                     model.start,
                     model.end,
@@ -668,16 +685,24 @@ fn object_item(placed: &PlacedObject) -> Item {
 fn line_items(
     from: (f32, f32),
     to: (f32, f32),
+    controls: Option<((f32, f32), (f32, f32))>,
     stroke: PathStroke,
     start: LineEnd,
     end: LineEnd,
 ) -> Vec<Item> {
-    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
-    let length = (dx * dx + dy * dy).sqrt();
-    let (ux, uy) = if length > 0.0 {
-        (dx / length, dy / length)
-    } else {
-        (1.0, 0.0)
+    // The way out of each end, along the curve when it is bent.
+    let unit = |from: (f32, f32), to: (f32, f32)| {
+        let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+        let length = (dx * dx + dy * dy).sqrt();
+        if length > 0.0 {
+            (dx / length, dy / length)
+        } else {
+            (1.0, 0.0)
+        }
+    };
+    let (start_way, end_way) = match controls {
+        Some((c1, c2)) => (unit(from, c1), unit(c2, to)),
+        None => (unit(from, to), unit(from, to)),
     };
     // As large as Pages draws them beside a line of a width.
     let size = (stroke.width * 3.0).max(6.0);
@@ -770,10 +795,14 @@ fn line_items(
             }
         }
     };
-    let a = ends(from, (-ux, -uy), start);
-    let b = ends(to, (ux, uy), end);
+    let a = ends(from, (-start_way.0, -start_way.1), start);
+    let b = ends(to, end_way, end);
+    let way = match controls {
+        Some((c1, c2)) => PathOp::Curve(c1.0, c1.1, c2.0, c2.1, b.0, b.1),
+        None => PathOp::Line(b.0, b.1),
+    };
     let mut out = vec![Item::Path {
-        path: vec![PathOp::Move(a.0, a.1), PathOp::Line(b.0, b.1)],
+        path: vec![PathOp::Move(a.0, a.1), way],
         fill: None,
         stroke: Some(stroke),
     }];

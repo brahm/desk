@@ -29,7 +29,7 @@ use super::TextEditor;
 use crate::view::{Guide, ObjectMark};
 
 /// How near the pointer has to be to a handle or a line, in pixels.
-const REACH: f64 = 5.0;
+pub(super) const REACH: f64 = 5.0;
 /// How near an edge has to be to another for a drag to snap it, in
 /// pixels.
 const SNAP: f64 = 6.0;
@@ -51,6 +51,8 @@ pub(super) enum Handle {
     Start,
     /// The end of a line, at the right of its frame.
     End,
+    /// The middle of a connection line, which bends it.
+    Bend,
 }
 
 const BOX_HANDLES: [Handle; 8] = [
@@ -82,9 +84,27 @@ fn line_ends(placed: &PlacedObject, rising: bool) -> ((f32, f32), (f32, f32)) {
     }
 }
 
+/// The start, middle and end of a connection line, in the coordinates of
+/// its frame.
+pub(super) fn connection_spots(placed: &PlacedObject) -> Option<[(f32, f32); 3]> {
+    let ObjectKind::Shape(Shape::Connection(line)) = &placed.object.kind else {
+        return None;
+    };
+    let (a, b) = line.ends_in(f64::from(placed.width), f64::from(placed.height));
+    let middle = desk_model::bent_middle(a, b, line.bend.to_pt());
+    Some([a, middle, b].map(|(x, y)| (x as f32, y as f32)))
+}
+
 /// Where a handle is, in the coordinates of the frame.
 fn handle_spot(placed: &PlacedObject, handle: Handle) -> (f32, f32) {
     let (w, h) = (placed.width, placed.height);
+    if let Some([start, middle, end]) = connection_spots(placed) {
+        return match handle {
+            Handle::Start => start,
+            Handle::End => end,
+            _ => middle,
+        };
+    }
     let rising = line(&placed.object).unwrap_or(false);
     let (start, end) = line_ends(placed, rising);
     match handle {
@@ -98,12 +118,15 @@ fn handle_spot(placed: &PlacedObject, handle: Handle) -> (f32, f32) {
         Handle::Left => (0.0, h / 2.0),
         Handle::Start => start,
         Handle::End => end,
+        Handle::Bend => (w / 2.0, h / 2.0),
     }
 }
 
 /// The handles of an object, with where they are on the page.
 pub(super) fn handles(placed: &PlacedObject) -> Vec<(Handle, (f32, f32))> {
-    let list: &[Handle] = if line(&placed.object).is_some() {
+    let list: &[Handle] = if connection_spots(placed).is_some() {
+        &[Handle::Start, Handle::Bend, Handle::End]
+    } else if line(&placed.object).is_some() {
         &[Handle::Start, Handle::End]
     } else {
         &BOX_HANDLES
@@ -124,6 +147,21 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
     };
     let (w, h) = (placed.width, placed.height);
     let outline = match line(&placed.object) {
+        _ if connection_spots(placed).is_some() => {
+            let segments = match &placed.object.kind {
+                ObjectKind::Shape(shape) => {
+                    desk_model::flattened(&shape.outline(f64::from(w), f64::from(h)))
+                }
+                _ => Vec::new(),
+            };
+            let last = segments.last().map(|s| s.1);
+            segments
+                .iter()
+                .map(|s| s.0)
+                .chain(last)
+                .map(|(x, y)| to_page((x as f32, y as f32)))
+                .collect()
+        }
         Some(rising) => {
             let (a, b) = line_ends(placed, rising);
             vec![to_page(a), to_page(b)]
@@ -135,6 +173,7 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
     };
     ObjectMark {
         page,
+        closed: outline.len() > 2 && connection_spots(placed).is_none(),
         outline,
         handles: handles(placed)
             .into_iter()
@@ -934,7 +973,7 @@ impl TextEditor {
                     .collect();
                 object.kind = ObjectKind::Group(members.into());
             } else {
-                let line = matches!(object.kind, ObjectKind::Shape(Shape::Line { .. }));
+                let line = matches!(&object.kind, ObjectKind::Shape(shape) if shape.is_line());
                 change(&mut object.style, line);
             }
         }
@@ -1266,6 +1305,9 @@ impl TextEditor {
             (grabbed, hit(&state.layout, page, px, py, reach))
         };
         if let Some((id, handle)) = grabbed {
+            if self.start_connection_drag(id, handle, page) {
+                return true;
+            }
             let kind = if control && line(&self.object_by_id(id)).is_none() {
                 DragKind::Rotate
             } else {
