@@ -162,6 +162,31 @@ pub(crate) fn outline(shape: &Shape, w: f64, h: f64) -> Vec<PathSegment> {
                 ])
             }
         }
+        Shape::Path { points, closed } => {
+            let at = |(x, y): (i32, i32)| (w * part(x), h * part(y));
+            let mut path = Vec::new();
+            let Some(first) = points.first() else {
+                return path;
+            };
+            let (x, y) = at(first.at);
+            path.push(Move(x, y));
+            let pairs = points.windows(2).map(|p| (p[0], p[1]));
+            let back = (*closed && points.len() > 2).then(|| (points[points.len() - 1], *first));
+            for (from, to) in pairs.chain(back) {
+                let (x, y) = at(to.at);
+                if from.after.is_some() || to.before.is_some() {
+                    let (ax, ay) = at(from.after.unwrap_or(from.at));
+                    let (bx, by) = at(to.before.unwrap_or(to.at));
+                    path.push(Curve(ax, ay, bx, by, x, y));
+                } else {
+                    path.push(Line(x, y));
+                }
+            }
+            if *closed {
+                path.push(Close);
+            }
+            path
+        }
         Shape::Balloon { radius, body, tip } => {
             let body_h = h * part(*body).clamp(0.1, 1.0);
             let r = radius.to_pt().clamp(0.0, w.min(body_h) / 2.0);
@@ -250,6 +275,43 @@ mod tests {
         }
         .outline(200.0, 100.0);
         assert!(corners(&double).contains(&(100, 0)));
+    }
+
+    #[test]
+    fn obj_09_obj_10_paths_join_their_points_with_lines_and_curves() {
+        use crate::PathPoint;
+        let curve = PathPoint {
+            at: (10_000, 0),
+            before: Some((5_000, 0)),
+            after: None,
+        };
+        let points = [
+            PathPoint::corner(0, 0),
+            curve,
+            PathPoint::corner(10_000, 10_000),
+        ];
+        let open = Shape::Path {
+            points: points.as_slice().into(),
+            closed: false,
+        }
+        .outline(100.0, 50.0);
+        assert_eq!(
+            open,
+            [
+                PathSegment::Move(0.0, 0.0),
+                PathSegment::Curve(0.0, 0.0, 50.0, 0.0, 100.0, 0.0),
+                PathSegment::Line(100.0, 50.0),
+            ]
+        );
+        let closed = Shape::Path {
+            points: points.as_slice().into(),
+            closed: true,
+        }
+        .outline(100.0, 50.0);
+        assert_eq!(
+            &closed[3..],
+            [PathSegment::Line(0.0, 0.0), PathSegment::Close]
+        );
     }
 
     #[test]

@@ -96,7 +96,7 @@ jobs:
       - name: Install GTK, Libadwaita, a display and AT-SPI
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us
+          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Drive Desk Writer as a screen reader sees it

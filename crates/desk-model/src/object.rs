@@ -294,6 +294,43 @@ pub enum Shape {
         /// of the width of the frame.
         tip: u16,
     },
+    /// A shape drawn with the pen, by its points, open or closed
+    /// (OBJ-09, OBJ-10).
+    Path {
+        /// The points, in order.
+        points: Arc<[PathPoint]>,
+        /// Whether the last point joins the first.
+        closed: bool,
+    },
+}
+
+/// A point of a shape drawn with the pen, in parts of [`POLYGON_SCALE`]
+/// of the frame from its top left corner, as its handles are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PathPoint {
+    /// Where the point is.
+    pub at: (i32, i32),
+    /// The handle of the curve that comes into the point, or none at a
+    /// corner.
+    pub before: Option<(i32, i32)>,
+    /// The handle of the curve that leaves it.
+    pub after: Option<(i32, i32)>,
+}
+
+impl PathPoint {
+    /// A corner at a point.
+    pub fn corner(x: i32, y: i32) -> Self {
+        Self {
+            at: (x, y),
+            before: None,
+            after: None,
+        }
+    }
+
+    /// Whether the curves through the point are smooth, with handles.
+    pub fn is_curve(&self) -> bool {
+        self.before.is_some() || self.after.is_some()
+    }
 }
 
 /// The most points of a star and sides of a polygon.

@@ -395,6 +395,9 @@ fn parametric_shape(shape: &Shape, w: f64, h: f64) -> odf::DrawKind {
         Shape::Balloon { radius, body, tip } => {
             format!("balloon {} {body} {tip}", radius.to_pt())
         }
+        Shape::Path { closed, .. } => {
+            format!("path {}", if closed { "closed" } else { "open" })
+        }
         _ => String::new(),
     };
     odf::DrawKind::CustomShape {
@@ -403,6 +406,100 @@ fn parametric_shape(shape: &Shape, w: f64, h: f64) -> odf::DrawKind {
         path: Some(path.join(" ")),
         desk_shape: Some(settings),
     }
+}
+
+/// A shape drawn with the pen from an `draw:enhanced-path` in the units
+/// of its view box, or none when the path is not one of plain numbers in
+/// `M`, `L`, `C` and `Z`, or has fewer than two points (OBJ-09).
+fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> Option<Shape> {
+    let tokens: Vec<&str> = path.split_whitespace().collect();
+    let mut flat: Vec<(char, Vec<f64>)> = Vec::new();
+    let mut i = 0;
+    while i < tokens.len() {
+        let command = tokens[i].chars().next()?;
+        i += 1;
+        let count = match command {
+            'M' | 'L' => 2,
+            'C' => 6,
+            'Z' | 'N' | 'F' | 'S' => 0,
+            _ => return None,
+        };
+        // A command repeats while numbers follow it.
+        loop {
+            let values: Vec<f64> = tokens
+                .get(i..i + count)?
+                .iter()
+                .map(|t| t.parse().ok())
+                .collect::<Option<_>>()?;
+            i += count;
+            flat.push((command, values));
+            let more = tokens.get(i).is_some_and(|t| t.parse::<f64>().is_ok());
+            if count == 0 || !more {
+                break;
+            }
+        }
+    }
+    // The view box, or the box of the points.
+    let all = || {
+        flat.iter()
+            .flat_map(|(_, v)| v.as_chunks::<2>().0.iter().copied())
+    };
+    let (x0, y0, w, h) = view_box.unwrap_or_else(|| {
+        let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+        for [x, y] in all() {
+            (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+        }
+        (x0, y0, x1 - x0, y1 - y0)
+    });
+    let scale = f64::from(POLYGON_SCALE);
+    let at = |x: f64, y: f64| {
+        let part = |v: f64, origin: f64, size: f64| {
+            if size > 0.0 {
+                ((v - origin) / size * scale).round() as i32
+            } else {
+                0
+            }
+        };
+        (part(x, x0, w), part(y, y0, h))
+    };
+    let mut points: Vec<desk_model::PathPoint> = Vec::new();
+    let mut closed = false;
+    for (command, v) in &flat {
+        match command {
+            'M' | 'L' if command == &'L' || points.is_empty() => {
+                let (x, y) = at(v[0], v[1]);
+                points.push(desk_model::PathPoint::corner(x, y));
+            }
+            'C' => {
+                // A handle on its point is no handle: a corner.
+                let handle = |p: (i32, i32), of: (i32, i32)| (p != of).then_some(p);
+                let last = points.last_mut()?;
+                last.after = handle(at(v[0], v[1]), last.at);
+                let to = at(v[4], v[5]);
+                points.push(desk_model::PathPoint {
+                    at: to,
+                    before: handle(at(v[2], v[3]), to),
+                    after: None,
+                });
+            }
+            'Z' => {
+                closed = true;
+                break;
+            }
+            // Only the first part of a path that has several.
+            'M' => break,
+            _ => {}
+        }
+    }
+    // A closed path that ends where it starts ends on its first point.
+    if closed && points.len() > 1 && points[0].at == points[points.len() - 1].at {
+        let last = points.pop()?;
+        points[0].before = last.before;
+    }
+    (points.len() >= 2).then(|| Shape::Path {
+        points: points.into(),
+        closed,
+    })
 }
 
 /// The shape that `desk:shape` gives, or none when it is not one.
@@ -529,13 +626,20 @@ fn kind(
             ObjectKind::Shape(Shape::Polygon(Arc::from(points)))
         }
         odf::DrawKind::CustomShape {
-            shape, desk_shape, ..
-        } => ObjectKind::Shape(
-            desk_shape
-                .as_deref()
-                .and_then(desk_shape_of)
-                .unwrap_or_else(|| custom_shape(shape)),
-        ),
+            shape,
+            desk_shape,
+            view_box,
+            path,
+        } => {
+            let drawn = || path.as_deref().and_then(|p| path_shape(p, *view_box));
+            ObjectKind::Shape(match desk_shape.as_deref() {
+                Some(s) if s.starts_with("path") => drawn().unwrap_or(Shape::Rectangle),
+                Some(s) => desk_shape_of(s).unwrap_or_else(|| custom_shape(shape)),
+                // A shape that other programs drew by its path.
+                None if shape == "non-primitive" => drawn().unwrap_or(Shape::Rectangle),
+                None => custom_shape(shape),
+            })
+        }
         odf::DrawKind::Image { href } => {
             let path = href.strip_prefix("./").unwrap_or(href);
             let Some(picture) = source
@@ -1244,7 +1348,8 @@ impl Exporter<'_> {
                 shape @ (Shape::Star { .. }
                 | Shape::RegularPolygon { .. }
                 | Shape::Arrow { .. }
-                | Shape::Balloon { .. }),
+                | Shape::Balloon { .. }
+                | Shape::Path { .. }),
             ) => parametric_shape(shape, w, h),
             ObjectKind::Image(picture) => odf::DrawKind::Image {
                 href: self.picture(picture),

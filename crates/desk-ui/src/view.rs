@@ -49,6 +49,7 @@ struct State {
     objects: Vec<ObjectMark>,
     /// The alignment guides that a drag of objects snaps to (OBJ-05).
     guides: Vec<Guide>,
+    path: Option<PathMark>,
 }
 
 /// A selected object, drawn over the pages: its outline and its handles,
@@ -64,6 +65,20 @@ pub struct ObjectMark {
     pub handles: Vec<(f64, f64)>,
     /// Whether it is locked, which its handles show.
     pub locked: bool,
+}
+
+/// A shape being drawn with the pen or having its points edited: its
+/// outline, its points and the handles of its curves (OBJ-09, OBJ-10).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PathMark {
+    /// The page it is on.
+    pub page: usize,
+    /// The outline, in points on the page.
+    pub outline: Vec<desk_model::PathSegment>,
+    /// Where its points are, and whether each is selected.
+    pub points: Vec<((f64, f64), bool)>,
+    /// The handles of its curves, from their point.
+    pub handles: Vec<((f64, f64), (f64, f64))>,
 }
 
 /// An alignment guide, from one point of a page to another.
@@ -134,6 +149,7 @@ impl DocumentView {
             backdrop: None,
             objects: Vec::new(),
             guides: Vec::new(),
+            path: None,
             squiggles: Vec::new(),
         }));
         let view = Self {
@@ -207,6 +223,15 @@ impl DocumentView {
             state.objects = objects;
             state.guides = guides;
         }
+        self.area.queue_draw();
+    }
+
+    /// Shows a shape being drawn with the pen or edited, or none.
+    pub fn set_path_mark(&self, mark: Option<PathMark>) {
+        if self.state.borrow().path == mark {
+            return;
+        }
+        self.state.borrow_mut().path = mark;
         self.area.queue_draw();
     }
 
@@ -770,6 +795,56 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
                 cr.set_source_rgb(0.21, 0.52, 0.89);
                 cr.stroke().ok();
             }
+        }
+    }
+    if let Some(mark) = state.path.as_ref().filter(|m| m.page == page) {
+        use desk_model::PathSegment;
+        cr.set_source_rgb(0.21, 0.52, 0.89);
+        for segment in &mark.outline {
+            match *segment {
+                PathSegment::Move(x, y) => {
+                    let (x, y) = at((x, y));
+                    cr.move_to(x, y);
+                }
+                PathSegment::Line(x, y) => {
+                    let (x, y) = at((x, y));
+                    cr.line_to(x, y);
+                }
+                PathSegment::Curve(ax, ay, bx, by, x, y) => {
+                    let (ax, ay) = at((ax, ay));
+                    let (bx, by) = at((bx, by));
+                    let (x, y) = at((x, y));
+                    cr.curve_to(ax, ay, bx, by, x, y);
+                }
+                PathSegment::Close => cr.close_path(),
+            }
+        }
+        cr.stroke().ok();
+        // The handles, in gray, with a dot at their end.
+        cr.set_source_rgb(0.45, 0.45, 0.45);
+        for &(from, to) in &mark.handles {
+            let (x0, y0) = at(from);
+            let (x1, y1) = at(to);
+            cr.move_to(x0, y0);
+            cr.line_to(x1, y1);
+            cr.stroke().ok();
+            cr.arc(x1, y1, 2.5, 0.0, std::f64::consts::TAU);
+            cr.fill().ok();
+        }
+        // The points, in red as Pages shows them, filled when selected.
+        const HALF: f64 = 3.0;
+        for &(point, selected) in &mark.points {
+            let (x, y) = at(point);
+            let (x, y) = (x.round() + 0.5, y.round() + 0.5);
+            cr.rectangle(x - HALF, y - HALF, 2.0 * HALF, 2.0 * HALF);
+            if selected {
+                cr.set_source_rgb(0.88, 0.11, 0.14);
+            } else {
+                cr.set_source_rgb(1.0, 1.0, 1.0);
+            }
+            cr.fill_preserve().ok();
+            cr.set_source_rgb(0.88, 0.11, 0.14);
+            cr.stroke().ok();
         }
     }
     cr.restore().ok();

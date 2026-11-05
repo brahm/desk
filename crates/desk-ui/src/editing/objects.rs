@@ -384,7 +384,7 @@ pub(super) struct ObjectDrag {
 }
 
 /// The objects of a layout with their pages, by identifier.
-fn find(layout: &DocumentLayout, id: NodeId) -> Option<(usize, &PlacedObject)> {
+pub(super) fn find(layout: &DocumentLayout, id: NodeId) -> Option<(usize, &PlacedObject)> {
     layout.pages.iter().enumerate().find_map(|(index, page)| {
         page.objects
             .iter()
@@ -1100,7 +1100,7 @@ impl TextEditor {
     }
 
     /// Records the step that added an object, and selects it.
-    fn select_new_object(&self, selection: super::Selection, id: NodeId) {
+    pub(super) fn select_new_object(&self, selection: super::Selection, id: NodeId) {
         {
             let mut state = self.state.borrow_mut();
             let action = state.next_action;
