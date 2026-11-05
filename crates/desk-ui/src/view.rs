@@ -59,8 +59,10 @@ pub struct ObjectMark {
     /// The page it is on.
     pub page: usize,
     /// The corners of its frame, rotated, in order around it; a line has
-    /// two.
+    /// two, and a connection line the points along its curve.
     pub outline: Vec<(f64, f64)>,
+    /// Whether the outline goes back around to its first point.
+    pub closed: bool,
     /// Where its handles are.
     pub handles: Vec<(f64, f64)>,
     /// Whether it is locked, which its handles show.
@@ -773,7 +775,7 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
                 cr.line_to(x, y);
             }
         }
-        if mark.outline.len() > 2 {
+        if mark.closed {
             cr.close_path();
         }
         cr.stroke().ok();

@@ -11,7 +11,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use desk_model::{
     BorderStyle, Fill, GraphicStyle, ImageFill, Length, LineEnd, ObjectKind, ObjectShadow, Picture,
-    Rgba, Shape, Stroke,
+    Rgba, Stroke,
 };
 
 use crate::editing::ObjectInfo;
@@ -128,7 +128,7 @@ fn line_end_name(end: LineEnd) -> String {
 
 /// Whether an object is a line, which has ends and no fill.
 fn is_line(kind: &ObjectKind) -> bool {
-    matches!(kind, ObjectKind::Shape(Shape::Line { .. }))
+    matches!(kind, ObjectKind::Shape(shape) if shape.is_line())
 }
 
 impl GraphicGroup {

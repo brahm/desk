@@ -36,3 +36,6 @@ pub const LOEXT: &str = "urn:org:documentfoundation:names:experimental:office:xm
 
 /// `xlink:`, for the links to pictures in the package.
 pub const XLINK: &str = "http://www.w3.org/1999/xlink";
+
+/// `xml:`, for `xml:id`.
+pub const XML: &str = "http://www.w3.org/XML/1998/namespace";

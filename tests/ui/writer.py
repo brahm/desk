@@ -449,6 +449,7 @@ def main():
     points_of_a_star(work)
     drawn_with_the_pen(work)
     editable_shape(work)
+    connection_line(work)
     print("All UI tests passed.")
 
 
@@ -1240,6 +1241,42 @@ def editable_shape(work):
             lambda: saved_content(letter, r'draw:enhanced-path="M [-\d]+ [-\d]+ C '),
         )
         check("Smooth Path turns its corners into curves (OBJ-10)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def connection_line(work):
+    """A connection line follows the shape it joins when the shape moves,
+    and is saved joined to it (OBJ-31)."""
+    joined = SHAPE.replace(b"<draw:rect ", b'<draw:rect draw:id="a" ', 1) + (
+        b'<draw:rect draw:id="b" text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="450pt" svg:y="250pt" svg:width="100pt" svg:height="100pt"/>'
+        b'<draw:connector text:anchor-type="page" text:anchor-page-number="1" '
+        b'draw:start-shape="a" draw:end-shape="b" '
+        b'svg:x1="396pt" svg:y1="300pt" svg:x2="450pt" svg:y2="300pt"/>'
+    )
+    writer, app, letter = open_with_a_shape(work, "Connection.odt", shape=joined)
+    try:
+        wait_for(
+            "the Metrics group of the Inspector",
+            lambda: (lambda n: n if n and showing(n) else None)(find_named(app, "Width")),
+        )
+        # Ten points left, and the line's start with it.
+        press("shift+Left")
+        time.sleep(0.5)
+        press("ctrl+s")
+
+        def start():
+            match = saved_content(
+                letter, r'<draw:connector[^>]*draw:start-shape="[^"]+"[^>]*svg:x1="([\d.]+)pt"'
+            ) or saved_content(
+                letter, r'<draw:connector[^>]*svg:x1="([\d.]+)pt"[^>]*draw:start-shape="[^"]+"'
+            )
+            return match and float(match.group(1)) < 390
+
+        wait_for("the saved connection line, moved with its shape", start)
+        check("a connection line follows the shape it joins (OBJ-31)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

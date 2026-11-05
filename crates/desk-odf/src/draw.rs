@@ -4,7 +4,7 @@
 //! Drawing objects: frames with pictures or text boxes, shapes, lines and
 //! groups (`draw:` elements), and the properties of their graphic styles.
 
-use crate::ns::{DESK, DRAW, FO, LOEXT, STYLE, SVG, TEXT, XLINK};
+use crate::ns::{DESK, DRAW, FO, LOEXT, STYLE, SVG, TEXT, XLINK, XML};
 use crate::text::Paragraph;
 use crate::units::{Color, Length, decimal, parse_percent};
 use crate::xml::{Element, Writer};
@@ -255,6 +255,9 @@ pub struct DrawObject {
     pub style: Option<String>,
     /// `draw:name`.
     pub name: Option<String>,
+    /// `xml:id`, or `draw:id` as older files have it, which connectors
+    /// name the shapes they join by.
+    pub id: Option<String>,
     /// `text:anchor-type`: `page`, `paragraph`, `char` or `as-char`.
     pub anchor: Option<String>,
     /// `text:anchor-page-number`, from 1, of an object anchored to a page.
@@ -287,6 +290,7 @@ impl DrawObject {
             kind,
             style: None,
             name: None,
+            id: None,
             anchor: None,
             anchor_page: None,
             x: None,
@@ -375,6 +379,32 @@ pub enum DrawKind {
         /// `desk:shape`: the kind and settings of a shape of Desk, which
         /// the path draws for other programs.
         desk_shape: Option<String>,
+    },
+    /// `draw:connector`, a line that joins two shapes, from one end to
+    /// the other.
+    Connector {
+        /// `svg:x1`.
+        x1: Length,
+        /// `svg:y1`.
+        y1: Length,
+        /// `svg:x2`.
+        x2: Length,
+        /// `svg:y2`.
+        y2: Length,
+        /// `draw:start-shape`: the id of the shape it starts at.
+        start_shape: Option<String>,
+        /// `draw:end-shape`: the id of the shape it ends at.
+        end_shape: Option<String>,
+        /// `draw:type`: `standard`, `lines`, `line` or `curve`.
+        line_type: Option<String>,
+        /// `desk:bend`: how far its middle is pulled aside, to the left of
+        /// the way from start to end, as Desk bends it.
+        bend: Option<Length>,
+        /// `svg:viewBox`: the units of its path, as left, top, width and
+        /// height.
+        view_box: Option<(f64, f64, f64, f64)>,
+        /// `svg:d`: the way it goes, in the units of the view box.
+        path: Option<String>,
     },
     /// `draw:frame` with a `draw:image`.
     Image {
@@ -594,6 +624,29 @@ fn draw_object_at(
                 y2: at("y2"),
             }
         }
+        "connector" => {
+            let at = |name| {
+                e.attr(SVG, name)
+                    .and_then(Length::parse)
+                    .unwrap_or_default()
+            };
+            let text = |ns, name| e.attr(ns, name).map(str::to_owned);
+            DrawKind::Connector {
+                x1: at("x1"),
+                y1: at("y1"),
+                x2: at("x2"),
+                y2: at("y2"),
+                start_shape: text(DRAW, "start-shape"),
+                end_shape: text(DRAW, "end-shape"),
+                line_type: text(DRAW, "type"),
+                bend: e.attr(DESK, "bend").and_then(Length::parse),
+                view_box: match numbers(e.attr(SVG, "viewBox").unwrap_or_default())[..] {
+                    [x, y, w, h] => Some((x, y, w, h)),
+                    _ => None,
+                },
+                path: text(SVG, "d"),
+            }
+        }
         "polygon" => {
             let flat = numbers(e.attr(DRAW, "points").unwrap_or_default());
             let view_box = match numbers(e.attr(SVG, "viewBox").unwrap_or_default())[..] {
@@ -670,6 +723,10 @@ fn draw_object_at(
         kind,
         style: e.attr(DRAW, "style-name").map(str::to_owned),
         name: e.attr(DRAW, "name").map(str::to_owned),
+        id: e
+            .attr(XML, "id")
+            .or_else(|| e.attr(DRAW, "id"))
+            .map(str::to_owned),
         anchor: e.attr(TEXT, "anchor-type").map(str::to_owned),
         anchor_page: e
             .attr(TEXT, "anchor-page-number")
@@ -695,6 +752,7 @@ pub(crate) fn write_draw_object(
         DrawKind::Rect { .. } => "draw:rect",
         DrawKind::Ellipse => "draw:ellipse",
         DrawKind::Line { .. } => "draw:line",
+        DrawKind::Connector { .. } => "draw:connector",
         DrawKind::Polygon { .. } => "draw:polygon",
         DrawKind::CustomShape { .. } => "draw:custom-shape",
         DrawKind::Image { .. } | DrawKind::TextBox { .. } => "draw:frame",
@@ -703,6 +761,10 @@ pub(crate) fn write_draw_object(
     w.start(name);
     w.attr_opt("draw:style-name", object.style.as_deref());
     w.attr_opt("draw:name", object.name.as_deref());
+    if let Some(id) = &object.id {
+        // Both, as other programs read one or the other.
+        w.attr("xml:id", id).attr("draw:id", id);
+    }
     w.attr_opt("text:anchor-type", object.anchor.as_deref());
     if let Some(page) = object.anchor_page {
         w.attr("text:anchor-page-number", &page.to_string());
@@ -710,7 +772,10 @@ pub(crate) fn write_draw_object(
     if let Some(z) = object.z_index {
         w.attr("draw:z-index", &z.to_string());
     }
-    if !matches!(object.kind, DrawKind::Line { .. } | DrawKind::Group(_)) {
+    if !matches!(
+        object.kind,
+        DrawKind::Line { .. } | DrawKind::Connector { .. } | DrawKind::Group(_)
+    ) {
         for (attr, value) in [
             ("svg:x", object.x),
             ("svg:y", object.y),
@@ -735,6 +800,34 @@ pub(crate) fn write_draw_object(
                 .attr("svg:y1", &y1.to_string())
                 .attr("svg:x2", &x2.to_string())
                 .attr("svg:y2", &y2.to_string());
+        }
+        DrawKind::Connector {
+            x1,
+            y1,
+            x2,
+            y2,
+            start_shape,
+            end_shape,
+            line_type,
+            bend,
+            view_box,
+            path,
+        } => {
+            w.attr_opt("draw:type", line_type.as_deref());
+            if let Some((x, y, width, height)) = view_box {
+                let numbers = [x, y, width, height].map(|n| decimal(*n));
+                w.attr("svg:viewBox", &numbers.join(" "));
+            }
+            w.attr_opt("svg:d", path.as_deref());
+            w.attr("svg:x1", &x1.to_string())
+                .attr("svg:y1", &y1.to_string())
+                .attr("svg:x2", &x2.to_string())
+                .attr("svg:y2", &y2.to_string());
+            w.attr_opt("draw:start-shape", start_shape.as_deref());
+            w.attr_opt("draw:end-shape", end_shape.as_deref());
+            if let Some(bend) = bend {
+                w.attr("desk:bend", &bend.to_string());
+            }
         }
         DrawKind::Polygon { points, view_box } => {
             if let Some((x, y, width, height)) = view_box {

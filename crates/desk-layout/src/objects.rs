@@ -130,6 +130,14 @@ impl PlacedObject {
             };
             return distance_to_segment((fx, fy), (0.0, y0), (self.width, y1)) <= tolerance;
         }
+        if let ObjectKind::Shape(shape @ desk_model::Shape::Connection(_)) = &self.object.kind {
+            // Near the line, along its curve.
+            let outline = shape.outline(f64::from(self.width), f64::from(self.height));
+            let point = |(x, y): (f64, f64)| (x as f32, y as f32);
+            return desk_model::flattened(&outline)
+                .into_iter()
+                .any(|(a, b)| distance_to_segment((fx, fy), point(a), point(b)) <= tolerance);
+        }
         fx >= -tolerance
             && fy >= -tolerance
             && fx <= self.width + tolerance
@@ -699,5 +707,24 @@ mod tests {
         assert_eq!(object_at(&objects, 150.0, 110.0, 2.0, false), Some(1));
         assert_eq!(object_at(&objects, 110.0, 118.0, 2.0, false), Some(0));
         assert_eq!(object_at(&objects, 10.0, 10.0, 2.0, false), None);
+        // A bent connection line is hit along its curve (OBJ-31).
+        let (frame, bent) = desk_model::Connection::between(
+            (100.0, 120.0),
+            (200.0, 120.0),
+            desk_model::Length::from_points(20),
+            None,
+            None,
+        );
+        let bent = PlacedObject::new(
+            &Object::new(
+                NodeId::new(4).unwrap(),
+                Shape::Connection(bent).into(),
+                frame,
+            ),
+            None,
+            0.0,
+        );
+        assert!(bent.contains(150.0, 100.0, 2.0));
+        assert!(!bent.contains(150.0, 119.0, 2.0));
     }
 }

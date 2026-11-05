@@ -28,6 +28,7 @@ use crate::i18n::tr;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
+mod connections;
 mod navigate;
 mod objects;
 mod outline;
@@ -396,6 +397,8 @@ struct State {
     alpha_pick: Option<(desk_model::NodeId, bool)>,
     /// The shape being drawn while the pen is on (OBJ-09).
     pen: Option<pen::Pen>,
+    /// A drag of an end or the middle of a connection line (OBJ-31).
+    connection_drag: Option<connections::ConnectionDrag>,
     /// The shape whose points show to be edited (OBJ-10).
     points_edit: Option<points::PointsEdit>,
     /// Whether the last action was typing at the cursor, which the next
@@ -530,6 +533,7 @@ impl TextEditor {
                 label_drag: None,
                 alpha_pick: None,
                 pen: None,
+                connection_drag: None,
                 points_edit: None,
                 typing: false,
                 pending: None,
@@ -3217,7 +3221,10 @@ impl TextEditor {
             let Some((x, y)) = gesture.start_point() else {
                 return;
             };
-            if this.drag_alpha(dx, dy) || this.drag_pen(dx, dy) || this.drag_points(x + dx, y + dy)
+            if this.drag_alpha(dx, dy)
+                || this.drag_pen(dx, dy)
+                || this.drag_points(x + dx, y + dy)
+                || this.drag_connection(x + dx, y + dy)
             {
                 return;
             }
@@ -3254,6 +3261,7 @@ impl TextEditor {
             this.end_alpha_drag();
             this.end_pen_drag();
             this.end_points_drag();
+            this.end_connection_drag();
             let mut state = this.state.borrow_mut();
             state.drag_from = None;
             state.label_drag = None;
