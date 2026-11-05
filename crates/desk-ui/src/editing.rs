@@ -31,6 +31,8 @@ use crate::view::{DocumentView, WeakView};
 mod navigate;
 mod objects;
 mod outline;
+mod pen;
+mod points;
 mod sections;
 mod stories;
 
@@ -392,6 +394,10 @@ struct State {
     /// The picture that clicks take colors out of, while Instant Alpha
     /// is on (OBJ-05), and whether a press on it is being dragged.
     alpha_pick: Option<(desk_model::NodeId, bool)>,
+    /// The shape being drawn while the pen is on (OBJ-09).
+    pen: Option<pen::Pen>,
+    /// The shape whose points show to be edited (OBJ-10).
+    points_edit: Option<points::PointsEdit>,
     /// Whether the last action was typing at the cursor, which the next
     /// letter typed continues as one step of the history.
     typing: bool,
@@ -523,6 +529,8 @@ impl TextEditor {
                 drag_from: None,
                 label_drag: None,
                 alpha_pick: None,
+                pen: None,
+                points_edit: None,
                 typing: false,
                 pending: None,
                 on_select: Vec::new(),
@@ -2975,6 +2983,9 @@ impl TextEditor {
             };
             // Esc takes the cursor from a header, footer or note back to
             // the body.
+            if this.pen_key(key) || this.points_key(key) {
+                return glib::Propagation::Stop;
+            }
             if key == gdk::Key::Escape && this.instant_alpha_on() {
                 this.stop_instant_alpha();
                 return glib::Propagation::Stop;
@@ -3087,7 +3098,11 @@ impl TextEditor {
             this.view.area().grab_focus();
             // While Instant Alpha is on, a click on the picture takes out
             // the color under it (OBJ-05).
-            if this.press_alpha(x, y) {
+            if this.press_alpha(x, y)
+                || this.press_pen(presses, x, y)
+                || (this.editing_points()
+                    && this.press_points(presses, x, y, gesture.current_event_state()))
+            {
                 this.state.borrow_mut().drag_from = None;
                 return;
             }
@@ -3202,7 +3217,8 @@ impl TextEditor {
             let Some((x, y)) = gesture.start_point() else {
                 return;
             };
-            if this.drag_alpha(dx, dy) {
+            if this.drag_alpha(dx, dy) || this.drag_pen(dx, dy) || this.drag_points(x + dx, y + dy)
+            {
                 return;
             }
             if this.dragging_objects() {
@@ -3236,6 +3252,8 @@ impl TextEditor {
             };
             this.end_object_drag();
             this.end_alpha_drag();
+            this.end_pen_drag();
+            this.end_points_drag();
             let mut state = this.state.borrow_mut();
             state.drag_from = None;
             state.label_drag = None;

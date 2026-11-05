@@ -2405,3 +2405,81 @@ fn obj_08_the_shapes_of_other_programs_become_those_of_desk() {
         .map(desk_model::ObjectKind::from)
     );
 }
+
+#[test]
+fn obj_09_obj_10_shapes_drawn_with_the_pen_are_kept_in_odt() {
+    use desk_model::{Frame, Object, ObjectKind, PathPoint, Shape};
+    let wave = Shape::Path {
+        points: [
+            PathPoint::corner(0, 10_000),
+            PathPoint {
+                at: (5_000, 0),
+                before: Some((2_000, 0)),
+                after: Some((8_000, 0)),
+            },
+            PathPoint::corner(10_000, 10_000),
+        ]
+        .as_slice()
+        .into(),
+        closed: false,
+    };
+    let closed = Shape::Path {
+        points: [
+            PathPoint::corner(0, 0),
+            PathPoint::corner(10_000, 2_000),
+            PathPoint::corner(4_000, 10_000),
+        ]
+        .as_slice()
+        .into(),
+        closed: true,
+    };
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Pen", |edit| {
+            for (i, shape) in [&wave, &closed].into_iter().enumerate() {
+                let id = edit.new_id();
+                edit.add_object(Object::new(
+                    id,
+                    shape.clone().into(),
+                    Frame::from_pt(120.0 * i as f64, 0.0, 100.0, 50.0),
+                ))?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let bytes = write_odt(&document).unwrap();
+    keep("obj-pen.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let kinds: Vec<ObjectKind> = read.objects().iter().map(|o| o.kind.clone()).collect();
+    assert_eq!(kinds, [ObjectKind::from(wave), ObjectKind::from(closed)]);
+}
+
+#[test]
+fn obj_09_paths_of_other_programs_are_read() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+<office:body><office:text>
+<draw:custom-shape text:anchor-type="page" text:anchor-page-number="1" svg:x="1in" svg:y="1in" svg:width="1in" svg:height="1in"><draw:enhanced-geometry svg:viewBox="0 0 200 100" draw:type="non-primitive" draw:enhanced-path="M 0 100 L 100 0 200 100 Z N"/></draw:custom-shape>
+<text:p/>
+</office:text></office:body></office:document-content>"##;
+    let document = import(&desk_odf::read_streams(content, None, None).unwrap()).unwrap();
+    let kinds: Vec<desk_model::ObjectKind> =
+        document.objects().iter().map(|o| o.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        [desk_model::ObjectKind::from(desk_model::Shape::Path {
+            points: [
+                desk_model::PathPoint::corner(0, 10_000),
+                desk_model::PathPoint::corner(5_000, 0),
+                desk_model::PathPoint::corner(10_000, 10_000),
+            ]
+            .as_slice()
+            .into(),
+            closed: true,
+        })]
+    );
+}

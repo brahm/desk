@@ -447,6 +447,8 @@ def main():
     instant_alpha_of_a_picture(work)
     chosen_picture(work)
     points_of_a_star(work)
+    drawn_with_the_pen(work)
+    editable_shape(work)
     print("All UI tests passed.")
 
 
@@ -1162,6 +1164,82 @@ def points_of_a_star(work):
             lambda: saved_content(letter, r'desk:shape="star 7 3820"'),
         )
         check("the points of the star are saved (OBJ-11)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def activate(action):
+    """Activates an action of the first window of Desk Writer, as its menu
+    item does, through the actions that GTK puts on the session bus: the
+    items of GTK's menus have no names for the accessibility tree."""
+    subprocess.run(
+        [
+            "gdbus", "call", "--session", "--dest", "br.com.brahm.Desk.Writer",
+            "--object-path", "/br/com/brahm/Desk/Writer/window/1",
+            "--method", "org.gtk.Actions.Activate", action, "[]", "{}",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+def drawn_with_the_pen(work):
+    """The pen draws a shape point by point, and a click on its first
+    point closes it (OBJ-09)."""
+    writer, app, letter = open_with_a_shape(work, "Pen.odt")
+    try:
+        press("Escape")
+        activate("draw-with-pen")
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Pen.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        x, y = int(window["X"]), int(window["Y"])
+        w, h = int(window["WIDTH"]), int(window["HEIGHT"])
+        corners = [(w // 4, h // 3), (w // 2, h // 4), (w // 2, h // 2)]
+        for cx, cy in corners + corners[:1]:
+            click(x + cx, y + cy)
+            time.sleep(0.4)
+        press("ctrl+s")
+        wait_for(
+            "the saved shape drawn with the pen",
+            lambda: saved_content(letter, r'desk:shape="path closed"'),
+        )
+        check("the pen draws a shape that a click on its first point closes (OBJ-09)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def editable_shape(work):
+    """Make Editable turns a selected rectangle into a shape of points,
+    and Smooth Path turns its corners into curves (OBJ-10)."""
+    writer, app, letter = open_with_a_shape(work, "Editable.odt")
+    try:
+        wait_for(
+            "the Metrics group of the Inspector",
+            lambda: (lambda n: n if n and showing(n) else None)(find_named(app, "Width")),
+        )
+        activate("make-editable")
+        time.sleep(0.5)
+        press("ctrl+s")
+        wait_for(
+            "the saved editable shape",
+            lambda: saved_content(letter, r'desk:shape="path closed"'),
+        )
+        check("Make Editable turns the rectangle into points (OBJ-10)", True)
+        activate("smooth-path")
+        time.sleep(0.5)
+        press("ctrl+s")
+        wait_for(
+            "the saved smooth shape",
+            lambda: saved_content(letter, r'draw:enhanced-path="M [-\d]+ [-\d]+ C '),
+        )
+        check("Smooth Path turns its corners into curves (OBJ-10)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

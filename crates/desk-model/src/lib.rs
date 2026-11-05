@@ -98,7 +98,7 @@ pub use list::{
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
     Adjustments, AlphaSeed, Anchor, Fill, Frame, GraphicStyle, ImageFill, LineEnd, MAX_SHAPE_SIDES,
-    MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE,
+    MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE, PathPoint,
     PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
 pub use object_edit::{Distribution, Layer, ObjectAlignment, reframed, translated, union};

@@ -15,8 +15,12 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::tr;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 16] = [
+pub(super) const OBJECT_ACTIONS: [&str; 20] = [
     "insert-picture",
+    "draw-with-pen",
+    "make-editable",
+    "smooth-path",
+    "sharpen-path",
     "insert-shape",
     "insert-text-box",
     "add-linked-text-box",
@@ -54,8 +58,14 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 12] = [
+        let simple: [(&str, EditorAction); 16] = [
             ("insert-text-box", |e| e.insert_shape(NewShape::TextBox)),
+            ("draw-with-pen", TextEditor::start_pen),
+            ("make-editable", |e| {
+                e.make_editable();
+            }),
+            ("smooth-path", |e| e.reshape_path(false)),
+            ("sharpen-path", |e| e.reshape_path(true)),
             ("add-linked-text-box", TextEditor::add_linked_text_box),
             ("bring-to-front", |e| e.layer_objects(Layer::Front)),
             ("bring-forward", |e| e.layer_objects(Layer::Forward)),
@@ -199,6 +209,7 @@ pub(super) fn shapes_menu() -> gio::Menu {
     ] {
         shapes.append(Some(&label), Some(&format!("win.insert-shape('{value}')")));
     }
+    shapes.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
     menu.append_submenu(Some(&tr("_Shape")), &shapes);
     menu
 }
@@ -235,6 +246,10 @@ pub(super) fn arrange_menu() -> gio::Menu {
     placing.append_submenu(Some(&tr("_Distribute Objects")), &distribute);
     placing.append(Some(&tr("Flip _Horizontally")), Some("win.flip-horizontal"));
     placing.append(Some(&tr("Flip _Vertically")), Some("win.flip-vertical"));
+    let shape = gio::Menu::new();
+    shape.append(Some(&tr("Make _Editable")), Some("win.make-editable"));
+    shape.append(Some(&tr("Smoo_th Path")), Some("win.smooth-path"));
+    shape.append(Some(&tr("Sha_rpen Path")), Some("win.sharpen-path"));
     let grouping = gio::Menu::new();
     grouping.append(Some(&tr("_Group")), Some("win.group"));
     grouping.append(Some(&tr("_Ungroup")), Some("win.ungroup"));
@@ -244,5 +259,6 @@ pub(super) fn arrange_menu() -> gio::Menu {
     menu.append_section(None, &layers);
     menu.append_section(None, &placing);
     menu.append_section(None, &grouping);
+    menu.append_section(None, &shape);
     menu
 }
