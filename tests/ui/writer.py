@@ -451,6 +451,7 @@ def main():
     drawn_with_the_pen(work)
     editable_shape(work)
     connection_line(work)
+    media_browser(work)
     print("All UI tests passed.")
 
 
@@ -1192,6 +1193,44 @@ def chosen_movie(work):
         wait_for("the window that plays the movie", lambda: showing_named(app, "Movie"))
         check("the Inspector plays the movie (OBJ-19)", True)
     finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def media_browser(work):
+    """The Media Browser shows the photographs of the Pictures folder, and
+    one activated there goes on the page (INT-14)."""
+    pictures = work / "Pictures"
+    pictures.mkdir(exist_ok=True)
+    photo = pictures / "browsed.jpg"
+    photo.write_bytes((ROOT / "crates" / "desk-render" / "tests" / "two-colors.jpg").read_bytes())
+    dirs = Path(os.environ["XDG_CONFIG_HOME"]) / "user-dirs.dirs"
+    dirs.write_text(f'XDG_PICTURES_DIR="{pictures}"\n')
+    writer, app, letter = open_with_a_shape(work, "Browsed.odt")
+    try:
+        press("Escape")
+        # The folders are read when the browser first shows.
+        activate("media-browser")
+        cell = wait_for("the photograph in the Media Browser", lambda: showing_named(app, "browsed.jpg"))
+        check("the Media Browser shows the Pictures folder (INT-14)", True)
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Media Browser", "windowfocus", "--sync"],
+            check=True,
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Media Browser", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        box = Atspi.Component.get_extents(cell, Atspi.CoordType.WINDOW)
+        # A double click activates it, as in the browser of Pages.
+        click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2, 2)
+        wait_for("the Image group of the Inspector", lambda: showing_named(app, "Take Out a Color"))
+        check("an activated photograph goes on the page (INT-14)", True)
+    finally:
+        dirs.unlink(missing_ok=True)
         writer.terminate()
         writer.wait(timeout=10)
 

@@ -34,6 +34,7 @@ mod links;
 mod links_pane;
 mod lists_pane;
 mod media;
+mod media_browser;
 mod media_pane;
 mod notes_pane;
 mod objects_pane;

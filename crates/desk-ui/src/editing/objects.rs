@@ -1151,21 +1151,43 @@ impl TextEditor {
         self.after_change(selection);
     }
 
-    /// Puts a picture in the middle of the page in sight, in front of the
-    /// others, and selects it: at its size at 72 pixels to the inch, or a
-    /// PDF at its size, made smaller to fit inside the margins (OBJ-01).
-    pub fn insert_picture(&self, picture: desk_model::Picture) {
-        let page = self.view.current_page().unwrap_or(0);
-        let frame = {
-            let state = self.state.borrow();
-            let setup = &state.layout.setup;
-            let (width, height) = (setup.width.to_pt(), setup.height.to_pt());
-            let room_w = (width - setup.margin_left.to_pt() - setup.margin_right.to_pt()).max(36.0);
-            let room_h =
-                (height - setup.margin_top.to_pt() - setup.margin_bottom.to_pt()).max(36.0);
-            let (w, h) = picture_size(&picture, (room_w, room_h));
-            Frame::from_pt((width - w) / 2.0, (height - h) / 2.0, w, h)
-        };
+    /// Where an object of a size goes: centered on `at`, a point of a
+    /// page, or in the middle of the page shown; as large as it is, or
+    /// smaller to fit within the margins.
+    pub(super) fn placed_frame(
+        &self,
+        size: impl Fn((f64, f64)) -> (f64, f64),
+        at: Option<(usize, f64, f64)>,
+    ) -> (usize, Frame) {
+        let state = self.state.borrow();
+        let setup = &state.layout.setup;
+        let (width, height) = (setup.width.to_pt(), setup.height.to_pt());
+        let room_w = (width - setup.margin_left.to_pt() - setup.margin_right.to_pt()).max(36.0);
+        let room_h = (height - setup.margin_top.to_pt() - setup.margin_bottom.to_pt()).max(36.0);
+        let (w, h) = size((room_w, room_h));
+        match at {
+            Some((page, x, y)) => (
+                page,
+                Frame::from_pt(
+                    (x - w / 2.0).clamp(0.0, (width - w).max(0.0)),
+                    (y - h / 2.0).clamp(0.0, (height - h).max(0.0)),
+                    w,
+                    h,
+                ),
+            ),
+            None => (
+                self.view.current_page().unwrap_or(0),
+                Frame::from_pt((width - w) / 2.0, (height - h) / 2.0, w, h),
+            ),
+        }
+    }
+
+    /// Puts a picture on a page, in front of the others, centered on `at`
+    /// or in the middle of the page shown, and selects it: at its size at
+    /// 72 pixels to the inch, or a PDF at its size, made smaller to fit
+    /// inside the margins (OBJ-01).
+    pub fn insert_picture_at(&self, picture: desk_model::Picture, at: Option<(usize, f64, f64)>) {
+        let (page, frame) = self.placed_frame(|room| picture_size(&picture, room), at);
         self.leave_story(None);
         let selection = self.selection();
         let result = self.state.borrow_mut().editor.edit("Insert Image", |edit| {

@@ -81,6 +81,8 @@ pub struct DocumentWindow {
     thumbnails_split: adw::OverlaySplitView,
     /// The Spelling and Grammar window, made when first shown.
     spelling: SpellingSlot,
+    /// The Media Browser, made when first shown (INT-14).
+    media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     format_revealer: gtk::Revealer,
     ruler: Ruler,
     vertical_ruler: Ruler,
@@ -416,6 +418,7 @@ impl DocumentWindow {
             thumbnails_split,
             outline,
             spelling: SpellingSlot::default(),
+            media_browser: std::cell::OnceCell::new(),
             format_revealer,
             ruler,
             vertical_ruler,
@@ -2398,6 +2401,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
         document.append(Some(&tr("Show Page _Thumbnails")), Some("win.thumbnails"));
         document.append(Some(&tr("Show as _Outline")), Some("win.outline"));
+        document.append(Some(&tr("Show _Media Browser")), Some("win.media-browser"));
         document.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
         document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));

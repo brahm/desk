@@ -99,6 +99,7 @@ impl DocumentWindow {
             }
         });
         self.window.add_action(&action);
+        self.add_media_browser_action();
         let with_string: [(&str, ChoiceAction); 3] = [
             ("insert-shape", |e, value| {
                 let shape = match value {
@@ -166,26 +167,9 @@ impl DocumentWindow {
             let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
                 return;
             };
-            if let Some(media) = crate::bullet_pictures::media_from_file(&file) {
-                // A movie stands for itself with its first frame.
-                let weak = Rc::downgrade(&this);
-                crate::media::probe(&media.clone(), 0, move |poster, duration| {
-                    let mut media = media;
-                    media.poster = poster;
-                    media.duration = duration;
-                    if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
-                        editor.insert_media(media);
-                    }
-                });
-                return;
-            }
-            match crate::bullet_pictures::document_picture_from_file(&file) {
-                Some(picture) => {
-                    if let Some(editor) = this.editor() {
-                        editor.insert_picture(picture);
-                    }
-                }
-                None => this.alert(
+            let Some(editor) = this.editor() else { return };
+            if !editor.insert_file(&file, None) {
+                this.alert(
                     &tr("Cannot open {name}").replace(
                         "{name}",
                         &file
@@ -193,9 +177,60 @@ impl DocumentWindow {
                             .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
                     ),
                     &tr("The file is not an image, movie or sound that Desk can read."),
-                ),
+                );
             }
         });
+    }
+}
+
+impl DocumentWindow {
+    /// Shows or hides the Media Browser, whose items go on the page shown
+    /// (INT-14).
+    fn add_media_browser_action(self: &Rc<Self>) {
+        let action = gio::SimpleAction::new_stateful("media-browser", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        action.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            let browser = this.media_browser();
+            if browser.showing() != on {
+                browser.toggle();
+            }
+            action.set_state(&on.to_variant());
+        });
+        self.window.add_action(&action);
+    }
+
+    /// The Media Browser, made the first time it is asked for.
+    fn media_browser(self: &Rc<Self>) -> Rc<crate::media_browser::MediaBrowser> {
+        self.media_browser
+            .get_or_init(|| {
+                let weak = Rc::downgrade(self);
+                let browser = crate::media_browser::MediaBrowser::new(
+                    self.window.upcast_ref(),
+                    move |file| {
+                        let Some(this) = weak.upgrade() else { return };
+                        if let Some(editor) = this.editor() {
+                            editor.insert_file(file, None);
+                        }
+                    },
+                );
+                // The menu follows the window, closed by its own button.
+                let window = self.window.downgrade();
+                browser.window().connect_visible_notify(move |browser| {
+                    if let Some(window) = window.upgrade() {
+                        crate::formatting::set_state(
+                            &window,
+                            "media-browser",
+                            browser.is_visible().to_variant(),
+                        );
+                    }
+                });
+                browser
+            })
+            .clone()
     }
 }
 
