@@ -958,3 +958,33 @@ fn obj_14_an_inline_text_box_saved_by_pages_keeps_its_text() {
     assert!(matches!(text_box.kind, ObjectKind::TextBox(_)));
     assert!(text_box.paragraphs().any(|p| !p.text().is_empty()));
 }
+
+#[test]
+fn obj_04_obj_07_obj_16_obj_37_obj_39_masks_adjustments_text_layout_and_effects_are_read() {
+    use desk_model::{Frame, ObjectKind, VerticalAlignment};
+    // The masked picture shows the part inside the mask.
+    let (_, objects) = fixture_objects("obj-04-mask.pages");
+    let picture = &objects[0];
+    assert_eq!(picture.frame, Frame::from_pt(185.0, 213.0, 27.0, 38.0));
+    assert_eq!(
+        picture.picture.mask,
+        Some(Frame::from_pt(-35.0, -13.0, 96.0, 64.0))
+    );
+    let (_, objects) = fixture_objects("obj-07-adjust-image.pages");
+    let adjust = objects[0].picture.adjust;
+    assert_eq!((adjust.saturation, adjust.brightness), (51, 1));
+    // Two columns, in the middle.
+    let (_, objects) = fixture_objects("obj-16-fmt-13-19-box-format.pages");
+    let ObjectKind::TextBox(text_box) = &objects[0].kind else {
+        panic!("{:?}", objects[0])
+    };
+    assert_eq!(text_box.columns, 2);
+    assert_eq!(text_box.vertical, VerticalAlignment::Middle);
+    // A shadow down and to the right, and opacity.
+    let (_, objects) = fixture_objects("obj-37-38-39-effects.pages");
+    let shadow = objects[0].style.shadow.expect("a shadow");
+    assert_eq!(shadow.angle, 31_500);
+    assert_eq!(shadow.offset, Length::from_points(6));
+    assert_eq!(shadow.opacity, 75);
+    assert_eq!(objects[2].style.opacity, 40);
+}

@@ -17,7 +17,7 @@ use crate::xml::{self, Element, Node};
 
 mod drawables;
 
-pub use drawables::{Drawable, DrawableKind, Geometry, Place, ShapePath, TextWrap};
+pub use drawables::{Drawable, DrawableKind, Geometry, ObjectShadow, Place, ShapePath, TextWrap};
 
 /// A line break inside a paragraph (`sf:lnbr`), as the model writes it.
 pub const LINE_BREAK: char = '\u{2028}';
@@ -284,7 +284,7 @@ impl PagesDocument {
             .collect();
         while let Some(drawable) = stack.pop() {
             match &drawable.kind {
-                DrawableKind::Image { path } => paths.push(path.clone()),
+                DrawableKind::Image { path, .. } => paths.push(path.clone()),
                 DrawableKind::Media { path, poster, .. } => {
                     paths.push(path.clone());
                     paths.extend(poster.clone());

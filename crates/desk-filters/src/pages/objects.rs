@@ -12,7 +12,8 @@ use desk_iwork::pages::{self as iwork, Drawable, DrawableKind, Place, ShapePath}
 use desk_iwork::sf::{StrokePattern, Value};
 use desk_model::{
     Anchor, BorderStyle, Fill, Frame, GraphicStyle, Length, LineEnd, MAX_SHAPE_SIDES, NodeId,
-    Object, ObjectKind, Op, POLYGON_SCALE, PathPoint, Shape, Stroke, TextBox, Wrap,
+    Object, ObjectKind, Op, POLYGON_SCALE, PathPoint, Shape, Stroke, TextBox, VerticalAlignment,
+    Wrap,
 };
 
 use super::{Importer, rgba};
@@ -138,6 +139,25 @@ fn line_end(value: Option<&Value>) -> LineEnd {
     }
 }
 
+/// The changes of Adjust Image, from the filter properties of Pages,
+/// which go from -100 to 100 as the model's do.
+fn adjustments(properties: &[(String, f64)]) -> desk_model::Adjustments {
+    let get = |name: &str| {
+        properties
+            .iter()
+            .find(|(n, _)| n == name)
+            .map_or(0, |(_, v)| v.round().clamp(-100.0, 100.0) as i8)
+    };
+    desk_model::Adjustments {
+        brightness: get("kSFRBrightnessProperty"),
+        contrast: get("kSFRContrastProperty"),
+        saturation: get("kSFRSaturationProperty"),
+        exposure: get("kSFRExposureProperty"),
+        temperature: get("kSFRTemperature"),
+        tint: get("kSFRTint"),
+    }
+}
+
 /// The style of the model for the properties of a graphic style.
 fn graphic_style(drawable: &Drawable) -> GraphicStyle {
     let properties = &drawable.style;
@@ -217,6 +237,40 @@ struct Builder<'a, 'b> {
 }
 
 impl Builder<'_, '_> {
+    /// Gives text the inset, columns and vertical alignment of the layout
+    /// style of the text of an object.
+    fn lay_out(&self, text_box: &mut TextBox, drawable: &Drawable) {
+        let sheet = self.importer.sheet;
+        let Some(style) = drawable.text_layout.as_deref().and_then(|l| sheet.find(l)) else {
+            return;
+        };
+        let chain = sheet.ancestry(style);
+        let get = |name: &str| chain.iter().find_map(|s| s.properties.get(name));
+        if let Some(Value::Padding { left, .. }) = get("padding") {
+            text_box.inset = Length::from_pt(left.max(0.0));
+        }
+        if let Some(Value::Number(v)) = get("verticalAlignment") {
+            text_box.vertical = match *v as i64 {
+                1 => VerticalAlignment::Middle,
+                2 => VerticalAlignment::Bottom,
+                _ => VerticalAlignment::Top,
+            };
+        }
+        if let Some(Value::Columns { columns, .. }) = get("columns")
+            && !columns.is_empty()
+        {
+            text_box.columns = u8::try_from(columns.len())
+                .unwrap_or(u8::MAX)
+                .clamp(1, desk_model::MAX_TEXT_BOX_COLUMNS);
+            // The gap, a part of the width of the text.
+            if let Some(&(_, gap)) = columns.first().filter(|_| columns.len() > 1) {
+                let (w, _) = drawable.geometry.size;
+                let width = (w - 2.0 * text_box.inset.to_pt()).max(0.0);
+                text_box.column_gap = Length::from_pt(gap * width);
+            }
+        }
+    }
+
     /// The picture of a file of the package, when it can be read.
     fn picture(&self, path: &str) -> Option<desk_model::Picture> {
         self.importer
@@ -237,12 +291,13 @@ impl Builder<'_, '_> {
         let geometry = &drawable.geometry;
         let (w, h) = geometry.size;
         let (cx, cy) = geometry.center();
-        let frame = Frame::from_pt(
+        let mut frame = Frame::from_pt(
             origin.0 + cx - w / 2.0,
             origin.1 + cy - h / 2.0,
             w.max(0.0),
             h.max(0.0),
         );
+        let mut picture_settings = desk_model::PictureSettings::default();
         let id = match drawable.id.as_ref().and_then(|i| self.ids.get(i)) {
             Some(&id) => id,
             None => self.importer.document.new_id(),
@@ -269,6 +324,7 @@ impl Builder<'_, '_> {
                     let mut text_box =
                         TextBox::new(std::mem::take(&mut text).into(), Length::from_points(4));
                     text_box.next = next.as_ref().and_then(|n| self.ids.get(n)).copied();
+                    self.lay_out(&mut text_box, drawable);
                     ObjectKind::TextBox(text_box)
                 } else {
                     let (shape, reversed) = shape(path, geometry.natural);
@@ -294,10 +350,31 @@ impl Builder<'_, '_> {
                 }
                 ObjectKind::Group(objects.into())
             }
-            DrawableKind::Image { path } => match self.picture(path) {
-                Some(picture) => ObjectKind::Image(picture),
-                None => return Ok(None),
-            },
+            DrawableKind::Image { path, mask, adjust } => {
+                let Some(picture) = self.picture(path) else {
+                    return Ok(None);
+                };
+                // Masked, the object is the part that shows, and the
+                // picture lies around it.
+                if let Some(mask) = mask {
+                    let (mw, mh) = mask.size;
+                    let (mx, my) = mask.center();
+                    let shown = Frame::from_pt(
+                        origin.0 + mx - mw / 2.0,
+                        origin.1 + my - mh / 2.0,
+                        mw.max(0.0),
+                        mh.max(0.0),
+                    );
+                    picture_settings.mask = Some(Frame {
+                        x: frame.x - shown.x,
+                        y: frame.y - shown.y,
+                        ..frame
+                    });
+                    frame = shown;
+                }
+                picture_settings.adjust = adjustments(adjust);
+                ObjectKind::Image(picture)
+            }
             DrawableKind::Media {
                 path,
                 poster,
@@ -335,6 +412,15 @@ impl Builder<'_, '_> {
         object.wrap = wrap;
         object.wrap_margin = wrap_margin;
         object.locked = drawable.locked;
+        object.picture = picture_settings;
+        object.style.shadow = drawable.shadow.map(|shadow| desk_model::ObjectShadow {
+            color: rgba(shadow.color),
+            // Pages turns it clockwise, the model counterclockwise.
+            angle: (-shadow.angle * 100.0).round().rem_euclid(36_000.0) as i32,
+            offset: Length::from_pt(shadow.distance.max(0.0)),
+            blur: Length::from_pt(shadow.radius.max(0.0)),
+            opacity: (shadow.opacity * 100.0).round().clamp(0.0, 100.0) as u8,
+        });
         if object.holds_text() && !text.iter().all(desk_model::Paragraph::is_empty) {
             // Pages centers the text of a shape that does not say how it
             // is aligned.
@@ -351,7 +437,9 @@ impl Builder<'_, '_> {
                     desk_model::Paragraph::from_runs(p.id(), p.style(), attrs, p.runs().cloned())
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            object.text = Some(TextBox::in_shape(Arc::from(centered)));
+            let mut text_box = TextBox::in_shape(Arc::from(centered));
+            self.lay_out(&mut text_box, drawable);
+            object.text = Some(text_box);
         }
         Ok(Some(object))
     }
