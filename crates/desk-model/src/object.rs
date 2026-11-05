@@ -223,6 +223,8 @@ pub enum ObjectKind {
     TextBox(TextBox),
     /// A picture, scaled to its frame (OBJ-02).
     Image(Picture),
+    /// A movie or a sound (OBJ-18).
+    Media(crate::Media),
     /// Objects grouped into one, with frames on the same page as the
     /// group's, from back to front.
     Group(Arc<[Object]>),

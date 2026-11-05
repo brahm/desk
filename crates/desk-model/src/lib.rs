@@ -56,6 +56,7 @@ mod header;
 mod id;
 mod inline;
 mod list;
+mod media;
 mod note;
 mod object;
 mod object_edit;
@@ -97,6 +98,7 @@ pub use list::{
     LIST_LEVELS, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind, NumberFormat,
     Numbering, detect_marker,
 };
+pub use media::{Media, MediaFormat, Repeat};
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
     Adjustments, AlphaSeed, Anchor, Fill, Frame, GraphicStyle, ImageFill, LineEnd, MAX_SHAPE_SIDES,

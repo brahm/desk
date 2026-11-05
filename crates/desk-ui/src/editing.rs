@@ -29,6 +29,7 @@ use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
 mod connections;
+mod media;
 mod navigate;
 mod objects;
 mod outline;

@@ -155,16 +155,55 @@ pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
         .or_else(|| picture_from_file(file))
 }
 
-/// The filter of the dialogs that choose a picture for a document: the
-/// formats that GTK reads, and PDF.
-pub fn document_picture_filters() -> gtk::gio::ListStore {
-    let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&crate::i18n::tr("Images")));
-    filter.add_pixbuf_formats();
-    filter.add_mime_type("application/pdf");
-    filter.add_suffix("pdf");
+/// The largest movie or sound a document keeps, as large as a file of a
+/// package that Desk reads.
+const MAX_MEDIA: u64 = 64 << 20;
+
+/// A movie or a sound from a file, if Desk knows its format and it is
+/// not too large to keep in a document (OBJ-18).
+pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
+    let size = file
+        .query_info(
+            "standard::size",
+            gtk::gio::FileQueryInfoFlags::NONE,
+            gtk::gio::Cancellable::NONE,
+        )
+        .ok()?
+        .size();
+    if size as u64 > MAX_MEDIA {
+        return None;
+    }
+    let (bytes, _) = file.load_contents(gtk::gio::Cancellable::NONE).ok()?;
+    desk_model::Media::from_bytes(bytes.to_vec())
+}
+
+/// The filters of the dialogs that choose a picture for a document: the
+/// formats that GTK reads and PDF, with movies and sounds when `media`.
+pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
+    let images = gtk::FileFilter::new();
+    images.set_name(Some(&crate::i18n::tr("Images")));
+    images.add_pixbuf_formats();
+    images.add_mime_type("application/pdf");
+    images.add_suffix("pdf");
+    let media = gtk::FileFilter::new();
+    media.set_name(Some(&crate::i18n::tr("Movies and Sounds")));
+    for kind in ["video/*", "audio/*"] {
+        media.add_mime_type(kind);
+    }
+    let all = gtk::FileFilter::new();
+    all.set_name(Some(&crate::i18n::tr("Images, Movies and Sounds")));
+    all.add_pixbuf_formats();
+    for kind in ["application/pdf", "video/*", "audio/*"] {
+        all.add_mime_type(kind);
+    }
     let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
-    filters.append(&filter);
+    if with_media {
+        filters.append(&all);
+    }
+    filters.append(&images);
+    if with_media {
+        filters.append(&media);
+    }
     filters
 }
 
