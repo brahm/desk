@@ -28,7 +28,7 @@ use desk_odf as odf;
 
 use crate::sections;
 
-mod objects;
+pub(crate) mod objects;
 
 /// The ODF name of the default paragraph style.
 const DEFAULT_STYLE: &str = "Standard";

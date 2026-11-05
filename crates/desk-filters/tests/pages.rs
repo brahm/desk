@@ -238,6 +238,8 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
     );
     let (document, log) = read_pages_logged(source.as_bytes()).unwrap();
     assert_eq!(document.body().len(), 3);
+    // The shape is read; the picture is not yet.
+    assert_eq!(document.objects().len(), 1);
     let entries: Vec<(Warning, usize)> = log
         .entries()
         .iter()
@@ -246,7 +248,7 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
     assert_eq!(
         entries,
         [
-            (Warning::Content(Content::FloatingObjects), 2),
+            (Warning::Content(Content::FloatingObjects), 1),
             (Warning::Content(Content::InlineObjects), 2),
             (Warning::Formatting(Formatting::DropCaps), 2),
         ]
@@ -716,4 +718,191 @@ fn fmt_01_fmt_02_colors_of_lines_saved_by_pages_are_read() {
     );
     // The color of the underline is no longer left out.
     assert!(log.is_empty(), "{log:?}");
+}
+
+/// The floating objects of a fixture, from back to front.
+fn fixture_objects(name: &str) -> (desk_model::Document, Vec<desk_model::Object>) {
+    let (document, _) = desk_filters::read_pages_at_logged(&fixture(name)).unwrap();
+    let objects = document.objects().iter().cloned().collect();
+    (document, objects)
+}
+
+#[test]
+fn obj_08_obj_11_shapes_saved_by_pages_are_read() {
+    use desk_model::{ObjectKind, Shape};
+    let (_, objects) = fixture_objects("obj-08-11-shapes.pages");
+    let shapes: Vec<Shape> = objects
+        .iter()
+        .map(|o| match &o.kind {
+            ObjectKind::Shape(shape) => shape.clone(),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(shapes.len(), 12, "{shapes:?}");
+    assert_eq!(shapes[0], Shape::Rectangle);
+    assert_eq!(
+        shapes[1],
+        Shape::RoundedRectangle {
+            radius: Length::from_points(15)
+        }
+    );
+    assert_eq!(shapes[2], Shape::Ellipse);
+    assert!(matches!(&shapes[3], Shape::Polygon(p) if p.len() == 3));
+    assert!(matches!(&shapes[4], Shape::Polygon(p) if p.len() == 3));
+    assert_eq!(
+        shapes[5],
+        Shape::Arrow {
+            double: false,
+            head: 4400,
+            tail: 3400
+        }
+    );
+    assert!(matches!(shapes[6], Shape::Arrow { double: true, .. }));
+    assert!(matches!(&shapes[7], Shape::Polygon(p) if p.len() == 4));
+    assert!(matches!(shapes[8], Shape::Balloon { .. }));
+    assert_eq!(
+        shapes[9],
+        Shape::Star {
+            points: 5,
+            inner: 5000
+        }
+    );
+    assert_eq!(shapes[10], Shape::RegularPolygon { sides: 5 });
+    assert_eq!(shapes[11], Shape::Line { rising: false });
+    // On the first page, where Pages put them, with its colors.
+    let first = &objects[0];
+    assert_eq!(first.anchor, desk_model::Anchor::Page(0));
+    assert_eq!(
+        first.frame,
+        desk_model::Frame::from_pt(60.0, 150.0, 100.0, 90.0)
+    );
+    assert!(matches!(
+        first.style.fill,
+        Some(desk_model::Fill::Color(Rgba {
+            r: 104,
+            g: 162,
+            b: 47,
+            ..
+        }))
+    ));
+    assert_eq!(
+        first.style.stroke.map(|s| s.width),
+        Some(Length::from_points(1))
+    );
+}
+
+#[test]
+fn obj_12_the_text_of_a_shape_saved_by_pages_is_centered_in_it() {
+    let (_, objects) = fixture_objects("obj-12-text-in-shape.pages");
+    let paragraphs: Vec<&desk_model::Paragraph> = objects[0].paragraphs().collect();
+    assert_eq!(paragraphs.len(), 1);
+    assert_eq!(paragraphs[0].text(), "Text inside the shape");
+    assert_eq!(paragraphs[0].attrs().alignment, Some(Alignment::Center));
+}
+
+#[test]
+fn obj_13_obj_15_text_boxes_saved_by_pages_keep_their_text_and_links() {
+    use desk_model::ObjectKind;
+    let (_, objects) = fixture_objects("obj-13-text-box.pages");
+    let [text_box] = objects.as_slice() else {
+        panic!("{objects:?}")
+    };
+    assert!(matches!(text_box.kind, ObjectKind::TextBox(_)));
+    let text: Vec<String> = text_box.paragraphs().map(|p| p.text()).collect();
+    assert_eq!(text, ["Floating text box"]);
+    // The text that flows from one linked box into the next is all in
+    // the first, its paragraph whole.
+    let (_, objects) = fixture_objects("obj-15-linked-boxes.pages");
+    let [first, second] = objects.as_slice() else {
+        panic!("{objects:?}")
+    };
+    let ObjectKind::TextBox(head) = &first.kind else {
+        panic!("{first:?}")
+    };
+    assert_eq!(head.next, Some(second.id));
+    let text: Vec<String> = first.paragraphs().map(|p| p.text()).collect();
+    assert_eq!(text.len(), 1, "{text:?}");
+    assert!(
+        text[0].contains("eiusmod tempor incididunt ut labore"),
+        "{text:?}"
+    );
+    assert!(second.paragraphs().all(|p| p.text().is_empty()));
+}
+
+#[test]
+fn obj_25_obj_30_obj_32_obj_34_groups_turns_flips_locks_and_backgrounds_are_read() {
+    use desk_model::{Frame, ObjectKind, Wrap};
+    let (_, objects) = fixture_objects("obj-30-group.pages");
+    let [group] = objects.as_slice() else {
+        panic!("{objects:?}")
+    };
+    let ObjectKind::Group(members) = &group.kind else {
+        panic!("{group:?}")
+    };
+    // The objects of a group keep their places on the page.
+    let frames: Vec<Frame> = members.iter().map(|m| m.frame).collect();
+    assert_eq!(
+        frames,
+        [
+            Frame::from_pt(100.0, 200.0, 120.0, 80.0),
+            Frame::from_pt(240.0, 200.0, 120.0, 80.0)
+        ]
+    );
+    // Pages places a turned object by the box around it as drawn.
+    let (_, objects) = fixture_objects("obj-34-flip-rotate.pages");
+    let turned = &objects[0];
+    assert_eq!(turned.rotation, 3000);
+    let middle = |f: Frame| {
+        (
+            f.x.to_pt() + f.width.to_pt() / 2.0,
+            f.y.to_pt() + f.height.to_pt() / 2.0,
+        )
+    };
+    let (x, y) = middle(turned.frame);
+    assert!(
+        (x - 153.66).abs() < 0.01 && (y - 246.34).abs() < 0.01,
+        "{x} {y}"
+    );
+    assert!(objects[1].flip_horizontal && objects[1].flip_vertical);
+    assert_eq!(objects[2].frame, Frame::from_pt(100.0, 350.0, 120.0, 80.0));
+    let (_, objects) = fixture_objects("obj-32-lock.pages");
+    assert!(objects[0].locked);
+    let (_, objects) = fixture_objects("obj-25-background.pages");
+    assert_eq!(objects[0].wrap, Wrap::Behind);
+}
+
+#[test]
+fn obj_35_obj_40_obj_41_strokes_and_fills_saved_by_pages_are_read() {
+    use desk_model::{Fill, LineEnd};
+    let (_, objects) = fixture_objects("obj-40-41-fills.pages");
+    assert_eq!(
+        objects[1].style.fill,
+        Some(Fill::Gradient {
+            from: Rgba::rgb(255, 0, 0),
+            to: Rgba::rgb(0, 0, 255),
+            angle: 4500
+        })
+    );
+    let (_, objects) = fixture_objects("obj-35-stroke.pages");
+    let strokes: Vec<desk_model::Stroke> = objects.iter().filter_map(|o| o.style.stroke).collect();
+    assert_eq!(strokes[0].color, Rgba::rgb(255, 0, 0));
+    assert_eq!(strokes[0].width, Length::from_points(4));
+    assert_eq!(strokes[1].style, BorderStyle::Dashed);
+    // The line goes right to left in Pages, its arrow at the left.
+    assert_eq!(
+        (strokes[3].start, strokes[3].end),
+        (LineEnd::Arrow, LineEnd::Circle)
+    );
+}
+
+#[test]
+fn int_03_int_05_page_layout_documents_and_master_objects_saved_by_pages_are_read() {
+    use desk_model::{Anchor, ObjectKind};
+    let (document, objects) = fixture_objects("int-03-page-layout.pages");
+    assert_eq!(document.page_setup().layout_pages, Some(1));
+    assert!(matches!(objects[0].kind, ObjectKind::TextBox(_)));
+    assert!(objects.iter().all(|o| o.anchor == Anchor::Page(0)));
+    let (document, objects) = fixture_objects("int-05-est-21-master-object.pages");
+    assert_eq!(document.page_setup().layout_pages, None);
+    assert_eq!(objects[0].anchor, Anchor::Master(None));
 }
