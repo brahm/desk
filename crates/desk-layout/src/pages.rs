@@ -267,6 +267,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     place_margins(document, &mut layout, system);
+    crate::objects::place_master_objects(document, &mut layout);
     crate::objects::place_inline_objects(document, &mut layout);
     crate::objects::place_object_text(document, &mut layout, system);
     layout.field_values = values;

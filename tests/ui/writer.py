@@ -452,6 +452,7 @@ def main():
     editable_shape(work)
     connection_line(work)
     media_browser(work)
+    master_objects(work)
     print("All UI tests passed.")
 
 
@@ -1374,6 +1375,69 @@ def connection_line(work):
 
         wait_for("the saved connection line, moved with its shape", start)
         check("a connection line follows the shape it joins (OBJ-31)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def saved_part(letter, part, pattern):
+    """Whether a part of the saved package matches a pattern."""
+    try:
+        with zipfile.ZipFile(letter) as package:
+            content = package.read(part).decode()
+    except (zipfile.BadZipFile, KeyError, OSError):
+        return False
+    return re.search(pattern, content)
+
+
+def master_objects(work):
+    """Arrange, Move to Section Master puts a shape on the master of its
+    section, saved in the master page; it is selected again only once
+    master objects are made selectable, and goes back to the page with
+    Move to Page (INT-05, EST-21)."""
+    writer, app, letter = open_with_a_shape(work, "Master.odt")
+    try:
+        def width_row():
+            return (lambda n: n if n and showing(n) else None)(find_named(app, "Width"))
+
+        wait_for("the Metrics group of the Inspector", width_row)
+        activate("move-to-master")
+        wait_for("the shape no longer selected", lambda: width_row() is None)
+        press("ctrl+s")
+        wait_for(
+            "the shape saved in the master page",
+            lambda: saved_part(letter, "styles.xml", r'<style:master-page[^>]*>.*<draw:rect '),
+        )
+        check("a shape moved to the master is saved in the master page (INT-05)", True)
+        check(
+            "and no longer on the page",
+            not saved_content(letter, r"<draw:rect "),
+        )
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Master.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        spot = (
+            int(window["X"]) + int(window["WIDTH"]) // 3,
+            int(window["Y"]) + int(window["HEIGHT"]) * 3 // 4,
+        )
+        click(*spot)
+        time.sleep(1)
+        check("a master object is not selected on the page (EST-21)", width_row() is None)
+        activate("masters-selectable")
+        click(*spot)
+        wait_for("the master object selected", width_row)
+        check("once master objects are selectable, a click selects one (EST-21)", True)
+        activate("move-to-page")
+        press("ctrl+s")
+        wait_for(
+            "the shape saved on the page again",
+            lambda: saved_content(letter, r'<draw:rect [^>]*text:anchor-type="page"'),
+        )
+        check("Move to Page puts it back on the page (EST-21)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

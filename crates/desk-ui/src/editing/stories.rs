@@ -61,6 +61,8 @@ pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<
     let p = layout.pages.get(page)?;
     if let Some(index) = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true)
         && p.objects[index].object.holds_text()
+        // The text of the masters is not typed in on the pages.
+        && !p.objects[index].object.anchor.is_master()
     {
         return Some(Story::TextBox(text_box_head(
             layout,

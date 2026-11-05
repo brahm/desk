@@ -428,6 +428,8 @@ struct State {
     objects: Vec<desk_model::NodeId>,
     /// A drag of objects in progress.
     object_drag: Option<objects::ObjectDrag>,
+    /// Which objects behind the text a press selects (OBJ-25, EST-21).
+    selectable: objects::Selectable,
     /// The guides it snaps to.
     guides: Vec<crate::view::Guide>,
 }
@@ -549,6 +551,7 @@ impl TextEditor {
                 story: None,
                 objects: Vec::new(),
                 object_drag: None,
+                selectable: objects::Selectable::default(),
                 guides: Vec::new(),
             })),
         };

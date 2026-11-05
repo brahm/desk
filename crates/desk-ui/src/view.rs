@@ -67,6 +67,9 @@ pub struct ObjectMark {
     pub handles: Vec<(f64, f64)>,
     /// Whether it is locked, which its handles show.
     pub locked: bool,
+    /// Whether it is an object of a master, whose handles are blue
+    /// (EST-21).
+    pub master: bool,
 }
 
 /// A shape being drawn with the pen or having its points edited: its
@@ -792,7 +795,11 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
                 cr.stroke().ok();
             } else {
                 cr.rectangle(x - HALF, y - HALF, 2.0 * HALF, 2.0 * HALF);
-                cr.set_source_rgb(1.0, 1.0, 1.0);
+                if mark.master {
+                    cr.set_source_rgb(0.21, 0.52, 0.89);
+                } else {
+                    cr.set_source_rgb(1.0, 1.0, 1.0);
+                }
                 cr.fill_preserve().ok();
                 cr.set_source_rgb(0.21, 0.52, 0.89);
                 cr.stroke().ok();

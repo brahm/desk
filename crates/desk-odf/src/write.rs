@@ -145,6 +145,9 @@ pub fn write_streams(document: &TextDocument) -> Streams {
                 write_header_footer(&mut w, name, part);
             }
         }
+        for object in &master.objects {
+            crate::draw::write_draw_object(&mut w, object, &write_paragraph);
+        }
         w.end();
     }
     w.end();

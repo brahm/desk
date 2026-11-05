@@ -124,6 +124,9 @@ pub struct MasterPage {
     pub footer_first: Option<HeaderFooter>,
     /// `style:footer-left`.
     pub footer_left: Option<HeaderFooter>,
+    /// The drawing objects of the master page, which show on every page
+    /// that uses it, behind the text.
+    pub objects: Vec<crate::draw::DrawObject>,
 }
 
 /// A header or a footer.

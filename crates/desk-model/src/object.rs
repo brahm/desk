@@ -497,6 +497,20 @@ pub enum Anchor {
     /// mark is (see [`crate::Field::ObjectMark`]); the frame gives only its
     /// size, and the text does not wrap around it (OBJ-01).
     InText,
+    /// On the master of a section, by the paragraph that starts the
+    /// section, or none for the first: behind the text of every page that
+    /// shows the headers and footers of that section, where the frame
+    /// puts it from the top left corner of the paper (INT-05, EST-21). The
+    /// text does not wrap around it, and it is selected only when master
+    /// objects are made selectable.
+    Master(Option<NodeId>),
+}
+
+impl Anchor {
+    /// Whether the object is on the master of a section (INT-05).
+    pub fn is_master(self) -> bool {
+        matches!(self, Self::Master(_))
+    }
 }
 
 /// How the text of the body goes around an object (OBJ-17).

@@ -253,6 +253,11 @@ impl DisplayList {
             height: layout.setup.height.to_pt() as f32,
             items: Vec::new(),
         };
+        // The objects of the master of the section, behind all else
+        // (INT-05).
+        for object in page.objects.iter().filter(|o| o.object.anchor.is_master()) {
+            list.items.push(object_item(object));
+        }
         for block in &page.blocks {
             list.block_background(block);
         }
@@ -260,7 +265,7 @@ impl DisplayList {
         for object in page
             .objects
             .iter()
-            .filter(|o| o.object.wrap == Wrap::Behind)
+            .filter(|o| o.object.wrap == Wrap::Behind && !o.object.anchor.is_master())
         {
             list.items.push(object_item(object));
         }
@@ -288,7 +293,7 @@ impl DisplayList {
         for object in page
             .objects
             .iter()
-            .filter(|o| o.object.wrap != Wrap::Behind)
+            .filter(|o| o.object.wrap != Wrap::Behind && !o.object.anchor.is_master())
         {
             list.items.push(object_item(object));
         }

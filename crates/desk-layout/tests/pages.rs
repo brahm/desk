@@ -1036,3 +1036,80 @@ fn obj_01_an_object_in_the_text_stands_on_its_line() {
     assert!(line.line.baseline - line.line.top >= 50.0 - 0.01);
     assert_eq!(layout.pages[0].lines.len(), 1);
 }
+
+#[test]
+fn int_05_master_objects_show_on_every_page_of_their_section_behind_the_text() {
+    use desk_model::{
+        Anchor, Editor, Frame, Object, ObjectKind, ParaAttrs, Position, Section, Shape,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let (second, ids) = editor
+        .edit("Setup", |edit| {
+            edit.set_page_setup(setup(400.0))?;
+            let at = edit.insert_text(start, &"words of text that wrap ".repeat(120))?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "The second section.")?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(Arc::new(Start::Section(
+                        Section {
+                            own_margins: true,
+                            ..Section::default()
+                        },
+                        Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let second = edit.document().body().get(1).unwrap().id();
+            let mut ids = Vec::new();
+            for section in [None, Some(second)] {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(100.0, 60.0, 200.0, 200.0),
+                );
+                object.anchor = Anchor::Master(section);
+                ids.push(object.id);
+                edit.add_object(object)?;
+            }
+            Ok((second, ids))
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let layout = paginate(editor.document(), &mut system);
+    assert!(layout.pages.len() >= 3, "{}", layout.pages.len());
+    let last = layout.pages.len() - 1;
+    for (index, page) in layout.pages.iter().enumerate() {
+        let shown: Vec<_> = page.objects.iter().map(|o| o.object.id).collect();
+        let expected = if index == last { ids[1] } else { ids[0] };
+        assert_eq!(shown, [expected], "page {index}");
+        assert_eq!(
+            layout.section_margins[page.section],
+            (index == last).then_some(second)
+        );
+    }
+    // The text does not go around them: it is laid out as without them.
+    let mut bare = editor.document().clone();
+    let mut edit = Editor::new(bare.clone());
+    edit.edit("Remove", |e| {
+        for id in &ids {
+            e.remove_object(*id)?;
+        }
+        Ok(())
+    })
+    .unwrap();
+    bare = edit.document().clone();
+    let without = paginate(&bare, &mut system);
+    let lines = |l: &DocumentLayout| -> Vec<(f32, f32, f32)> {
+        l.pages[0]
+            .lines
+            .iter()
+            .map(|l| (l.origin.0 + l.line.x, l.origin.1, l.line.advance))
+            .collect()
+    };
+    assert_eq!(lines(&layout), lines(&without));
+}

@@ -180,6 +180,7 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
             .map(|(_, (x, y))| (f64::from(x), f64::from(y)))
             .collect(),
         locked: placed.object.locked,
+        master: placed.object.anchor.is_master(),
     }
 }
 
@@ -422,8 +423,22 @@ pub(super) struct ObjectDrag {
     preview: Vec<Placement>,
 }
 
-/// The objects of a layout with their pages, by identifier.
+thread_local! {
+    /// The page where an object was last pressed. An object of a master
+    /// shows on several pages, and is found on that one when it is there.
+    static PRESSED_ON: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+}
+
+/// An object of a layout with its page, by identifier.
 pub(super) fn find(layout: &DocumentLayout, id: NodeId) -> Option<(usize, &PlacedObject)> {
+    if let Some(on) = PRESSED_ON.get()
+        && let Some(placed) = layout
+            .pages
+            .get(on)
+            .and_then(|p| p.objects.iter().find(|o| o.object.id == id))
+    {
+        return Some((on, placed));
+    }
     layout.pages.iter().enumerate().find_map(|(index, page)| {
         page.objects
             .iter()
@@ -442,22 +457,64 @@ fn on_text(layout: &DocumentLayout, page: usize, x: f32, y: f32) -> bool {
     })
 }
 
+/// Which objects behind the text a press can select: those sent to the
+/// background and those of the masters of the sections, each only once
+/// the Arrange menu makes them selectable (OBJ-25, EST-21).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Selectable {
+    /// Objects behind the text.
+    pub background: bool,
+    /// Objects of the masters.
+    pub masters: bool,
+}
+
+impl Selectable {
+    /// Whether a press can select an object.
+    fn allows(self, object: &Object) -> bool {
+        if object.anchor.is_master() {
+            self.masters
+        } else if object.wrap == Wrap::Behind {
+            self.background
+        } else {
+            true
+        }
+    }
+}
+
 /// The object a press on a page lands on: the frontmost under it, or one
-/// behind the text where no text is.
+/// behind the text that can be selected, where no text is.
 pub(super) fn hit(
     layout: &DocumentLayout,
     page: usize,
     x: f32,
     y: f32,
     reach: f32,
+    selectable: Selectable,
 ) -> Option<NodeId> {
     let objects = &layout.pages.get(page)?.objects;
     let index = object_at(objects, x, y, reach, false).or_else(|| {
-        (!on_text(layout, page, x, y))
-            .then(|| object_at(objects, x, y, reach, true))
-            .flatten()
+        if on_text(layout, page, x, y) {
+            return None;
+        }
+        objects
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(_, o)| selectable.allows(&o.object))
+            .find(|(_, o)| o.contains(x, y, reach))
+            .map(|(i, _)| i)
     })?;
     Some(objects[index].object.id)
+}
+
+/// The frame of a placed object, from the top left corner of the paper.
+fn frame_of(placed: &PlacedObject) -> Frame {
+    Frame::from_pt(
+        f64::from(placed.x),
+        f64::from(placed.y),
+        f64::from(placed.width),
+        f64::from(placed.height),
+    )
 }
 
 /// An object given the place a drag left it in, with its anchor and
@@ -650,6 +707,102 @@ impl TextEditor {
             }
             Err(error) => gtk::glib::g_warning!("desk", "cannot arrange: {error}"),
         }
+    }
+
+    /// Which objects behind the text a press selects.
+    pub fn selectable(&self) -> Selectable {
+        self.state.borrow().selectable
+    }
+
+    /// Makes objects behind the text, or those of the masters, selectable
+    /// or not, as the Arrange menu does (OBJ-25, EST-21). Those that are
+    /// no longer selectable are no longer selected.
+    pub fn set_selectable(&self, selectable: Selectable) {
+        let ids = {
+            let mut state = self.state.borrow_mut();
+            state.selectable = selectable;
+            let document = state.editor.document();
+            state
+                .objects
+                .iter()
+                .copied()
+                .filter(|id| {
+                    document
+                        .objects()
+                        .get(*id)
+                        .is_some_and(|o| selectable.allows(o))
+                })
+                .collect::<Vec<_>>()
+        };
+        if ids != self.selected_objects() {
+            self.select_objects(ids);
+        }
+    }
+
+    /// Moves the selected floating objects to the master of the section
+    /// of their page, where they stay as they are and show on every page
+    /// of the section (EST-21): "Move Objects to Section Master".
+    pub fn move_objects_to_master(&self) {
+        let placed: Vec<(NodeId, Anchor, Frame)> = {
+            let state = self.state.borrow();
+            state
+                .objects
+                .iter()
+                .filter_map(|&id| {
+                    let (page, placed) = find(&state.layout, id)?;
+                    let o = &placed.object;
+                    if o.anchor == Anchor::InText || o.anchor.is_master() {
+                        return None;
+                    }
+                    let section = state.layout.pages[page].section;
+                    let key = state.layout.section_margins.get(section).copied().flatten();
+                    Some((id, Anchor::Master(key), frame_of(placed)))
+                })
+                .collect()
+        };
+        self.move_objects("Move to Section Master", placed);
+    }
+
+    /// Moves the selected objects of a master to the page where they are
+    /// selected, as floating objects of that page alone: "Move Objects to
+    /// Page".
+    pub fn move_objects_to_page(&self) {
+        let placed: Vec<(NodeId, Anchor, Frame)> = {
+            let state = self.state.borrow();
+            state
+                .objects
+                .iter()
+                .filter_map(|&id| {
+                    let (page, placed) = find(&state.layout, id)?;
+                    placed
+                        .object
+                        .anchor
+                        .is_master()
+                        .then(|| (id, Anchor::Page(page as u32), frame_of(placed)))
+                })
+                .collect()
+        };
+        self.move_objects("Move to Page", placed);
+    }
+
+    /// Gives objects another anchor, with the frame they have on the page,
+    /// and keeps those selected that can still be.
+    fn move_objects(&self, name: &str, placed: Vec<(NodeId, Anchor, Frame)>) {
+        if placed.is_empty() {
+            return;
+        }
+        let selectable = self.selectable();
+        let keep: Vec<NodeId> = placed
+            .iter()
+            .filter(|(_, anchor, _)| !anchor.is_master() || selectable.masters)
+            .map(|(id, ..)| *id)
+            .collect();
+        self.arrange_objects(name, move |edit, _| {
+            for (id, anchor, frame) in placed {
+                edit.place_object(id, anchor, frame)?;
+            }
+            Ok(Some(keep))
+        });
     }
 
     /// Puts the selected objects in the line of the text, or takes them
@@ -1324,8 +1477,14 @@ impl TextEditor {
                     }
                 }
             }
-            (grabbed, hit(&state.layout, page, px, py, reach))
+            (
+                grabbed,
+                hit(&state.layout, page, px, py, reach, state.selectable),
+            )
         };
+        if grabbed.is_some() || hit_id.is_some() {
+            PRESSED_ON.set(Some(page));
+        }
         if let Some((id, handle)) = grabbed {
             if self.start_connection_drag(id, handle, page) {
                 return true;
@@ -1767,7 +1926,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_03_presses_find_objects_but_behind_ones_only_off_the_text() {
+    fn obj_03_obj_25_presses_find_objects_but_behind_ones_only_off_the_text() {
         let mut editor = desk_model::Editor::new(desk_model::Document::new_word_processing());
         let start = editor.document().start();
         let (front, back) = editor
@@ -1793,9 +1952,17 @@ mod tests {
         let layout = crate::lay_out(editor.document());
         let line = &layout.pages[0].lines[0];
         let (tx, ty) = (line.origin.0 + 5.0, (line.top() + line.bottom()) / 2.0);
-        assert_eq!(hit(&layout, 0, 350.0, 420.0, 2.0), Some(front));
-        assert_eq!(hit(&layout, 0, 10.0, 700.0, 2.0), Some(back));
-        assert_eq!(hit(&layout, 0, tx, ty, 2.0), None);
+        let all = Selectable {
+            background: true,
+            masters: true,
+        };
+        assert_eq!(hit(&layout, 0, 350.0, 420.0, 2.0, all), Some(front));
+        assert_eq!(hit(&layout, 0, 10.0, 700.0, 2.0, all), Some(back));
+        assert_eq!(hit(&layout, 0, tx, ty, 2.0, all), None);
+        // Until background objects are made selectable (OBJ-25).
+        let none = Selectable::default();
+        assert_eq!(hit(&layout, 0, 350.0, 420.0, 2.0, none), Some(front));
+        assert_eq!(hit(&layout, 0, 10.0, 700.0, 2.0, none), None);
     }
 
     #[test]
