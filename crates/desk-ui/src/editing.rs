@@ -556,6 +556,7 @@ impl TextEditor {
         this.update_squiggles();
         this.connect_keyboard();
         this.connect_pointer();
+        this.connect_drop();
         this.connect_input_method();
         this.start_blinking();
         this.view.area().grab_focus();

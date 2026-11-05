@@ -5,7 +5,9 @@
 //! file, played with a double click or the QuickTime inspector, and
 //! given another poster frame.
 
-use desk_model::{Anchor, Frame, Media, NodeId, Object, ObjectKind};
+use desk_model::{Anchor, Media, NodeId, Object, ObjectKind};
+use gtk::prelude::*;
+use gtk::{gdk, gio};
 
 use super::TextEditor;
 use super::objects::find;
@@ -30,20 +32,10 @@ pub(super) fn media_size(media: &Media, room: (f64, f64)) -> (f64, f64) {
 }
 
 impl TextEditor {
-    /// Puts a movie or a sound in the middle of the page shown, and
-    /// selects it (OBJ-18).
-    pub fn insert_media(&self, media: Media) {
-        let page = self.view.current_page().unwrap_or(0);
-        let frame = {
-            let state = self.state.borrow();
-            let setup = &state.layout.setup;
-            let (width, height) = (setup.width.to_pt(), setup.height.to_pt());
-            let room_w = (width - setup.margin_left.to_pt() - setup.margin_right.to_pt()).max(36.0);
-            let room_h =
-                (height - setup.margin_top.to_pt() - setup.margin_bottom.to_pt()).max(36.0);
-            let (w, h) = media_size(&media, (room_w, room_h));
-            Frame::from_pt((width - w) / 2.0, (height - h) / 2.0, w, h)
-        };
+    /// Puts a movie or a sound on a page, centered on `at` or in the
+    /// middle of the page shown, and selects it (OBJ-18).
+    pub fn insert_media(&self, media: Media, at: Option<(usize, f64, f64)>) {
+        let (page, frame) = self.placed_frame(|room| media_size(&media, room), at);
         self.leave_story(None);
         let selection = self.selection();
         let name = if media.is_sound() {
@@ -62,6 +54,53 @@ impl TextEditor {
             Ok(id) => self.select_new_object(selection, id),
             Err(error) => gtk::glib::g_warning!("desk", "cannot insert: {error}"),
         }
+    }
+
+    /// Puts the picture, movie or sound of a file on a page, centered on
+    /// `at` or in the middle of the page shown (OBJ-01, OBJ-18). Returns
+    /// false when the file is none that Desk reads.
+    pub fn insert_file(&self, file: &gio::File, at: Option<(usize, f64, f64)>) -> bool {
+        if let Some(media) = crate::bullet_pictures::media_from_file(file) {
+            // A movie stands for itself with its first frame.
+            let weak = self.downgrade();
+            crate::media::probe(&media.clone(), 0, move |poster, duration| {
+                let mut media = media;
+                media.poster = poster;
+                media.duration = duration;
+                if let Some(this) = weak.upgrade() {
+                    this.insert_media(media, at);
+                }
+            });
+            return true;
+        }
+        match crate::bullet_pictures::document_picture_from_file(file) {
+            Some(picture) => {
+                self.insert_picture_at(picture, at);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Takes files dropped on the pages, from the file manager or the
+    /// Media Browser, where they are dropped (OBJ-02, INT-14).
+    pub(super) fn connect_drop(&self) {
+        let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+        let weak = self.downgrade();
+        drop.connect_drop(move |_, value, x, y| {
+            let (Some(this), Ok(files)) = (weak.upgrade(), value.get::<gdk::FileList>()) else {
+                return false;
+            };
+            let at = this.view.page_at(x, y);
+            let mut used = false;
+            for (i, file) in files.files().iter().enumerate() {
+                // Each a little lower and to the right of the one before.
+                let at = at.map(|(page, x, y)| (page, x + 18.0 * i as f64, y + 18.0 * i as f64));
+                used |= this.insert_file(file, at);
+            }
+            used
+        });
+        self.view.area().add_controller(drop);
     }
 
     /// Plays a movie or a sound where it is on the page (OBJ-19).
