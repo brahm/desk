@@ -47,6 +47,11 @@ pub struct Object {
     pub wrap: Wrap,
     /// The room left between the object and the text around it.
     pub wrap_margin: Length,
+    /// The outline that the text goes around when it wraps tightly, in
+    /// parts of [`POLYGON_SCALE`] of the frame from its top left corner:
+    /// that of a shape, or the edge of the opaque part of a picture
+    /// (OBJ-17). None when the text goes around the box of the object.
+    pub contour: Option<Arc<[(i32, i32)]>>,
     /// Whether it cannot be moved, resized or deleted until unlocked.
     pub locked: bool,
     /// The text inside a shape, as Pages lets one type in any shape but
@@ -154,10 +159,42 @@ impl Object {
             style: GraphicStyle::default(),
             wrap: Wrap::Both,
             wrap_margin: Length::from_points(12),
+            contour: None,
             locked: false,
             text: None,
             picture: PictureSettings::default(),
         }
+    }
+
+    /// The outline of a shape as a contour for the text to wrap around
+    /// tightly, or none for an object that is not a shape with an inside.
+    pub fn shape_contour(&self) -> Option<Arc<[(i32, i32)]>> {
+        let ObjectKind::Shape(shape) = &self.kind else {
+            return None;
+        };
+        if shape.is_line() {
+            return None;
+        }
+        let (w, h) = (self.frame.width.to_pt(), self.frame.height.to_pt());
+        if w <= 0.0 || h <= 0.0 {
+            return None;
+        }
+        let scale = f64::from(POLYGON_SCALE);
+        let mut points: Vec<(i32, i32)> = Vec::new();
+        for (a, _) in crate::flattened(&shape.outline(w, h)) {
+            let point = (
+                (a.0 / w * scale).round() as i32,
+                (a.1 / h * scale).round() as i32,
+            );
+            if points.last() != Some(&point) {
+                points.push(point);
+            }
+        }
+        // Closed by itself.
+        if points.len() > 1 && points.first() == points.last() {
+            points.pop();
+        }
+        (points.len() >= 3).then(|| points.into())
     }
 
     /// Whether text can be typed in it: a text box, or a shape but a

@@ -82,6 +82,7 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             shadow_blur,
             opacity,
             wrap,
+            wrap_contour,
             run_through,
             margin,
             padding,
@@ -976,6 +977,19 @@ fn import_one(
         built.wrap = Wrap::AboveAndBelow;
     }
     built.wrap_margin = g.margin.map_or(Length::ZERO, length);
+    if g.wrap_contour == Some(true)
+        && !matches!(
+            built.wrap,
+            Wrap::AboveAndBelow | Wrap::Through | Wrap::Behind
+        )
+    {
+        // The outline it was given, or that of the shape.
+        built.contour = object
+            .contour
+            .as_ref()
+            .map(|c| Arc::from(c.as_slice()))
+            .or_else(|| built.shape_contour());
+    }
     built.locked = g.protect.as_deref().is_some_and(|p| p.contains("position"));
     let mirror = g.mirror.as_deref().unwrap_or_default();
     built.flip_horizontal = mirror.contains("horizontal");
@@ -1449,6 +1463,9 @@ impl Exporter<'_> {
         g.wrap = Some(wrap.into());
         g.run_through = through.map(Into::into);
         g.margin = Some(odf_length(object.wrap_margin));
+        if object.contour.is_some() {
+            g.wrap_contour = Some(true);
+        }
         if object.locked {
             g.protect = Some("position size".into());
         }
@@ -1641,6 +1658,9 @@ impl Exporter<'_> {
         let mut out = odf::DrawObject::new(kind);
         out.style = Some(style);
         out.text = text;
+        if !matches!(object.kind, ObjectKind::Shape(_)) {
+            out.contour = object.contour.as_deref().map(<[_]>::to_vec);
+        }
         if linked {
             // Named, for the boxes linked to it to name it.
             out.name = Some(text_box_name(object.id));

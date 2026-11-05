@@ -418,7 +418,8 @@ impl TextEditor {
     ) {
         let selection = self.selection();
         let depth = self.state.borrow().editor.undo_depth();
-        let changed = with_points(object, points, closed);
+        let mut changed = with_points(object, points, closed);
+        super::objects::refresh_contour(&mut changed, object);
         let edits = |edit: &mut desk_model::Edit| edit.replace_object(changed);
         let result = {
             let mut state = self.state.borrow_mut();

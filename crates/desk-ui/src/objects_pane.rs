@@ -43,6 +43,9 @@ pub struct ObjectGroups {
     keep_proportions: adw::SwitchRow,
     rotation: adw::SpinRow,
     wrap: adw::ComboRow,
+    /// Whether the text goes around the outline of the object rather
+    /// than its box (OBJ-17).
+    tight: adw::SwitchRow,
     margin: adw::SpinRow,
     locked: adw::SwitchRow,
     /// Whether the object is in the line of the text (OBJ-01).
@@ -143,6 +146,12 @@ impl ObjectGroups {
             .title(tr("Text Wrap"))
             .model(&gtk::StringList::new(&names))
             .build();
+        let tight = adw::SwitchRow::builder()
+            .title(tr("Tight"))
+            .subtitle(tr(
+                "Around the outline of a shape or the opaque part of a picture",
+            ))
+            .build();
         let margin = spin(&tr("Extra Space"), 0.0, 1584.0);
         let locked = adw::SwitchRow::builder()
             .title(tr("Locked"))
@@ -156,6 +165,7 @@ impl ObjectGroups {
         let wrap_group = adw::PreferencesGroup::builder().title(tr("Wrap")).build();
         wrap_group.add(&inline);
         wrap_group.add(&wrap);
+        wrap_group.add(&tight);
         wrap_group.add(&margin);
         wrap_group.add(&locked);
         let vertical_names = [tr("Top"), tr("Middle"), tr("Bottom")];
@@ -184,6 +194,7 @@ impl ObjectGroups {
             keep_proportions,
             rotation,
             wrap,
+            tight,
             margin,
             locked,
             inline,
@@ -249,6 +260,24 @@ impl ObjectGroups {
             };
             if let Some(editor) = wrap_editor() {
                 editor.set_object("Text Wrap", |object| object.wrap = wrap);
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let tight_editor = editor.clone();
+        this.tight.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let tight = row.is_active();
+            if let Some(editor) = tight_editor() {
+                editor.set_object("Text Wrap", |object| {
+                    object.contour = if tight {
+                        desk_render::object_contour(object)
+                    } else {
+                        None
+                    };
+                });
             }
         });
         let weak = Rc::downgrade(&this);
@@ -445,6 +474,23 @@ impl ObjectGroups {
         self.x.set_sensitive(editable && !inline);
         self.y.set_sensitive(editable && !inline);
         self.wrap.set_sensitive(editable && !inline);
+        // Only a shape with an inside or a picture has an outline, and only
+        // text that goes beside it follows it.
+        let outlined = match &info.object.kind {
+            desk_model::ObjectKind::Shape(shape) => !shape.is_line(),
+            desk_model::ObjectKind::Image(_) => true,
+            _ => false,
+        };
+        let beside = matches!(
+            info.object.wrap,
+            Wrap::Both | Wrap::Largest | Wrap::Left | Wrap::Right
+        );
+        let tight = info.object.contour.is_some();
+        if self.tight.is_active() != tight {
+            self.tight.set_active(tight);
+        }
+        self.tight.set_visible(outlined);
+        self.tight.set_sensitive(editable && !inline && beside);
         self.margin.set_sensitive(editable && !inline);
         let shape_text = desk_model::TextBox::in_shape(std::sync::Arc::from([]));
         let text = info

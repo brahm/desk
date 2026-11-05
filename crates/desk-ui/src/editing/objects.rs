@@ -1024,7 +1024,9 @@ impl TextEditor {
             };
             let mut seeds = object.picture.alpha.to_vec();
             change(&mut seeds);
+            let before = object.clone();
             object.picture.alpha = seeds.into();
+            refresh_contour(&mut object, &before);
             edit.replace_object(object)
         };
         let result = {
@@ -1140,6 +1142,7 @@ impl TextEditor {
                 }
                 let mut changed = object.clone();
                 restyle(&mut changed, &change);
+                refresh_contour(&mut changed, &object);
                 if changed != object {
                     edit.replace_object(changed)?;
                 }
@@ -1176,6 +1179,7 @@ impl TextEditor {
                 object.frame = reframed.frame;
                 object.kind = reframed.kind;
             }
+            refresh_contour(&mut object, &info.object);
             edit.replace_object(object).map(|()| None)
         });
     }
@@ -1756,9 +1760,11 @@ impl TextEditor {
             .into_iter()
             .map(|mut object| {
                 // Only the size of an object in the text is its own.
+                let before = self.object_by_id(object.id);
                 if drag.kind == DragKind::Move && object.anchor == Anchor::InText {
-                    object = self.object_by_id(object.id);
+                    object = before.clone();
                 }
+                refresh_contour(&mut object, &before);
                 object
             })
             .collect();
@@ -1822,6 +1828,21 @@ fn picture_size(picture: &desk_model::Picture, room: (f64, f64)) -> (f64, f64) {
     let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
     let fit = (room.0 / w).min(room.1 / h).min(1.0);
     (w * fit, h * fit)
+}
+
+/// Traces again the contour that text wraps tightly around an object
+/// whose shape, picture or size `before` changed (OBJ-17).
+pub(super) fn refresh_contour(object: &mut Object, before: &Object) {
+    if object.contour.is_none() {
+        return;
+    }
+    let changed = object.kind != before.kind
+        || object.picture != before.picture
+        || object.frame.width != before.frame.width
+        || object.frame.height != before.frame.height;
+    if changed {
+        object.contour = desk_render::object_contour(object);
+    }
 }
 
 #[cfg(test)]

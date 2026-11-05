@@ -157,7 +157,58 @@ impl PlacedObject {
             x1: x1 + margin,
             y1: y1 + margin,
             wrap: self.object.wrap,
+            profile: self.profile(margin),
         })
+    }
+
+    /// The room that the contour of the object takes from the text, band
+    /// by band down the page, with the margin around it: each band is
+    /// from a top to a bottom, and from a left to a right.
+    fn profile(&self, margin: f32) -> Option<Profile> {
+        let contour = self.object.contour.as_ref().filter(|c| c.len() >= 3)?;
+        let scale = desk_model::POLYGON_SCALE as f32;
+        let points: Vec<(f32, f32)> = contour
+            .iter()
+            .map(|&(x, y)| {
+                self.to_page(
+                    x as f32 / scale * self.width,
+                    y as f32 / scale * self.height,
+                )
+            })
+            .collect();
+        let top = points.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
+        let bottom = points.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max);
+        let mut bands = Vec::new();
+        let mut b0 = top - margin;
+        while b0 < bottom + margin {
+            let b1 = b0 + PROFILE_BAND;
+            // The part of each edge within the band and the margin around
+            // it.
+            let (lo, hi) = (b0 - margin, b1 + margin);
+            let mut span: Option<(f32, f32)> = None;
+            for (i, &a) in points.iter().enumerate() {
+                let b = points[(i + 1) % points.len()];
+                let (ya, yb) = (a.1.min(b.1), a.1.max(b.1));
+                if yb < lo || ya > hi {
+                    continue;
+                }
+                let x_at = |y: f32| {
+                    if (b.1 - a.1).abs() < f32::EPSILON {
+                        a.0
+                    } else {
+                        a.0 + (b.0 - a.0) * (y - a.1) / (b.1 - a.1)
+                    }
+                };
+                for x in [x_at(lo.clamp(ya, yb)), x_at(hi.clamp(ya, yb))] {
+                    span = Some(span.map_or((x, x), |(s, t)| (s.min(x), t.max(x))));
+                }
+            }
+            if let Some((s, t)) = span {
+                bands.push((b0, b1, s - margin, t + margin));
+            }
+            b0 = b1;
+        }
+        Some(bands.into())
     }
 }
 
@@ -236,14 +287,43 @@ pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::Docu
     }
 }
 
-/// The room that an object takes from the text, in points on the page.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// The bands of a contour down the page, each from a top to a bottom and
+/// from a left to a right, in points.
+pub(crate) type Profile = Arc<[(f32, f32, f32, f32)]>;
+
+/// How tall the bands of the contour of an object are, in points.
+const PROFILE_BAND: f32 = 2.0;
+
+/// The room that an object takes from the text, in points on the page:
+/// its box, and the bands of its contour when the text wraps tightly
+/// around it.
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Exclusion {
     pub x0: f32,
     pub y0: f32,
     pub x1: f32,
     pub y1: f32,
     pub wrap: Wrap,
+    pub profile: Option<Profile>,
+}
+
+impl Exclusion {
+    /// The left and right of the room it takes from a line from `y0` to
+    /// `y1`, or none when it takes none there.
+    fn span(&self, y0: f32, y1: f32) -> Option<(f32, f32)> {
+        if self.y1 <= y0 || self.y0 >= y1 {
+            return None;
+        }
+        let Some(bands) = &self.profile else {
+            return Some((self.x0, self.x1));
+        };
+        bands
+            .iter()
+            .filter(|b| b.1 > y0 && b.0 < y1)
+            .fold(None, |span, b| {
+                Some(span.map_or((b.2, b.3), |(s, t): (f32, f32)| (s.min(b.2), t.max(b.3))))
+            })
+    }
 }
 
 /// The part of a paragraph on one page or column: from a height of the
@@ -292,10 +372,10 @@ fn free_segments(piece: &Piece, width: f32, top: f32, height: f32) -> Vec<(f32, 
     let (y0, y1) = (piece.origin + top, piece.origin + top + height);
     let mut free = vec![(0.0f32, width)];
     for e in &piece.exclusions {
-        if e.y1 <= y0 || e.y0 >= y1 {
+        let Some((x0, x1)) = e.span(y0, y1) else {
             continue;
-        }
-        let (a, b) = (e.x0 - piece.left, e.x1 - piece.left);
+        };
+        let (a, b) = (x0 - piece.left, x1 - piece.left);
         if b <= 0.0 || a >= width {
             continue;
         }
@@ -653,8 +733,34 @@ mod tests {
                 x1: 300.0,
                 y1: 200.0,
                 wrap,
+                profile: None,
             }],
         }
+    }
+
+    #[test]
+    fn obj_17_text_wraps_tightly_around_a_contour() {
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::triangle()),
+            Frame::from_pt(200.0, 100.0, 100.0, 100.0),
+        );
+        object.wrap_margin = desk_model::Length::ZERO;
+        object.contour = object.shape_contour();
+        let placed = PlacedObject::new(&object, None, 0.0);
+        let e = placed.exclusion().unwrap();
+        // Near the point of the triangle, little room is taken; near its
+        // base, all its width.
+        let (a, b) = e.span(100.0, 102.0).unwrap();
+        assert!(a > 245.0 && b < 255.0, "{a} {b}");
+        let (a, b) = e.span(196.0, 198.0).unwrap();
+        assert!(a < 203.0 && b > 297.0, "{a} {b}");
+        assert_eq!(e.span(201.0, 210.0), None);
+        // Without a contour, the box.
+        object.contour = None;
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        assert_eq!(e.span(100.0, 102.0), Some((200.0, 300.0)));
     }
 
     #[test]

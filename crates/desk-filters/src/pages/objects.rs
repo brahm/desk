@@ -199,6 +199,53 @@ fn graphic_style(drawable: &Drawable) -> GraphicStyle {
     }
 }
 
+/// The contour of a picture, in parts of its frame `shown`, from the
+/// `traced` outline of its opaque part in its `natural` size, the picture
+/// filling `whole`.
+fn traced_outline(
+    traced: &str,
+    natural: (f64, f64),
+    whole: Frame,
+    shown: Frame,
+) -> Option<Arc<[(i32, i32)]>> {
+    let (nw, nh) = natural;
+    if nw <= 0.0 || nh <= 0.0 {
+        return None;
+    }
+    let outline = crate::odt::objects::path_shape(traced, Some((0.0, 0.0, nw, nh)))?;
+    let outline = Object::new(
+        desk_model::NodeId::new(1).expect("not zero"),
+        ObjectKind::Shape(outline),
+        whole,
+    );
+    let points = outline.shape_contour()?;
+    if whole == shown {
+        return Some(points);
+    }
+    // A mask shows a part of the picture: the contour is placed in it,
+    // and kept inside it.
+    let (sw, sh) = (shown.width.to_pt(), shown.height.to_pt());
+    if sw <= 0.0 || sh <= 0.0 {
+        return None;
+    }
+    let scale = f64::from(POLYGON_SCALE);
+    let dx = (whole.x - shown.x).to_pt();
+    let dy = (whole.y - shown.y).to_pt();
+    let (ww, wh) = (whole.width.to_pt(), whole.height.to_pt());
+    let placed: Vec<(i32, i32)> = points
+        .iter()
+        .map(|&(x, y)| {
+            let x = (dx + f64::from(x) / scale * ww) / sw * scale;
+            let y = (dy + f64::from(y) / scale * wh) / sh * scale;
+            (
+                x.round().clamp(0.0, scale) as i32,
+                y.round().clamp(0.0, scale) as i32,
+            )
+        })
+        .collect();
+    Some(placed.into())
+}
+
 /// How text goes around an object.
 fn wrap(drawable: &Drawable) -> (Wrap, Length) {
     let margin = drawable.wrap.as_ref().map_or(Length::from_points(12), |w| {
@@ -304,6 +351,7 @@ impl Builder<'_, '_> {
         };
         let mut text = Vec::new();
         let mut swap_ends = false;
+        let mut traced_contour = None;
         let kind = match &drawable.kind {
             DrawableKind::Shape {
                 path,
@@ -350,10 +398,16 @@ impl Builder<'_, '_> {
                 }
                 ObjectKind::Group(objects.into())
             }
-            DrawableKind::Image { path, mask, adjust } => {
+            DrawableKind::Image {
+                path,
+                mask,
+                adjust,
+                traced,
+            } => {
                 let Some(picture) = self.picture(path) else {
                     return Ok(None);
                 };
+                let whole = frame;
                 // Masked, the object is the part that shows, and the
                 // picture lies around it.
                 if let Some(mask) = mask {
@@ -373,6 +427,9 @@ impl Builder<'_, '_> {
                     frame = shown;
                 }
                 picture_settings.adjust = adjustments(adjust);
+                traced_contour = traced
+                    .as_deref()
+                    .and_then(|t| traced_outline(t, geometry.natural, whole, frame));
                 ObjectKind::Image(picture)
             }
             DrawableKind::Media {
@@ -411,6 +468,16 @@ impl Builder<'_, '_> {
         }
         object.wrap = wrap;
         object.wrap_margin = wrap_margin;
+        if drawable.wrap.as_ref().is_some_and(|w| w.tight)
+            && matches!(wrap, Wrap::Both | Wrap::Left | Wrap::Right | Wrap::Largest)
+        {
+            // Around the outline of a shape, or the opaque part of a
+            // picture (OBJ-17).
+            object.contour = match &object.kind {
+                ObjectKind::Image(_) => traced_contour,
+                _ => object.shape_contour(),
+            };
+        }
         object.locked = drawable.locked;
         object.picture = picture_settings;
         object.style.shadow = drawable.shadow.map(|shadow| desk_model::ObjectShadow {
@@ -568,4 +635,23 @@ fn remove_mark(document: &mut desk_model::Document, id: NodeId) -> Result<(), Fi
         })?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn obj_17_the_traced_outline_of_a_picture_is_placed_in_its_mask() {
+        let whole = Frame::from_pt(0.0, 0.0, 100.0, 50.0);
+        // A triangle over the picture, in its natural size of 200 by 100.
+        let traced = "M 0 0 L 200 0 L 100 100 Z";
+        let outline = traced_outline(traced, (200.0, 100.0), whole, whole).unwrap();
+        assert_eq!(&*outline, &[(0, 0), (10_000, 0), (5_000, 10_000)]);
+        // Its right half shows: the outline is kept inside it.
+        let shown = Frame::from_pt(50.0, 0.0, 50.0, 50.0);
+        let outline = traced_outline(traced, (200.0, 100.0), whole, shown).unwrap();
+        assert_eq!(&*outline, &[(0, 0), (10_000, 0), (0, 10_000)]);
+        assert!(traced_outline("M 0 0 L 1 1", (0.0, 1.0), whole, whole).is_none());
+    }
 }

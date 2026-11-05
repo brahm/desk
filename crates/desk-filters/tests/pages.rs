@@ -988,3 +988,18 @@ fn obj_04_obj_07_obj_16_obj_37_obj_39_masks_adjustments_text_layout_and_effects_
     assert_eq!(shadow.opacity, 75);
     assert_eq!(objects[2].style.opacity, 40);
 }
+
+#[test]
+fn obj_17_objects_saved_with_a_tight_wrap_keep_their_outline() {
+    let (_, objects) = fixture_objects("obj-17-wrap.pages");
+    assert_eq!(objects.len(), 5);
+    for object in &objects {
+        // Rectangles, so their outline is their box.
+        assert_eq!(
+            object.contour.as_deref(),
+            Some(&[(0, 0), (10_000, 0), (10_000, 10_000), (0, 10_000)][..]),
+            "{object:?}"
+        );
+    }
+    assert_eq!(objects[0].wrap, desk_model::Wrap::Largest);
+}

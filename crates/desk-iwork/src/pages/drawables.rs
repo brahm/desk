@@ -176,6 +176,9 @@ pub enum DrawableKind {
         /// The changes of Adjust Image (`sf:filter-properties`), by name,
         /// as `kSFRSaturationProperty`.
         adjust: Vec<(String, f64)>,
+        /// `sf:traced-path`: the outline of the opaque part of the
+        /// picture, in its natural size, that text wraps tightly around.
+        traced: Option<String>,
     },
     /// A movie or a sound (`sf:media` with `sf:movie-media`).
     Media {
@@ -273,6 +276,9 @@ pub struct TextWrap {
     pub kind: String,
     /// `sf:margin`, in points.
     pub margin: f64,
+    /// Whether `sf:wrap-style` is `tight`: around the outline of the
+    /// object rather than its box.
+    pub tight: bool,
 }
 
 /// How many of an object and the objects of its group the reader does
@@ -328,6 +334,10 @@ fn media(ids: &Ids<'_>, element: &Element) -> DrawableKind {
                             .collect()
                     })
                     .unwrap_or_default(),
+                traced: content
+                    .child(SF, "traced-path")
+                    .and_then(|t| t.attr(SFA, "path"))
+                    .map(str::to_owned),
             }),
         "movie-media" => {
             let movie = content.child(SF, "self-contained-movie");
@@ -488,6 +498,7 @@ impl<'a> Reader<'a, '_> {
                         .unwrap_or("directional")
                         .to_owned(),
                     margin: number(wrap, SF, "margin"),
+                    tight: wrap.attr(SF, "wrap-style") == Some("tight"),
                 });
             }
             style = current
