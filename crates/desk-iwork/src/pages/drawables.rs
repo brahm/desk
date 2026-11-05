@@ -165,6 +165,26 @@ pub enum DrawableKind {
     },
     /// A group of objects (`sf:group`), placed from its top left corner.
     Group(Vec<Drawable>),
+    /// A picture (`sf:media` with `sf:image-media`), by the path of its
+    /// file in the package.
+    Image {
+        /// `sf:data sf:path` of the picture as it was put in.
+        path: String,
+    },
+    /// A movie or a sound (`sf:media` with `sf:movie-media`).
+    Media {
+        /// The path of its file in the package: the first of
+        /// `sf:other-datas`, which holds the movie itself, or else
+        /// `sf:main-movie`.
+        path: String,
+        /// The path of the picture that stands for a movie
+        /// (`sf:poster-image`).
+        poster: Option<String>,
+        /// `sf:looping`: `no`, `loop`, or `palindrome` for back and forth.
+        looping: String,
+        /// `sf:volume`, from 0 to 1.
+        volume: f64,
+    },
     /// An object the reader does not read yet, by its element: a picture,
     /// a movie, a chart or a table.
     Other(String),
@@ -201,11 +221,78 @@ pub struct TextWrap {
     pub enabled: bool,
     /// `sf:direction`: `both`, `left`, `right` or `neither`.
     pub direction: String,
-    /// `sf:floating-wrap-type`: `directional`, or `largest` for the side
-    /// with more room.
+    /// `sf:floating-wrap-type`: `directional`, `largest` for the side with
+    /// more room, or `neither` for above and below.
     pub kind: String,
     /// `sf:margin`, in points.
     pub margin: f64,
+}
+
+/// How many of an object and the objects of its group the reader does
+/// not read.
+fn left_out(drawable: &Drawable) -> usize {
+    match &drawable.kind {
+        DrawableKind::Other(_) => 1,
+        DrawableKind::Group(objects) => objects.iter().map(left_out).sum(),
+        _ => 0,
+    }
+}
+
+/// The path of the file of an `sf:data` element under an element.
+fn data_path(ids: &Ids<'_>, element: &Element) -> Option<String> {
+    let element = ids.deref(element);
+    let data = if element.name.is(SF, "data") {
+        element
+    } else {
+        element.child(SF, "data")?
+    };
+    data.attr(SF, "path").map(str::to_owned)
+}
+
+/// A picture or a movie (`sf:media`).
+fn media(ids: &Ids<'_>, element: &Element) -> DrawableKind {
+    let Some(content) = element
+        .child(SF, "content")
+        .and_then(|c| c.elements().next())
+    else {
+        return DrawableKind::Other("media".into());
+    };
+    let path = match content.name.local.as_str() {
+        "image-media" => content
+            .child(SF, "filtered-image")
+            .and_then(|f| {
+                f.child(SF, "unfiltered")
+                    .or_else(|| f.child(SF, "unfiltered-ref"))
+            })
+            .and_then(|u| data_path(ids, u))
+            .map(|path| DrawableKind::Image { path }),
+        "movie-media" => {
+            let movie = content.child(SF, "self-contained-movie");
+            let path = movie
+                .and_then(|m| m.child(SF, "other-datas"))
+                .and_then(|o| o.elements().find_map(|d| data_path(ids, d)))
+                .or_else(|| {
+                    movie
+                        .and_then(|m| m.child(SF, "main-movie"))
+                        .and_then(|m| m.attr(SF, "path"))
+                        .map(str::to_owned)
+                });
+            path.map(|path| DrawableKind::Media {
+                path,
+                poster: content
+                    .child(SF, "poster-image")
+                    .and_then(|p| data_path(ids, p)),
+                looping: content.attr(SF, "looping").unwrap_or("no").to_owned(),
+                volume: content
+                    .attr(SF, "volume")
+                    .and_then(|v| v.trim().parse::<f64>().ok())
+                    .filter(|v| v.is_finite())
+                    .unwrap_or(1.0),
+            })
+        }
+        _ => None,
+    };
+    path.unwrap_or_else(|| DrawableKind::Other("media".into()))
 }
 
 /// A number of an attribute, 0 when it is missing or not a number.
@@ -267,7 +354,8 @@ impl<'a> Reader<'a, '_> {
                 .and_then(|w| w.child(SF, "external-text-wrap"));
             if let Some(wrap) = wrap {
                 return Some(TextWrap {
-                    enabled: wrap.attr(SF, "floating-wrap-enabled") != Some("false"),
+                    // Pages leaves it out when it is off.
+                    enabled: wrap.attr(SF, "floating-wrap-enabled") == Some("true"),
                     direction: wrap.attr(SF, "direction").unwrap_or("both").to_owned(),
                     kind: wrap
                         .attr(SF, "floating-wrap-type")
@@ -339,6 +427,15 @@ impl<'a> Reader<'a, '_> {
                 "textbox-chain" | "style" => {}
                 _ => {
                     if let Some(drawable) = self.drawable(child, place) {
+                        // Counted as the floating objects an import leaves
+                        // out.
+                        let left_out = left_out(&drawable);
+                        if left_out > 0 {
+                            match self.skipped.iter_mut().find(|(n, _)| n == "drawables") {
+                                Some((_, count)) => *count += left_out,
+                                None => self.skipped.push(("drawables".to_owned(), left_out)),
+                            }
+                        }
                         out.push(drawable);
                     }
                 }
@@ -373,20 +470,8 @@ impl<'a> Reader<'a, '_> {
                 }
                 DrawableKind::Group(objects)
             }
-            other => {
-                let name = match other {
-                    "media" | "image" => "media",
-                    "chart-info" => "chart",
-                    "tabular-info" => "table",
-                    _ => other,
-                };
-                // Counted as the floating objects an import leaves out.
-                match self.skipped.iter_mut().find(|(n, _)| n == "drawables") {
-                    Some((_, count)) => *count += 1,
-                    None => self.skipped.push(("drawables".to_owned(), 1)),
-                }
-                DrawableKind::Other(name.to_owned())
-            }
+            "media" => media(self.ids, element),
+            other => DrawableKind::Other(other.to_owned()),
         };
         Some(Drawable {
             id: element.attr(SFA, "ID").map(str::to_owned),
@@ -480,5 +565,25 @@ pub(super) fn read(
         }
     }
     reader.document.drawables = drawables;
+    // The objects in the line of the text, which the text refers to.
+    let attachments: Vec<&Element> = root
+        .descendants()
+        .filter(|e| e.name.is(SF, "attachment"))
+        .filter(|e| e.attr(SF, "kind") == Some("drawable-attachment"))
+        .collect();
+    for attachment in attachments {
+        let Some(id) = attachment.attr(SFA, "ID") else {
+            continue;
+        };
+        let object = attachment
+            .elements()
+            .find(|e| !matches!(e.name.local.as_str(), "position" | "original-size"));
+        let Some(drawable) = object.and_then(|o| reader.drawable(o, &Place::Page(0))) else {
+            continue;
+        };
+        if left_out(&drawable) == 0 {
+            reader.document.attachments.push((id.to_owned(), drawable));
+        }
+    }
     reader.skipped
 }

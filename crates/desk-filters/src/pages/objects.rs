@@ -195,11 +195,12 @@ fn wrap(drawable: &Drawable) -> (Wrap, Length) {
         Wrap::Through
     } else if wrap.kind == "largest" {
         Wrap::Largest
+    } else if wrap.kind == "neither" {
+        Wrap::AboveAndBelow
     } else {
         match wrap.direction.as_str() {
             "left" => Wrap::Left,
             "right" => Wrap::Right,
-            "neither" => Wrap::AboveAndBelow,
             _ => Wrap::Both,
         }
     };
@@ -210,11 +211,21 @@ fn wrap(drawable: &Drawable) -> (Wrap, Length) {
 /// link to each other by.
 struct Builder<'a, 'b> {
     importer: &'b mut Importer<'a>,
+    source: &'b iwork::PagesDocument,
     /// The ids of the objects, by the object IDs of Pages.
     ids: HashMap<String, NodeId>,
 }
 
 impl Builder<'_, '_> {
+    /// The picture of a file of the package, when it can be read.
+    fn picture(&self, path: &str) -> Option<desk_model::Picture> {
+        self.importer
+            .pictures
+            .iter()
+            .find(|(p, _)| p == path)
+            .map(|(_, picture)| picture.clone())
+    }
+
     /// The object for a drawable, placed from `origin`, or none for one
     /// that the import leaves out.
     fn object(
@@ -283,6 +294,32 @@ impl Builder<'_, '_> {
                 }
                 ObjectKind::Group(objects.into())
             }
+            DrawableKind::Image { path } => match self.picture(path) {
+                Some(picture) => ObjectKind::Image(picture),
+                None => return Ok(None),
+            },
+            DrawableKind::Media {
+                path,
+                poster,
+                looping,
+                volume,
+            } => {
+                let Some(mut media) = self
+                    .source
+                    .file(path)
+                    .and_then(|bytes| desk_model::Media::from_bytes(bytes.to_vec()))
+                else {
+                    return Ok(None);
+                };
+                media.poster = poster.as_deref().and_then(|p| self.picture(p));
+                media.repeat = match looping.as_str() {
+                    "loop" => desk_model::Repeat::Loop,
+                    "palindrome" => desk_model::Repeat::BackAndForth,
+                    _ => desk_model::Repeat::None,
+                };
+                media.volume = (volume * 100.0).round().clamp(0.0, 100.0) as u8;
+                ObjectKind::Media(media)
+            }
             DrawableKind::Other(_) => return Ok(None),
         };
         let (wrap, wrap_margin) = wrap(drawable);
@@ -323,14 +360,15 @@ impl Builder<'_, '_> {
 /// Puts the floating objects of a document in it: those of the pages on
 /// their pages, and those of the masters on the masters of their
 /// sections, by the paragraphs that start the sections with headers of
-/// their own. The first section is that of `first`. Returns how many it
-/// left out.
+/// their own. The first section is that of `first`. Then puts the objects
+/// in the lines of the body where their marks are. Returns how many
+/// floating objects and objects in the text it left out.
 pub(super) fn import_objects(
     importer: &mut Importer<'_>,
     source: &iwork::PagesDocument,
     first: Option<&str>,
     sections: &HashMap<&str, NodeId>,
-) -> Result<usize, FilterError> {
+) -> Result<(usize, usize), FilterError> {
     let mut drawables: Vec<&Drawable> = source.drawables.iter().collect();
     // From back to front: the masters behind the pages, the objects behind
     // the text first, then by their order.
@@ -340,6 +378,7 @@ pub(super) fn import_objects(
     });
     let mut builder = Builder {
         importer,
+        source,
         ids: HashMap::new(),
     };
     for drawable in &drawables {
@@ -364,6 +403,14 @@ pub(super) fn import_objects(
             },
         };
         let Some(mut object) = builder.object(drawable, anchor, (0.0, 0.0))? else {
+            // The reader counts the objects it does not read; these are a
+            // picture or a movie whose file cannot be read.
+            if matches!(
+                drawable.kind,
+                DrawableKind::Image { .. } | DrawableKind::Media { .. }
+            ) {
+                left_out += 1;
+            }
             continue;
         };
         if matches!(
@@ -381,5 +428,56 @@ pub(super) fn import_objects(
             .document
             .apply(Op::InsertObject { index, object })?;
     }
-    Ok(left_out)
+    // The objects in the lines of the body, each where its mark is.
+    let inline = std::mem::take(&mut builder.importer.inline);
+    let mut inline_left_out = 0;
+    for (id, attachment) in inline {
+        let built = source
+            .attachments
+            .iter()
+            .find(|(a, _)| *a == attachment)
+            .map(|(_, d)| builder.object(d, Anchor::InText, (0.0, 0.0)))
+            .transpose()?
+            .flatten();
+        let Some(mut object) = built else {
+            inline_left_out += 1;
+            remove_mark(&mut builder.importer.document, id)?;
+            continue;
+        };
+        object.id = id;
+        object.frame.x = Length::ZERO;
+        object.frame.y = Length::ZERO;
+        object.rotation = 0;
+        object.wrap = Wrap::Both;
+        let index = builder.importer.document.objects().len();
+        builder
+            .importer
+            .document
+            .apply(Op::InsertObject { index, object })?;
+    }
+    Ok((left_out, inline_left_out))
+}
+
+/// Takes out of the body the mark of an object that is left out.
+fn remove_mark(document: &mut desk_model::Document, id: NodeId) -> Result<(), FilterError> {
+    let found = document.body().iter().find_map(|paragraph| {
+        let mut offset = 0;
+        for run in paragraph.runs() {
+            if let Some(Some(desk_model::Field::ObjectMark { object })) = &run.attrs.field
+                && *object == id
+            {
+                return Some((paragraph.id(), offset..offset + run.len()));
+            }
+            offset += run.len();
+        }
+        None
+    });
+    if let Some((paragraph, range)) = found {
+        document.apply(Op::ReplaceText {
+            paragraph,
+            range,
+            runs: Vec::new(),
+        })?;
+    }
+    Ok(())
 }

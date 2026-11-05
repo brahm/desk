@@ -130,6 +130,12 @@ pub enum Field {
         /// `sf:bookmark`: a name of [`Paragraph::marks`].
         bookmark: String,
     },
+    /// An object in the line of the text (`sf:attachment-ref`), by the
+    /// object ID of its attachment in [`PagesDocument::attachments`].
+    Object {
+        /// `sfa:IDREF`.
+        id: String,
+    },
 }
 
 /// How the notes of a document show, from the Document Inspector
@@ -243,6 +249,9 @@ pub struct PagesDocument {
     /// The floating objects, of the pages and of the masters of the
     /// sections, in the order they are saved.
     pub drawables: Vec<Drawable>,
+    /// The objects in the line of the text (`sf:attachment` of kind
+    /// `drawable-attachment`) that the reader reads, by object ID.
+    pub attachments: Vec<(String, Drawable)>,
     /// Whether the document has body text (Document Inspector, "Document
     /// Body"): a page layout document has none.
     pub has_body: bool,
@@ -267,6 +276,23 @@ impl PagesDocument {
                 _ => None,
             })
             .collect();
+        // The pictures and movies of the objects.
+        let mut stack: Vec<&Drawable> = self
+            .drawables
+            .iter()
+            .chain(self.attachments.iter().map(|(_, d)| d))
+            .collect();
+        while let Some(drawable) = stack.pop() {
+            match &drawable.kind {
+                DrawableKind::Image { path } => paths.push(path.clone()),
+                DrawableKind::Media { path, poster, .. } => {
+                    paths.push(path.clone());
+                    paths.extend(poster.clone());
+                }
+                DrawableKind::Group(objects) => stack.extend(objects),
+                _ => {}
+            }
+        }
         paths.sort();
         paths.dedup();
         paths
@@ -729,6 +755,15 @@ impl BodyReader<'_, '_> {
                             self.push_field(runs, style, field);
                         }
                         "footnote-mark" => self.push_field(runs, style, Field::NoteMark),
+                        "attachment" => {
+                            let id = child.attr(SFA, "ID").unwrap_or_default();
+                            if self.document.attachments.iter().any(|(i, _)| i == id) {
+                                let field = Field::Object { id: id.to_owned() };
+                                self.push_field(runs, style, field);
+                            } else {
+                                self.skip(child);
+                            }
+                        }
                         "footnotebr" => self.note_break = true,
                         name if IGNORED.contains(&name) => {}
                         _ => self.skip(child),
