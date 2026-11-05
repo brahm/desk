@@ -455,6 +455,14 @@ pub enum NewShape {
     RoundedRectangle,
     Ellipse,
     Triangle,
+    RightTriangle,
+    Diamond,
+    Arrow,
+    DoubleArrow,
+    Star,
+    Polygon,
+    QuoteBubble,
+    Callout,
     Line,
     TextBox,
 }
@@ -1020,6 +1028,30 @@ impl TextEditor {
                 ),
                 NewShape::Ellipse => (Shape::Ellipse.into(), Some(blue), Some(line)),
                 NewShape::Triangle => (Shape::triangle().into(), Some(blue), Some(line)),
+                NewShape::RightTriangle
+                | NewShape::Diamond
+                | NewShape::Arrow
+                | NewShape::DoubleArrow
+                | NewShape::Star
+                | NewShape::Polygon
+                | NewShape::QuoteBubble
+                | NewShape::Callout => {
+                    let s = desk_model::POLYGON_SCALE;
+                    let polygon = |points: &[(i32, i32)]| Shape::Polygon(Arc::from(points));
+                    let outline = match shape {
+                        NewShape::RightTriangle => polygon(&[(0, 0), (s, s), (0, s)]),
+                        NewShape::Diamond => {
+                            polygon(&[(s / 2, 0), (s, s / 2), (s / 2, s), (0, s / 2)])
+                        }
+                        NewShape::Arrow => Shape::arrow(false),
+                        NewShape::DoubleArrow => Shape::arrow(true),
+                        NewShape::Star => Shape::star(),
+                        NewShape::Polygon => Shape::regular_polygon(),
+                        NewShape::QuoteBubble => Shape::balloon(true),
+                        _ => Shape::balloon(false),
+                    };
+                    (outline.into(), Some(blue), Some(line))
+                }
                 NewShape::Line => (Shape::Line { rising: false }.into(), None, Some(line)),
                 NewShape::TextBox => {
                     let style = edit.document().styles().default_paragraph();

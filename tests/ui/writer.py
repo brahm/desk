@@ -446,6 +446,7 @@ def main():
     shadow_of_a_shape(work)
     instant_alpha_of_a_picture(work)
     chosen_picture(work)
+    points_of_a_star(work)
     print("All UI tests passed.")
 
 
@@ -1129,6 +1130,38 @@ def chosen_picture(work):
         with zipfile.ZipFile(letter) as package:
             name = next(n for n in package.namelist() if n.endswith(".jpg"))
             check("the photograph is saved as it came", package.read(name) == photo.read_bytes())
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def points_of_a_star(work):
+    """The Shape group of the Inspector sets the points of a selected
+    star, which are saved with it (OBJ-11)."""
+    star = (
+        b'<draw:custom-shape text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
+        b'<draw:enhanced-geometry draw:type="star5"/></draw:custom-shape>'
+    )
+    writer, app, letter = open_with_a_shape(work, "Star.odt", star)
+    try:
+        def points_row():
+            for node in walk(app):
+                if node.get_name() == "Star Points" and showing(node):
+                    return node
+            return None
+
+        row = wait_for("the Shape group of the Inspector", points_row)
+        check("a selected star shows its points", True)
+        spin = next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
+        Atspi.Value.set_current_value(spin, 7.0)
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved points of the star",
+            lambda: saved_content(letter, r'desk:shape="star 7 3820"'),
+        )
+        check("the points of the star are saved (OBJ-11)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
