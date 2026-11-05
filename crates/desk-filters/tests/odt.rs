@@ -1914,6 +1914,7 @@ fn objects(document: &Document) -> Vec<String> {
             desk_model::Anchor::Paragraph(id) => format!("paragraph {:?}", index(id)),
             desk_model::Anchor::Page(page) => format!("page {page}"),
             desk_model::Anchor::InText => "in the text".to_owned(),
+            desk_model::Anchor::Master(_) => "on the master".to_owned(),
         };
         let kind = match &o.kind {
             desk_model::ObjectKind::TextBox(t) => format!(
@@ -2630,4 +2631,79 @@ fn obj_18_movies_of_other_programs_are_read() {
         (media.repeat, media.volume, media.is_sound()),
         (desk_model::Repeat::Loop, 50, true)
     );
+}
+
+#[test]
+fn int_05_est_21_master_objects_are_kept_in_the_master_pages_of_their_sections() {
+    use desk_model::{
+        Anchor, Editor, Fill, Frame, Object, ObjectKind, ParaAttrs, Position, Rgba, Section, Shape,
+        Start,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let second = editor
+        .edit("Masters", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Two")?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section {
+                            own_margins: true,
+                            ..Section::default()
+                        },
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let second = edit.document().body().get(1).unwrap().id();
+            for (i, section) in [None, Some(second)].into_iter().enumerate() {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    Shape::Ellipse.into(),
+                    Frame::from_pt(100.0 + 50.0 * i as f64, 300.0, 200.0, 120.0),
+                );
+                object.anchor = Anchor::Master(section);
+                object.style.fill = Some(Fill::Color(Rgba::rgb(0x33, 0x66, 0x99)));
+                edit.add_object(object)?;
+            }
+            // And one on the page, as before.
+            let mut object = Object::new(
+                edit.new_id(),
+                Shape::Rectangle.into(),
+                Frame::from_pt(72.0, 72.0, 50.0, 50.0),
+            );
+            object.anchor = Anchor::Page(0);
+            edit.add_object(object)?;
+            Ok(second)
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let bytes = write_odt(&document).unwrap();
+    keep("int-master-objects.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let second_read = read.body().get(1).unwrap().id();
+    let mut anchors: Vec<(Anchor, ObjectKind, Frame, Option<Fill>)> = read
+        .objects()
+        .iter()
+        .map(|o| (o.anchor, o.kind.clone(), o.frame, o.style.fill.clone()))
+        .collect();
+    anchors.sort_by_key(|(a, ..)| format!("{a:?}"));
+    let mut expected: Vec<(Anchor, ObjectKind, Frame, Option<Fill>)> = document
+        .objects()
+        .iter()
+        .map(|o| {
+            let anchor = match o.anchor {
+                Anchor::Master(Some(id)) if id == second => Anchor::Master(Some(second_read)),
+                other => other,
+            };
+            (anchor, o.kind.clone(), o.frame, o.style.fill.clone())
+        })
+        .collect();
+    expected.sort_by_key(|(a, ..)| format!("{a:?}"));
+    assert_eq!(anchors, expected);
 }

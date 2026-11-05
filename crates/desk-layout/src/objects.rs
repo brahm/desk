@@ -193,8 +193,9 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
     Arc::new(
         objects
             .iter()
-            // Objects in the text are placed with their lines.
-            .filter(|object| object.anchor != Anchor::InText)
+            // Objects in the text are placed with their lines, and those
+            // of the masters on every page of their sections.
+            .filter(|object| object.anchor != Anchor::InText && !object.anchor.is_master())
             .map(|object| Floating {
                 object: object.clone(),
                 anchor: match object.anchor {
@@ -202,11 +203,37 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
                     Anchor::Paragraph(id) => indexes
                         .get(&id)
                         .map_or(Place::Page(0), |&i| Place::Paragraph(i)),
-                    Anchor::InText => Place::Page(0),
+                    Anchor::InText | Anchor::Master(_) => Place::Page(0),
                 },
             })
             .collect(),
     )
+}
+
+/// Puts the objects of the master of each section behind everything else
+/// on the pages that show the headers and footers of that section, but
+/// for the pages left blank (INT-05, EST-16).
+pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::DocumentLayout) {
+    let masters: Vec<&Object> = document
+        .objects()
+        .iter()
+        .filter(|o| o.anchor.is_master())
+        .collect();
+    if masters.is_empty() {
+        return;
+    }
+    for page in &mut layout.pages {
+        if page.blank {
+            continue;
+        }
+        let key = layout.section_margins.get(page.section).copied().flatten();
+        let placed: Vec<PlacedObject> = masters
+            .iter()
+            .filter(|o| o.anchor == Anchor::Master(key))
+            .map(|o| PlacedObject::new(o, None, 0.0))
+            .collect();
+        page.objects.splice(0..0, placed);
+    }
 }
 
 /// The room that an object takes from the text, in points on the page.
@@ -591,9 +618,10 @@ fn distance_to_segment(p: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
 }
 
 /// The frontmost object on a page under a point, by its index among the
-/// objects of the page, if any is (OBJ-03). Objects behind the text are
-/// found only when `behind` is set, as Pages selects them only when
-/// nothing else is under the pointer.
+/// objects of the page, if any is (OBJ-03). Objects behind the text, and
+/// those of the master of the section, are found only when `behind` is
+/// set, as Pages selects them only when nothing else is under the
+/// pointer.
 pub fn object_at(
     objects: &[PlacedObject],
     x: f32,
@@ -605,7 +633,7 @@ pub fn object_at(
         .iter()
         .enumerate()
         .rev()
-        .filter(|(_, o)| behind || o.object.wrap != Wrap::Behind)
+        .filter(|(_, o)| behind || (o.object.wrap != Wrap::Behind && !o.object.anchor.is_master()))
         .find(|(_, o)| o.contains(x, y, tolerance))
         .map(|(i, _)| i)
 }

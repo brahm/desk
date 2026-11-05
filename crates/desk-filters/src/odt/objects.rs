@@ -864,7 +864,7 @@ fn import_one(
                 y += top;
             }
         }
-        Anchor::InText => {}
+        Anchor::InText | Anchor::Master(_) => {}
         Anchor::Paragraph(_) => {
             // From the edge of the paper, or from the margin.
             if !h_rel.starts_with("page") || h_rel.starts_with("page-content") {
@@ -1709,6 +1709,10 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
             }
             continue;
         }
+        if object.anchor.is_master() {
+            // In the master page of its section, with the headers.
+            continue;
+        }
         floating.push((z, object));
     }
     // A mark without its object is left out.
@@ -1722,7 +1726,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     for (z, object) in floating {
         let at = match object.anchor {
             Anchor::Paragraph(id) => indexes.get(&id).copied(),
-            Anchor::Page(_) | Anchor::InText => None,
+            Anchor::Page(_) | Anchor::InText | Anchor::Master(_) => None,
         };
         let mut drawn = match (object.anchor, at) {
             (Anchor::Paragraph(_), Some(_)) => exporter.object(object, "paragraph", None, left),
@@ -1730,7 +1734,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
             (Anchor::Paragraph(_) | Anchor::InText, None) => {
                 exporter.object(object, "page", Some(0), 0.0)
             }
-            (Anchor::InText, Some(_)) => continue,
+            (Anchor::InText | Anchor::Master(_), _) => continue,
         };
         drawn.z_index = Some(z as u32);
         match at.and_then(|i| out.body.get_mut(i)) {
@@ -1741,6 +1745,92 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     out.gradients = std::mem::take(&mut exporter.gradients);
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
+}
+
+/// Writes the objects of the masters of the sections in their master
+/// pages, with their styles among the automatic styles of `styles.xml`
+/// (INT-05). `masters` names the master page of each section that has
+/// one; the objects of another go on the first.
+pub(super) fn export_master_objects(
+    document: &Document,
+    names: &HashMap<desk_model::StyleId, String>,
+    masters: &HashMap<NodeId, String>,
+    pictures: &mut Vec<(String, Vec<u8>)>,
+    out: &mut odf::TextDocument,
+) {
+    let mut automatic = std::mem::take(&mut out.master_styles);
+    let mut exporter = Exporter {
+        document,
+        names,
+        automatic: &mut automatic,
+        pictures,
+        gradients: std::mem::take(&mut out.gradients),
+        markers: std::mem::take(&mut out.markers),
+        fill_images: std::mem::take(&mut out.fill_images),
+    };
+    for (z, object) in document.objects().iter().enumerate() {
+        let Anchor::Master(section) = object.anchor else {
+            continue;
+        };
+        let mut drawn = exporter.object(object, "page", None, 0.0);
+        drawn.z_index = Some(z as u32);
+        let name = section.and_then(|id| masters.get(&id));
+        let page = match name {
+            Some(name) => out
+                .masters
+                .iter_mut()
+                .find(|(n, _)| n == name)
+                .map(|(_, page)| page),
+            None => None,
+        };
+        page.unwrap_or(&mut out.master).objects.push(drawn);
+    }
+    out.gradients = std::mem::take(&mut exporter.gradients);
+    out.markers = std::mem::take(&mut exporter.markers);
+    out.fill_images = std::mem::take(&mut exporter.fill_images);
+    out.master_styles = automatic;
+}
+
+/// The drawing objects of a master page as objects of the master of
+/// `section` (INT-05), read with the styles of `styles.xml`.
+pub(super) fn import_master_objects(
+    source: &odf::TextDocument,
+    master: &odf::MasterPage,
+    section: Option<NodeId>,
+    document: &mut Document,
+    paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
+) -> Result<(), FilterError> {
+    if master.objects.is_empty() {
+        return Ok(());
+    }
+    let on_master = odf::TextDocument {
+        default_style: source.default_style.clone(),
+        styles: source.styles.clone(),
+        automatic_styles: source.master_styles.clone(),
+        page_layout: source.page_layout.clone(),
+        pictures: source.pictures.clone(),
+        page_objects: master
+            .objects
+            .iter()
+            .map(|o| odf::DrawObject {
+                anchor: Some("page".into()),
+                anchor_page: None,
+                ..o.clone()
+            })
+            .collect(),
+        gradients: source.gradients.clone(),
+        markers: source.markers.clone(),
+        fill_images: source.fill_images.clone(),
+        ..odf::TextDocument::default()
+    };
+    let before = document.objects().len();
+    import_objects(&on_master, document, paragraph)?;
+    let added: Vec<Object> = document.objects().iter().skip(before).cloned().collect();
+    for mut object in added {
+        object.anchor = Anchor::Master(section);
+        document.apply(Op::ReplaceObject { object })?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

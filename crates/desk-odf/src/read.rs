@@ -775,6 +775,10 @@ fn read_master(master: &Element) -> MasterPage {
         footer: part("footer"),
         footer_first: part("footer-first"),
         footer_left: part("footer-left"),
+        objects: master
+            .elements()
+            .filter_map(|e| crate::draw::draw_object(e, &paragraph))
+            .collect(),
     }
 }
 

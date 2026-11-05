@@ -3,7 +3,7 @@
 
 //! The shapes, text boxes and connection lines of the Insert menu, and
 //! the Arrange menu of Pages, for the selected objects (OBJ-03 to OBJ-08,
-//! OBJ-13, OBJ-31).
+//! OBJ-13, OBJ-25, OBJ-31, EST-21).
 
 use std::rc::Rc;
 
@@ -16,8 +16,12 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::tr;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 21] = [
+pub(super) const OBJECT_ACTIONS: [&str; 25] = [
     "insert-picture",
+    "move-to-master",
+    "move-to-page",
+    "background-selectable",
+    "masters-selectable",
     "insert-connection",
     "draw-with-pen",
     "make-editable",
@@ -60,7 +64,9 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 17] = [
+        let simple: [(&str, EditorAction); 19] = [
+            ("move-to-master", TextEditor::move_objects_to_master),
+            ("move-to-page", TextEditor::move_objects_to_page),
             ("insert-text-box", |e| e.insert_shape(NewShape::TextBox)),
             ("insert-connection", TextEditor::insert_connection),
             ("draw-with-pen", TextEditor::start_pen),
@@ -100,6 +106,7 @@ impl DocumentWindow {
         });
         self.window.add_action(&action);
         self.add_media_browser_action();
+        self.add_selectable_actions();
         let with_string: [(&str, ChoiceAction); 3] = [
             ("insert-shape", |e, value| {
                 let shape = match value {
@@ -184,6 +191,35 @@ impl DocumentWindow {
 }
 
 impl DocumentWindow {
+    /// Makes the objects behind the text, or those of the masters,
+    /// selectable or not (OBJ-25, EST-21).
+    fn add_selectable_actions(self: &Rc<Self>) {
+        for (name, masters) in [
+            ("background-selectable", false),
+            ("masters-selectable", true),
+        ] {
+            let action = gio::SimpleAction::new_stateful(name, None, &false.to_variant());
+            let weak = Rc::downgrade(self);
+            action.connect_change_state(move |action, value| {
+                let (Some(editor), Some(on)) = (
+                    weak.upgrade().and_then(|this| this.editor()),
+                    value.and_then(|v| v.get::<bool>()),
+                ) else {
+                    return;
+                };
+                let mut selectable = editor.selectable();
+                if masters {
+                    selectable.masters = on;
+                } else {
+                    selectable.background = on;
+                }
+                editor.set_selectable(selectable);
+                action.set_state(&on.to_variant());
+            });
+            self.window.add_action(&action);
+        }
+    }
+
     /// Shows or hides the Media Browser, whose items go on the page shown
     /// (INT-14).
     fn add_media_browser_action(self: &Rc<Self>) {
@@ -309,10 +345,26 @@ pub(super) fn arrange_menu() -> gio::Menu {
     grouping.append(Some(&tr("_Ungroup")), Some("win.ungroup"));
     grouping.append(Some(&tr("_Lock")), Some("win.lock"));
     grouping.append(Some(&tr("U_nlock")), Some("win.unlock"));
+    // The masters of the sections and the background (EST-21, OBJ-25).
+    let masters = gio::Menu::new();
+    masters.append(
+        Some(&tr("Move to Section _Master")),
+        Some("win.move-to-master"),
+    );
+    masters.append(Some(&tr("Move to _Page")), Some("win.move-to-page"));
+    masters.append(
+        Some(&tr("Make Background Objects _Selectable")),
+        Some("win.background-selectable"),
+    );
+    masters.append(
+        Some(&tr("Make Master _Objects Selectable")),
+        Some("win.masters-selectable"),
+    );
     let menu = gio::Menu::new();
     menu.append_section(None, &layers);
     menu.append_section(None, &placing);
     menu.append_section(None, &grouping);
     menu.append_section(None, &shape);
+    menu.append_section(None, &masters);
     menu
 }

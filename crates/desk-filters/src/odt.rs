@@ -1403,7 +1403,7 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             parts.push((Some(*id), page));
         }
     }
-    for (section, master) in parts {
+    for &(section, master) in &parts {
         for (place, part) in [
             (MarginPages::Default, &master.header, MarginKind::Header),
             (MarginPages::First, &master.header_first, MarginKind::Header),
@@ -1463,6 +1463,26 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             &Marks::new(),
         )
     })?;
+    // The objects of the masters of the sections (INT-05).
+    for (section, master) in parts {
+        objects::import_master_objects(
+            source,
+            master,
+            section,
+            &mut document,
+            &mut |document, paragraph| {
+                import_paragraph(
+                    &styled,
+                    document,
+                    &ids,
+                    default,
+                    paragraph,
+                    relative,
+                    &Marks::new(),
+                )
+            },
+        )?;
+    }
 
     let text = &source.text_settings;
     document.apply(Op::SetTextSettings {
@@ -2243,6 +2263,7 @@ fn export_margins(
         footer: part(margins, footer(MarginPages::Default), setup.footers),
         footer_first: part(margins, footer(MarginPages::First), setup.footers),
         footer_left: part(margins, footer(MarginPages::Left), setup.footers),
+        objects: Vec::new(),
     };
     out.master = master(document.headers_footers());
     let mut masters: Vec<(NodeId, String)> = section_masters(document).into_iter().collect();
@@ -2737,6 +2758,13 @@ pub fn export(document: &Document) -> odf::TextDocument {
     out.automatic_styles = automatic;
     out.section_styles = section_styles;
     export_margins(document, &names, &mut out);
+    objects::export_master_objects(
+        document,
+        &names,
+        &section_masters(document),
+        &mut pictures,
+        &mut out,
+    );
     out.pictures = pictures;
 
     let page = document.page_setup();

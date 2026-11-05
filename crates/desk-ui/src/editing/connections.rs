@@ -182,7 +182,14 @@ impl TextEditor {
             .then(|| {
                 let state = self.state.borrow();
                 let reach = (super::objects::REACH / self.view.scale()) as f32;
-                hit(&state.layout, drag.page, x as f32, y as f32, reach)
+                hit(
+                    &state.layout,
+                    drag.page,
+                    x as f32,
+                    y as f32,
+                    reach,
+                    state.selectable,
+                )
             })
             .flatten()
             .filter(|&other| {
