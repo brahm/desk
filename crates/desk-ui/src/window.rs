@@ -655,6 +655,20 @@ impl DocumentWindow {
         if self.action_state("outline") {
             self.show_outline(true);
         }
+        // A page layout document opens with its thumbnails and both
+        // rulers, as in Pages (INT-03).
+        if self.editor().is_some_and(|e| e.is_page_layout()) {
+            self.window.change_action_state("ruler", &true.to_variant());
+            self.show_rulers();
+            // The sidebar opens once the window has its size.
+            let weak = Rc::downgrade(self);
+            glib::idle_add_local_once(move || {
+                if let Some(this) = weak.upgrade() {
+                    this.window
+                        .change_action_state("thumbnails", &true.to_variant());
+                }
+            });
+        }
         self.format_revealer.set_reveal_child(true);
         self.refresh();
         self.show_format();
@@ -708,7 +722,8 @@ impl DocumentWindow {
     /// Shows the rulers that Show Ruler and the preferences ask for.
     fn show_rulers(&self) {
         let on = self.action_state("ruler");
-        let vertical = on && preferences::get().vertical_ruler;
+        let page_layout = self.editor().is_some_and(|e| e.is_page_layout());
+        let vertical = on && (page_layout || preferences::get().vertical_ruler);
         self.ruler.widget().set_visible(on);
         self.vertical_ruler.widget().set_visible(vertical);
         self.ruler_corner.set_visible(vertical);

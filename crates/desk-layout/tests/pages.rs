@@ -1113,3 +1113,41 @@ fn int_05_master_objects_show_on_every_page_of_their_section_behind_the_text() {
     };
     assert_eq!(lines(&layout), lines(&without));
 }
+
+#[test]
+fn int_03_a_page_layout_document_has_its_pages_and_no_body_text() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Shape};
+    let mut editor = Editor::new(Document::new_page_layout());
+    let ids = editor
+        .edit("Pages", |edit| {
+            let mut setup = *edit.document().page_setup();
+            setup.layout_pages = Some(3);
+            edit.set_page_setup(setup)?;
+            let mut ids = Vec::new();
+            // The last is on a page past the last, and goes on the last.
+            for page in [0, 2, 7] {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(100.0, 100.0, 80.0, 60.0),
+                );
+                object.anchor = Anchor::Page(page);
+                ids.push(object.id);
+                edit.add_object(object)?;
+            }
+            Ok(ids)
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let layout = paginate(editor.document(), &mut system);
+    assert_eq!(layout.pages.len(), 3);
+    let on: Vec<Vec<_>> = layout
+        .pages
+        .iter()
+        .map(|p| p.objects.iter().map(|o| o.object.id).collect())
+        .collect();
+    assert_eq!(on, [vec![ids[0]], vec![], vec![ids[1], ids[2]]]);
+    assert!(layout.pages.iter().all(|p| p.lines.is_empty()));
+    let numbers: Vec<u32> = layout.pages.iter().map(|p| p.number).collect();
+    assert_eq!(numbers, [1, 2, 3]);
+}

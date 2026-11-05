@@ -49,6 +49,19 @@ impl TextEditor {
 
     /// The page the cursor is on, in the body.
     pub fn cursor_page(&self) -> Option<usize> {
+        if self.is_page_layout() {
+            // No cursor in the body of a page layout document: the page
+            // of the object selected, or of the page in sight (INT-03).
+            let selected = self.selected_objects();
+            let state = self.state.borrow();
+            let anchored = selected.first().and_then(|&id| {
+                match state.editor.document().objects().get(id)?.anchor {
+                    desk_model::Anchor::Page(p) => usize::try_from(p).ok(),
+                    _ => None,
+                }
+            });
+            return anchored.or_else(|| self.view.current_page()).or(Some(0));
+        }
         let state = self.state.borrow();
         let spot = match &state.story {
             Some(mode) => mode.body.focus,
@@ -150,6 +163,11 @@ impl TextEditor {
     /// section, when the page is all of it, or else its text.
     pub fn delete_page(&self, page: usize) {
         self.leave_story(None);
+        if self.is_page_layout() {
+            let page = u32::try_from(page).unwrap_or(u32::MAX);
+            self.layout_page_edit("Delete Page", |edit| edit.delete_layout_page(page));
+            return;
+        }
         let sections = self.page_sections();
         let Some(&section) = sections.get(page) else {
             return;
@@ -175,5 +193,54 @@ impl TextEditor {
             focus: end,
         });
         self.replace_selection("Delete Page", "");
+    }
+
+    /// Whether the document is laid out page by page, with no body text
+    /// (INT-03).
+    pub fn is_page_layout(&self) -> bool {
+        let state = self.state.borrow();
+        let editor = state
+            .story
+            .as_ref()
+            .map_or(&state.editor, |mode| &mode.main);
+        editor.document().page_setup().is_page_layout()
+    }
+
+    /// Adds a page to a page layout document after the page in sight, or
+    /// of the object selected, and shows it (INT-03).
+    pub fn add_layout_page(&self) {
+        self.leave_story(None);
+        let page = self.cursor_page().unwrap_or(0);
+        let after = u32::try_from(page).unwrap_or(u32::MAX);
+        self.layout_page_edit("Insert Page", |edit| edit.add_layout_page(after));
+        self.view.scroll_to_page(page + 1);
+    }
+
+    /// Adds or takes out pages of a page layout document, leaving no
+    /// object selected.
+    fn layout_page_edit(
+        &self,
+        name: &str,
+        change: impl FnOnce(&mut desk_model::Edit) -> Result<(), ModelError>,
+    ) {
+        self.select_objects(Vec::new());
+        let selection = self.selection();
+        let depth = self.state.borrow().editor.undo_depth();
+        let result = self.state.borrow_mut().editor.edit(name, change);
+        self.state.borrow_mut().typing = false;
+        match result {
+            Ok(()) if self.state.borrow().editor.undo_depth() > depth => {
+                {
+                    let mut state = self.state.borrow_mut();
+                    let action = state.next_action;
+                    state.next_action += 1;
+                    state.undo.push((selection, selection, action));
+                    state.redo.clear();
+                }
+                self.after_change(selection);
+            }
+            Ok(()) => {}
+            Err(error) => gtk::glib::g_warning!("desk", "cannot change the pages: {error}"),
+        }
     }
 }

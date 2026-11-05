@@ -453,6 +453,7 @@ def main():
     connection_line(work)
     media_browser(work)
     master_objects(work)
+    page_layout(work)
     print("All UI tests passed.")
 
 
@@ -1438,6 +1439,54 @@ def master_objects(work):
             lambda: saved_content(letter, r'<draw:rect [^>]*text:anchor-type="page"'),
         )
         check("Move to Page puts it back on the page (EST-21)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+PAGE_LAYOUT_SETTINGS = (
+    b'<?xml version="1.0" encoding="UTF-8"?>'
+    b'<office:document-settings '
+    b'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+    b'xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0" office:version="1.3">'
+    b'<office:settings><config:config-item-set config:name="DeskTextSettings">'
+    b'<config:config-item config:name="PageLayoutPages" config:type="int">1</config:config-item>'
+    b"</config:config-item-set></office:settings></office:document-settings>"
+)
+
+
+def page_layout(work):
+    """A page layout document takes no typing in its body, and a page
+    break adds a page to it, saved with the count of its pages (INT-03)."""
+    writer, app, letter = open_with_a_shape(
+        work, "Layout.odt", extra={"settings.xml": PAGE_LAYOUT_SETTINGS}
+    )
+    try:
+        document = find(app, Atspi.Role.TEXT, "Layout.odt")
+        before = text_of(document)
+        check("a page layout document opens with no body text (INT-03)", before.strip() == "")
+        wait_for(
+            "the thumbnail of the page",
+            lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
+        )
+        check("and with the thumbnails of its pages (INT-03)", True)
+        press("Escape")
+        type_text("Hello")
+        press("Return")
+        time.sleep(1)
+        check("typing puts no text in its body (INT-03)", text_of(document) == before)
+        activate("insert-page-break")
+        press("ctrl+s")
+        wait_for(
+            "the document saved with two pages",
+            lambda: saved_part(
+                letter,
+                "settings.xml",
+                r'config:name="PageLayoutPages" config:type="int">2<',
+            ),
+        )
+        check("a page break adds a page to it (INT-03)", True)
+        check("and its body still has no text", not saved_content(letter, r"Hello"))
     finally:
         writer.terminate()
         writer.wait(timeout=10)

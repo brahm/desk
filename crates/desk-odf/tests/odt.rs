@@ -504,6 +504,7 @@ fn full_document() -> TextDocument {
             note_gap: Some("20pt".into()),
             header_margin: Some("18pt".into()),
             footer_margin: None,
+            layout_pages: Some(3),
         },
         style_shortcuts: vec![
             StyleShortcut {
