@@ -2443,6 +2443,15 @@ impl TextEditor {
 
     /// Gives the paragraphs of the selection a paragraph style.
     pub fn set_paragraph_style(&self, style: StyleId) {
+        if self.style_selected_objects(
+            "Paragraph Style",
+            desk_model::TextStyling::Paragraph {
+                style,
+                clean: false,
+            },
+        ) {
+            return;
+        }
         self.format_ranges("Paragraph Style", |edit, from, to| {
             edit.set_paragraph_style(from, to, style)
         });
@@ -2452,6 +2461,12 @@ impl TextEditor {
     /// the formatting set over it, as a style shortcut with Alt does
     /// (STY-04).
     pub fn set_paragraph_style_clean(&self, style: StyleId) {
+        if self.style_selected_objects(
+            "Paragraph Style",
+            desk_model::TextStyling::Paragraph { style, clean: true },
+        ) {
+            return;
+        }
         self.format_ranges("Paragraph Style", |edit, from, to| {
             edit.set_paragraph_style_clean(from, to, style)
         });
@@ -2459,9 +2474,34 @@ impl TextEditor {
 
     /// Gives the selected text a character style, or none.
     pub fn set_character_style(&self, style: Option<StyleId>) {
+        if self.style_selected_objects(
+            "Character Style",
+            desk_model::TextStyling::Character {
+                style,
+                clean: false,
+            },
+        ) {
+            return;
+        }
         self.format_ranges("Character Style", |edit, from, to| {
             edit.set_character_style(from, to, style)
         });
+    }
+
+    /// Gives all the text of the selected objects a style, when objects
+    /// rather than text are selected, as one action (STY-02). Whether
+    /// they were.
+    fn style_selected_objects(&self, name: &str, styling: desk_model::TextStyling) -> bool {
+        if self.story().is_some() || !self.has_selected_objects() {
+            return false;
+        }
+        self.arrange_objects(name, |edit, ids| {
+            for &id in ids {
+                edit.style_object_text(id, styling)?;
+            }
+            Ok(None)
+        });
+        true
     }
 
     /// Gives the selection a style of either family; with `clean`, the
@@ -2472,7 +2512,15 @@ impl TextEditor {
             Some(StyleFamily::Paragraph) if clean => self.set_paragraph_style_clean(style),
             Some(StyleFamily::Paragraph) => self.set_paragraph_style(style),
             Some(StyleFamily::Character) => {
-                if clean {
+                if clean
+                    && !self.style_selected_objects(
+                        "Character Style",
+                        desk_model::TextStyling::Character {
+                            style: Some(style),
+                            clean: true,
+                        },
+                    )
+                {
                     self.format_ranges("Character Style", |edit, from, to| {
                         edit.set_character_style(from, to, Some(style))?;
                         edit.clear_character_attrs(from, to)
@@ -2561,12 +2609,33 @@ impl TextEditor {
     /// Everything that a search finds in the document, and in its
     /// headers, footers and notes (TXT-12, TXT-13).
     pub fn find(&self, query: &desk_model::Query) -> Vec<desk_model::Found> {
+        let stories = self.all_stories();
         let state = self.state.borrow();
-        let stories: Vec<Story> = stories::story_pages(Self::main_layout(&state))
+        Self::main_document(&state).find_everywhere(query, &stories)
+    }
+
+    /// The headers, footers, notes, text boxes and shapes with text that
+    /// the pages show.
+    pub fn all_stories(&self) -> Vec<Story> {
+        stories::story_pages(Self::main_layout(&self.state.borrow()))
             .into_iter()
             .map(|(story, _)| story)
-            .collect();
-        Self::main_document(&state).find_everywhere(query, &stories)
+            .collect()
+    }
+
+    /// Whether any text uses a style: in the body, or in a header, a
+    /// footer, a note, a text box or a shape (STY-09).
+    pub fn style_used(&self, style: StyleId) -> bool {
+        let stories = self.all_stories();
+        let state = self.state.borrow();
+        let document = Self::main_document(&state);
+        !document.style_uses(style).is_empty()
+            || stories.iter().any(|&story| {
+                !document
+                    .with_body(document.story_paragraphs(story))
+                    .style_uses(style)
+                    .is_empty()
+            })
     }
 
     /// Selects a piece of text that a search found, and shows it, in the

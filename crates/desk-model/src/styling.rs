@@ -710,6 +710,18 @@ impl Edit {
             self.put(other)?;
         }
         // The text that uses it.
+        self.replace_style_in_body(id, family, replacement)?;
+        self.apply(Op::RemoveStyle { style: id })
+    }
+
+    /// Gives the text of the body that uses a style another style of its
+    /// family, or none for a character or a list style.
+    fn replace_style_in_body(
+        &mut self,
+        id: StyleId,
+        family: StyleFamily,
+        replacement: Option<StyleId>,
+    ) -> Result<(), ModelError> {
         let uses = self.document().style_uses(id);
         match family {
             StyleFamily::Paragraph => {
@@ -740,7 +752,50 @@ impl Edit {
                 }
             }
         }
-        self.apply(Op::RemoveStyle { style: id })
+        Ok(())
+    }
+
+    /// Gives all the text that uses a style another style of its family,
+    /// or none for a character or a list style: in the body and in some
+    /// headers, footers, notes, text boxes and shapes, as the advanced
+    /// Find & Replace of Pages replaces styles (STY-09). Gives back how
+    /// many pieces of text used it.
+    pub fn replace_style_uses(
+        &mut self,
+        id: StyleId,
+        replacement: Option<StyleId>,
+        stories: &[crate::story::Story],
+    ) -> Result<usize, ModelError> {
+        let styles = self.document().styles();
+        let family = styles
+            .get(id)
+            .map(Style::family)
+            .ok_or(ModelError::UnknownStyle(id))?;
+        match replacement {
+            Some(other) if other == id => return Ok(0),
+            Some(other) => styles.check_family(other, family)?,
+            None if family == StyleFamily::Paragraph => {
+                return Err(ModelError::UnknownStyle(id));
+            }
+            None => {}
+        }
+        let mut count = self.document().style_uses(id).len();
+        self.replace_style_in_body(id, family, replacement)?;
+        for &story in stories {
+            let paragraphs = self.document().story_paragraphs(story);
+            let copy = self.document().with_body(paragraphs);
+            let uses = copy.style_uses(id).len();
+            if uses == 0 {
+                continue;
+            }
+            count += uses;
+            let mut copy = copy;
+            copy.transact("Replace Style", |edit| {
+                edit.replace_style_in_body(id, family, replacement)
+            })?;
+            self.set_story(story, copy.body().iter().cloned().collect())?;
+        }
+        Ok(count)
     }
 
     /// Replaces a font family with another in every style and all the

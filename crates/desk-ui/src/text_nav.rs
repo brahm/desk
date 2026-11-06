@@ -553,51 +553,79 @@ pub struct InvisibleMark {
 /// The invisible characters of a document as laid out.
 pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<InvisibleMark> {
     let mut marks = Vec::new();
+    let body: Vec<&desk_model::Paragraph> = document.body().iter().collect();
     for (page, p) in layout.pages.iter().enumerate() {
         for line in &p.lines {
-            let Some(paragraph) = document.body().get(line.paragraph) else {
+            line_invisibles(&mut marks, page, line, &body);
+        }
+        // Those of the text in text boxes and shapes, unless turned
+        // (INT-10).
+        let mut objects: Vec<&desk_layout::PlacedObject> = p.objects.iter().collect();
+        while let Some(placed) = objects.pop() {
+            objects.extend(&placed.children);
+            if placed.lines.is_empty() || placed.object.rotation != 0 {
                 continue;
-            };
-            let text = paragraph.text();
-            let range = line.line.range.clone();
-            let x = |offset: usize| f64::from(line.origin.0 + line.line.caret_x(offset));
-            let baseline = f64::from(line.baseline());
-            let ascent = baseline - f64::from(line.top());
-            let Some(slice) = text.get(range.clone()) else {
-                continue;
-            };
-            for (at, c) in slice.char_indices() {
-                let kind = match c {
-                    ' ' => Invisible::Space,
-                    desk_model::NO_BREAK_SPACE => Invisible::NoBreakSpace,
-                    '\t' => Invisible::Tab,
-                    desk_model::LINE_BREAK => Invisible::LineBreak,
-                    _ => continue,
-                };
-                let offset = range.start + at;
-                marks.push(InvisibleMark {
-                    page,
-                    kind,
-                    x0: x(offset),
-                    x1: x(offset + c.len_utf8()),
-                    baseline,
-                    ascent,
-                });
             }
-            if range.end == text.len() && !slice.ends_with(desk_model::LINE_BREAK) {
-                let end = x(text.len());
-                marks.push(InvisibleMark {
-                    page,
-                    kind: Invisible::end_of(document.body().get(line.paragraph + 1)),
-                    x0: end,
-                    x1: end,
-                    baseline,
-                    ascent,
-                });
+            let head = document.text_box_head(placed.object.id);
+            let Some(text) = document.objects().get(head).and_then(|o| o.text_box()) else {
+                continue;
+            };
+            let paragraphs: Vec<&desk_model::Paragraph> = text.paragraphs.iter().collect();
+            for line in &placed.lines {
+                line_invisibles(&mut marks, page, line, &paragraphs);
             }
         }
     }
     marks
+}
+
+/// The invisible characters of a line of some paragraphs.
+fn line_invisibles(
+    marks: &mut Vec<InvisibleMark>,
+    page: usize,
+    line: &desk_layout::PlacedLine,
+    paragraphs: &[&desk_model::Paragraph],
+) {
+    let Some(paragraph) = paragraphs.get(line.paragraph) else {
+        return;
+    };
+    let text = paragraph.text();
+    let range = line.line.range.clone();
+    let x = |offset: usize| f64::from(line.origin.0 + line.line.caret_x(offset));
+    let baseline = f64::from(line.baseline());
+    let ascent = baseline - f64::from(line.top());
+    let Some(slice) = text.get(range.clone()) else {
+        return;
+    };
+    for (at, c) in slice.char_indices() {
+        let kind = match c {
+            ' ' => Invisible::Space,
+            desk_model::NO_BREAK_SPACE => Invisible::NoBreakSpace,
+            '\t' => Invisible::Tab,
+            desk_model::LINE_BREAK => Invisible::LineBreak,
+            _ => continue,
+        };
+        let offset = range.start + at;
+        marks.push(InvisibleMark {
+            page,
+            kind,
+            x0: x(offset),
+            x1: x(offset + c.len_utf8()),
+            baseline,
+            ascent,
+        });
+    }
+    if range.end == text.len() && !slice.ends_with(desk_model::LINE_BREAK) {
+        let end = x(text.len());
+        marks.push(InvisibleMark {
+            page,
+            kind: Invisible::end_of(paragraphs.get(line.paragraph + 1).copied()),
+            x0: end,
+            x1: end,
+            baseline,
+            ascent,
+        });
+    }
 }
 
 #[cfg(test)]
@@ -798,6 +826,39 @@ mod tests {
         assert!(marks[0].ascent > 0.0);
         // The empty paragraph ends at its start, on the next line.
         assert!(marks[3].baseline > marks[2].baseline);
+    }
+
+    #[test]
+    fn int_10_invisibles_show_in_text_boxes_too() {
+        use desk_model::{Frame, Object, ObjectKind, ParaAttrs, Paragraph, Run, TextBox};
+        use std::sync::Arc;
+        let mut editor = Editor::new(Document::new_page_layout());
+        editor
+            .edit("Add", |e| {
+                let style = e.document().styles().default_paragraph();
+                let paragraph = Paragraph::from_runs(
+                    e.new_id(),
+                    style,
+                    ParaAttrs::default(),
+                    [Run::new("a b")],
+                )?;
+                let id = e.new_id();
+                e.add_object(Object::new(
+                    id,
+                    ObjectKind::TextBox(TextBox::new(
+                        Arc::from([paragraph]),
+                        Length::from_points(4),
+                    )),
+                    Frame::from_pt(100.0, 100.0, 200.0, 100.0),
+                ))
+            })
+            .unwrap();
+        let doc = editor.document().clone();
+        let layout = laid_out(&doc);
+        let kinds: Vec<_> = invisibles(&doc, &layout).iter().map(|m| m.kind).collect();
+        assert_eq!(kinds, [Invisible::Space, Invisible::Paragraph]);
+        let marks = invisibles(&doc, &layout);
+        assert!(marks[0].x0 > 100.0 && marks[0].baseline > 100.0);
     }
 
     #[test]

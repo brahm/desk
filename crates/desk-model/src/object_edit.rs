@@ -759,6 +759,82 @@ impl Edit {
     }
 }
 
+/// A style that the whole text of an object takes when the object is
+/// selected rather than its text (STY-02).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextStyling {
+    /// A paragraph style, with or without the attributes set over it
+    /// (STY-04).
+    Paragraph {
+        /// The style.
+        style: crate::StyleId,
+        /// Whether the attributes set over it go.
+        clean: bool,
+    },
+    /// A character style, or none, with or without the attributes set
+    /// over it.
+    Character {
+        /// The style.
+        style: Option<crate::StyleId>,
+        /// Whether the attributes set over it go.
+        clean: bool,
+    },
+}
+
+impl Edit {
+    /// Gives the whole text of an object, a text box or a shape with
+    /// text, a paragraph or a character style, as Pages does when the
+    /// object is selected (STY-02). Other objects stay as they are.
+    pub fn style_object_text(
+        &mut self,
+        id: NodeId,
+        styling: TextStyling,
+    ) -> Result<(), ModelError> {
+        let Some(mut object) = self.document().objects().get(id).cloned() else {
+            return Err(ModelError::UnknownObject(id));
+        };
+        let Some(text) = object.text_box_mut() else {
+            return Ok(());
+        };
+        let paragraphs = text
+            .paragraphs
+            .iter()
+            .map(|p| {
+                let (style, mut attrs) = match styling {
+                    TextStyling::Paragraph { style, clean: true } => (style, p.attrs().structure()),
+                    TextStyling::Paragraph { style, .. } => (style, p.attrs().clone()),
+                    TextStyling::Character { .. } => (p.style(), p.attrs().clone()),
+                };
+                if let TextStyling::Paragraph { .. } = styling {
+                    // A new paragraph style takes the place of a list.
+                    attrs.list_style = None;
+                }
+                let runs = p.runs().cloned().map(|mut run| {
+                    match styling {
+                        TextStyling::Paragraph { clean: true, .. } => {
+                            run.attrs = run.attrs.text_bound()
+                        }
+                        TextStyling::Character { style, clean } => {
+                            run.style = style;
+                            if clean {
+                                run.attrs = run.attrs.text_bound();
+                            }
+                        }
+                        TextStyling::Paragraph { .. } => {}
+                    }
+                    run
+                });
+                crate::text::Paragraph::from_runs(p.id(), style, attrs, runs)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        text.paragraphs = paragraphs.into();
+        if self.document().objects().get(id) == Some(&object) {
+            return Ok(());
+        }
+        self.replace_object(object)
+    }
+}
+
 /// Pages of a page layout document, copied with the objects on them, to
 /// paste (EST-16).
 #[derive(Clone, Debug, PartialEq)]
@@ -1160,5 +1236,147 @@ mod tests {
             .edit("Delete Pages", |e| e.delete_layout_pages(&[0, 1]))
             .unwrap();
         assert_eq!(editor.document().page_setup().layout_pages, Some(1));
+    }
+
+    #[test]
+    fn doc_20_statistics_count_the_text_of_objects_and_the_graphics() {
+        use crate::object::TextBox;
+        use crate::text::{Paragraph, Run};
+        let mut editor = Editor::new(Document::new_page_layout());
+        let boxes: Vec<NodeId> = ["Três palavras aqui", ""]
+            .iter()
+            .map(|text| {
+                editor
+                    .edit("Add", |e| {
+                        let style = e.document().styles().default_paragraph();
+                        let paragraph = Paragraph::from_runs(
+                            e.new_id(),
+                            style,
+                            crate::ParaAttrs::default(),
+                            [Run::new(text)],
+                        )?;
+                        let id = e.new_id();
+                        e.add_object(Object::new(
+                            id,
+                            ObjectKind::TextBox(TextBox::new(
+                                Arc::from([paragraph]),
+                                Length::from_points(4),
+                            )),
+                            Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                        ))?;
+                        Ok(id)
+                    })
+                    .unwrap()
+            })
+            .collect();
+        editor
+            .edit("Link", |e| e.link_text_box(boxes[0], boxes[1]))
+            .unwrap();
+        add(&mut editor, 100.0, 100.0, 20.0, 20.0);
+        let statistics = editor.document().statistics();
+        assert_eq!(statistics.words, 3);
+        assert_eq!(statistics.graphics, 3);
+        // The empty paragraph of the body and the one of the text.
+        assert_eq!(statistics.paragraphs, 2);
+    }
+
+    #[test]
+    fn sty_02_a_selected_text_box_takes_a_style_in_all_its_text() {
+        use crate::object::TextBox;
+        use crate::style::ParagraphStyle;
+        use crate::text::{Paragraph, Run};
+        let mut document = Document::new_word_processing();
+        let heading = document.new_id();
+        document
+            .put_style(ParagraphStyle::new(heading, "Heading"))
+            .unwrap();
+        let mut editor = Editor::new(document);
+        let id = editor
+            .edit("Add", |e| {
+                let style = e.document().styles().default_paragraph();
+                let mut paragraphs = Vec::new();
+                for text in ["One", "Two"] {
+                    let mut run = Run::new(text);
+                    run.attrs.italic = Some(true);
+                    paragraphs.push(Paragraph::from_runs(
+                        e.new_id(),
+                        style,
+                        crate::ParaAttrs::default(),
+                        [run],
+                    )?);
+                }
+                let id = e.new_id();
+                e.add_object(Object::new(
+                    id,
+                    ObjectKind::TextBox(TextBox::new(paragraphs.into(), Length::from_points(4))),
+                    Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                ))?;
+                Ok(id)
+            })
+            .unwrap();
+        editor
+            .edit("Paragraph Style", |e| {
+                e.style_object_text(
+                    id,
+                    TextStyling::Paragraph {
+                        style: heading,
+                        clean: true,
+                    },
+                )
+            })
+            .unwrap();
+        let object = editor.document().objects().get(id).unwrap().clone();
+        let paragraphs: Vec<_> = object.paragraphs().collect();
+        assert!(paragraphs.iter().all(|p| p.style() == heading));
+        // The bold set over the style goes with Clean.
+        assert!(
+            paragraphs
+                .iter()
+                .flat_map(|p| p.runs())
+                .all(|r| r.attrs.italic.is_none())
+        );
+    }
+
+    #[test]
+    fn sty_09_replacing_a_style_reaches_text_boxes() {
+        use crate::object::TextBox;
+        use crate::style::ParagraphStyle;
+        use crate::text::{Paragraph, Run};
+        let mut document = Document::new_word_processing();
+        let quote = document.new_id();
+        document
+            .put_style(ParagraphStyle::new(quote, "Quote"))
+            .unwrap();
+        let mut editor = Editor::new(document);
+        let id = editor
+            .edit("Add", |e| {
+                let paragraph = Paragraph::from_runs(
+                    e.new_id(),
+                    quote,
+                    crate::ParaAttrs::default(),
+                    [Run::new("Hi")],
+                )?;
+                let id = e.new_id();
+                e.add_object(Object::new(
+                    id,
+                    ObjectKind::TextBox(TextBox::new(
+                        Arc::from([paragraph]),
+                        Length::from_points(4),
+                    )),
+                    Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                ))?;
+                Ok(id)
+            })
+            .unwrap();
+        let body = editor.document().styles().default_paragraph();
+        let stories = editor.document().text_box_stories();
+        let count = editor
+            .edit("Replace Style", |e| {
+                e.replace_style_uses(quote, Some(body), &stories)
+            })
+            .unwrap();
+        assert_eq!(count, 1);
+        let object = editor.document().objects().get(id).unwrap();
+        assert!(object.paragraphs().all(|p| p.style() == body));
     }
 }

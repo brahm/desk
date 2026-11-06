@@ -432,7 +432,7 @@ impl StylesDrawer {
 
     fn add_actions(self: &Rc<Self>) {
         type StyleAction = fn(&Rc<StylesDrawer>, &TextEditor, StyleId);
-        let on_style: [(&str, StyleAction); 5] = [
+        let on_style: [(&str, StyleAction); 6] = [
             ("redefine", |this, editor, id| {
                 let result = editor.style_edit(&tr("Redefine Style"), |edit, from, to| {
                     edit.redefine_style(id, from, to)
@@ -458,6 +458,9 @@ impl StylesDrawer {
                 if editor.select_uses(id) {
                     editor.focus();
                 }
+            }),
+            ("replace-uses", |this, editor, id| {
+                this.replace_uses(editor, id)
             }),
             ("rename", |this, editor, id| this.rename(editor, id)),
             ("delete", |this, editor, id| this.delete(editor, id)),
@@ -693,14 +696,73 @@ impl StylesDrawer {
             );
             return;
         }
-        let used = !editor.document().style_uses(id).is_empty();
-        if !used {
+        if !editor.style_used(id) {
             let result = editor.style_edit(&tr("Delete Style"), |edit, _, _| {
                 edit.delete_style(id, None)
             });
             self.report(&tr("Cannot Delete the Style"), result);
             return;
         }
+        self.ask_replacement(
+            editor,
+            id,
+            &tr("Delete “{name}”?").replace("{name}", style.name()),
+            &tr("The style is in use. Choose a style to replace it."),
+            ("_Delete", true),
+            move |this, editor, choice| {
+                let stories = editor.all_stories();
+                let result = editor.style_edit(&tr("Delete Style"), |edit, _, _| {
+                    let to = match family {
+                        StyleFamily::Paragraph => {
+                            choice.or(Some(edit.document().styles().default_paragraph()))
+                        }
+                        _ => choice,
+                    };
+                    edit.replace_style_uses(id, to, &stories)?;
+                    edit.delete_style(id, choice)
+                });
+                this.report(&tr("Cannot Delete the Style"), result);
+            },
+        );
+    }
+
+    /// Gives all the text that uses a style another style, everywhere
+    /// in the document: the advanced Find & Replace of styles (STY-09).
+    fn replace_uses(self: &Rc<Self>, editor: &TextEditor, id: StyleId) {
+        let Some(style) = editor.styles().get(id).cloned() else {
+            return;
+        };
+        self.ask_replacement(
+            editor,
+            id,
+            &tr("Replace “{name}”?").replace("{name}", style.name()),
+            &tr("All the text that uses the style, in text boxes and shapes too, takes the style chosen."),
+            ("_Replace", false),
+            move |this, editor, choice| {
+                let stories = editor.all_stories();
+                let result = editor.style_edit(&tr("Replace Style"), |edit, _, _| {
+                    edit.replace_style_uses(id, choice, &stories)
+                });
+                this.report(&tr("Cannot Replace the Style"), result);
+            },
+        );
+    }
+
+    /// Asks for a style of the family of another to take its place, and
+    /// then does `then` with it, or with none for no character style.
+    fn ask_replacement(
+        self: &Rc<Self>,
+        editor: &TextEditor,
+        id: StyleId,
+        heading: &str,
+        body: &str,
+        (verb, destructive): (&str, bool),
+        then: impl Fn(&Rc<Self>, &TextEditor, Option<StyleId>) + 'static,
+    ) {
+        let styles = editor.styles();
+        let Some(family) = styles.get(id).map(Style::family) else {
+            return;
+        };
         let mut choices: Vec<Option<StyleId>> = Vec::new();
         let mut names: Vec<String> = Vec::new();
         if family == StyleFamily::Character {
@@ -721,10 +783,7 @@ impl StylesDrawer {
         } else {
             0
         };
-        let dialog = adw::AlertDialog::new(
-            Some(&tr("Delete “{name}”?").replace("{name}", style.name())),
-            Some(&tr("The style is in use. Choose a style to replace it.")),
-        );
+        let dialog = adw::AlertDialog::new(Some(heading), Some(body));
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
         let replacement = gtk::DropDown::builder()
             .model(&gtk::StringList::new(&names))
@@ -733,25 +792,26 @@ impl StylesDrawer {
         labelled(&replacement, &tr("Replace With"));
         dialog.set_extra_child(Some(&replacement));
         dialog.add_response("cancel", &tr("_Cancel"));
-        dialog.add_response("delete", &tr("_Delete"));
-        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("delete"));
+        dialog.add_response("go", &tr(verb));
+        if destructive {
+            dialog.set_response_appearance("go", adw::ResponseAppearance::Destructive);
+        } else {
+            dialog.set_response_appearance("go", adw::ResponseAppearance::Suggested);
+        }
+        dialog.set_default_response(Some("go"));
         dialog.set_close_response("cancel");
         let weak = Rc::downgrade(self);
         let editor = editor.clone();
         dialog.connect_response(None, move |_, response| {
             let Some(this) = weak.upgrade() else { return };
-            if response != "delete" {
+            if response != "go" {
                 return;
             }
             let choice = choices
                 .get(replacement.selected() as usize)
                 .copied()
                 .flatten();
-            let result = editor.style_edit(&tr("Delete Style"), |edit, _, _| {
-                edit.delete_style(id, choice)
-            });
-            this.report(&tr("Cannot Delete the Style"), result);
+            then(&this, &editor, choice);
         });
         self.present(&dialog);
     }
@@ -935,6 +995,7 @@ fn style_menu() -> gio::Menu {
     );
     change.append(Some(&tr("Re_vert to Defined Style")), Some("styles.revert"));
     change.append(Some(&tr("_Select All Uses")), Some("styles.select-uses"));
+    change.append(Some(&tr("Re_place All Uses…")), Some("styles.replace-uses"));
     menu.append_section(None, &change);
     let shortcut = gio::Menu::new();
     let item = gio::MenuItem::new(Some(&tr("None")), None);
