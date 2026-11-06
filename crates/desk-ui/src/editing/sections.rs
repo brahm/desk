@@ -2,17 +2,34 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Whole sections and pages, as the page thumbnails and Edit ▸ Delete
-//! Page change them (EST-17, TXT-02).
+//! Page change them (EST-17, TXT-02). Each page of a page layout document
+//! is a section of its own (EST-16).
 
 use std::cell::RefCell;
 
-use desk_model::{ModelError, SectionsClip};
+use desk_model::{LayoutPagesClip, ModelError, SectionsClip};
 
 use super::{Selection, Spot, TextEditor};
 
+/// What was last cut or copied in the thumbnails: sections of a word
+/// processing document, or pages of a page layout one.
+#[derive(Clone, Debug)]
+enum Clip {
+    Sections(SectionsClip),
+    Pages(LayoutPagesClip),
+}
+
 thread_local! {
     /// The sections last cut or copied in the thumbnails.
-    static CLIP: RefCell<Option<SectionsClip>> = const { RefCell::new(None) };
+    static CLIP: RefCell<Option<Clip>> = const { RefCell::new(None) };
+}
+
+/// Pages of a page layout document by index, as the model counts them.
+fn page_indices(indices: &[usize]) -> Vec<u32> {
+    indices
+        .iter()
+        .filter_map(|&i| u32::try_from(i).ok())
+        .collect()
 }
 
 /// Whether sections were cut or copied, to paste.
@@ -30,6 +47,10 @@ impl TextEditor {
 
     /// The section of each page, by its index among the sections.
     pub fn page_sections(&self) -> Vec<usize> {
+        if self.is_page_layout() {
+            let pages = Self::main_layout(&self.state.borrow()).pages.len();
+            return (0..pages).collect();
+        }
         let state = self.state.borrow();
         let ranges = Self::main_document(&state).section_ranges();
         let layout = Self::main_layout(&state);
@@ -90,7 +111,15 @@ impl TextEditor {
 
     /// Copies sections, by index, to paste them.
     pub fn copy_sections(&self, indices: &[usize]) {
-        let clip = Self::main_document(&self.state.borrow()).copy_sections(indices);
+        let clip = {
+            let state = self.state.borrow();
+            let document = Self::main_document(&state);
+            if document.page_setup().is_page_layout() {
+                Clip::Pages(document.copy_layout_pages(&page_indices(indices)))
+            } else {
+                Clip::Sections(document.copy_sections(indices))
+            }
+        };
         CLIP.with(|c| *c.borrow_mut() = Some(clip));
     }
 
@@ -102,6 +131,11 @@ impl TextEditor {
 
     /// Deletes sections.
     pub fn delete_sections(&self, indices: &[usize]) {
+        if self.is_page_layout() {
+            let pages = page_indices(indices);
+            self.layout_page_edit("Delete Page", |edit| edit.delete_layout_pages(&pages));
+            return;
+        }
         let first = indices.iter().copied().min().unwrap_or(0);
         let name = if indices.len() == 1 {
             "Delete Section"
@@ -117,16 +151,32 @@ impl TextEditor {
     /// Pastes the sections cut or copied before section `before`, or at
     /// the end when it is their count.
     pub fn paste_sections(&self, before: usize) {
-        let Some(clip) = CLIP.with(|c| c.borrow().clone()) else {
-            return;
-        };
-        self.section_edit("Paste Sections", |edit| {
-            Ok(edit.paste_sections(before, &clip)?.start)
-        });
+        let clip = CLIP.with(|c| c.borrow().clone());
+        match (clip, self.is_page_layout()) {
+            (Some(Clip::Pages(clip)), true) => {
+                let before = u32::try_from(before).unwrap_or(u32::MAX);
+                self.layout_page_edit("Paste Pages", |edit| {
+                    edit.paste_layout_pages(before, &clip).map(drop)
+                });
+            }
+            (Some(Clip::Sections(clip)), false) => {
+                self.section_edit("Paste Sections", |edit| {
+                    Ok(edit.paste_sections(before, &clip)?.start)
+                });
+            }
+            _ => {}
+        }
     }
 
     /// Duplicates sections, after the last of them.
     pub fn duplicate_sections(&self, indices: &[usize]) {
+        if self.is_page_layout() {
+            let pages = page_indices(indices);
+            self.layout_page_edit("Duplicate", |edit| {
+                edit.duplicate_layout_pages(&pages).map(drop)
+            });
+            return;
+        }
         self.section_edit("Duplicate", |edit| {
             Ok(edit.duplicate_sections(indices)?.start)
         });
@@ -134,6 +184,21 @@ impl TextEditor {
 
     /// Moves sections before section `before`, or copies them there.
     pub fn move_sections(&self, indices: &[usize], before: usize, copy: bool) {
+        if self.is_page_layout() {
+            let pages = page_indices(indices);
+            let before = u32::try_from(before).unwrap_or(u32::MAX);
+            if copy {
+                let clip = Self::main_document(&self.state.borrow()).copy_layout_pages(&pages);
+                self.layout_page_edit("Copy Pages", |edit| {
+                    edit.paste_layout_pages(before, &clip).map(drop)
+                });
+            } else {
+                self.layout_page_edit("Move Pages", |edit| {
+                    edit.move_layout_pages(&pages, before).map(drop)
+                });
+            }
+            return;
+        }
         if copy {
             let clip = Self::main_document(&self.state.borrow()).copy_sections(indices);
             self.section_edit("Copy Sections", |edit| {

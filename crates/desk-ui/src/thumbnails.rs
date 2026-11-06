@@ -81,6 +81,18 @@ impl Thumbnails {
     }
 
     /// The widget.
+    /// Cuts, copies, pastes or duplicates the pages selected, when the
+    /// thumbnails have the keyboard: the shortcuts of the window come
+    /// here first. Whether they did.
+    pub fn take_shortcut(&self, action: &str) -> bool {
+        if !self.root.has_focus() || self.selected.borrow().is_empty() && action != "paste" {
+            return false;
+        }
+        self.root
+            .activate_action(&format!("thumbs.{action}"), None)
+            .is_ok()
+    }
+
     pub fn widget(&self) -> &gtk::ScrolledWindow {
         &self.root
     }
@@ -337,20 +349,35 @@ impl Thumbnails {
         if selected.is_empty() {
             return;
         }
-        let dialog = adw::AlertDialog::new(
-            Some(&trn(
-                "Delete Section?",
-                "Delete Sections?",
-                selected.len() as u64,
-            )),
-            Some(
-                &trn(
+        let count = selected.len() as u64;
+        // Each page of a page layout document is a section (EST-16).
+        let pages = (self.editor)().is_some_and(|e| e.is_page_layout());
+        let (heading, body) = if pages {
+            (
+                if count == 1 {
+                    tr("Delete Page?")
+                } else {
+                    tr("Delete Pages?")
+                },
+                trn(
+                    "The page and all its objects will be deleted.",
+                    "The {n} pages and all their objects will be deleted.",
+                    count,
+                ),
+            )
+        } else {
+            (
+                trn("Delete Section?", "Delete Sections?", count),
+                trn(
                     "The section and all its pages will be deleted.",
                     "The {n} sections and all their pages will be deleted.",
-                    selected.len() as u64,
-                )
-                .replace("{n}", &selected.len().to_string()),
-            ),
+                    count,
+                ),
+            )
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&heading),
+            Some(&body.replace("{n}", &selected.len().to_string())),
         );
         dialog.add_response("cancel", &tr("_Cancel"));
         dialog.add_response("delete", &tr("_Delete"));

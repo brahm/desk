@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 16:14+0000\n"
+"POT-Creation-Date: 2026-11-06 16:28+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -103,7 +103,7 @@ msgstr "Documento inteiro"
 #: crates/desk-ui/src/styles_drawer.rs:597
 #: crates/desk-ui/src/styles_drawer.rs:659
 #: crates/desk-ui/src/styles_drawer.rs:735
-#: crates/desk-ui/src/thumbnails.rs:355 crates/desk-ui/src/window.rs:1046
+#: crates/desk-ui/src/thumbnails.rs:370 crates/desk-ui/src/window.rs:1046
 #: crates/desk-ui/src/window.rs:1187 crates/desk-ui/src/window.rs:1219
 #: crates/desk-ui/src/window.rs:1248
 msgid "_Cancel"
@@ -2509,7 +2509,7 @@ msgid "Replace With"
 msgstr "Substituir por"
 
 #: crates/desk-ui/src/styles_drawer.rs:736
-#: crates/desk-ui/src/thumbnails.rs:356 crates/desk-ui/src/thumbnails.rs:444
+#: crates/desk-ui/src/thumbnails.rs:371 crates/desk-ui/src/thumbnails.rs:459
 #: crates/desk-ui/src/window.rs:1188
 msgid "_Delete"
 msgstr "_Apagar"
@@ -2594,32 +2594,46 @@ msgstr "Preenchimento"
 msgid "Remove Tab Stop"
 msgstr "Remover tabulação"
 
-#: crates/desk-ui/src/thumbnails.rs:342
+#: crates/desk-ui/src/thumbnails.rs:346 crates/desk-ui/src/window.rs:1181
+msgid "Delete Page?"
+msgstr "Apagar a página?"
+
+#: crates/desk-ui/src/thumbnails.rs:348
+msgid "Delete Pages?"
+msgstr "Apagar as páginas?"
+
+#: crates/desk-ui/src/thumbnails.rs:351
+msgid "The page and all its objects will be deleted."
+msgid_plural "The {n} pages and all their objects will be deleted."
+msgstr[0] "A página e todos os seus objetos serão apagados."
+msgstr[1] "As {n} páginas e todos os seus objetos serão apagados."
+
+#: crates/desk-ui/src/thumbnails.rs:358
 msgid "Delete Section?"
 msgid_plural "Delete Sections?"
 msgstr[0] "Apagar a seção?"
 msgstr[1] "Apagar as seções?"
 
-#: crates/desk-ui/src/thumbnails.rs:348
+#: crates/desk-ui/src/thumbnails.rs:360
 msgid "The section and all its pages will be deleted."
 msgid_plural "The {n} sections and all their pages will be deleted."
 msgstr[0] "A seção e todas as suas páginas serão apagadas."
 msgstr[1] "As {n} seções e todas as suas páginas serão apagadas."
 
-#: crates/desk-ui/src/thumbnails.rs:440 crates/desk-ui/src/window.rs:2171
+#: crates/desk-ui/src/thumbnails.rs:455 crates/desk-ui/src/window.rs:2171
 msgid "Cu_t"
 msgstr "Recor_tar"
 
-#: crates/desk-ui/src/thumbnails.rs:441 crates/desk-ui/src/warnings.rs:81
+#: crates/desk-ui/src/thumbnails.rs:456 crates/desk-ui/src/warnings.rs:81
 #: crates/desk-ui/src/window.rs:2172
 msgid "_Copy"
 msgstr "_Copiar"
 
-#: crates/desk-ui/src/thumbnails.rs:442 crates/desk-ui/src/window.rs:2173
+#: crates/desk-ui/src/thumbnails.rs:457 crates/desk-ui/src/window.rs:2173
 msgid "_Paste"
 msgstr "Co_lar"
 
-#: crates/desk-ui/src/thumbnails.rs:443
+#: crates/desk-ui/src/thumbnails.rs:458
 msgid "D_uplicate"
 msgstr "D_uplicar"
 
@@ -2739,10 +2753,6 @@ msgid "Save this document first: the link names a file from its folder."
 msgstr ""
 "Salve este documento primeiro: o link indica um arquivo a partir da pasta "
 "dele."
-
-#: crates/desk-ui/src/window.rs:1181
-msgid "Delete Page?"
-msgstr "Apagar a página?"
 
 #: crates/desk-ui/src/window.rs:1183
 msgid "Everything on page {n} will be deleted."

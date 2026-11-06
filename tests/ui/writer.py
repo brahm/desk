@@ -456,6 +456,7 @@ def main():
     page_layout(work)
     copies_of_a_shape(work)
     guide_from_the_ruler(work)
+    pages_as_sections(work)
     print("All UI tests passed.")
 
 
@@ -1564,6 +1565,47 @@ def guide_from_the_ruler(work):
             lambda: saved_part(letter, "settings.xml", r'config:name="Guides"[^>]*>h [0-9.]+(pt|in|cm|mm)<'),
         )
         check("a drag from the ruler leaves a guide on the page, saved with it (OBJ-28)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def pages_as_sections(work):
+    """In a page layout document each page is a section of its own: the
+    thumbnails select a page, and Duplicate copies it with its objects
+    after it (EST-16, EST-04)."""
+    writer, app, letter = open_with_a_shape(
+        work, "Sections.odt", extra={"settings.xml": PAGE_LAYOUT_SETTINGS}
+    )
+    try:
+        thumbnail = wait_for("the thumbnail of the page", lambda: showing_named(app, "Page 1"))
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Sections.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        box = Atspi.Component.get_extents(thumbnail, Atspi.CoordType.WINDOW)
+        click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2)
+        press("ctrl+d")
+        wait_for(
+            "the thumbnail of the copy",
+            lambda: showing_named(app, "Page 2"),
+        )
+        press("ctrl+s")
+        wait_for(
+            "the document saved with two pages",
+            lambda: saved_part(
+                letter,
+                "settings.xml",
+                r'config:name="PageLayoutPages" config:type="int">2<',
+            ),
+        )
+        check(
+            "Duplicate in the thumbnails copies a page with its shape (EST-16)",
+            len(re.findall(r"<draw:rect", zipfile.ZipFile(letter).read("content.xml").decode())) == 2,
+        )
     finally:
         writer.terminate()
         writer.wait(timeout=10)

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 16:14+0000\n"
+"POT-Creation-Date: 2026-11-06 16:28+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -101,7 +101,7 @@ msgstr ""
 #: crates/desk-ui/src/auto_numbers.rs:91
 #: crates/desk-ui/src/styles_drawer.rs:597
 #: crates/desk-ui/src/styles_drawer.rs:659
-#: crates/desk-ui/src/styles_drawer.rs:735 crates/desk-ui/src/thumbnails.rs:355
+#: crates/desk-ui/src/styles_drawer.rs:735 crates/desk-ui/src/thumbnails.rs:370
 #: crates/desk-ui/src/window.rs:1046 crates/desk-ui/src/window.rs:1187
 #: crates/desk-ui/src/window.rs:1219 crates/desk-ui/src/window.rs:1248
 msgid "_Cancel"
@@ -2487,8 +2487,8 @@ msgstr ""
 msgid "Replace With"
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:736 crates/desk-ui/src/thumbnails.rs:356
-#: crates/desk-ui/src/thumbnails.rs:444 crates/desk-ui/src/window.rs:1188
+#: crates/desk-ui/src/styles_drawer.rs:736 crates/desk-ui/src/thumbnails.rs:371
+#: crates/desk-ui/src/thumbnails.rs:459 crates/desk-ui/src/window.rs:1188
 msgid "_Delete"
 msgstr ""
 
@@ -2572,32 +2572,46 @@ msgstr ""
 msgid "Remove Tab Stop"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:342
+#: crates/desk-ui/src/thumbnails.rs:346 crates/desk-ui/src/window.rs:1181
+msgid "Delete Page?"
+msgstr ""
+
+#: crates/desk-ui/src/thumbnails.rs:348
+msgid "Delete Pages?"
+msgstr ""
+
+#: crates/desk-ui/src/thumbnails.rs:351
+msgid "The page and all its objects will be deleted."
+msgid_plural "The {n} pages and all their objects will be deleted."
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/desk-ui/src/thumbnails.rs:358
 msgid "Delete Section?"
 msgid_plural "Delete Sections?"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/thumbnails.rs:348
+#: crates/desk-ui/src/thumbnails.rs:360
 msgid "The section and all its pages will be deleted."
 msgid_plural "The {n} sections and all their pages will be deleted."
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/thumbnails.rs:440 crates/desk-ui/src/window.rs:2171
+#: crates/desk-ui/src/thumbnails.rs:455 crates/desk-ui/src/window.rs:2171
 msgid "Cu_t"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:441 crates/desk-ui/src/warnings.rs:81
+#: crates/desk-ui/src/thumbnails.rs:456 crates/desk-ui/src/warnings.rs:81
 #: crates/desk-ui/src/window.rs:2172
 msgid "_Copy"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:442 crates/desk-ui/src/window.rs:2173
+#: crates/desk-ui/src/thumbnails.rs:457 crates/desk-ui/src/window.rs:2173
 msgid "_Paste"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:443
+#: crates/desk-ui/src/thumbnails.rs:458
 msgid "D_uplicate"
 msgstr ""
 
@@ -2712,10 +2726,6 @@ msgstr ""
 
 #: crates/desk-ui/src/window.rs:1099
 msgid "Save this document first: the link names a file from its folder."
-msgstr ""
-
-#: crates/desk-ui/src/window.rs:1181
-msgid "Delete Page?"
 msgstr ""
 
 #: crates/desk-ui/src/window.rs:1183

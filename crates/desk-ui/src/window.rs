@@ -1432,7 +1432,12 @@ impl DocumentWindow {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
             action.connect_activate(move |_, _| {
-                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                let Some(this) = weak.upgrade() else { return };
+                // Pages selected in the thumbnails take Cut, Copy and Paste.
+                if matches!(name, "cut" | "copy" | "paste") && this.thumbnails.take_shortcut(name) {
+                    return;
+                }
+                if let Some(editor) = this.editor() {
                     run(&editor);
                 }
             });

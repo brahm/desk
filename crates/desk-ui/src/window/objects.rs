@@ -94,7 +94,12 @@ impl DocumentWindow {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
             action.connect_activate(move |_, _| {
-                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                let Some(this) = weak.upgrade() else { return };
+                // Pages selected in the thumbnails take Duplicate.
+                if name == "duplicate-objects" && this.thumbnails.take_shortcut("duplicate") {
+                    return;
+                }
+                if let Some(editor) = this.editor() {
                     run(&editor);
                 }
             });
