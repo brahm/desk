@@ -1464,11 +1464,34 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         )
     })?;
     // The objects of the masters of the sections (INT-05).
+    let setup = *document.page_setup();
+    let footer_height = source
+        .page_layout
+        .footer
+        .and_then(|f| f.min_height)
+        .map_or(0.0, |h| length(h).to_pt());
     for (section, master) in parts {
+        // The objects of the paragraphs of the header and the footer,
+        // from their tops: the header margin below the top of the paper,
+        // and the height of the footer above its margin.
+        let frames = |part: &Option<odf::HeaderFooter>| -> Vec<odf::DrawObject> {
+            part.iter()
+                .flat_map(|p| &p.paragraphs)
+                .flat_map(|p| p.frames.iter().cloned())
+                .collect()
+        };
+        let framed = [
+            (frames(&master.header), setup.header_margin.to_pt()),
+            (
+                frames(&master.footer),
+                (setup.height - setup.footer_margin).to_pt() - footer_height,
+            ),
+        ];
         objects::import_master_objects(
             source,
             master,
             section,
+            &framed,
             &mut document,
             &mut |document, paragraph| {
                 import_paragraph(

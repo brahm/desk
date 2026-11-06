@@ -2707,3 +2707,99 @@ fn int_05_est_21_master_objects_are_kept_in_the_master_pages_of_their_sections()
     expected.sort_by_key(|(a, ..)| format!("{a:?}"));
     assert_eq!(anchors, expected);
 }
+
+#[test]
+fn obj_30_obj_34_a_turned_group_is_saved_with_its_objects_turned() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Shape};
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Group", |edit| {
+            let a = Object::new(
+                edit.new_id(),
+                Shape::Rectangle.into(),
+                Frame::from_pt(100.0, 100.0, 50.0, 50.0),
+            );
+            let b = Object::new(
+                edit.new_id(),
+                Shape::Ellipse.into(),
+                Frame::from_pt(250.0, 150.0, 50.0, 50.0),
+            );
+            let mut group = Object::new(
+                edit.new_id(),
+                ObjectKind::Group(std::sync::Arc::from(vec![a, b])),
+                Frame::from_pt(100.0, 100.0, 200.0, 100.0),
+            );
+            group.anchor = Anchor::Page(0);
+            group.rotation = 9_000;
+            edit.add_object(group)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("obj-turned-group.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let group = read.objects().iter().next().unwrap();
+    let ObjectKind::Group(children) = &group.kind else {
+        panic!("{:?}", group.kind);
+    };
+    let centers: Vec<(i64, i64, i32)> = children
+        .iter()
+        .map(|o| {
+            let f = o.frame;
+            (
+                (f.x.to_pt() + f.width.to_pt() / 2.0).round() as i64,
+                (f.y.to_pt() + f.height.to_pt() / 2.0).round() as i64,
+                o.rotation,
+            )
+        })
+        .collect();
+    // A quarter turn counterclockwise about the center of the group,
+    // (200, 150): the left of it goes below, and the right above.
+    assert_eq!(centers, [(175, 225, 9_000), (225, 75, 9_000)]);
+}
+
+#[test]
+fn int_05_objects_in_the_headers_of_other_programs_go_on_the_master() {
+    let content = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">
+<office:body><office:text><text:p>Body</text:p></office:text></office:body></office:document-content>"##;
+    let styles = r##"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
+<office:automatic-styles>
+<style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="612pt" fo:page-height="792pt" fo:margin-top="36pt" fo:margin-bottom="36pt" fo:margin-left="72pt" fo:margin-right="72pt"/>
+<style:header-style><style:header-footer-properties fo:min-height="20pt" fo:margin-bottom="16pt"/></style:header-style>
+<style:footer-style><style:header-footer-properties fo:min-height="20pt" fo:margin-top="16pt"/></style:footer-style>
+</style:page-layout>
+</office:automatic-styles>
+<office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1">
+<style:header><text:p>Logo<draw:rect text:anchor-type="paragraph" svg:x="300pt" svg:y="2pt" svg:width="40pt" svg:height="20pt"/></text:p></style:header>
+<style:footer><text:p><draw:ellipse text:anchor-type="paragraph" svg:x="0pt" svg:y="0pt" svg:width="10pt" svg:height="10pt"/>Foot</text:p></style:footer>
+</style:master-page></office:master-styles></office:document-styles>"##;
+    let document = import(&desk_odf::read_streams(content, Some(styles), None).unwrap()).unwrap();
+    let setup = *document.page_setup();
+    let objects: Vec<&desk_model::Object> = document.objects().iter().collect();
+    assert_eq!(objects.len(), 2, "{objects:?}");
+    assert!(
+        objects
+            .iter()
+            .all(|o| o.anchor == desk_model::Anchor::Master(None))
+    );
+    // The rectangle stands two points below the top of the header, from
+    // the left margin, as the paragraph it moved with.
+    let header = &objects[0].frame;
+    assert_eq!(
+        (header.x.to_pt(), header.y.to_pt()),
+        (372.0, setup.header_margin.to_pt() + 2.0)
+    );
+    // The circle, at the top of the footer.
+    let footer = &objects[1].frame;
+    assert_eq!(
+        footer.y.to_pt(),
+        (setup.height - setup.footer_margin).to_pt() - 20.0
+    );
+}

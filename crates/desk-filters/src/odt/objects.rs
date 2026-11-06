@@ -1594,10 +1594,11 @@ impl Exporter<'_> {
                     chain_next: text.next.map(text_box_name),
                 }
             }
+            // A draw:g is not turned: its objects are, about its center.
             ObjectKind::Group(objects) => odf::DrawKind::Group(
                 objects
                     .iter()
-                    .map(|o| self.object(o, anchor, None, dx))
+                    .map(|o| self.object(&turned_with_group(o, object), anchor, None, dx))
                     .collect(),
             ),
             _ => odf::DrawKind::Rect {
@@ -1673,6 +1674,29 @@ impl Exporter<'_> {
         }
         out
     }
+}
+
+/// An object of a group as it shows when the group is turned: turned as
+/// much more, with its center turned about the center of the group.
+fn turned_with_group(child: &Object, group: &Object) -> Object {
+    let mut out = child.clone();
+    if group.rotation == 0 {
+        return out;
+    }
+    let g = group.frame;
+    let (gx, gy) = (
+        g.x.to_pt() + g.width.to_pt() / 2.0,
+        g.y.to_pt() + g.height.to_pt() / 2.0,
+    );
+    let f = child.frame;
+    let (w, h) = (f.width.to_pt(), f.height.to_pt());
+    let (dx, dy) = (f.x.to_pt() + w / 2.0 - gx, f.y.to_pt() + h / 2.0 - gy);
+    let (sin, cos) = (f64::from(group.rotation) / 100.0).to_radians().sin_cos();
+    // As the page shows a turned object: counterclockwise, y down.
+    let (cx, cy) = (gx + dx * cos + dy * sin, gy - dx * sin + dy * cos);
+    out.frame = Frame::from_pt(cx - w / 2.0, cy - h / 2.0, w, h);
+    out.rotation = (child.rotation + group.rotation).rem_euclid(36_000);
+    out
 }
 
 /// Writes the objects of a document: those fixed on pages before the
@@ -1792,24 +1816,42 @@ pub(super) fn export_master_objects(
 }
 
 /// The drawing objects of a master page as objects of the master of
-/// `section` (INT-05), read with the styles of `styles.xml`.
+/// `section` (INT-05), read with the styles of `styles.xml`; and those
+/// that move with the paragraphs of its headers and footers, which Desk
+/// puts on the master too, below the top of the header or the footer by
+/// `offset`, as `framed` gives them.
 pub(super) fn import_master_objects(
     source: &odf::TextDocument,
     master: &odf::MasterPage,
     section: Option<NodeId>,
+    framed: &[(Vec<odf::DrawObject>, f64)],
     document: &mut Document,
     paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
 ) -> Result<(), FilterError> {
-    if master.objects.is_empty() {
-        return Ok(());
-    }
-    let on_master = odf::TextDocument {
-        default_style: source.default_style.clone(),
-        styles: source.styles.clone(),
-        automatic_styles: source.master_styles.clone(),
-        page_layout: source.page_layout.clone(),
-        pictures: source.pictures.clone(),
-        page_objects: master
+    let mut parts: Vec<(odf::TextDocument, f64)> = Vec::new();
+    let on_master =
+        |page_objects: Vec<odf::DrawObject>, frames: Vec<odf::DrawObject>| odf::TextDocument {
+            default_style: source.default_style.clone(),
+            styles: source.styles.clone(),
+            automatic_styles: source.master_styles.clone(),
+            page_layout: source.page_layout.clone(),
+            pictures: source.pictures.clone(),
+            body: if frames.is_empty() {
+                Vec::new()
+            } else {
+                vec![odf::Paragraph {
+                    frames,
+                    ..odf::Paragraph::default()
+                }]
+            },
+            page_objects,
+            gradients: source.gradients.clone(),
+            markers: source.markers.clone(),
+            fill_images: source.fill_images.clone(),
+            ..odf::TextDocument::default()
+        };
+    if !master.objects.is_empty() {
+        let objects = master
             .objects
             .iter()
             .map(|o| odf::DrawObject {
@@ -1817,18 +1859,32 @@ pub(super) fn import_master_objects(
                 anchor_page: None,
                 ..o.clone()
             })
-            .collect(),
-        gradients: source.gradients.clone(),
-        markers: source.markers.clone(),
-        fill_images: source.fill_images.clone(),
-        ..odf::TextDocument::default()
-    };
-    let before = document.objects().len();
-    import_objects(&on_master, document, paragraph)?;
-    let added: Vec<Object> = document.objects().iter().skip(before).cloned().collect();
-    for mut object in added {
-        object.anchor = Anchor::Master(section);
-        document.apply(Op::ReplaceObject { object })?;
+            .collect();
+        parts.push((on_master(objects, Vec::new()), 0.0));
+    }
+    for (frames, offset) in framed {
+        let frames: Vec<odf::DrawObject> = frames
+            .iter()
+            // Those in the line of the text are not read yet.
+            .filter(|o| o.anchor.as_deref() != Some("as-char"))
+            .map(|o| odf::DrawObject {
+                anchor: Some("paragraph".into()),
+                ..o.clone()
+            })
+            .collect();
+        if !frames.is_empty() {
+            parts.push((on_master(Vec::new(), frames), *offset));
+        }
+    }
+    for (part, offset) in parts {
+        let before = document.objects().len();
+        import_objects(&part, document, paragraph)?;
+        let added: Vec<Object> = document.objects().iter().skip(before).cloned().collect();
+        for mut object in added {
+            object.anchor = Anchor::Master(section);
+            object.frame.y = object.frame.y + Length::from_pt(offset);
+            document.apply(Op::ReplaceObject { object })?;
+        }
     }
     Ok(())
 }
