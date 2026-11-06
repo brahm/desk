@@ -464,23 +464,63 @@ pub fn place_inline_objects(document: &Document, layout: &mut DocumentLayout) {
                 .push((at.offset, object));
         }
     }
-    for page in &mut layout.pages {
-        let mut placed = Vec::new();
-        for line in &page.lines {
-            let Some(found) = marks.get(&line.paragraph) else {
-                continue;
-            };
-            for &(offset, object) in found {
-                if !line.line.range.contains(&offset) {
-                    continue;
-                }
-                let mut at = PlacedObject::new(object, Some(line.paragraph), 0.0);
+    // Those in the lines of headers, footers and notes (EST-12, EST-13),
+    // by the identifier of their paragraph.
+    let mut story_marks: HashMap<desk_model::NodeId, Vec<(usize, &Object)>> = HashMap::new();
+    for (id, (_, at)) in document.story_object_marks() {
+        if let Some(object) = document.objects().get(id)
+            && object.anchor == Anchor::InText
+        {
+            story_marks
+                .entry(at.paragraph)
+                .or_default()
+                .push((at.offset, object));
+        }
+    }
+    let place = |line: &PlacedLine, found: &[(usize, &Object)], paragraph: Option<usize>| {
+        found
+            .iter()
+            .filter(|(offset, _)| line.line.range.contains(offset))
+            .map(|&(offset, object)| {
+                let mut at = PlacedObject::new(object, paragraph, 0.0);
                 at.x = line.origin.0 + line.line.caret_x(offset);
                 at.y = line.baseline() - at.height;
-                placed.push(at);
+                at
+            })
+            .collect::<Vec<_>>()
+    };
+    for index in 0..layout.pages.len() {
+        let mut placed = Vec::new();
+        let page = &layout.pages[index];
+        for line in &page.lines {
+            if let Some(found) = marks.get(&line.paragraph) {
+                placed.extend(place(line, found, Some(line.paragraph)));
             }
         }
-        page.objects.extend(placed);
+        if !story_marks.is_empty() {
+            for (line, margin) in page.margin_lines.iter().zip(&page.margin_places) {
+                let (_, section) = crate::margin_of_page(layout, index, margin.kind);
+                let paragraphs = document.section_headers_footers(section).get(*margin);
+                if let Some(found) = paragraphs
+                    .get(line.paragraph)
+                    .and_then(|p| story_marks.get(&p.id()))
+                {
+                    placed.extend(place(line, found, None));
+                }
+            }
+            for (line, part) in page.note_lines.iter().zip(&page.note_parts) {
+                let found = layout
+                    .notes
+                    .get(line.paragraph)
+                    .and_then(|id| document.notes().get(*id))
+                    .and_then(|note| note.paragraphs.get(*part))
+                    .and_then(|p| story_marks.get(&p.id()));
+                if let Some(found) = found {
+                    placed.extend(place(line, found, None));
+                }
+            }
+        }
+        layout.pages[index].objects.extend(placed);
     }
 }
 

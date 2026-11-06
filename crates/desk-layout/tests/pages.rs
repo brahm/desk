@@ -1195,3 +1195,71 @@ fn int_03_a_page_layout_document_has_its_pages_and_no_body_text() {
     let numbers: Vec<u32> = layout.pages.iter().map(|p| p.number).collect();
     assert_eq!(numbers, [1, 2, 3]);
 }
+
+#[test]
+fn est_12_an_object_in_the_line_of_a_header_shows_on_every_page() {
+    use desk_model::{
+        Anchor, CharAttrs, Editor, FIELD_CHARACTER, Field, Frame, MarginKind, MarginPages,
+        MarginPlace, Object, ObjectKind, ParaAttrs, Paragraph, Run, Shape,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let logo = editor
+        .edit("Header", |edit| {
+            edit.set_page_setup(setup(400.0))?;
+            edit.insert_text(start, &"words of text that wrap ".repeat(250))?;
+            let logo = edit.new_id();
+            let style = edit.document().styles().default_paragraph();
+            let mark = FIELD_CHARACTER.to_string();
+            let header = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                vec![
+                    Run::new("Logo "),
+                    Run::with_attrs(
+                        &mark,
+                        None,
+                        CharAttrs {
+                            field: Some(Some(Field::ObjectMark { object: logo })),
+                            ..CharAttrs::default()
+                        },
+                    ),
+                ],
+            )?;
+            edit.set_header_footer(
+                MarginPlace::new(MarginKind::Header, MarginPages::Default),
+                vec![header],
+            )?;
+            let mut object = Object::new(
+                logo,
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(0.0, 0.0, 30.0, 12.0),
+            );
+            object.anchor = Anchor::InText;
+            edit.add_object(object)?;
+            Ok(logo)
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut TextSystem::new());
+    assert!(layout.pages.len() >= 3, "{}", layout.pages.len());
+    for (index, page) in layout.pages.iter().enumerate() {
+        let placed: Vec<_> = page
+            .objects
+            .iter()
+            .filter(|o| o.object.id == logo)
+            .collect();
+        assert_eq!(placed.len(), 1, "page {index}");
+        let placed = placed[0];
+        // After the word, in the line of the header, above the body.
+        let line = &page.margin_lines[0];
+        assert!(
+            placed.x > line.origin.0 + 20.0,
+            "page {index}: {}",
+            placed.x
+        );
+        assert!(placed.y >= line.top() - 0.01, "page {index}: {}", placed.y);
+        assert!(placed.y + 12.0 <= line.bottom() + 0.01, "page {index}");
+        assert!(line.bottom() <= page.lines[0].top() + 0.01, "page {index}");
+    }
+}

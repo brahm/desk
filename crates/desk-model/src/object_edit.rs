@@ -250,6 +250,10 @@ impl Edit {
             }
             if let Some(mark) = self.document().object_mark(object.id) {
                 self.remove_mark(mark)?;
+            } else if let Some(&(story, mark)) =
+                self.document().story_object_marks().get(&object.id)
+            {
+                self.remove_story_mark(story, mark)?;
             }
             self.remove_object(object.id)?;
         }

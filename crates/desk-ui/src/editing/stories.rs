@@ -548,7 +548,10 @@ impl TextEditor {
         let story = mode.story;
         let write = |edit: &mut desk_model::Edit| {
             edit.adopt_document_settings(&copy)?;
-            edit.set_story(story, paragraphs.clone())
+            let before = edit.document().story_paragraphs(story);
+            edit.set_story(story, paragraphs.clone())?;
+            // The objects in its lines (EST-12, EST-13).
+            edit.adopt_story_objects(&copy, &before)
         };
         let name = mode.action_name();
         let result = if mode.main.undo_depth() > mode.depth {

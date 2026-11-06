@@ -55,6 +55,7 @@ mod format;
 mod header;
 mod id;
 mod inline;
+pub use inline::marks_in;
 mod list;
 mod media;
 mod note;

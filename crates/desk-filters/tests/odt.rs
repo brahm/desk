@@ -3117,3 +3117,135 @@ fn est_19_masters_of_the_first_page_and_the_left_pages_round_trip() {
         ]
     );
 }
+
+#[test]
+fn est_12_est_13_objects_in_the_lines_of_headers_and_notes_round_trip() {
+    use desk_model::{
+        Anchor, FIELD_CHARACTER, Field, Frame, MarginKind, MarginPages, MarginPlace, Note, Object,
+        ObjectKind, Picture, Shape,
+    };
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let mark = FIELD_CHARACTER.to_string();
+    let marked = |object| CharAttrs {
+        field: Some(Some(Field::ObjectMark { object })),
+        ..CharAttrs::default()
+    };
+    // A picture in the header, after a word.
+    let logo = document.new_id();
+    let header = Paragraph::from_runs(
+        document.new_id(),
+        body,
+        ParaAttrs::default(),
+        vec![
+            Run::new("Logo "),
+            Run::with_attrs(&mark, None, marked(logo)),
+        ],
+    )
+    .unwrap();
+    let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    document
+        .apply(Op::SetHeaderFooter {
+            section: None,
+            place,
+            paragraphs: vec![header],
+        })
+        .unwrap();
+    let mut picture = Object::new(
+        logo,
+        ObjectKind::Image(Picture::from_png(pixel_png()).unwrap()),
+        Frame::from_pt(0.0, 0.0, 30.0, 20.0),
+    );
+    picture.anchor = Anchor::InText;
+    document
+        .apply(Op::InsertObject {
+            index: 0,
+            object: picture,
+        })
+        .unwrap();
+    // A shape in a note.
+    let note = document.new_id();
+    let square = document.new_id();
+    let noted = Paragraph::from_runs(
+        document.new_id(),
+        body,
+        ParaAttrs::default(),
+        vec![
+            Run::with_attrs(
+                &mark,
+                None,
+                CharAttrs {
+                    field: Some(Some(Field::NoteMark { note })),
+                    ..CharAttrs::default()
+                },
+            ),
+            Run::new("See "),
+            Run::with_attrs(&mark, None, marked(square)),
+        ],
+    )
+    .unwrap();
+    document
+        .apply(Op::SetNote {
+            id: note,
+            note: Some(Note {
+                id: note,
+                mark: None,
+                paragraphs: vec![noted].into(),
+            }),
+        })
+        .unwrap();
+    let mut shape = Object::new(
+        square,
+        ObjectKind::Shape(Shape::Rectangle),
+        Frame::from_pt(0.0, 0.0, 12.0, 12.0),
+    );
+    shape.anchor = Anchor::InText;
+    document
+        .apply(Op::InsertObject {
+            index: 1,
+            object: shape,
+        })
+        .unwrap();
+    let text = Paragraph::from_runs(
+        document.new_id(),
+        body,
+        ParaAttrs::default(),
+        vec![
+            Run::new("Text"),
+            Run::with_attrs(
+                &mark,
+                None,
+                CharAttrs {
+                    field: Some(Some(Field::NoteMark { note })),
+                    baseline: Some(Baseline::Superscript),
+                    ..CharAttrs::default()
+                },
+            ),
+        ],
+    )
+    .unwrap();
+    document
+        .apply(Op::InsertParagraph {
+            index: 1,
+            paragraph: text,
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("est-12-13-inline-objects.odt", &bytes);
+    let again = read_odt(&bytes).unwrap();
+    let marks = again.story_object_marks();
+    assert_eq!(marks.len(), 2, "{marks:?}");
+    let mut kinds: Vec<(bool, (f64, f64))> = marks
+        .iter()
+        .map(|(id, (story, _))| {
+            let object = again.objects().get(*id).unwrap();
+            assert_eq!(object.anchor, Anchor::InText);
+            (
+                matches!(story, desk_model::Story::Margin { .. }),
+                (object.frame.width.to_pt(), object.frame.height.to_pt()),
+            )
+        })
+        .collect();
+    kinds.sort_by_key(|a| a.0);
+    assert_eq!(kinds, [(false, (12.0, 12.0)), (true, (30.0, 20.0))]);
+}
