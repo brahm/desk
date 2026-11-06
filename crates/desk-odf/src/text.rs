@@ -271,6 +271,10 @@ pub struct TextSettings {
     /// How far the footer is from the bottom of the paper, while the pages
     /// show none.
     pub footer_margin: Option<String>,
+    /// How many pages a page layout document has, which marks it as one:
+    /// its body is only the empty paragraphs that give other programs its
+    /// pages.
+    pub layout_pages: Option<u32>,
 }
 
 /// A list style (`text:list-style`).

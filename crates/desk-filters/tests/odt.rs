@@ -2803,3 +2803,37 @@ fn int_05_objects_in_the_headers_of_other_programs_go_on_the_master() {
         (setup.height - setup.footer_margin).to_pt() - 20.0
     );
 }
+
+#[test]
+fn int_03_page_layout_documents_keep_their_pages_and_have_no_body() {
+    use desk_model::{Anchor, Editor, Frame, Object, Shape};
+    let mut editor = Editor::new(Document::new_page_layout());
+    editor
+        .edit("Pages", |edit| {
+            let mut setup = *edit.document().page_setup();
+            setup.layout_pages = Some(3);
+            edit.set_page_setup(setup)?;
+            for page in [1, 2] {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    Shape::Rectangle.into(),
+                    Frame::from_pt(100.0, 100.0 * f64::from(page), 80.0, 60.0),
+                );
+                object.anchor = Anchor::Page(page);
+                edit.add_object(object)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("int-page-layout.odt", &bytes);
+    // Other programs see three pages.
+    let odf = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(odf.body.len(), 3);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.page_setup().layout_pages, Some(3));
+    assert_eq!(read.body().len(), 1);
+    assert!(read.body().get(0).unwrap().is_empty());
+    let anchors: Vec<Anchor> = read.objects().iter().map(|o| o.anchor).collect();
+    assert_eq!(anchors, [Anchor::Page(1), Anchor::Page(2)]);
+}

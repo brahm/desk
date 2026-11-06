@@ -246,6 +246,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(inactive) = text.links_inactive {
             config_item(&mut w, "LinksInactive", "boolean", boolean(inactive));
         }
+        if let Some(pages) = text.layout_pages {
+            config_item(&mut w, "PageLayoutPages", "int", &pages.to_string());
+        }
         if !text.never_hyphenate.is_empty() {
             config_item(
                 &mut w,

@@ -1042,6 +1042,14 @@ impl TextEditor {
     /// paragraph splits there, and the text after the break starts a
     /// page, a column, a layout or a section.
     pub fn insert_break(&self, kind: BreakKind) {
+        if self.is_page_layout() {
+            // A page layout document has pages, not text to break: a
+            // page break adds a page (INT-03).
+            if kind == BreakKind::Page {
+                self.add_layout_page();
+            }
+            return;
+        }
         if self.story().is_some() {
             // Not in headers, footers and notes, as in Pages.
             return;
@@ -1494,8 +1502,13 @@ impl TextEditor {
 
     /// Whether a change of the text from one spot to another would change
     /// a table of contents, which only updating it changes; the bell
-    /// rings then (EST-22).
+    /// rings then (EST-22). Nothing changes the body of a page layout
+    /// document (INT-03).
     fn toc_refuses(&self, start: Spot, end: Spot) -> bool {
+        if self.story().is_none() && self.is_page_layout() {
+            // A page layout document has no body text to edit (INT-03).
+            return true;
+        }
         let refused = {
             let state = self.state.borrow();
             let document = state.editor.document();

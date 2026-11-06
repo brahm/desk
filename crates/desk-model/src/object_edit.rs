@@ -524,6 +524,69 @@ impl Edit {
         }
         Ok(())
     }
+
+    /// Adds a page after page `after` of a page layout document, moving
+    /// the objects of the pages after it down by one (INT-03). A word
+    /// processing document is left as it is.
+    pub fn add_layout_page(&mut self, after: u32) -> Result<(), ModelError> {
+        let mut setup = *self.document().page_setup();
+        let Some(pages) = setup.layout_pages else {
+            return Ok(());
+        };
+        let later: Vec<Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| matches!(o.anchor, Anchor::Page(p) if p > after))
+            .cloned()
+            .collect();
+        for mut object in later {
+            if let Anchor::Page(p) = object.anchor {
+                object.anchor = Anchor::Page(p + 1);
+            }
+            self.replace_object(object)?;
+        }
+        setup.layout_pages = Some(pages.saturating_add(1));
+        self.set_page_setup(setup)
+    }
+
+    /// Takes page `page` out of a page layout document with the objects
+    /// on it, locked ones too, moving the objects of the pages after it up
+    /// by one (INT-03). The last page left, and a word processing
+    /// document, are left as they are.
+    pub fn delete_layout_page(&mut self, page: u32) -> Result<(), ModelError> {
+        let mut setup = *self.document().page_setup();
+        let Some(pages) = setup.layout_pages else {
+            return Ok(());
+        };
+        if pages <= 1 || page >= pages {
+            return Ok(());
+        }
+        let on_or_after: Vec<Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| matches!(o.anchor, Anchor::Page(p) if p >= page))
+            .cloned()
+            .collect();
+        for mut object in on_or_after {
+            match object.anchor {
+                Anchor::Page(p) if p == page => {
+                    if let ObjectKind::TextBox(text) = &object.kind {
+                        self.unlink_text_box(object.id, text)?;
+                    }
+                    self.remove_object(object.id)?;
+                }
+                Anchor::Page(p) => {
+                    object.anchor = Anchor::Page(p - 1);
+                    self.replace_object(object)?;
+                }
+                _ => {}
+            }
+        }
+        setup.layout_pages = Some(pages - 1);
+        self.set_page_setup(setup)
+    }
 }
 
 #[cfg(test)]
@@ -737,5 +800,45 @@ mod tests {
         let document = editor.document();
         assert_eq!(document.text_box_chain(c), vec![c]);
         assert_eq!(document.story_paragraphs(Story::TextBox(c)).len(), 2);
+    }
+
+    #[test]
+    fn int_03_pages_are_added_and_taken_out_with_their_objects() {
+        let mut editor = Editor::new(Document::new_page_layout());
+        editor.edit("Add Page", |e| e.add_layout_page(0)).unwrap();
+        let a = add(&mut editor, 10.0, 10.0, 20.0, 20.0);
+        let b = add(&mut editor, 10.0, 10.0, 20.0, 20.0);
+        editor
+            .edit("Move", |e| {
+                let frame = e.document().objects().get(b).unwrap().frame;
+                e.place_object(b, Anchor::Page(1), frame)
+            })
+            .unwrap();
+        // A page between them moves the second down.
+        editor.edit("Add Page", |e| e.add_layout_page(0)).unwrap();
+        let anchor = |editor: &Editor, id| editor.document().objects().get(id).map(|o| o.anchor);
+        assert_eq!(editor.document().page_setup().layout_pages, Some(3));
+        assert_eq!(anchor(&editor, a), Some(Anchor::Page(0)));
+        assert_eq!(anchor(&editor, b), Some(Anchor::Page(2)));
+        // Taking out the first takes its object with it.
+        editor
+            .edit("Delete Page", |e| e.delete_layout_page(0))
+            .unwrap();
+        assert_eq!(editor.document().page_setup().layout_pages, Some(2));
+        assert_eq!(anchor(&editor, a), None);
+        assert_eq!(anchor(&editor, b), Some(Anchor::Page(1)));
+        editor
+            .edit("Delete Page", |e| e.delete_layout_page(0))
+            .unwrap();
+        // The last page stays.
+        editor
+            .edit("Delete Page", |e| e.delete_layout_page(0))
+            .unwrap();
+        assert_eq!(editor.document().page_setup().layout_pages, Some(1));
+        assert_eq!(anchor(&editor, b), Some(Anchor::Page(0)));
+        // A word processing document has no pages of its own to add.
+        let mut editor = Editor::new(Document::new_word_processing());
+        editor.edit("Add Page", |e| e.add_layout_page(0)).unwrap();
+        assert_eq!(editor.document().page_setup().layout_pages, None);
     }
 }

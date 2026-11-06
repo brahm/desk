@@ -266,6 +266,9 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         }
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
+    if let Some(count) = setup.layout_pages {
+        layout_pages(document, &mut layout, count);
+    }
     place_margins(document, &mut layout, system);
     crate::objects::place_master_objects(document, &mut layout);
     crate::objects::place_inline_objects(document, &mut layout);
@@ -273,6 +276,56 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     layout.field_values = values;
     layout.notes = plan.note_ids();
     layout
+}
+
+/// The pages of a page layout document: as many as it has, without the
+/// text of the body, each with the objects fixed on it, from back to
+/// front (INT-03). Objects on pages past the last go on the last, and
+/// those that move with a paragraph on the first.
+fn layout_pages(document: &Document, layout: &mut DocumentLayout, count: u32) {
+    let count = count.max(1) as usize;
+    let setup = layout.setup;
+    let body = layout.pages.first().map_or(
+        (
+            setup.margin_top.to_pt() as f32,
+            (setup.height - setup.margin_bottom).to_pt() as f32,
+        ),
+        |p| p.body,
+    );
+    let (left, right) = (
+        setup.margin_left.to_pt() as f32,
+        setup.margin_right.to_pt() as f32,
+    );
+    let floats = crate::objects::floating(document);
+    layout.pages = (0..count)
+        .map(|index| {
+            let facing_left = setup.facing_pages && index % 2 == 1;
+            let objects = floats
+                .iter()
+                .filter(|f| match f.anchor {
+                    Place::Page(page) => page.min(count - 1) == index,
+                    Place::Paragraph(_) => index == 0,
+                })
+                .map(|f| PlacedObject::new(&f.object, None, 0.0))
+                .collect();
+            Page {
+                number: index as u32 + 1,
+                section: 0,
+                first_of_section: index == 0,
+                left: facing_left,
+                margins: if facing_left {
+                    (right, left)
+                } else {
+                    (left, right)
+                },
+                body,
+                objects,
+                ..Page::default()
+            }
+        })
+        .collect();
+    layout.sections.truncate(1);
+    layout.section_margins.truncate(1);
 }
 
 /// Whether a paragraph has a field.

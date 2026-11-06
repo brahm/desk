@@ -1486,6 +1486,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             footers: source.has_footers,
             header_margin: length(page.header),
             footer_margin: length(page.footer),
+            layout_pages: None,
         },
     })?;
     // Whether Pages hyphenates and forms ligatures at all, from the

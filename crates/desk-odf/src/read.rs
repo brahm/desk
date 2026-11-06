@@ -646,6 +646,13 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("HeaderMargin") => out.header_margin = Some(text.trim().to_owned()),
                 Some("FooterMargin") => out.footer_margin = Some(text.trim().to_owned()),
                 Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
+                Some("PageLayoutPages") => {
+                    out.layout_pages = text
+                        .trim()
+                        .parse()
+                        .ok()
+                        .filter(|n| (1..=10_000).contains(n));
+                }
                 Some("NeverHyphenate") => {
                     out.never_hyphenate = text
                         .lines()

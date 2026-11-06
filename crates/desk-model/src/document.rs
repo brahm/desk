@@ -142,6 +142,10 @@ pub struct PageSetup {
     pub header_margin: Length,
     /// How far the bottom of the footer is from the bottom of the paper.
     pub footer_margin: Length,
+    /// How many pages a page layout document has (INT-03), or none for a
+    /// word processing document. A page layout document has no body text:
+    /// its text is in text boxes, and all its objects float on its pages.
+    pub layout_pages: Option<u32>,
 }
 
 impl PageSetup {
@@ -181,7 +185,13 @@ impl PageSetup {
             footers: true,
             header_margin: Self::DEFAULT_HEADER_MARGIN,
             footer_margin: Self::DEFAULT_HEADER_MARGIN,
+            layout_pages: None,
         }
+    }
+
+    /// Whether the pages are those of a page layout document (INT-03).
+    pub fn is_page_layout(&self) -> bool {
+        self.layout_pages.is_some()
     }
 
     /// A4 in portrait, 210 by 297 mm rounded to whole points as Pages and
@@ -347,6 +357,15 @@ impl Document {
                 objects: Objects::default(),
             }),
         }
+    }
+
+    /// Makes an empty page layout document, of one page with no body text
+    /// (INT-03).
+    pub fn new_page_layout() -> Self {
+        let mut document = Self::new_word_processing();
+        let Container::Pages(flow) = &mut document.container;
+        flow.page.layout_pages = Some(1);
+        document
     }
 
     /// Returns a new identifier, never used before in this document.

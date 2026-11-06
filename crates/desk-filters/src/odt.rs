@@ -909,6 +909,26 @@ fn odf_list_style(
 
 /// Builds a document from an ODF text document.
 pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
+    // A page layout document has no body: the empty paragraphs that give
+    // other programs its pages are left out (INT-03).
+    if let Some(pages) = source.text_settings.layout_pages {
+        let mut source = source.clone();
+        source.body.truncate(1);
+        if let Some(first) = source.body.first_mut() {
+            first.spans.clear();
+            first.frames.clear();
+        }
+        let mut document = import_text(&source)?;
+        let mut setup = *document.page_setup();
+        setup.layout_pages = Some(pages);
+        document.apply(Op::SetPageSetup { page: setup })?;
+        return Ok(document);
+    }
+    import_text(source)
+}
+
+/// A word processing document from its ODF.
+fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     let mut document = Document::new_word_processing();
     let default = document.styles().default_paragraph();
 
@@ -2153,6 +2173,41 @@ fn export_spans(
     spans
 }
 
+/// The body of a page layout document, which has none of its own: as
+/// many empty paragraphs as it has pages, each but the first after a page
+/// break, so that other programs show its pages (INT-03).
+fn page_layout_body(out: &mut odf::TextDocument, automatic: &mut Vec<odf::Style>, pages: u32) {
+    out.text_settings.layout_pages = Some(pages);
+    let mut first = out.body.first().cloned().unwrap_or_default();
+    first.spans.clear();
+    first.frames.clear();
+    let name = "DeskPage".to_owned();
+    let mut style = odf::Style {
+        name: name.clone(),
+        family: odf::Family::Paragraph,
+        parent: first.style.clone(),
+        ..odf::Style::default()
+    };
+    if let Some(base) = automatic
+        .iter()
+        .find(|s| Some(&s.name) == first.style.as_ref())
+    {
+        style.parent.clone_from(&base.parent);
+        style.properties = base.properties.clone();
+    }
+    style.properties.paragraph.break_before = Some(odf::Break::Page);
+    automatic.push(style);
+    let frames = std::mem::take(&mut out.body[0].frames);
+    out.body.truncate(1);
+    out.body[0].frames = frames;
+    for _ in 1..pages.max(1) {
+        out.body.push(odf::Paragraph {
+            style: Some(name.clone()),
+            ..first.clone()
+        });
+    }
+}
+
 /// The names of the master pages of the sections that have headers and
 /// footers of their own, by the paragraph that starts each (EST-16).
 fn section_masters(document: &Document) -> HashMap<NodeId, String> {
@@ -2778,6 +2833,9 @@ pub fn export(document: &Document) -> odf::TextDocument {
         },
         &mut out,
     );
+    if let Some(pages) = document.page_setup().layout_pages {
+        page_layout_body(&mut out, &mut automatic, pages);
+    }
     out.automatic_styles = automatic;
     out.section_styles = section_styles;
     export_margins(document, &names, &mut out);
