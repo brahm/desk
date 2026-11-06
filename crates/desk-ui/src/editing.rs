@@ -29,6 +29,7 @@ use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
 mod connections;
+mod copies;
 mod media;
 mod navigate;
 mod objects;
@@ -156,6 +157,11 @@ thread_local! {
     /// The text last copied in Desk, with its styles, while the clipboard
     /// still holds that text.
     static COPIED: RefCell<Option<(String, desk_model::Fragment)>> = const { RefCell::new(None) };
+}
+
+/// Forgets the text copied, as objects were copied after it.
+fn forget_copied_text() {
+    COPIED.with(|c| *c.borrow_mut() = None);
 }
 
 /// The marks of the notes in the body, by paragraph and offset, in order.
@@ -428,6 +434,8 @@ struct State {
     objects: Vec<desk_model::NodeId>,
     /// A drag of objects in progress.
     object_drag: Option<objects::ObjectDrag>,
+    /// A drag that selects the objects in a rectangle (OBJ-21).
+    marquee: Option<copies::MarqueeDrag>,
     /// Which objects behind the text a press selects (OBJ-25, EST-21).
     selectable: objects::Selectable,
     /// The guides it snaps to.
@@ -551,6 +559,7 @@ impl TextEditor {
                 story: None,
                 objects: Vec::new(),
                 object_drag: None,
+                marquee: None,
                 selectable: objects::Selectable::default(),
                 guides: Vec::new(),
             })),
@@ -643,6 +652,11 @@ impl TextEditor {
 
     /// Selects the whole document.
     pub fn select_all(&self) {
+        // Out of the text, it selects the objects (OBJ-21).
+        if self.has_selected_objects() || (self.is_page_layout() && self.story().is_none()) {
+            self.select_all_objects();
+            return;
+        }
         let document = self.state.borrow().editor.snapshot();
         self.select(Selection {
             anchor: Spot::default(),
@@ -721,6 +735,10 @@ impl TextEditor {
     /// Copies the selection to the clipboard, as text for other apps and
     /// with its styles for Desk (TXT-04).
     pub fn copy(&self) {
+        if self.has_selected_objects() {
+            self.copy_objects();
+            return;
+        }
         let text = self.selected_text();
         if text.is_empty() {
             return;
@@ -735,11 +753,16 @@ impl TextEditor {
                 .ok()
         };
         COPIED.with(|c| *c.borrow_mut() = fragment.map(|f| (text.clone(), f)));
+        copies::forget_copied_objects();
         self.view.area().clipboard().set_text(&text);
     }
 
     /// Copies the selection and deletes it.
     pub fn cut(&self) {
+        if self.has_selected_objects() {
+            self.cut_objects();
+            return;
+        }
         if self.selection().is_empty() {
             return;
         }
@@ -761,6 +784,9 @@ impl TextEditor {
     }
 
     fn paste_keeping_style(&self, keep: bool) {
+        if self.paste_objects() {
+            return;
+        }
         let weak = self.downgrade();
         self.view
             .area()
@@ -3246,6 +3272,10 @@ impl TextEditor {
             {
                 return;
             }
+            if this.drag_marquee(x + dx, y + dy) {
+                this.state.borrow_mut().drag_from = None;
+                return;
+            }
             if this.dragging_objects() {
                 this.drag_objects(x + dx, y + dy, gesture.current_event_state());
                 return;
@@ -3276,6 +3306,7 @@ impl TextEditor {
                 return Default::default();
             };
             this.end_object_drag();
+            this.end_marquee();
             this.end_alpha_drag();
             this.end_pen_drag();
             this.end_points_drag();

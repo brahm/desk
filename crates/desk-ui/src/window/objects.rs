@@ -13,10 +13,11 @@ use gtk::{gio, glib};
 
 use super::DocumentWindow;
 use crate::editing::{NewShape, TextEditor};
-use crate::i18n::tr;
+use crate::i18n::{tr, trc};
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 25] = [
+pub(super) const OBJECT_ACTIONS: [&str; 26] = [
+    "duplicate-objects",
     "insert-picture",
     "move-to-master",
     "move-to-page",
@@ -45,7 +46,8 @@ pub(super) const OBJECT_ACTIONS: [&str; 25] = [
 ];
 
 /// The keys of the Arrange menu.
-pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 9] = [
+pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 10] = [
+    ("win.duplicate-objects", &["<Control>d"]),
     ("win.insert-picture", &["<Control><Shift>v"]),
     ("win.bring-to-front", &["<Control><Shift>bracketright"]),
     ("win.bring-forward", &["<Control>bracketright"]),
@@ -64,7 +66,8 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 19] = [
+        let simple: [(&str, EditorAction); 20] = [
+            ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),
             ("move-to-page", TextEditor::move_objects_to_page),
             ("insert-text-box", |e| e.insert_shape(NewShape::TextBox)),
@@ -341,6 +344,11 @@ pub(super) fn arrange_menu() -> gio::Menu {
     shape.append(Some(&tr("Smoo_th Path")), Some("win.smooth-path"));
     shape.append(Some(&tr("Sha_rpen Path")), Some("win.sharpen-path"));
     let grouping = gio::Menu::new();
+    // A copy a little lower and to the right (OBJ-22).
+    grouping.append(
+        Some(&trc("Arrange", "Dupl_icate")),
+        Some("win.duplicate-objects"),
+    );
     grouping.append(Some(&tr("_Group")), Some("win.group"));
     grouping.append(Some(&tr("_Ungroup")), Some("win.ungroup"));
     grouping.append(Some(&tr("_Lock")), Some("win.lock"));

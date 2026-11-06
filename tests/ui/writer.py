@@ -454,6 +454,7 @@ def main():
     media_browser(work)
     master_objects(work)
     page_layout(work)
+    copies_of_a_shape(work)
     print("All UI tests passed.")
 
 
@@ -1487,6 +1488,45 @@ def page_layout(work):
         )
         check("a page break adds a page to it (INT-03)", True)
         check("and its body still has no text", not saved_content(letter, r"Hello"))
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def copies_of_a_shape(work):
+    """Duplicate and Copy and Paste put copies of a selected shape on the
+    page, each a little lower and to the right, and they are saved with it
+    (OBJ-22)."""
+    writer, app, letter = open_with_a_shape(work, "Copies.odt")
+    try:
+        press("ctrl+d")
+        time.sleep(0.5)
+        press("ctrl+c")
+        press("ctrl+v")
+        time.sleep(1)
+        press("ctrl+s")
+        def corners():
+            content = saved_content(letter, r"<draw:rect")
+            if not content:
+                return None
+            with zipfile.ZipFile(letter) as package:
+                text = package.read("content.xml").decode()
+            rects = re.findall(r"<draw:rect[^>]*>", text)
+            if len(rects) != 3:
+                return None
+            return sorted(
+                (
+                    round(points(re.search(r'svg:x="([^"]+)"', r).group(1))),
+                    round(points(re.search(r'svg:y="([^"]+)"', r).group(1))),
+                )
+                for r in rects
+            )
+
+        found = wait_for("the shape and its two copies saved", corners)
+        check(
+            "Duplicate and Paste put copies of the shape ten points lower and to the right (OBJ-22)",
+            found == [(96, 200), (106, 210), (116, 220)],
+        )
     finally:
         writer.terminate()
         writer.wait(timeout=10)

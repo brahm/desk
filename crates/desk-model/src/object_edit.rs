@@ -395,6 +395,72 @@ impl Edit {
         Ok(())
     }
 
+    /// Adds copies of objects in front of the others, with identifiers
+    /// of their own, and returns those identifiers in the same order
+    /// (OBJ-22). A connection line among them stays joined to the copies
+    /// of the objects it joined. Objects in the text are not copied, as
+    /// each is a character of it.
+    pub fn add_copies(&mut self, objects: &[Object]) -> Result<Vec<NodeId>, ModelError> {
+        let objects: Vec<&Object> = objects
+            .iter()
+            .filter(|o| o.anchor != Anchor::InText)
+            .collect();
+        let mut copies = Vec::with_capacity(objects.len());
+        for object in &objects {
+            copies.push(self.renumbered_object(object)?);
+        }
+        let copied = |id: Option<NodeId>| {
+            let id = id?;
+            objects
+                .iter()
+                .position(|o| o.id == id)
+                .map(|i| copies[i].id)
+        };
+        let joined: Vec<Option<(Option<NodeId>, Option<NodeId>)>> = objects
+            .iter()
+            .map(|o| match &o.kind {
+                ObjectKind::Shape(crate::Shape::Connection(line)) => {
+                    Some((copied(line.start), copied(line.end)))
+                }
+                _ => None,
+            })
+            .collect();
+        let mut ids = Vec::with_capacity(copies.len());
+        for (mut copy, joined) in copies.into_iter().zip(joined) {
+            if let (Some((start, end)), ObjectKind::Shape(crate::Shape::Connection(line))) =
+                (joined, &mut copy.kind)
+            {
+                line.start = start;
+                line.end = end;
+            }
+            ids.push(copy.id);
+            self.add_object(copy)?;
+        }
+        Ok(ids)
+    }
+
+    /// Adds copies of objects moved by `dx` across and `dy` down, as
+    /// Duplicate does, and returns their identifiers, from back to front
+    /// (OBJ-22).
+    pub fn duplicate_objects(
+        &mut self,
+        ids: &[NodeId],
+        dx: Length,
+        dy: Length,
+    ) -> Result<Vec<NodeId>, ModelError> {
+        for &id in ids {
+            self.object(id)?;
+        }
+        let objects: Vec<Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| ids.contains(&o.id))
+            .map(|o| translated(o, dx, dy))
+            .collect();
+        self.add_copies(&objects)
+    }
+
     /// Groups objects into one, where the frontmost of them was, and
     /// returns its identifier (OBJ-06). They must move with the same
     /// thing, and not be locked.
@@ -648,6 +714,66 @@ mod tests {
         assert_eq!(order(&editor), vec![b]);
         editor.undo().unwrap();
         assert_eq!(order(&editor), vec![a, b]);
+    }
+
+    #[test]
+    fn obj_22_copies_get_ids_of_their_own_and_keep_their_lines_joined() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let a = add(&mut editor, 10.0, 10.0, 50.0, 20.0);
+        let b = add(&mut editor, 100.0, 10.0, 50.0, 20.0);
+        let line = editor
+            .edit("Arrange", |e| {
+                let id = e.new_id();
+                e.add_object(Object::new(
+                    id,
+                    ObjectKind::Shape(Shape::Connection(crate::Connection {
+                        start: Some(a),
+                        end: Some(b),
+                        from: (0, 5_000),
+                        to: (10_000, 5_000),
+                        bend: Length::ZERO,
+                    })),
+                    Frame::from_pt(60.0, 20.0, 40.0, 0.0),
+                ))?;
+                Ok(id)
+            })
+            .unwrap();
+        // Duplicate: copies a little lower and to the right, in front.
+        let copies = editor
+            .edit("Duplicate", |e| {
+                e.duplicate_objects(&[line, a, b], Length::from_pt(9.0), Length::from_pt(9.0))
+            })
+            .unwrap();
+        assert_eq!(copies.len(), 3);
+        assert_eq!(order(&editor)[..3], [a, b, line]);
+        assert_eq!(order(&editor)[3..], copies[..]);
+        assert!(copies.iter().all(|c| ![a, b, line].contains(c)));
+        assert_eq!(frame(&editor, copies[0]), (19.0, 19.0, 50.0, 20.0));
+        let ObjectKind::Shape(Shape::Connection(joined)) =
+            &editor.document().objects().get(copies[2]).unwrap().kind
+        else {
+            panic!("a line");
+        };
+        assert_eq!(
+            (joined.start, joined.end),
+            (Some(copies[0]), Some(copies[1]))
+        );
+        // A line copied without its objects joins nothing.
+        let alone = editor
+            .edit("Paste", |e| {
+                let line = e.document().objects().get(line).unwrap().clone();
+                e.add_copies(&[line])
+            })
+            .unwrap();
+        let ObjectKind::Shape(Shape::Connection(loose)) =
+            &editor.document().objects().get(alone[0]).unwrap().kind
+        else {
+            panic!("a line");
+        };
+        assert_eq!((loose.start, loose.end), (None, None));
+        editor.undo().unwrap();
+        editor.undo().unwrap();
+        assert_eq!(order(&editor), vec![a, b, line]);
     }
 
     #[test]

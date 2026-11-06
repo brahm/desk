@@ -50,6 +50,21 @@ struct State {
     /// The alignment guides that a drag of objects snaps to (OBJ-05).
     guides: Vec<Guide>,
     path: Option<PathMark>,
+    /// The rectangle a drag draws to select the objects it touches
+    /// (OBJ-21).
+    marquee: Option<Marquee>,
+}
+
+/// The rectangle of a drag that selects objects, between two corners in
+/// points on its page (OBJ-21).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Marquee {
+    /// The page it is on.
+    pub page: usize,
+    /// Where the drag started.
+    pub from: (f64, f64),
+    /// Where the pointer is.
+    pub to: (f64, f64),
 }
 
 /// A selected object, drawn over the pages: its outline and its handles,
@@ -155,6 +170,7 @@ impl DocumentView {
             objects: Vec::new(),
             guides: Vec::new(),
             path: None,
+            marquee: None,
             squiggles: Vec::new(),
         }));
         let view = Self {
@@ -228,6 +244,16 @@ impl DocumentView {
             state.objects = objects;
             state.guides = guides;
         }
+        self.area.queue_draw();
+    }
+
+    /// Shows the rectangle of a drag that selects objects, or none
+    /// (OBJ-21).
+    pub fn set_marquee(&self, marquee: Option<Marquee>) {
+        if self.state.borrow().marquee == marquee {
+            return;
+        }
+        self.state.borrow_mut().marquee = marquee;
         self.area.queue_draw();
     }
 
@@ -768,6 +794,17 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
         cr.line_to(x1.round() + 0.5, y1.round() + 0.5);
     }
     cr.stroke().ok();
+    if let Some(marquee) = state.marquee.filter(|m| m.page == page) {
+        let (x0, y0) = at(marquee.from);
+        let (x1, y1) = at(marquee.to);
+        let (x, y) = (x0.min(x1).round() + 0.5, y0.min(y1).round() + 0.5);
+        let (w, h) = ((x1 - x0).abs().round(), (y1 - y0).abs().round());
+        cr.rectangle(x, y, w, h);
+        cr.set_source_rgba(0.21, 0.52, 0.89, 0.15);
+        cr.fill_preserve().ok();
+        cr.set_source_rgb(0.21, 0.52, 0.89);
+        cr.stroke().ok();
+    }
     for mark in state.objects.iter().filter(|m| m.page == page) {
         cr.set_source_rgb(0.21, 0.52, 0.89);
         for (i, &point) in mark.outline.iter().enumerate() {

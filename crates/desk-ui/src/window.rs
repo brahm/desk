@@ -2154,6 +2154,7 @@ impl DocumentWindow {
         edit.append(Some(&tr("Cu_t")), Some("win.cut"));
         edit.append(Some(&tr("_Copy")), Some("win.copy"));
         edit.append(Some(&tr("_Paste")), Some("win.paste"));
+        edit.append(Some(&tr("Dupl_icate")), Some("win.duplicate-objects"));
         edit.append(
             Some(&tr("Paste and _Match Style")),
             Some("win.paste-match-style"),

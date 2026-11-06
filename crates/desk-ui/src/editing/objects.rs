@@ -419,6 +419,9 @@ pub(super) struct ObjectDrag {
     /// The objects dragged, as they were placed when it started, with
     /// their pages.
     objects: Vec<(usize, PlacedObject)>,
+    /// Whether Alt is held, so that the drag leaves copies where it
+    /// drops and the objects where they were (OBJ-22).
+    copying: bool,
     /// Where they go.
     preview: Vec<Placement>,
 }
@@ -448,7 +451,7 @@ pub(super) fn find(layout: &DocumentLayout, id: NodeId) -> Option<(usize, &Place
 }
 
 /// Whether a point of a page is on a line of its text.
-fn on_text(layout: &DocumentLayout, page: usize, x: f32, y: f32) -> bool {
+pub(super) fn on_text(layout: &DocumentLayout, page: usize, x: f32, y: f32) -> bool {
     layout.pages.get(page).is_some_and(|page| {
         page.lines.iter().any(|l| {
             let left = l.origin.0 + l.line.x;
@@ -470,7 +473,7 @@ pub struct Selectable {
 
 impl Selectable {
     /// Whether a press can select an object.
-    fn allows(self, object: &Object) -> bool {
+    pub(super) fn allows(self, object: &Object) -> bool {
         if object.anchor.is_master() {
             self.masters
         } else if object.wrap == Wrap::Behind {
@@ -1502,10 +1505,14 @@ impl TextEditor {
             return true;
         }
         let Some(id) = hit_id else {
-            if self.has_selected_objects() {
+            let marquee = presses == 1 && self.marquee_starts(page, px, py);
+            if self.has_selected_objects() && !(marquee && (shift || control)) {
                 self.state.borrow_mut().objects.clear();
                 self.show_objects();
                 self.selection_changed();
+            }
+            if marquee {
+                return self.start_marquee(page, (px, py));
             }
             return false;
         };
@@ -1591,6 +1598,7 @@ impl TextEditor {
             start,
             objects,
             preview,
+            copying: false,
         });
     }
 
@@ -1602,6 +1610,7 @@ impl TextEditor {
     /// Follows the pointer in a drag of objects, to a point of the area.
     pub(super) fn drag_objects(&self, x: f64, y: f64, modifiers: gdk::ModifierType) {
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
+        let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
         let scale = self.view.scale();
         let Some(drag) = self.state.borrow().object_drag.clone() else {
             return;
@@ -1705,6 +1714,7 @@ impl TextEditor {
             let mut state = self.state.borrow_mut();
             if let Some(drag) = state.object_drag.as_mut() {
                 drag.preview = preview;
+                drag.copying = alt && drag.kind == DragKind::Move;
             }
             state.guides = guides;
         }
@@ -1725,6 +1735,11 @@ impl TextEditor {
             .map(|((p, o), placement)| placed_object(o, *p, placement))
             .collect();
         if changed.is_empty() {
+            self.show_objects();
+            return;
+        }
+        if drag.copying {
+            self.add_dragged_copies(changed);
             self.show_objects();
             return;
         }
