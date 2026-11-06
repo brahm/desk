@@ -334,9 +334,16 @@ impl Painter {
                             picture,
                             rect,
                             tile,
+                            tint,
                         } = paint
                         {
                             self.set_picture(cr, picture, *rect, *tile)?;
+                            // The tint goes over the picture, inside the
+                            // path (OBJ-42).
+                            if let Some(tint) = tint.filter(|t| t.a > 0) {
+                                cr.fill_preserve()?;
+                                set_color(cr, tint);
+                            }
                         } else {
                             set_paint(cr, paint)?;
                         }
@@ -384,6 +391,9 @@ impl Painter {
                     blur,
                     color,
                 } => self.paint_cast_shadow(cr, items, *offset, *blur, *color)?,
+                Item::Reflection { items, opacity } => {
+                    self.paint_reflection(cr, items, *opacity)?;
+                }
                 Item::Group {
                     transform,
                     opacity,
@@ -407,6 +417,42 @@ impl Painter {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Paints items upside down below where they draw, mirrored at their
+    /// foot, fading from an opacity there to nothing over half their
+    /// height, as the reflection of Pages (OBJ-38).
+    fn paint_reflection(
+        &mut self,
+        cr: &Context,
+        items: &[Item],
+        opacity: f32,
+    ) -> Result<(), RenderError> {
+        if opacity <= 0.0 {
+            return Ok(());
+        }
+        let recording = cairo::RecordingSurface::create(cairo::Content::ColorAlpha, None)?;
+        {
+            let rc = Context::new(&recording)?;
+            self.paint_items(&rc, items)?;
+        }
+        let (_, iy, iw, ih) = recording.ink_extents();
+        if iw <= 0.0 || ih <= 0.0 {
+            return Ok(());
+        }
+        let foot = iy + ih;
+        cr.save()?;
+        cr.push_group();
+        cr.transform(Matrix::new(1.0, 0.0, 0.0, -1.0, 0.0, 2.0 * foot));
+        cr.set_source_surface(&recording, 0.0, 0.0)?;
+        cr.paint()?;
+        cr.pop_group_to_source()?;
+        let fade = cairo::LinearGradient::new(0.0, foot, 0.0, foot + ih / 2.0);
+        fade.add_color_stop_rgba(0.0, 0.0, 0.0, 0.0, f64::from(opacity.min(1.0)));
+        fade.add_color_stop_rgba(1.0, 0.0, 0.0, 0.0, 0.0);
+        cr.mask(&fade)?;
+        cr.restore()?;
         Ok(())
     }
 

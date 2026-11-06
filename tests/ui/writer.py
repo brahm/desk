@@ -457,6 +457,7 @@ def main():
     copies_of_a_shape(work)
     guide_from_the_ruler(work)
     pages_as_sections(work)
+    reflection_of_a_shape(work)
     print("All UI tests passed.")
 
 
@@ -1606,6 +1607,24 @@ def pages_as_sections(work):
             "Duplicate in the thumbnails copies a page with its shape (EST-16)",
             len(re.findall(r"<draw:rect", zipfile.ZipFile(letter).read("content.xml").decode())) == 2,
         )
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def reflection_of_a_shape(work):
+    """The Graphic group of the Inspector reflects a selected shape below
+    it, at half its opacity, and the reflection is saved (OBJ-38)."""
+    writer, app, letter = open_with_a_shape(work, "Reflection.odt")
+    try:
+        toggle_switch_row(app, "Reflection", "the Graphic group of the Inspector")
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved reflection",
+            lambda: saved_content(letter, r'desk:reflection="50%"'),
+        )
+        check("the reflection of the shape is saved (OBJ-38)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

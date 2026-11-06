@@ -987,6 +987,9 @@ fn obj_04_obj_07_obj_16_obj_37_obj_39_masks_adjustments_text_layout_and_effects_
     assert_eq!(shadow.offset, Length::from_points(6));
     assert_eq!(shadow.opacity, 75);
     assert_eq!(objects[2].style.opacity, 40);
+    // A reflection at half its opacity (OBJ-38).
+    let reflections: Vec<Option<u8>> = objects.iter().map(|o| o.style.reflection).collect();
+    assert_eq!(reflections, [None, Some(50), None]);
 }
 
 #[test]
@@ -1002,4 +1005,18 @@ fn obj_17_objects_saved_with_a_tight_wrap_keep_their_outline() {
         );
     }
     assert_eq!(objects[0].wrap, desk_model::Wrap::Largest);
+}
+
+#[test]
+fn obj_42_pictures_that_fill_shapes_are_read() {
+    let (_, objects) = fixture_objects("obj-42-image-fill.pages");
+    let filled = objects
+        .iter()
+        .find_map(|o| match &o.style.fill {
+            Some(desk_model::Fill::Image { picture, mode, .. }) => Some((picture.clone(), *mode)),
+            _ => None,
+        })
+        .expect("a shape filled with a picture");
+    assert_eq!(filled.1, desk_model::ImageFill::ScaleToFit);
+    assert_eq!((filled.0.width(), filled.0.height()), (96, 64));
 }

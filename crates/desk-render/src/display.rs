@@ -136,6 +136,15 @@ pub enum Item {
         /// The color, with the opacity of the shadow.
         color: Rgba,
     },
+    /// Items reflected upside down below where they draw, fading from an
+    /// opacity at their foot to nothing (OBJ-38).
+    Reflection {
+        /// The items reflected.
+        items: Vec<Item>,
+        /// How opaque the reflection is at the foot of the items, from 0
+        /// to 1.
+        opacity: f32,
+    },
     /// A filled rectangle, as for underlines and strikethroughs.
     Rect {
         /// The left edge.
@@ -177,6 +186,8 @@ pub enum Paint {
         rect: (f32, f32, f32, f32),
         /// Whether it repeats beyond that rectangle.
         tile: bool,
+        /// A color laid over it, with its opacity (OBJ-42).
+        tint: Option<Rgba>,
     },
 }
 
@@ -205,6 +216,7 @@ fn image_paint(picture: Picture, mode: ImageFill, frame: (f32, f32, f32, f32)) -
         picture,
         rect,
         tile,
+        tint: None,
     }
 }
 
@@ -497,7 +509,24 @@ fn object_item(placed: &PlacedObject) -> Item {
                 to,
             }
         }
-        Fill::Image { picture, mode } => image_paint(picture, mode, (x, y, w, h)),
+        Fill::Image {
+            picture,
+            mode,
+            tint,
+        } => match image_paint(picture, mode, (x, y, w, h)) {
+            Paint::Image {
+                picture,
+                rect,
+                tile,
+                ..
+            } => Paint::Image {
+                picture,
+                rect,
+                tile,
+                tint,
+            },
+            other => other,
+        },
         _ => Paint::Color(Rgba::BLACK),
     });
     let stroke = style.stroke.map(|stroke| {
@@ -671,35 +700,47 @@ fn object_item(placed: &PlacedObject) -> Item {
         cy - (yx * cx + yy * cy),
     ];
     let opacity = f32::from(style.opacity.min(100)) / 100.0;
-    let Some(shadow) = style.shadow else {
-        return Item::Group {
-            transform,
-            opacity,
-            items: list.items,
-        };
-    };
-    // The shadow falls on the page the same way however the object is
-    // turned, and fades with it.
     let object = Item::Group {
         transform,
         opacity: 1.0,
         items: list.items,
     };
-    let (dx, dy) = shadow.offset_xy();
-    let mut color = shadow.color;
-    color.a = (u16::from(color.a) * u16::from(shadow.opacity.min(100)) / 100) as u8;
+    let mut items = Vec::new();
+    // The shadow falls on the page the same way however the object is
+    // turned, and fades with it.
+    if let Some(shadow) = style.shadow {
+        let (dx, dy) = shadow.offset_xy();
+        let mut color = shadow.color;
+        color.a = (u16::from(color.a) * u16::from(shadow.opacity.min(100)) / 100) as u8;
+        items.push(Item::CastShadow {
+            items: vec![object.clone()],
+            offset: (dx as f32, dy as f32),
+            blur: shadow.blur.to_pt() as f32,
+            color,
+        });
+    }
+    // The reflection, below the object as it stands on the page.
+    if let Some(reflection) = style.reflection.filter(|r| *r > 0) {
+        items.push(Item::Reflection {
+            items: vec![object.clone()],
+            opacity: f32::from(reflection.min(100)) / 100.0,
+        });
+    }
+    if items.is_empty() {
+        let Item::Group { items, .. } = object else {
+            unreachable!("the object is a group")
+        };
+        return Item::Group {
+            transform,
+            opacity,
+            items,
+        };
+    }
+    items.push(object);
     Item::Group {
         transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
         opacity,
-        items: vec![
-            Item::CastShadow {
-                items: vec![object.clone()],
-                offset: (dx as f32, dy as f32),
-                blur: shadow.blur.to_pt() as f32,
-                color,
-            },
-            object,
-        ],
+        items,
     }
 }
 

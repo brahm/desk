@@ -3,7 +3,8 @@
 
 //! The Graphic inspector of Pages, for the selected objects (OBJ-09,
 //! OBJ-10, OBJ-11, OBJ-12): what fills them, the line around them and at
-//! the ends of a line, their shadow and how opaque they are.
+//! the ends of a line, their shadow and reflection and how opaque they
+//! are.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -83,6 +84,8 @@ pub struct GraphicGroup {
     shadow_offset: adw::SpinRow,
     shadow_blur: adw::SpinRow,
     shadow_opacity: adw::SpinRow,
+    reflection: adw::SwitchRow,
+    reflection_opacity: adw::SpinRow,
     opacity: adw::SpinRow,
     updating: Cell<bool>,
 }
@@ -140,6 +143,8 @@ impl GraphicGroup {
                 tr("Color Fill"),
                 tr("Gradient Fill"),
                 tr("Image Fill"),
+                // A picture with a color over it (OBJ-42).
+                tr("Tinted Image Fill"),
             ],
         );
         let image_button = gtk::Button::builder()
@@ -175,6 +180,10 @@ impl GraphicGroup {
         shadow_blur.set_subtitle(&tr("Points"));
         let shadow_opacity = spin(&tr("Shadow Opacity"), 0.0, 100.0, 1.0);
         shadow_opacity.set_subtitle(&tr("Percent"));
+        // A reflection below the object, as in Pages (OBJ-38).
+        let reflection = adw::SwitchRow::builder().title(tr("Reflection")).build();
+        let reflection_opacity = spin(&tr("Reflection Opacity"), 0.0, 100.0, 1.0);
+        reflection_opacity.set_subtitle(&tr("Percent"));
         let opacity = spin(&tr("Opacity"), 0.0, 100.0, 1.0);
         opacity.set_subtitle(&tr("Percent"));
         let group = adw::PreferencesGroup::builder()
@@ -198,6 +207,8 @@ impl GraphicGroup {
             shadow_offset.upcast_ref(),
             shadow_blur.upcast_ref(),
             shadow_opacity.upcast_ref(),
+            reflection.upcast_ref(),
+            reflection_opacity.upcast_ref(),
             opacity.upcast_ref(),
         ] {
             group.add(row);
@@ -228,6 +239,8 @@ impl GraphicGroup {
             shadow_offset,
             shadow_blur,
             shadow_opacity,
+            reflection,
+            reflection_opacity,
             opacity,
             updating: Cell::new(false),
         });
@@ -244,7 +257,7 @@ impl GraphicGroup {
                 }
                 let Some(editor) = editor() else { return };
                 if matches!(part, Part::Fill)
-                    && this.fill.selected() == 3
+                    && matches!(this.fill.selected(), 3 | 4)
                     && this.picture.borrow().is_none()
                 {
                     // An image fill begins with an image.
@@ -254,6 +267,10 @@ impl GraphicGroup {
                 let fill = this.fill_value();
                 let stroke = this.stroke_value();
                 let shadow = this.shadow_value();
+                let reflection = this
+                    .reflection
+                    .is_active()
+                    .then(|| this.reflection_opacity.value().round().clamp(0.0, 100.0) as u8);
                 let opacity = this.opacity.value().round().clamp(0.0, 100.0) as u8;
                 editor.style_objects(name, move |style, line| match part {
                     Part::Fill => {
@@ -271,6 +288,7 @@ impl GraphicGroup {
                         });
                     }
                     Part::Shadow => style.shadow = shadow,
+                    Part::Reflection => style.reflection = reflection,
                     Part::Opacity => style.opacity = opacity,
                 });
                 this.show_rows();
@@ -322,6 +340,12 @@ impl GraphicGroup {
             let on = changed.clone();
             row.connect_value_notify(move |_| on("Shadow", Part::Shadow));
         }
+        let on = changed.clone();
+        this.reflection
+            .connect_active_notify(move |_| on("Reflection", Part::Reflection));
+        let on = changed.clone();
+        this.reflection_opacity
+            .connect_value_notify(move |_| on("Reflection", Part::Reflection));
         let on = changed;
         this.opacity
             .connect_value_notify(move |_| on("Opacity", Part::Opacity));
@@ -376,12 +400,20 @@ impl GraphicGroup {
                 to: from_gdk(&self.gradient_end.rgba()),
                 angle: (self.gradient_angle.value() * 100.0).round() as i32,
             }),
-            3 => self.picture.borrow().clone().map(|picture| Fill::Image {
+            fill @ (3 | 4) => self.picture.borrow().clone().map(|picture| Fill::Image {
                 picture,
                 mode: IMAGE_FILLS
                     .get(self.image_mode.selected() as usize)
                     .copied()
                     .unwrap_or_default(),
+                // An opaque tint would hide the picture: it starts at half.
+                tint: (fill == 4).then(|| {
+                    let mut tint = from;
+                    if tint.a == 255 {
+                        tint.a = 128;
+                    }
+                    tint
+                }),
             }),
             _ => None,
         }
@@ -424,9 +456,9 @@ impl GraphicGroup {
         let fill = self.fill.selected();
         let shown = self.fill.is_visible();
         self.fill_color_row
-            .set_visible(shown && (fill == 1 || fill == 2));
-        self.image_row.set_visible(shown && fill == 3);
-        self.image_mode.set_visible(shown && fill == 3);
+            .set_visible(shown && matches!(fill, 1 | 2 | 4));
+        self.image_row.set_visible(shown && matches!(fill, 3 | 4));
+        self.image_mode.set_visible(shown && matches!(fill, 3 | 4));
         self.gradient_end_row
             .set_visible(self.fill.is_visible() && fill == 2);
         self.gradient_angle
@@ -447,6 +479,8 @@ impl GraphicGroup {
         ] {
             row.set_visible(shadow);
         }
+        self.reflection_opacity
+            .set_visible(self.reflection.is_active());
     }
 
     /// Shows the style of the selected objects, or hides the group when
@@ -492,8 +526,15 @@ impl GraphicGroup {
                 set_color(&self.gradient_end, to);
                 set(&self.gradient_angle, f64::from(angle) / 100.0);
             }
-            Some(Fill::Image { picture, mode }) => {
-                select(&self.fill, 3);
+            Some(Fill::Image {
+                picture,
+                mode,
+                tint,
+            }) => {
+                select(&self.fill, if tint.is_some() { 4 } else { 3 });
+                if let Some(tint) = tint {
+                    set_color(&self.fill_color, tint);
+                }
                 *self.picture.borrow_mut() = Some(picture);
                 let index = IMAGE_FILLS.iter().position(|m| *m == mode).unwrap_or(0);
                 select(&self.image_mode, index as u32);
@@ -531,6 +572,13 @@ impl GraphicGroup {
         set(&self.shadow_offset, shadow.offset.to_pt());
         set(&self.shadow_blur, shadow.blur.to_pt());
         set(&self.shadow_opacity, f64::from(shadow.opacity));
+        if self.reflection.is_active() != style.reflection.is_some() {
+            self.reflection.set_active(style.reflection.is_some());
+        }
+        set(
+            &self.reflection_opacity,
+            f64::from(style.reflection.unwrap_or(GraphicStyle::REFLECTION)),
+        );
         set(&self.opacity, f64::from(style.opacity));
         self.show_rows();
         self.updating.set(false);
@@ -543,5 +591,6 @@ enum Part {
     Fill,
     Stroke,
     Shadow,
+    Reflection,
     Opacity,
 }

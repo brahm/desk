@@ -276,13 +276,18 @@ impl PagesDocument {
                 _ => None,
             })
             .collect();
-        // The pictures and movies of the objects.
+        // The pictures and movies of the objects, and the pictures that
+        // fill them.
         let mut stack: Vec<&Drawable> = self
             .drawables
             .iter()
             .chain(self.attachments.iter().map(|(_, d)| d))
             .collect();
         while let Some(drawable) = stack.pop() {
+            // A picture that fills it (OBJ-42).
+            if let Some(crate::sf::Value::TexturedFill { path, .. }) = drawable.style.get("fill") {
+                paths.push(path.clone());
+            }
             match &drawable.kind {
                 DrawableKind::Image { path, .. } => paths.push(path.clone()),
                 DrawableKind::Media { path, poster, .. } => {

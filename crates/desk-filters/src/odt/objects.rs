@@ -80,6 +80,9 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             shadow_color,
             shadow_opacity,
             shadow_blur,
+            reflection,
+            fill_tint,
+            fill_tint_opacity,
             opacity,
             wrap,
             wrap_contour,
@@ -927,7 +930,16 @@ fn import_one(
             // ODF repeats a picture unless it says otherwise.
             _ => ImageFill::Tile,
         };
-        style.fill = Some(Fill::Image { picture, mode });
+        let tint = g.fill_tint.map(|color| {
+            let mut tint = rgba(color);
+            tint.a = (g.fill_tint_opacity.unwrap_or(100.0).clamp(0.0, 100.0) * 2.55).round() as u8;
+            tint
+        });
+        style.fill = Some(Fill::Image {
+            picture,
+            mode,
+            tint,
+        });
     } else if let Some(gradient) = gradient {
         style.fill = Some(model_gradient(gradient));
     } else if filled && let Some(color) = g.fill_color {
@@ -958,6 +970,7 @@ fn import_one(
     if let ObjectKind::Image(picture) = &built.kind {
         built.picture = model_picture_settings(&g, picture, frame);
     }
+    style.reflection = g.reflection.map(|r| r.round().clamp(0.0, 100.0) as u8);
     if g.shadow.as_deref() == Some("visible") {
         style.shadow = Some(model_shadow(&g));
     }
@@ -1384,7 +1397,15 @@ impl Exporter<'_> {
         let mut g = odf::GraphicProperties::default();
         let style = &object.style;
         match &style.fill {
-            Some(Fill::Image { picture, mode }) => {
+            Some(Fill::Image {
+                picture,
+                mode,
+                tint,
+            }) => {
+                if let Some(tint) = *tint {
+                    g.fill_tint = Some(odf_color(tint));
+                    g.fill_tint_opacity = Some((f64::from(tint.a) / 2.55 * 10.0).round() / 10.0);
+                }
                 g.fill = Some("bitmap".into());
                 let href = self.picture(picture);
                 g.fill_image_name = Some(self.fill_image(href));
@@ -1442,6 +1463,7 @@ impl Exporter<'_> {
         if style.opacity < 100 {
             g.opacity = Some(f64::from(style.opacity));
         }
+        g.reflection = style.reflection.map(f64::from);
         if let Some(shadow) = style.shadow {
             let (dx, dy) = shadow.offset_xy();
             g.shadow = Some("visible".into());

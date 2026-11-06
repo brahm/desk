@@ -145,6 +145,15 @@ pub enum Value {
         /// The colors, by where they are from 0 to 1, in order.
         stops: Vec<(f64, Color)>,
     },
+    /// A picture that fills an object (`sf:textured-fill`): how it is
+    /// sized to the object (`sf:technique`: `fit`, `fill`, `stretch`,
+    /// `natural` or `tile`) and the path of its file in the package.
+    TexturedFill {
+        /// `sf:technique`.
+        technique: String,
+        /// The `sf:path` of its unfiltered data.
+        path: String,
+    },
     /// What an end of a line ends in (`sf:line-end`), by its
     /// `sf:identifier`, as `filled arrow` or `open circle`.
     LineEnd(String),
@@ -365,6 +374,19 @@ impl Value {
                     .unwrap_or_default()
                     .to_owned(),
             ),
+            "textured-fill" => {
+                let path = element
+                    .descendants()
+                    .filter(|e| e.name.is(SF, "data"))
+                    .find_map(|e| e.attr(SF, "path"));
+                match path {
+                    Some(path) => Self::TexturedFill {
+                        technique: element.attr(SF, "technique").unwrap_or("fill").to_owned(),
+                        path: path.to_owned(),
+                    },
+                    None => Self::Other("textured-fill".into()),
+                }
+            }
             "angle-gradient" => {
                 let mut stops: Vec<(f64, Color)> = element
                     .descendants()

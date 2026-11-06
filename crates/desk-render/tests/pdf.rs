@@ -424,6 +424,54 @@ fn obj_09_obj_10_obj_11_gradients_line_ends_and_shadows_are_painted() {
 }
 
 #[test]
+fn obj_38_objects_are_reflected_below_fading_away() {
+    use desk_model::{Document, Editor, Fill, Frame, Object, ObjectKind, Shape, Wrap};
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(20.0, 20.0, 100.0, 40.0),
+            );
+            square.style.fill = Some(Fill::Color(Rgba::rgb(255, 0, 0)));
+            square.style.reflection = Some(100);
+            square.wrap = Wrap::Through;
+            edit.add_object(square)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    // Red right below the square, paler further down, and gone past half
+    // its height.
+    let (r, g, _) = pixel(70, 61);
+    assert!(r > 240 && g < 30, "{r} {g}");
+    let (_, g, _) = pixel(70, 72);
+    assert!((60..230).contains(&g), "{g}");
+    assert_eq!(pixel(70, 85), (255, 255, 255));
+    assert_eq!(pixel(70, 15), (255, 255, 255));
+}
+
+#[test]
 fn obj_09_pictures_fill_objects_as_their_mode_says() {
     use desk_model::{
         Document, Editor, Fill, Frame, ImageFill, Object, ObjectKind, Picture, Shape, Wrap,
@@ -458,10 +506,27 @@ fn obj_09_pictures_fill_objects_as_their_mode_says() {
                 square.style.fill = Some(Fill::Image {
                     picture: picture.clone(),
                     mode,
+                    tint: None,
                 });
                 square.wrap = Wrap::Through;
                 edit.add_object(square)?;
             }
+            // Tinted half blue (OBJ-42).
+            let mut tinted = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(130.0, 20.0, 50.0, 40.0),
+            );
+            tinted.style.fill = Some(Fill::Image {
+                picture: picture.clone(),
+                mode: ImageFill::Stretch,
+                tint: Some(Rgba {
+                    a: 128,
+                    ..Rgba::rgb(0, 0, 255)
+                }),
+            });
+            tinted.wrap = Wrap::Through;
+            edit.add_object(tinted)?;
             Ok(())
         })
         .unwrap();
@@ -487,6 +552,12 @@ fn obj_09_pictures_fill_objects_as_their_mode_says() {
     // Tiled, it fills it all.
     assert_eq!(pixel(25, 140), (255, 0, 0));
     assert_eq!(pixel(115, 155), (255, 0, 0));
+    // The tint lies over the picture.
+    let (r, g, b) = pixel(155, 40);
+    assert!(
+        (110..=145).contains(&r) && g < 10 && (110..=145).contains(&b),
+        "{r} {g} {b}"
+    );
 }
 
 #[test]
