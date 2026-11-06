@@ -8,7 +8,7 @@ use desk_model::{Found, ModelError};
 use super::{Selection, Spot, TextEditor};
 
 /// A paragraph of the body as the outline shows it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct OutlineRow {
     /// The level of its topic, or none for text.
     pub level: Option<u8>,
@@ -16,6 +16,9 @@ pub struct OutlineRow {
     pub text: String,
     /// Whether topics or text come under it.
     pub has_children: bool,
+    /// The objects in its text or that move with it, each alone, to show
+    /// in miniature (TXT-14).
+    pub objects: Vec<desk_render::DisplayList>,
 }
 
 /// The range that differs between two texts, in bytes of the old one,
@@ -49,8 +52,32 @@ impl TextEditor {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
         let count = document.body().len();
+        let objects_of = |paragraph: Option<&desk_model::Paragraph>| {
+            let Some(paragraph) = paragraph else {
+                return Vec::new();
+            };
+            let mut ids: Vec<desk_model::NodeId> = paragraph
+                .runs()
+                .filter_map(|run| match &run.attrs.field {
+                    Some(Some(desk_model::Field::ObjectMark { object })) => Some(*object),
+                    _ => None,
+                })
+                .collect();
+            ids.extend(
+                document
+                    .objects()
+                    .iter()
+                    .filter(|o| o.anchor == desk_model::Anchor::Paragraph(paragraph.id()))
+                    .map(|o| o.id),
+            );
+            ids.iter()
+                .filter_map(|&id| super::objects::find(&state.layout, id))
+                .map(|(_, placed)| desk_render::DisplayList::of_object(placed))
+                .collect()
+        };
         (0..count)
             .map(|index| OutlineRow {
+                objects: objects_of(document.body().get(index)),
                 level: document.outline_level(index),
                 text: document
                     .body()

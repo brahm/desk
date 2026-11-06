@@ -4,7 +4,9 @@
 //! The effects of characters and paragraphs in the Inspector, as the Text
 //! inspector of Pages has them: tracking, ligatures, outline and the
 //! background of characters (FMT-04, FMT-09, FMT-10, FMT-20), and the
-//! background and rules or border of paragraphs (FMT-20, FMT-21).
+//! background and rules or border of paragraphs (FMT-20, FMT-21), and the
+//! shadow of the text, which Pages sets in its Graphic inspector when
+//! text is selected (FMT-03).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -12,7 +14,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use desk_model::{
     BorderSides, BorderStyle, CharAttrs, CharFormat, Length, Ligatures, ParaAttrs, ParaBorder,
-    ParaFormat, Rgba,
+    ParaFormat, Rgba, Shadow,
 };
 
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
@@ -146,6 +148,12 @@ pub struct Effects {
     width: adw::SpinRow,
     color: ColorRow,
     offset: adw::SpinRow,
+    shadow_group: adw::PreferencesGroup,
+    shadow: ColorRow,
+    shadow_angle: adw::SpinRow,
+    shadow_offset: adw::SpinRow,
+    shadow_blur: adw::SpinRow,
+    shadow_opacity: adw::SpinRow,
     /// The border shown, which a change of one of its rows changes.
     border: Cell<ParaBorder>,
     shown: RefCell<Option<(CharFormat, ParaFormat)>>,
@@ -203,6 +211,25 @@ impl Effects {
         paragraph.add(&color.row);
         paragraph.add(&offset);
 
+        let shadow = ColorRow::new(&tr("Text Shadow"), Rgba::BLACK);
+        let spin = |title: String, max: f64, subtitle: String| {
+            let row = adw::SpinRow::with_range(0.0, max, 1.0);
+            row.set_title(&title);
+            row.set_subtitle(&subtitle);
+            row
+        };
+        let shadow_angle = spin(tr("Shadow Angle"), 359.0, tr("Degrees, counterclockwise"));
+        let shadow_offset = spin(tr("Shadow Offset"), 100.0, tr("Points"));
+        let shadow_blur = spin(tr("Shadow Blur"), 100.0, tr("Points"));
+        let shadow_opacity = spin(tr("Shadow Opacity"), 100.0, tr("Percent"));
+        let shadow_group = adw::PreferencesGroup::builder()
+            .title(tr("Text Shadow"))
+            .build();
+        shadow_group.add(&shadow.row);
+        for row in [&shadow_angle, &shadow_offset, &shadow_blur, &shadow_opacity] {
+            shadow_group.add(row);
+        }
+
         let this = Rc::new(Self {
             character,
             paragraph,
@@ -216,6 +243,12 @@ impl Effects {
             width,
             color,
             offset,
+            shadow_group,
+            shadow,
+            shadow_angle,
+            shadow_offset,
+            shadow_blur,
+            shadow_opacity,
             border: Cell::new(ParaBorder::default()),
             shown: RefCell::new(None),
             updating: Cell::new(false),
@@ -252,6 +285,36 @@ impl Effects {
             }),
         );
         self.tracking.connect_value_notify(move |_| changed());
+        let shadow_changed = with(
+            self,
+            Rc::new(|this, editor| {
+                let shadow = this.shadow.value().map(|color| Shadow {
+                    angle: this.shadow_angle.value().round() as i32,
+                    offset: Length::from_pt(this.shadow_offset.value()),
+                    blur: Length::from_pt(this.shadow_blur.value()),
+                    opacity: this.shadow_opacity.value().round() as u8,
+                    color,
+                });
+                this.show_shadow_rows(shadow.is_some());
+                editor.set_character_attrs(
+                    "Text Shadow",
+                    &CharAttrs {
+                        shadow: Some(shadow),
+                        ..CharAttrs::default()
+                    },
+                );
+            }),
+        );
+        self.shadow.connect_changed(shadow_changed.clone());
+        for row in [
+            &self.shadow_angle,
+            &self.shadow_offset,
+            &self.shadow_blur,
+            &self.shadow_opacity,
+        ] {
+            let changed = shadow_changed.clone();
+            row.connect_value_notify(move |_| changed());
+        }
         let changed = with(
             self,
             Rc::new(|this, editor| {
@@ -347,8 +410,21 @@ impl Effects {
     }
 
     /// The groups, to add to the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 2] {
-        [&self.character, &self.paragraph]
+    pub fn groups(&self) -> [&adw::PreferencesGroup; 3] {
+        [&self.character, &self.shadow_group, &self.paragraph]
+    }
+
+    /// The details of the shadow only matter when there is one.
+    fn show_shadow_rows(&self, on: bool) {
+        self.shadow.button.set_sensitive(on);
+        for row in [
+            &self.shadow_angle,
+            &self.shadow_offset,
+            &self.shadow_blur,
+            &self.shadow_opacity,
+        ] {
+            row.set_sensitive(on);
+        }
     }
 
     /// The details of the line only matter when there is one.
@@ -382,6 +458,13 @@ impl Effects {
         ));
         self.outline.set_active(character.outline);
         self.text_background.show(character.background);
+        self.shadow.show(character.shadow.map(|s| s.color));
+        let shadow = character.shadow.unwrap_or_default();
+        self.shadow_angle.set_value(f64::from(shadow.angle));
+        self.shadow_offset.set_value(shadow.offset.to_pt());
+        self.shadow_blur.set_value(shadow.blur.to_pt());
+        self.shadow_opacity.set_value(f64::from(shadow.opacity));
+        self.show_shadow_rows(character.shadow.is_some());
         self.paragraph_background.show(paragraph.background);
         let border = paragraph.border;
         self.border.set(border);

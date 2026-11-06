@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 20:22+0000\n"
+"POT-Creation-Date: 2026-11-06 20:56+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -165,23 +165,23 @@ msgid "Bookmark"
 msgstr ""
 
 #: crates/desk-ui/src/editing/objects.rs:1272 crates/desk-ui/src/fonts.rs:346
-#: crates/desk-ui/src/outline_view.rs:321
+#: crates/desk-ui/src/outline_view.rs:341
 msgid "Text"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:43
+#: crates/desk-ui/src/effects.rs:45
 msgid "Use Default"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:44
+#: crates/desk-ui/src/effects.rs:46
 msgid "Use None"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:45
+#: crates/desk-ui/src/effects.rs:47
 msgid "Use All"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:51 crates/desk-ui/src/fonts.rs:177
+#: crates/desk-ui/src/effects.rs:53 crates/desk-ui/src/fonts.rs:177
 #: crates/desk-ui/src/graphic_pane.rs:148
 #: crates/desk-ui/src/graphic_pane.rs:167
 #: crates/desk-ui/src/graphic_pane.rs:222 crates/desk-ui/src/lists_pane.rs:58
@@ -192,44 +192,44 @@ msgstr ""
 msgid "None"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:52
+#: crates/desk-ui/src/effects.rs:54
 msgid "Rule Above"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:53
+#: crates/desk-ui/src/effects.rs:55
 msgid "Rule Below"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:54
+#: crates/desk-ui/src/effects.rs:56
 msgid "Rules Above and Below"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:55
+#: crates/desk-ui/src/effects.rs:57
 msgid "Border Around"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:61 crates/desk-ui/src/graphic_pane.rs:223
+#: crates/desk-ui/src/effects.rs:63 crates/desk-ui/src/graphic_pane.rs:223
 msgid "Solid"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:62 crates/desk-ui/src/graphic_pane.rs:224
+#: crates/desk-ui/src/effects.rs:64 crates/desk-ui/src/graphic_pane.rs:224
 msgid "Dashed"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:63 crates/desk-ui/src/graphic_pane.rs:225
+#: crates/desk-ui/src/effects.rs:65 crates/desk-ui/src/graphic_pane.rs:225
 msgid "Dotted"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:87 crates/desk-ui/src/graphic_pane.rs:674
+#: crates/desk-ui/src/effects.rs:89 crates/desk-ui/src/graphic_pane.rs:674
 msgid "Color"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:159
+#: crates/desk-ui/src/effects.rs:167
 msgid "Character Spacing"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:160 crates/desk-ui/src/fonts.rs:374
-#: crates/desk-ui/src/graphic_pane.rs:212
+#: crates/desk-ui/src/effects.rs:168 crates/desk-ui/src/effects.rs:224
+#: crates/desk-ui/src/fonts.rs:374 crates/desk-ui/src/graphic_pane.rs:212
 #: crates/desk-ui/src/graphic_pane.rs:216
 #: crates/desk-ui/src/graphic_pane.rs:218
 #: crates/desk-ui/src/graphic_pane.rs:235
@@ -240,39 +240,40 @@ msgstr ""
 msgid "Percent"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:162 crates/desk-ui/src/fonts.rs:392
+#: crates/desk-ui/src/effects.rs:170 crates/desk-ui/src/fonts.rs:392
 msgid "Ligatures"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:165 crates/desk-ui/src/outline_view.rs:112
+#: crates/desk-ui/src/effects.rs:173 crates/desk-ui/src/outline_view.rs:125
 msgid "Outline"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:166
+#: crates/desk-ui/src/effects.rs:174
 msgid "Character Background"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:168 crates/desk-ui/src/writing_tools.rs:74
+#: crates/desk-ui/src/effects.rs:176 crates/desk-ui/src/writing_tools.rs:74
 msgid "Characters"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:176 crates/desk-ui/src/fonts.rs:366
+#: crates/desk-ui/src/effects.rs:184 crates/desk-ui/src/fonts.rs:366
 msgid "Paragraph Background"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:178
+#: crates/desk-ui/src/effects.rs:186
 msgid "Borders and Rules"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:182
+#: crates/desk-ui/src/effects.rs:190
 msgid "Line Style"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:186
+#: crates/desk-ui/src/effects.rs:194
 msgid "Line Width"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:187 crates/desk-ui/src/fonts.rs:375
+#: crates/desk-ui/src/effects.rs:195 crates/desk-ui/src/effects.rs:222
+#: crates/desk-ui/src/effects.rs:223 crates/desk-ui/src/fonts.rs:375
 #: crates/desk-ui/src/fonts.rs:376 crates/desk-ui/src/formatting.rs:463
 #: crates/desk-ui/src/formatting.rs:464 crates/desk-ui/src/graphic_pane.rs:239
 #: crates/desk-ui/src/graphic_pane.rs:248
@@ -281,20 +282,49 @@ msgstr ""
 msgid "Points"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:189
+#: crates/desk-ui/src/effects.rs:197
 msgid "Line Color"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:193
+#: crates/desk-ui/src/effects.rs:201
 msgid "Offset"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:194
+#: crates/desk-ui/src/effects.rs:202
 msgid "Distance from the text, in points"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:197
+#: crates/desk-ui/src/effects.rs:205
 msgid "Background and Borders"
+msgstr ""
+
+#: crates/desk-ui/src/effects.rs:214 crates/desk-ui/src/effects.rs:226
+msgid "Text Shadow"
+msgstr ""
+
+#: crates/desk-ui/src/effects.rs:221 crates/desk-ui/src/graphic_pane.rs:189
+#: crates/desk-ui/src/graphic_pane.rs:246 crates/desk-ui/src/objects_pane.rs:95
+msgid "Degrees, counterclockwise"
+msgstr ""
+
+#: crates/desk-ui/src/effects.rs:221 crates/desk-ui/src/fonts.rs:377
+#: crates/desk-ui/src/graphic_pane.rs:245
+msgid "Shadow Angle"
+msgstr ""
+
+#: crates/desk-ui/src/effects.rs:222 crates/desk-ui/src/fonts.rs:376
+#: crates/desk-ui/src/graphic_pane.rs:247
+msgid "Shadow Offset"
+msgstr ""
+
+#: crates/desk-ui/src/effects.rs:223 crates/desk-ui/src/fonts.rs:375
+#: crates/desk-ui/src/graphic_pane.rs:249
+msgid "Shadow Blur"
+msgstr ""
+
+#: crates/desk-ui/src/effects.rs:224 crates/desk-ui/src/fonts.rs:374
+#: crates/desk-ui/src/graphic_pane.rs:251
+msgid "Shadow Opacity"
 msgstr ""
 
 #: crates/desk-ui/src/eyedropper.rs:25 crates/desk-ui/src/eyedropper.rs:29
@@ -585,24 +615,8 @@ msgstr ""
 msgid "Shadow"
 msgstr ""
 
-#: crates/desk-ui/src/fonts.rs:374 crates/desk-ui/src/graphic_pane.rs:251
-msgid "Shadow Opacity"
-msgstr ""
-
-#: crates/desk-ui/src/fonts.rs:375 crates/desk-ui/src/graphic_pane.rs:249
-msgid "Shadow Blur"
-msgstr ""
-
-#: crates/desk-ui/src/fonts.rs:376 crates/desk-ui/src/graphic_pane.rs:247
-msgid "Shadow Offset"
-msgstr ""
-
 #: crates/desk-ui/src/fonts.rs:377
 msgid "Degrees"
-msgstr ""
-
-#: crates/desk-ui/src/fonts.rs:377 crates/desk-ui/src/graphic_pane.rs:245
-msgid "Shadow Angle"
 msgstr ""
 
 #: crates/desk-ui/src/fonts.rs:380
@@ -845,11 +859,6 @@ msgstr ""
 
 #: crates/desk-ui/src/graphic_pane.rs:188
 msgid "Gradient Angle"
-msgstr ""
-
-#: crates/desk-ui/src/graphic_pane.rs:189
-#: crates/desk-ui/src/graphic_pane.rs:246 crates/desk-ui/src/objects_pane.rs:95
-msgid "Degrees, counterclockwise"
 msgstr ""
 
 #: crates/desk-ui/src/graphic_pane.rs:190
@@ -1704,44 +1713,52 @@ msgstr ""
 msgid "Text Box"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:59 crates/desk-ui/src/outline_view.rs:60
+#: crates/desk-ui/src/outline_view.rs:65 crates/desk-ui/src/outline_view.rs:66
 msgid "Visible Levels"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:63
+#: crates/desk-ui/src/outline_view.rs:69 crates/desk-ui/src/outline_view.rs:71
 msgid "Show Only the First Line"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:71
+#: crates/desk-ui/src/outline_view.rs:74 crates/desk-ui/src/outline_view.rs:76
+msgid "Show Objects in Miniature"
+msgstr ""
+
+#: crates/desk-ui/src/outline_view.rs:83
 msgid "Promote"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:72
+#: crates/desk-ui/src/outline_view.rs:84
 msgid "Demote"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:73
+#: crates/desk-ui/src/outline_view.rs:85
 msgid "Copy as Outline"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:74
+#: crates/desk-ui/src/outline_view.rs:86
 msgid "Paste as Outline"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:85
+#: crates/desk-ui/src/outline_view.rs:97
 msgid "Levels"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:270
+#: crates/desk-ui/src/outline_view.rs:290
 msgid "Drag to move the topic"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:287
+#: crates/desk-ui/src/outline_view.rs:307
 msgid "Show or Hide the Subtopics"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:320
+#: crates/desk-ui/src/outline_view.rs:340
 msgid "Topic, level {n}"
+msgstr ""
+
+#: crates/desk-ui/src/outline_view.rs:581
+msgid "Objects"
 msgstr ""
 
 #: crates/desk-ui/src/picture_pane.rs:98

@@ -40,6 +40,9 @@ pub struct CopiedStyle {
     pub lists: Vec<ListStyle>,
 }
 
+/// How a paragraph looks, and each of its runs.
+type ParagraphLook = (crate::ParaFormat, Vec<CharFormat>);
+
 /// Text copied with its styles, to paste into the same or another document
 /// keeping its look (TXT-04).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1155,6 +1158,8 @@ impl Edit {
         ids: &[StyleId],
         replace: bool,
     ) -> Result<Vec<StyleId>, ModelError> {
+        // How the text of locked objects looks, which it keeps (STY-10).
+        let locked = self.locked_looks();
         // The identifier and name that each imported style takes.
         let mut map: HashMap<StyleId, StyleId> = HashMap::new();
         let mut order: Vec<(StyleId, StyleId, Style)> = Vec::new();
@@ -1294,7 +1299,79 @@ impl Edit {
             }
             self.put(linked)?;
         }
+        self.keep_locked_looks(locked)?;
         Ok(ids.iter().map(|id| map[id]).collect())
+    }
+
+    /// The look of each paragraph and run of the text of the locked
+    /// objects, by object.
+    fn locked_looks(&self) -> Vec<(NodeId, Vec<ParagraphLook>)> {
+        let styles = self.document().styles();
+        self.document()
+            .objects()
+            .iter()
+            .filter(|o| o.locked)
+            .filter_map(|o| {
+                let text = o.text_box()?;
+                let looks = text
+                    .paragraphs
+                    .iter()
+                    .map(|p| {
+                        let runs = p
+                            .runs()
+                            .map(|r| styles.resolve_character(p.style(), r.style, &r.attrs))
+                            .collect();
+                        (styles.resolve_paragraph(p.style(), p.attrs()), runs)
+                    })
+                    .collect();
+                Some((o.id, looks))
+            })
+            .collect()
+    }
+
+    /// Gives the text of locked objects the look it had, as attributes of
+    /// its own over the styles it keeps: their text takes the new styles
+    /// but looks as it did (STY-10).
+    fn keep_locked_looks(
+        &mut self,
+        looks: Vec<(NodeId, Vec<ParagraphLook>)>,
+    ) -> Result<(), ModelError> {
+        for (id, looks) in looks {
+            let Some(mut object) = self.document().objects().get(id).cloned() else {
+                continue;
+            };
+            let Some(text) = object.text_box() else {
+                continue;
+            };
+            let styles = self.document().styles();
+            let mut paragraphs = Vec::with_capacity(text.paragraphs.len());
+            for (p, (paragraph_look, run_looks)) in text.paragraphs.iter().zip(&looks) {
+                let base = styles.resolve_paragraph(p.style(), &ParaAttrs::default());
+                let mut attrs = p.attrs().clone();
+                attrs.merge(&ParaAttrs::from(paragraph_look.clone()).difference(&base));
+                let runs: Vec<_> = p
+                    .runs()
+                    .zip(run_looks)
+                    .map(|(run, look)| {
+                        let base =
+                            styles.resolve_character(p.style(), run.style, &CharAttrs::default());
+                        let mut run = run.clone();
+                        run.attrs
+                            .merge(&CharAttrs::from(look.clone()).difference(&base));
+                        run
+                    })
+                    .collect();
+                paragraphs.push(Paragraph::from_runs(p.id(), p.style(), attrs, runs)?);
+            }
+            if let Some(own) = object.text_box_mut() {
+                if own.paragraphs.iter().eq(paragraphs.iter()) {
+                    continue;
+                }
+                own.paragraphs = paragraphs.into();
+            }
+            self.replace_object(object)?;
+        }
+        Ok(())
     }
 
     /// Points the list style that attributes from another document name

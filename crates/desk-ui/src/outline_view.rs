@@ -8,7 +8,8 @@
 //!
 //! Return makes a topic of the same level, Tab a subtopic and Shift+Tab a
 //! topic one level up. The bar above chooses the levels that show and
-//! whether a topic shows only its first line, and copies a topic as the
+//! whether a topic shows only its first line and its objects in
+//! miniature, and copies a topic as the
 //! outline of Keynote takes it (IOP-26). The handles and triangles are
 //! not part of the document, and never print.
 
@@ -26,6 +27,9 @@ use crate::i18n::tr;
 /// How far each level is indented, in pixels.
 const INDENT: i32 = 24;
 
+/// The largest side of an object in miniature, in pixels.
+const MINIATURE: u32 = 48;
+
 /// The outline of a document window.
 pub struct OutlineView {
     root: gtk::Box,
@@ -34,6 +38,8 @@ pub struct OutlineView {
     /// The levels that show: 1 to 9, and 10 for the text too.
     levels: gtk::SpinButton,
     truncate: gtk::ToggleButton,
+    /// Whether the objects of each row show in miniature (TXT-14).
+    miniatures: gtk::ToggleButton,
     /// The topics whose subtopics are hidden, by the index of their
     /// paragraph.
     collapsed: RefCell<HashSet<usize>>,
@@ -62,6 +68,12 @@ impl OutlineView {
             .icon_name("format-justify-left-symbolic")
             .tooltip_text(tr("Show Only the First Line"))
             .build();
+        labelled(&truncate, &tr("Show Only the First Line"));
+        let miniatures = gtk::ToggleButton::builder()
+            .icon_name("image-x-generic-symbolic")
+            .tooltip_text(tr("Show Objects in Miniature"))
+            .build();
+        labelled(&miniatures, &tr("Show Objects in Miniature"));
         let button = |icon: &str, tip: String| {
             gtk::Button::builder()
                 .icon_name(icon)
@@ -85,6 +97,7 @@ impl OutlineView {
         bar.append(&gtk::Label::new(Some(&tr("Levels"))));
         bar.append(&levels);
         bar.append(&truncate);
+        bar.append(&miniatures);
         bar.append(&gtk::Separator::new(gtk::Orientation::Vertical));
         bar.append(&copy);
         bar.append(&paste);
@@ -116,6 +129,7 @@ impl OutlineView {
             editor,
             levels,
             truncate,
+            miniatures,
             collapsed: RefCell::new(HashSet::new()),
             views: RefCell::new(Vec::new()),
             editing: Cell::new(false),
@@ -132,6 +146,12 @@ impl OutlineView {
         });
         let weak = Rc::downgrade(&this);
         this.truncate.connect_toggled(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.rebuild();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        this.miniatures.connect_toggled(move |_| {
             if let Some(this) = weak.upgrade() {
                 this.rebuild();
             }
@@ -324,7 +344,18 @@ impl OutlineView {
         self.connect_text(&text, index);
         line.append(&handle);
         line.append(&triangle);
-        line.append(&text);
+        if self.miniatures.is_active() && !row.objects.is_empty() {
+            let column = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .spacing(4)
+                .hexpand(true)
+                .build();
+            column.append(&text);
+            column.append(&miniatures(&row.objects));
+            line.append(&column);
+        } else {
+            line.append(&text);
+        }
         self.connect_drag(&handle, &line, index);
         (line, text)
     }
@@ -538,4 +569,30 @@ impl OutlineView {
 /// The offset of a place of a buffer in bytes of its text.
 fn cursor_bytes(buffer: &gtk::TextBuffer, at: &gtk::TextIter) -> usize {
     buffer.text(&buffer.start_iter(), at, false).len()
+}
+
+/// The objects of a row in miniature, side by side (TXT-14).
+fn miniatures(objects: &[desk_render::DisplayList]) -> gtk::Box {
+    let strip = gtk::Box::builder()
+        .spacing(6)
+        .margin_bottom(4)
+        .accessible_role(gtk::AccessibleRole::Group)
+        .build();
+    strip.update_property(&[gtk::accessible::Property::Label(&tr("Objects"))]);
+    let mut painter = desk_render::Painter::new().ok();
+    for object in objects {
+        let picture = gtk::Picture::builder()
+            .can_shrink(false)
+            .css_classes(["card"])
+            .build();
+        if let Some(png) = painter
+            .as_mut()
+            .and_then(|p| p.thumbnail_png(object, MINIATURE).ok())
+            && let Ok(texture) = gdk::Texture::from_bytes(&glib::Bytes::from_owned(png))
+        {
+            picture.set_paintable(Some(&texture));
+        }
+        strip.append(&picture);
+    }
+    strip
 }
