@@ -2874,3 +2874,138 @@ fn obj_28_fixed_guides_are_kept_in_the_settings() {
     let read = read_odt(&bytes).unwrap();
     assert_eq!(read.text_settings().guides, guides);
 }
+
+#[test]
+fn obj_41_advanced_gradients_round_trip_and_round_ones_of_other_programs_are_read() {
+    use desk_model::{
+        Editor, Fill, Frame, Gradient, GradientStop, Object, ObjectKind, Shape, Wrap,
+    };
+    let linear = Gradient {
+        stops: vec![
+            GradientStop {
+                blend: 300,
+                ..GradientStop::new(0, Rgba::rgb(255, 0, 0))
+            },
+            GradientStop::new(
+                400,
+                Rgba {
+                    a: 128,
+                    ..Rgba::rgb(0, 255, 0)
+                },
+            ),
+            GradientStop::new(1000, Rgba::rgb(0, 0, 255)),
+        ],
+        angle: 9000,
+        center: None,
+    };
+    let radial = Gradient {
+        stops: vec![
+            GradientStop::new(0, Rgba::WHITE),
+            GradientStop::new(1000, Rgba::rgb(0, 0, 128)),
+        ],
+        angle: 0,
+        center: Some((250, 700)),
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            for (x, gradient) in [(10.0, &linear), (100.0, &radial)] {
+                let mut shape = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(x, 10.0, 60.0, 40.0),
+                );
+                shape.style.fill = Some(Fill::Advanced(gradient.clone()));
+                shape.wrap = Wrap::Through;
+                edit.add_object(shape)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("obj-41-advanced-gradients.odt", &bytes);
+    let again = read_odt(&bytes).unwrap();
+    let fills: Vec<_> = again
+        .objects()
+        .iter()
+        .map(|o| o.style.fill.clone())
+        .collect();
+    assert_eq!(
+        fills,
+        [Some(Fill::Advanced(linear)), Some(Fill::Advanced(radial))]
+    );
+    // Other programs see the first and last colors, the end color of a
+    // radial gradient in its middle.
+    let written = export(editor.document());
+    let round = written
+        .gradients
+        .iter()
+        .find(|g| g.style == "radial")
+        .unwrap();
+    assert_eq!(round.center, Some((25.0, 70.0)));
+    assert_eq!(round.end_color.unwrap().to_string(), "#ffffff");
+
+    let ns = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+  office:version="1.3""#;
+    let styles = format!(
+        r##"<office:document-styles {ns}><office:styles>
+  <draw:gradient draw:name="Glow" draw:style="radial" draw:start-color="#000000"
+    draw:end-color="#ffff00" draw:cx="30%" draw:cy="40%" draw:border="0%"/>
+  <draw:gradient draw:name="Band" draw:style="axial" draw:start-color="#0000ff"
+    draw:end-color="#ffffff" draw:angle="0" draw:border="0%"/>
+ </office:styles></office:document-styles>"##
+    );
+    let content = format!(
+        r##"<office:document-content {ns}>
+ <office:automatic-styles>
+  <style:style style:name="gr1" style:family="graphic">
+   <style:graphic-properties draw:fill="gradient" draw:fill-gradient-name="Glow"/>
+  </style:style>
+  <style:style style:name="gr2" style:family="graphic">
+   <style:graphic-properties draw:fill="gradient" draw:fill-gradient-name="Band"/>
+  </style:style>
+ </office:automatic-styles>
+ <office:body><office:text>
+  <text:p>Text<draw:rect text:anchor-type="paragraph" draw:style-name="gr1"
+     svg:width="2cm" svg:height="1cm" svg:x="1cm" svg:y="0.5cm"/><draw:rect
+     text:anchor-type="paragraph" draw:style-name="gr2"
+     svg:width="2cm" svg:height="1cm" svg:x="4cm" svg:y="0.5cm"/></text:p>
+ </office:text></office:body>
+</office:document-content>"##
+    );
+    let source = odf::read_streams(&content, Some(&styles), None).unwrap();
+    let document = import(&source).unwrap();
+    let fills: Vec<_> = document
+        .objects()
+        .iter()
+        .map(|o| o.style.fill.clone())
+        .collect();
+    assert_eq!(
+        fills[0],
+        Some(Fill::Advanced(Gradient {
+            stops: vec![
+                GradientStop::new(0, Rgba::rgb(255, 255, 0)),
+                GradientStop::new(1000, Rgba::BLACK),
+            ],
+            angle: 27000,
+            center: Some((300, 400)),
+        }))
+    );
+    // Blue at both ends and white in the middle, going down.
+    assert_eq!(
+        fills[1],
+        Some(Fill::Advanced(Gradient {
+            stops: vec![
+                GradientStop::new(0, Rgba::rgb(0, 0, 255)),
+                GradientStop::new(500, Rgba::WHITE),
+                GradientStop::new(1000, Rgba::rgb(0, 0, 255)),
+            ],
+            angle: 27000,
+            center: None,
+        }))
+    );
+}

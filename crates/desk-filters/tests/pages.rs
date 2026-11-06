@@ -1020,3 +1020,58 @@ fn obj_42_pictures_that_fill_shapes_are_read() {
     assert_eq!(filled.1, desk_model::ImageFill::ScaleToFit);
     assert_eq!((filled.0.width(), filled.0.height()), (96, 64));
 }
+
+#[test]
+fn obj_41_advanced_and_radial_gradients_of_pages_are_read() {
+    use desk_model::{Fill, Gradient, GradientStop};
+    let index = desk_iwork::read_index_at(&fixture("obj-40-41-fills.pages")).unwrap();
+    let start = index
+        .find(r#"<sf:angle-gradient sf:opacity="1" sf:type="linear" sf:angle="0.785"#)
+        .unwrap();
+    let end = index[start..].find("</sf:angle-gradient>").unwrap() + start + 20;
+    let color = |r, g, b| {
+        format!(
+            r#"<sf:color xsi:type="sfa:calibrated-rgb-color-type" sfa:r="{r}" sfa:g="{g}" sfa:b="{b}" sfa:a="1"/>"#
+        )
+    };
+    let stops = format!(
+        r#"<sf:stops><sf:gradient-stop sf:fraction="0" sf:inflection="0.3">{}</sf:gradient-stop><sf:gradient-stop sf:fraction="0.6" sf:inflection="0.5">{}</sf:gradient-stop><sf:gradient-stop sf:fraction="1" sf:inflection="0.5">{}</sf:gradient-stop></sf:stops>"#,
+        color(1, 0, 0),
+        color(0, 1, 0),
+        color(0, 0, 1)
+    );
+    let fill = |gradient: &str| {
+        let changed = format!("{}{gradient}{}", &index[..start], &index[end..]);
+        let document = desk_filters::read_pages(changed.as_bytes()).unwrap();
+        document.objects().iter().nth(1).unwrap().style.fill.clone()
+    };
+    let three = vec![
+        GradientStop {
+            blend: 300,
+            ..GradientStop::new(0, Rgba::rgb(255, 0, 0))
+        },
+        GradientStop::new(600, Rgba::rgb(0, 255, 0)),
+        GradientStop::new(1000, Rgba::rgb(0, 0, 255)),
+    ];
+    assert_eq!(
+        fill(&format!(
+            r#"<sf:angle-gradient sf:opacity="1" sf:type="linear" sf:angle="0">{stops}</sf:angle-gradient>"#
+        )),
+        Some(Fill::Advanced(Gradient {
+            stops: three.clone(),
+            angle: 0,
+            center: None,
+        }))
+    );
+    // Out from a quarter of the way across and halfway down.
+    assert_eq!(
+        fill(&format!(
+            r#"<sf:transform-gradient sf:opacity="1" sf:type="radial">{stops}<sf:start sfa:x="25" sfa:y="50"/><sf:end sfa:x="100" sfa:y="50"/><sf:baseNaturalSize sfa:w="100" sfa:h="100"/></sf:transform-gradient>"#
+        )),
+        Some(Fill::Advanced(Gradient {
+            stops: three,
+            angle: 0,
+            center: Some((250, 500)),
+        }))
+    );
+}

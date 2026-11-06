@@ -11,12 +11,13 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{
-    BorderStyle, Fill, GraphicStyle, ImageFill, Length, LineEnd, ObjectKind, ObjectShadow, Picture,
-    Rgba, Stroke,
+    BorderStyle, Fill, Gradient, GradientStop, GraphicStyle, ImageFill, Length, LineEnd,
+    ObjectKind, ObjectShadow, Picture, Rgba, Stroke,
 };
 
 use crate::editing::ObjectInfo;
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
+use crate::gradient_bar::GradientBar;
 use crate::i18n::tr;
 
 /// The ends of a line, in the order of their lists.
@@ -71,6 +72,15 @@ pub struct GraphicGroup {
     gradient_end: gtk::ColorDialogButton,
     gradient_end_row: adw::ActionRow,
     gradient_angle: adw::SpinRow,
+    /// The rows of the advanced gradient (OBJ-41).
+    gradient_kind: adw::ComboRow,
+    gradient_bar: Rc<GradientBar>,
+    gradient_colors_row: adw::ActionRow,
+    gradient_remove: gtk::Button,
+    stop_position: adw::SpinRow,
+    stop_blend: adw::SpinRow,
+    center_x: adw::SpinRow,
+    center_y: adw::SpinRow,
     stroke: adw::ComboRow,
     stroke_color: gtk::ColorDialogButton,
     stroke_color_row: adw::ActionRow,
@@ -145,6 +155,9 @@ impl GraphicGroup {
                 tr("Image Fill"),
                 // A picture with a color over it (OBJ-42).
                 tr("Tinted Image Fill"),
+                // Several colors, along a line or out from a point
+                // (OBJ-41).
+                tr("Advanced Gradient Fill"),
             ],
         );
         let image_button = gtk::Button::builder()
@@ -159,6 +172,35 @@ impl GraphicGroup {
         let (gradient_end_row, gradient_end) = color_row(&tr("Gradient End Color"));
         let gradient_angle = spin(&tr("Gradient Angle"), 0.0, 359.0, 1.0);
         gradient_angle.set_subtitle(&tr("Degrees, counterclockwise"));
+        let gradient_kind = combo(&tr("Gradient Type"), &[tr("Linear"), tr("Radial")]);
+        let gradient_bar = GradientBar::new();
+        let gradient_colors_row = adw::ActionRow::builder()
+            .title(tr("Gradient Colors"))
+            .subtitle(tr("Click to add a color, drag to move it"))
+            .build();
+        let icon_button = |icon: &str, label: &str| {
+            let button = gtk::Button::builder()
+                .icon_name(icon)
+                .valign(gtk::Align::Center)
+                .tooltip_text(label)
+                .css_classes(["flat"])
+                .build();
+            labelled(&button, label);
+            button
+        };
+        let gradient_add = icon_button("list-add-symbolic", &tr("Add Color"));
+        let gradient_remove = icon_button("list-remove-symbolic", &tr("Remove Color"));
+        gradient_colors_row.add_suffix(gradient_bar.widget());
+        gradient_colors_row.add_suffix(&gradient_add);
+        gradient_colors_row.add_suffix(&gradient_remove);
+        let stop_position = spin(&tr("Color Position"), 0.0, 100.0, 1.0);
+        stop_position.set_subtitle(&tr("Percent"));
+        let stop_blend = spin(&tr("Blend Point"), 1.0, 99.0, 1.0);
+        stop_blend.set_subtitle(&tr("Percent of the way to the next color"));
+        let center_x = spin(&tr("Horizontal Center"), 0.0, 100.0, 1.0);
+        center_x.set_subtitle(&tr("Percent"));
+        let center_y = spin(&tr("Vertical Center"), 0.0, 100.0, 1.0);
+        center_y.set_subtitle(&tr("Percent"));
         let stroke = combo(
             &tr("Stroke"),
             &[tr("None"), tr("Solid"), tr("Dashed"), tr("Dotted")],
@@ -195,7 +237,13 @@ impl GraphicGroup {
             image_row.upcast_ref(),
             image_mode.upcast_ref(),
             gradient_end_row.upcast_ref(),
+            gradient_kind.upcast_ref(),
             gradient_angle.upcast_ref(),
+            center_x.upcast_ref(),
+            center_y.upcast_ref(),
+            gradient_colors_row.upcast_ref(),
+            stop_position.upcast_ref(),
+            stop_blend.upcast_ref(),
             stroke.upcast_ref(),
             stroke_color_row.upcast_ref(),
             stroke_width.upcast_ref(),
@@ -226,6 +274,14 @@ impl GraphicGroup {
             gradient_end,
             gradient_end_row,
             gradient_angle,
+            gradient_kind,
+            gradient_bar,
+            gradient_colors_row,
+            gradient_remove,
+            stop_position,
+            stop_blend,
+            center_x,
+            center_y,
             stroke,
             stroke_color,
             stroke_color_row,
@@ -295,8 +351,24 @@ impl GraphicGroup {
             }
         };
         let on = changed.clone();
-        this.fill
-            .connect_selected_notify(move |_| on("Fill", Part::Fill));
+        let weak = Rc::downgrade(&this);
+        this.fill.connect_selected_notify(move |row| {
+            // An advanced gradient starts from the colors there are.
+            if let Some(this) = weak.upgrade()
+                && row.selected() == 5
+                && !this.updating.get()
+            {
+                if this.gradient_bar.stops().len() < 2 {
+                    let from = from_gdk(&this.fill_color.rgba());
+                    this.gradient_bar.set_stops(vec![
+                        GradientStop::new(0, from),
+                        GradientStop::new(1000, Rgba::WHITE),
+                    ]);
+                }
+                this.show_stop();
+            }
+            on("Fill", Part::Fill)
+        });
         let on = changed.clone();
         this.image_mode
             .connect_selected_notify(move |_| on("Fill", Part::Fill));
@@ -308,13 +380,62 @@ impl GraphicGroup {
                 this.choose_picture();
             }
         });
-        for button in [&this.fill_color, &this.gradient_end] {
-            let on = changed.clone();
-            button.connect_rgba_notify(move |_| on("Fill", Part::Fill));
+        let on = changed.clone();
+        let weak = Rc::downgrade(&this);
+        let stop_changed = move || {
+            // The rows of the chosen color set it in the bar first.
+            if let Some(this) = weak.upgrade()
+                && this.fill.selected() == 5
+                && !this.updating.get()
+            {
+                this.take_stop();
+            }
+            on("Fill", Part::Fill)
+        };
+        let on = stop_changed.clone();
+        this.fill_color.connect_rgba_notify(move |_| on());
+        for row in [&this.stop_position, &this.stop_blend] {
+            let on = stop_changed.clone();
+            row.connect_value_notify(move |_| on());
         }
         let on = changed.clone();
-        this.gradient_angle
-            .connect_value_notify(move |_| on("Fill", Part::Fill));
+        this.gradient_end
+            .connect_rgba_notify(move |_| on("Fill", Part::Fill));
+        for row in [&this.gradient_angle, &this.center_x, &this.center_y] {
+            let on = changed.clone();
+            row.connect_value_notify(move |_| on("Fill", Part::Fill));
+        }
+        let on = changed.clone();
+        this.gradient_kind
+            .connect_selected_notify(move |_| on("Fill", Part::Fill));
+        // The bar changes its colors itself: the fill is set from them, and
+        // the rows show the color chosen in it.
+        let on = changed.clone();
+        let weak = Rc::downgrade(&this);
+        this.gradient_bar.connect_change(move || {
+            if let Some(this) = weak.upgrade() {
+                this.show_stop();
+            }
+            on("Fill", Part::Fill);
+        });
+        let weak = Rc::downgrade(&this);
+        this.gradient_bar.connect_select(move || {
+            if let Some(this) = weak.upgrade() {
+                this.show_stop();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        gradient_add.connect_clicked(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.gradient_bar.add();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        this.gradient_remove.connect_clicked(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.gradient_bar.remove();
+            }
+        });
         for row in [&this.stroke, &this.start, &this.end] {
             let on = changed.clone();
             row.connect_selected_notify(move |_| on("Stroke", Part::Stroke));
@@ -390,6 +511,36 @@ impl GraphicGroup {
         );
     }
 
+    /// Sets the color chosen in the bar of the advanced gradient from the
+    /// rows that show it.
+    fn take_stop(&self) {
+        let percent = |row: &adw::SpinRow| (row.value() * 10.0).round().clamp(0.0, 1000.0) as u16;
+        self.gradient_bar.set_current(GradientStop {
+            at: percent(&self.stop_position),
+            color: from_gdk(&self.fill_color.rgba()),
+            blend: percent(&self.stop_blend),
+        });
+    }
+
+    /// Shows the color chosen in the bar of the advanced gradient in the
+    /// rows that set it.
+    fn show_stop(&self) {
+        let stops = self.gradient_bar.stops();
+        let current = self.gradient_bar.current();
+        let Some(stop) = stops.get(current) else {
+            return;
+        };
+        let updating = self.updating.replace(true);
+        let color = to_gdk(stop.color);
+        if self.fill_color.rgba() != color {
+            self.fill_color.set_rgba(&color);
+        }
+        self.stop_position.set_value(f64::from(stop.at) / 10.0);
+        self.stop_blend.set_value(f64::from(stop.blend) / 10.0);
+        self.updating.set(updating);
+        self.show_rows();
+    }
+
     /// The fill that the rows ask for.
     fn fill_value(&self) -> Option<Fill> {
         let from = from_gdk(&self.fill_color.rgba());
@@ -415,6 +566,15 @@ impl GraphicGroup {
                     tint
                 }),
             }),
+            5 => Some(Fill::Advanced(Gradient {
+                stops: self.gradient_bar.stops(),
+                angle: (self.gradient_angle.value() * 100.0).round() as i32,
+                center: (self.gradient_kind.selected() == 1).then(|| {
+                    let part =
+                        |row: &adw::SpinRow| (row.value() * 10.0).round().clamp(0.0, 1000.0) as u16;
+                    (part(&self.center_x), part(&self.center_y))
+                }),
+            })),
             _ => None,
         }
     }
@@ -456,13 +616,30 @@ impl GraphicGroup {
         let fill = self.fill.selected();
         let shown = self.fill.is_visible();
         self.fill_color_row
-            .set_visible(shown && matches!(fill, 1 | 2 | 4));
+            .set_visible(shown && matches!(fill, 1 | 2 | 4 | 5));
+        self.fill_color_row.set_title(&if fill == 5 {
+            tr("Color")
+        } else {
+            tr("Fill Color")
+        });
+        let advanced = shown && fill == 5;
+        let radial = advanced && self.gradient_kind.selected() == 1;
+        self.gradient_kind.set_visible(advanced);
+        self.gradient_colors_row.set_visible(advanced);
+        self.stop_position.set_visible(advanced);
+        let stops = self.gradient_bar.stops().len();
+        // The last color blends into none.
+        self.stop_blend
+            .set_visible(advanced && self.gradient_bar.current() + 1 < stops);
+        self.gradient_remove.set_sensitive(stops > 2);
+        self.center_x.set_visible(radial);
+        self.center_y.set_visible(radial);
         self.image_row.set_visible(shown && matches!(fill, 3 | 4));
         self.image_mode.set_visible(shown && matches!(fill, 3 | 4));
         self.gradient_end_row
             .set_visible(self.fill.is_visible() && fill == 2);
         self.gradient_angle
-            .set_visible(self.fill.is_visible() && fill == 2);
+            .set_visible(shown && (fill == 2 || (fill == 5 && !radial)));
         let stroked = self.stroke.selected() > 0;
         self.stroke_color_row.set_visible(stroked);
         self.stroke_width.set_visible(stroked);
@@ -525,6 +702,23 @@ impl GraphicGroup {
                 set_color(&self.fill_color, from);
                 set_color(&self.gradient_end, to);
                 set(&self.gradient_angle, f64::from(angle) / 100.0);
+                // An advanced gradient chosen next starts from it.
+                self.gradient_bar
+                    .set_stops(Gradient::linear(from, to, angle).stops);
+            }
+            Some(Fill::Advanced(gradient)) => {
+                select(&self.fill, 5);
+                set(&self.gradient_angle, f64::from(gradient.angle) / 100.0);
+                select(&self.gradient_kind, u32::from(gradient.center.is_some()));
+                let (cx, cy) = gradient.center.unwrap_or((500, 500));
+                set(&self.center_x, f64::from(cx) / 10.0);
+                set(&self.center_y, f64::from(cy) / 10.0);
+                self.gradient_bar.set_stops(gradient.stops);
+                if let Some(stop) = self.gradient_bar.stops().get(self.gradient_bar.current()) {
+                    set_color(&self.fill_color, stop.color);
+                    set(&self.stop_position, f64::from(stop.at) / 10.0);
+                    set(&self.stop_blend, f64::from(stop.blend) / 10.0);
+                }
             }
             Some(Fill::Image {
                 picture,
@@ -544,6 +738,9 @@ impl GraphicGroup {
                 set_color(&self.fill_color, BLUE);
                 set_color(&self.gradient_end, Rgba::WHITE);
             }
+        }
+        if !matches!(style.fill, Some(Fill::Gradient { .. } | Fill::Advanced(_))) {
+            self.gradient_bar.set_stops(Vec::new());
         }
         match style.stroke {
             Some(stroke) => {

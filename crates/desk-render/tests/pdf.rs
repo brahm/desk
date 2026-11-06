@@ -826,3 +826,87 @@ fn obj_18_movies_show_their_poster_and_sounds_a_speaker() {
     assert_eq!(pixel(30, 140), (0x55, 0x55, 0x55));
     assert_eq!(pixel(5, 105), (255, 255, 255));
 }
+
+#[test]
+fn obj_41_advanced_gradients_of_several_colors_and_radial_ones_are_painted() {
+    use desk_model::{
+        Document, Editor, Fill, Frame, Gradient, GradientStop, Object, ObjectKind, Shape, Wrap,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            // Red, green in the middle and blue, from left to right.
+            let mut bar = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(20.0, 20.0, 100.0, 40.0),
+            );
+            bar.style.fill = Some(Fill::Advanced(Gradient {
+                stops: vec![
+                    GradientStop::new(0, Rgba::rgb(255, 0, 0)),
+                    GradientStop::new(500, Rgba::rgb(0, 255, 0)),
+                    GradientStop::new(1000, Rgba::rgb(0, 0, 255)),
+                ],
+                angle: 0,
+                center: None,
+            }));
+            bar.wrap = Wrap::Through;
+            edit.add_object(bar)?;
+            // White in the middle of a square, black at its corners.
+            let mut round = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(20.0, 100.0, 80.0, 80.0),
+            );
+            round.style.fill = Some(Fill::Advanced(Gradient {
+                stops: vec![
+                    GradientStop::new(0, Rgba::WHITE),
+                    GradientStop::new(1000, Rgba::BLACK),
+                ],
+                angle: 0,
+                center: Some((500, 500)),
+            }));
+            round.wrap = Wrap::Through;
+            edit.add_object(round)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    let (r, g, b) = pixel(22, 40);
+    assert!(r > 240 && g < 15 && b < 15, "red at the left: {r} {g} {b}");
+    let (r, g, b) = pixel(70, 40);
+    assert!(
+        r < 15 && g > 240 && b < 15,
+        "green in the middle: {r} {g} {b}"
+    );
+    let (r, g, b) = pixel(118, 40);
+    assert!(
+        r < 15 && g < 15 && b > 240,
+        "blue at the right: {r} {g} {b}"
+    );
+    let (r, _, _) = pixel(60, 140);
+    assert!(r > 245, "white in the middle: {r}");
+    let (r, _, _) = pixel(21, 101);
+    assert!(r < 15, "black at a corner: {r}");
+    let (edge, _, _) = pixel(60, 101);
+    assert!((60..200).contains(&edge), "between at the edge: {edge}");
+}

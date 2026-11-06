@@ -103,18 +103,65 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
     out
 }
 
-/// A gradient of ODF as Desk fills with it: along a line, from one
-/// color to the other (OBJ-09). Other kinds of gradients are taken as
-/// along a line.
+/// A gradient of ODF as Desk fills with it (OBJ-09, OBJ-41): along a
+/// line from one color to the other; the colors of an advanced gradient
+/// of Desk; a radial gradient out from its center, as the other round and
+/// square ones are taken; or an axial one as a line that turns back.
 fn model_gradient(gradient: &odf::Gradient) -> Fill {
+    use desk_model::{Gradient, GradientStop};
     // ODF turns its gradient counterclockwise from going down; Desk
     // measures the way it goes counterclockwise from going right.
-    let angle = ((gradient.angle + 270.0) * 100.0).round() as i64;
-    Fill::Gradient {
-        from: gradient.start_color.map_or(desk_model::Rgba::BLACK, rgba),
-        to: gradient.end_color.map_or(desk_model::Rgba::WHITE, rgba),
-        angle: angle.rem_euclid(36000) as i32,
+    let angle = (((gradient.angle + 270.0) * 100.0).round() as i64).rem_euclid(36000) as i32;
+    let start = gradient.start_color.map_or(desk_model::Rgba::BLACK, rgba);
+    let end = gradient.end_color.map_or(desk_model::Rgba::WHITE, rgba);
+    let radial = matches!(
+        gradient.style.as_str(),
+        "radial" | "ellipsoid" | "square" | "rectangular"
+    );
+    let center = radial.then(|| {
+        let (cx, cy) = gradient.center.unwrap_or((50.0, 50.0));
+        let part = |v: f64| (v * 10.0).round().clamp(0.0, 1000.0) as u16;
+        (part(cx), part(cy))
+    });
+    let mut stops: Vec<GradientStop> = gradient
+        .stops
+        .iter()
+        .map(|stop| {
+            let mut color = stop.color.map_or(desk_model::Rgba::BLACK, rgba);
+            if let Some(opacity) = stop.opacity {
+                color.a = (opacity * 2.55).round().clamp(0.0, 255.0) as u8;
+            }
+            GradientStop {
+                blend: stop
+                    .blend
+                    .map_or(500, |b| (b * 1000.0).round().clamp(0.0, 1000.0) as u16),
+                ..GradientStop::new((stop.offset * 1000.0).round() as u16, color)
+            }
+        })
+        .collect();
+    if stops.len() < 2 {
+        stops = match (radial, gradient.style.as_str()) {
+            // The end color of ODF is in the middle of these.
+            (true, _) => vec![GradientStop::new(0, end), GradientStop::new(1000, start)],
+            (false, "axial") => vec![
+                GradientStop::new(0, start),
+                GradientStop::new(500, end),
+                GradientStop::new(1000, start),
+            ],
+            _ => {
+                return Fill::Gradient {
+                    from: start,
+                    to: end,
+                    angle,
+                };
+            }
+        };
     }
+    Fill::Advanced(Gradient {
+        stops,
+        angle,
+        center,
+    })
 }
 
 /// The gradient of ODF that fills as Desk does, without its name.
@@ -126,7 +173,38 @@ fn odf_gradient(from: desk_model::Rgba, to: desk_model::Rgba, angle: i32) -> odf
         end_color: Some(odf_color(to)),
         angle: (f64::from(angle) / 100.0 - 270.0).rem_euclid(360.0),
         border: Some(0.0),
+        center: None,
+        stops: Vec::new(),
     }
+}
+
+/// The gradient of ODF for an advanced gradient of Desk, without its
+/// name: its first and last colors as ODF has them, for the other apps,
+/// and all of them in `desk:gradient-stop` (OBJ-41).
+fn odf_advanced_gradient(gradient: &desk_model::Gradient) -> odf::Gradient {
+    let mut stops = gradient.stops.clone();
+    stops.sort_by_key(|s| s.at);
+    let first = stops.first().map_or(desk_model::Rgba::BLACK, |s| s.color);
+    let last = stops.last().map_or(desk_model::Rgba::WHITE, |s| s.color);
+    let mut out = odf_gradient(first, last, gradient.angle);
+    if let Some((cx, cy)) = gradient.center {
+        out.style = "radial".into();
+        // The start color of ODF is outside, and the end color in the
+        // middle.
+        out.start_color = Some(odf_color(last));
+        out.end_color = Some(odf_color(first));
+        out.center = Some((f64::from(cx) / 10.0, f64::from(cy) / 10.0));
+    }
+    out.stops = stops
+        .iter()
+        .map(|stop| odf::GradientStop {
+            offset: f64::from(stop.at) / 1000.0,
+            color: Some(odf_color(stop.color)),
+            opacity: (stop.color.a != 255).then(|| f64::from(stop.color.a) / 2.55),
+            blend: (stop.blend != 500).then(|| f64::from(stop.blend) / 1000.0),
+        })
+        .collect();
+    out
 }
 
 /// The end of a line that a marker of ODF draws, by its name, as near as
@@ -1427,6 +1505,13 @@ impl Exporter<'_> {
                 g.fill = Some("gradient".into());
                 g.fill_color = Some(odf_color(from));
                 g.fill_gradient_name = Some(self.gradient(odf_gradient(from, to, angle)));
+            }
+            Some(Fill::Advanced(gradient)) => {
+                g.fill = Some("gradient".into());
+                if let Some(first) = gradient.stops.iter().min_by_key(|s| s.at) {
+                    g.fill_color = Some(odf_color(first.color));
+                }
+                g.fill_gradient_name = Some(self.gradient(odf_advanced_gradient(gradient)));
             }
             _ => g.fill = Some("none".into()),
         }

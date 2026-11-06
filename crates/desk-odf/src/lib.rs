@@ -48,7 +48,8 @@ mod write;
 mod xml;
 
 pub use draw::{
-    DrawKind, DrawObject, FillImage, Gradient, GraphicProperties, Marker, parse_transform,
+    DrawKind, DrawObject, FillImage, Gradient, GradientStop, GraphicProperties, Marker,
+    parse_transform,
 };
 pub use error::OdfError;
 pub use package::{

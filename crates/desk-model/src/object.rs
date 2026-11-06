@@ -624,6 +624,9 @@ pub enum Fill {
         /// bottom up.
         angle: i32,
     },
+    /// Colors that turn into each other one after another, along a line
+    /// or out from a point: the advanced gradient of Pages (OBJ-41).
+    Advanced(Gradient),
     /// A picture, sized to the object as the mode says (OBJ-09).
     Image {
         /// The picture.
@@ -634,6 +637,74 @@ pub enum Fill {
         /// tinted image fill of Pages (OBJ-42).
         tint: Option<Rgba>,
     },
+}
+
+/// The advanced gradient of Pages: several colors, with where each
+/// one blends into the next, along a line or out from a point (OBJ-41).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Gradient {
+    /// The colors, in order from where it starts; two at least.
+    pub stops: Vec<GradientStop>,
+    /// Which way a gradient along a line goes, as in [`Fill::Gradient`].
+    pub angle: i32,
+    /// The point a radial gradient goes out from, in thousandths of the
+    /// width and the height of the object from its top left corner; none
+    /// along a line. It reaches the farthest corner.
+    pub center: Option<(u16, u16)>,
+}
+
+/// A color of an advanced gradient.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GradientStop {
+    /// Where it is, in thousandths of the way.
+    pub at: u16,
+    /// The color.
+    pub color: Rgba,
+    /// Where it is half blended into the next color, in thousandths of
+    /// the way to it: 500 is halfway.
+    pub blend: u16,
+}
+
+impl GradientStop {
+    /// A color at a place, which blends halfway into the next.
+    pub fn new(at: u16, color: Rgba) -> Self {
+        Self {
+            at: at.min(1000),
+            color,
+            blend: 500,
+        }
+    }
+}
+
+impl Gradient {
+    /// A gradient along a line of the colors of a two color one.
+    pub fn linear(from: Rgba, to: Rgba, angle: i32) -> Self {
+        Self {
+            stops: vec![GradientStop::new(0, from), GradientStop::new(1000, to)],
+            angle,
+            center: None,
+        }
+    }
+
+    /// The colors to draw, by where they are from 0 to 1, with one more
+    /// halfway between two where the blend is not in the middle.
+    pub fn color_stops(&self) -> Vec<(f64, Rgba)> {
+        let mut stops = self.stops.clone();
+        stops.sort_by_key(|s| s.at);
+        let mut out = Vec::new();
+        for (i, stop) in stops.iter().enumerate() {
+            out.push((f64::from(stop.at.min(1000)) / 1000.0, stop.color));
+            if let Some(next) = stops.get(i + 1)
+                && stop.blend != 500
+                && next.at > stop.at
+            {
+                let at = f64::from(stop.at)
+                    + f64::from(next.at - stop.at) * f64::from(stop.blend.clamp(1, 999)) / 1000.0;
+                out.push((at.min(1000.0) / 1000.0, stop.color.mix(next.color)));
+            }
+        }
+        out
+    }
 }
 
 /// How a picture fills an object, as the Graphic inspector of Pages
@@ -798,6 +869,33 @@ mod tests {
             ObjectKind::Shape(Shape::Rectangle),
             Frame::from_pt(10.0, 20.0, 30.0, 40.0),
         )
+    }
+
+    #[test]
+    fn obj_41_a_blend_point_off_the_middle_adds_the_color_halfway_there() {
+        let gradient = Gradient {
+            stops: vec![
+                GradientStop {
+                    blend: 250,
+                    ..GradientStop::new(0, Rgba::BLACK)
+                },
+                GradientStop::new(1000, Rgba::WHITE),
+            ],
+            angle: 0,
+            center: None,
+        };
+        assert_eq!(
+            gradient.color_stops(),
+            vec![
+                (0.0, Rgba::BLACK),
+                (0.25, Rgba::rgb(128, 128, 128)),
+                (1.0, Rgba::WHITE)
+            ]
+        );
+        assert_eq!(
+            Gradient::linear(Rgba::BLACK, Rgba::WHITE, 0).color_stops(),
+            vec![(0.0, Rgba::BLACK), (1.0, Rgba::WHITE)]
+        );
     }
 
     #[test]

@@ -137,13 +137,20 @@ pub enum Value {
         /// `sf:right`.
         right: f64,
     },
-    /// A gradient of colors (`sf:angle-gradient`), as objects are filled
-    /// with.
+    /// A gradient of colors (`sf:angle-gradient`, or a radial
+    /// `sf:transform-gradient`), as objects are filled with.
     Gradient {
         /// `sf:angle`, in radians counterclockwise from the right.
         angle: f64,
         /// The colors, by where they are from 0 to 1, in order.
         stops: Vec<(f64, Color)>,
+        /// The `sf:inflection` of each color: where it is half blended
+        /// into the next, from 0 to 1 of the way.
+        inflections: Vec<f64>,
+        /// The point a radial gradient (`sf:type="radial"`) goes out from,
+        /// in parts of the width and height of the object; none along a
+        /// line.
+        center: Option<(f64, f64)>,
     },
     /// A picture that fills an object (`sf:textured-fill`): how it is
     /// sized to the object (`sf:technique`: `fit`, `fill`, `stretch`,
@@ -387,26 +394,48 @@ impl Value {
                     None => Self::Other("textured-fill".into()),
                 }
             }
-            "angle-gradient" => {
-                let mut stops: Vec<(f64, Color)> = element
+            "angle-gradient" | "transform-gradient" => {
+                let number = |e: &Element, ns, name| {
+                    e.attr(ns, name)
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite())
+                };
+                let mut stops: Vec<(f64, Color, f64)> = element
                     .descendants()
                     .filter(|e| e.name.is(SF, "gradient-stop"))
                     .filter_map(|stop| {
-                        let at = stop
-                            .attr(SF, "fraction")
-                            .and_then(|v| v.trim().parse::<f64>().ok())
-                            .filter(|v| v.is_finite())?;
-                        Some((at.clamp(0.0, 1.0), color(stop.child(SF, "color")?)?))
+                        let at = number(stop, SF, "fraction")?;
+                        let inflection = number(stop, SF, "inflection").unwrap_or(0.5);
+                        Some((
+                            at.clamp(0.0, 1.0),
+                            color(stop.child(SF, "color")?)?,
+                            inflection.clamp(0.0, 1.0),
+                        ))
                     })
                     .collect();
                 stops.sort_by(|a, b| a.0.total_cmp(&b.0));
+                // The start of a transform gradient, in the natural size
+                // of the object it was made for.
+                let center = (element.attr(SF, "type") == Some("radial")).then(|| {
+                    let pair = |name, x, y| {
+                        let e = element.child(SF, name)?;
+                        Some((number(e, SFA, x)?, number(e, SFA, y)?))
+                    };
+                    match (pair("start", "x", "y"), pair("baseNaturalSize", "w", "h")) {
+                        (Some((x, y)), Some((w, h))) if w > 0.0 && h > 0.0 => {
+                            ((x / w).clamp(0.0, 1.0), (y / h).clamp(0.0, 1.0))
+                        }
+                        _ => (0.5, 0.5),
+                    }
+                });
                 Self::Gradient {
-                    angle: element
-                        .attr(SF, "angle")
-                        .and_then(|v| v.trim().parse::<f64>().ok())
-                        .filter(|v| v.is_finite())
-                        .unwrap_or(0.0),
-                    stops,
+                    angle: number(element, SF, "angle").unwrap_or(0.0),
+                    inflections: stops.iter().map(|s| s.2).collect(),
+                    stops: stops
+                        .into_iter()
+                        .map(|(at, color, _)| (at, color))
+                        .collect(),
+                    center,
                 }
             }
             other => Self::Other(other.to_owned()),

@@ -458,6 +458,7 @@ def main():
     guide_from_the_ruler(work)
     pages_as_sections(work)
     reflection_of_a_shape(work)
+    advanced_gradient(work)
     print("All UI tests passed.")
 
 
@@ -1385,6 +1386,19 @@ def connection_line(work):
         writer.wait(timeout=10)
 
 
+def click_node(node, name):
+    """Clicks the middle of a node of the window titled `name`."""
+    geometry = subprocess.run(
+        ["xdotool", "search", "--name", name, "getwindowgeometry", "--shell"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+    box = Atspi.Component.get_extents(node, Atspi.CoordType.WINDOW)
+    click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2)
+
+
 def saved_part(letter, part, pattern):
     """Whether a part of the saved package matches a pattern."""
     try:
@@ -1580,15 +1594,7 @@ def pages_as_sections(work):
     )
     try:
         thumbnail = wait_for("the thumbnail of the page", lambda: showing_named(app, "Page 1"))
-        geometry = subprocess.run(
-            ["xdotool", "search", "--name", "Sections.odt", "getwindowgeometry", "--shell"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
-        box = Atspi.Component.get_extents(thumbnail, Atspi.CoordType.WINDOW)
-        click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2)
+        click_node(thumbnail, "Sections.odt")
         press("ctrl+d")
         wait_for(
             "the thumbnail of the copy",
@@ -1625,6 +1631,50 @@ def reflection_of_a_shape(work):
             lambda: saved_content(letter, r'desk:reflection="50%"'),
         )
         check("the reflection of the shape is saved (OBJ-38)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+
+def advanced_gradient(work):
+    """The Graphic group of the Inspector fills a selected shape with an
+    advanced gradient, adds a color halfway along it, and the colors are
+    saved (OBJ-41)."""
+    writer, app, letter = open_with_a_shape(work, "Gradient.odt")
+    try:
+        fill = wait_for(
+            "the Fill row of the Graphic group",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_name() == "Fill"
+                    and n.get_role() == Atspi.Role.COMBO_BOX
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
+        # The list of fills opens, and its last one is the advanced
+        # gradient.
+        click_node(fill, "Gradient.odt")
+        time.sleep(1)
+        press("End", "Return")
+        add = wait_for("the Add Color button", lambda: showing_named(app, "Add Color"))
+        Atspi.Action.do_action(add, 0)
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved gradient of three colors",
+            lambda: saved_part(
+                letter,
+                "styles.xml",
+                r'<draw:gradient [^>]*><desk:gradient-stop svg:offset="0"[^>]*/>'
+                r'<desk:gradient-stop svg:offset="0.5"[^>]*/><desk:gradient-stop svg:offset="1"',
+            ),
+        )
+        check("a color added to an advanced gradient is saved (OBJ-41)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
