@@ -265,7 +265,7 @@ fn doc_22_what_the_model_cannot_hold_is_logged() {
 #[test]
 fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
     // Saved by Pages '09 on the reference machine, with one of each
-    // thing that the model cannot hold yet.
+    // thing that the model could not hold when it was made.
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../corpus/fixtures/pages/lossy-import.pages");
     let (document, log) = desk_filters::read_pages_at_logged(&path).unwrap();
@@ -274,14 +274,9 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
         .iter()
         .map(|e| (e.warning.clone(), e.count))
         .collect();
-    assert_eq!(
-        entries,
-        [
-            (Warning::Content(Content::FloatingObjects), 1),
-            (Warning::Content(Content::InlineObjects), 1),
-            (Warning::Content(Content::Comments), 1),
-        ]
-    );
+    // Its floating picture and the one in its text are read.
+    assert_eq!(entries, [(Warning::Content(Content::Comments), 1)]);
+    assert_eq!(document.objects().len(), 2);
     // The text of the body is kept, without that of the footnote, which
     // is a note of its own (EST-13), and the comment.
     let text: Vec<String> = document.body().iter().map(|p| p.text()).collect();
@@ -905,4 +900,61 @@ fn int_03_int_05_page_layout_documents_and_master_objects_saved_by_pages_are_rea
     let (document, objects) = fixture_objects("int-05-est-21-master-object.pages");
     assert_eq!(document.page_setup().layout_pages, None);
     assert_eq!(objects[0].anchor, Anchor::Master(None));
+}
+
+#[test]
+fn obj_01_obj_02_obj_18_obj_19_pictures_and_movies_saved_by_pages_are_read() {
+    use desk_model::{Anchor, Field, ObjectKind, Repeat};
+    // A picture in the line of the text and one floating on the page.
+    let (document, objects) = fixture_objects("obj-01-floating-inline.pages");
+    let [floating, inline] = objects.as_slice() else {
+        panic!("{objects:?}")
+    };
+    assert_eq!(floating.anchor, Anchor::Page(0));
+    assert_eq!(
+        floating.frame,
+        desk_model::Frame::from_pt(200.0, 180.0, 96.0, 64.0)
+    );
+    assert!(matches!(&floating.kind, ObjectKind::Image(p) if p.width() == 96));
+    // Its wrap is off, so the text goes through it, as Pages prints it.
+    assert_eq!(floating.wrap, desk_model::Wrap::Through);
+    assert_eq!(inline.anchor, Anchor::InText);
+    // Its mark is where Pages put it in the text.
+    let first = document.body().get(0).unwrap();
+    let marked = first.runs().any(|r| {
+        matches!(&r.attrs.field, Some(Some(Field::ObjectMark { object })) if *object == inline.id)
+    });
+    assert!(marked, "{:?}", first.text());
+    // Every format of picture that Pages takes.
+    let (_, objects) = fixture_objects("obj-02-image-formats.pages");
+    assert_eq!(objects.len(), 5);
+    assert!(
+        objects
+            .iter()
+            .all(|o| matches!(o.kind, ObjectKind::Image(_)) && o.anchor == Anchor::InText)
+    );
+    // A sound and a movie, with its poster frame.
+    let (_, objects) = fixture_objects("obj-18-audio-video.pages");
+    let kinds: Vec<(bool, bool)> = objects
+        .iter()
+        .map(|o| match &o.kind {
+            ObjectKind::Media(m) => (m.is_sound(), m.poster.is_some()),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(kinds, [(true, false), (false, true)]);
+    let (_, objects) = fixture_objects("obj-19-movie-settings.pages");
+    assert!(matches!(&objects[0].kind, ObjectKind::Media(m) if m.repeat == Repeat::BackAndForth));
+}
+
+#[test]
+fn obj_14_an_inline_text_box_saved_by_pages_keeps_its_text() {
+    use desk_model::{Anchor, ObjectKind};
+    let (_, objects) = fixture_objects("obj-14-inline-text-box.pages");
+    let [text_box] = objects.as_slice() else {
+        panic!("{objects:?}")
+    };
+    assert_eq!(text_box.anchor, Anchor::InText);
+    assert!(matches!(text_box.kind, ObjectKind::TextBox(_)));
+    assert!(text_box.paragraphs().any(|p| !p.text().is_empty()));
 }

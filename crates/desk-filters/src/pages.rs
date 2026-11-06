@@ -530,6 +530,11 @@ struct Importer<'a> {
     /// next paragraph read takes.
     marks: HashMap<String, NodeId>,
     next_id: Option<NodeId>,
+    /// Whether the text read is the body, where objects can be in the
+    /// line of the text, and the objects met there, by the id of their
+    /// marks and the object IDs of their attachments.
+    in_body: bool,
+    inline: Vec<(NodeId, String)>,
 }
 
 /// The levels of a list style of Pages, through its parents.
@@ -640,6 +645,8 @@ impl<'a> Importer<'a> {
             note: None,
             marks: HashMap::new(),
             next_id: None,
+            in_body: false,
+            inline: Vec::new(),
         };
         importer.styles()?;
         Ok(importer)
@@ -977,6 +984,15 @@ impl<'a> Importer<'a> {
                         let Some(note) = self.note else { continue };
                         Field::NoteMark { note }
                     }
+                    iwork::Field::Object { id } => {
+                        // Only the body holds objects in its lines.
+                        if !self.in_body {
+                            continue;
+                        }
+                        let object = self.document.new_id();
+                        self.inline.push((object, id.clone()));
+                        Field::ObjectMark { object }
+                    }
                     iwork::Field::PageOf { bookmark } => {
                         // A page number whose paragraph is gone is left out.
                         let Some(&paragraph) = self.marks.get(bookmark) else {
@@ -1172,9 +1188,10 @@ fn model_field(field: &iwork::Field) -> Field {
             ),
         },
         // The importer numbers the notes.
-        iwork::Field::Note { .. } | iwork::Field::NoteMark | iwork::Field::PageOf { .. } => {
-            Field::PAGE_NUMBER
-        }
+        iwork::Field::Note { .. }
+        | iwork::Field::NoteMark
+        | iwork::Field::PageOf { .. }
+        | iwork::Field::Object { .. } => Field::PAGE_NUMBER,
     }
 }
 
@@ -1386,7 +1403,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             (Some(Start::Section(s, _)), Some(style)) if s.own_margins => Some(style.as_str()),
             _ => None,
         };
-        let built = importer.paragraph(paragraph, start.map(std::sync::Arc::new))?;
+        importer.in_body = true;
+        let built = importer.paragraph(paragraph, start.map(std::sync::Arc::new));
+        importer.in_body = false;
+        let built = built?;
         if let (Some(style), Some(first)) = (own, built.first()) {
             own_sections.insert(style, first.id());
         }
@@ -1468,8 +1488,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     // The floating objects, on their pages and on the masters of their
     // sections.
     let first_style = source.body.first().and_then(|p| p.section.as_deref());
-    let left_out = objects::import_objects(&mut importer, source, first_style, &own_sections)?;
-    log.add(Warning::Content(Content::FloatingObjects), left_out);
+    let (floating, inline) =
+        objects::import_objects(&mut importer, source, first_style, &own_sections)?;
+    log.add(Warning::Content(Content::FloatingObjects), floating);
+    log.add(Warning::Content(Content::InlineObjects), inline);
     let toc_ids = importer.ids.clone();
     let mut document = importer.document;
     if index > 1 {
