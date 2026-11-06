@@ -44,6 +44,7 @@ const SECTIONS: &[Section] = &[
             ("<Control><Shift>z", n_("Redo")),
             ("<Control>x", n_("Cut")),
             ("<Control>c", n_("Copy")),
+            ("<Control>d", n_("Duplicate")),
             ("<Control>v", n_("Paste")),
             ("<Control><Shift><Alt>v", n_("Paste and match style")),
             ("<Control>a", n_("Select all")),
