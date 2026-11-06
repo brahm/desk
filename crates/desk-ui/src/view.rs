@@ -53,6 +53,22 @@ struct State {
     /// The rectangle a drag draws to select the objects it touches
     /// (OBJ-21).
     marquee: Option<Marquee>,
+    /// The outlines that the layout view shows: of the body, the columns,
+    /// the headers, the footers and the text boxes (INT-09).
+    outlines: Vec<Outline>,
+    /// The guides fixed on every page (OBJ-28).
+    fixed_guides: Vec<desk_model::FixedGuide>,
+    /// A guide being dragged out of a ruler or along the page.
+    dragged_guide: Option<desk_model::FixedGuide>,
+}
+
+/// A box that the layout view outlines on a page, in points (INT-09).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Outline {
+    /// The page it is on.
+    pub page: usize,
+    /// Its left edge, its top, its width and its height.
+    pub rect: (f64, f64, f64, f64),
 }
 
 /// The rectangle of a drag that selects objects, between two corners in
@@ -171,6 +187,9 @@ impl DocumentView {
             guides: Vec::new(),
             path: None,
             marquee: None,
+            outlines: Vec::new(),
+            fixed_guides: Vec::new(),
+            dragged_guide: None,
             squiggles: Vec::new(),
         }));
         let view = Self {
@@ -255,6 +274,58 @@ impl DocumentView {
         }
         self.state.borrow_mut().marquee = marquee;
         self.area.queue_draw();
+    }
+
+    /// Shows the outlines of the layout view, or none (INT-09).
+    pub fn set_outlines(&self, outlines: Vec<Outline>) {
+        if self.state.borrow().outlines == outlines {
+            return;
+        }
+        self.state.borrow_mut().outlines = outlines;
+        self.area.queue_draw();
+    }
+
+    /// Shows the guides fixed on the pages and one being dragged
+    /// (OBJ-28).
+    pub fn set_fixed_guides(
+        &self,
+        guides: Vec<desk_model::FixedGuide>,
+        dragged: Option<desk_model::FixedGuide>,
+    ) {
+        {
+            let mut state = self.state.borrow_mut();
+            if state.fixed_guides == guides && state.dragged_guide == dragged {
+                return;
+            }
+            state.fixed_guides = guides;
+            state.dragged_guide = dragged;
+        }
+        self.area.queue_draw();
+    }
+
+    /// The page under a point of another widget, such as a ruler, the
+    /// point on it, in points, and whether the point is over the pages
+    /// in sight at all.
+    pub fn page_at_widget(
+        &self,
+        widget: &impl IsA<gtk::Widget>,
+        x: f64,
+        y: f64,
+    ) -> Option<(usize, f64, f64, bool)> {
+        let point = widget.compute_point(
+            &self.scrolled,
+            &gtk::graphene::Point::new(x as f32, y as f32),
+        )?;
+        let (vx, vy) = (f64::from(point.x()), f64::from(point.y()));
+        let inside = vx >= 0.0
+            && vy >= 0.0
+            && vx <= f64::from(self.scrolled.width())
+            && vy <= f64::from(self.scrolled.height());
+        let (page, px, py) = self.page_at(
+            vx + self.scrolled.hadjustment().value(),
+            vy + self.scrolled.vadjustment().value(),
+        )?;
+        Some((page, px, py, inside))
     }
 
     /// Shows a shape being drawn with the pen or edited, or none.
@@ -794,6 +865,40 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
         cr.line_to(x1.round() + 0.5, y1.round() + 0.5);
     }
     cr.stroke().ok();
+    // The outlines of the layout view, in grey (INT-09).
+    cr.set_source_rgb(0.7, 0.7, 0.7);
+    for outline in state.outlines.iter().filter(|o| o.page == page) {
+        let (x, y, w, h) = outline.rect;
+        let (x0, y0) = at((x, y));
+        let (x1, y1) = at((x + w, y + h));
+        cr.rectangle(
+            x0.round() + 0.5,
+            y0.round() + 0.5,
+            (x1 - x0).round(),
+            (y1 - y0).round(),
+        );
+    }
+    cr.stroke().ok();
+    // The fixed guides, across the whole page (OBJ-28).
+    let guides = state
+        .fixed_guides
+        .iter()
+        .map(|g| (g, 0.7))
+        .chain(state.dragged_guide.iter().map(|g| (g, 1.0)));
+    for (guide, alpha) in guides {
+        cr.set_source_rgba(0.21, 0.52, 0.89, alpha);
+        let at = guide.at.to_pt() * scale;
+        if guide.vertical {
+            let x = (rect.x + at).round() + 0.5;
+            cr.move_to(x, rect.y);
+            cr.line_to(x, rect.y + rect.height);
+        } else {
+            let y = (rect.y + at).round() + 0.5;
+            cr.move_to(rect.x, y);
+            cr.line_to(rect.x + rect.width, y);
+        }
+        cr.stroke().ok();
+    }
     if let Some(marquee) = state.marquee.filter(|m| m.page == page) {
         let (x0, y0) = at(marquee.from);
         let (x1, y1) = at(marquee.to);

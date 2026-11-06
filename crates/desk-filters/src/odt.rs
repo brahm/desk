@@ -1560,6 +1560,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 page_links: source.toc_levels.iter().any(|l| l.link),
             },
             links_inactive: text.links_inactive.unwrap_or(false),
+            guides: fixed_guides(&text.guides),
         },
     })?;
 
@@ -2430,6 +2431,17 @@ pub fn export(document: &Document) -> odf::TextDocument {
             // document that does not say takes the sum (FMT-15).
             larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
             links_inactive: settings.links_inactive.then_some(true),
+            guides: settings
+                .guides
+                .iter()
+                .map(|g| {
+                    format!(
+                        "{} {}",
+                        if g.vertical { "v" } else { "h" },
+                        odf_length(g.at)
+                    )
+                })
+                .collect(),
             ..odf_note_settings(settings.notes)
         },
         notes_configuration: notes_configuration(settings.notes),
@@ -2892,5 +2904,26 @@ pub fn export(document: &Document) -> odf::TextDocument {
         creator: some(&meta.author),
         generator: Some(format!("Desk/{}", env!("CARGO_PKG_VERSION"))),
     };
+    out
+}
+
+/// The guides fixed on the pages, from the settings of the document
+/// (OBJ-28). One that cannot be read is left out.
+fn fixed_guides(guides: &[String]) -> Vec<desk_model::FixedGuide> {
+    let mut out: Vec<desk_model::FixedGuide> = guides
+        .iter()
+        .filter_map(|g| {
+            let (kind, at) = g.split_once(' ')?;
+            let vertical = match kind {
+                "v" => true,
+                "h" => false,
+                _ => return None,
+            };
+            let at = length(odf::Length::parse(at.trim())?);
+            Some(desk_model::FixedGuide { vertical, at })
+        })
+        .collect();
+    out.sort();
+    out.dedup();
     out
 }

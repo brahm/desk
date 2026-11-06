@@ -649,6 +649,7 @@ impl DocumentWindow {
             }
         });
         editor.set_show_invisibles(self.action_state("invisibles"));
+        editor.set_show_layout(self.action_state("show-layout"));
         *self.editor.borrow_mut() = Some(editor);
         self.stack.set_visible_child_name("document");
         // A document saved as an outline opens as one (DOC-16).
@@ -1526,6 +1527,22 @@ impl DocumentWindow {
             }
         });
         self.window.add_action(&invisibles);
+
+        // The outlines of the body, the columns, the headers, the footers
+        // and the text boxes (INT-09).
+        let layout = gio::SimpleAction::new_stateful("show-layout", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        layout.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            if let Some(editor) = this.editor() {
+                editor.set_show_layout(on);
+            }
+        });
+        self.window.add_action(&layout);
 
         // The rulers show in a word processing document (INT-02).
         let ruler = gio::SimpleAction::new_stateful("ruler", None, &true.to_variant());
@@ -2415,6 +2432,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         document.append(Some(&tr("Show _Fonts")), Some("win.fonts"));
         document.append(Some(&tr("Show _Styles Drawer")), Some("win.styles-drawer"));
         document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
+        document.append(Some(&tr("Show _Layout")), Some("win.show-layout"));
         document.append(Some(&tr("Show Page _Thumbnails")), Some("win.thumbnails"));
         document.append(Some(&tr("Show as _Outline")), Some("win.outline"));
         document.append(Some(&tr("Show _Media Browser")), Some("win.media-browser"));

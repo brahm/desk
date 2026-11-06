@@ -249,6 +249,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(pages) = text.layout_pages {
             config_item(&mut w, "PageLayoutPages", "int", &pages.to_string());
         }
+        if !text.guides.is_empty() {
+            config_item(&mut w, "Guides", "string", &text.guides.join("\n"));
+        }
         if !text.never_hyphenate.is_empty() {
             config_item(
                 &mut w,

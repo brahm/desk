@@ -77,6 +77,19 @@ pub struct TextSettings {
     /// Whether links do nothing when clicked, so that their text is edited
     /// as any other (EST-25).
     pub links_inactive: bool,
+    /// The guides fixed on the pages, which objects snap to (OBJ-28).
+    pub guides: Vec<FixedGuide>,
+}
+
+/// A guide fixed on every page, dragged out of a ruler, that objects snap
+/// to (OBJ-28).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FixedGuide {
+    /// Whether it runs down the page, at a distance from its left edge,
+    /// rather than across it, at a distance from its top.
+    pub vertical: bool,
+    /// How far it is from the left or the top edge of the paper.
+    pub at: Length,
 }
 
 /// How the space after a paragraph and the space before the next make the
@@ -100,6 +113,7 @@ impl Default for TextSettings {
             notes: NoteSettings::default(),
             toc: crate::toc::TocSettings::default(),
             links_inactive: false,
+            guides: Vec::new(),
         }
     }
 }

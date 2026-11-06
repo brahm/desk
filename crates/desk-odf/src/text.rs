@@ -275,6 +275,10 @@ pub struct TextSettings {
     /// its body is only the empty paragraphs that give other programs its
     /// pages.
     pub layout_pages: Option<u32>,
+    /// The guides fixed on the pages (OBJ-28), each `h` for one across
+    /// the page or `v` for one down it, and its distance from the top or
+    /// the left edge of the paper: `h 72pt`.
+    pub guides: Vec<String>,
 }
 
 /// A list style (`text:list-style`).
