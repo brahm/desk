@@ -31,7 +31,7 @@ const MASK_SHAPES: [NewShape; 12] = [
 ];
 
 /// A mask that shows all of a picture in its frame.
-fn whole_mask(frame: Frame) -> Frame {
+pub(crate) fn whole_mask(frame: Frame) -> Frame {
     Frame {
         x: desk_model::Length::ZERO,
         y: desk_model::Length::ZERO,

@@ -1200,6 +1200,39 @@ impl TextEditor {
         });
     }
 
+    /// Masks the selected picture with a shape, as Mask with Shape of the
+    /// Arrange menu does (OBJ-04): a picture not masked yet shows whole in
+    /// the shape at first.
+    pub fn mask_picture(&self, shape: NewShape) {
+        if !self.picture_selected() {
+            return;
+        }
+        let shape = shape.shape().filter(|s| *s != desk_model::Shape::Rectangle);
+        self.set_object("Mask with Shape", |object| {
+            if object.picture.mask.is_none() {
+                object.picture.mask = Some(crate::picture_pane::whole_mask(object.frame));
+            }
+            object.picture.mask_shape = shape;
+        });
+    }
+
+    /// Takes the mask off the selected picture (OBJ-04).
+    pub fn unmask_picture(&self) {
+        if !self.picture_selected() {
+            return;
+        }
+        self.set_object("Unmask", |object| {
+            object.picture.mask = None;
+            object.picture.mask_shape = None;
+        });
+    }
+
+    /// Whether one picture is selected.
+    fn picture_selected(&self) -> bool {
+        self.object_info()
+            .is_some_and(|info| info.count == 1 && matches!(info.object.kind, ObjectKind::Image(_)))
+    }
+
     /// Changes the first selected object as the inspectors ask: its frame
     /// on its page, in points, its rotation, its wrap and its margin.
     pub fn set_object(&self, name: &str, change: impl FnOnce(&mut Object)) {

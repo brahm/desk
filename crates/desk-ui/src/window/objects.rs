@@ -16,7 +16,9 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::{tr, trc};
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 26] = [
+pub(super) const OBJECT_ACTIONS: [&str; 28] = [
+    "mask-with-shape",
+    "unmask",
     "duplicate-objects",
     "insert-picture",
     "move-to-master",
@@ -66,7 +68,8 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 20] = [
+        let simple: [(&str, EditorAction); 21] = [
+            ("unmask", TextEditor::unmask_picture),
             ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),
             ("move-to-page", TextEditor::move_objects_to_page),
@@ -115,24 +118,12 @@ impl DocumentWindow {
         self.window.add_action(&action);
         self.add_media_browser_action();
         self.add_selectable_actions();
-        let with_string: [(&str, ChoiceAction); 3] = [
+        let with_string: [(&str, ChoiceAction); 4] = [
             ("insert-shape", |e, value| {
-                let shape = match value {
-                    "rounded" => NewShape::RoundedRectangle,
-                    "ellipse" => NewShape::Ellipse,
-                    "triangle" => NewShape::Triangle,
-                    "right-triangle" => NewShape::RightTriangle,
-                    "diamond" => NewShape::Diamond,
-                    "arrow" => NewShape::Arrow,
-                    "double-arrow" => NewShape::DoubleArrow,
-                    "star" => NewShape::Star,
-                    "polygon" => NewShape::Polygon,
-                    "quote-bubble" => NewShape::QuoteBubble,
-                    "callout" => NewShape::Callout,
-                    "line" => NewShape::Line,
-                    _ => NewShape::Rectangle,
-                };
-                e.insert_shape(shape);
+                e.insert_shape(named_shape(value))
+            }),
+            ("mask-with-shape", |e, value| {
+                e.mask_picture(named_shape(value))
             }),
             ("align-objects", |e, value| {
                 let alignment = match value {
@@ -288,7 +279,19 @@ pub(super) fn shapes_menu() -> gio::Menu {
         Some("win.add-linked-text-box"),
     );
     let shapes = gio::Menu::new();
-    for (label, value) in [
+    for (label, value) in shape_names().into_iter().chain([(tr("_Line"), "line")]) {
+        shapes.append(Some(&label), Some(&format!("win.insert-shape('{value}')")));
+    }
+    shapes.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
+    menu.append_submenu(Some(&tr("_Shape")), &shapes);
+    // Joins the two selected objects (OBJ-31).
+    menu.append(Some(&tr("Connection L_ine")), Some("win.insert-connection"));
+    menu
+}
+
+/// The shapes of Insert Shape and Mask with Shape, with their values.
+fn shape_names() -> [(String, &'static str); 12] {
+    [
         (tr("_Rectangle"), "rectangle"),
         (tr("Rounded Re_ctangle"), "rounded"),
         (tr("_Oval"), "ellipse"),
@@ -301,15 +304,26 @@ pub(super) fn shapes_menu() -> gio::Menu {
         (tr("_Polygon"), "polygon"),
         (tr("_Quote Bubble"), "quote-bubble"),
         (tr("Call_out"), "callout"),
-        (tr("_Line"), "line"),
-    ] {
-        shapes.append(Some(&label), Some(&format!("win.insert-shape('{value}')")));
+    ]
+}
+
+/// The shape that a value of Insert Shape and Mask with Shape names.
+fn named_shape(value: &str) -> NewShape {
+    match value {
+        "rounded" => NewShape::RoundedRectangle,
+        "ellipse" => NewShape::Ellipse,
+        "triangle" => NewShape::Triangle,
+        "right-triangle" => NewShape::RightTriangle,
+        "diamond" => NewShape::Diamond,
+        "arrow" => NewShape::Arrow,
+        "double-arrow" => NewShape::DoubleArrow,
+        "star" => NewShape::Star,
+        "polygon" => NewShape::Polygon,
+        "quote-bubble" => NewShape::QuoteBubble,
+        "callout" => NewShape::Callout,
+        "line" => NewShape::Line,
+        _ => NewShape::Rectangle,
     }
-    shapes.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
-    menu.append_submenu(Some(&tr("_Shape")), &shapes);
-    // Joins the two selected objects (OBJ-31).
-    menu.append(Some(&tr("Connection L_ine")), Some("win.insert-connection"));
-    menu
 }
 
 /// The Arrange menu of Pages (OBJ-03 to OBJ-07).
@@ -348,6 +362,16 @@ pub(super) fn arrange_menu() -> gio::Menu {
     shape.append(Some(&tr("Make _Editable")), Some("win.make-editable"));
     shape.append(Some(&tr("Smoo_th Path")), Some("win.smooth-path"));
     shape.append(Some(&tr("Sha_rpen Path")), Some("win.sharpen-path"));
+    // Mask with Shape and Unmask for the selected picture (OBJ-04).
+    let masks = gio::Menu::new();
+    for (label, value) in shape_names() {
+        masks.append(
+            Some(&label),
+            Some(&format!("win.mask-with-shape('{value}')")),
+        );
+    }
+    shape.append_submenu(Some(&tr("Mask with S_hape")), &masks);
+    shape.append(Some(&tr("Un_mask")), Some("win.unmask"));
     let grouping = gio::Menu::new();
     // A copy a little lower and to the right (OBJ-22).
     grouping.append(
