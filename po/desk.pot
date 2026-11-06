@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 19:24+0000\n"
+"POT-Creation-Date: 2026-11-06 20:22+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1171,29 +1171,29 @@ msgstr ""
 msgid "Outside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:239
+#: crates/desk-ui/src/lib.rs:262
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:242
+#: crates/desk-ui/src/lib.rs:265
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:245
+#: crates/desk-ui/src/lib.rs:268
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:440 crates/desk-ui/src/window.rs:198
+#: crates/desk-ui/src/lib.rs:466 crates/desk-ui/src/window.rs:198
 msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:462
+#: crates/desk-ui/src/lib.rs:488
 msgid "All Documents"
 msgstr ""
 
@@ -3514,7 +3514,7 @@ msgstr ""
 msgid "Pages Documents"
 msgstr ""
 
-#: crates/desk-writer/src/main.rs:63
+#: crates/desk-writer/src/main.rs:80
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""

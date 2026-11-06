@@ -109,7 +109,8 @@ pub use object::{
     VerticalAlignment, Wrap,
 };
 pub use object_edit::{
-    Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, reframed, translated, union,
+    Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, new_origin, reframed,
+    translated, union,
 };
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};

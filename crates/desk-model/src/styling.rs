@@ -1038,6 +1038,80 @@ impl Edit {
 
     /// The style of the document with the name of a style, or the style
     /// itself added with a new identifier.
+    /// Objects copied from another document, with the styles that their
+    /// text names taken by name: those this document has, and the others
+    /// brought in with every attribute they resolve to there (IOP-27,
+    /// IOP-28). The objects keep their identifiers.
+    pub fn adopt_object_styles(
+        &mut self,
+        from: &Document,
+        objects: &[crate::Object],
+    ) -> Result<Vec<crate::Object>, ModelError> {
+        let mut styles: HashMap<StyleId, StyleId> = HashMap::new();
+        objects
+            .iter()
+            .map(|object| self.adopt_styles_of(from, object, &mut styles))
+            .collect()
+    }
+
+    fn adopt_styles_of(
+        &mut self,
+        from: &Document,
+        object: &crate::Object,
+        styles: &mut HashMap<StyleId, StyleId>,
+    ) -> Result<crate::Object, ModelError> {
+        let mut object = object.clone();
+        if let crate::ObjectKind::Group(members) = &object.kind {
+            let members = members
+                .iter()
+                .map(|m| self.adopt_styles_of(from, m, styles))
+                .collect::<Result<Vec<_>, _>>()?;
+            object.kind = crate::ObjectKind::Group(members.into());
+            return Ok(object);
+        }
+        let Some(text) = object.text_box().cloned() else {
+            return Ok(object);
+        };
+        let mut adopt = |edit: &mut Self, id: StyleId, family: StyleFamily| {
+            if let Some(&found) = styles.get(&id) {
+                return Ok(Some(found));
+            }
+            let style = match family {
+                StyleFamily::Paragraph => from.flat_paragraph_style(id).map(Style::Paragraph),
+                StyleFamily::Character => from.flat_character_style(id).map(Style::Character),
+                StyleFamily::List => from.styles().list(id).cloned().map(Style::List),
+            };
+            let Some(style) = style else {
+                return Ok(None);
+            };
+            let found = edit.style_by_name_or_add(style)?;
+            styles.insert(id, found);
+            Ok::<_, ModelError>(Some(found))
+        };
+        let default = self.document().styles().default_paragraph();
+        let mut paragraphs = Vec::with_capacity(text.paragraphs.len());
+        for p in text.paragraphs.iter() {
+            let style = adopt(self, p.style(), StyleFamily::Paragraph)?.unwrap_or(default);
+            let mut attrs = p.attrs().clone();
+            if let Some(Some(list)) = attrs.list_style {
+                attrs.list_style = Some(adopt(self, list, StyleFamily::List)?);
+            }
+            let mut runs = Vec::new();
+            for run in p.runs() {
+                let mut run = run.clone();
+                if let Some(character) = run.style {
+                    run.style = adopt(self, character, StyleFamily::Character)?;
+                }
+                runs.push(run);
+            }
+            paragraphs.push(Paragraph::from_runs(p.id(), style, attrs, runs)?);
+        }
+        if let Some(own) = object.text_box_mut() {
+            own.paragraphs = paragraphs.into();
+        }
+        Ok(object)
+    }
+
     fn style_by_name_or_add(&mut self, style: Style) -> Result<StyleId, ModelError> {
         if let Some(found) = self
             .document()

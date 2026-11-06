@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 19:24+0000\n"
+"POT-Creation-Date: 2026-11-06 20:22+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -38,13 +38,11 @@ msgstr "Página {page} de {pages}"
 msgid "Auto Page Numbers"
 msgstr "Números de página automáticos"
 
-#: crates/desk-ui/src/auto_numbers.rs:53
-#: crates/desk-ui/src/headers_pane.rs:164
+#: crates/desk-ui/src/auto_numbers.rs:53 crates/desk-ui/src/headers_pane.rs:164
 msgid "Footer"
 msgstr "Rodapé"
 
-#: crates/desk-ui/src/auto_numbers.rs:53
-#: crates/desk-ui/src/headers_pane.rs:161
+#: crates/desk-ui/src/auto_numbers.rs:53 crates/desk-ui/src/headers_pane.rs:161
 msgid "Header"
 msgstr "Cabeçalho"
 
@@ -102,10 +100,9 @@ msgstr "Documento inteiro"
 #: crates/desk-ui/src/auto_numbers.rs:91
 #: crates/desk-ui/src/styles_drawer.rs:600
 #: crates/desk-ui/src/styles_drawer.rs:662
-#: crates/desk-ui/src/styles_drawer.rs:794
-#: crates/desk-ui/src/thumbnails.rs:382 crates/desk-ui/src/window.rs:1046
-#: crates/desk-ui/src/window.rs:1187 crates/desk-ui/src/window.rs:1219
-#: crates/desk-ui/src/window.rs:1248
+#: crates/desk-ui/src/styles_drawer.rs:794 crates/desk-ui/src/thumbnails.rs:382
+#: crates/desk-ui/src/window.rs:1046 crates/desk-ui/src/window.rs:1187
+#: crates/desk-ui/src/window.rs:1219 crates/desk-ui/src/window.rs:1248
 msgid "_Cancel"
 msgstr "_Cancelar"
 
@@ -665,9 +662,8 @@ msgid "4 Columns"
 msgstr "4 colunas"
 
 #: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
-#: crates/desk-ui/src/layout_pane.rs:231
-#: crates/desk-ui/src/objects_pane.rs:179 crates/desk-ui/src/ruler.rs:569
-#: crates/desk-ui/src/ruler.rs:591
+#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:179
+#: crates/desk-ui/src/ruler.rs:569 crates/desk-ui/src/ruler.rs:591
 msgid "Columns"
 msgstr "Colunas"
 
@@ -740,8 +736,7 @@ msgstr "Páginas espelhadas"
 msgid "Left and right pages swap their margins, as in a book"
 msgstr "As páginas da esquerda e da direita trocam as margens, como num livro"
 
-#: crates/desk-ui/src/gradient_bar.rs:47
-#: crates/desk-ui/src/graphic_pane.rs:193
+#: crates/desk-ui/src/gradient_bar.rs:47 crates/desk-ui/src/graphic_pane.rs:193
 msgid "Gradient Colors"
 msgstr "Cores do degradê"
 
@@ -852,8 +847,7 @@ msgid "Gradient Angle"
 msgstr "Ângulo do degradê"
 
 #: crates/desk-ui/src/graphic_pane.rs:189
-#: crates/desk-ui/src/graphic_pane.rs:246
-#: crates/desk-ui/src/objects_pane.rs:95
+#: crates/desk-ui/src/graphic_pane.rs:246 crates/desk-ui/src/objects_pane.rs:95
 msgid "Degrees, counterclockwise"
 msgstr "Graus, no sentido anti-horário"
 
@@ -1178,23 +1172,23 @@ msgstr "Margem interna"
 msgid "Outside Margin"
 msgstr "Margem externa"
 
-#: crates/desk-ui/src/lib.rs:239
+#: crates/desk-ui/src/lib.rs:262
 msgid ""
-"The font {requested} is not installed, so {used} is used, which has the same"
-" metrics."
+"The font {requested} is not installed, so {used} is used, which has the same "
+"metrics."
 msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}, que tem as "
 "mesmas métricas."
 
-#: crates/desk-ui/src/lib.rs:242
+#: crates/desk-ui/src/lib.rs:265
 msgid ""
-"The font {requested} is not installed, so {used} is used, which looks alike;"
-" lines may break elsewhere."
+"The font {requested} is not installed, so {used} is used, which looks alike; "
+"lines may break elsewhere."
 msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}, que é "
 "parecida; as linhas podem quebrar em outros pontos."
 
-#: crates/desk-ui/src/lib.rs:245
+#: crates/desk-ui/src/lib.rs:268
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
@@ -1202,11 +1196,11 @@ msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}; as linhas "
 "podem quebrar em outros pontos."
 
-#: crates/desk-ui/src/lib.rs:440 crates/desk-ui/src/window.rs:198
+#: crates/desk-ui/src/lib.rs:466 crates/desk-ui/src/window.rs:198
 msgid "Open a Document"
 msgstr "Abrir um documento"
 
-#: crates/desk-ui/src/lib.rs:462
+#: crates/desk-ui/src/lib.rs:488
 msgid "All Documents"
 msgstr "Todos os documentos"
 
@@ -1286,8 +1280,8 @@ msgstr "Hiperlinks"
 msgid ""
 "Insert ▸ Hyperlink links the selection. A link to a bookmark starts with #."
 msgstr ""
-"Inserir ▸ Hiperlink cria um link na seleção. Um link para um marcador começa"
-" com #."
+"Inserir ▸ Hiperlink cria um link na seleção. Um link para um marcador começa "
+"com #."
 
 #: crates/desk-ui/src/links_pane.rs:108
 msgid "Bookmarks"
@@ -1351,8 +1345,7 @@ msgid "Table of Contents"
 msgstr "Sumário"
 
 #: crates/desk-ui/src/links_pane.rs:403
-msgid ""
-"Insert ▸ Table of Contents adds one before the paragraph of the cursor."
+msgid "Insert ▸ Table of Contents adds one before the paragraph of the cursor."
 msgstr "Inserir ▸ Sumário adiciona um antes do parágrafo do cursor."
 
 #: crates/desk-ui/src/links_pane.rs:460
@@ -1591,8 +1584,8 @@ msgstr "Notas de rodapé e notas finais"
 #: crates/desk-ui/src/notes_pane.rs:169
 msgid "Insert ▸ Footnote adds a note at the cursor. Its text is edited here."
 msgstr ""
-"Inserir ▸ Nota de rodapé adiciona uma nota no cursor. O texto dela é editado"
-" aqui."
+"Inserir ▸ Nota de rodapé adiciona uma nota no cursor. O texto dela é editado "
+"aqui."
 
 #: crates/desk-ui/src/objects_pane.rs:87
 msgid "X"
@@ -2422,8 +2415,7 @@ msgstr "Barra lateral de pesquisa"
 msgid "Find the next misspelled word"
 msgstr "Buscar a próxima palavra com erro de ortografia"
 
-#: crates/desk-ui/src/shortcuts.rs:124
-#: crates/desk-ui/src/spelling_window.rs:97
+#: crates/desk-ui/src/shortcuts.rs:124 crates/desk-ui/src/spelling_window.rs:97
 msgid "Spelling and Grammar"
 msgstr "Ortografia e gramática"
 
@@ -3546,12 +3538,11 @@ msgstr "Texto OpenDocument"
 msgid "Pages Documents"
 msgstr "Documentos do Pages"
 
-#: crates/desk-writer/src/main.rs:63
+#: crates/desk-writer/src/main.rs:80
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""
-"O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages "
-"(.pages)."
+"O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages (.pages)."
 
 #: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:67
 msgid "headers"
@@ -3648,7 +3639,8 @@ msgstr[1] "Não importado: {what}, em {n} parágrafos."
 #~ msgid "columns, whose text flows in one"
 #~ msgstr "colunas, cujo texto corre numa só"
 
-#~ msgid "Left out facing pages, so left pages have the margins of right pages."
+#~ msgid ""
+#~ "Left out facing pages, so left pages have the margins of right pages."
 #~ msgstr ""
 #~ "Não importado: páginas espelhadas, então as páginas da esquerda têm as "
 #~ "margens das da direita."

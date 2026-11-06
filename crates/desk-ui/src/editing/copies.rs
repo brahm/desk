@@ -5,7 +5,9 @@
 //! of the selected objects, Duplicate, which puts a copy a little lower
 //! and to the right, a drag with Alt that leaves a copy where it drops,
 //! and selecting the floating objects, all of them or those a drag draws
-//! a rectangle over.
+//! a rectangle over. Other apps of Desk get the objects too, in the format
+//! of the app, and paste them with the styles of their text (IOP-27,
+//! IOP-28).
 
 use std::cell::RefCell;
 
@@ -27,6 +29,8 @@ pub(super) const COPY_OFFSET: f64 = 10.0;
 struct CopiedObjects {
     page: usize,
     objects: Vec<Object>,
+    /// The document they are from, whose styles their text names.
+    document: desk_model::Document,
 }
 
 /// A drag that draws a rectangle on a page and selects the objects it
@@ -79,6 +83,7 @@ impl TextEditor {
         Some(CopiedObjects {
             page: page?,
             objects,
+            document: state.editor.document().clone(),
         })
     }
 
@@ -111,9 +116,23 @@ impl TextEditor {
             ] => gdk::Texture::from_bytes(&gtk::glib::Bytes::from(picture.data())).ok(),
             _ => None,
         };
-        match picture {
-            Some(texture) => clipboard.set_texture(&texture),
-            None => clipboard.set_text(&text),
+        let mut content = vec![match picture {
+            Some(texture) => gdk::ContentProvider::for_value(&texture.to_value()),
+            None => gdk::ContentProvider::for_value(&text.to_value()),
+        }];
+        // For the other apps of Desk.
+        if let Some(format) = crate::objects_format() {
+            match (format.write)(&copied.document, &copied.objects) {
+                Ok(bytes) => content.push(gdk::ContentProvider::for_bytes(
+                    format.media_type,
+                    &gtk::glib::Bytes::from_owned(bytes),
+                )),
+                Err(error) => gtk::glib::g_warning!("desk", "cannot copy the objects: {error}"),
+            }
+        }
+        if let Err(error) = clipboard.set_content(Some(&gdk::ContentProvider::new_union(&content)))
+        {
+            gtk::glib::g_warning!("desk", "cannot copy: {error}");
         }
         super::forget_copied_text();
         COPIED_OBJECTS.with(|c| *c.borrow_mut() = Some(copied));
@@ -134,12 +153,69 @@ impl TextEditor {
     /// little lower and to the right when copies already stand there. One
     /// that was in the line of the text goes in at the cursor (OBJ-22).
     pub(super) fn paste_objects(&self) -> bool {
-        if !self.view.area().clipboard().is_local() {
-            return false;
+        let clipboard = self.view.area().clipboard();
+        if !clipboard.is_local() {
+            return self.paste_objects_of_other_apps(&clipboard);
         }
         let Some(copied) = COPIED_OBJECTS.with(|c| c.borrow().clone()) else {
             return false;
         };
+        self.paste_copied(&copied);
+        true
+    }
+
+    /// Pastes the objects that another app of Desk put on the clipboard,
+    /// when it holds some (IOP-27, IOP-28).
+    fn paste_objects_of_other_apps(&self, clipboard: &gdk::Clipboard) -> bool {
+        let Some(format) = crate::objects_format() else {
+            return false;
+        };
+        if !clipboard.formats().contain_mime_type(format.media_type) {
+            return false;
+        }
+        let weak = self.downgrade();
+        let clipboard = clipboard.clone();
+        gtk::glib::spawn_future_local(async move {
+            let read = async {
+                let (stream, _) = clipboard
+                    .read_future(&[format.media_type], gtk::glib::Priority::DEFAULT)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let out = gtk::gio::MemoryOutputStream::new_resizable();
+                out.splice_future(
+                    &stream,
+                    gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
+                        | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
+                    gtk::glib::Priority::DEFAULT,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                (format.read)(&out.steal_as_bytes())
+            };
+            let document = match read.await {
+                Ok(document) => document,
+                Err(error) => {
+                    gtk::glib::g_warning!("desk", "cannot paste the objects: {error}");
+                    return;
+                }
+            };
+            let Some(this) = weak.upgrade() else { return };
+            let page = this.view.current_page().unwrap_or(0);
+            let objects = document.objects().iter().cloned().collect();
+            this.paste_copied(&CopiedObjects {
+                page,
+                objects,
+                document,
+            });
+        });
+        true
+    }
+
+    /// Pastes copied objects: on the page in sight, where they were on
+    /// theirs, or a little lower and to the right when copies already
+    /// stand there. One that was in the line of the text goes in at the
+    /// cursor (OBJ-22).
+    fn paste_copied(&self, copied: &CopiedObjects) {
         let cursor = (!self.has_selected_objects() && self.story().is_none())
             .then(|| {
                 let state = self.state.borrow();
@@ -172,6 +248,7 @@ impl TextEditor {
         let selection = self.selection();
         let depth = self.state.borrow().editor.undo_depth();
         let result = self.state.borrow_mut().editor.edit("Paste", |edit| {
+            let objects = edit.adopt_object_styles(&copied.document, &objects)?;
             let ids = edit.add_copies(&objects)?;
             if let Some(at) = cursor {
                 // Those from the text go back in it, one after another.
@@ -196,7 +273,6 @@ impl TextEditor {
             Ok(_) => {}
             Err(error) => gtk::glib::g_warning!("desk", "cannot paste: {error}"),
         }
-        true
     }
 
     /// The page the cursor is on.

@@ -403,12 +403,16 @@ impl Edit {
     /// of their own, and returns those identifiers in the same order
     /// (OBJ-22). A connection line among them stays joined to the copies
     /// of the objects it joined. Objects in the text are not copied, as
-    /// each is a character of it.
+    /// each is a character of it. Each copy shares its origin with the
+    /// object it copies, which takes one if it has none and is in the
+    /// document (IOP-33).
     pub fn add_copies(&mut self, objects: &[Object]) -> Result<Vec<NodeId>, ModelError> {
-        let objects: Vec<&Object> = objects
+        let objects: Vec<Object> = objects
             .iter()
             .filter(|o| o.anchor != Anchor::InText)
-            .collect();
+            .map(|o| self.with_origin(o))
+            .collect::<Result<_, _>>()?;
+        let objects: Vec<&Object> = objects.iter().collect();
         let mut copies = Vec::with_capacity(objects.len());
         for object in &objects {
             copies.push(self.renumbered_object(object)?);
@@ -441,6 +445,38 @@ impl Edit {
             self.add_object(copy)?;
         }
         Ok(ids)
+    }
+
+    /// An object to copy, with an origin: its own, or a new one, which
+    /// the object in the document with its identifier takes too, if that
+    /// is the same object and has none (IOP-33).
+    fn with_origin(&mut self, object: &Object) -> Result<Object, ModelError> {
+        let mut object = object.clone();
+        if object.origin.is_some() {
+            return Ok(object);
+        }
+        let source = self
+            .document()
+            .objects()
+            .get(object.id)
+            .filter(|source| source.kind == object.kind)
+            .cloned();
+        match source {
+            Some(Object {
+                origin: Some(origin),
+                ..
+            }) => object.origin = Some(origin),
+            Some(source) => {
+                let origin = new_origin();
+                object.origin = Some(origin);
+                self.replace_object(Object {
+                    origin: Some(origin),
+                    ..source
+                })?;
+            }
+            None => object.origin = Some(new_origin()),
+        }
+        Ok(object)
     }
 
     /// Adds copies of objects moved by `dx` across and `dy` down, as
@@ -864,6 +900,21 @@ impl crate::Document {
             .collect();
         LayoutPagesClip { pages }
     }
+}
+
+/// An origin for the copies of an object that has none: a number no other
+/// object is likely to have, in this document or another (IOP-33).
+pub fn new_origin() -> u64 {
+    use std::hash::{BuildHasher, Hasher};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNT: AtomicU64 = AtomicU64::new(0);
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u64(COUNT.fetch_add(1, Ordering::Relaxed));
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos() as u64);
+    hasher.write_u64(now);
+    hasher.finish().max(1)
 }
 
 #[cfg(test)]

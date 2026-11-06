@@ -65,7 +65,7 @@ use adw::prelude::*;
 use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
-pub use desk_model::Document;
+pub use desk_model::{Document, Object};
 use i18n::tr;
 pub use view::DocumentView;
 use window::DocumentWindow;
@@ -107,6 +107,29 @@ pub struct Opener {
     /// Writes a document as the bytes of a file of that kind, with a
     /// preview of its first page as a PNG image when there is one.
     pub save: SaveFn,
+    /// How it puts objects on the clipboard for the other apps of Desk,
+    /// and reads theirs (IOP-27, IOP-28).
+    pub objects: Option<ObjectsFormat>,
+}
+
+/// Objects on the clipboard between the apps of Desk (IOP-27, IOP-28).
+#[derive(Clone, Copy)]
+pub struct ObjectsFormat {
+    /// The media type of the bytes.
+    pub media_type: &'static str,
+    /// The bytes of objects of a document.
+    pub write: fn(&Document, &[Object]) -> Result<Vec<u8>, String>,
+    /// A document with the objects of the bytes, whose styles their text
+    /// names.
+    pub read: fn(&[u8]) -> Result<Document, String>,
+}
+
+static OBJECTS_FORMAT: std::sync::OnceLock<ObjectsFormat> = std::sync::OnceLock::new();
+
+/// How objects go on the clipboard between the apps of Desk, if the app
+/// says.
+pub(crate) fn objects_format() -> Option<ObjectsFormat> {
+    OBJECTS_FORMAT.get().copied()
 }
 
 /// Writes a document as the bytes of a file, with a preview of its first
@@ -254,6 +277,9 @@ pub fn substitution(choice: &FontChoice) -> String {
 /// An app that opens documents passes how it does.
 pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCode {
     register_icons();
+    if let Some(format) = opener.and_then(|o| o.objects) {
+        let _ = OBJECTS_FORMAT.set(format);
+    }
     let mut flags = gio::ApplicationFlags::empty();
     if opener.is_some() {
         flags |= gio::ApplicationFlags::HANDLES_OPEN;

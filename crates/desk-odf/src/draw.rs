@@ -364,6 +364,9 @@ pub struct DrawObject {
     /// The `draw:contour-polygon` of a frame: the points of the outline
     /// that text wraps around, in ten-thousandths of the frame.
     pub contour: Option<Vec<(i32, i32)>>,
+    /// `desk:origin`: what the copies of one object share, which Magic
+    /// Move of Desk Slides matches (IOP-33).
+    pub origin: Option<String>,
 }
 
 /// The `svg:viewBox` side that Desk writes a `draw:contour-polygon` in.
@@ -390,6 +393,7 @@ impl DrawObject {
             z_index: None,
             text: Vec::new(),
             contour: None,
+            origin: None,
         }
     }
 
@@ -908,6 +912,7 @@ fn draw_object_at(
         z_index: e.attr(DRAW, "z-index").and_then(|n| n.trim().parse().ok()),
         text,
         contour: e.child(DRAW, "contour-polygon").and_then(contour_polygon),
+        origin: e.attr(DESK, "origin").map(str::to_owned),
     })
 }
 
@@ -965,6 +970,7 @@ pub(crate) fn write_draw_object(
     if let Some(z) = object.z_index {
         w.attr("draw:z-index", &z.to_string());
     }
+    w.attr_opt("desk:origin", object.origin.as_deref());
     if !matches!(
         object.kind,
         DrawKind::Line { .. } | DrawKind::Connector { .. } | DrawKind::Group(_)
