@@ -455,6 +455,7 @@ def main():
     master_objects(work)
     page_layout(work)
     copies_of_a_shape(work)
+    guide_from_the_ruler(work)
     print("All UI tests passed.")
 
 
@@ -1527,6 +1528,42 @@ def copies_of_a_shape(work):
             "Duplicate and Paste put copies of the shape ten points lower and to the right (OBJ-22)",
             found == [(96, 200), (106, 210), (116, 220)],
         )
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def guide_from_the_ruler(work):
+    """A drag from the ruler down onto the page leaves a guide across it,
+    saved with the document (OBJ-28); the layout view turns on and off
+    (INT-09)."""
+    writer, app, letter = open_with_a_shape(work, "Guides.odt")
+    try:
+        activate("show-layout")
+        ruler = wait_for("the ruler", lambda: showing_named(app, "Ruler"))
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", "Guides.odt", "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        box = Atspi.Component.get_extents(ruler, Atspi.CoordType.WINDOW)
+        x = int(window["X"]) + box.x + box.width * 2 // 5
+        y = int(window["Y"]) + box.y + box.height // 2
+        subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y), "mousedown", "1"], check=True)
+        for step in range(1, 11):
+            subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y + step * 15)], check=True)
+            time.sleep(0.05)
+        subprocess.run(["xdotool", "mouseup", "1"], check=True)
+        time.sleep(0.5)
+        activate("show-layout")
+        press("ctrl+s")
+        wait_for(
+            "the guide saved in the settings",
+            lambda: saved_part(letter, "settings.xml", r'config:name="Guides"[^>]*>h [0-9.]+(pt|in|cm|mm)<'),
+        )
+        check("a drag from the ruler leaves a guide on the page, saved with it (OBJ-28)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

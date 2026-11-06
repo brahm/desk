@@ -70,6 +70,8 @@ struct Drag {
     off: bool,
     /// Whether Alt was held, so that a margin moves without the indents.
     keep_indents: bool,
+    /// Whether it drags a guide out onto the pages (OBJ-28).
+    guide: bool,
 }
 
 struct State {
@@ -139,7 +141,9 @@ impl Ruler {
             }
         });
         ruler.connect_drawing();
-        if !vertical {
+        if vertical {
+            ruler.connect_guides(editor);
+        } else {
             ruler.connect_pointer(editor);
         }
         ruler
@@ -380,6 +384,51 @@ impl Ruler {
         });
     }
 
+    /// Lets a drag from the ruler beside the pages bring out a guide down
+    /// them (OBJ-28).
+    fn connect_guides(&self, editor: EditorOf) {
+        let drag = gtk::GestureDrag::builder()
+            .button(gtk::gdk::BUTTON_PRIMARY)
+            .build();
+        let ruler = self.downgrade();
+        let edit = editor.clone();
+        drag.connect_drag_update(move |gesture, dx, dy| {
+            let (Some(ruler), Some(editor), Some((x, y))) =
+                (ruler.upgrade(), edit(), gesture.start_point())
+            else {
+                return;
+            };
+            if x + dx > f64::from(THICKNESS) + TEAR_OFF
+                || ruler.state.borrow().drag.is_some_and(|d| d.guide)
+            {
+                ruler.state.borrow_mut().drag = Some(Drag {
+                    marker: None,
+                    start: (x, y),
+                    position: 0.0,
+                    moved: true,
+                    off: false,
+                    keep_indents: false,
+                    guide: true,
+                });
+                editor.drag_guide_from_ruler(&ruler.area, true, x + dx, y + dy);
+            }
+        });
+        let ruler = self.downgrade();
+        drag.connect_drag_end(move |_, _, _| {
+            let Some(ruler) = ruler.upgrade() else { return };
+            let guide = ruler
+                .state
+                .borrow_mut()
+                .drag
+                .take()
+                .is_some_and(|d| d.guide);
+            if guide && let Some(editor) = editor() {
+                editor.end_guide_drag();
+            }
+        });
+        self.area.add_controller(drag);
+    }
+
     fn connect_pointer(&self, editor: EditorOf) {
         let drag = gtk::GestureDrag::builder()
             .button(gtk::gdk::BUTTON_PRIMARY)
@@ -399,9 +448,11 @@ impl Ruler {
                 moved: false,
                 off: false,
                 keep_indents,
+                guide: false,
             });
         });
         let ruler = self.downgrade();
+        let edit = editor.clone();
         drag.connect_drag_update(move |_, dx, dy| {
             let Some(ruler) = ruler.upgrade() else { return };
             let Some(mut drag) = ruler.state.borrow().drag else {
@@ -409,6 +460,16 @@ impl Ruler {
             };
             let x = drag.start.0 + dx;
             let y = drag.start.1 + dy;
+            // A drag from the ruler down onto the pages brings out a guide
+            // across them (OBJ-28).
+            drag.guide |= drag.marker.is_none() && y > f64::from(THICKNESS) + TEAR_OFF;
+            if drag.guide {
+                if let Some(editor) = edit() {
+                    editor.drag_guide_from_ruler(&ruler.area, false, x, y);
+                }
+                ruler.state.borrow_mut().drag = Some(drag);
+                return;
+            }
             drag.moved |= dx.abs() > 2.0;
             if let Some(position) = ruler.position_at(x) {
                 drag.position = ruler.snap(position);
@@ -428,6 +489,12 @@ impl Ruler {
                 (state.drag.take(), state.format.clone())
             };
             ruler.area.queue_draw();
+            if drag.is_some_and(|d| d.guide) {
+                if let Some(editor) = edit() {
+                    editor.end_guide_drag();
+                }
+                return;
+            }
             let (Some(drag), Some(format), Some(editor)) = (drag, format, edit()) else {
                 return;
             };

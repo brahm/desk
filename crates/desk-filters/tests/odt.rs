@@ -358,6 +358,7 @@ fn sample() -> Document {
                 notes: Default::default(),
                 toc: Default::default(),
                 links_inactive: true,
+                guides: Vec::new(),
             },
         })
         .unwrap();
@@ -2838,4 +2839,32 @@ fn int_03_page_layout_documents_keep_their_pages_and_have_no_body() {
     assert!(read.body().get(0).unwrap().is_empty());
     let anchors: Vec<Anchor> = read.objects().iter().map(|o| o.anchor).collect();
     assert_eq!(anchors, [Anchor::Page(1), Anchor::Page(2)]);
+}
+
+#[test]
+fn obj_28_fixed_guides_are_kept_in_the_settings() {
+    use desk_model::{Editor, FixedGuide, Length};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let guides = vec![
+        FixedGuide {
+            vertical: false,
+            at: Length::from_pt(144.5),
+        },
+        FixedGuide {
+            vertical: true,
+            at: Length::from_pt(72.0),
+        },
+    ];
+    editor
+        .edit("Guides", |edit| {
+            let mut settings = edit.document().text_settings().clone();
+            settings.guides.clone_from(&guides);
+            edit.set_text_settings(settings)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    let odf = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(odf.text_settings.guides.len(), 2);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.text_settings().guides, guides);
 }
