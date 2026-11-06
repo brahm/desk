@@ -393,7 +393,7 @@ impl Value {
 }
 
 /// A color element, in any of the color spaces that iWork saves.
-fn color(element: &Element) -> Option<Color> {
+pub(crate) fn color(element: &Element) -> Option<Color> {
     let get = |name| {
         element
             .attr(SFA, name)

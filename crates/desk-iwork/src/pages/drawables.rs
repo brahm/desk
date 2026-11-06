@@ -170,6 +170,12 @@ pub enum DrawableKind {
     Image {
         /// `sf:data sf:path` of the picture as it was put in.
         path: String,
+        /// `sf:crop-geometry`: the part of the picture that shows, when a
+        /// mask hides the rest, placed as the picture is.
+        mask: Option<Geometry>,
+        /// The changes of Adjust Image (`sf:filter-properties`), by name,
+        /// as `kSFRSaturationProperty`.
+        adjust: Vec<(String, f64)>,
     },
     /// A movie or a sound (`sf:media` with `sf:movie-media`).
     Media {
@@ -212,6 +218,47 @@ pub struct Drawable {
     pub wrap: Option<TextWrap>,
     /// `sf:locked`.
     pub locked: bool,
+    /// The shadow of its style (a `SFIUDropShadow` filter).
+    pub shadow: Option<ObjectShadow>,
+    /// Whether its style reflects it (a `SFIUReflection` filter).
+    pub reflection: bool,
+    /// The layout style of its text (`sf:text sf:layoutstyle`), by its
+    /// identifier or object ID: its inset, columns and vertical
+    /// alignment.
+    pub text_layout: Option<String>,
+}
+
+/// The shadow of an object (`SFIUDropShadow`), with what Pages takes when
+/// the filter does not say.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ObjectShadow {
+    /// `inputColor`.
+    pub color: crate::sf::Color,
+    /// `inputAngle`, in degrees clockwise from the right.
+    pub angle: f64,
+    /// `inputDistance`, in points.
+    pub distance: f64,
+    /// `inputRadius`: how blurred it is, in points.
+    pub radius: f64,
+    /// `inputOpacity`, from 0 to 1.
+    pub opacity: f64,
+}
+
+impl Default for ObjectShadow {
+    fn default() -> Self {
+        Self {
+            color: crate::sf::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            },
+            angle: 45.0,
+            distance: 6.0,
+            radius: 10.0,
+            opacity: 0.75,
+        }
+    }
 }
 
 /// How text goes around an object (`sf:external-text-wrap`).
@@ -265,7 +312,23 @@ fn media(ids: &Ids<'_>, element: &Element) -> DrawableKind {
                     .or_else(|| f.child(SF, "unfiltered-ref"))
             })
             .and_then(|u| data_path(ids, u))
-            .map(|path| DrawableKind::Image { path }),
+            .map(|path| DrawableKind::Image {
+                path,
+                mask: element.child(SF, "crop-geometry").map(Geometry::read),
+                adjust: content
+                    .child(SF, "filtered-image")
+                    .and_then(|f| f.child(SF, "filter-properties"))
+                    .map(|p| {
+                        p.elements()
+                            .filter_map(|e| {
+                                let n = e.child(SF, "number")?;
+                                let v = n.attr(SFA, "number")?.trim().parse::<f64>().ok()?;
+                                v.is_finite().then(|| (e.name.local.clone(), v))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            }),
         "movie-media" => {
             let movie = content.child(SF, "self-contained-movie");
             let path = movie
@@ -338,6 +401,69 @@ impl<'a> Reader<'a, '_> {
                 .and_then(|p| self.graphic_styles.get(p).copied());
         }
         out
+    }
+
+    /// The shadow and the reflection of a graphic style, from the first
+    /// of it and its parents that has filters.
+    fn filters(&self, element: &'a Element) -> (Option<ObjectShadow>, bool) {
+        let mut style = element
+            .child(SF, "style")
+            .and_then(|s| s.elements().next())
+            .map(|s| self.ids.deref(s));
+        for _ in 0..MAX_PARENTS {
+            let Some(current) = style else { break };
+            let filters = current
+                .child(SF, "property-map")
+                .and_then(|m| m.child(SF, "filters"));
+            if let Some(filters) = filters {
+                let mut shadow = None;
+                let mut reflection = false;
+                for info in filters
+                    .descendants()
+                    .filter(|e| e.name.is(SF, "core-image-filter-info"))
+                {
+                    let class = info
+                        .elements()
+                        .map(|e| self.ids.deref(e))
+                        .find(|e| e.name.is(SF, "core-image-filter-descriptor"))
+                        .and_then(|d| d.attr(SF, "filterClassName"));
+                    match class {
+                        Some("SFIUDropShadow") => {
+                            let overrides = info.child(SF, "overrides");
+                            let get = |name: &str| {
+                                overrides?
+                                    .child(SF, name)?
+                                    .child(SF, "number")?
+                                    .attr(SFA, "number")?
+                                    .trim()
+                                    .parse::<f64>()
+                                    .ok()
+                                    .filter(|v| v.is_finite())
+                            };
+                            let base = ObjectShadow::default();
+                            shadow = Some(ObjectShadow {
+                                color: overrides
+                                    .and_then(|o| o.child(SF, "inputColor"))
+                                    .and_then(|c| c.child(SF, "color"))
+                                    .and_then(crate::sf::color)
+                                    .unwrap_or(base.color),
+                                angle: get("inputAngle").unwrap_or(base.angle),
+                                distance: get("inputDistance").unwrap_or(base.distance),
+                                radius: get("inputRadius").unwrap_or(base.radius),
+                                opacity: get("inputOpacity").unwrap_or(base.opacity),
+                            });
+                        }
+                        Some("SFIUReflection") => reflection = true,
+                        _ => {}
+                    }
+                }
+                return (shadow, reflection);
+            }
+            style = current
+                .attr(SF, "parent-ident")
+                .and_then(|p| self.graphic_styles.get(p).copied());
+        }
+        (None, false)
     }
 
     /// The text wrap of a graphic style and of its parents.
@@ -473,6 +599,7 @@ impl<'a> Reader<'a, '_> {
             "media" => media(self.ids, element),
             other => DrawableKind::Other(other.to_owned()),
         };
+        let (shadow, reflection) = self.filters(element);
         Some(Drawable {
             id: element.attr(SFA, "ID").map(str::to_owned),
             place: place.clone(),
@@ -488,6 +615,12 @@ impl<'a> Reader<'a, '_> {
             style: self.style(element),
             wrap: self.wrap(element),
             locked: element.attr(SF, "locked") == Some("true"),
+            shadow,
+            reflection,
+            text_layout: element
+                .child(SF, "text")
+                .and_then(|t| t.attr(SF, "layoutstyle"))
+                .map(str::to_owned),
         })
     }
 }
