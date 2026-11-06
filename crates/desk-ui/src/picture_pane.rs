@@ -10,14 +10,42 @@ use std::rc::Rc;
 use adw::prelude::*;
 use desk_model::{Adjustments, Frame, ObjectKind};
 
-use crate::editing::ObjectInfo;
+use crate::editing::{NewShape, ObjectInfo};
 use crate::formatting::EditorOf;
 use crate::i18n::tr;
+
+/// The shapes of Mask with Shape, in the order of their list (OBJ-04).
+const MASK_SHAPES: [NewShape; 12] = [
+    NewShape::Rectangle,
+    NewShape::RoundedRectangle,
+    NewShape::Ellipse,
+    NewShape::Triangle,
+    NewShape::RightTriangle,
+    NewShape::Diamond,
+    NewShape::Arrow,
+    NewShape::DoubleArrow,
+    NewShape::Star,
+    NewShape::Polygon,
+    NewShape::QuoteBubble,
+    NewShape::Callout,
+];
+
+/// A mask that shows all of a picture in its frame.
+fn whole_mask(frame: Frame) -> Frame {
+    Frame {
+        x: desk_model::Length::ZERO,
+        y: desk_model::Length::ZERO,
+        width: frame.width,
+        height: frame.height,
+    }
+}
 
 /// The Image group of the Inspector.
 pub struct PictureGroup {
     group: adw::PreferencesGroup,
     mask: adw::SwitchRow,
+    /// The shape of the mask: Mask with Shape (OBJ-04).
+    mask_shape: adw::ComboRow,
     scale: adw::SpinRow,
     left: adw::SpinRow,
     top: adw::SpinRow,
@@ -70,6 +98,27 @@ impl PictureGroup {
             .title(tr("Mask"))
             .subtitle(tr("Shows only the part of the picture inside its frame"))
             .build();
+        let names = [
+            tr("Rectangle"),
+            tr("Rounded Rectangle"),
+            tr("Oval"),
+            tr("Triangle"),
+            tr("Right Triangle"),
+            tr("Diamond"),
+            tr("Arrow"),
+            tr("Double Arrow"),
+            tr("Star"),
+            tr("Polygon"),
+            tr("Quote Bubble"),
+            tr("Callout"),
+            // A shape of another program, which none of these is.
+            tr("Other Shape"),
+        ];
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let mask_shape = adw::ComboRow::builder()
+            .title(tr("Mask Shape"))
+            .model(&gtk::StringList::new(&names))
+            .build();
         let scale = spin(&tr("Picture Size"), 1.0, 1000.0);
         scale.set_subtitle(&tr("Percent of the frame"));
         let left = spin(&tr("Picture Left"), -10_000.0, 10_000.0);
@@ -120,6 +169,7 @@ impl PictureGroup {
         buttons.add_suffix(&reset);
         let group = adw::PreferencesGroup::builder().title(tr("Image")).build();
         group.add(&mask);
+        group.add(&mask_shape);
         group.add(&scale);
         group.add(&left);
         group.add(&top);
@@ -131,6 +181,7 @@ impl PictureGroup {
         let this = Rc::new(Self {
             group,
             mask,
+            mask_shape,
             scale,
             left,
             top,
@@ -158,15 +209,7 @@ impl PictureGroup {
                 let name = if on { "Mask" } else { "Unmask" };
                 editor.set_object(name, |object| match (on, object.picture.mask) {
                     // The frame begins by showing all of the picture.
-                    (true, None) => {
-                        let f = object.frame;
-                        object.picture.mask = Some(Frame {
-                            x: desk_model::Length::ZERO,
-                            y: desk_model::Length::ZERO,
-                            width: f.width,
-                            height: f.height,
-                        });
-                    }
+                    (true, None) => object.picture.mask = Some(whole_mask(object.frame)),
                     // The frame grows to hold all of it again, given on the
                     // page as the Inspector gives frames.
                     (false, Some(m)) => {
@@ -178,8 +221,32 @@ impl PictureGroup {
                             m.height.to_pt(),
                         );
                         object.picture.mask = None;
+                        object.picture.mask_shape = None;
                     }
                     _ => {}
+                });
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let shape_editor = editor.clone();
+        this.mask_shape.connect_selected_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let Some(chosen) = MASK_SHAPES.get(row.selected() as usize) else {
+                return;
+            };
+            let shape = chosen
+                .shape()
+                .filter(|s| *s != desk_model::Shape::Rectangle);
+            if let Some(editor) = shape_editor() {
+                editor.set_object("Mask with Shape", |object| {
+                    // A shape masks a picture that shows whole at first.
+                    if object.picture.mask.is_none() {
+                        object.picture.mask = Some(whole_mask(object.frame));
+                    }
+                    object.picture.mask_shape = shape;
                 });
             }
         });
@@ -273,7 +340,13 @@ impl PictureGroup {
                         desk_render::reduced_picture(picture, object.picture.mask, size)
                     {
                         object.kind = ObjectKind::Image(reduced);
-                        object.picture.mask = None;
+                        // What shows is all of the picture now, still in
+                        // the shape of its mask.
+                        object.picture.mask = object
+                            .picture
+                            .mask_shape
+                            .is_some()
+                            .then(|| whole_mask(object.frame));
                     }
                 });
             }
@@ -291,6 +364,7 @@ impl PictureGroup {
         for row in [&self.scale, &self.left, &self.top] {
             row.set_visible(masked);
         }
+        self.mask_shape.set_visible(masked);
     }
 
     /// Shows the selected picture, or hides the group when no picture is
@@ -321,6 +395,17 @@ impl PictureGroup {
         let settings = &info.object.picture;
         if self.mask.is_active() != settings.mask.is_some() {
             self.mask.set_active(settings.mask.is_some());
+        }
+        let shape = settings
+            .mask_shape
+            .clone()
+            .unwrap_or(desk_model::Shape::Rectangle);
+        let index = MASK_SHAPES
+            .iter()
+            .position(|s| s.shape().as_ref() == Some(&shape))
+            .unwrap_or(MASK_SHAPES.len());
+        if self.mask_shape.selected() != index as u32 {
+            self.mask_shape.set_selected(index as u32);
         }
         if let Some(mask) = settings.mask {
             let width = info.object.frame.width.to_pt();

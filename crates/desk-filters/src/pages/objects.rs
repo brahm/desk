@@ -239,6 +239,43 @@ fn graphic_style(
             .map_or(100, |o| (o * 100.0).round().clamp(0.0, 100.0) as u8),
         shadow: None,
         reflection: None,
+        frame: match properties.get("stroke") {
+            Some(Value::Frame { name, scale }) => Some(desk_model::PictureFrame {
+                style: frame_style(name),
+                scale: (scale * 100.0).round().clamp(10.0, 400.0) as u16,
+            }),
+            _ => None,
+        },
+    }
+}
+
+/// The frame of the library of Desk most like a frame of Pages, by its
+/// name (OBJ-36).
+fn frame_style(name: &str) -> desk_model::FrameStyle {
+    use desk_model::FrameStyle;
+    let name = name.to_lowercase();
+    if ["wood", "classic", "baroque", "ornate", "vintage"]
+        .iter()
+        .any(|n| name.contains(n))
+    {
+        FrameStyle::Classic
+    } else if ["metal", "silver", "chrome", "steel"]
+        .iter()
+        .any(|n| name.contains(n))
+    {
+        FrameStyle::Metal
+    } else if ["tape", "scrapbook", "pushpin"]
+        .iter()
+        .any(|n| name.contains(n))
+    {
+        FrameStyle::Tape
+    } else if ["gallery", "museum", "mat", "modern"]
+        .iter()
+        .any(|n| name.contains(n))
+    {
+        FrameStyle::Gallery
+    } else {
+        FrameStyle::Photo
     }
 }
 
@@ -444,6 +481,7 @@ impl Builder<'_, '_> {
             DrawableKind::Image {
                 path,
                 mask,
+                mask_path,
                 adjust,
                 traced,
             } => {
@@ -468,6 +506,13 @@ impl Builder<'_, '_> {
                         ..frame
                     });
                     frame = shown;
+                    // A mask of another shape than a rectangle (OBJ-04).
+                    if let Some(path) = mask_path {
+                        let (outline, _) = shape(path, mask.natural);
+                        if !matches!(outline, Shape::Rectangle | Shape::Line { .. }) {
+                            picture_settings.mask_shape = Some(outline);
+                        }
+                    }
                 }
                 picture_settings.adjust = adjustments(adjust);
                 traced_contour = traced

@@ -459,6 +459,7 @@ def main():
     pages_as_sections(work)
     reflection_of_a_shape(work)
     advanced_gradient(work)
+    mask_and_frame(work)
     print("All UI tests passed.")
 
 
@@ -1399,6 +1400,49 @@ def click_node(node, name):
     click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2)
 
 
+def reveal(node, name):
+    """Scrolls the node of the window titled `name` up into sight, with
+    the wheel over it."""
+    geometry = subprocess.run(
+        ["xdotool", "search", "--name", name, "getwindowgeometry", "--shell"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+    for _ in range(20):
+        box = Atspi.Component.get_extents(node, Atspi.CoordType.WINDOW)
+        if box.y + box.height <= int(window["HEIGHT"]) - 60:
+            return
+        x = int(window["X"]) + box.x + box.width // 2
+        y = int(window["Y"]) + int(window["HEIGHT"]) // 2
+        subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y), "click", "5"], check=True)
+        time.sleep(0.3)
+
+
+def choose_in_list(app, title, name, keys):
+    """Opens the list of the first showing row titled `title`, in the
+    window titled `name`, and picks an item with keys."""
+    row = wait_for(
+        f"the {title} row",
+        lambda: next(
+            (
+                n
+                for n in walk(app)
+                if n.get_name() == title
+                and n.get_role() == Atspi.Role.COMBO_BOX
+                and showing(n)
+            ),
+            None,
+        ),
+    )
+    reveal(row, name)
+    click_node(row, name)
+    time.sleep(1)
+    press(*keys)
+    time.sleep(1)
+
+
 def saved_part(letter, part, pattern):
     """Whether a part of the saved package matches a pattern."""
     try:
@@ -1643,24 +1687,9 @@ def advanced_gradient(work):
     saved (OBJ-41)."""
     writer, app, letter = open_with_a_shape(work, "Gradient.odt")
     try:
-        fill = wait_for(
-            "the Fill row of the Graphic group",
-            lambda: next(
-                (
-                    n
-                    for n in walk(app)
-                    if n.get_name() == "Fill"
-                    and n.get_role() == Atspi.Role.COMBO_BOX
-                    and showing(n)
-                ),
-                None,
-            ),
-        )
         # The list of fills opens, and its last one is the advanced
         # gradient.
-        click_node(fill, "Gradient.odt")
-        time.sleep(1)
-        press("End", "Return")
+        choose_in_list(app, "Fill", "Gradient.odt", ["End", "Return"])
         add = wait_for("the Add Color button", lambda: showing_named(app, "Add Color"))
         Atspi.Action.do_action(add, 0)
         time.sleep(1)
@@ -1675,6 +1704,41 @@ def advanced_gradient(work):
             ),
         )
         check("a color added to an advanced gradient is saved (OBJ-41)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+
+def mask_and_frame(work):
+    """The Image group of the Inspector masks a selected picture with an
+    oval, the Graphic group puts a picture frame around it, and both are
+    saved (OBJ-04, OBJ-36)."""
+    picture = (
+        b'<draw:frame text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
+        b'<draw:image xlink:href="Pictures/gray.png" xlink:type="simple"/></draw:frame>'
+    )
+    writer, app, letter = open_with_a_shape(
+        work,
+        "Masked.odt",
+        picture,
+        {"Pictures/gray.png": png(16, 16, (128, 128, 128))},
+    )
+    try:
+        toggle_switch_row(app, "Mask", "the Image group of the Inspector")
+        time.sleep(1)
+        # The third shape of the list is the oval.
+        choose_in_list(app, "Mask Shape", "Masked.odt", ["Home", "Down", "Down", "Return"])
+        # The picture frame is the last of the lines.
+        choose_in_list(app, "Stroke", "Masked.odt", ["End", "Return"])
+        press("ctrl+s")
+        wait_for(
+            "the saved mask and frame",
+            lambda: saved_content(letter, r'desk:mask-shape="ellipse"')
+            and saved_content(letter, r'desk:picture-frame="photo"'),
+        )
+        check("a picture masked with an oval and framed is saved (OBJ-04, OBJ-36)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

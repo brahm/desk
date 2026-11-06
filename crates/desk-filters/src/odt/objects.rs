@@ -68,6 +68,7 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             luminance,
             contrast,
             mask,
+            mask_shape,
             image_adjust,
             instant_alpha,
             marker_start,
@@ -81,6 +82,8 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             shadow_opacity,
             shadow_blur,
             reflection,
+            picture_frame,
+            picture_frame_scale,
             fill_tint,
             fill_tint_opacity,
             opacity,
@@ -329,6 +332,7 @@ fn odf_picture_settings(
                 odf_length(mask.width),
                 odf_length(mask.height)
             ));
+            g.mask_shape = settings.mask_shape.as_ref().and_then(mask_shape_text);
         }
     }
     if !settings.alpha.is_empty() {
@@ -354,6 +358,84 @@ fn odf_picture_settings(
     }
 }
 
+/// The `desk:mask-shape` of the shape of a mask (OBJ-04).
+fn mask_shape_text(shape: &Shape) -> Option<String> {
+    use desk_model::PathSegment;
+    Some(match shape {
+        Shape::Rectangle | Shape::Line { .. } | Shape::Connection(_) => return None,
+        Shape::Ellipse => "ellipse".into(),
+        Shape::RoundedRectangle { radius } => format!("rounded {}", radius.to_pt()),
+        Shape::Polygon(points) => {
+            let numbers: Vec<String> = points.iter().map(|(x, y)| format!("{x} {y}")).collect();
+            format!("points {}", numbers.join(" "))
+        }
+        Shape::Path { .. } => {
+            let s = f64::from(POLYGON_SCALE);
+            let n = |v: f64| format!("{}", v.round() as i64);
+            let path: Vec<String> = shape
+                .outline(s, s)
+                .into_iter()
+                .map(|segment| match segment {
+                    PathSegment::Move(x, y) => format!("M {} {}", n(x), n(y)),
+                    PathSegment::Line(x, y) => format!("L {} {}", n(x), n(y)),
+                    PathSegment::Curve(ax, ay, bx, by, cx, cy) => format!(
+                        "C {} {} {} {} {} {}",
+                        n(ax),
+                        n(ay),
+                        n(bx),
+                        n(by),
+                        n(cx),
+                        n(cy)
+                    ),
+                    PathSegment::Close => "Z".to_owned(),
+                })
+                .collect();
+            format!("outline {}", path.join(" "))
+        }
+        other => match parametric_shape(other, 1.0, 1.0) {
+            odf::DrawKind::CustomShape {
+                desk_shape: Some(settings),
+                ..
+            } if !settings.is_empty() => settings,
+            _ => return None,
+        },
+    })
+}
+
+/// The shape of a mask from its `desk:mask-shape` (OBJ-04).
+fn mask_shape_of(text: &str) -> Option<Shape> {
+    let text = text.trim();
+    if text == "ellipse" {
+        return Some(Shape::Ellipse);
+    }
+    if let Some(radius) = text.strip_prefix("rounded ") {
+        let radius: f64 = radius.trim().parse().ok()?;
+        return radius.is_finite().then(|| Shape::RoundedRectangle {
+            radius: Length::from_pt(radius.clamp(0.0, 10_000.0)),
+        });
+    }
+    if let Some(numbers) = text.strip_prefix("points ") {
+        let numbers: Vec<i32> = numbers
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<Result<_, _>>()
+            .ok()?;
+        let s = POLYGON_SCALE;
+        let points: Vec<(i32, i32)> = numbers
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&[x, y]| (x.clamp(-s, 2 * s), y.clamp(-s, 2 * s)))
+            .collect();
+        return (points.len() >= 3).then(|| Shape::Polygon(points.into()));
+    }
+    if let Some(path) = text.strip_prefix("outline ") {
+        let s = f64::from(POLYGON_SCALE);
+        return path_shape(path, Some((0.0, 0.0, s, s)));
+    }
+    desk_shape_of(text)
+}
+
 /// How a picture is masked and adjusted, from the properties of its style.
 fn model_picture_settings(
     g: &odf::GraphicProperties,
@@ -372,6 +454,7 @@ fn model_picture_settings(
     if let Some(m) = mask {
         if m[2] > 0.0 && m[3] > 0.0 && m.iter().all(|v| v.abs() < 1e5) {
             settings.mask = Some(Frame::from_pt(m[0], m[1], m[2], m[3]));
+            settings.mask_shape = g.mask_shape.as_deref().and_then(mask_shape_of);
         }
     } else if let Some(clip) = g
         .clip
@@ -1049,6 +1132,16 @@ fn import_one(
         built.picture = model_picture_settings(&g, picture, frame);
     }
     style.reflection = g.reflection.map(|r| r.round().clamp(0.0, 100.0) as u8);
+    style.frame = g
+        .picture_frame
+        .as_deref()
+        .and_then(desk_model::FrameStyle::from_name)
+        .map(|frame_style| desk_model::PictureFrame {
+            style: frame_style,
+            scale: g
+                .picture_frame_scale
+                .map_or(100, |s| s.round().clamp(10.0, 400.0) as u16),
+        });
     if g.shadow.as_deref() == Some("visible") {
         style.shadow = Some(model_shadow(&g));
     }
@@ -1549,6 +1642,10 @@ impl Exporter<'_> {
             g.opacity = Some(f64::from(style.opacity));
         }
         g.reflection = style.reflection.map(f64::from);
+        if let Some(frame) = style.frame {
+            g.picture_frame = Some(frame.style.name().into());
+            g.picture_frame_scale = (frame.scale != 100).then_some(f64::from(frame.scale));
+        }
         if let Some(shadow) = style.shadow {
             let (dx, dy) = shadow.offset_xy();
             g.shadow = Some("visible".into());

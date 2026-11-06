@@ -71,6 +71,10 @@ pub struct PictureSettings {
     /// frame, when the frame masks it: only the part inside the frame
     /// shows (OBJ-04). None when the picture fills its frame.
     pub mask: Option<Frame>,
+    /// The shape of the mask, which shows only the part of the picture
+    /// inside it, scaled to the frame: Mask with Shape (OBJ-04). None for
+    /// a rectangle.
+    pub mask_shape: Option<Shape>,
     /// Where Instant Alpha was clicked, in order: each click takes out
     /// the color under it and the colors near it around it (OBJ-05).
     pub alpha: Arc<[AlphaSeed]>,
@@ -274,7 +278,7 @@ impl From<Shape> for ObjectKind {
 }
 
 /// The outline of a shape, scaled to its frame.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Shape {
     /// A rectangle.
@@ -586,6 +590,84 @@ pub struct GraphicStyle {
     /// How opaque its reflection below it is where it starts, in percent;
     /// none when it is not reflected (OBJ-38).
     pub reflection: Option<u8>,
+    /// The picture frame around it, which takes the place of the line
+    /// (OBJ-36); none when it has none.
+    pub frame: Option<PictureFrame>,
+}
+
+/// A picture frame of the library of Desk, drawn around an object as
+/// the frames of Pages are (OBJ-36).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PictureFrame {
+    /// Which frame of the library.
+    pub style: FrameStyle,
+    /// How thick it is, in percent of its own thickness.
+    pub scale: u16,
+}
+
+impl PictureFrame {
+    /// A frame of a style at its own thickness.
+    pub fn new(style: FrameStyle) -> Self {
+        Self { style, scale: 100 }
+    }
+
+    /// How far it reaches out of the object, at its scale.
+    pub fn width(&self) -> Length {
+        Length::from_pt(self.style.width().to_pt() * f64::from(self.scale) / 100.0)
+    }
+}
+
+/// The picture frames of the library of Desk.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum FrameStyle {
+    /// A white border with a gray edge and a soft shadow, as a print.
+    #[default]
+    Photo,
+    /// A wide white mat inside a thin black frame, as in a gallery.
+    Gallery,
+    /// A frame of dark wood with a gold edge.
+    Classic,
+    /// Brushed metal.
+    Metal,
+    /// A white border with tape across its top corners.
+    Tape,
+}
+
+impl FrameStyle {
+    /// Every style, in the order of the library.
+    pub const ALL: [Self; 5] = [
+        Self::Photo,
+        Self::Gallery,
+        Self::Classic,
+        Self::Metal,
+        Self::Tape,
+    ];
+
+    /// Its name in files.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Photo => "photo",
+            Self::Gallery => "gallery",
+            Self::Classic => "classic",
+            Self::Metal => "metal",
+            Self::Tape => "tape",
+        }
+    }
+
+    /// The style of a name in files.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|s| s.name() == name)
+    }
+
+    /// How far it reaches out of the object at its own thickness.
+    pub fn width(self) -> Length {
+        Length::from_points(match self {
+            Self::Photo | Self::Tape => 8,
+            Self::Gallery => 20,
+            Self::Classic => 14,
+            Self::Metal => 9,
+        })
+    }
 }
 
 impl Default for GraphicStyle {
@@ -596,6 +678,7 @@ impl Default for GraphicStyle {
             opacity: 100,
             shadow: None,
             reflection: None,
+            frame: None,
         }
     }
 }

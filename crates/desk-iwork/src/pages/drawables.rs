@@ -173,6 +173,9 @@ pub enum DrawableKind {
         /// `sf:crop-geometry`: the part of the picture that shows, when a
         /// mask hides the rest, placed as the picture is.
         mask: Option<Geometry>,
+        /// `sf:masking-shape-path-source`: the outline of the mask, in
+        /// the units of its natural size, when Mask with Shape made it.
+        mask_path: Option<ShapePath>,
         /// The changes of Adjust Image (`sf:filter-properties`), by name,
         /// as `kSFRSaturationProperty`.
         adjust: Vec<(String, f64)>,
@@ -322,6 +325,9 @@ fn media(ids: &Ids<'_>, element: &Element) -> DrawableKind {
             .map(|path| DrawableKind::Image {
                 path,
                 mask: element.child(SF, "crop-geometry").map(Geometry::read),
+                mask_path: element
+                    .child(SF, "masking-shape-path-source")
+                    .map(ShapePath::read),
                 adjust: content
                     .child(SF, "filtered-image")
                     .and_then(|f| f.child(SF, "filter-properties"))

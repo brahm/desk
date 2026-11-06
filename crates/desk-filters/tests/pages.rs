@@ -1075,3 +1075,49 @@ fn obj_41_advanced_and_radial_gradients_of_pages_are_read() {
         }))
     );
 }
+
+#[test]
+fn obj_04_obj_36_masks_of_a_shape_and_picture_frames_of_pages_are_read() {
+    use desk_model::{FrameStyle, ObjectKind, PictureFrame, Shape};
+    let (_, objects) = fixture_objects("obj-36-frame.pages");
+    let picture = objects
+        .iter()
+        .find(|o| matches!(o.kind, ObjectKind::Image(_)))
+        .unwrap();
+    // The frame of the menu of Pages, as the photo frame of Desk.
+    assert_eq!(
+        picture.style.frame,
+        Some(PictureFrame::new(FrameStyle::Photo))
+    );
+    // The mask of the fixture is a rectangle; as a triangle it is a shape.
+    // A copy of the package, with its index as given.
+    let read = |index: &str| {
+        let dir = std::env::temp_dir().join(format!("desk-obj-04-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = fixture("obj-04-mask.pages");
+        std::fs::copy(
+            source.join("test-picture.png"),
+            dir.join("test-picture.png"),
+        )
+        .unwrap();
+        std::fs::write(dir.join("index.xml"), index).unwrap();
+        let (document, _) = desk_filters::read_pages_at_logged(&dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        document.objects().iter().next().unwrap().picture.clone()
+    };
+    let index = desk_iwork::read_index_at(&fixture("obj-04-mask.pages")).unwrap();
+    let rectangle = r#"sfa:path="M 0 0 L 27 0 L 27 38 L 0 38 Z M 0 0""#;
+    assert!(index.contains(rectangle));
+    let masked = read(&index);
+    assert!(masked.mask.is_some());
+    assert_eq!(masked.mask_shape, None);
+    let triangle = read(&index.replace(rectangle, r#"sfa:path="M 0 0 L 27 38 L 0 38 Z""#));
+    let s = desk_model::POLYGON_SCALE;
+    assert_eq!(
+        triangle.mask_shape,
+        Some(Shape::Polygon(std::sync::Arc::from(
+            &[(0, 0), (s, s), (0, s)][..]
+        )))
+    );
+}
