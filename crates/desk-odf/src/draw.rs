@@ -81,6 +81,9 @@ pub struct GraphicProperties {
     /// `style:wrap`: `none`, `left`, `right`, `parallel`, `dynamic`,
     /// `run-through` or `biggest`.
     pub wrap: Option<String>,
+    /// `style:wrap-contour`: whether the text goes around the outline of
+    /// the object rather than its box.
+    pub wrap_contour: Option<bool>,
     /// `style:run-through`: `foreground` or `background`.
     pub run_through: Option<String>,
     /// `fo:margin-left`, which Desk writes on every side: the room
@@ -278,7 +281,13 @@ pub struct DrawObject {
     /// `text:h` children of a `draw:rect`, `draw:ellipse`,
     /// `draw:polygon` or `draw:custom-shape`.
     pub text: Vec<Paragraph>,
+    /// The `draw:contour-polygon` of a frame: the points of the outline
+    /// that text wraps around, in ten-thousandths of the frame.
+    pub contour: Option<Vec<(i32, i32)>>,
 }
+
+/// The `svg:viewBox` side that Desk writes a `draw:contour-polygon` in.
+pub const CONTOUR_SCALE: i32 = 10_000;
 
 /// Every number read is finite, so equality is reflexive.
 impl Eq for DrawObject {}
@@ -300,6 +309,7 @@ impl DrawObject {
             transform: None,
             z_index: None,
             text: Vec::new(),
+            contour: None,
         }
     }
 
@@ -484,6 +494,7 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         shadow_blur: length(DESK, "shadow-blur").or_else(|| length(LOEXT, "shadow-blur")),
         opacity: e.attr(DRAW, "opacity").and_then(parse_percent),
         wrap: text(STYLE, "wrap"),
+        wrap_contour: text(STYLE, "wrap-contour").map(|v| v == "true"),
         run_through: text(STYLE, "run-through"),
         margin: length(FO, "margin-left").or_else(|| length(FO, "margin")),
         padding: length(FO, "padding").or_else(|| length(FO, "padding-left")),
@@ -569,6 +580,9 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
         w.attr("draw:opacity", &format!("{}%", decimal(opacity)));
     }
     w.attr_opt("style:wrap", g.wrap.as_deref());
+    if let Some(contour) = g.wrap_contour {
+        w.attr("style:wrap-contour", if contour { "true" } else { "false" });
+    }
     w.attr_opt("style:run-through", g.run_through.as_deref());
     if let Some(margin) = g.margin {
         let margin = margin.to_string();
@@ -791,7 +805,31 @@ fn draw_object_at(
         transform: e.attr(DRAW, "transform").map(str::to_owned),
         z_index: e.attr(DRAW, "z-index").and_then(|n| n.trim().parse().ok()),
         text,
+        contour: e.child(DRAW, "contour-polygon").and_then(contour_polygon),
     })
+}
+
+/// The points of a `draw:contour-polygon`, brought to a side of
+/// [`CONTOUR_SCALE`] from its `svg:viewBox`.
+fn contour_polygon(e: &Element) -> Option<Vec<(i32, i32)>> {
+    let flat = numbers(e.attr(DRAW, "points").unwrap_or_default());
+    let (x0, y0, w, h) = match numbers(e.attr(SVG, "viewBox").unwrap_or_default())[..] {
+        [x, y, w, h] if w > 0.0 && h > 0.0 => (x, y, w, h),
+        _ => return None,
+    };
+    let scale = f64::from(CONTOUR_SCALE);
+    let points: Vec<(i32, i32)> = flat
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|p| {
+            (
+                ((p[0] - x0) / w * scale).round() as i32,
+                ((p[1] - y0) / h * scale).round() as i32,
+            )
+        })
+        .collect();
+    (points.len() >= 3).then_some(points)
 }
 
 /// Writes a drawing object. `paragraph` writes the paragraphs of a text
@@ -975,6 +1013,21 @@ pub(crate) fn write_draw_object(
             }
             w.end();
         }
+    }
+    if let Some(contour) = object.contour.as_ref().filter(|_| name == "draw:frame") {
+        let points: Vec<String> = contour.iter().map(|(x, y)| format!("{x},{y}")).collect();
+        w.start("draw:contour-polygon");
+        if let (Some(width), Some(height)) = (object.width, object.height) {
+            w.attr("svg:width", &width.to_string())
+                .attr("svg:height", &height.to_string());
+        }
+        w.attr(
+            "svg:viewBox",
+            &format!("0 0 {CONTOUR_SCALE} {CONTOUR_SCALE}"),
+        )
+        .attr("draw:points", &points.join(" "))
+        .attr("draw:recreate-on-edit", "false")
+        .end();
     }
     if let DrawKind::Group(objects) = &object.kind {
         for child in objects {

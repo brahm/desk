@@ -25,6 +25,7 @@
 //! ```
 
 mod backend;
+mod contour;
 mod display;
 
 /// The Cairo bindings, for painting on a context of one's own.
@@ -33,4 +34,5 @@ pub use cairo;
 pub use backend::{
     Painter, RenderError, adjusted_surface, pdf_size, picture_surface, reduced_picture,
 };
+pub use contour::object_contour;
 pub use display::{DisplayList, Item, Paint, PathOp, PathStroke, PlacedGlyph, shape_path};

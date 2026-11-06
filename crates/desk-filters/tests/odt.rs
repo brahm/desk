@@ -1746,6 +1746,7 @@ fn with_objects() -> Document {
             square.locked = true;
             square.wrap = Wrap::Left;
             square.wrap_margin = Length::from_points(6);
+            square.contour = square.shape_contour();
             square.style.fill = Some(Fill::Color(Rgba::rgb(200, 10, 20)));
             square.style.stroke = Some(Stroke {
                 style: BorderStyle::Dashed,
@@ -1845,6 +1846,7 @@ fn with_objects() -> Document {
                 Frame::from_pt(50.0, 600.0, 80.0, 80.0),
             );
             image.wrap = Wrap::Largest;
+            image.contour = Some(Arc::from([(0, 0), (10_000, 0), (5_000, 10_000)]));
             image.picture = desk_model::PictureSettings {
                 mask: Some(Frame::from_pt(-10.0, -20.0, 120.0, 100.0)),
                 alpha: Arc::from([
@@ -1965,7 +1967,7 @@ fn objects(document: &Document) -> Vec<String> {
 }
 
 #[test]
-fn obj_01_obj_08_obj_13_objects_are_kept_in_odt() {
+fn obj_01_obj_08_obj_13_obj_17_objects_are_kept_in_odt() {
     let document = with_objects();
     let bytes = write_odt(&document).unwrap();
     keep("obj-objects.odt", &bytes);
