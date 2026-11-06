@@ -539,18 +539,20 @@ pub enum Anchor {
     /// size, and the text does not wrap around it (OBJ-01).
     InText,
     /// On the master of a section, by the paragraph that starts the
-    /// section, or none for the first: behind the text of every page that
-    /// shows the headers and footers of that section, where the frame
-    /// puts it from the top left corner of the paper (INT-05, EST-21). The
-    /// text does not wrap around it, and it is selected only when master
-    /// objects are made selectable.
-    Master(Option<NodeId>),
+    /// section, or none for the first: behind the text of the pages of
+    /// that section that show the headers and footers of the same pages,
+    /// where the frame puts it from the top left corner of the paper
+    /// (INT-05, EST-21). A section whose first page or left pages differ
+    /// has masters of their own for them (EST-19). The text does not wrap
+    /// around it, and it is selected only when master objects are made
+    /// selectable.
+    Master(Option<NodeId>, crate::MarginPages),
 }
 
 impl Anchor {
     /// Whether the object is on the master of a section (INT-05).
     pub fn is_master(self) -> bool {
-        matches!(self, Self::Master(_))
+        matches!(self, Self::Master(..))
     }
 }
 

@@ -254,7 +254,7 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
                     Anchor::Paragraph(id) => indexes
                         .get(&id)
                         .map_or(Place::Page(0), |&i| Place::Paragraph(i)),
-                    Anchor::InText | Anchor::Master(_) => Place::Page(0),
+                    Anchor::InText | Anchor::Master(..) => Place::Page(0),
                 },
             })
             .collect(),
@@ -273,17 +273,23 @@ pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::Docu
     if masters.is_empty() {
         return;
     }
-    for page in &mut layout.pages {
-        if page.blank {
+    for index in 0..layout.pages.len() {
+        if layout.pages[index].blank {
             continue;
         }
-        let key = layout.section_margins.get(page.section).copied().flatten();
+        let section = layout.pages[index].section;
+        let key = layout.section_margins.get(section).copied().flatten();
+        // The pages of the section it is: the first, a left page or any
+        // other, as for its header (EST-19).
+        let pages = crate::margin_of_page(layout, index, desk_model::MarginKind::Header)
+            .0
+            .pages;
         let placed: Vec<PlacedObject> = masters
             .iter()
-            .filter(|o| o.anchor == Anchor::Master(key))
+            .filter(|o| o.anchor == Anchor::Master(key, pages))
             .map(|o| PlacedObject::new(o, None, 0.0))
             .collect();
-        page.objects.splice(0..0, placed);
+        layout.pages[index].objects.splice(0..0, placed);
     }
 }
 

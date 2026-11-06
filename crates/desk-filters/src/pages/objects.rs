@@ -249,6 +249,19 @@ fn graphic_style(
     }
 }
 
+/// The pages of its section that an object of a master shows on, by the
+/// group of Pages it is in (EST-19): the first page, the even pages,
+/// which are the left ones, or the others.
+fn master_pages(group: &str) -> desk_model::MarginPages {
+    if group.starts_with("first") {
+        desk_model::MarginPages::First
+    } else if group.starts_with("even") || group.starts_with("left") {
+        desk_model::MarginPages::Left
+    } else {
+        desk_model::MarginPages::Default
+    }
+}
+
 /// The frame of the library of Desk most like a frame of Pages, by its
 /// name (OBJ-36).
 fn frame_style(name: &str) -> desk_model::FrameStyle {
@@ -637,11 +650,11 @@ pub(super) fn import_objects(
     for drawable in drawables {
         let anchor = match &drawable.place {
             Place::Page(page) => Anchor::Page(*page),
-            Place::Master { section, .. } if Some(section.as_str()) == first => {
-                Anchor::Master(None)
+            Place::Master { section, pages, .. } if Some(section.as_str()) == first => {
+                Anchor::Master(None, master_pages(pages))
             }
-            Place::Master { section, .. } => match sections.get(section.as_str()) {
-                Some(&id) => Anchor::Master(Some(id)),
+            Place::Master { section, pages, .. } => match sections.get(section.as_str()) {
+                Some(&id) => Anchor::Master(Some(id), master_pages(pages)),
                 None => {
                     left_out += 1;
                     continue;

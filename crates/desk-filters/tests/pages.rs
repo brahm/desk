@@ -899,7 +899,10 @@ fn int_03_int_05_page_layout_documents_and_master_objects_saved_by_pages_are_rea
     assert!(objects.iter().all(|o| o.anchor == Anchor::Page(0)));
     let (document, objects) = fixture_objects("int-05-est-21-master-object.pages");
     assert_eq!(document.page_setup().layout_pages, None);
-    assert_eq!(objects[0].anchor, Anchor::Master(None));
+    assert_eq!(
+        objects[0].anchor,
+        Anchor::Master(None, desk_model::MarginPages::Default)
+    );
 }
 
 #[test]
@@ -1120,4 +1123,23 @@ fn obj_04_obj_36_masks_of_a_shape_and_picture_frames_of_pages_are_read() {
             &[(0, 0), (s, s), (0, s)][..]
         )))
     );
+}
+
+#[test]
+fn est_19_masters_of_the_first_page_and_the_even_pages_of_pages_are_read() {
+    use desk_model::{Anchor, MarginPages};
+    let index = desk_iwork::read_index_at(&fixture("int-05-est-21-master-object.pages")).unwrap();
+    assert!(index.contains("<sl:allpages-group>"));
+    for (group, pages) in [
+        ("firstpage-group", MarginPages::First),
+        ("evenpage-group", MarginPages::Left),
+        ("oddpage-group", MarginPages::Default),
+    ] {
+        let changed = index
+            .replace("<sl:allpages-group>", &format!("<sl:{group}>"))
+            .replace("</sl:allpages-group>", &format!("</sl:{group}>"));
+        let document = desk_filters::read_pages(changed.as_bytes()).unwrap();
+        let master = document.objects().iter().next().unwrap();
+        assert_eq!(master.anchor, Anchor::Master(None, pages), "{group}");
+    }
 }

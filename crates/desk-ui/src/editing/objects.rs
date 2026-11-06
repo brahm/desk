@@ -798,7 +798,14 @@ impl TextEditor {
                     }
                     let section = state.layout.pages[page].section;
                     let key = state.layout.section_margins.get(section).copied().flatten();
-                    Some((id, Anchor::Master(key), frame_of(placed)))
+                    // The master of the pages it is on: the first page of
+                    // the section, its left pages or the others (EST-19).
+                    let (place, _) = desk_layout::margin_of_page(
+                        &state.layout,
+                        page,
+                        desk_model::MarginKind::Header,
+                    );
+                    Some((id, Anchor::Master(key, place.pages), frame_of(placed)))
                 })
                 .collect()
         };
