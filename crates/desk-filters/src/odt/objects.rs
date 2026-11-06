@@ -411,7 +411,7 @@ fn parametric_shape(shape: &Shape, w: f64, h: f64) -> odf::DrawKind {
 /// A shape drawn with the pen from an `draw:enhanced-path` in the units
 /// of its view box, or none when the path is not one of plain numbers in
 /// `M`, `L`, `C` and `Z`, or has fewer than two points (OBJ-09).
-fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> Option<Shape> {
+pub(crate) fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> Option<Shape> {
     let tokens: Vec<&str> = path.split_whitespace().collect();
     let mut flat: Vec<(char, Vec<f64>)> = Vec::new();
     let mut i = 0;

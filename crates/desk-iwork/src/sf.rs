@@ -137,6 +137,17 @@ pub enum Value {
         /// `sf:right`.
         right: f64,
     },
+    /// A gradient of colors (`sf:angle-gradient`), as objects are filled
+    /// with.
+    Gradient {
+        /// `sf:angle`, in radians counterclockwise from the right.
+        angle: f64,
+        /// The colors, by where they are from 0 to 1, in order.
+        stops: Vec<(f64, Color)>,
+    },
+    /// What an end of a line ends in (`sf:line-end`), by its
+    /// `sf:identifier`, as `filled arrow` or `open circle`.
+    LineEnd(String),
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -348,6 +359,34 @@ impl Value {
                 .attr(SF, "ident")
                 .or_else(|| element.attr(SFA, "ID"))
                 .map_or_else(|| Self::Other("style".into()), |i| Self::StyleRef(i.into())),
+            "line-end" => Self::LineEnd(
+                element
+                    .attr(SF, "identifier")
+                    .unwrap_or_default()
+                    .to_owned(),
+            ),
+            "angle-gradient" => {
+                let mut stops: Vec<(f64, Color)> = element
+                    .descendants()
+                    .filter(|e| e.name.is(SF, "gradient-stop"))
+                    .filter_map(|stop| {
+                        let at = stop
+                            .attr(SF, "fraction")
+                            .and_then(|v| v.trim().parse::<f64>().ok())
+                            .filter(|v| v.is_finite())?;
+                        Some((at.clamp(0.0, 1.0), color(stop.child(SF, "color")?)?))
+                    })
+                    .collect();
+                stops.sort_by(|a, b| a.0.total_cmp(&b.0));
+                Self::Gradient {
+                    angle: element
+                        .attr(SF, "angle")
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite())
+                        .unwrap_or(0.0),
+                    stops,
+                }
+            }
             other => Self::Other(other.to_owned()),
         }
     }
@@ -405,7 +444,7 @@ fn color(element: &Element) -> Option<Color> {
 pub struct Properties(pub Vec<(String, Value)>);
 
 impl Properties {
-    fn read(ids: &Ids<'_>, map: &Element) -> Self {
+    pub(crate) fn read(ids: &Ids<'_>, map: &Element) -> Self {
         let mut properties = Vec::new();
         for property in map.elements() {
             if let Some(value) = property.elements().next() {

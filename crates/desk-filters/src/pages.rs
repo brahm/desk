@@ -34,6 +34,8 @@ use desk_model::{NodeId, Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings
 use desk_model::{TocLevel, TocSettings};
 
 use crate::FilterError;
+
+mod objects;
 use crate::log::{Content, Formatting, ImportLog, Warning};
 
 /// The identifier of Body in the templates of Pages.
@@ -1463,6 +1465,11 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             }),
         })?;
     }
+    // The floating objects, on their pages and on the masters of their
+    // sections.
+    let first_style = source.body.first().and_then(|p| p.section.as_deref());
+    let left_out = objects::import_objects(&mut importer, source, first_style, &own_sections)?;
+    log.add(Warning::Content(Content::FloatingObjects), left_out);
     let toc_ids = importer.ids.clone();
     let mut document = importer.document;
     if index > 1 {
@@ -1486,7 +1493,9 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             footers: source.has_footers,
             header_margin: length(page.header),
             footer_margin: length(page.footer),
-            layout_pages: None,
+            // A document without body text is laid out page by page
+            // (INT-03).
+            layout_pages: (!source.has_body).then_some(source.pages.max(1)),
         },
     })?;
     // Whether Pages hyphenates and forms ligatures at all, from the

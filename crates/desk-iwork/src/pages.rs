@@ -15,6 +15,10 @@ use crate::ns::{KEY, LS, SF, SFA, SL};
 use crate::sf::{Ids, Stylesheet};
 use crate::xml::{self, Element, Node};
 
+mod drawables;
+
+pub use drawables::{Drawable, DrawableKind, Geometry, Place, ShapePath, TextWrap};
+
 /// A line break inside a paragraph (`sf:lnbr`), as the model writes it.
 pub const LINE_BREAK: char = '\u{2028}';
 /// A page break (`sf:pgbr`).
@@ -236,6 +240,14 @@ pub struct PagesDocument {
     /// Whether the text uses ligatures (Document Inspector, "Use
     /// ligatures"), true when the document does not say.
     pub use_ligatures: bool,
+    /// The floating objects, of the pages and of the masters of the
+    /// sections, in the order they are saved.
+    pub drawables: Vec<Drawable>,
+    /// Whether the document has body text (Document Inspector, "Document
+    /// Body"): a page layout document has none.
+    pub has_body: bool,
+    /// How many pages the document has, by the pages of its sections.
+    pub pages: u32,
     /// The files of the package that the document uses, by path, with
     /// their bytes: the pictures of image bullets. Only reading a package
     /// fills them, not parsing an index.
@@ -303,16 +315,14 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         return Err(IworkError::WrongType(kind));
     }
     let ids = Ids::new(&root);
-    let mut skipped = Vec::new();
-    let count = root
-        .children_named(SL, "drawables")
-        .map(floating_objects)
-        .sum::<usize>();
-    if count > 0 {
-        skipped.push(("drawables".to_owned(), count));
-    }
     let mut document = PagesDocument {
-        skipped,
+        has_body: publication_flag(&root, "kSFWPHasBodyProperty").unwrap_or(true),
+        pages: root
+            .children_named(SL, "drawables")
+            .flat_map(|d| d.descendants())
+            .filter(|e| e.name.is(SL, "section-drawables"))
+            .filter_map(|e| e.attr(SL, "page-count")?.trim().parse::<u32>().ok())
+            .fold(0u32, u32::saturating_add),
         metadata: root
             .child(SF, "metadata")
             .map(|m| metadata(&ids, m))
@@ -335,6 +345,19 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         toc_links: publication_flag(&root, "kSFWPTOCLinksEnabledProperty").unwrap_or(true),
         ..PagesDocument::default()
     };
+    // The floating objects, and those of them the reader cannot read yet.
+    let skipped = drawables::read(&ids, &root, &mut document);
+    document.skipped.extend(skipped);
+    let pages = document
+        .drawables
+        .iter()
+        .filter_map(|d| match d.place {
+            Place::Page(p) => Some(p.saturating_add(1)),
+            Place::Master { .. } => None,
+        })
+        .max()
+        .unwrap_or(0);
+    document.pages = document.pages.max(pages);
     let Some(storage) = root
         .children_named(SF, "text-storage")
         .find(|s| s.attr(SF, "kind") == Some("body"))
@@ -488,33 +511,6 @@ fn page_geometry(info: &Element) -> PageGeometry {
         page.facing = margins.attr(SF, "facing-pages") == Some("true");
     }
     page
-}
-
-/// Elements under `sl:drawables` that only group the floating objects: of
-/// the pages, and of the masters of each section.
-const DRAWABLE_GROUPS: &[&str] = &[
-    "masters-group",
-    "section-drawables",
-    "page-group",
-    "foregroundmaster-group",
-    "backgroundmaster-group",
-];
-
-/// How many floating objects the drawables of a document hold.
-fn floating_objects(drawables: &Element) -> usize {
-    let mut count = 0;
-    let mut stack = vec![drawables];
-    while let Some(group) = stack.pop() {
-        for child in group.elements() {
-            if DRAWABLE_GROUPS.contains(&child.name.local.as_str()) {
-                stack.push(child);
-            } else if group.name.local != "section-drawables" {
-                // The section drawables also hold their style.
-                count += 1;
-            }
-        }
-    }
-    count
 }
 
 /// Elements that hold nothing to show, or that Pages saves only to lay
