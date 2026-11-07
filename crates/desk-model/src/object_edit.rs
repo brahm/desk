@@ -653,6 +653,137 @@ impl Edit {
         setup.layout_pages = Some(pages - 1);
         self.set_page_setup(setup)
     }
+
+    /// Takes pages out of a page layout document, by index, with the
+    /// objects on them; at least one page is left (INT-03, TXT-02).
+    pub fn delete_layout_pages(&mut self, pages: &[u32]) -> Result<(), ModelError> {
+        let mut pages = pages.to_vec();
+        pages.sort_unstable();
+        pages.dedup();
+        for &page in pages.iter().rev() {
+            self.delete_layout_page(page)?;
+        }
+        Ok(())
+    }
+
+    /// Moves pages of a page layout document, by index, with their
+    /// objects, to before page `before` as the pages stood, or to the end
+    /// when it is their count (EST-16). Gives back the index of the first
+    /// moved.
+    pub fn move_layout_pages(&mut self, pages: &[u32], before: u32) -> Result<u32, ModelError> {
+        let Some(count) = self.document().page_setup().layout_pages else {
+            return Ok(0);
+        };
+        let moved: Vec<u32> = (0..count).filter(|p| pages.contains(p)).collect();
+        if moved.is_empty() {
+            return Ok(0);
+        }
+        let before = before.min(count);
+        let mut order: Vec<u32> = (0..count).filter(|p| !moved.contains(p)).collect();
+        let at = order.iter().take_while(|&&p| p < before).count();
+        order.splice(at..at, moved.iter().copied());
+        // Where each page goes.
+        let mut to = vec![0; count as usize];
+        for (new, &old) in order.iter().enumerate() {
+            to[old as usize] = new as u32;
+        }
+        let objects: Vec<Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| matches!(o.anchor, Anchor::Page(p) if to.get(p as usize).is_some_and(|&n| n != p)))
+            .cloned()
+            .collect();
+        for mut object in objects {
+            if let Anchor::Page(p) = object.anchor {
+                object.anchor = Anchor::Page(to[p as usize]);
+            }
+            self.replace_object(object)?;
+        }
+        Ok(at as u32)
+    }
+
+    /// Puts copies of the pages of a clip, with their objects, before page
+    /// `before` of a page layout document, or at the end when it is their
+    /// count. Gives back the index of the first.
+    pub fn paste_layout_pages(
+        &mut self,
+        before: u32,
+        clip: &LayoutPagesClip,
+    ) -> Result<u32, ModelError> {
+        let mut setup = *self.document().page_setup();
+        let Some(count) = setup.layout_pages else {
+            return Ok(0);
+        };
+        let before = before.min(count);
+        let added = u32::try_from(clip.pages.len()).unwrap_or(u32::MAX);
+        if added == 0 {
+            return Ok(before);
+        }
+        let later: Vec<Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| matches!(o.anchor, Anchor::Page(p) if p >= before))
+            .cloned()
+            .collect();
+        for mut object in later {
+            if let Anchor::Page(p) = object.anchor {
+                object.anchor = Anchor::Page(p.saturating_add(added));
+            }
+            self.replace_object(object)?;
+        }
+        setup.layout_pages = Some(count.saturating_add(added));
+        self.set_page_setup(setup)?;
+        let objects: Vec<Object> = clip
+            .pages
+            .iter()
+            .zip(before..)
+            .flat_map(|(objects, page)| {
+                objects.iter().map(move |o| Object {
+                    anchor: Anchor::Page(page),
+                    ..o.clone()
+                })
+            })
+            .collect();
+        self.add_copies(&objects)?;
+        Ok(before)
+    }
+
+    /// Puts copies of pages of a page layout document after the last of
+    /// them. Gives back the index of the first copy.
+    pub fn duplicate_layout_pages(&mut self, pages: &[u32]) -> Result<u32, ModelError> {
+        let clip = self.document().copy_layout_pages(pages);
+        let after = pages.iter().copied().max().map_or(0, |p| p + 1);
+        self.paste_layout_pages(after, &clip)
+    }
+}
+
+/// Pages of a page layout document, copied with the objects on them, to
+/// paste (EST-16).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LayoutPagesClip {
+    /// The objects of each page, from back to front.
+    pages: Vec<Vec<Object>>,
+}
+
+impl crate::Document {
+    /// Copies pages of a page layout document, by index, in order, with
+    /// the objects fixed on them.
+    pub fn copy_layout_pages(&self, pages: &[u32]) -> LayoutPagesClip {
+        let count = self.page_setup().layout_pages.unwrap_or(0);
+        let pages = (0..count)
+            .filter(|p| pages.contains(p))
+            .map(|page| {
+                self.objects()
+                    .iter()
+                    .filter(|o| o.anchor == Anchor::Page(page))
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+        LayoutPagesClip { pages }
+    }
 }
 
 #[cfg(test)]
@@ -966,5 +1097,68 @@ mod tests {
         let mut editor = Editor::new(Document::new_word_processing());
         editor.edit("Add Page", |e| e.add_layout_page(0)).unwrap();
         assert_eq!(editor.document().page_setup().layout_pages, None);
+    }
+
+    #[test]
+    fn est_16_pages_of_a_page_layout_document_move_copy_and_go_as_sections() {
+        let mut editor = Editor::new(Document::new_page_layout());
+        editor
+            .edit("Pages", |e| {
+                e.add_layout_page(0)?;
+                e.add_layout_page(1)
+            })
+            .unwrap();
+        let mut on = Vec::new();
+        for page in 0..3 {
+            let id = add(&mut editor, 10.0, 10.0, 20.0, 20.0);
+            editor
+                .edit("Move", |e| {
+                    let frame = e.document().objects().get(id).unwrap().frame;
+                    e.place_object(id, Anchor::Page(page), frame)
+                })
+                .unwrap();
+            on.push(id);
+        }
+        let anchor = |editor: &Editor, id| editor.document().objects().get(id).map(|o| o.anchor);
+        // The last page moves first.
+        let first = editor
+            .edit("Move Pages", |e| e.move_layout_pages(&[2], 0))
+            .unwrap();
+        assert_eq!(first, 0);
+        let anchors: Vec<_> = on.iter().map(|&id| anchor(&editor, id)).collect();
+        assert_eq!(
+            anchors,
+            [
+                Some(Anchor::Page(1)),
+                Some(Anchor::Page(2)),
+                Some(Anchor::Page(0))
+            ]
+        );
+        // A copy of the first page goes after it, with a copy of its object.
+        let copy = editor
+            .edit("Duplicate", |e| e.duplicate_layout_pages(&[0]))
+            .unwrap();
+        assert_eq!(copy, 1);
+        let document = editor.document();
+        assert_eq!(document.page_setup().layout_pages, Some(4));
+        assert_eq!(
+            document
+                .objects()
+                .iter()
+                .filter(|o| o.anchor == Anchor::Page(1))
+                .count(),
+            1
+        );
+        assert_eq!(anchor(&editor, on[0]), Some(Anchor::Page(2)));
+        // Two pages go at once, and at least one page stays.
+        editor
+            .edit("Delete Pages", |e| e.delete_layout_pages(&[0, 1]))
+            .unwrap();
+        assert_eq!(editor.document().page_setup().layout_pages, Some(2));
+        assert_eq!(anchor(&editor, on[0]), Some(Anchor::Page(0)));
+        editor
+            .edit("Delete Pages", |e| e.delete_layout_pages(&[0, 1]))
+            .unwrap();
+        assert_eq!(editor.document().page_setup().layout_pages, Some(1));
     }
 }

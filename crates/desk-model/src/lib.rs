@@ -105,7 +105,9 @@ pub use object::{
     MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE, PathPoint,
     PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
-pub use object_edit::{Distribution, Layer, ObjectAlignment, reframed, translated, union};
+pub use object_edit::{
+    Distribution, Layer, LayoutPagesClip, ObjectAlignment, reframed, translated, union,
+};
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::{Picture, PictureFormat};
