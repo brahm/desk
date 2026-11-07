@@ -609,7 +609,10 @@ impl<'a> Reader<'a, '_> {
             "group" => {
                 let mut objects = Vec::new();
                 for child in element.elements() {
-                    if matches!(child.name.local.as_str(), "geometry" | "wrap" | "style") {
+                    if matches!(
+                        child.name.local.as_str(),
+                        "geometry" | "wrap" | "style" | "external-text-wrap"
+                    ) {
                         continue;
                     }
                     if let Some(object) = self.drawable(child, place) {

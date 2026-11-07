@@ -733,6 +733,38 @@ fn doc_05_fonts_of_the_mac_keep_the_lines_and_ligatures_of_pages() {
 }
 
 #[test]
+fn doc_05_a_ligature_of_the_font_reads_as_the_letters_it_joins() {
+    // Helvetica Neue, as TeX Gyre Heros stands for it, joins fi itself:
+    // the glyph of the ligature carries both letters, so that a PDF reads
+    // "Definir" and not "Defnir".
+    let mut system = TextSystem::new();
+    let format = CharFormat {
+        font_family: Arc::from("Helvetica Neue"),
+        font_size: Length::from_points(12),
+        ..CharFormat::default()
+    };
+    for text in ["Definir", "fluxo", "office"] {
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[(text, format.clone())],
+        );
+        let run = &layout.lines[0].runs[0];
+        assert_eq!(run.text, text);
+        assert!(!run.clusters.is_empty(), "{text}");
+        assert!(
+            run.clusters.iter().all(|c| c.1 > 0),
+            "{text}: {:?}",
+            run.clusters
+        );
+        assert_eq!(
+            run.clusters.iter().map(|c| c.0).sum::<u32>() as usize,
+            text.len()
+        );
+    }
+}
+
+#[test]
 fn txt_03_a_cursor_stops_at_every_character_of_a_line() {
     let mut system = TextSystem::new();
     let layout = plain(&mut system, ParaFormat::default(), TEXT);

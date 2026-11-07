@@ -682,6 +682,13 @@ impl BodyReader<'_, '_> {
                     self.skip(child);
                     self.inline(child, style, runs);
                 }
+                // A merge field of a template holds the text that Pages
+                // shows for it, which it filled in from the contacts.
+                Node::Element(child)
+                    if child.name.ns == SF && child.name.local == "merge-field-ref" =>
+                {
+                    self.inline(child, style, runs);
+                }
                 Node::Element(child) if child.name.ns == SF => {
                     let child = self.ids.deref(child);
                     match child.name.local.as_str() {

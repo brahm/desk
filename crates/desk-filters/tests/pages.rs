@@ -1143,3 +1143,104 @@ fn est_19_masters_of_the_first_page_and_the_even_pages_of_pages_are_read() {
         assert_eq!(master.anchor, Anchor::Master(None, pages), "{group}");
     }
 }
+
+#[test]
+fn est_12_doc_22_headers_of_a_template_with_contacts_are_read_as_pages_shows_them() {
+    use desk_model::{Anchor, MarginKind, MarginPages, MarginPlace};
+    // As in templates of Pages: the first section has a style, and the
+    // headers named after it are those Pages shows, over the default
+    // ones. A merge field shows the text Pages filled in from the
+    // contacts, and a picture can sit in the line of a footer.
+    let shape = |id: &str| {
+        format!(
+            r#"<sf:attachment sf:kind="drawable-attachment" sfa:ID="{id}"><sf:drawable-shape><sf:geometry><sf:naturalSize sfa:w="20" sfa:h="10"/><sf:size sfa:w="20" sfa:h="10"/><sf:position sfa:x="0" sfa:y="0"/></sf:geometry><sf:path><sf:bezier-path><sf:bezier sfa:path="M 0 0 L 20 0 L 20 10 Z"/></sf:bezier-path></sf:path></sf:drawable-shape><sf:position sfa:x="0" sfa:y="0"/></sf:attachment>"#
+        )
+    };
+    let margin = |item: &str, name: &str, inner: &str| {
+        format!(
+            r#"<sf:{item} sf:name="{name}"><sf:text-storage sf:kind="header">{inner}</sf:text-storage></sf:{item}>"#
+        )
+    };
+    let headers = [
+        margin(
+            "header",
+            "SFWPDefaultOddHeaderIdentifier",
+            r#"<sf:text-body><sf:p>Company Name</sf:p></sf:text-body>"#,
+        ),
+        margin(
+            "header",
+            "section-style-0-odd-header",
+            r#"<sf:fields><sf:merge-field sf:property="Organization" sf:category="from" sfa:ID="M-1"><sf:table-field sfa:string="Empresa"/></sf:merge-field></sf:fields><sf:text-body><sf:p><sf:merge-field-ref sfa:IDREF="M-1"><sf:span sf:style="character-style-1">DM9DDB</sf:span></sf:merge-field-ref> Brasil</sf:p></sf:text-body>"#,
+        ),
+    ]
+    .concat();
+    let footers = [
+        margin(
+            "footer",
+            "SFWPDefaultFirstFooterIdentifier",
+            r#"<sf:text-body><sf:p>Rua Comercial</sf:p></sf:text-body>"#,
+        ),
+        margin(
+            "footer",
+            "section-style-0-first-page-footer",
+            &format!(
+                r#"<sf:attachments>{}</sf:attachments><sf:text-body><sf:p><sf:attachment-ref sfa:IDREF="D-1" sf:kind="drawable-attachment"/>Av. Brigadeiro</sf:p></sf:text-body>"#,
+                shape("D-1")
+            ),
+        ),
+    ]
+    .concat();
+    // A group in the line of the body keeps the wrap of the text around
+    // it beside its objects.
+    let attachments = format!(
+        r#"<sf:attachments><sf:attachment sf:kind="drawable-attachment" sfa:ID="G-1"><sf:group><sf:geometry><sf:naturalSize sfa:w="20" sfa:h="10"/><sf:size sfa:w="20" sfa:h="10"/><sf:position sfa:x="0" sfa:y="0"/></sf:geometry>{}<sf:external-text-wrap sf:wrap-style="regular" sf:floating-wrap-enabled="true" sf:margin="12"/></sf:group><sf:position sfa:x="0" sfa:y="0"/></sf:attachment></sf:attachments>"#,
+        shape("unused")
+            .replace(
+                r#"<sf:attachment sf:kind="drawable-attachment" sfa:ID="unused">"#,
+                ""
+            )
+            .replace(r#"<sf:position sfa:x="0" sfa:y="0"/></sf:attachment>"#, "")
+    );
+    let body = r#"<sf:p>Logo <sf:attachment-ref sfa:IDREF="G-1"/></sf:p>"#;
+    let source = index(STYLES, "", body)
+        .replace(
+            r#"<sf:stylesheet-ref sfa:IDREF="SFSStylesheet-2"/><sf:text-body>"#,
+            &format!(r#"<sf:stylesheet-ref sfa:IDREF="SFSStylesheet-2"/>{attachments}<sf:text-body>"#),
+        )
+        .replace(
+            r#"<sf:section sf:name="Text Page">"#,
+            r#"<sf:section sf:name="Text Page" sf:style="section-style-0">"#,
+        )
+        .replace(
+            "<sf:text-storage sf:kind=\"body\"",
+            &format!(
+                "<sf:headers>{headers}</sf:headers><sf:footers>{footers}</sf:footers><sf:text-storage sf:kind=\"body\""
+            ),
+        );
+    let (document, log) = read_pages_logged(source.as_bytes()).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let text = |kind, pages| {
+        document
+            .headers_footers()
+            .get(MarginPlace::new(kind, pages))
+            .iter()
+            .map(|p| p.text().replace(desk_model::FIELD_CHARACTER, "[]"))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        text(MarginKind::Header, MarginPages::Default),
+        ["DM9DDB Brasil"]
+    );
+    assert_eq!(
+        text(MarginKind::Footer, MarginPages::First),
+        ["[]Av. Brigadeiro"]
+    );
+    // The shape of the footer and the group of the body, each in its line.
+    let objects: Vec<_> = document.objects().iter().collect();
+    assert_eq!(objects.len(), 2, "{objects:?}");
+    assert!(objects.iter().all(|o| o.anchor == Anchor::InText));
+    assert!(
+        matches!(objects[0].kind, desk_model::ObjectKind::Group(_))
+            || matches!(objects[1].kind, desk_model::ObjectKind::Group(_))
+    );
+}

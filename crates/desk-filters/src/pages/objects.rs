@@ -737,7 +737,38 @@ fn remove_mark(document: &mut desk_model::Document, id: NodeId) -> Result<(), Fi
             range,
             runs: Vec::new(),
         })?;
+        return Ok(());
     }
+    // A mark in a header or a footer.
+    let Some((desk_model::Story::Margin { section, place }, at)) =
+        document.story_object_marks().get(&id).copied()
+    else {
+        return Ok(());
+    };
+    let Some(paragraphs) = document
+        .all_headers_footers()
+        .into_iter()
+        .find(|(s, _)| *s == section)
+        .map(|(_, margins)| margins.get(place).to_vec())
+    else {
+        return Ok(());
+    };
+    let mark = |run: &desk_model::Run| matches!(&run.attrs.field, Some(Some(desk_model::Field::ObjectMark { object })) if *object == id);
+    let paragraphs = paragraphs
+        .into_iter()
+        .map(|p| {
+            if p.id() != at.paragraph {
+                return Ok(p);
+            }
+            let runs: Vec<desk_model::Run> = p.runs().filter(|r| !mark(r)).cloned().collect();
+            desk_model::Paragraph::from_runs(p.id(), p.style(), p.attrs().clone(), runs)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    document.apply(Op::SetHeaderFooter {
+        section,
+        place,
+        paragraphs,
+    })?;
     Ok(())
 }
 
