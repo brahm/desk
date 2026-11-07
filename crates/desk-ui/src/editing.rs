@@ -30,6 +30,7 @@ use crate::view::{DocumentView, WeakView};
 
 mod connections;
 mod copies;
+mod guides;
 mod media;
 mod navigate;
 mod objects;
@@ -436,6 +437,10 @@ struct State {
     object_drag: Option<objects::ObjectDrag>,
     /// A drag that selects the objects in a rectangle (OBJ-21).
     marquee: Option<copies::MarqueeDrag>,
+    /// Whether the layout view is on (INT-09).
+    show_layout: bool,
+    /// A drag of a fixed guide (OBJ-28).
+    guide_drag: Option<guides::GuideDrag>,
     /// Which objects behind the text a press selects (OBJ-25, EST-21).
     selectable: objects::Selectable,
     /// The guides it snaps to.
@@ -560,6 +565,8 @@ impl TextEditor {
                 objects: Vec::new(),
                 object_drag: None,
                 marquee: None,
+                show_layout: false,
+                guide_drag: None,
                 selectable: objects::Selectable::default(),
                 guides: Vec::new(),
             })),
@@ -2240,6 +2247,8 @@ impl TextEditor {
         self.view.set_book(self.facing_pages());
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
+        self.show_outlines();
+        self.show_guides();
         self.view.access().set_text(text.clone());
         self.state.borrow_mut().access = text;
     }
@@ -3272,6 +3281,10 @@ impl TextEditor {
             {
                 return;
             }
+            if this.drag_guide(x + dx, y + dy) {
+                this.state.borrow_mut().drag_from = None;
+                return;
+            }
             if this.drag_marquee(x + dx, y + dy) {
                 this.state.borrow_mut().drag_from = None;
                 return;
@@ -3307,6 +3320,7 @@ impl TextEditor {
             };
             this.end_object_drag();
             this.end_marquee();
+            this.end_guide_drag();
             this.end_alpha_drag();
             this.end_pen_drag();
             this.end_points_drag();

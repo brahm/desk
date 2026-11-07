@@ -505,6 +505,7 @@ fn full_document() -> TextDocument {
             header_margin: Some("18pt".into()),
             footer_margin: None,
             layout_pages: Some(3),
+            guides: vec!["h 72pt".into(), "v 1in".into()],
         },
         style_shortcuts: vec![
             StyleShortcut {

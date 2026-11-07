@@ -653,6 +653,15 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                         .ok()
                         .filter(|n| (1..=10_000).contains(n));
                 }
+                Some("Guides") => {
+                    out.guides = text
+                        .lines()
+                        .map(str::trim)
+                        .filter(|g| !g.is_empty())
+                        .take(1_000)
+                        .map(str::to_owned)
+                        .collect();
+                }
                 Some("NeverHyphenate") => {
                     out.never_hyphenate = text
                         .lines()

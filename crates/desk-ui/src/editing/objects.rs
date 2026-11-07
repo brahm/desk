@@ -354,6 +354,19 @@ impl Snaps {
         }
     }
 
+    /// The same, and the guides fixed on the pages too (OBJ-28).
+    pub fn with_fixed(mut self, guides: &[desk_model::FixedGuide]) -> Self {
+        for guide in guides {
+            let at = guide.at.to_pt() as f32;
+            if guide.vertical {
+                self.across.push(at);
+            } else {
+                self.down.push(at);
+            }
+        }
+        self
+    }
+
     /// How far to move a box, left, top, right and bottom, across and
     /// down for its edges or middles to meet the nearest within `reach`,
     /// and the guides that show where they meet.
@@ -1505,6 +1518,13 @@ impl TextEditor {
             return true;
         }
         let Some(id) = hit_id else {
+            // A press on a fixed guide moves it (OBJ-28).
+            if presses == 1
+                && !on_text(&self.state.borrow().layout, page, px, py)
+                && self.press_guide(px, py)
+            {
+                return true;
+            }
             let marquee = presses == 1 && self.marquee_starts(page, px, py);
             if self.has_selected_objects() && !(marquee && (shift || control)) {
                 self.state.borrow_mut().objects.clear();
@@ -1662,7 +1682,8 @@ impl TextEditor {
                     .map(|o| o.bounds())
                     .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
                 {
-                    let snaps = Snaps::new(&state.layout, page, &ids);
+                    let fixed = &Self::main_document(&state).text_settings().guides;
+                    let snaps = Snaps::new(&state.layout, page, &ids).with_fixed(fixed);
                     let moved = (bounds.0 + dx, bounds.1 + dy, bounds.2 + dx, bounds.3 + dy);
                     let ((ax, ay), found, _) = snaps.snap(moved, (SNAP / scale) as f32);
                     if !shift || dy == 0.0 {

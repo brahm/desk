@@ -291,6 +291,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.align('center')", &["<Control>bar"]),
             ("win.align('right')", &["<Control>braceright"]),
             ("win.invisibles", &["<Control><Shift>i"]),
+            ("win.show-layout", &["<Control><Shift>l"]),
             ("win.styles-drawer", &["<Control><Shift>t"]),
             ("win.copy-style", &["<Control><Alt>c"]),
             ("win.paste-style", &["<Control><Alt>v"]),

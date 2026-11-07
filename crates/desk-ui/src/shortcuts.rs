@@ -91,6 +91,7 @@ const SECTIONS: &[Section] = &[
                 n_("Apply a style and drop the formatting over it"),
             ),
             ("<Control>r", n_("Show ruler")),
+            ("<Control><Shift>l", n_("Show layout")),
         ],
     ),
     (
