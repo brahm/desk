@@ -186,7 +186,7 @@ OBJ-38	obj-37-38-39-effects.pages	Object shadow, reflection and opacity	made
 OBJ-39	obj-37-38-39-effects.pages	Object shadow, reflection and opacity	made	
 OBJ-40	obj-40-41-fills.pages	A solid color fill and a linear gradient	made	OBJ-41: linear gradient of two colors; the advanced gradient of several colors was not made.
 OBJ-41	obj-40-41-fills.pages	A solid color fill and a linear gradient	made	OBJ-41: linear gradient of two colors; the advanced gradient of several colors was not made.
-OBJ-42	obj-42-image-fill.pages	A shape with an image fill	made	Plain image fill; tinted image fill was not made.
+OBJ-42	obj-42-image-fill.pages	A shape with an image fill	made	Plain image fill here; the tinted image fill, red and blue, is in obj-42-tinted-image-fill.pages.
 OBJ-43		Equações (MathType 6)	skipped	Needs MathType 6, which is not in the VM.
 TAB-01	tab-01-basic.pages	An inline table with text and numbers	made	
 TAB-02		Ferramentas de tabela	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.

@@ -1025,6 +1025,53 @@ fn obj_42_pictures_that_fill_shapes_are_read() {
 }
 
 #[test]
+fn obj_42_tinted_image_fills_saved_by_pages_are_read() {
+    // Red at 75% over a picture scaled to fill, blue at 40% over the same
+    // picture tiled, and the picture alone: Pages saves it once, and the
+    // other fills refer to it.
+    let (_, objects) = fixture_objects("obj-42-tinted-image-fill.pages");
+    let mut fills: Vec<(f64, desk_model::ImageFill, Option<Rgba>, u32)> = objects
+        .iter()
+        .filter_map(|o| match &o.style.fill {
+            Some(desk_model::Fill::Image {
+                picture,
+                mode,
+                tint,
+            }) => Some((o.frame.y.to_pt(), *mode, *tint, picture.width())),
+            _ => None,
+        })
+        .collect();
+    fills.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let fills: Vec<_> = fills.into_iter().map(|(_, m, t, w)| (m, t, w)).collect();
+    assert_eq!(
+        fills,
+        [
+            (
+                desk_model::ImageFill::ScaleToFill,
+                Some(Rgba {
+                    r: 255,
+                    g: 0,
+                    b: 0,
+                    a: 191
+                }),
+                96
+            ),
+            (
+                desk_model::ImageFill::Tile,
+                Some(Rgba {
+                    r: 0,
+                    g: 0,
+                    b: 255,
+                    a: 102
+                }),
+                96
+            ),
+            (desk_model::ImageFill::ScaleToFill, None, 96),
+        ]
+    );
+}
+
+#[test]
 fn obj_41_advanced_and_radial_gradients_of_pages_are_read() {
     use desk_model::{Fill, Gradient, GradientStop};
     let index = desk_iwork::read_index_at(&fixture("obj-40-41-fills.pages")).unwrap();
