@@ -1804,7 +1804,8 @@ impl Exporter<'_> {
             },
             ObjectKind::Shape(Shape::Line { .. }) => {
                 // From the start to the end, flipped as it is drawn.
-                let ((sx, sy), (ex, ey)) = object.line_ends_in(w, h).unwrap_or(((0.0, 0.0), (w, h)));
+                let ((sx, sy), (ex, ey)) =
+                    object.line_ends_in(w, h).unwrap_or(((0.0, 0.0), (w, h)));
                 odf::DrawKind::Line {
                     x1: odf::Length(x + sx),
                     y1: odf::Length(y + sy),

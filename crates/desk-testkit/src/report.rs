@@ -360,6 +360,21 @@ impl Report {
         !self.unknown_rows.is_empty() || self.cases.iter().any(CaseResult::is_failure)
     }
 
+    /// What the README says of the matrix: how many rows have tests,
+    /// how many of them check what Pages laid out, and how many of those
+    /// still differ.
+    pub fn summary(&self) -> String {
+        let count =
+            |keep: &dyn Fn(Status) -> bool| self.rows.iter().filter(|r| keep(r.status)).count();
+        let tested = count(&|s| s != Status::Pending);
+        let against = count(&|s| matches!(s, Status::Matches | Status::Compared | Status::Differs));
+        let differ = count(&|s| s == Status::Differs);
+        format!(
+            "{tested} of the {} rows of its parity matrix have tests, {against} of them against what Pages itself laid out, of which {differ} still differ",
+            self.rows.len()
+        )
+    }
+
     /// The report as JSON.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("the report serializes")
@@ -459,7 +474,11 @@ impl Report {
                 row.compared.len()
             );
         }
-        let differing: Vec<&RowReport> = self.rows.iter().filter(|r| !r.differing.is_empty()).collect();
+        let differing: Vec<&RowReport> = self
+            .rows
+            .iter()
+            .filter(|r| !r.differing.is_empty())
+            .collect();
         if !differing.is_empty() {
             md.push_str("\n## Documentos do Pages que ainda diferem\n\n");
             for row in differing {
@@ -685,6 +704,18 @@ fn ids_in_name(name: &str) -> Vec<String> {
     ids
 }
 
+/// Where the README holds the summary of the report.
+const README_START: &str = "<!-- parity -->";
+const README_END: &str = "<!-- /parity -->";
+
+/// The README with `summary` between its parity marks, or `None` when it
+/// has no marks.
+pub fn readme_with(readme: &str, summary: &str) -> Option<String> {
+    let start = readme.find(README_START)? + README_START.len();
+    let end = start + readme[start..].find(README_END)?;
+    Some(format!("{}{summary}{}", &readme[..start], &readme[end..]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -701,13 +732,22 @@ mod tests {
             "#[test]\nfn est_05_widows() {}\n#[test]\n#[ignore]\nfn fmt_12_align() {}\nfn est_04_helper() {}\n",
             &mut found,
         );
+        let readme = "Some 1 of 2 rows<!-- parity -->old<!-- /parity -->.";
+        assert_eq!(
+            readme_with(readme, "new").as_deref(),
+            Some("Some 1 of 2 rows<!-- parity -->new<!-- /parity -->.")
+        );
+        assert_eq!(readme_with("no marks", "new"), None);
         let marked = marked_tests(
             "#[test]\n#[ignore = \"differs from Pages: words move\"]\nfn obj_12_text() {}\n#[test]\nfn obj_13_box() {}\n",
         );
         assert_eq!(
             marked,
             [
-                ("obj_12_text".to_owned(), Some("differs from Pages: words move".to_owned())),
+                (
+                    "obj_12_text".to_owned(),
+                    Some("differs from Pages: words move".to_owned())
+                ),
                 ("obj_13_box".to_owned(), None),
             ]
         );

@@ -1327,7 +1327,9 @@ fn doc_05_an_empty_property_takes_what_pages_starts_from() {
     let italic = |i: usize| {
         let p = paragraph(i);
         let run = p.runs().next().unwrap();
-        styles.resolve_character(p.style(), run.style, &run.attrs).italic
+        styles
+            .resolve_character(p.style(), run.style, &run.attrs)
+            .italic
     };
     assert!(!italic(0));
     assert!(italic(1));

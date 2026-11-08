@@ -92,7 +92,9 @@ fn line_ends(placed: &PlacedObject) -> ((f32, f32), (f32, f32)) {
     placed
         .object
         .line_ends_in(f64::from(placed.width), f64::from(placed.height))
-        .map_or(((0.0, 0.0), (placed.width, placed.height)), |(a, b)| (to(a), to(b)))
+        .map_or(((0.0, 0.0), (placed.width, placed.height)), |(a, b)| {
+            (to(a), to(b))
+        })
 }
 
 /// The start, middle and end of a connection line, in the coordinates of
@@ -1335,7 +1337,11 @@ impl TextEditor {
     /// `change` gets each with its frame as placed on its page, in points,
     /// and frames it on the page too, as the Inspector measures them
     /// (OBJ-33).
-    pub fn set_each_object(&self, name: &str, change: impl FnMut(&mut Object, (f64, f64, f64, f64))) {
+    pub fn set_each_object(
+        &self,
+        name: &str,
+        change: impl FnMut(&mut Object, (f64, f64, f64, f64)),
+    ) {
         let ids = self.selected_objects();
         self.change_objects(name, &ids, change);
     }
@@ -2180,7 +2186,8 @@ mod tests {
 
     #[test]
     fn obj_23_shift_keeps_a_move_across_down_or_at_45_degrees() {
-        let near = |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01;
+        let near =
+            |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01;
         assert_eq!(constrained(30.0, 4.0), (30.0, 0.0));
         assert_eq!(constrained(-3.0, -40.0), (0.0, -40.0));
         // Nearer the diagonal than either axis: along it.
@@ -2205,7 +2212,15 @@ mod tests {
         assert!((flipped_end.0 - start.0).abs() < 0.01 && (flipped_end.1 - end.1).abs() < 0.01);
         // Dragging the end of the flipped line keeps it flipped.
         let (x, y, w, h, shape) = resize(&line, Handle::End, (start.0 - 20.0, end.1), false, false);
-        assert!(near((x, y, w, h), (start.0 - 20.0, start.1, end.0 - start.0 + 20.0, end.1 - start.1)));
+        assert!(near(
+            (x, y, w, h),
+            (
+                start.0 - 20.0,
+                start.1,
+                end.0 - start.0 + 20.0,
+                end.1 - start.1
+            )
+        ));
         assert_eq!(shape, Some((false, true, false)));
     }
 

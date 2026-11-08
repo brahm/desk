@@ -890,18 +890,36 @@ fn draw_marks(
 
 /// What a drag of objects tells, in a dark box below and right of the
 /// pointer, as Pages shows it (OBJ-23).
-fn draw_drag_label(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
+fn draw_drag_label(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
     let Some(label) = state.drag_label.as_ref().filter(|l| l.page == page) else {
         return;
     };
     cr.save().ok();
-    cr.select_font_face("Sans", gtk::cairo::FontSlant::Normal, gtk::cairo::FontWeight::Normal);
+    cr.select_font_face(
+        "Sans",
+        gtk::cairo::FontSlant::Normal,
+        gtk::cairo::FontWeight::Normal,
+    );
     cr.set_font_size(11.0);
-    let (x, y) = (rect.x + label.at.0 * scale + 14.0, rect.y + label.at.1 * scale + 18.0);
+    let (x, y) = (
+        rect.x + label.at.0 * scale + 14.0,
+        rect.y + label.at.1 * scale + 18.0,
+    );
     const PAD: f64 = 4.0;
     if let Ok(extents) = cr.text_extents(&label.text) {
         let (w, h) = (extents.x_advance(), 11.0);
-        cr.rectangle(x.round(), y.round(), (w + 2.0 * PAD).round(), (h + 2.0 * PAD).round());
+        cr.rectangle(
+            x.round(),
+            y.round(),
+            (w + 2.0 * PAD).round(),
+            (h + 2.0 * PAD).round(),
+        );
         cr.set_source_rgba(0.1, 0.1, 0.1, 0.85);
         cr.fill().ok();
         cr.set_source_rgb(1.0, 1.0, 1.0);

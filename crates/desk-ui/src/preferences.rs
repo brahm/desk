@@ -287,8 +287,7 @@ impl Preferences {
         {
             out.guide_color = color;
         }
-        out.show_size_and_position =
-            editing("show-size-and-position", out.show_size_and_position);
+        out.show_size_and_position = editing("show-size-and-position", out.show_size_and_position);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -605,7 +604,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         |p, on| p.include_preview = on,
     ));
     // As the General pane of Pages lays out its alignment guides.
-    let objects = adw::PreferencesGroup::builder().title(tr("Objects")).build();
+    let objects = adw::PreferencesGroup::builder()
+        .title(tr("Objects"))
+        .build();
     let guide_button = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::new())
         .rgba(&crate::formatting::to_gdk(current.guide_color))

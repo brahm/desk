@@ -1075,7 +1075,11 @@ fn doc_05_an_object_alone_on_a_line_keeps_the_text_below_it_at_any_spacing() {
     // At least 14 points: the picture and the text below it.
     let line = lay_out(&mut system, LineSpacing::AtLeast(Length::from_points(14)));
     assert!((line.baseline - line.top - 60.0).abs() < 0.01, "{line:?}");
-    assert!((line.height - 60.0 - under).abs() < 0.51, "{} {under}", line.height);
+    assert!(
+        (line.height - 60.0 - under).abs() < 0.51,
+        "{} {under}",
+        line.height
+    );
     // At least more than that: the height asked for.
     let line = lay_out(&mut system, LineSpacing::AtLeast(Length::from_points(90)));
     assert!((line.height - 90.0).abs() < 0.01, "{line:?}");
