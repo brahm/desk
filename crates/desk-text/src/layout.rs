@@ -25,7 +25,7 @@ use parley::{
 };
 
 use crate::fonts::{FontChoice, PagesFont, choose, pages_font};
-use crate::input::{FI, FL, ParagraphText, SMALL_CAPS_SCALE};
+use crate::input::{FF, FFI, FI, FL, ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
 use crate::tabs::{Piece, TabPlace, TabRuler};
 
@@ -562,13 +562,13 @@ impl TextSystem {
                 // text sits at the top of the line and any extra space goes
                 // below it, except with exact spacing, where the text sits
                 // on the bottom less its descent and leading. A multiple
-                // scales the line without its leading.
+                // scales the line without its leading, to a whole point.
                 let leading = line_box
                     .or_else(|| boxes.first().copied())
                     .map_or(0.0, |b| b.leading);
                 let pitch = match format.line_spacing {
                     LineSpacing::Multiple { percent } => {
-                        (height - leading) * percent as f32 / 100.0 + leading
+                        ((height - leading) * percent as f32 / 100.0 + leading).round()
                     }
                     LineSpacing::AtLeast(min) => height.max(min.to_pt() as f32),
                     LineSpacing::Exactly(exact) => {
@@ -1030,13 +1030,15 @@ fn properties<'a>(
         }),
         StyleProperty::VerticalAlign(VerticalAlign::length(raise)),
     ];
-    if format.tracking != 0 {
-        properties.push(StyleProperty::LetterSpacing(
-            format.tracking as f32 / 1000.0 * size,
-        ));
+    let pages = pages_font(&format.font_family, format.weight.value());
+    // A family laid out as in Pages spaces its letters so that its lines
+    // are as wide as there, whatever font stands for it (DOC-05).
+    let spacing = format.tracking as f32 / 1000.0 + pages.map_or(0.0, |f| f.spacing);
+    if spacing != 0.0 {
+        properties.push(StyleProperty::LetterSpacing(spacing * size));
     }
     properties.push(StyleProperty::FontFeatures(parley::FontFeatures::Source(
-        font_features(format, pages_font(&format.font_family).is_some()).into(),
+        font_features(format, pages.is_some()).into(),
     )));
     if format.language.tag() != "und"
         && let Ok(language) = Language::parse(format.language.tag())
@@ -1080,37 +1082,62 @@ fn script_shift(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -
     }
 }
 
-/// The ascent, descent and leading of a run in points, and whether its
-/// leading goes above the text: those Pages uses for its family when they
-/// were measured (DOC-05), otherwise those of its font. `size` is the size
-/// of the run and `metrics` its font's metrics at that size.
+/// Where the leading of a line goes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LeadingPlace {
+    /// Over the text, as Pages puts it with Apple's own fonts.
+    Above,
+    /// Under the text, as Pages puts it with fonts that have a line gap.
+    Below,
+    /// Split around the text, as Parley splits it, the larger half below.
+    Around,
+}
+
+/// The ascent, descent and leading of a run in points, and where its
+/// leading goes: those Pages uses for its family and weight when they were
+/// measured (DOC-05), otherwise those of its font. `size` is the size of
+/// the run and `metrics` its font's metrics at that size.
 fn vertical_metrics(
     format: &CharFormat,
     size: f32,
     metrics: &parley::FontMetrics,
-) -> (f32, f32, f32, bool) {
-    match pages_font(&format.font_family) {
+) -> (f32, f32, f32, LeadingPlace) {
+    match pages_font(&format.font_family, format.weight.value()) {
         Some(PagesFont {
             ascent,
             descent,
             leading,
             leading_above,
             ..
-        }) => (ascent * size, descent * size, leading * size, leading_above),
-        None => (metrics.ascent, metrics.descent, metrics.leading, false),
+        }) => (
+            ascent * size,
+            descent * size,
+            leading * size,
+            if leading_above {
+                LeadingPlace::Above
+            } else {
+                LeadingPlace::Below
+            },
+        ),
+        None => (
+            metrics.ascent,
+            metrics.descent,
+            metrics.leading,
+            LeadingPlace::Around,
+        ),
     }
 }
 
-/// The box of a run, in whole points. The leading is split around the text
-/// as Parley splits it, the larger half below, or goes above it; a shift of
-/// the baseline moves the box.
+/// The box of a run, in whole points: Pages rounds the ascent, the descent
+/// and the leading each to a whole point. A shift of the baseline moves
+/// the box.
 fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> RunBox {
-    let (ascent, descent, leading, leading_above) = vertical_metrics(format, size, metrics);
+    let (ascent, descent, leading, place) = vertical_metrics(format, size, metrics);
     let (ascent, descent, leading) = (ascent.round(), descent.round(), leading.round());
-    let over = if leading_above {
-        ascent + leading
-    } else {
-        ascent + (leading / 2.0).floor()
+    let over = match place {
+        LeadingPlace::Above => ascent + leading,
+        LeadingPlace::Below => ascent,
+        LeadingPlace::Around => ascent + (leading / 2.0).floor(),
     };
     let raise = (format.baseline_shift.to_pt() as f32).round();
     RunBox {
@@ -1148,6 +1175,8 @@ fn run_text(
             match c {
                 FI => text.push_str("fi"),
                 FL => text.push_str("fl"),
+                FF => text.push_str("ff"),
+                FFI => text.push_str("ffi"),
                 // A place where the word may break is not text to copy.
                 SOFT_HYPHEN => {}
                 c => text.push(c),

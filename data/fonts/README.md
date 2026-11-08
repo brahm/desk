@@ -27,7 +27,16 @@ on the reference machine (DOC-05):
   of the original. Apple's own fonts (Helvetica, Times, Courier,
   Palatino) have no line gap, and Pages gives their lines a leading of a
   fifth of their height, over the text: Helvetica at 12 pt has lines
-  14 pt tall, Palatino 16 pt.
+  14 pt tall, Palatino 16 pt. Fonts with a line gap, such as Helvetica
+  Neue, have it under the text, and each face of Helvetica Neue has its
+  own height: Light at 12 pt has lines 15 pt tall. Pages rounds the
+  ascent, the descent and the leading each to a whole point, and a
+  multiple of the line spacing to a whole point too.
+- **The width of the lines** of a family whose free substitute has the
+  widths of another font comes from a spacing between letters: TeX Gyre
+  Heros and Nimbus Sans have the widths of Helvetica, and Helvetica Neue
+  is about 1% wider in Regular and 3% narrower in Light, as measured on
+  the text of a real document.
 - **Ligatures** are those of Pages: fi and fl in Times and Palatino, and
   nothing in Courier or in Microsoft's fonts, whatever the substitute
   offers. The PDF keeps the letters a ligature joins as its text.

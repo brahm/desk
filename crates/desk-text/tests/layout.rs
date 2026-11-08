@@ -765,6 +765,79 @@ fn doc_05_a_ligature_of_the_font_reads_as_the_letters_it_joins() {
 }
 
 #[test]
+fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
+    // As measured on the reference machine: Pages rounds the ascent, the
+    // descent and the line gap of each face to whole points, and puts the
+    // gap below the text.
+    let mut system = TextSystem::new();
+    let neue = |weight: u16, size: i32| CharFormat {
+        font_family: Arc::from("Helvetica Neue"),
+        font_size: Length::from_points(size),
+        weight: FontWeight::new(weight),
+        ..CharFormat::default()
+    };
+    let text = "Line one\u{2028}Line two\u{2028}Line three";
+    for (weight, size, baseline, pitch) in [
+        (400, 12, 11.0, 14.0),
+        (300, 12, 12.0, 15.0),
+        (100, 12, 11.0, 14.0),
+        (500, 12, 12.0, 15.0),
+        (700, 12, 12.0, 15.0),
+        // At 72 pt the gap rounds to 2 pt, all of it under the text.
+        (400, 72, 69.0, 69.0 + 15.0 + 2.0),
+    ] {
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[(text, neue(weight, size))],
+        );
+        let lines = &layout.lines;
+        assert_eq!(lines[0].baseline, baseline, "{weight} at {size} pt");
+        assert_eq!(lines[1].top - lines[0].top, pitch, "{weight} at {size} pt");
+    }
+
+    // A multiple of the line rounds to a whole point: 130% of the 11 pt
+    // line of Light at 9 pt is 14 pt, as in Pages.
+    let spaced = ParaFormat {
+        line_spacing: LineSpacing::Multiple { percent: 130 },
+        ..ParaFormat::default()
+    };
+    let layout = lay(&mut system, spaced, &[(text, neue(300, 9))]);
+    assert_eq!(layout.lines[1].top - layout.lines[0].top, 14.0);
+
+    // Its letters are spaced so that a line is as wide as in Pages, where
+    // this one is 310.75 pt in Regular and 301.45 pt in Light.
+    let fox = "The quick brown fox jumps over the lazy dog 0123456789";
+    let width = |system: &mut TextSystem, weight| {
+        let layout = lay_in(
+            system,
+            ParaFormat::default(),
+            &[(fox, neue(weight, 12))],
+            &Column::new(500.0),
+        );
+        let run = layout.lines[0].runs.last().unwrap();
+        run.x + run.advance
+    };
+    let regular = width(&mut system, 400);
+    assert!((309.0..312.5).contains(&regular), "{regular}");
+    let light = width(&mut system, 300);
+    assert!((298.0..303.0).contains(&light), "{light}");
+
+    // Regular and Bold join ff and ffi as well as fi and fl; the other
+    // faces join only fi and fl. The text of the PDF keeps the letters.
+    for (weight, glyphs) in [(400, 4), (700, 4), (300, 5)] {
+        let layout = lay(
+            &mut system,
+            ParaFormat::default(),
+            &[("office", neue(weight, 12))],
+        );
+        let run = &layout.lines[0].runs[0];
+        assert_eq!(run.text, "office");
+        assert_eq!(run.glyphs.len(), glyphs, "{weight}");
+    }
+}
+
+#[test]
 fn txt_03_a_cursor_stops_at_every_character_of_a_line() {
     let mut system = TextSystem::new();
     let layout = plain(&mut system, ParaFormat::default(), TEXT);
