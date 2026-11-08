@@ -7,8 +7,9 @@
 //! pixels in a hundred.
 //!
 //! The documents with text in an oval, a text box in the text and wraps
-//! do not match yet, and are left out until they do:
-//! obj-12-text-in-shape, obj-14-inline-text-box and obj-17-wrap.
+//! do not match yet: their tests are kept from running with
+//! `#[ignore = "differs from Pages: …"]`, which the parity report reads
+//! to show their rows as different from Pages, until they match.
 
 use std::path::{Path, PathBuf};
 
@@ -178,4 +179,22 @@ fn obj_19_movies_match_pages() {
 #[test]
 fn obj_42_tinted_image_fills_match_pages() {
     check("obj-42-tinted-image-fill");
+}
+
+#[test]
+#[ignore = "differs from Pages: the text in the oval breaks otherwise"]
+fn obj_12_text_in_shapes_matches_pages() {
+    check("obj-12-text-in-shape");
+}
+
+#[test]
+#[ignore = "differs from Pages: the text of the box in the text moves"]
+fn obj_14_inline_text_boxes_match_pages() {
+    check("obj-14-inline-text-box");
+}
+
+#[test]
+#[ignore = "differs from Pages: the words are where Pages put them, but 7 % of the pixels differ"]
+fn obj_17_wraps_match_pages() {
+    check("obj-17-wrap");
 }

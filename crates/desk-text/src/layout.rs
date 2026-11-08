@@ -514,6 +514,8 @@ impl TextSystem {
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
         let mut searched_from = y;
+        // Whether the band was measured again with a shorter line.
+        let mut shortened = false;
         'band: loop {
             let indent = if first_line { left + first } else { left };
             let mut segments: Vec<(f32, f32)> = space
@@ -588,7 +590,17 @@ impl TextSystem {
                     .iter()
                     .map(|c| boxes[c.run])
                     .reduce(RunBox::max);
-                let height = line_box.map_or(laid_out, |b| b.over + b.under);
+                // An object stands on the baseline of the text it is in, so
+                // the line keeps the part of that text below the baseline,
+                // whatever the spacing (DOC-05).
+                let height = line_box.map_or(laid_out, |b| {
+                    let under = span(pos, line_end)
+                        .iter()
+                        .filter(|c| objects[c.run])
+                        .map(|c| text_boxes[c.run].under)
+                        .fold(b.under, f32::max);
+                    b.over + under
+                });
                 let mut text_top = y;
                 // As Pages measured on the reference machine (FMT-14): the
                 // text sits at the top of the line and any extra space goes
@@ -640,6 +652,20 @@ impl TextSystem {
                     guess = pitch;
                     continue 'band;
                 }
+                if pitch + 0.001 < guess
+                    && !shortened
+                    && space.segments(y, pitch) != space.segments(y, guess)
+                {
+                    // Shorter than the band was measured for, next to an
+                    // object: the line takes only its own height from it,
+                    // as in Pages (OBJ-17).
+                    breaker.revert_to(saved);
+                    (pos, next_break) = (saved_pos, saved_next);
+                    placed.truncate(saved_placed);
+                    guess = pitch;
+                    shortened = true;
+                    continue 'band;
+                }
                 tallest = tallest.max(pitch);
                 placed.push(Placed {
                     x,
@@ -660,6 +686,7 @@ impl TextSystem {
                 }
             }
             y += tallest;
+            shortened = false;
         }
         breaker.finish();
         layout.align(alignment(format.alignment), AlignmentOptions::default());

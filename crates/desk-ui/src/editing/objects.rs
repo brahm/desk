@@ -9,7 +9,7 @@
 //! Shift or Ctrl and a click add it to the selection or take it out. A
 //! drag of an object moves the selected ones, snapping to the edges and
 //! the middle of the page and of the other objects, with yellow guides;
-//! Shift keeps it straight across or down. A drag of a handle resizes the
+//! Shift keeps it straight across, down or at 45 degrees. A drag of a handle resizes the
 //! object, keeping its proportions with Shift; with Ctrl it rotates the
 //! object around its center, by steps of 45 degrees with Shift. The drag
 //! shows the outline where the objects go, and becomes one action of the
@@ -27,7 +27,8 @@ use desk_model::{
 use gtk::gdk;
 
 use super::TextEditor;
-use crate::view::{Guide, ObjectMark};
+use crate::preferences::Units;
+use crate::view::{DragLabel, Guide, ObjectMark};
 
 /// How near the pointer has to be to a handle or a line, in pixels.
 pub(super) const REACH: f64 = 5.0;
@@ -75,14 +76,25 @@ fn line(object: &Object) -> Option<bool> {
     }
 }
 
-/// The ends of a line, in the coordinates of its frame.
-fn line_ends(placed: &PlacedObject, rising: bool) -> ((f32, f32), (f32, f32)) {
-    let (w, h) = (placed.width, placed.height);
-    if rising {
-        ((0.0, h), (w, 0.0))
-    } else {
-        ((0.0, 0.0), (w, h))
-    }
+/// How a line is drawn in its frame: whether it rises, and whether it
+/// is flipped across and down, which keeps its start and end apart.
+type LineShape = (bool, bool, bool);
+
+/// The shape of a line, or `None` when the object is no line.
+fn line_shape(object: &Object) -> Option<LineShape> {
+    line(object).map(|rising| (rising, object.flip_horizontal, object.flip_vertical))
+}
+
+/// The ends of a line, in the coordinates of its frame, flipped as the
+/// line is drawn: the start first.
+fn line_ends(placed: &PlacedObject) -> ((f32, f32), (f32, f32)) {
+    let to = |(x, y): (f64, f64)| (x as f32, y as f32);
+    placed
+        .object
+        .line_ends_in(f64::from(placed.width), f64::from(placed.height))
+        .map_or(((0.0, 0.0), (placed.width, placed.height)), |(a, b)| {
+            (to(a), to(b))
+        })
 }
 
 /// The start, middle and end of a connection line, in the coordinates of
@@ -106,8 +118,7 @@ fn handle_spot(placed: &PlacedObject, handle: Handle) -> (f32, f32) {
             _ => middle,
         };
     }
-    let rising = line(&placed.object).unwrap_or(false);
-    let (start, end) = line_ends(placed, rising);
+    let (start, end) = line_ends(placed);
     match handle {
         Handle::TopLeft => (0.0, 0.0),
         Handle::Top => (w / 2.0, 0.0),
@@ -163,8 +174,8 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
                 .map(|(x, y)| to_page((x as f32, y as f32)))
                 .collect()
         }
-        Some(rising) => {
-            let (a, b) = line_ends(placed, rising);
+        Some(_) => {
+            let (a, b) = line_ends(placed);
             vec![to_page(a), to_page(b)]
         }
         None => [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)]
@@ -196,8 +207,8 @@ pub(super) struct Placement {
     pub width: f32,
     pub height: f32,
     pub rotation: i32,
-    /// Whether a line rises, which dragging one of its ends can change.
-    pub rising: Option<bool>,
+    /// How a line is drawn, which dragging one of its ends can change.
+    pub line: Option<LineShape>,
 }
 
 impl Placement {
@@ -210,7 +221,7 @@ impl Placement {
             width: placed.width,
             height: placed.height,
             rotation: placed.object.rotation,
-            rising: line(&placed.object),
+            line: line_shape(&placed.object),
         }
     }
 
@@ -222,29 +233,39 @@ impl Placement {
         placed.width = self.width;
         placed.height = self.height;
         placed.object.rotation = self.rotation;
-        if let Some(rising) = self.rising {
-            placed.object.kind = ObjectKind::Shape(Shape::Line { rising });
+        if let Some(shape) = self.line {
+            set_line_shape(&mut placed.object, shape);
         }
         placed
     }
 }
 
+/// Draws a line the way `shape` says.
+fn set_line_shape(object: &mut Object, (rising, across, down): LineShape) {
+    object.kind = ObjectKind::Shape(Shape::Line { rising });
+    object.flip_horizontal = across;
+    object.flip_vertical = down;
+}
+
 /// An object resized by dragging a handle to a point of the page: the
 /// handles on the other side stay where they are, as the object is
-/// rotated. With `keep`, a corner keeps the proportions of the object.
+/// rotated. With `keep`, a corner keeps the proportions of the object;
+/// with `from_center`, the opposite handles move as far the other way,
+/// and the center stays where it is, as Option resizes in Pages (OBJ-33).
 pub(super) fn resize(
     placed: &PlacedObject,
     handle: Handle,
     point: (f32, f32),
     keep: bool,
-) -> (f32, f32, f32, f32, Option<bool>) {
+    from_center: bool,
+) -> (f32, f32, f32, f32, Option<LineShape>) {
     let (fx, fy) = placed.to_frame(point.0, point.1);
     let (w, h) = (placed.width, placed.height);
     let (mut l, mut t, mut r, mut b) = (0.0, 0.0, w, h);
-    let mut rising = None;
+    let mut shape = None;
     match handle {
         Handle::Start | Handle::End => {
-            let (start, end) = line_ends(placed, line(&placed.object).unwrap_or(false));
+            let (start, end) = line_ends(placed);
             let (a, z) = if handle == Handle::Start {
                 ((fx, fy), end)
             } else {
@@ -254,9 +275,10 @@ pub(super) fn resize(
             r = a.0.max(z.0);
             t = a.1.min(z.1);
             b = a.1.max(z.1);
-            // The end further left is the lower one when it rises.
-            let (left, right) = if a.0 <= z.0 { (a, z) } else { (z, a) };
-            rising = Some(left.1 > right.1);
+            // The start stays the start, wherever it goes (OBJ-29).
+            let mut moved = placed.object.clone();
+            moved.set_line_direction(f64::from(z.0 - a.0), f64::from(z.1 - a.1));
+            shape = line_shape(&moved);
         }
         _ => {
             let moves_left = matches!(handle, Handle::TopLeft | Handle::Left | Handle::BottomLeft);
@@ -281,26 +303,89 @@ pub(super) fn resize(
             if moves_bottom {
                 b = fy.max(t + SMALLEST);
             }
+            if from_center {
+                // The other edge mirrors the one dragged about the center.
+                let mirrored = |near: f32, size: f32| {
+                    let half = (size / 2.0 - near).abs().max(SMALLEST / 2.0);
+                    (size / 2.0 - half, size / 2.0 + half)
+                };
+                if moves_left {
+                    (l, r) = mirrored(l, w);
+                } else if moves_right {
+                    (l, r) = mirrored(r, w);
+                }
+                if moves_top {
+                    (t, b) = mirrored(t, h);
+                } else if moves_bottom {
+                    (t, b) = mirrored(b, h);
+                }
+            }
             let corner = (moves_left || moves_right) && (moves_top || moves_bottom);
             if keep && corner && w > 0.0 && h > 0.0 {
                 let scale = ((r - l) / w).max((b - t) / h);
                 let (nw, nh) = (w * scale, h * scale);
-                if moves_left {
-                    l = r - nw;
+                if from_center {
+                    (l, r) = ((w - nw) / 2.0, (w + nw) / 2.0);
+                    (t, b) = ((h - nh) / 2.0, (h + nh) / 2.0);
                 } else {
-                    r = l + nw;
-                }
-                if moves_top {
-                    t = b - nh;
-                } else {
-                    b = t + nh;
+                    if moves_left {
+                        l = r - nw;
+                    } else {
+                        r = l + nw;
+                    }
+                    if moves_top {
+                        t = b - nh;
+                    } else {
+                        b = t + nh;
+                    }
                 }
             }
         }
     }
     let (nw, nh) = (r - l, b - t);
     let (cx, cy) = placed.to_page((l + r) / 2.0, (t + b) / 2.0);
-    (cx - nw / 2.0, cy - nh / 2.0, nw, nh, rising)
+    (cx - nw / 2.0, cy - nh / 2.0, nw, nh, shape)
+}
+
+/// A move kept across, down or at 45 degrees, as Shift keeps it in Pages
+/// (OBJ-23): the direction nearest to the pointer's, as far along it as
+/// the pointer went.
+pub(super) fn constrained(dx: f32, dy: f32) -> (f32, f32) {
+    let step = std::f32::consts::FRAC_PI_4;
+    let angle = (dy.atan2(dx) / step).round() * step;
+    let along = dx * angle.cos() + dy * angle.sin();
+    let (x, y) = (along * angle.cos(), along * angle.sin());
+    // Straight across or down stays exactly so.
+    let clean = |v: f32| if v.abs() < 1e-4 { 0.0 } else { v };
+    (clean(x), clean(y))
+}
+
+/// What a drag tells next to the pointer, as Pages shows it while the
+/// preference is on (OBJ-23): where the objects moved are, how big the
+/// object resized is, or how far the object is turned.
+pub(super) fn drag_text(kind: DragKind, preview: &[Placement], units: Units) -> Option<String> {
+    let length = |points: f32| {
+        let digits = units.digits() as usize;
+        format!(
+            "{:.*} {}",
+            digits,
+            f64::from(points) / units.points(),
+            units.symbol()
+        )
+    };
+    let first = preview.first()?;
+    Some(match kind {
+        DragKind::Move => {
+            let on_page = preview.iter().filter(|p| p.page == first.page);
+            let x = on_page.clone().map(|p| p.x).fold(f32::MAX, f32::min);
+            let y = on_page.map(|p| p.y).fold(f32::MAX, f32::min);
+            format!("x: {}  y: {}", length(x), length(y))
+        }
+        DragKind::Resize(_) => {
+            format!("w: {}  h: {}", length(first.width), length(first.height))
+        }
+        DragKind::Rotate => format!("{:.0}°", f64::from(first.rotation) / 100.0),
+    })
 }
 
 /// The rotation of an object turned by dragging from one point of the
@@ -555,8 +640,8 @@ fn placed_object(original: &PlacedObject, from_page: usize, placement: &Placemen
         changed.anchor = Anchor::Page(placement.page as u32);
     }
     changed.rotation = placement.rotation;
-    if let Some(rising) = placement.rising {
-        changed.kind = ObjectKind::Shape(Shape::Line { rising });
+    if let Some(shape) = placement.line {
+        set_line_shape(&mut changed, shape);
     }
     changed
 }
@@ -1240,30 +1325,90 @@ impl TextEditor {
         let Some(info) = self.object_info() else {
             return;
         };
-        let original =
-            find(&self.state.borrow().layout, info.object.id).map(|(_, placed)| placed.clone());
+        let mut change = Some(change);
+        self.change_objects(name, &[info.object.id], |object, _| {
+            if let Some(change) = change.take() {
+                change(object);
+            }
+        });
+    }
+
+    /// Changes every selected object that is not locked, as one action:
+    /// `change` gets each with its frame as placed on its page, in points,
+    /// and frames it on the page too, as the Inspector measures them
+    /// (OBJ-33).
+    pub fn set_each_object(
+        &self,
+        name: &str,
+        change: impl FnMut(&mut Object, (f64, f64, f64, f64)),
+    ) {
+        let ids = self.selected_objects();
+        self.change_objects(name, &ids, change);
+    }
+
+    fn change_objects(
+        &self,
+        name: &str,
+        ids: &[NodeId],
+        mut change: impl FnMut(&mut Object, (f64, f64, f64, f64)),
+    ) {
+        let originals: Vec<(Object, Option<PlacedObject>)> = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            ids.iter()
+                .filter_map(|id| {
+                    let object = document.objects().get(*id)?.clone();
+                    let placed = find(&state.layout, *id).map(|(_, p)| p.clone());
+                    Some((object, placed))
+                })
+                .collect()
+        };
+        if originals.is_empty() {
+            return;
+        }
         self.arrange_objects(name, |edit, _| {
-            let mut object = info.object.clone();
-            if object.locked {
-                return Ok(None);
+            for (before, placed) in &originals {
+                if before.locked {
+                    continue;
+                }
+                let frame = placed.as_ref().map_or(
+                    (
+                        before.frame.x.to_pt(),
+                        before.frame.y.to_pt(),
+                        before.frame.width.to_pt(),
+                        before.frame.height.to_pt(),
+                    ),
+                    |p| {
+                        (
+                            f64::from(p.x),
+                            f64::from(p.y),
+                            f64::from(p.width),
+                            f64::from(p.height),
+                        )
+                    },
+                );
+                let mut object = before.clone();
+                change(&mut object, frame);
+                if let Some(placed) = placed
+                    && object.frame != before.frame
+                {
+                    // The inspector shows the frame on the page; an object
+                    // that moves with a paragraph keeps its anchor.
+                    let shift_x = placed.x as f64 - before.frame.x.to_pt();
+                    let shift_y = placed.y as f64 - before.frame.y.to_pt();
+                    let mut frame = object.frame;
+                    frame.x = Length::from_pt(frame.x.to_pt() - shift_x);
+                    frame.y = Length::from_pt(frame.y.to_pt() - shift_y);
+                    let reframed = desk_model::reframed(before, frame);
+                    object.frame = reframed.frame;
+                    object.kind = reframed.kind;
+                }
+                refresh_contour(&mut object, before);
+                if object != *before {
+                    edit.replace_object(object)?;
+                }
             }
-            change(&mut object);
-            if let Some(placed) = &original
-                && object.frame != info.object.frame
-            {
-                // The inspector shows the frame on the page; an object
-                // that moves with a paragraph keeps its anchor.
-                let shift_x = placed.x as f64 - info.object.frame.x.to_pt();
-                let shift_y = placed.y as f64 - info.object.frame.y.to_pt();
-                let mut frame = object.frame;
-                frame.x = Length::from_pt(frame.x.to_pt() - shift_x);
-                frame.y = Length::from_pt(frame.y.to_pt() - shift_y);
-                let reframed = desk_model::reframed(&info.object, frame);
-                object.frame = reframed.frame;
-                object.kind = reframed.kind;
-            }
-            refresh_contour(&mut object, &info.object);
-            edit.replace_object(object).map(|()| None)
+            Ok(None)
         });
     }
 
@@ -1703,6 +1848,9 @@ impl TextEditor {
     pub(super) fn drag_objects(&self, x: f64, y: f64, modifiers: gdk::ModifierType) {
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
         let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
+        // Ctrl hides the guides while it is held, as Command does in
+        // Pages, and the objects go where the pointer takes them (OBJ-27).
+        let unguided = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
         let scale = self.view.scale();
         let Some(drag) = self.state.borrow().object_drag.clone() else {
             return;
@@ -1720,11 +1868,7 @@ impl TextEditor {
             DragKind::Move => {
                 let (mut dx, mut dy) = (point.0 - sx, point.1 - sy);
                 if shift {
-                    if dx.abs() > dy.abs() {
-                        dy = 0.0;
-                    } else {
-                        dx = 0.0;
-                    }
+                    (dx, dy) = constrained(dx, dy);
                 }
                 let fixed = drag
                     .objects
@@ -1753,11 +1897,13 @@ impl TextEditor {
                     .iter()
                     .map(|o| o.bounds())
                     .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
+                    .filter(|_| !unguided)
                 {
                     let fixed = &Self::main_document(&state).text_settings().guides;
                     let snaps = Snaps::new(&state.layout, page, &ids).with_fixed(fixed);
                     let moved = (bounds.0 + dx, bounds.1 + dy, bounds.2 + dx, bounds.3 + dy);
                     let ((ax, ay), found, _) = snaps.snap(moved, (SNAP / scale) as f32);
+                    // Kept to a direction, the move snaps only along it.
                     if !shift || dy == 0.0 {
                         dx += ax;
                     }
@@ -1783,13 +1929,13 @@ impl TextEditor {
                 .objects
                 .iter()
                 .map(|(p, o)| {
-                    let (x, y, width, height, rising) = resize(o, handle, point, shift);
+                    let (x, y, width, height, shape) = resize(o, handle, point, shift, alt);
                     Placement {
                         x,
                         y,
                         width,
                         height,
-                        rising: rising.or(line(&o.object)),
+                        line: shape.or(line_shape(&o.object)),
                         ..Placement::of(*p, o)
                     }
                 })
@@ -1803,6 +1949,18 @@ impl TextEditor {
                 })
                 .collect(),
         };
+        let label = crate::preferences::get()
+            .show_size_and_position
+            .then(|| drag_text(drag.kind, &preview, crate::preferences::get().units))
+            .flatten()
+            .map(|text| {
+                let (page, at) = match under {
+                    Some((page, px, py)) => (page, (px, py)),
+                    None => (drag.page, (f64::from(point.0), f64::from(point.1))),
+                };
+                DragLabel { page, at, text }
+            });
+        self.view.set_drag_label(label);
         {
             let mut state = self.state.borrow_mut();
             if let Some(drag) = state.object_drag.as_mut() {
@@ -1820,6 +1978,7 @@ impl TextEditor {
             return;
         };
         self.state.borrow_mut().guides.clear();
+        self.view.set_drag_label(None);
         let changed: Vec<Object> = drag
             .objects
             .iter()
@@ -1980,31 +2139,104 @@ mod tests {
     #[test]
     fn obj_33_handles_resize_from_the_other_side() {
         let flat = placed(0, Shape::Rectangle);
-        let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false);
+        let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false, false);
         assert!(near((x, y, w, h), (100.0, 100.0, 150.0, 70.0)));
-        let (x, y, w, h, _) = resize(&flat, Handle::Left, (80.0, 0.0), false);
+        let (x, y, w, h, _) = resize(&flat, Handle::Left, (80.0, 0.0), false, false);
         assert!(near((x, y, w, h), (80.0, 100.0, 120.0, 50.0)));
         // Shift keeps the proportions, from the corner across.
-        let (x, y, w, h, _) = resize(&flat, Handle::TopLeft, (0.0, 90.0), true);
+        let (x, y, w, h, _) = resize(&flat, Handle::TopLeft, (0.0, 90.0), true, false);
         assert!(near((x, y, w, h), (0.0, 50.0, 200.0, 100.0)));
+        // Alt keeps the center where it is, with Shift too.
+        let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false, true);
+        assert!(near((x, y, w, h), (50.0, 80.0, 200.0, 90.0)));
+        let (x, y, w, h, _) = resize(&flat, Handle::TopLeft, (0.0, 90.0), true, true);
+        assert!(near((x, y, w, h), (0.0, 50.0, 300.0, 150.0)));
+        let (x, y, w, h, _) = resize(&flat, Handle::Top, (0.0, 110.0), false, true);
+        assert!(near((x, y, w, h), (100.0, 110.0, 100.0, 30.0)));
         // Turned a quarter, the right handle is at the top: dragging it up
         // makes the object wider, with its bottom where it was.
         let standing = placed(9000, Shape::Rectangle);
         let (hx, hy) = handles(&standing)[3].1;
         assert!((hx - 150.0).abs() < 0.01 && (hy - 75.0).abs() < 0.01);
-        let (x, y, w, h, _) = resize(&standing, Handle::Right, (150.0, 55.0), false);
+        let (x, y, w, h, _) = resize(&standing, Handle::Right, (150.0, 55.0), false, false);
         assert!(near((x, y, w, h), (90.0, 90.0, 120.0, 50.0)));
+    }
+
+    #[test]
+    fn obj_23_a_drag_tells_where_the_objects_go() {
+        let square = placed(0, Shape::Rectangle);
+        let mut placement = Placement::of(0, &square);
+        placement.x = 72.0;
+        placement.y = 36.0;
+        placement.rotation = 4500;
+        let preview = [placement];
+        assert_eq!(
+            drag_text(DragKind::Move, &preview, Units::Points).as_deref(),
+            Some("x: 72.0 pt  y: 36.0 pt")
+        );
+        assert_eq!(
+            drag_text(DragKind::Resize(Handle::Right), &preview, Units::Inches).as_deref(),
+            Some("w: 1.39 in  h: 0.69 in")
+        );
+        assert_eq!(
+            drag_text(DragKind::Rotate, &preview, Units::Points).as_deref(),
+            Some("45°")
+        );
+    }
+
+    #[test]
+    fn obj_23_shift_keeps_a_move_across_down_or_at_45_degrees() {
+        let near =
+            |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01;
+        assert_eq!(constrained(30.0, 4.0), (30.0, 0.0));
+        assert_eq!(constrained(-3.0, -40.0), (0.0, -40.0));
+        // Nearer the diagonal than either axis: along it.
+        let (x, y) = constrained(30.0, 20.0);
+        assert!(near((x, y), (25.0, 25.0)), "{x} {y}");
+        let (x, y) = constrained(-20.0, 30.0);
+        assert!(near((x, y), (-25.0, 25.0)), "{x} {y}");
+    }
+
+    #[test]
+    fn obj_29_the_handles_of_a_flipped_line_sit_on_its_ends() {
+        let mut line = placed(0, Shape::Line { rising: false });
+        let ends = |l: &PlacedObject| {
+            let h = handles(l);
+            (h[0].1, h[1].1)
+        };
+        let (start, end) = ends(&line);
+        line.object.flip_horizontal = true;
+        let (flipped_start, flipped_end) = ends(&line);
+        // Flipped across, the start is where the top right corner is.
+        assert!((flipped_start.0 - end.0).abs() < 0.01 && (flipped_start.1 - start.1).abs() < 0.01);
+        assert!((flipped_end.0 - start.0).abs() < 0.01 && (flipped_end.1 - end.1).abs() < 0.01);
+        // Dragging the end of the flipped line keeps it flipped.
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (start.0 - 20.0, end.1), false, false);
+        assert!(near(
+            (x, y, w, h),
+            (
+                start.0 - 20.0,
+                start.1,
+                end.0 - start.0 + 20.0,
+                end.1 - start.1
+            )
+        ));
+        assert_eq!(shape, Some((false, true, false)));
     }
 
     #[test]
     fn obj_33_the_ends_of_a_line_move_and_it_turns() {
         let line = placed(0, Shape::Line { rising: false });
-        let (x, y, w, h, rising) = resize(&line, Handle::End, (50.0, 20.0), false);
+        // Dragged to the left of its start, the end stays the end: the
+        // line flips across instead of trading its ends (OBJ-29).
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 20.0), false, false);
         assert!(near((x, y, w, h), (50.0, 20.0, 50.0, 80.0)));
-        assert_eq!(rising, Some(false));
-        let (x, y, w, h, rising) = resize(&line, Handle::End, (50.0, 180.0), false);
+        assert_eq!(shape, Some((true, true, false)));
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 180.0), false, false);
         assert!(near((x, y, w, h), (50.0, 100.0, 50.0, 80.0)));
-        assert_eq!(rising, Some(true));
+        assert_eq!(shape, Some((false, true, false)));
+        let (_, _, _, _, shape) = resize(&line, Handle::End, (250.0, 180.0), false, false);
+        assert_eq!(shape, Some((false, false, false)));
         let square = placed(0, Shape::Rectangle);
         let (cx, cy) = square.center();
         // From the right of the center up to above it: a quarter turn

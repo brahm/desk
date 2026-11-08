@@ -520,21 +520,40 @@ pub(crate) fn color(element: &Element) -> Option<Color> {
     })
 }
 
-/// The lengths that Pages saves empty when they are zero.
-const ZERO_WHEN_EMPTY: &[&str] = &[
-    "spaceBefore",
-    "spaceAfter",
-    "leftIndent",
-    "rightIndent",
-    "firstLineIndent",
+/// What a property saved empty stands for: the value Pages starts from
+/// before any style, which it saves empty instead of the number. A style
+/// that takes its parent's space after a heading away keeps
+/// `<sf:spaceAfter/>`, and the TOC styles keep `<sf:outlineLevel/>` under
+/// the headings they list (DOC-05). Widow control and hyphenation are on
+/// before any style says otherwise, as the default paragraph style saves
+/// them empty and Pages keeps widows away in it (EST-05).
+const EMPTY_MEANS: &[(&str, f64)] = &[
+    ("spaceBefore", 0.0),
+    ("spaceAfter", 0.0),
+    ("leftIndent", 0.0),
+    ("rightIndent", 0.0),
+    ("firstLineIndent", 0.0),
+    ("baselineShift", 0.0),
+    ("tracking", 0.0),
+    ("bold", 0.0),
+    ("italic", 0.0),
+    ("outline", 0.0),
+    ("underline", 0.0),
+    ("strikethru", 0.0),
+    ("superscript", 0.0),
+    ("capitalization", 0.0),
+    ("keepWithNext", 0.0),
+    ("keepLinesTogether", 0.0),
+    ("pageBreakBefore", 0.0),
+    ("outlineLevel", 0.0),
+    ("widowControl", 1.0),
+    ("hyphenate", 1.0),
 ];
 
 /// The properties that a style sets, in the order of its property map.
-/// A property saved empty is not set, so it is left out, and one saved
-/// with `sf:null` is set to [`Value::Null`]. The exception are the
-/// spaces and indents of paragraphs: Pages saves a length of zero empty,
-/// so a style that takes its parent's space after a heading away keeps
-/// `<sf:spaceAfter/>` (DOC-05).
+/// A property saved with `sf:null` is set to [`Value::Null`]. One saved
+/// empty is set to where Pages starts from, for those in `EMPTY_MEANS`;
+/// the others are left out, as not set.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Properties(pub Vec<(String, Value)>);
 
@@ -544,8 +563,14 @@ impl Properties {
         for property in map.elements() {
             if let Some(value) = property.elements().next() {
                 properties.push((property.name.local.clone(), Value::read(ids, value)));
-            } else if ZERO_WHEN_EMPTY.contains(&property.name.local.as_str()) {
-                properties.push((property.name.local.clone(), Value::Number(0.0)));
+            } else if let Some((name, value)) = EMPTY_MEANS
+                .iter()
+                .find(|(name, _)| *name == property.name.local.as_str())
+            {
+                properties.push(((*name).to_owned(), Value::Number(*value)));
+            } else if property.name.local == "tabs" {
+                // No tab stops of its own.
+                properties.push((property.name.local.clone(), Value::Tabs(Vec::new())));
             }
         }
         Self(properties)

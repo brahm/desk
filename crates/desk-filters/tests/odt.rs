@@ -1796,6 +1796,20 @@ fn with_objects() -> Document {
             });
             line.wrap = Wrap::Through;
             edit.add_object(line)?;
+            // A line drawn right to left keeps its start the start
+            // (OBJ-29): it is flipped across, and ODF says so by the
+            // order of its points.
+            let mut back = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Line { rising: false }),
+                Frame::from_pt(10.0, 90.0, 80.0, 30.0),
+            );
+            back.flip_horizontal = true;
+            back.style.stroke = Some(Stroke {
+                end: desk_model::LineEnd::Arrow,
+                ..Stroke::new(Rgba::BLACK, Length::from_points(1))
+            });
+            edit.add_object(back)?;
             let mut tiled = Object::new(
                 edit.new_id(),
                 ObjectKind::Shape(Shape::Ellipse),
@@ -1982,7 +1996,10 @@ fn obj_01_obj_08_obj_13_obj_17_objects_are_kept_in_odt() {
     let read = read_odt(&bytes).unwrap();
     assert_eq!(objects(&read), objects(&document));
     // The formatting of the text of a text box is kept.
-    let desk_model::ObjectKind::TextBox(text) = &read.objects().iter().nth(4).unwrap().kind else {
+    let Some(text) = read.objects().iter().find_map(|o| match &o.kind {
+        desk_model::ObjectKind::TextBox(text) => Some(text),
+        _ => None,
+    }) else {
         panic!("a text box");
     };
     let paragraph = &text.paragraphs[0];

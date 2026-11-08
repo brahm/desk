@@ -279,6 +279,9 @@ pub struct RowReport {
     pub tests: Vec<String>,
     /// Those of them that compare a document of Pages with its PDF.
     pub compared: Vec<String>,
+    /// Those that compare a document of Pages that Desk does not lay out
+    /// as Pages did yet.
+    pub differing: Vec<String>,
 }
 
 /// The parity report.
@@ -294,12 +297,14 @@ pub struct Report {
 
 impl Report {
     /// Builds the report from the results of the cases, the tests named
-    /// after each row and those of them that compare with Pages.
+    /// after each row, those of them that compare with Pages and those
+    /// known to differ from it.
     pub fn new(
         matrix: Vec<Row>,
         cases: Vec<CaseResult>,
         tests: &BTreeMap<String, Vec<String>>,
         compared: &BTreeMap<String, Vec<String>>,
+        differing: &BTreeMap<String, Vec<String>>,
     ) -> Self {
         let rows = matrix
             .into_iter()
@@ -308,7 +313,8 @@ impl Report {
                     cases.iter().filter(|c| c.rows.contains(&row.id)).collect();
                 let tests = tests.get(&row.id).cloned().unwrap_or_default();
                 let compared = compared.get(&row.id).cloned().unwrap_or_default();
-                let status = if checking.iter().any(|c| c.is_failure()) {
+                let differing = differing.get(&row.id).cloned().unwrap_or_default();
+                let status = if checking.iter().any(|c| c.is_failure()) || !differing.is_empty() {
                     Status::Differs
                 } else if checking
                     .iter()
@@ -329,6 +335,7 @@ impl Report {
                     cases: checking.iter().map(|c| c.name.clone()).collect(),
                     tests,
                     compared,
+                    differing,
                     row,
                 }
             })
@@ -351,6 +358,21 @@ impl Report {
     /// Whether a case failed, or names a row the matrix does not have.
     pub fn has_failures(&self) -> bool {
         !self.unknown_rows.is_empty() || self.cases.iter().any(CaseResult::is_failure)
+    }
+
+    /// What the README says of the matrix: how many rows have tests,
+    /// how many of them check what Pages laid out, and how many of those
+    /// still differ.
+    pub fn summary(&self) -> String {
+        let count =
+            |keep: &dyn Fn(Status) -> bool| self.rows.iter().filter(|r| keep(r.status)).count();
+        let tested = count(&|s| s != Status::Pending);
+        let against = count(&|s| matches!(s, Status::Matches | Status::Compared | Status::Differs));
+        let differ = count(&|s| s == Status::Differs);
+        format!(
+            "{tested} of the {} rows of its parity matrix have tests, {against} of them against what Pages itself laid out, of which {differ} still differ",
+            self.rows.len()
+        )
     }
 
     /// The report as JSON.
@@ -452,6 +474,17 @@ impl Report {
                 row.compared.len()
             );
         }
+        let differing: Vec<&RowReport> = self
+            .rows
+            .iter()
+            .filter(|r| !r.differing.is_empty())
+            .collect();
+        if !differing.is_empty() {
+            md.push_str("\n## Documentos do Pages que ainda diferem\n\n");
+            for row in differing {
+                let _ = writeln!(md, "- {}: {}", row.row.id, row.differing.join(", "));
+            }
+        }
         md
     }
 }
@@ -533,6 +566,22 @@ pub fn tests_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<Strin
 /// `compare_words`, which lay out documents that Pages saved on the
 /// reference machine and compare them with the PDF that Pages made.
 pub fn compared_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<String>>> {
+    comparisons(crates, false)
+}
+
+/// The tests that lay out a document of Pages known to differ from its
+/// PDF, as [`compared_by_row`] finds them, kept from running with
+/// `#[ignore = "differs from Pages: …"]` until Desk matches it. Their
+/// rows are reported as different from Pages.
+pub fn differing_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<String>>> {
+    comparisons(crates, true)
+}
+
+/// What an ignored test says when it compares a document that Desk does
+/// not lay out as Pages yet.
+pub const DIFFERS: &str = "differs from Pages";
+
+fn comparisons(crates: &Path, differing: bool) -> std::io::Result<BTreeMap<String, Vec<String>>> {
     let mut found: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let dir = crates.join("desk-testkit/tests");
     if !dir.is_dir() {
@@ -543,7 +592,14 @@ pub fn compared_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<St
         if path.extension().is_some_and(|e| e == "rs") {
             let text = std::fs::read_to_string(&path)?;
             if text.contains("compare_words(") {
-                scan_tests(&text, &mut found);
+                for (name, ignored) in marked_tests(&text) {
+                    let differs = ignored.is_some_and(|reason| reason.starts_with(DIFFERS));
+                    if differs == differing {
+                        for id in ids_in_name(&name) {
+                            found.entry(id).or_default().push(name.clone());
+                        }
+                    }
+                }
             }
         }
     }
@@ -584,11 +640,32 @@ fn scan_ui_checks(text: &str, found: &mut BTreeMap<String, Vec<String>>) {
 }
 
 fn scan_tests(text: &str, found: &mut BTreeMap<String, Vec<String>>) {
+    for (name, _) in marked_tests(text) {
+        for id in ids_in_name(&name) {
+            found.entry(id).or_default().push(name.clone());
+        }
+    }
+}
+
+/// The tests of a file, each with what its `#[ignore]` says, if it is
+/// ignored: empty for a bare `#[ignore]`.
+fn marked_tests(text: &str) -> Vec<(String, Option<String>)> {
+    let mut tests = Vec::new();
     let mut test_next = false;
+    let mut ignored = None;
     for line in text.lines() {
         let line = line.trim();
         if line.starts_with("#[test]") {
             test_next = true;
+            ignored = None;
+            continue;
+        }
+        if test_next && let Some(rest) = line.strip_prefix("#[ignore") {
+            let reason = rest
+                .split_once('"')
+                .and_then(|(_, r)| r.rsplit_once('"'))
+                .map_or("", |(r, _)| r);
+            ignored = Some(reason.to_owned());
             continue;
         }
         if !test_next || line.starts_with("#[") || line.starts_with("//") {
@@ -602,10 +679,9 @@ fn scan_tests(text: &str, found: &mut BTreeMap<String, Vec<String>>) {
         else {
             continue;
         };
-        for id in ids_in_name(name) {
-            found.entry(id).or_default().push(name.to_owned());
-        }
+        tests.push((name.to_owned(), ignored.take()));
     }
+    tests
 }
 
 /// The IDs at the start of a test name, such as FMT-15 and EST-04 in
@@ -628,6 +704,18 @@ fn ids_in_name(name: &str) -> Vec<String> {
     ids
 }
 
+/// Where the README holds the summary of the report.
+const README_START: &str = "<!-- parity -->";
+const README_END: &str = "<!-- /parity -->";
+
+/// The README with `summary` between its parity marks, or `None` when it
+/// has no marks.
+pub fn readme_with(readme: &str, summary: &str) -> Option<String> {
+    let start = readme.find(README_START)? + README_START.len();
+    let end = start + readme[start..].find(README_END)?;
+    Some(format!("{}{summary}{}", &readme[..start], &readme[end..]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -643,6 +731,25 @@ mod tests {
         scan_tests(
             "#[test]\nfn est_05_widows() {}\n#[test]\n#[ignore]\nfn fmt_12_align() {}\nfn est_04_helper() {}\n",
             &mut found,
+        );
+        let readme = "Some 1 of 2 rows<!-- parity -->old<!-- /parity -->.";
+        assert_eq!(
+            readme_with(readme, "new").as_deref(),
+            Some("Some 1 of 2 rows<!-- parity -->new<!-- /parity -->.")
+        );
+        assert_eq!(readme_with("no marks", "new"), None);
+        let marked = marked_tests(
+            "#[test]\n#[ignore = \"differs from Pages: words move\"]\nfn obj_12_text() {}\n#[test]\nfn obj_13_box() {}\n",
+        );
+        assert_eq!(
+            marked,
+            [
+                (
+                    "obj_12_text".to_owned(),
+                    Some("differs from Pages: words move".to_owned())
+                ),
+                ("obj_13_box".to_owned(), None),
+            ]
         );
         assert_eq!(found["EST-05"], ["est_05_widows"]);
         assert_eq!(found["FMT-12"], ["fmt_12_align"]);

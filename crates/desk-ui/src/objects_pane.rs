@@ -45,6 +45,8 @@ pub struct ObjectGroups {
     width: adw::SpinRow,
     height: adw::SpinRow,
     keep_proportions: adw::SwitchRow,
+    /// Sets a picture to the size it was made at (OBJ-33).
+    original_size: adw::ActionRow,
     rotation: adw::SpinRow,
     wrap: adw::ComboRow,
     /// Whether the text goes around the outline of the object rather
@@ -102,28 +104,60 @@ fn frame_to_page(frame: (f64, f64, f64, f64), rotation: i32, p: (f64, f64)) -> (
     (cx + dx * cos + dy * sin, cy - dx * sin + dy * cos)
 }
 
-/// Where a line starts and ends on the page (OBJ-29).
+/// The frame on the page that a row asks for, from an object's frame on
+/// the page and its rotation, with the other side keeping the proportions
+/// when they are constrained.
+fn metric_frame(
+    frame: (f64, f64, f64, f64),
+    rotation: i32,
+    metric: Metric,
+    points: f64,
+    keep: bool,
+) -> Frame {
+    let (mut x, mut y, mut w, mut h) = frame;
+    // X and Y place the box that holds the turned object.
+    let (bx, by, _, _) = bounding_box(frame, rotation);
+    match metric {
+        Metric::X => x += points - bx,
+        Metric::Y => y += points - by,
+        Metric::Width => {
+            if keep && w > 0.0 {
+                h *= points / w;
+            }
+            w = points;
+        }
+        Metric::Height => {
+            if keep && h > 0.0 {
+                w *= points / h;
+            }
+            h = points;
+        }
+    }
+    Frame::from_pt(x, y, w, h)
+}
+
+/// The size of a picture as it was made, at 72 pixels to the inch, from
+/// the top left corner of its frame on the page, as Original Size sets
+/// it (OBJ-33). `None` when the object is no picture.
+pub(crate) fn picture_original_size(
+    object: &desk_model::Object,
+    frame: (f64, f64, f64, f64),
+) -> Option<Frame> {
+    let desk_model::ObjectKind::Image(picture) = &object.kind else {
+        return None;
+    };
+    let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
+    Some(Frame::from_pt(frame.0, frame.1, w, h))
+}
+
+/// The start and the end of a line on the page, with its flips and its
+/// rotation, or `None` when the object is no line.
 pub(crate) fn line_ends(
     object: &desk_model::Object,
     frame: (f64, f64, f64, f64),
 ) -> Option<((f64, f64), (f64, f64))> {
-    let desk_model::ObjectKind::Shape(desk_model::Shape::Line { rising }) = object.kind else {
-        return None;
-    };
     let (_, _, w, h) = frame;
-    let (mut start, mut end) = if rising {
-        ((0.0, h), (w, 0.0))
-    } else {
-        ((0.0, 0.0), (w, h))
-    };
-    for p in [&mut start, &mut end] {
-        if object.flip_horizontal {
-            p.0 = w - p.0;
-        }
-        if object.flip_vertical {
-            p.1 = h - p.1;
-        }
-    }
+    let (start, end) = object.line_ends_in(w, h)?;
     Some((
         frame_to_page(frame, object.rotation, start),
         frame_to_page(frame, object.rotation, end),
@@ -131,25 +165,16 @@ pub(crate) fn line_ends(
 }
 
 /// Makes a line go from `start` to `end` on the page, keeping how far it
-/// is turned and which end has which arrow (OBJ-29).
+/// is turned and which end has which arrow: the start stays the start,
+/// as in Pages, even when it lies right of the end (OBJ-29).
 pub(crate) fn set_line_ends(object: &mut desk_model::Object, start: (f64, f64), end: (f64, f64)) {
     let (sin, cos) = (f64::from(object.rotation) / 100.0).to_radians().sin_cos();
     let (dx, dy) = (end.0 - start.0, end.1 - start.1);
     // In the axes of the frame, which turn with it.
-    let (mut fx, mut fy) = (dx * cos - dy * sin, dx * sin + dy * cos);
-    // A line starts on the left of its frame: the other way round, its
-    // ends trade places, and so do their arrows.
-    if fx < 0.0 {
-        (fx, fy) = (-fx, -fy);
-        if let Some(stroke) = &mut object.style.stroke {
-            std::mem::swap(&mut stroke.start, &mut stroke.end);
-        }
-    }
-    let (w, h) = (fx, fy.abs());
+    let (fx, fy) = (dx * cos - dy * sin, dx * sin + dy * cos);
+    let (w, h) = (fx.abs(), fy.abs());
     let (cx, cy) = ((start.0 + end.0) / 2.0, (start.1 + end.1) / 2.0);
-    object.kind = desk_model::ObjectKind::Shape(desk_model::Shape::Line { rising: fy < 0.0 });
-    object.flip_horizontal = false;
-    object.flip_vertical = false;
+    object.set_line_direction(fx, fy);
     object.frame = Frame::from_pt(cx - w / 2.0, cy - h / 2.0, w, h);
 }
 
@@ -210,6 +235,13 @@ impl ObjectGroups {
             metrics.add(row);
         }
         metrics.add(&keep_proportions);
+        let original_size = adw::ActionRow::builder()
+            .title(tr("Original Size"))
+            .subtitle(tr("The size the picture was made at"))
+            .activatable(true)
+            .build();
+        original_size.add_suffix(&gtk::Image::from_icon_name("view-restore-symbolic"));
+        metrics.add(&original_size);
         metrics.add(&rotation);
         metrics.add(&flip);
 
@@ -275,6 +307,7 @@ impl ObjectGroups {
             width,
             height,
             keep_proportions,
+            original_size,
             rotation,
             wrap,
             tight,
@@ -308,15 +341,17 @@ impl ObjectGroups {
                     return;
                 }
                 let Some(editor) = editor() else { return };
-                let Some(info) = editor.object_info() else {
-                    return;
-                };
-                let frame = this.frame(&info, metric, row.value());
+                let points = tab_stops::from_units(row.value(), this.units.get()).to_pt();
+                let keep = this.keep_proportions.is_active();
                 let name = match metric {
                     Metric::X | Metric::Y => "Move",
                     Metric::Width | Metric::Height => "Resize",
                 };
-                editor.set_object(name, |object| object.frame = frame);
+                // Each of the objects selected, as Pages sizes several
+                // at once (OBJ-33).
+                editor.set_each_object(name, |object, frame| {
+                    object.frame = metric_frame(frame, object.rotation, metric, points, keep);
+                });
             });
         }
         for i in 0..4 {
@@ -336,6 +371,16 @@ impl ObjectGroups {
                 });
             });
         }
+        let size_editor = editor.clone();
+        this.original_size.connect_activated(move |_| {
+            if let Some(editor) = size_editor() {
+                editor.set_each_object("Original Size", |object, frame| {
+                    if let Some(original) = picture_original_size(object, frame) {
+                        object.frame = original;
+                    }
+                });
+            }
+        });
         let weak = Rc::downgrade(&this);
         let rotate_editor = editor.clone();
         this.rotation.connect_value_notify(move |row| {
@@ -345,7 +390,7 @@ impl ObjectGroups {
             }
             if let Some(editor) = rotate_editor() {
                 let rotation = (row.value() * 100.0).round() as i32;
-                editor.set_object("Rotate", |object| object.rotation = rotation);
+                editor.set_each_object("Rotate", |object, _| object.rotation = rotation);
             }
         });
         let weak = Rc::downgrade(&this);
@@ -481,33 +526,6 @@ impl ObjectGroups {
         ]
     }
 
-    /// The frame on the page that a row asks for, with the other side
-    /// keeping the proportions when they are constrained.
-    fn frame(&self, info: &ObjectInfo, metric: Metric, value: f64) -> Frame {
-        let points = tab_stops::from_units(value, self.units.get()).to_pt();
-        let (mut x, mut y, mut w, mut h) = info.frame;
-        let keep = self.keep_proportions.is_active();
-        // X and Y place the box that holds the turned object.
-        let (bx, by, _, _) = bounding_box(info.frame, info.object.rotation);
-        match metric {
-            Metric::X => x += points - bx,
-            Metric::Y => y += points - by,
-            Metric::Width => {
-                if keep && w > 0.0 {
-                    h *= points / w;
-                }
-                w = points;
-            }
-            Metric::Height => {
-                if keep && h > 0.0 {
-                    w *= points / h;
-                }
-                h = points;
-            }
-        }
-        Frame::from_pt(x, y, w, h)
-    }
-
     /// Measures the rows in other units.
     pub fn set_units(&self, units: Units) {
         self.updating.set(true);
@@ -559,15 +577,19 @@ impl ObjectGroups {
         set(&self.width, in_units(w));
         set(&self.height, in_units(h));
         set(&self.rotation, f64::from(info.object.rotation) / 100.0);
-        let one = info.count == 1;
-        let editable = one && !info.object.locked;
-        for row in [&self.x, &self.y, &self.width, &self.height, &self.rotation]
-            .into_iter()
-            .chain(&self.ends)
-        {
+        // Several objects take the same measures, but only one line its
+        // ends.
+        let editable = !info.object.locked;
+        for row in [&self.x, &self.y, &self.width, &self.height, &self.rotation] {
             row.set_sensitive(editable);
         }
+        for row in &self.ends {
+            row.set_sensitive(editable && info.count == 1);
+        }
         self.keep_proportions.set_sensitive(editable);
+        self.original_size
+            .set_visible(matches!(info.object.kind, desk_model::ObjectKind::Image(_)));
+        self.original_size.set_sensitive(editable);
         let index = WRAPS
             .iter()
             .position(|w| *w == info.object.wrap)
@@ -660,6 +682,44 @@ mod tests {
     }
 
     #[test]
+    fn obj_33_original_size_gives_a_picture_the_size_it_was_made_at() {
+        let surface = gtk::cairo::ImageSurface::create(gtk::cairo::Format::ARgb32, 30, 20).unwrap();
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        let picture = desk_model::Picture::from_png(png).unwrap();
+        let object = Object::new(
+            desk_model::NodeId::new(1).unwrap(),
+            ObjectKind::Image(picture),
+            Frame::from_pt(0.0, 0.0, 300.0, 50.0),
+        );
+        let frame = picture_original_size(&object, (40.0, 60.0, 300.0, 50.0)).unwrap();
+        assert_eq!(frame, Frame::from_pt(40.0, 60.0, 30.0, 20.0));
+        let square = Object::new(
+            desk_model::NodeId::new(2).unwrap(),
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(0.0, 0.0, 10.0, 10.0),
+        );
+        assert!(picture_original_size(&square, (0.0, 0.0, 10.0, 10.0)).is_none());
+    }
+
+    #[test]
+    fn obj_33_sizes_typed_in_keep_the_proportions_when_asked() {
+        let frame = (10.0, 20.0, 100.0, 50.0);
+        assert_eq!(
+            metric_frame(frame, 0, Metric::Width, 200.0, true),
+            Frame::from_pt(10.0, 20.0, 200.0, 100.0)
+        );
+        assert_eq!(
+            metric_frame(frame, 0, Metric::Height, 25.0, false),
+            Frame::from_pt(10.0, 20.0, 100.0, 25.0)
+        );
+        assert_eq!(
+            metric_frame(frame, 0, Metric::X, 0.0, false),
+            Frame::from_pt(0.0, 20.0, 100.0, 50.0)
+        );
+    }
+
+    #[test]
     fn obj_29_x_and_y_place_the_box_of_a_turned_object() {
         // Upright, the box is the frame.
         let frame = (100.0, 50.0, 80.0, 40.0);
@@ -694,8 +754,8 @@ mod tests {
         assert!(close(start, (110.0, 70.0)) && close(end, (10.0, 20.0)));
         line.flip_horizontal = false;
 
-        // Ends typed in move the line. Typed right to left, its ends trade
-        // places, and the arrow stays where it was asked for.
+        // Ends typed in move the line. Typed right to left, the start
+        // stays the start, with its arrow, and the line flips across.
         set_line_ends(&mut line, (200.0, 100.0), (50.0, 40.0));
         let frame = (
             line.frame.x.to_pt(),
@@ -704,10 +764,11 @@ mod tests {
             line.frame.height.to_pt(),
         );
         let (start, end) = line_ends(&line, frame).unwrap();
-        assert!(close(start, (50.0, 40.0)), "{start:?}");
-        assert!(close(end, (200.0, 100.0)), "{end:?}");
+        assert!(close(start, (200.0, 100.0)), "{start:?}");
+        assert!(close(end, (50.0, 40.0)), "{end:?}");
+        assert!(line.flip_horizontal);
         let stroke = line.style.stroke.as_ref().unwrap();
-        assert_eq!((stroke.start, stroke.end), (LineEnd::Arrow, LineEnd::None));
+        assert_eq!((stroke.start, stroke.end), (LineEnd::None, LineEnd::Arrow));
         // So does a turned line, whose frame turns with it.
         line.rotation = 3000;
         set_line_ends(&mut line, (0.0, 0.0), (30.0, 80.0));
@@ -722,7 +783,7 @@ mod tests {
         let near =
             |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01;
         assert!(
-            near(start, (30.0, 80.0)) && near(end, (0.0, 0.0)),
+            near(start, (0.0, 0.0)) && near(end, (30.0, 80.0)),
             "{start:?} {end:?}"
         );
     }

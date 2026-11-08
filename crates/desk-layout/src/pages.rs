@@ -749,6 +749,18 @@ pub fn paginate_texts_spaced(
     paginate_with_footnotes(setup, texts, system, sum, None, None)
 }
 
+/// How many times a document with notes in later columns is laid out, at
+/// most, for their room to settle.
+const MAX_NOTE_PASSES: usize = 4;
+
+/// A footnote met in a column of a page.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct NoteAhead {
+    page: usize,
+    column: usize,
+    note: usize,
+}
+
 /// Lays out prepared paragraphs on pages with their footnotes, which take
 /// room at the foot of the pages that refer to them.
 pub(crate) fn paginate_with_footnotes(
@@ -759,20 +771,40 @@ pub(crate) fn paginate_with_footnotes(
     footnotes: Option<Rc<Footnotes>>,
     room: Option<&MarginRoom>,
 ) -> DocumentLayout {
-    let mut layout = Paginator {
-        setup,
-        texts,
-        system,
-        sum,
-        footnotes: footnotes.clone(),
-        blocks: HashMap::new(),
-        floats: room.map(|r| r.floats.clone()).unwrap_or_default(),
-        pages: Vec::new(),
-        sections: Vec::new(),
-        section_margins: Vec::new(),
-        room,
-    }
-    .run();
+    // A note met in a later column of a page takes its room from the
+    // columns before it too, as in Pages: the page is laid out again with
+    // that room kept from its first column, until the notes stay on the
+    // pages and in the columns they were met in (EST-07, EST-13).
+    let mut ahead: Vec<NoteAhead> = Vec::new();
+    let mut blocks = HashMap::new();
+    let mut passes = 0;
+    let mut layout = loop {
+        let mut paginator = Paginator {
+            setup,
+            texts,
+            system: &mut *system,
+            sum,
+            footnotes: footnotes.clone(),
+            blocks: std::mem::take(&mut blocks),
+            floats: room.map(|r| r.floats.clone()).unwrap_or_default(),
+            pages: Vec::new(),
+            sections: Vec::new(),
+            section_margins: Vec::new(),
+            room,
+            ahead: ahead.clone(),
+            met: Vec::new(),
+        };
+        let layout = paginator.run();
+        let mut met: Vec<NoteAhead> = paginator.met.into_iter().filter(|m| m.column > 0).collect();
+        met.sort_unstable();
+        met.dedup();
+        passes += 1;
+        if met == ahead || passes == MAX_NOTE_PASSES {
+            break layout;
+        }
+        blocks = paginator.blocks;
+        ahead = met;
+    };
     if let Some(footnotes) = footnotes {
         footnotes.place(&mut layout);
     }
@@ -851,7 +883,18 @@ impl Footnotes {
 
     /// The room that the notes of a page take, with the rule above them.
     fn reserved(&self, page: &Page) -> f32 {
-        let parts = self.parts(page);
+        self.reserved_with(page, &[])
+    }
+
+    /// The room that the notes of a page take, and the whole of `later`
+    /// notes below them, with the rule above them.
+    fn reserved_with(&self, page: &Page, later: &[usize]) -> f32 {
+        let mut parts = self.parts(page);
+        parts.extend(
+            later
+                .iter()
+                .map(|&note| (note, 0..self.notes[note].0.len())),
+        );
         if parts.is_empty() {
             return 0.0;
         }
@@ -956,6 +999,11 @@ struct Paginator<'a> {
     section_margins: Vec<Option<desk_model::NodeId>>,
     /// The room the headers and footers take, when known.
     room: Option<&'a MarginRoom>,
+    /// The footnotes that a layout before met in later columns, whose
+    /// room the columns before them keep.
+    ahead: Vec<NoteAhead>,
+    /// The footnotes met so far, by page and column.
+    met: Vec<NoteAhead>,
 }
 
 impl Paginator<'_> {
@@ -1169,7 +1217,7 @@ impl Paginator<'_> {
         self.new_page(layout, true, true)
     }
 
-    fn run(mut self) -> DocumentLayout {
+    fn run(&mut self) -> DocumentLayout {
         let n = self.texts.len();
         self.sections.push(self.setup.section);
         self.section_margins.push(None);
@@ -1267,9 +1315,9 @@ impl Paginator<'_> {
         }
         DocumentLayout {
             setup: self.setup,
-            pages: self.pages,
-            sections: self.sections,
-            section_margins: self.section_margins,
+            pages: std::mem::take(&mut self.pages),
+            sections: std::mem::take(&mut self.sections),
+            section_margins: std::mem::take(&mut self.section_margins),
             field_values: Vec::new(),
             notes: Vec::new(),
         }
@@ -1293,9 +1341,18 @@ impl Paginator<'_> {
             let body = bottom - top;
             let (x, width) = self.column(cursor.page, &cursor.region, cursor.column);
             let column_height = body - cursor.region.top;
-            let reserved = footnotes
-                .as_ref()
-                .map_or(0.0, |n| n.reserved(&self.pages[cursor.page]));
+            let reserved = footnotes.as_ref().map_or(0.0, |n| {
+                let page = &self.pages[cursor.page];
+                // The notes a later column of the page will meet.
+                let later: Vec<usize> = self
+                    .ahead
+                    .iter()
+                    .filter(|h| h.page == cursor.page && h.column > cursor.column)
+                    .map(|h| h.note)
+                    .filter(|note| !page.footnotes.iter().any(|&(_, n)| n == *note))
+                    .collect();
+                n.reserved_with(page, &later)
+            });
             let split_before = self.pages[cursor.page].split_note.is_some();
             let carries = self.pages[cursor.page].carried_note.is_some();
             let at_top = cursor.empty;
@@ -1482,6 +1539,11 @@ impl Paginator<'_> {
                     for &(offset, note) in notes.refs.get(i).into_iter().flatten() {
                         if line.line.range.contains(&offset) {
                             page.footnotes.push((i, note));
+                            self.met.push(NoteAhead {
+                                page: cursor.page,
+                                column: cursor.column,
+                                note,
+                            });
                         }
                     }
                 }

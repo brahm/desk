@@ -714,10 +714,11 @@ impl DocumentWindow {
     }
 
     /// Shows what the preferences say about the window: the counts at
-    /// the bottom and the color of invisibles.
+    /// the bottom, the color of invisibles and that of the guides.
     fn show_window_preferences(&self, preferences: &preferences::Preferences) {
         self.counts_label.set_visible(preferences.show_counts);
         self.view.set_invisibles_color(preferences.invisibles_color);
+        self.view.set_guide_color(preferences.guide_color);
     }
 
     /// Shows the rulers that Show Ruler and the preferences ask for.

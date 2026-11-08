@@ -153,6 +153,39 @@ impl Adjustments {
 }
 
 impl Object {
+    /// The start and the end of a line in a frame `width` by `height`,
+    /// from its top left corner as if it were not turned, with its flips
+    /// applied, as it is drawn (OBJ-29). `None` when it is no line.
+    pub fn line_ends_in(&self, width: f64, height: f64) -> Option<((f64, f64), (f64, f64))> {
+        let ObjectKind::Shape(Shape::Line { rising }) = self.kind else {
+            return None;
+        };
+        let (mut start, mut end) = if rising {
+            ((0.0, height), (width, 0.0))
+        } else {
+            ((0.0, 0.0), (width, height))
+        };
+        for p in [&mut start, &mut end] {
+            if self.flip_horizontal {
+                p.0 = width - p.0;
+            }
+            if self.flip_vertical {
+                p.1 = height - p.1;
+            }
+        }
+        Some((start, end))
+    }
+
+    /// Makes the object a line that goes `across` and `down` from its
+    /// start to its end, in the axes of its frame: the start stays the
+    /// start and keeps its arrow, the way Pages keeps the ends of a line
+    /// apart, by flipping it when it goes to the left (OBJ-29).
+    pub fn set_line_direction(&mut self, across: f64, down: f64) {
+        self.kind = ObjectKind::Shape(Shape::Line { rising: down < 0.0 });
+        self.flip_horizontal = across < 0.0;
+        self.flip_vertical = false;
+    }
+
     /// An object with a frame on the first page, no fill and no line,
     /// that the text goes around on both sides.
     pub fn new(id: NodeId, kind: ObjectKind, frame: Frame) -> Self {

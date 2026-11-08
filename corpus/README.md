@@ -74,6 +74,11 @@ rows about the application alone or what the reference machine cannot
 do. Desk reads only the format of Pages '09, so there are no documents
 saved in the format of Pages '08.
 
+`long-document.pages` is a long document of 41 pages, with sections,
+headers and footers, a table of contents, footnotes, pictures, columns
+and page breaks, whose text is filler, so that the tests of
+`desk-testkit` check a long document against Pages in public.
+
 The tests of `desk-filters` open every one of them and check that the
 import names what it leaves out. `lossy-import.pages` has one of each
 thing that Desk does not import yet, such as headers, images, footnotes,

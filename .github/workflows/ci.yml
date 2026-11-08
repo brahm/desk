@@ -44,7 +44,7 @@ jobs:
       - name: Check dependency rules
         run: ci/check-deps.sh
       - name: Compare the corpus with Pages
-        run: cargo run --locked --package desk-testkit --bin desk-parity
+        run: cargo run --locked --package desk-testkit --bin desk-parity -- --check-readme
       - name: Keep the parity report and the diff images
         if: always()
         uses: actions/upload-artifact@v4

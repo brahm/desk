@@ -94,6 +94,7 @@ fn a_case_matches_its_own_pdf_and_not_another() {
         vec![result],
         &Default::default(),
         &Default::default(),
+        &Default::default(),
     );
     assert_eq!(report.rows[0].status, Status::Differs);
     assert!(report.has_failures());
@@ -175,6 +176,7 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
         Vec::new(),
         &tests,
         &compared,
+        &Default::default(),
     );
     assert_eq!(report.rows[0].status, Status::Compared);
     assert_eq!(report.rows[1].status, Status::Tested);
@@ -183,4 +185,37 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
             .to_markdown(Path::new("."))
             .contains("comparado com o PDF do Pages")
     );
+}
+
+#[test]
+fn the_report_tells_documents_of_pages_that_still_differ() {
+    // The documents with text in shapes do not match Pages yet: their
+    // tests are kept from running, and their rows are different.
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let differing = desk_testkit::report::differing_by_row(&crates).unwrap();
+    assert!(differing.contains_key("OBJ-12"), "{differing:?}");
+    let compared = desk_testkit::report::compared_by_row(&crates).unwrap();
+    assert!(
+        compared
+            .values()
+            .flatten()
+            .all(|t| !differing.values().flatten().any(|d| d == t))
+    );
+    let report = Report::new(
+        vec![matrix::Row {
+            id: "OBJ-12".into(),
+            phase: Some(6),
+            feature: String::new(),
+            expected: String::new(),
+            guide_pages: String::new(),
+            odf: String::new(),
+        }],
+        Vec::new(),
+        &Default::default(),
+        &compared,
+        &differing,
+    );
+    assert_eq!(report.rows[0].status, Status::Differs);
+    assert!(!report.has_failures());
+    assert!(report.to_markdown(Path::new(".")).contains("ainda diferem"));
 }

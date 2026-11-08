@@ -1265,3 +1265,56 @@ fn est_12_an_object_in_the_line_of_a_header_shows_on_every_page() {
         assert!(line.bottom() <= page.lines[0].top() + 0.01, "page {index}");
     }
 }
+
+#[test]
+fn est_07_est_13_a_note_in_the_second_column_takes_room_from_the_first() {
+    use desk_model::{CharAttrs, Editor, FIELD_CHARACTER, Field, Note, ParaAttrs, Paragraph, Run};
+    let mut system = TextSystem::new();
+    let h = line_height(&mut system);
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let mut page = setup(h * 10.0 + 1.0);
+            page.layout = columns(2);
+            edit.set_page_setup(page)?;
+            // Ten lines fill the first column; the mark is in the second.
+            let text = ["line"; 10].join(&LINE_BREAK.to_string());
+            let at = edit.insert_text(start, &text)?;
+            let at = edit.split_paragraph(at)?;
+            let at = edit.insert_text(at, "Text")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            let body = edit.document().styles().default_paragraph();
+            let text = ["note"; 2].join(&LINE_BREAK.to_string());
+            let id = edit.new_id();
+            let paragraph =
+                Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new(&text)])?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![paragraph].into(),
+                }),
+            )
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    let first = &layout.pages[0];
+    assert_eq!(first.note_lines.len(), 2);
+    let rule = first.note_rule.expect("a rule").1;
+    // The note runs across both columns, so the first column ends above
+    // it, and its last lines go to the second column.
+    let left: Vec<_> = first.lines.iter().filter(|l| l.origin.0 < 100.0).collect();
+    assert!(left.len() < 10, "{}", left.len());
+    for line in &left {
+        assert!(line.origin.1 + line.line.top + line.line.height <= rule + 0.5);
+    }
+    assert!(first.lines.iter().any(|l| l.paragraph == 1));
+}

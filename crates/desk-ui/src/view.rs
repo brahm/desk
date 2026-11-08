@@ -49,6 +49,10 @@ struct State {
     objects: Vec<ObjectMark>,
     /// The alignment guides that a drag of objects snaps to (OBJ-27).
     guides: Vec<Guide>,
+    /// Their color (OBJ-27).
+    guide_color: desk_model::Rgba,
+    /// What a drag of objects tells next to the pointer (OBJ-23).
+    drag_label: Option<DragLabel>,
     path: Option<PathMark>,
     /// The rectangle a drag draws to select the objects it touches
     /// (OBJ-21).
@@ -60,6 +64,18 @@ struct State {
     fixed_guides: Vec<desk_model::FixedGuide>,
     /// A guide being dragged out of a ruler or along the page.
     dragged_guide: Option<desk_model::FixedGuide>,
+}
+
+/// What a drag of objects tells next to the pointer: where the objects
+/// are, how big they are or how far they are turned (OBJ-23).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DragLabel {
+    /// The page the pointer is on.
+    pub page: usize,
+    /// The point of the page it is next to, in points.
+    pub at: (f64, f64),
+    /// What it says.
+    pub text: String,
 }
 
 /// A box that the layout view outlines on a page, in points (INT-09).
@@ -185,6 +201,8 @@ impl DocumentView {
             backdrop: None,
             objects: Vec::new(),
             guides: Vec::new(),
+            guide_color: crate::preferences::GUIDE_COLOR,
+            drag_label: None,
             path: None,
             marquee: None,
             outlines: Vec::new(),
@@ -249,6 +267,25 @@ impl DocumentView {
             state.selection = selection;
             state.caret = caret;
             state.caret_on = true;
+        }
+        self.area.queue_draw();
+    }
+
+    /// Sets the color of the alignment guides (OBJ-27).
+    pub fn set_guide_color(&self, color: desk_model::Rgba) {
+        self.state.borrow_mut().guide_color = color;
+        self.area.queue_draw();
+    }
+
+    /// Shows a few words next to a point of a page while objects are
+    /// dragged, or none (OBJ-23).
+    pub fn set_drag_label(&self, label: Option<DragLabel>) {
+        {
+            let mut state = self.state.borrow_mut();
+            if state.drag_label == label {
+                return;
+            }
+            state.drag_label = label;
         }
         self.area.queue_draw();
     }
@@ -836,6 +873,7 @@ fn draw_marks(
     }
     cr.fill().ok();
     draw_objects(cr, state, page, rect, scale);
+    draw_drag_label(cr, state, page, rect, scale);
     let Some(caret) = state.caret.filter(|c| c.page == page) else {
         return;
     };
@@ -850,14 +888,60 @@ fn draw_marks(
     cr.stroke().ok();
 }
 
+/// What a drag of objects tells, in a dark box below and right of the
+/// pointer, as Pages shows it (OBJ-23).
+fn draw_drag_label(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
+    let Some(label) = state.drag_label.as_ref().filter(|l| l.page == page) else {
+        return;
+    };
+    cr.save().ok();
+    cr.select_font_face(
+        "Sans",
+        gtk::cairo::FontSlant::Normal,
+        gtk::cairo::FontWeight::Normal,
+    );
+    cr.set_font_size(11.0);
+    let (x, y) = (
+        rect.x + label.at.0 * scale + 14.0,
+        rect.y + label.at.1 * scale + 18.0,
+    );
+    const PAD: f64 = 4.0;
+    if let Ok(extents) = cr.text_extents(&label.text) {
+        let (w, h) = (extents.x_advance(), 11.0);
+        cr.rectangle(
+            x.round(),
+            y.round(),
+            (w + 2.0 * PAD).round(),
+            (h + 2.0 * PAD).round(),
+        );
+        cr.set_source_rgba(0.1, 0.1, 0.1, 0.85);
+        cr.fill().ok();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.move_to(x.round() + PAD, y.round() + PAD + h - 2.0);
+        cr.show_text(&label.text).ok();
+    }
+    cr.restore().ok();
+}
+
 /// The selected objects, with their outline in the accent color and
 /// white handles, or grey crosses when they are locked, as Pages draws
-/// them; and the guides, in yellow.
+/// them; and the guides, in yellow unless the preferences say otherwise.
 fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
     let at = |(x, y): (f64, f64)| (rect.x + x * scale, rect.y + y * scale);
     cr.save().ok();
     cr.set_line_width(1.0);
-    cr.set_source_rgb(0.96, 0.76, 0.07);
+    let rgba = |c: desk_model::Rgba| {
+        let part = |v: u8| f64::from(v) / 255.0;
+        (part(c.r), part(c.g), part(c.b), part(c.a))
+    };
+    let (r, g, b, a) = rgba(state.guide_color);
+    cr.set_source_rgba(r, g, b, a);
     for guide in state.guides.iter().filter(|g| g.page == page) {
         let (x0, y0) = at(guide.from);
         let (x1, y1) = at(guide.to);

@@ -122,13 +122,10 @@ impl PlacedObject {
     /// frame, as Pages selects it.
     pub fn contains(&self, x: f32, y: f32, tolerance: f32) -> bool {
         let (fx, fy) = self.to_frame(x, y);
-        if let ObjectKind::Shape(desk_model::Shape::Line { rising }) = &self.object.kind {
-            let (y0, y1) = if *rising {
-                (self.height, 0.0)
-            } else {
-                (0.0, self.height)
-            };
-            return distance_to_segment((fx, fy), (0.0, y0), (self.width, y1)) <= tolerance;
+        let (w, h) = (f64::from(self.width), f64::from(self.height));
+        if let Some((a, b)) = self.object.line_ends_in(w, h) {
+            let to = |(x, y): (f64, f64)| (x as f32, y as f32);
+            return distance_to_segment((fx, fy), to(a), to(b)) <= tolerance;
         }
         if let ObjectKind::Shape(shape @ desk_model::Shape::Connection(_)) = &self.object.kind {
             // Near the line, along its curve.
@@ -149,7 +146,15 @@ impl PlacedObject {
         if matches!(self.object.wrap, Wrap::Through | Wrap::Behind) {
             return None;
         }
-        let margin = self.object.wrap_margin.to_pt() as f32;
+        // The margin is from the outside of the stroke, as in Pages
+        // (OBJ-17).
+        let stroke = self
+            .object
+            .style
+            .stroke
+            .as_ref()
+            .map_or(0.0, |s| s.width.to_pt() as f32 / 2.0);
+        let margin = self.object.wrap_margin.to_pt() as f32 + stroke;
         let (x0, y0, x1, y1) = self.bounds();
         Some(Exclusion {
             x0: x0 - margin,
@@ -182,29 +187,60 @@ impl PlacedObject {
         let mut b0 = top - margin;
         while b0 < bottom + margin {
             let b1 = b0 + PROFILE_BAND;
-            // The part of each edge within the band and the margin around
-            // it.
-            let (lo, hi) = (b0 - margin, b1 + margin);
+            // The contour grown by the margin all around, as Pages grows
+            // it: a point of the contour takes the room of a circle of the
+            // margin around it, so that the room ends round over the top
+            // and bottom of a round picture (OBJ-17).
             let mut span: Option<(f32, f32)> = None;
+            let mut take = |x: f32, y: f32| {
+                let dy = if y < b0 {
+                    b0 - y
+                } else if y > b1 {
+                    y - b1
+                } else {
+                    0.0
+                };
+                if dy > margin {
+                    return;
+                }
+                let reach = (margin * margin - dy * dy).max(0.0).sqrt();
+                let (s, t) = (x - reach, x + reach);
+                span = Some(span.map_or((s, t), |(a, b)| (a.min(s), b.max(t))));
+            };
+            let (lo, hi) = (b0 - margin, b1 + margin);
             for (i, &a) in points.iter().enumerate() {
                 let b = points[(i + 1) % points.len()];
                 let (ya, yb) = (a.1.min(b.1), a.1.max(b.1));
                 if yb < lo || ya > hi {
                     continue;
                 }
-                let x_at = |y: f32| {
+                let at = |y: f32| {
                     if (b.1 - a.1).abs() < f32::EPSILON {
-                        a.0
+                        (a.0, y)
                     } else {
-                        a.0 + (b.0 - a.0) * (y - a.1) / (b.1 - a.1)
+                        (a.0 + (b.0 - a.0) * (y - a.1) / (b.1 - a.1), y)
                     }
                 };
-                for x in [x_at(lo.clamp(ya, yb)), x_at(hi.clamp(ya, yb))] {
-                    span = Some(span.map_or((x, x), |(s, t)| (s.min(x), t.max(x))));
+                if (b.1 - a.1).abs() < f32::EPSILON {
+                    take(a.0, a.1);
+                    take(b.0, b.1);
+                    continue;
+                }
+                // The edge where it is near the band, at its ends, where
+                // it crosses the band and in steps above and below it.
+                let (from, to) = (lo.max(ya), hi.min(yb));
+                let mut ys = vec![from, to];
+                ys.extend([b0, b1].into_iter().filter(|y| (from..=to).contains(y)));
+                for k in 1..PROFILE_STEPS {
+                    ys.push(from + (to - from) * k as f32 / PROFILE_STEPS as f32);
+                }
+                for y in ys {
+                    let (x, y) = at(y);
+                    take(x, y);
                 }
             }
-            if let Some((s, t)) = span {
-                bands.push((b0, b1, s - margin, t + margin));
+            if let Some(span) = span {
+                bands.push((b0, b1, span.0, span.1));
             }
             b0 = b1;
         }
@@ -298,7 +334,10 @@ pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::Docu
 pub(crate) type Profile = Arc<[(f32, f32, f32, f32)]>;
 
 /// How tall the bands of the contour of an object are, in points.
-const PROFILE_BAND: f32 = 2.0;
+const PROFILE_BAND: f32 = 0.5;
+
+/// How many steps an edge of a contour near a band is taken in.
+const PROFILE_STEPS: usize = 8;
 
 /// The room that an object takes from the text, in points on the page:
 /// its box, and the bands of its contour when the text wraps tightly
@@ -834,6 +873,34 @@ mod tests {
         object.contour = None;
         let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
         assert_eq!(e.span(100.0, 102.0), Some((200.0, 300.0)));
+    }
+
+    #[test]
+    fn obj_17_the_margin_of_a_contour_is_round_and_from_the_outside_of_its_stroke() {
+        use desk_model::{Frame, Length, NodeId, Object, ObjectKind, Shape, Stroke};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(200.0, 100.0, 100.0, 100.0),
+        );
+        object.wrap_margin = Length::from_points(12);
+        object.style.stroke = Some(Stroke::new(desk_model::Rgba::BLACK, Length::from_points(1)));
+        object.contour = object.shape_contour();
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        // Beside the rectangle, its margin and half its stroke.
+        let (a, b) = e.span(150.0, 151.0).unwrap();
+        assert!(
+            (a - 187.5).abs() < 0.01 && (b - 312.5).abs() < 0.01,
+            "{a} {b}"
+        );
+        // Ten points below it, the corners of the margin are round, as
+        // Pages draws them: 7.5 points at their side.
+        let (a, b) = e.span(210.0, 211.0).unwrap();
+        assert!(
+            (a - 192.5).abs() < 0.3 && (b - 307.5).abs() < 0.3,
+            "{a} {b}"
+        );
+        assert_eq!(e.span(213.0, 220.0), None);
     }
 
     #[test]
