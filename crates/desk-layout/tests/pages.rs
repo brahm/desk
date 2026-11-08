@@ -927,10 +927,12 @@ fn obj_13_obj_16_fmt_13_fmt_19_text_boxes_flow_through_columns_and_sit_where_ask
     let top = paginate(&with_text_box(1, VerticalAlignment::Top, 3), &mut system);
     let line = &top.pages[0].objects[0].lines[0];
     assert!((line.top() - 105.0).abs() < 0.01);
-    let height = line.bottom() - line.top();
+    // Pages centers the text from the top of its first line to the
+    // baseline of its last (FMT-19).
+    let block = line.baseline() - line.top();
     let middle = paginate(&with_text_box(1, VerticalAlignment::Middle, 3), &mut system);
     let line = &middle.pages[0].objects[0].lines[0];
-    assert!((line.top() - (105.0 + (190.0 - height) / 2.0)).abs() < 0.01);
+    assert!((line.top() - (105.0 + (190.0 - block) / 2.0)).abs() < 0.01);
     let bottom = paginate(&with_text_box(1, VerticalAlignment::Bottom, 3), &mut system);
     let line = &bottom.pages[0].objects[0].lines[0];
     assert!((line.bottom() - 295.0).abs() < 0.01);
@@ -996,10 +998,10 @@ fn obj_12_fmt_13_text_sits_in_the_middle_of_a_shape() {
     let lines = &layout.pages[0].objects[0].lines;
     assert_eq!(lines.len(), 1);
     // In the rectangle inside the oval, and in the middle from top to
-    // bottom.
+    // bottom, from the top of the line to its baseline.
     let side = (1.0 - std::f32::consts::FRAC_1_SQRT_2) / 2.0;
     assert!((lines[0].origin.0 - (104.0 + 200.0 * side)).abs() < 0.01);
-    let middle = (lines[0].top() + lines[0].bottom()) / 2.0;
+    let middle = (lines[0].top() + lines[0].baseline()) / 2.0;
     assert!((middle - 150.0).abs() < 0.01, "{middle}");
 }
 

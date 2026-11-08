@@ -424,6 +424,12 @@ pub(crate) fn in_the_way(e: &Exclusion, left: f32, right: f32, top: f32) -> bool
     e.y1 > top && e.x1 > left && e.x0 < right
 }
 
+/// Whether an object in the text hangs from the top of its line instead
+/// of standing on its baseline: a text box, as Pages places one (OBJ-14).
+fn hangs(object: &Object) -> bool {
+    matches!(object.kind, ObjectKind::TextBox(_))
+}
+
 /// The width and height of the objects in the text of a document, by
 /// object, for the marks that hold their places (OBJ-01); none when it has
 /// none.
@@ -434,7 +440,16 @@ pub(crate) fn inline_sizes(
         .objects()
         .iter()
         .filter(|o| o.anchor == Anchor::InText)
-        .map(|o| (o.id, (o.frame.width, o.frame.height)))
+        .map(|o| {
+            // A text box in the text hangs from the top of its line, as in
+            // Pages, and does not make the line taller (OBJ-14).
+            let height = if hangs(o) {
+                desk_model::Length::ZERO
+            } else {
+                o.frame.height
+            };
+            (o.id, (o.frame.width, height))
+        })
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
 }
@@ -484,7 +499,11 @@ pub fn place_inline_objects(document: &Document, layout: &mut DocumentLayout) {
             .map(|&(offset, object)| {
                 let mut at = PlacedObject::new(object, paragraph, 0.0);
                 at.x = line.origin.0 + line.line.caret_x(offset);
-                at.y = line.baseline() - at.height;
+                at.y = if hangs(object) {
+                    line.top()
+                } else {
+                    line.baseline() - at.height
+                };
                 at
             })
             .collect::<Vec<_>>()
@@ -713,12 +732,20 @@ pub fn flow_text_boxes(
             });
         }
     }
-    // Text that does not fill a box sits where its alignment says.
+    // Text that does not fill a box sits where its alignment says. Pages
+    // centers the text from the top of its first line to the baseline of
+    // its last, without the descent below it (FMT-19).
     for (b, lines) in out.iter_mut().enumerate() {
         let room = (rooms[b].height - lowest[b]).max(0.0);
+        let below = lines
+            .iter()
+            .max_by(|a, c| a.bottom().total_cmp(&c.bottom()))
+            .map_or(0.0, |l| {
+                l.top() + l.line.height - (l.origin.1 + l.line.baseline)
+            });
         let shift = match rooms[b].vertical {
             VerticalAlignment::Top => 0.0,
-            VerticalAlignment::Middle => room / 2.0,
+            VerticalAlignment::Middle => ((room + below) / 2.0).min(rooms[b].height),
             VerticalAlignment::Bottom => room,
         };
         if shift > 0.0 {
