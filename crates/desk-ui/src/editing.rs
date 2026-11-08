@@ -401,7 +401,7 @@ struct State {
     /// its page, and how many levels it has moved the item.
     label_drag: Option<(f64, i32)>,
     /// The picture that clicks take colors out of, while Instant Alpha
-    /// is on (OBJ-05), and whether a press on it is being dragged.
+    /// is on (OBJ-06), and whether a press on it is being dragged.
     alpha_pick: Option<(desk_model::NodeId, bool)>,
     /// The shape being drawn while the pen is on (OBJ-09).
     pen: Option<pen::Pen>,
@@ -431,7 +431,7 @@ struct State {
     /// editor edits a copy of it (EST-12, EST-13).
     story: Option<stories::StoryMode>,
     /// The objects selected, from back to front, rather than text
-    /// (OBJ-03).
+    /// (OBJ-21).
     objects: Vec<desk_model::NodeId>,
     /// A drag of objects in progress.
     object_drag: Option<objects::ObjectDrag>,
@@ -487,7 +487,7 @@ pub struct Format {
     pub link: Option<Arc<str>>,
     /// The names of the bookmarks of the document, in order (EST-26).
     pub bookmarks: Vec<Arc<str>>,
-    /// The selected objects, when objects are selected (OBJ-03).
+    /// The selected objects, when objects are selected (OBJ-21).
     pub object: Option<ObjectInfo>,
 }
 
@@ -3223,7 +3223,7 @@ impl TextEditor {
             };
             this.view.area().grab_focus();
             // While Instant Alpha is on, a click on the picture takes out
-            // the color under it (OBJ-05).
+            // the color under it (OBJ-06).
             if this.press_alpha(x, y)
                 || this.press_pen(presses, x, y)
                 || (this.editing_points()
@@ -3233,7 +3233,7 @@ impl TextEditor {
                 return;
             }
             // A click on an object selects it, or on a handle of one
-            // starts resizing it (OBJ-03).
+            // starts resizing it (OBJ-33).
             if this.press_object(presses, x, y, gesture.current_event_state()) {
                 this.state.borrow_mut().drag_from = None;
                 return;

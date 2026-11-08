@@ -739,7 +739,7 @@ def objects_on_the_page(work):
         type_text("zz")
         time.sleep(0.5)
         check(
-            "typing leaves the text alone while a shape is selected",
+            "typing leaves the text alone while a shape is selected (OBJ-21)",
             text_of(document) == "US Letter, landscape\n",
         )
         press("shift+Right", "shift+Down", "ctrl+s")
@@ -749,7 +749,7 @@ def objects_on_the_page(work):
         )
         x = points(re.search(r'svg:x="([^"]+)"', rect).group(1))
         y = points(re.search(r'svg:y="([^"]+)"', rect).group(1))
-        check("Shift and the arrows move the shape by ten points (OBJ-03)", (round(x), round(y)) == (106, 130))
+        check("Shift and the arrows move the shape by ten points (OBJ-23)", (round(x), round(y)) == (106, 130))
         press("Delete", "ctrl+s")
         wait_for("the file without the shape", lambda: saved_rect(False))
         check("Delete removes the selected shape", True)
@@ -1093,7 +1093,7 @@ def objects_in_the_outline(work):
 
 def instant_alpha_of_a_picture(work):
     """Instant Alpha takes out the color clicked in a selected picture,
-    and the click is saved with it (OBJ-05)."""
+    and the click is saved with it (OBJ-06)."""
     picture = (
         b'<draw:frame text:anchor-type="page" text:anchor-page-number="1" '
         b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
@@ -1137,7 +1137,7 @@ def instant_alpha_of_a_picture(work):
             "the saved click of Instant Alpha",
             lambda: saved_content(letter, r'desk:instant-alpha="\d+ \d+ 20"'),
         )
-        check("the color clicked in the picture is taken out and saved (OBJ-05)", True)
+        check("the color clicked in the picture is taken out and saved (OBJ-06)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

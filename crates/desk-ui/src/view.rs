@@ -45,9 +45,9 @@ struct State {
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
-    /// The outlines and handles of the selected objects (OBJ-03).
+    /// The outlines and handles of the selected objects (OBJ-21).
     objects: Vec<ObjectMark>,
-    /// The alignment guides that a drag of objects snaps to (OBJ-05).
+    /// The alignment guides that a drag of objects snaps to (OBJ-27).
     guides: Vec<Guide>,
     path: Option<PathMark>,
     /// The rectangle a drag draws to select the objects it touches

@@ -303,7 +303,7 @@ fn natural_size(picture: &desk_model::Picture) -> (f64, f64) {
 
 /// How a picture is masked and adjusted, as ODF writes it: `fo:clip`,
 /// `draw:luminance` and `draw:contrast` for other programs, and the
-/// `desk:` attributes that keep it exactly (OBJ-04, OBJ-05, OBJ-06).
+/// `desk:` attributes that keep it exactly (OBJ-04, OBJ-06, OBJ-07).
 fn odf_picture_settings(
     g: &mut odf::GraphicProperties,
     object: &Object,
@@ -2274,7 +2274,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn obj_04_obj_06_masks_and_adjustments_of_other_programs_are_read() {
+    fn obj_04_obj_07_masks_and_adjustments_of_other_programs_are_read() {
         // Eight pixels square: six points at 96 pixels an inch.
         let picture = crate::picture::picture_within(&png(8, 8), MAX_SIDE).unwrap();
         let g = odf::GraphicProperties {

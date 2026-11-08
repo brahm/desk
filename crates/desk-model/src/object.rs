@@ -63,7 +63,7 @@ pub struct Object {
     /// shapes are not linked.
     pub text: Option<TextBox>,
     /// How a picture is masked and adjusted; the defaults for any other
-    /// object (OBJ-04, OBJ-05, OBJ-06).
+    /// object (OBJ-04, OBJ-06, OBJ-07).
     pub picture: PictureSettings,
 }
 
@@ -80,14 +80,14 @@ pub struct PictureSettings {
     /// a rectangle.
     pub mask_shape: Option<Shape>,
     /// Where Instant Alpha was clicked, in order: each click takes out
-    /// the color under it and the colors near it around it (OBJ-05).
+    /// the color under it and the colors near it around it (OBJ-06).
     pub alpha: Arc<[AlphaSeed]>,
-    /// The changes of Adjust Image (OBJ-06).
+    /// The changes of Adjust Image (OBJ-07).
     pub adjust: Adjustments,
 }
 
 /// A click of Instant Alpha on a picture: the region of the color under
-/// it, as far as the colors stay near it, is taken out (OBJ-05).
+/// it, as far as the colors stay near it, is taken out (OBJ-06).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AlphaSeed {
     /// Where across the picture, in ten-thousandths of its width.

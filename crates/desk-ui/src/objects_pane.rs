@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The Metrics and Wrap inspectors of Pages, for the selected objects
-//! (OBJ-03, OBJ-07, OBJ-17): where the object is and how big, how far it
+//! (OBJ-23, OBJ-33, OBJ-34, OBJ-17): where the object is and how big, how far it
 //! is rotated and whether it is flipped; how the text goes around it, and
 //! whether it is locked.
 

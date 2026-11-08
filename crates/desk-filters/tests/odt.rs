@@ -2054,7 +2054,7 @@ fn obj_08_shapes_of_other_programs_are_read() {
 }
 
 #[test]
-fn obj_09_obj_10_obj_11_effects_of_other_programs_are_read() {
+fn obj_35_obj_37_obj_41_effects_of_other_programs_are_read() {
     let ns = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
   xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
   xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"

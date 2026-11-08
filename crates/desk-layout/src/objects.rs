@@ -118,7 +118,7 @@ impl PlacedObject {
     }
 
     /// Whether a point of the page is on the object, or within
-    /// `tolerance` of a line (OBJ-03). A shape is hit anywhere in its
+    /// `tolerance` of a line (OBJ-21). A shape is hit anywhere in its
     /// frame, as Pages selects it.
     pub fn contains(&self, x: f32, y: f32, tolerance: f32) -> bool {
         let (fx, fy) = self.to_frame(x, y);
@@ -744,7 +744,7 @@ fn distance_to_segment(p: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
 }
 
 /// The frontmost object on a page under a point, by its index among the
-/// objects of the page, if any is (OBJ-03). Objects behind the text, and
+/// objects of the page, if any is (OBJ-21). Objects behind the text, and
 /// those of the master of the section, are found only when `behind` is
 /// set, as Pages selects them only when nothing else is under the
 /// pointer.
@@ -856,7 +856,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_03_objects_are_hit_where_they_are_drawn() {
+    fn obj_21_objects_are_hit_where_they_are_drawn() {
         use desk_model::{Frame, NodeId, Shape};
         let shape = |id: u64, shape: Shape, rotation: i32| {
             let mut object = Object::new(

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Objects moved, resized, rotated, flipped, layered, grouped, aligned,
-//! distributed and locked, as the Arrange menu of Pages does (OBJ-03,
-//! OBJ-04, OBJ-05, OBJ-06, OBJ-07).
+//! distributed and locked, as the Arrange menu of Pages does (OBJ-23,
+//! OBJ-24, OBJ-26, OBJ-30, OBJ-32, OBJ-33, OBJ-34).
 //!
 //! A locked object is left as it is by every edit here but unlocking it.
 //! The objects of a group keep their frames on the page, so a group is
@@ -17,7 +17,7 @@ use crate::object::{Anchor, Frame, Object, ObjectKind};
 use crate::transaction::Edit;
 use crate::units::Length;
 
-/// Where objects are lined up, by their frames (OBJ-05).
+/// Where objects are lined up, by their frames (OBJ-26).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ObjectAlignment {
     /// Their left edges, on the leftmost.
@@ -34,7 +34,7 @@ pub enum ObjectAlignment {
     Bottom,
 }
 
-/// Which way objects are spread evenly (OBJ-05).
+/// Which way objects are spread evenly (OBJ-26).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Distribution {
     /// Across, with the same room between each and the next.
@@ -170,7 +170,7 @@ impl Edit {
     }
 
     /// Moves objects by `dx` across and `dy` down, leaving the locked
-    /// ones where they are (OBJ-03).
+    /// ones where they are (OBJ-23).
     pub fn move_objects(
         &mut self,
         ids: &[NodeId],
@@ -205,7 +205,7 @@ impl Edit {
     }
 
     /// Sets how far objects are rotated, in hundredths of a degree
-    /// counterclockwise, from 0 up to a whole turn (OBJ-03).
+    /// counterclockwise, from 0 up to a whole turn (OBJ-34).
     pub fn rotate_objects(&mut self, ids: &[NodeId], rotation: i32) -> Result<(), ModelError> {
         let rotation = rotation.rem_euclid(36_000);
         for mut object in self.unlocked(ids)? {
@@ -215,7 +215,7 @@ impl Edit {
         Ok(())
     }
 
-    /// Flips objects left to right, or upside down (OBJ-03).
+    /// Flips objects left to right, or upside down (OBJ-34).
     pub fn flip_objects(&mut self, ids: &[NodeId], horizontally: bool) -> Result<(), ModelError> {
         for mut object in self.unlocked(ids)? {
             if horizontally {
@@ -947,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_03_objects_move_rotate_and_flip_but_not_when_locked() {
+    fn obj_23_obj_32_obj_34_objects_move_rotate_and_flip_but_not_when_locked() {
         let mut editor = Editor::new(Document::new_word_processing());
         let a = add(&mut editor, 10.0, 10.0, 50.0, 20.0);
         let b = add(&mut editor, 100.0, 10.0, 50.0, 20.0);
@@ -1039,7 +1039,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_04_objects_go_forward_backward_front_and_back() {
+    fn obj_24_objects_go_forward_backward_front_and_back() {
         let mut editor = Editor::new(Document::new_word_processing());
         let ids: Vec<NodeId> = (0..4)
             .map(|i| add(&mut editor, i as f64, 0.0, 1.0, 1.0))
@@ -1068,7 +1068,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_06_objects_are_grouped_resized_and_ungrouped() {
+    fn obj_30_obj_33_objects_are_grouped_resized_and_ungrouped() {
         let mut editor = Editor::new(Document::new_word_processing());
         let back = add(&mut editor, 0.0, 0.0, 5.0, 5.0);
         let a = add(&mut editor, 10.0, 10.0, 10.0, 10.0);
@@ -1098,7 +1098,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_05_objects_are_aligned_and_distributed() {
+    fn obj_26_objects_are_aligned_and_distributed() {
         let mut editor = Editor::new(Document::new_word_processing());
         let a = add(&mut editor, 10.0, 0.0, 10.0, 10.0);
         let b = add(&mut editor, 50.0, 30.0, 20.0, 10.0);
@@ -1132,7 +1132,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_13_text_boxes_are_linked_and_unlinked() {
+    fn obj_15_text_boxes_are_linked_and_unlinked() {
         use crate::object::TextBox;
         use crate::story::Story;
         use crate::text::{Paragraph, Run};

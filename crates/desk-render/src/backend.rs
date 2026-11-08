@@ -133,7 +133,7 @@ impl Painter {
     }
 
     /// A picture with a color taken out and its colors adjusted
-    /// (OBJ-05, OBJ-06), made once.
+    /// (OBJ-06, OBJ-07), made once.
     fn adjusted_picture(
         &mut self,
         picture: &desk_model::Picture,
@@ -744,7 +744,7 @@ fn paint_surface(
 }
 
 /// A copy of a picture with the regions that Instant Alpha clicked taken
-/// out, and its colors adjusted (OBJ-05, OBJ-06).
+/// out, and its colors adjusted (OBJ-06, OBJ-07).
 pub fn adjusted_surface(
     source: &cairo::ImageSurface,
     alpha: &[desk_model::AlphaSeed],
@@ -935,7 +935,7 @@ fn set_color(cr: &Context, color: Rgba) {
 }
 
 /// A picture made smaller for its place, as Reduce File Size does
-/// (OBJ-06): only the part that its mask shows, at two pixels a point of
+/// (OBJ-05): only the part that its mask shows, at two pixels a point of
 /// its frame, and never larger than it was. `mask` is where the whole
 /// picture lies from the top left corner of a frame of `size`, in points.
 /// None when it would not be smaller.

@@ -904,7 +904,7 @@ fn with_text_box(columns: u8, vertical: desk_model::VerticalAlignment, words: us
 }
 
 #[test]
-fn obj_13_text_boxes_flow_through_columns_and_sit_where_asked() {
+fn obj_13_obj_16_fmt_13_fmt_19_text_boxes_flow_through_columns_and_sit_where_asked() {
     use desk_model::VerticalAlignment;
     let mut system = TextSystem::new();
     // Enough text to fill one column and go on in the next.
@@ -937,7 +937,7 @@ fn obj_13_text_boxes_flow_through_columns_and_sit_where_asked() {
 }
 
 #[test]
-fn obj_13_text_goes_on_in_linked_boxes() {
+fn obj_15_text_goes_on_in_linked_boxes() {
     let mut system = TextSystem::new();
     let mut document = with_text_box(1, desk_model::VerticalAlignment::Top, 150);
     let first = document.objects().iter().next().unwrap().id;
@@ -972,7 +972,7 @@ fn obj_13_text_goes_on_in_linked_boxes() {
 }
 
 #[test]
-fn obj_08_text_sits_in_the_middle_of_a_shape() {
+fn obj_12_fmt_13_text_sits_in_the_middle_of_a_shape() {
     use desk_model::{Frame, Object, ParaAttrs, Paragraph, Run, TextBox};
     let mut system = TextSystem::new();
     let mut document = Document::new_word_processing();
