@@ -86,7 +86,16 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
             document
                 .page_objects
                 .iter()
-                .chain(document.body.iter().flat_map(|p| p.objects()))
+                .chain(document.body.iter().flat_map(|p| p.all_objects()))
+                .chain(
+                    std::iter::once(&document.master)
+                        .chain(document.masters.iter().map(|(_, m)| m))
+                        .flat_map(|m| {
+                            m.objects
+                                .iter()
+                                .chain(m.paragraphs().flat_map(|p| p.all_objects()))
+                        }),
+                )
                 .flat_map(|o| o.hrefs())
                 .map(str::to_owned),
         )

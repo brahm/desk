@@ -10,6 +10,9 @@
 //! mark out as a character as wide and as tall as the frame of the
 //! object, standing on the baseline. Deleting the mark deletes the
 //! object, and deleting the object deletes its mark.
+//!
+//! Headers, footers and notes hold objects in their lines too (EST-12,
+//! EST-13): their marks are in the paragraphs of those stories.
 
 use std::collections::HashMap;
 
@@ -18,7 +21,8 @@ use crate::error::ModelError;
 use crate::header::{FIELD_CHARACTER, Field};
 use crate::id::NodeId;
 use crate::object::{Anchor, Frame, Object};
-use crate::text::Position;
+use crate::story::Story;
+use crate::text::{Paragraph, Position};
 use crate::transaction::Edit;
 
 impl Document {
@@ -40,13 +44,91 @@ impl Document {
         marks
     }
 
+    /// Where the marks of the objects in the lines of the headers, the
+    /// footers and the notes are: by object, the story and the position
+    /// in its paragraphs (EST-12, EST-13).
+    pub fn story_object_marks(&self) -> HashMap<NodeId, (Story, Position)> {
+        let mut marks = HashMap::new();
+        let mut scan = |story: Story, paragraphs: &[Paragraph]| {
+            for (object, at) in marks_in(paragraphs) {
+                marks.entry(object).or_insert((story, at));
+            }
+        };
+        for (section, margins) in self.all_headers_footers() {
+            for place in crate::MarginPlace::ALL {
+                scan(Story::Margin { section, place }, margins.get(place));
+            }
+        }
+        for note in self.notes().iter() {
+            scan(Story::Note(note.id), &note.paragraphs);
+        }
+        marks
+    }
+
     /// The position of the mark of an object in the text, if it has one.
     pub fn object_mark(&self, id: NodeId) -> Option<Position> {
         self.object_marks().get(&id).copied()
     }
 }
 
+/// The marks of objects in paragraphs, in order: the object and the
+/// position of its mark.
+pub fn marks_in(paragraphs: &[Paragraph]) -> Vec<(NodeId, Position)> {
+    let mut marks = Vec::new();
+    for paragraph in paragraphs {
+        let mut offset = 0;
+        for run in paragraph.runs() {
+            if let Some(Some(Field::ObjectMark { object })) = &run.attrs.field {
+                marks.push((*object, Position::new(paragraph.id(), offset)));
+            }
+            offset += run.len();
+        }
+    }
+    marks
+}
+
 impl Edit {
+    /// Takes the objects in the lines of a story as a copy of the document
+    /// has them, after the text of the story was edited in its body with
+    /// the tools of the body (see [`Document::with_body`]): those added or
+    /// changed there, and not those whose marks are gone from `before`,
+    /// the paragraphs the story had (EST-12, EST-13).
+    pub fn adopt_story_objects(
+        &mut self,
+        from: &Document,
+        before: &[Paragraph],
+    ) -> Result<(), ModelError> {
+        let now = from.object_marks();
+        for id in now.keys() {
+            let Some(object) = from.objects().get(*id) else {
+                continue;
+            };
+            if object.anchor != Anchor::InText {
+                continue;
+            }
+            match self.document().objects().get(*id) {
+                Some(same) if same == object => {}
+                Some(_) => self.replace_object(object.clone())?,
+                None => self.add_object(object.clone())?,
+            }
+        }
+        let body = self.document().object_marks();
+        let stories = self.document().story_object_marks();
+        for (id, _) in marks_in(before) {
+            let gone =
+                !now.contains_key(&id) && !body.contains_key(&id) && !stories.contains_key(&id);
+            let in_text = self
+                .document()
+                .objects()
+                .get(id)
+                .is_some_and(|o| o.anchor == Anchor::InText);
+            if gone && in_text {
+                self.remove_object(id)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Puts an object in the line of the text, at a position of the body,
     /// and returns the position after its mark (OBJ-01).
     pub fn insert_object_in_text(
@@ -171,6 +253,28 @@ impl Edit {
         Ok(copy)
     }
 
+    /// Deletes the mark of an object in a header, a footer or a note.
+    pub(crate) fn remove_story_mark(
+        &mut self,
+        story: Story,
+        at: Position,
+    ) -> Result<(), ModelError> {
+        let mut paragraphs = self.document().story_paragraphs(story);
+        let Some(paragraph) = paragraphs.iter_mut().find(|p| p.id() == at.paragraph) else {
+            return Ok(());
+        };
+        let end = at.offset + FIELD_CHARACTER.len_utf8();
+        let mut runs = paragraph.slice(0..at.offset)?;
+        runs.extend(paragraph.slice(end..paragraph.len())?);
+        *paragraph = Paragraph::from_runs(
+            paragraph.id(),
+            paragraph.style(),
+            paragraph.attrs().clone(),
+            runs,
+        )?;
+        self.set_story(story, paragraphs)
+    }
+
     /// Deletes the mark at a position, and only it.
     pub(crate) fn remove_mark(&mut self, at: Position) -> Result<(), ModelError> {
         let end = Position::new(at.paragraph, at.offset + FIELD_CHARACTER.len_utf8());
@@ -187,13 +291,14 @@ impl Edit {
             return Ok(());
         }
         let marks = self.document().object_marks();
+        let stories = self.document().story_object_marks();
         for &id in ids {
             let in_text = self
                 .document()
                 .objects()
                 .get(id)
                 .is_some_and(|o| o.anchor == Anchor::InText);
-            if in_text && !marks.contains_key(&id) {
+            if in_text && !marks.contains_key(&id) && !stories.contains_key(&id) {
                 self.remove_object(id)?;
             }
         }
@@ -312,5 +417,79 @@ mod tests {
             document.objects().get(*other).unwrap().frame,
             document.objects().get(id).unwrap().frame
         );
+    }
+
+    #[test]
+    fn est_12_objects_in_a_header_are_kept_and_go_with_their_marks() {
+        use crate::{MarginKind, MarginPages, MarginPlace, Run, Story};
+        let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+        let story = Story::Margin {
+            section: None,
+            place,
+        };
+        let mut editor = Editor::new(Document::new_word_processing());
+        editor
+            .edit("Header", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let header = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    crate::ParaAttrs::default(),
+                    vec![Run::new("Hi")],
+                )?;
+                edit.set_header_footer(place, vec![header])
+            })
+            .unwrap();
+        // Edits the header as its editor does: in the body of a copy.
+        let edit_story =
+            |editor: &mut Editor, change: &dyn Fn(&mut Edit) -> Result<(), ModelError>| {
+                let before = editor.document().story_paragraphs(story);
+                let mut copy = Editor::new(editor.document().with_body(before.clone()));
+                copy.edit("Story", |edit| change(edit)).unwrap();
+                let copy = copy.document().clone();
+                editor
+                    .edit("Story", |edit| {
+                        edit.set_story(story, copy.body().iter().cloned().collect())?;
+                        edit.adopt_story_objects(&copy, &before)
+                    })
+                    .unwrap();
+            };
+        let id = editor.edit("Id", |edit| Ok(edit.new_id())).unwrap();
+        edit_story(&mut editor, &|edit| {
+            let line = edit.document().body().get(0).unwrap().id();
+            edit.insert_object_in_text(Position::new(line, 2), shape(id))?;
+            Ok(())
+        });
+        let marks = editor.document().story_object_marks();
+        assert_eq!(marks.len(), 1, "{marks:?}");
+        assert_eq!(marks[&id].0, story);
+        assert_eq!(
+            editor.document().objects().get(id).unwrap().anchor,
+            Anchor::InText
+        );
+        assert!(editor.document().object_marks().is_empty());
+        // Its mark deleted with the text, the object goes too.
+        edit_story(&mut editor, &|edit| {
+            let line = edit.document().body().get(0).unwrap().id();
+            edit.delete(
+                Position::new(line, 1),
+                Position::new(line, 2 + FIELD_CHARACTER.len_utf8()),
+            )?;
+            Ok(())
+        });
+        assert!(editor.document().objects().get(id).is_none());
+        assert_eq!(editor.document().story_paragraphs(story)[0].text(), "H");
+        // Deleted as an object, its mark goes from the header.
+        edit_story(&mut editor, &|edit| {
+            let line = edit.document().body().get(0).unwrap().id();
+            edit.insert_object_in_text(Position::new(line, 1), shape(id))?;
+            Ok(())
+        });
+        assert!(editor.document().objects().get(id).is_some());
+        editor
+            .edit("Delete", |edit| edit.delete_objects(&[id]))
+            .unwrap();
+        assert!(editor.document().story_object_marks().is_empty());
+        assert_eq!(editor.document().story_paragraphs(story)[0].text(), "H");
     }
 }

@@ -776,7 +776,6 @@ fn read_master(master: &Element) -> MasterPage {
     let part = |name: &str| {
         master.child(STYLE, name).map(|e| {
             let mut paragraphs = Vec::new();
-            // Objects in headers and footers are not read yet.
             collect_paragraphs(e, None, None, &mut paragraphs, &mut Vec::new());
             HeaderFooter {
                 display: e.attr(STYLE, "display") != Some("false"),

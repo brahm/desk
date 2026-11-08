@@ -819,6 +819,34 @@ impl Paragraph {
                 _ => None,
             }))
     }
+
+    /// Its drawing objects and those of the notes in its text.
+    pub fn all_objects(&self) -> Vec<&crate::draw::DrawObject> {
+        let mut all: Vec<_> = self.objects().collect();
+        for span in &self.spans {
+            if let Some(Field::Note(note)) = &span.field {
+                all.extend(note.body.iter().flat_map(Self::all_objects));
+            }
+        }
+        all
+    }
+}
+
+impl MasterPage {
+    /// The paragraphs of its headers and footers.
+    pub fn paragraphs(&self) -> impl Iterator<Item = &Paragraph> {
+        [
+            &self.header,
+            &self.header_first,
+            &self.header_left,
+            &self.footer,
+            &self.footer_first,
+            &self.footer_left,
+        ]
+        .into_iter()
+        .flatten()
+        .flat_map(|part| &part.paragraphs)
+    }
 }
 
 /// Where a paragraph is in a list.

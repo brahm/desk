@@ -1363,6 +1363,10 @@ impl TextEditor {
     /// 72 pixels to the inch, or a PDF at its size, made smaller to fit
     /// inside the margins (OBJ-01).
     pub fn insert_picture_at(&self, picture: desk_model::Picture, at: Option<(usize, f64, f64)>) {
+        if at.is_none() && matches!(self.story(), Some(Story::Margin { .. } | Story::Note(_))) {
+            self.insert_picture_in_line(picture);
+            return;
+        }
         let (page, frame) = self.placed_frame(|room| picture_size(&picture, room), at);
         self.leave_story(None);
         let selection = self.selection();
@@ -1377,6 +1381,37 @@ impl TextEditor {
             Ok(id) => self.select_new_object(selection, id),
             Err(error) => gtk::glib::g_warning!("desk", "cannot insert: {error}"),
         }
+    }
+
+    /// Puts a picture in the line of the header, the footer or the note
+    /// being edited, at the cursor or in place of the selection (EST-12,
+    /// EST-13): no wider than the text, and no taller than two inches.
+    fn insert_picture_in_line(&self, picture: desk_model::Picture) {
+        let before = self.selection();
+        let (start, end) = before.ordered();
+        let width = {
+            let state = self.state.borrow();
+            let setup = state.layout.setup;
+            setup.body_width().to_pt()
+        };
+        let (w, h) = picture_size(&picture, (width.max(1.0), 144.0));
+        let result = self.state.borrow_mut().editor.edit("Insert Image", |edit| {
+            let from = super::at_spot(edit.document(), start)?;
+            let to = super::at_spot(edit.document(), end)?;
+            let at = if start == end {
+                from
+            } else {
+                edit.delete(from, to)?
+            };
+            let object = Object::new(
+                edit.new_id(),
+                ObjectKind::Image(picture),
+                Frame::from_pt(0.0, 0.0, w, h),
+            );
+            let after = edit.insert_object_in_text(at, object)?;
+            Ok(crate::text_nav::Spot::of(edit.document(), after))
+        });
+        self.finish_edit(before, result);
     }
 
     /// Adds a text box linked after the last of those linked with the

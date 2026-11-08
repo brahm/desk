@@ -1411,10 +1411,23 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
 
     // The headers and footers, whose paragraphs name the automatic
     // styles of the styles.
+    // The pictures of their objects too, when they have any (EST-12).
+    let drawn = std::iter::once(&source.master)
+        .chain(source.masters.iter().map(|(_, page)| page))
+        .flat_map(odf::MasterPage::paragraphs)
+        .any(|paragraph| paragraph.objects().next().is_some());
     let styled = odf::TextDocument {
         default_style: source.default_style.clone(),
         styles: source.styles.clone(),
         automatic_styles: source.master_styles.clone(),
+        pictures: if drawn {
+            source.pictures.clone()
+        } else {
+            Vec::new()
+        },
+        gradients: source.gradients.clone(),
+        markers: source.markers.clone(),
+        fill_images: source.fill_images.clone(),
         ..odf::TextDocument::default()
     };
     let mut parts: Vec<(Option<NodeId>, &odf::MasterPage)> = vec![(None, master)];
@@ -1449,6 +1462,24 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     &Marks::new(),
                 )?);
             }
+            // The objects in its lines (EST-12).
+            objects::import_story_inline_objects(
+                &styled,
+                &mut document,
+                &part.paragraphs,
+                &mut paragraphs,
+                &mut |document, paragraph| {
+                    import_paragraph(
+                        &styled,
+                        document,
+                        &ids,
+                        default,
+                        paragraph,
+                        relative,
+                        &Marks::new(),
+                    )
+                },
+            )?;
             if paragraphs.iter().all(Paragraph::is_empty) {
                 continue;
             }
@@ -1749,6 +1780,24 @@ fn import_note(
             runs,
         )?);
     }
+    // The objects in its lines (EST-13).
+    objects::import_story_inline_objects(
+        source,
+        document,
+        &note.body,
+        &mut paragraphs,
+        &mut |document, paragraph| {
+            import_paragraph(
+                source,
+                document,
+                ids,
+                default,
+                paragraph,
+                relative,
+                &Marks::new(),
+            )
+        },
+    )?;
     if paragraphs.is_empty() {
         paragraphs.push(Paragraph::new(document.new_id(), default));
     }
@@ -2123,16 +2172,14 @@ fn export_spans(
                 }
             }
             Some(Some(Field::ObjectMark { object })) => {
-                // In the body, where the object is written in its place;
-                // elsewhere, Desk has no objects in the text.
-                if notes.is_some() {
-                    let mut placeholder = odf::DrawObject::new(odf::DrawKind::Group(Vec::new()));
-                    placeholder.name = Some(objects::inline_placeholder(*object));
-                    spans.push(odf::Span {
-                        field: Some(odf::Field::Object(Box::new(placeholder))),
-                        ..odf::Span::default()
-                    });
-                }
+                // Where the object is written in its place, in the body, a
+                // note, a header or a footer (OBJ-01, EST-12, EST-13).
+                let mut placeholder = odf::DrawObject::new(odf::DrawKind::Group(Vec::new()));
+                placeholder.name = Some(objects::inline_placeholder(*object));
+                spans.push(odf::Span {
+                    field: Some(odf::Field::Object(Box::new(placeholder))),
+                    ..odf::Span::default()
+                });
             }
             Some(Some(Field::NoteMark { note })) => {
                 let Some(notes) = notes.as_deref_mut() else {

@@ -1278,6 +1278,63 @@ fn import_inline_objects(
     Ok(())
 }
 
+/// Adds the objects in the lines of a header, a footer or a note, each
+/// with the identifier that its mark in `model` names, and takes out of
+/// `model` the marks of those that Desk cannot hold (EST-12, EST-13).
+/// `odf` are the paragraphs that `model` was read from, in order.
+pub(super) fn import_story_inline_objects(
+    source: &odf::TextDocument,
+    document: &mut Document,
+    odf: &[odf::Paragraph],
+    model: &mut [Paragraph],
+    paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
+) -> Result<(), FilterError> {
+    let setup = *document.page_setup();
+    for (p, built) in odf.iter().zip(model.iter_mut()) {
+        let inline: Vec<&odf::DrawObject> = p
+            .spans
+            .iter()
+            .filter_map(|s| match &s.field {
+                Some(odf::Field::Object(o)) => Some(&**o),
+                _ => None,
+            })
+            .collect();
+        let marks = desk_model::marks_in(std::slice::from_ref(built));
+        let mut gone = Vec::new();
+        for (i, &(id, at)) in marks.iter().enumerate() {
+            let object = match inline.get(i) {
+                Some(object) => import_one(source, document, object, None, &setup, paragraph, 0)?,
+                None => None,
+            };
+            match object {
+                Some(mut object) => {
+                    object.id = id;
+                    object.anchor = Anchor::InText;
+                    object.frame.x = Length::ZERO;
+                    object.frame.y = Length::ZERO;
+                    object.rotation = 0;
+                    object.wrap = Wrap::Both;
+                    let index = document.objects().len();
+                    document.apply(Op::InsertObject { index, object })?;
+                }
+                None => gone.push(at.offset),
+            }
+        }
+        if gone.is_empty() {
+            continue;
+        }
+        let mut runs = Vec::new();
+        let mut from = 0;
+        for offset in gone {
+            runs.extend(built.slice(from..offset)?);
+            from = offset + FIELD_CHARACTER.len_utf8();
+        }
+        runs.extend(built.slice(from..built.len())?);
+        *built = Paragraph::from_runs(built.id(), built.style(), built.attrs().clone(), runs)?;
+    }
+    Ok(())
+}
+
 /// The name that holds the place of an object in the text while the
 /// objects are written.
 pub(super) fn inline_placeholder(id: NodeId) -> String {
@@ -1941,6 +1998,63 @@ fn turned_with_group(child: &Object, group: &Object) -> Object {
     out
 }
 
+/// The spans that hold the places of objects in paragraphs and in the
+/// notes in them, by the names of the places.
+fn collect_placeholders<'a>(
+    paragraphs: impl Iterator<Item = &'a mut odf::Paragraph>,
+    out: &mut HashMap<String, &'a mut odf::Span>,
+) {
+    for paragraph in paragraphs {
+        for span in paragraph.spans.iter_mut() {
+            let name = match &span.field {
+                Some(odf::Field::Object(o)) => o.name.clone(),
+                _ => None,
+            };
+            if let Some(name) = name {
+                out.insert(name, span);
+                continue;
+            }
+            if let Some(odf::Field::Note(note)) = &mut span.field {
+                collect_placeholders(note.body.iter_mut(), out);
+            }
+        }
+    }
+}
+
+/// Takes out the places of objects that were not written, in paragraphs
+/// and in the notes in them.
+fn drop_placeholders<'a>(
+    paragraphs: impl Iterator<Item = &'a mut odf::Paragraph>,
+    stray: &[String],
+) {
+    for paragraph in paragraphs {
+        paragraph.spans.retain(|span| match &span.field {
+            Some(odf::Field::Object(o)) => o.name.as_ref().is_none_or(|n| !stray.contains(n)),
+            _ => true,
+        });
+        for span in &mut paragraph.spans {
+            if let Some(odf::Field::Note(note)) = &mut span.field {
+                drop_placeholders(note.body.iter_mut(), stray);
+            }
+        }
+    }
+}
+
+/// The paragraphs of the headers and footers of a master page.
+fn master_paragraphs(page: &mut odf::MasterPage) -> impl Iterator<Item = &mut odf::Paragraph> {
+    [
+        &mut page.header,
+        &mut page.header_first,
+        &mut page.header_left,
+        &mut page.footer,
+        &mut page.footer_first,
+        &mut page.footer_left,
+    ]
+    .into_iter()
+    .flatten()
+    .flat_map(|part| part.paragraphs.iter_mut())
+}
+
 /// Writes the objects of a document: those fixed on pages before the
 /// first paragraph, and those that move with a paragraph in it.
 pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDocument) {
@@ -1952,16 +2066,10 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
         .map(|(i, p)| (p.id(), i))
         .collect();
     let left = document.page_setup().margin_left.to_pt();
-    // Where the marks of the objects in the text were written.
-    let mut placeholders: HashMap<String, &mut odf::Span> = out
-        .body
-        .iter_mut()
-        .flat_map(|p| p.spans.iter_mut())
-        .filter_map(|span| match &span.field {
-            Some(odf::Field::Object(o)) => o.name.clone().map(|name| (name, span)),
-            _ => None,
-        })
-        .collect();
+    // Where the marks of the objects in the text were written, in the
+    // body and its notes.
+    let mut placeholders: HashMap<String, &mut odf::Span> = HashMap::new();
+    collect_placeholders(out.body.iter_mut(), &mut placeholders);
     let mut floating = Vec::new();
     for (z, object) in document.objects().iter().enumerate() {
         if object.anchor == Anchor::InText {
@@ -1983,12 +2091,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     }
     // A mark without its object is left out.
     let stray: Vec<String> = placeholders.into_keys().collect();
-    for paragraph in &mut out.body {
-        paragraph.spans.retain(|span| match &span.field {
-            Some(odf::Field::Object(o)) => o.name.as_ref().is_none_or(|n| !stray.contains(n)),
-            _ => true,
-        });
-    }
+    drop_placeholders(out.body.iter_mut(), &stray);
     for (z, object) in floating {
         let at = match object.anchor {
             Anchor::Paragraph(id) => indexes.get(&id).copied(),
@@ -2034,6 +2137,32 @@ pub(super) fn export_master_objects(
         markers: std::mem::take(&mut out.markers),
         fill_images: std::mem::take(&mut out.fill_images),
     };
+    // The objects in the lines of the headers and footers (EST-12), with
+    // the styles of the master pages.
+    {
+        let mut placeholders: HashMap<String, &mut odf::Span> = HashMap::new();
+        collect_placeholders(master_paragraphs(&mut out.master), &mut placeholders);
+        for (_, page) in &mut out.masters {
+            collect_placeholders(master_paragraphs(page), &mut placeholders);
+        }
+        for (z, object) in document.objects().iter().enumerate() {
+            if object.anchor != Anchor::InText {
+                continue;
+            }
+            if let Some(span) = placeholders.remove(&inline_placeholder(object.id)) {
+                let mut drawn = exporter.object(object, "as-char", None, 0.0);
+                drawn.x = None;
+                drawn.y = None;
+                drawn.z_index = Some(z as u32);
+                span.field = Some(odf::Field::Object(Box::new(drawn)));
+            }
+        }
+        let stray: Vec<String> = placeholders.into_keys().collect();
+        drop_placeholders(master_paragraphs(&mut out.master), &stray);
+        for (_, page) in &mut out.masters {
+            drop_placeholders(master_paragraphs(page), &stray);
+        }
+    }
     for (z, object) in document.objects().iter().enumerate() {
         let Anchor::Master(section, _) = object.anchor else {
             continue;

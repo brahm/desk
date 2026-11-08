@@ -429,7 +429,8 @@ pub fn margin_lines(
         pages: layout.pages.len() as u32,
         notes: None,
         pages_of: None,
-        objects: None,
+        // Objects in the lines of headers and footers (EST-12).
+        objects: crate::objects::inline_sizes(document),
     };
     let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
     let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
@@ -493,8 +494,11 @@ impl MarginRoom {
                 if !shown || paragraphs.iter().all(Paragraph::is_empty) {
                     continue;
                 }
-                let (lines, bottom) =
-                    margin_block(document, paragraphs, width, &FieldValues::default(), system);
+                let values = FieldValues {
+                    objects: crate::objects::inline_sizes(document),
+                    ..FieldValues::default()
+                };
+                let (lines, bottom) = margin_block(document, paragraphs, width, &values, system);
                 let reach = match place.kind {
                     MarginKind::Header => bottom,
                     MarginKind::Footer => {
