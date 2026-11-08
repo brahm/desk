@@ -1924,7 +1924,7 @@ fn objects(document: &Document) -> Vec<String> {
             desk_model::Anchor::Paragraph(id) => format!("paragraph {:?}", index(id)),
             desk_model::Anchor::Page(page) => format!("page {page}"),
             desk_model::Anchor::InText => "in the text".to_owned(),
-            desk_model::Anchor::Master(_) => "on the master".to_owned(),
+            desk_model::Anchor::Master(..) => "on the master".to_owned(),
         };
         let kind = match &o.kind {
             desk_model::ObjectKind::TextBox(t) => format!(
@@ -2677,7 +2677,7 @@ fn int_05_est_21_master_objects_are_kept_in_the_master_pages_of_their_sections()
                     Shape::Ellipse.into(),
                     Frame::from_pt(100.0 + 50.0 * i as f64, 300.0, 200.0, 120.0),
                 );
-                object.anchor = Anchor::Master(section);
+                object.anchor = Anchor::Master(section, desk_model::MarginPages::Default);
                 object.style.fill = Some(Fill::Color(Rgba::rgb(0x33, 0x66, 0x99)));
                 edit.add_object(object)?;
             }
@@ -2708,7 +2708,9 @@ fn int_05_est_21_master_objects_are_kept_in_the_master_pages_of_their_sections()
         .iter()
         .map(|o| {
             let anchor = match o.anchor {
-                Anchor::Master(Some(id)) if id == second => Anchor::Master(Some(second_read)),
+                Anchor::Master(Some(id), pages) if id == second => {
+                    Anchor::Master(Some(second_read), pages)
+                }
                 other => other,
             };
             (anchor, o.kind.clone(), o.frame, o.style.fill.clone())
@@ -2797,7 +2799,7 @@ fn int_05_objects_in_the_headers_of_other_programs_go_on_the_master() {
     assert!(
         objects
             .iter()
-            .all(|o| o.anchor == desk_model::Anchor::Master(None))
+            .all(|o| o.anchor == desk_model::Anchor::Master(None, desk_model::MarginPages::Default))
     );
     // The rectangle stands two points below the top of the header, from
     // the left margin, as the paragraph it moved with.
@@ -3067,4 +3069,51 @@ fn obj_04_obj_36_masks_of_a_shape_and_picture_frames_round_trip() {
         .map(|o| (o.picture.mask_shape.clone(), o.style.frame))
         .collect();
     assert_eq!(read, written);
+}
+
+#[test]
+fn est_19_masters_of_the_first_page_and_the_left_pages_round_trip() {
+    use desk_model::{Anchor, Editor, Frame, MarginPages, Object, ObjectKind, Section, Shape};
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Masters", |edit| {
+            let mut setup = *edit.document().page_setup();
+            setup.section = Section {
+                first_page_different: true,
+                left_right_different: true,
+                ..setup.section
+            };
+            edit.set_page_setup(setup)?;
+            for (i, pages) in [MarginPages::Default, MarginPages::First, MarginPages::Left]
+                .into_iter()
+                .enumerate()
+            {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(100.0 + 60.0 * i as f64, 60.0, 50.0, 50.0),
+                );
+                object.anchor = Anchor::Master(None, pages);
+                edit.add_object(object)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("est-19-masters.odt", &bytes);
+    let again = read_odt(&bytes).unwrap();
+    let mut anchors: Vec<_> = again
+        .objects()
+        .iter()
+        .map(|o| (o.frame.x.to_pt().round() as i64, o.anchor))
+        .collect();
+    anchors.sort_by_key(|a| a.0);
+    assert_eq!(
+        anchors,
+        [
+            (100, Anchor::Master(None, MarginPages::Default)),
+            (160, Anchor::Master(None, MarginPages::First)),
+            (220, Anchor::Master(None, MarginPages::Left)),
+        ]
+    );
 }

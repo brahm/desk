@@ -84,6 +84,7 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             reflection,
             picture_frame,
             picture_frame_scale,
+            master_pages,
             fill_tint,
             fill_tint_opacity,
             opacity,
@@ -1029,7 +1030,7 @@ fn import_one(
                 y += top;
             }
         }
-        Anchor::InText | Anchor::Master(_) => {}
+        Anchor::InText | Anchor::Master(..) => {}
         Anchor::Paragraph(_) => {
             // From the edge of the paper, or from the margin.
             if !h_rel.starts_with("page") || h_rel.starts_with("page-content") {
@@ -1057,6 +1058,16 @@ fn import_one(
     }
     let mut built = Object::new(document.new_id(), kind, frame);
     built.anchor = model_anchor;
+    // On a master page, the pages of the section it shows on (EST-19);
+    // the master is set where the master page is read.
+    let master_pages = match g.master_pages.as_deref() {
+        Some("first") => Some(desk_model::MarginPages::First),
+        Some("left") => Some(desk_model::MarginPages::Left),
+        _ => None,
+    };
+    if let Some(pages) = master_pages {
+        built.anchor = Anchor::Master(None, pages);
+    }
     built.rotation = rotation;
     let style = &mut built.style;
     let filled = match g.fill.as_deref() {
@@ -1642,6 +1653,13 @@ impl Exporter<'_> {
             g.opacity = Some(f64::from(style.opacity));
         }
         g.reflection = style.reflection.map(f64::from);
+        if let Anchor::Master(_, pages) = object.anchor {
+            g.master_pages = match pages {
+                desk_model::MarginPages::Default => None,
+                desk_model::MarginPages::First => Some("first".into()),
+                desk_model::MarginPages::Left => Some("left".into()),
+            };
+        }
         if let Some(frame) = style.frame {
             g.picture_frame = Some(frame.style.name().into());
             g.picture_frame_scale = (frame.scale != 100).then_some(f64::from(frame.scale));
@@ -1974,7 +1992,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     for (z, object) in floating {
         let at = match object.anchor {
             Anchor::Paragraph(id) => indexes.get(&id).copied(),
-            Anchor::Page(_) | Anchor::InText | Anchor::Master(_) => None,
+            Anchor::Page(_) | Anchor::InText | Anchor::Master(..) => None,
         };
         let mut drawn = match (object.anchor, at) {
             (Anchor::Paragraph(_), Some(_)) => exporter.object(object, "paragraph", None, left),
@@ -1982,7 +2000,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
             (Anchor::Paragraph(_) | Anchor::InText, None) => {
                 exporter.object(object, "page", Some(0), 0.0)
             }
-            (Anchor::InText | Anchor::Master(_), _) => continue,
+            (Anchor::InText | Anchor::Master(..), _) => continue,
         };
         drawn.z_index = Some(z as u32);
         match at.and_then(|i| out.body.get_mut(i)) {
@@ -2017,7 +2035,7 @@ pub(super) fn export_master_objects(
         fill_images: std::mem::take(&mut out.fill_images),
     };
     for (z, object) in document.objects().iter().enumerate() {
-        let Anchor::Master(section) = object.anchor else {
+        let Anchor::Master(section, _) = object.anchor else {
             continue;
         };
         let mut drawn = exporter.object(object, "page", None, 0.0);
@@ -2105,7 +2123,11 @@ pub(super) fn import_master_objects(
         import_objects(&part, document, paragraph)?;
         let added: Vec<Object> = document.objects().iter().skip(before).cloned().collect();
         for mut object in added {
-            object.anchor = Anchor::Master(section);
+            let pages = match object.anchor {
+                Anchor::Master(_, pages) => pages,
+                _ => desk_model::MarginPages::Default,
+            };
+            object.anchor = Anchor::Master(section, pages);
             object.frame.y = object.frame.y + Length::from_pt(offset);
             document.apply(Op::ReplaceObject { object })?;
         }

@@ -96,6 +96,9 @@ pub struct GraphicProperties {
     /// `desk:picture-frame-scale`: how thick the picture frame is, in
     /// percent.
     pub picture_frame_scale: Option<f64>,
+    /// `desk:master-pages`: the pages of its section that an object of a
+    /// master page shows on, `first` or `left`, when not all (EST-19).
+    pub master_pages: Option<String>,
     /// `style:wrap`: `none`, `left`, `right`, `parallel`, `dynamic`,
     /// `run-through` or `biggest`.
     pub wrap: Option<String>,
@@ -573,6 +576,7 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         opacity: e.attr(DRAW, "opacity").and_then(parse_percent),
         reflection: e.attr(DESK, "reflection").and_then(parse_percent),
         picture_frame: text(DESK, "picture-frame"),
+        master_pages: text(DESK, "master-pages"),
         picture_frame_scale: e.attr(DESK, "picture-frame-scale").and_then(parse_percent),
         fill_tint: e.attr(DESK, "fill-tint").and_then(Color::parse),
         fill_tint_opacity: e.attr(DESK, "fill-tint-opacity").and_then(parse_percent),
@@ -667,6 +671,7 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
         w.attr("desk:fill-tint-opacity", &format!("{}%", decimal(opacity)));
     }
     w.attr_opt("desk:picture-frame", g.picture_frame.as_deref());
+    w.attr_opt("desk:master-pages", g.master_pages.as_deref());
     if let Some(scale) = g.picture_frame_scale {
         w.attr("desk:picture-frame-scale", &format!("{}%", decimal(scale)));
     }

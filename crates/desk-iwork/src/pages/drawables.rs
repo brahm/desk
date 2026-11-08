@@ -29,6 +29,9 @@ pub enum Place {
         section: String,
         /// Whether it is behind the text (`sl:backgroundmaster-group`).
         background: bool,
+        /// The local name of the group of the pages it shows on, as
+        /// `allpages-group`, `firstpage-group` or `evenpage-group`.
+        pages: String,
     },
 }
 
@@ -552,15 +555,14 @@ impl<'a> Reader<'a, '_> {
                         ("foregroundmaster-group", false),
                         ("backgroundmaster-group", true),
                     ] {
-                        let place = Place::Master {
-                            section: section.clone(),
-                            background,
-                        };
                         for master in child.children_named(SL, name) {
-                            // All pages, first, odd and even pages: the
-                            // master of the model has the same objects on
-                            // all.
+                            // All pages, the first, odd and even pages.
                             for pages in master.elements() {
+                                let place = Place::Master {
+                                    section: section.clone(),
+                                    background,
+                                    pages: pages.name.local.clone(),
+                                };
                                 self.group(pages, &place, out);
                             }
                         }

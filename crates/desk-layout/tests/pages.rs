@@ -1072,7 +1072,7 @@ fn int_05_master_objects_show_on_every_page_of_their_section_behind_the_text() {
                     ObjectKind::Shape(Shape::Rectangle),
                     Frame::from_pt(100.0, 60.0, 200.0, 200.0),
                 );
-                object.anchor = Anchor::Master(section);
+                object.anchor = Anchor::Master(section, desk_model::MarginPages::Default);
                 ids.push(object.id);
                 edit.add_object(object)?;
             }
@@ -1112,6 +1112,50 @@ fn int_05_master_objects_show_on_every_page_of_their_section_behind_the_text() {
             .collect()
     };
     assert_eq!(lines(&layout), lines(&without));
+}
+
+#[test]
+fn est_19_the_first_page_and_the_left_pages_have_masters_of_their_own() {
+    use desk_model::{Anchor, Editor, Frame, MarginPages, Object, ObjectKind, Section, Shape};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let ids = editor
+        .edit("Setup", |edit| {
+            edit.set_page_setup(PageSetup {
+                section: Section {
+                    first_page_different: true,
+                    left_right_different: true,
+                    ..Section::default()
+                },
+                ..setup(400.0)
+            })?;
+            edit.insert_text(start, &"words of text that wrap ".repeat(250))?;
+            let mut ids = Vec::new();
+            for pages in [MarginPages::Default, MarginPages::First, MarginPages::Left] {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(100.0, 60.0, 50.0, 50.0),
+                );
+                object.anchor = Anchor::Master(None, pages);
+                ids.push(object.id);
+                edit.add_object(object)?;
+            }
+            Ok(ids)
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut TextSystem::new());
+    assert!(layout.pages.len() >= 4, "{}", layout.pages.len());
+    for (index, page) in layout.pages.iter().enumerate() {
+        let shown: Vec<_> = page.objects.iter().map(|o| o.object.id).collect();
+        // The first page, then left and right pages in turn.
+        let expected = match index {
+            0 => ids[1],
+            i if i % 2 == 1 => ids[2],
+            _ => ids[0],
+        };
+        assert_eq!(shown, [expected], "page {index}");
+    }
 }
 
 #[test]
