@@ -30,8 +30,10 @@ document compatibility with Apple iWork '09 (Pages, Numbers and Keynote
 extensions for what standard ODF cannot hold.
 
 The project is in development, starting with Desk Writer. Its text
-engine, its document structure and its writing tools are done (the
-first five phases of the plan, 97 of the 274 rows of its parity matrix):
+engine, its document structure and its writing tools are done, and its
+objects nearly so (the first six phases of the plan, 152 of the 304 rows
+of its parity matrix have tests, 69 of them against what Pages itself
+laid out):
 
 - It opens ODT documents and Pages '09 documents, listing what a Pages
   document holds that Desk cannot show yet, and saves as ODT.
@@ -44,9 +46,14 @@ first five phases of the plan, 97 of the 274 rows of its parity matrix):
   and endnotes, tables of contents, hyperlinks and bookmarks.
 - It shows the pages one by one or two by two, with page thumbnails, and
   shows the document as an outline whose topics can be moved.
+- It places pictures, shapes, text boxes, movies and sounds on the page
+  or in the text, with masks, Instant Alpha, image adjustments, fills,
+  strokes, shadows, reflections and picture frames; moves, resizes,
+  turns, flips, layers, aligns, groups and locks them; and wraps the
+  text around them.
 - `desk-convert` exports documents to PDF from the command line.
 
-Objects and page layout come next, then tables, formulas and charts.
+Tables and charts come next, then review and collaboration.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
 has a nightly branch built from `main` every night:
