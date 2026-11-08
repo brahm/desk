@@ -1124,3 +1124,51 @@ fn doc_05_an_object_alone_on_a_line_keeps_the_text_below_it_at_any_spacing() {
         "{line:?} {under}"
     );
 }
+
+#[test]
+fn fmt_12_a_justified_line_with_few_spaces_spreads_its_letters_as_pages_does() {
+    let mut system = TextSystem::new();
+    let text = "Desk lays outtextandgoeson";
+    let lay_out = |system: &mut TextSystem, alignment, width| {
+        let paragraph = ParaFormat {
+            alignment,
+            ..ParaFormat::default()
+        };
+        lay_in(system, paragraph, &[(text, sans())], &Column::new(width))
+    };
+    let xs = |layout: &ParagraphLayout| -> Vec<f32> {
+        layout.lines[0]
+            .runs
+            .iter()
+            .flat_map(|r| r.glyphs.iter().map(|g| g.x))
+            .collect()
+    };
+    let left = lay_out(&mut system, Alignment::Left, 140.0);
+    let natural = xs(&left);
+    // "Desk lays" at 12 points: six gaps between letters and a space.
+    let advance = left.lines[0].advance;
+    let check = |system: &mut TextSystem, width: f32, between: f32, space: f32| {
+        let justified = lay_out(system, Alignment::Justify, width);
+        assert_eq!(line_texts(&justified, text)[0], "Desk lays ");
+        let spread = xs(&justified);
+        let grown: Vec<f32> = (1..9)
+            .map(|i| (spread[i] - spread[i - 1]) - (natural[i] - natural[i - 1]))
+            .collect();
+        for (i, g) in grown.iter().enumerate() {
+            let want = match i {
+                3 => 0.0,
+                4 => space,
+                _ => between,
+            };
+            assert!((g - want).abs() < 0.01, "{width}: {grown:?}");
+        }
+    };
+    // 20 points to fill: the space grows by half an em and half the gap
+    // between the letters, which share the rest.
+    let between = (20.0 - 6.0) / 6.5;
+    check(&mut system, advance + 20.0, between, 6.0 + between / 2.0);
+    // 80 points: the letters grow by 0.2892 em at most, and the space
+    // takes the rest.
+    let between = 0.2892 * 12.0;
+    check(&mut system, advance + 80.0, between, 80.0 - 6.0 * between);
+}
