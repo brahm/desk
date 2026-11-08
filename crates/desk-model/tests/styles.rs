@@ -739,3 +739,56 @@ fn sty_10_text_in_locked_objects_takes_the_imported_style_and_keeps_its_look() {
         (heading, Alignment::Center, Length::from_points(18))
     );
 }
+
+#[test]
+fn iop_17_iop_25_text_pasted_where_styles_are_not_kept_keeps_its_look() {
+    // Heading text with a character style, copied whole, pasted into a
+    // document that takes no named styles from it.
+    let (mut source, heading) = editor();
+    let (a, b, end) = (at(&source, 0, 0), at(&source, 0, 3), at(&source, 0, 13));
+    source
+        .edit("Setup", |edit| {
+            edit.set_paragraph_style(a, a, heading)?;
+            edit.new_character_style("Slanted", italic(), a, b, true)?;
+            Ok(())
+        })
+        .unwrap();
+    let fragment = source.document().copy_fragment(a, end).unwrap();
+
+    let mut target = Editor::new(Document::new_word_processing());
+    let start = target.document().start();
+    let styles_before = target.document().styles().iter().count();
+    target
+        .edit("Paste", |edit| {
+            edit.paste_fragment_resolved(start, &fragment).map(drop)
+        })
+        .unwrap();
+    let document = target.document();
+    assert_eq!(paragraph(&target, 0).text(), "one two three");
+    // No style came with the text.
+    assert_eq!(document.styles().iter().count(), styles_before);
+    assert!(
+        document
+            .styles()
+            .by_name(StyleFamily::Paragraph, "Heading")
+            .is_none()
+    );
+    assert!(
+        document
+            .styles()
+            .by_name(StyleFamily::Character, "Slanted")
+            .is_none()
+    );
+    assert_eq!(
+        paragraph(&target, 0).style(),
+        document.styles().default_paragraph()
+    );
+    // It looks as it did: bold, 18 pt and centered, the first word slanted.
+    let first = look(&target, 0, 1);
+    assert!(first.weight.is_bold() && first.italic);
+    assert_eq!(first.font_size, Length::from_points(18));
+    assert!(!look(&target, 0, 6).italic);
+    let p = paragraph(&target, 0);
+    let format = document.styles().resolve_paragraph(p.style(), p.attrs());
+    assert_eq!(format.alignment, Alignment::Center);
+}

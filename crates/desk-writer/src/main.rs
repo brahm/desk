@@ -12,7 +12,7 @@ use std::path::Path;
 
 use desk_ui::gtk::glib;
 use desk_ui::i18n::{n_, tr};
-use desk_ui::{AppInfo, Document, Object, ObjectsFormat, Opened, Opener};
+use desk_ui::{AppInfo, Document, Fragment, Object, ObjectsFormat, Opened, Opener};
 
 const APP: AppInfo = AppInfo {
     id: "br.com.brahm.Desk.Writer",
@@ -33,6 +33,10 @@ const OPENER: Opener = Opener {
         media_type: desk_filters::clip::OBJECTS_TYPE,
         write: copy_objects,
         read: paste_objects,
+        text_type: desk_filters::clip::TEXT_TYPE,
+        write_text: copy_text,
+        read_text: paste_text,
+        named_styles: true,
     }),
 };
 
@@ -46,6 +50,17 @@ fn paste_objects(bytes: &[u8]) -> Result<Document, String> {
     desk_filters::clip::read_objects(bytes)
         .map(|clip| clip.document().clone())
         .map_err(|e| e.to_string())
+}
+
+/// Puts text with its styles on the clipboard for the other apps of Desk.
+fn copy_text(fragment: &Fragment) -> Result<Vec<u8>, String> {
+    desk_filters::clip::write_text(fragment).map_err(|e| e.to_string())
+}
+
+/// Reads the text with its styles that an app of Desk put on the
+/// clipboard.
+fn paste_text(bytes: &[u8]) -> Result<Fragment, String> {
+    desk_filters::clip::read_text(bytes).map_err(|e| e.to_string())
 }
 
 /// Writes a document as an OpenDocument text, with its preview.

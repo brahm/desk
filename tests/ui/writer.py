@@ -461,6 +461,7 @@ def main():
     page_layout(work)
     copies_of_a_shape(work)
     objects_between_apps(work)
+    styled_text_between_apps(work)
     guide_from_the_ruler(work)
     pages_as_sections(work)
     reflection_of_a_shape(work)
@@ -1794,6 +1795,76 @@ def objects_between_apps(work):
         writer.terminate()
         writer.wait(timeout=10)
 
+
+def styled_text_between_apps(work):
+    """Text copied with its paragraph style in one app of Desk pastes in
+    another, a process of its own, with that style (IOP-17, IOP-25)."""
+    source = work / "StyledSource.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(source)], check=True)
+    with zipfile.ZipFile(source) as package:
+        files = {n: package.read(n) for n in package.namelist()}
+    files["styles.xml"] = files["styles.xml"].replace(
+        b"<office:styles>",
+        b'<office:styles><style:style style:name="Clip_20_Style" style:display-name="Clip Style" '
+        b'style:family="paragraph"><style:text-properties fo:font-weight="bold"/></style:style>',
+        1,
+    )
+    files["content.xml"] = files["content.xml"].replace(
+        b"<office:text>",
+        b'<office:text><text:p text:style-name="Clip_20_Style">Styled words</text:p>',
+        1,
+    )
+    with zipfile.ZipFile(source, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for n, data in files.items():
+            package.writestr(n, data, zipfile.ZIP_DEFLATED)
+    writer = subprocess.Popen([str(WRITER), str(source)])
+    other = None
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "StyledSource.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "StyledSource.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        # The first paragraph, with its end.
+        press("ctrl+Home", "shift+Down", "ctrl+c")
+        time.sleep(0.5)
+        target = work / "StyledTarget.odt"
+        subprocess.run([str(CONVERT), str(FIXTURE), str(target)], check=True)
+        # A bus of its own, so that it is another process and not a
+        # window of the first.
+        other = subprocess.Popen(
+            ["dbus-run-session", "--", str(WRITER), str(target)],
+            start_new_session=True,
+            env={**os.environ, "GTK_A11Y": "none", "NO_AT_BRIDGE": "1"},
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "StyledTarget.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        time.sleep(1)
+        # In a paragraph of its own at the end.
+        press("ctrl+End", "Return", "ctrl+v")
+        time.sleep(1)
+        press("ctrl+s")
+        found = wait_for(
+            "the pasted text saved with its style in the other app",
+            lambda: saved_content(target, r'<text:p text:style-name="Clip_20_Style">Styled words'),
+        )
+        check(
+            "text copied in one app of Desk pastes in another with its paragraph style (IOP-17, IOP-25)",
+            bool(found),
+        )
+    finally:
+        if other is not None:
+            os.killpg(other.pid, signal.SIGTERM)
+            other.wait(timeout=10)
+        writer.terminate()
+        writer.wait(timeout=10)
 
 def guide_from_the_ruler(work):
     """A drag from the ruler down onto the page leaves a guide across it,

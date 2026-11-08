@@ -759,9 +759,35 @@ impl TextEditor {
                 .and_then(|(a, b)| document.copy_fragment(a, b))
                 .ok()
         };
+        // The other apps of Desk get the text with its styles too (IOP-17,
+        // IOP-25).
+        let styled = fragment
+            .as_ref()
+            .zip(crate::objects_format())
+            .and_then(|(f, format)| match (format.write_text)(f) {
+                Ok(bytes) => Some(gdk::ContentProvider::for_bytes(
+                    format.text_type,
+                    &gtk::glib::Bytes::from_owned(bytes),
+                )),
+                Err(error) => {
+                    gtk::glib::g_warning!("desk", "cannot copy the styles of the text: {error}");
+                    None
+                }
+            });
         COPIED.with(|c| *c.borrow_mut() = fragment.map(|f| (text.clone(), f)));
         copies::forget_copied_objects();
-        self.view.area().clipboard().set_text(&text);
+        let clipboard = self.view.area().clipboard();
+        match styled {
+            Some(styled) => {
+                let plain = gdk::ContentProvider::for_value(&text.to_value());
+                if let Err(error) =
+                    clipboard.set_content(Some(&gdk::ContentProvider::new_union(&[plain, styled])))
+                {
+                    gtk::glib::g_warning!("desk", "cannot copy: {error}");
+                }
+            }
+            None => clipboard.set_text(&text),
+        }
     }
 
     /// Copies the selection and deletes it.
@@ -794,6 +820,9 @@ impl TextEditor {
         if self.paste_objects() {
             return;
         }
+        if keep && self.paste_text_of_other_apps() {
+            return;
+        }
         let weak = self.downgrade();
         self.view
             .area()
@@ -817,6 +846,48 @@ impl TextEditor {
                     None => this.replace_selection("Paste", &text),
                 }
             });
+    }
+
+    /// Pastes the text with its styles that another app of Desk put on the
+    /// clipboard, when it holds some (IOP-17, IOP-25).
+    fn paste_text_of_other_apps(&self) -> bool {
+        let clipboard = self.view.area().clipboard();
+        let Some(format) = crate::objects_format() else {
+            return false;
+        };
+        if clipboard.is_local() || !clipboard.formats().contain_mime_type(format.text_type) {
+            return false;
+        }
+        let weak = self.downgrade();
+        gtk::glib::spawn_future_local(async move {
+            let read = async {
+                let (stream, _) = clipboard
+                    .read_future(&[format.text_type], gtk::glib::Priority::DEFAULT)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let out = gtk::gio::MemoryOutputStream::new_resizable();
+                out.splice_future(
+                    &stream,
+                    gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
+                        | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
+                    gtk::glib::Priority::DEFAULT,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                (format.read_text)(&out.steal_as_bytes())
+            };
+            let fragment = match read.await {
+                Ok(fragment) => fragment,
+                Err(error) => {
+                    gtk::glib::g_warning!("desk", "cannot paste the text: {error}");
+                    return;
+                }
+            };
+            if let Some(this) = weak.upgrade() {
+                this.paste_fragment(&fragment);
+            }
+        });
+        true
     }
 
     /// Replaces a font family with another one in the whole document, as
@@ -847,7 +918,12 @@ impl TextEditor {
             } else {
                 edit.delete(from, to)?
             };
-            let after = edit.paste_fragment(at, fragment)?;
+            let named = crate::objects_format().is_none_or(|f| f.named_styles);
+            let after = if named {
+                edit.paste_fragment(at, fragment)?
+            } else {
+                edit.paste_fragment_resolved(at, fragment)?
+            };
             Ok(Spot::of(edit.document(), after))
         });
         self.finish_edit(before, result);
