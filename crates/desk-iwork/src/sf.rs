@@ -160,6 +160,9 @@ pub enum Value {
         technique: String,
         /// The `sf:path` of its unfiltered data.
         path: String,
+        /// The color of a tinted image fill (`sf:color`), with the opacity
+        /// of the tint as its alpha.
+        tint: Option<Color>,
     },
     /// What an end of a line ends in (`sf:line-end`), by its
     /// `sf:identifier`, as `filled arrow` or `open circle`.
@@ -398,14 +401,27 @@ impl Value {
                     .to_owned(),
             ),
             "textured-fill" => {
-                let path = element
-                    .descendants()
-                    .filter(|e| e.name.is(SF, "data"))
-                    .find_map(|e| e.attr(SF, "path"));
+                // The picture is saved once: the other fills that use it
+                // refer to it (`sf:unfiltered-ref`).
+                let data = |e: &Element| {
+                    e.descendants()
+                        .filter(|e| e.name.is(SF, "data"))
+                        .find_map(|e| e.attr(SF, "path"))
+                        .map(str::to_owned)
+                };
+                let path = data(element).or_else(|| {
+                    element
+                        .descendants()
+                        .filter(|e| e.name.is(SF, "unfiltered-ref"))
+                        .find_map(|e| data(ids.deref(e)))
+                });
                 match path {
                     Some(path) => Self::TexturedFill {
                         technique: element.attr(SF, "technique").unwrap_or("fill").to_owned(),
-                        path: path.to_owned(),
+                        path,
+                        // A tinted image fill (OBJ-42): the color over the
+                        // picture, whose alpha is the opacity of the tint.
+                        tint: element.child(SF, "color").and_then(color),
                     },
                     None => Self::Other("textured-fill".into()),
                 }

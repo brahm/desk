@@ -166,7 +166,11 @@ fn graphic_style(
     let properties = &drawable.style;
     let fill = match properties.get("fill") {
         // A picture that fills it (OBJ-42).
-        Some(Value::TexturedFill { technique, path }) => picture(path).map(|picture| Fill::Image {
+        Some(Value::TexturedFill {
+            technique,
+            path,
+            tint,
+        }) => picture(path).map(|picture| Fill::Image {
             picture,
             mode: match technique.as_str() {
                 "fit" => desk_model::ImageFill::ScaleToFit,
@@ -175,7 +179,7 @@ fn graphic_style(
                 "tile" => desk_model::ImageFill::Tile,
                 _ => desk_model::ImageFill::ScaleToFill,
             },
-            tint: None,
+            tint: tint.map(rgba),
         }),
         Some(Value::Color(color)) => Some(Fill::Color(rgba(*color))),
         Some(Value::Gradient {
