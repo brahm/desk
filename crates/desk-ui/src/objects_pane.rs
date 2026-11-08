@@ -102,28 +102,14 @@ fn frame_to_page(frame: (f64, f64, f64, f64), rotation: i32, p: (f64, f64)) -> (
     (cx + dx * cos + dy * sin, cy - dx * sin + dy * cos)
 }
 
-/// Where a line starts and ends on the page (OBJ-29).
+/// The start and the end of a line on the page, with its flips and its
+/// rotation, or `None` when the object is no line.
 pub(crate) fn line_ends(
     object: &desk_model::Object,
     frame: (f64, f64, f64, f64),
 ) -> Option<((f64, f64), (f64, f64))> {
-    let desk_model::ObjectKind::Shape(desk_model::Shape::Line { rising }) = object.kind else {
-        return None;
-    };
     let (_, _, w, h) = frame;
-    let (mut start, mut end) = if rising {
-        ((0.0, h), (w, 0.0))
-    } else {
-        ((0.0, 0.0), (w, h))
-    };
-    for p in [&mut start, &mut end] {
-        if object.flip_horizontal {
-            p.0 = w - p.0;
-        }
-        if object.flip_vertical {
-            p.1 = h - p.1;
-        }
-    }
+    let (start, end) = object.line_ends_in(w, h)?;
     Some((
         frame_to_page(frame, object.rotation, start),
         frame_to_page(frame, object.rotation, end),
@@ -131,25 +117,16 @@ pub(crate) fn line_ends(
 }
 
 /// Makes a line go from `start` to `end` on the page, keeping how far it
-/// is turned and which end has which arrow (OBJ-29).
+/// is turned and which end has which arrow: the start stays the start,
+/// as in Pages, even when it lies right of the end (OBJ-29).
 pub(crate) fn set_line_ends(object: &mut desk_model::Object, start: (f64, f64), end: (f64, f64)) {
     let (sin, cos) = (f64::from(object.rotation) / 100.0).to_radians().sin_cos();
     let (dx, dy) = (end.0 - start.0, end.1 - start.1);
     // In the axes of the frame, which turn with it.
-    let (mut fx, mut fy) = (dx * cos - dy * sin, dx * sin + dy * cos);
-    // A line starts on the left of its frame: the other way round, its
-    // ends trade places, and so do their arrows.
-    if fx < 0.0 {
-        (fx, fy) = (-fx, -fy);
-        if let Some(stroke) = &mut object.style.stroke {
-            std::mem::swap(&mut stroke.start, &mut stroke.end);
-        }
-    }
-    let (w, h) = (fx, fy.abs());
+    let (fx, fy) = (dx * cos - dy * sin, dx * sin + dy * cos);
+    let (w, h) = (fx.abs(), fy.abs());
     let (cx, cy) = ((start.0 + end.0) / 2.0, (start.1 + end.1) / 2.0);
-    object.kind = desk_model::ObjectKind::Shape(desk_model::Shape::Line { rising: fy < 0.0 });
-    object.flip_horizontal = false;
-    object.flip_vertical = false;
+    object.set_line_direction(fx, fy);
     object.frame = Frame::from_pt(cx - w / 2.0, cy - h / 2.0, w, h);
 }
 
@@ -694,8 +671,8 @@ mod tests {
         assert!(close(start, (110.0, 70.0)) && close(end, (10.0, 20.0)));
         line.flip_horizontal = false;
 
-        // Ends typed in move the line. Typed right to left, its ends trade
-        // places, and the arrow stays where it was asked for.
+        // Ends typed in move the line. Typed right to left, the start
+        // stays the start, with its arrow, and the line flips across.
         set_line_ends(&mut line, (200.0, 100.0), (50.0, 40.0));
         let frame = (
             line.frame.x.to_pt(),
@@ -704,10 +681,11 @@ mod tests {
             line.frame.height.to_pt(),
         );
         let (start, end) = line_ends(&line, frame).unwrap();
-        assert!(close(start, (50.0, 40.0)), "{start:?}");
-        assert!(close(end, (200.0, 100.0)), "{end:?}");
+        assert!(close(start, (200.0, 100.0)), "{start:?}");
+        assert!(close(end, (50.0, 40.0)), "{end:?}");
+        assert!(line.flip_horizontal);
         let stroke = line.style.stroke.as_ref().unwrap();
-        assert_eq!((stroke.start, stroke.end), (LineEnd::Arrow, LineEnd::None));
+        assert_eq!((stroke.start, stroke.end), (LineEnd::None, LineEnd::Arrow));
         // So does a turned line, whose frame turns with it.
         line.rotation = 3000;
         set_line_ends(&mut line, (0.0, 0.0), (30.0, 80.0));
@@ -722,7 +700,7 @@ mod tests {
         let near =
             |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01;
         assert!(
-            near(start, (30.0, 80.0)) && near(end, (0.0, 0.0)),
+            near(start, (0.0, 0.0)) && near(end, (30.0, 80.0)),
             "{start:?} {end:?}"
         );
     }

@@ -122,13 +122,10 @@ impl PlacedObject {
     /// frame, as Pages selects it.
     pub fn contains(&self, x: f32, y: f32, tolerance: f32) -> bool {
         let (fx, fy) = self.to_frame(x, y);
-        if let ObjectKind::Shape(desk_model::Shape::Line { rising }) = &self.object.kind {
-            let (y0, y1) = if *rising {
-                (self.height, 0.0)
-            } else {
-                (0.0, self.height)
-            };
-            return distance_to_segment((fx, fy), (0.0, y0), (self.width, y1)) <= tolerance;
+        let (w, h) = (f64::from(self.width), f64::from(self.height));
+        if let Some((a, b)) = self.object.line_ends_in(w, h) {
+            let to = |(x, y): (f64, f64)| (x as f32, y as f32);
+            return distance_to_segment((fx, fy), to(a), to(b)) <= tolerance;
         }
         if let ObjectKind::Shape(shape @ desk_model::Shape::Connection(_)) = &self.object.kind {
             // Near the line, along its curve.

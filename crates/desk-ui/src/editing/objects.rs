@@ -75,14 +75,23 @@ fn line(object: &Object) -> Option<bool> {
     }
 }
 
-/// The ends of a line, in the coordinates of its frame.
-fn line_ends(placed: &PlacedObject, rising: bool) -> ((f32, f32), (f32, f32)) {
-    let (w, h) = (placed.width, placed.height);
-    if rising {
-        ((0.0, h), (w, 0.0))
-    } else {
-        ((0.0, 0.0), (w, h))
-    }
+/// How a line is drawn in its frame: whether it rises, and whether it
+/// is flipped across and down, which keeps its start and end apart.
+type LineShape = (bool, bool, bool);
+
+/// The shape of a line, or `None` when the object is no line.
+fn line_shape(object: &Object) -> Option<LineShape> {
+    line(object).map(|rising| (rising, object.flip_horizontal, object.flip_vertical))
+}
+
+/// The ends of a line, in the coordinates of its frame, flipped as the
+/// line is drawn: the start first.
+fn line_ends(placed: &PlacedObject) -> ((f32, f32), (f32, f32)) {
+    let to = |(x, y): (f64, f64)| (x as f32, y as f32);
+    placed
+        .object
+        .line_ends_in(f64::from(placed.width), f64::from(placed.height))
+        .map_or(((0.0, 0.0), (placed.width, placed.height)), |(a, b)| (to(a), to(b)))
 }
 
 /// The start, middle and end of a connection line, in the coordinates of
@@ -106,8 +115,7 @@ fn handle_spot(placed: &PlacedObject, handle: Handle) -> (f32, f32) {
             _ => middle,
         };
     }
-    let rising = line(&placed.object).unwrap_or(false);
-    let (start, end) = line_ends(placed, rising);
+    let (start, end) = line_ends(placed);
     match handle {
         Handle::TopLeft => (0.0, 0.0),
         Handle::Top => (w / 2.0, 0.0),
@@ -163,8 +171,8 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
                 .map(|(x, y)| to_page((x as f32, y as f32)))
                 .collect()
         }
-        Some(rising) => {
-            let (a, b) = line_ends(placed, rising);
+        Some(_) => {
+            let (a, b) = line_ends(placed);
             vec![to_page(a), to_page(b)]
         }
         None => [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)]
@@ -196,8 +204,8 @@ pub(super) struct Placement {
     pub width: f32,
     pub height: f32,
     pub rotation: i32,
-    /// Whether a line rises, which dragging one of its ends can change.
-    pub rising: Option<bool>,
+    /// How a line is drawn, which dragging one of its ends can change.
+    pub line: Option<LineShape>,
 }
 
 impl Placement {
@@ -210,7 +218,7 @@ impl Placement {
             width: placed.width,
             height: placed.height,
             rotation: placed.object.rotation,
-            rising: line(&placed.object),
+            line: line_shape(&placed.object),
         }
     }
 
@@ -222,11 +230,18 @@ impl Placement {
         placed.width = self.width;
         placed.height = self.height;
         placed.object.rotation = self.rotation;
-        if let Some(rising) = self.rising {
-            placed.object.kind = ObjectKind::Shape(Shape::Line { rising });
+        if let Some(shape) = self.line {
+            set_line_shape(&mut placed.object, shape);
         }
         placed
     }
+}
+
+/// Draws a line the way `shape` says.
+fn set_line_shape(object: &mut Object, (rising, across, down): LineShape) {
+    object.kind = ObjectKind::Shape(Shape::Line { rising });
+    object.flip_horizontal = across;
+    object.flip_vertical = down;
 }
 
 /// An object resized by dragging a handle to a point of the page: the
@@ -237,14 +252,14 @@ pub(super) fn resize(
     handle: Handle,
     point: (f32, f32),
     keep: bool,
-) -> (f32, f32, f32, f32, Option<bool>) {
+) -> (f32, f32, f32, f32, Option<LineShape>) {
     let (fx, fy) = placed.to_frame(point.0, point.1);
     let (w, h) = (placed.width, placed.height);
     let (mut l, mut t, mut r, mut b) = (0.0, 0.0, w, h);
-    let mut rising = None;
+    let mut shape = None;
     match handle {
         Handle::Start | Handle::End => {
-            let (start, end) = line_ends(placed, line(&placed.object).unwrap_or(false));
+            let (start, end) = line_ends(placed);
             let (a, z) = if handle == Handle::Start {
                 ((fx, fy), end)
             } else {
@@ -254,9 +269,10 @@ pub(super) fn resize(
             r = a.0.max(z.0);
             t = a.1.min(z.1);
             b = a.1.max(z.1);
-            // The end further left is the lower one when it rises.
-            let (left, right) = if a.0 <= z.0 { (a, z) } else { (z, a) };
-            rising = Some(left.1 > right.1);
+            // The start stays the start, wherever it goes (OBJ-29).
+            let mut moved = placed.object.clone();
+            moved.set_line_direction(f64::from(z.0 - a.0), f64::from(z.1 - a.1));
+            shape = line_shape(&moved);
         }
         _ => {
             let moves_left = matches!(handle, Handle::TopLeft | Handle::Left | Handle::BottomLeft);
@@ -300,7 +316,7 @@ pub(super) fn resize(
     }
     let (nw, nh) = (r - l, b - t);
     let (cx, cy) = placed.to_page((l + r) / 2.0, (t + b) / 2.0);
-    (cx - nw / 2.0, cy - nh / 2.0, nw, nh, rising)
+    (cx - nw / 2.0, cy - nh / 2.0, nw, nh, shape)
 }
 
 /// The rotation of an object turned by dragging from one point of the
@@ -555,8 +571,8 @@ fn placed_object(original: &PlacedObject, from_page: usize, placement: &Placemen
         changed.anchor = Anchor::Page(placement.page as u32);
     }
     changed.rotation = placement.rotation;
-    if let Some(rising) = placement.rising {
-        changed.kind = ObjectKind::Shape(Shape::Line { rising });
+    if let Some(shape) = placement.line {
+        set_line_shape(&mut changed, shape);
     }
     changed
 }
@@ -1783,13 +1799,13 @@ impl TextEditor {
                 .objects
                 .iter()
                 .map(|(p, o)| {
-                    let (x, y, width, height, rising) = resize(o, handle, point, shift);
+                    let (x, y, width, height, shape) = resize(o, handle, point, shift);
                     Placement {
                         x,
                         y,
                         width,
                         height,
-                        rising: rising.or(line(&o.object)),
+                        line: shape.or(line_shape(&o.object)),
                         ..Placement::of(*p, o)
                     }
                 })
@@ -1997,14 +2013,37 @@ mod tests {
     }
 
     #[test]
+    fn obj_29_the_handles_of_a_flipped_line_sit_on_its_ends() {
+        let mut line = placed(0, Shape::Line { rising: false });
+        let ends = |l: &PlacedObject| {
+            let h = handles(l);
+            (h[0].1, h[1].1)
+        };
+        let (start, end) = ends(&line);
+        line.object.flip_horizontal = true;
+        let (flipped_start, flipped_end) = ends(&line);
+        // Flipped across, the start is where the top right corner is.
+        assert!((flipped_start.0 - end.0).abs() < 0.01 && (flipped_start.1 - start.1).abs() < 0.01);
+        assert!((flipped_end.0 - start.0).abs() < 0.01 && (flipped_end.1 - end.1).abs() < 0.01);
+        // Dragging the end of the flipped line keeps it flipped.
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (start.0 - 20.0, end.1), false);
+        assert!(near((x, y, w, h), (start.0 - 20.0, start.1, end.0 - start.0 + 20.0, end.1 - start.1)));
+        assert_eq!(shape, Some((false, true, false)));
+    }
+
+    #[test]
     fn obj_33_the_ends_of_a_line_move_and_it_turns() {
         let line = placed(0, Shape::Line { rising: false });
-        let (x, y, w, h, rising) = resize(&line, Handle::End, (50.0, 20.0), false);
+        // Dragged to the left of its start, the end stays the end: the
+        // line flips across instead of trading its ends (OBJ-29).
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 20.0), false);
         assert!(near((x, y, w, h), (50.0, 20.0, 50.0, 80.0)));
-        assert_eq!(rising, Some(false));
-        let (x, y, w, h, rising) = resize(&line, Handle::End, (50.0, 180.0), false);
+        assert_eq!(shape, Some((true, true, false)));
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 180.0), false);
         assert!(near((x, y, w, h), (50.0, 100.0, 50.0, 80.0)));
-        assert_eq!(rising, Some(true));
+        assert_eq!(shape, Some((false, true, false)));
+        let (_, _, _, _, shape) = resize(&line, Handle::End, (250.0, 180.0), false);
+        assert_eq!(shape, Some((false, false, false)));
         let square = placed(0, Shape::Rectangle);
         let (cx, cy) = square.center();
         // From the right of the center up to above it: a quarter turn

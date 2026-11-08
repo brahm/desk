@@ -1193,6 +1193,11 @@ fn import_one(
     let mirror = g.mirror.as_deref().unwrap_or_default();
     built.flip_horizontal = mirror.contains("horizontal");
     built.flip_vertical = mirror.contains("vertical");
+    if let odf::DrawKind::Line { x1, y1, x2, y2 } = &object.kind {
+        // A line goes from its first point to its second, which keeps
+        // its start the start, flipped when it goes left (OBJ-29).
+        built.set_line_direction(x2.0 - x1.0, y2.0 - y1.0);
+    }
     if built.holds_text() && !object.text.is_empty() && built.text_box().is_none() {
         // The text of a shape, in its middle unless it says otherwise.
         let mut paragraphs = Vec::with_capacity(object.text.len());
@@ -1755,9 +1760,11 @@ impl Exporter<'_> {
         if let ObjectKind::Image(picture) = &object.kind {
             odf_picture_settings(&mut g, object, picture);
         }
+        // A line is flipped in the order of its points.
+        let flips = !matches!(object.kind, ObjectKind::Shape(Shape::Line { .. }));
         let mirror: Vec<&str> = [
-            (object.flip_horizontal, "horizontal"),
-            (object.flip_vertical, "vertical"),
+            (flips && object.flip_horizontal, "horizontal"),
+            (flips && object.flip_vertical, "vertical"),
         ]
         .into_iter()
         .filter_map(|(on, name)| on.then_some(name))
@@ -1795,13 +1802,14 @@ impl Exporter<'_> {
                     .collect(),
                 view_box: Some((0.0, 0.0, f64::from(POLYGON_SCALE), f64::from(POLYGON_SCALE))),
             },
-            ObjectKind::Shape(Shape::Line { rising }) => {
-                let (y1, y2) = if *rising { (y + h, y) } else { (y, y + h) };
+            ObjectKind::Shape(Shape::Line { .. }) => {
+                // From the start to the end, flipped as it is drawn.
+                let ((sx, sy), (ex, ey)) = object.line_ends_in(w, h).unwrap_or(((0.0, 0.0), (w, h)));
                 odf::DrawKind::Line {
-                    x1: odf::Length(x),
-                    y1: odf::Length(y1),
-                    x2: odf::Length(x + w),
-                    y2: odf::Length(y2),
+                    x1: odf::Length(x + sx),
+                    y1: odf::Length(y + sy),
+                    x2: odf::Length(x + ex),
+                    y2: odf::Length(y + ey),
                 }
             }
             ObjectKind::Shape(Shape::Connection(line)) => {
