@@ -6,12 +6,9 @@
 //! as many pages, and draw their objects as Pages drew them, to a few
 //! pixels in a hundred.
 //!
-//! The documents with text in shapes and text boxes, wraps and movies do
-//! not match yet, and are left out until they do: obj-02-image-formats,
-//! obj-12-text-in-shape, obj-13-text-box, obj-14-inline-text-box,
-//! obj-15-linked-boxes, obj-16-fmt-13-19-box-format, obj-17-wrap,
-//! obj-18-audio-video, obj-19-movie-settings and
-//! obj-42-tinted-image-fill.
+//! The documents with text in an oval, a text box in the text and wraps
+//! do not match yet, and are left out until they do:
+//! obj-12-text-in-shape, obj-14-inline-text-box and obj-17-wrap.
 
 use std::path::{Path, PathBuf};
 
@@ -146,4 +143,39 @@ fn obj_40_obj_41_fills_match_pages() {
 #[test]
 fn obj_42_image_fills_match_pages() {
     check("obj-42-image-fill");
+}
+
+#[test]
+fn obj_02_pictures_of_every_format_match_pages() {
+    check("obj-02-image-formats");
+}
+
+#[test]
+fn obj_13_fmt_13_text_boxes_match_pages() {
+    check("obj-13-text-box");
+}
+
+#[test]
+fn obj_15_linked_text_boxes_match_pages() {
+    check("obj-15-linked-boxes");
+}
+
+#[test]
+fn obj_16_fmt_13_fmt_19_columns_and_alignment_of_text_boxes_match_pages() {
+    check("obj-16-fmt-13-19-box-format");
+}
+
+#[test]
+fn obj_18_sounds_and_movies_in_the_text_match_pages() {
+    check("obj-18-audio-video");
+}
+
+#[test]
+fn obj_19_movies_match_pages() {
+    check("obj-19-movie-settings");
+}
+
+#[test]
+fn obj_42_tinted_image_fills_match_pages() {
+    check("obj-42-tinted-image-fill");
 }

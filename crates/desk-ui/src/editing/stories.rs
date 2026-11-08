@@ -798,8 +798,9 @@ mod tests {
         let paragraphs: Vec<Paragraph> = sub.document().body().iter().cloned().collect();
         let edited = story_layout(&layout, story, 0, sub.document());
         let line = &edited.pages[0].lines[0];
-        // In the middle of the shape, from top to bottom.
-        assert!(((line.top() + line.bottom()) / 2.0 - 430.0).abs() < 0.01);
+        // In the middle of the shape, from its top to its baseline, as
+        // Pages centres it (FMT-19).
+        assert!(((line.top() + line.baseline()) / 2.0 - 430.0).abs() < 0.01);
         editor
             .edit("Edit Text", |edit| edit.set_story(story, paragraphs))
             .unwrap();

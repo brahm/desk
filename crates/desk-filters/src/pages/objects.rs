@@ -383,14 +383,24 @@ struct Builder<'a, 'b> {
 impl Builder<'_, '_> {
     /// Gives text the inset, columns and vertical alignment of the layout
     /// style of the text of an object.
-    fn lay_out(&self, text_box: &mut TextBox, drawable: &Drawable) {
+    fn lay_out(&self, text_box: &mut TextBox, drawable: &Drawable, in_shape: bool) {
         let sheet = self.importer.sheet;
         let Some(style) = drawable.text_layout.as_deref().and_then(|l| sheet.find(l)) else {
             return;
         };
         let chain = sheet.ancestry(style);
         let get = |name: &str| chain.iter().find_map(|s| s.properties.get(name));
-        if let Some(Value::Padding { left, .. }) = get("padding") {
+        // Pages lays the text of a text box out from the edges of its
+        // frame: the inset of 4 pt of the default layout style of text
+        // boxes is not drawn (FMT-13, OBJ-13). Shapes keep theirs.
+        let padding = chain
+            .iter()
+            .find(|s| s.properties.get("padding").is_some())
+            .filter(|s| {
+                in_shape || s.ident.as_deref() != Some("graphic-textbox-layout-style-default")
+            })
+            .and_then(|s| s.properties.get("padding"));
+        if let Some(Value::Padding { left, .. }) = padding {
             text_box.inset = Length::from_pt(left.max(0.0));
         }
         if let Some(Value::Number(v)) = get("verticalAlignment") {
@@ -466,10 +476,9 @@ impl Builder<'_, '_> {
                             self.importer.body,
                         ));
                     }
-                    let mut text_box =
-                        TextBox::new(std::mem::take(&mut text).into(), Length::from_points(4));
+                    let mut text_box = TextBox::new(std::mem::take(&mut text).into(), Length::ZERO);
                     text_box.next = next.as_ref().and_then(|n| self.ids.get(n)).copied();
-                    self.lay_out(&mut text_box, drawable);
+                    self.lay_out(&mut text_box, drawable, false);
                     ObjectKind::TextBox(text_box)
                 } else {
                     let (shape, reversed) = shape(path, geometry.natural);
@@ -613,7 +622,7 @@ impl Builder<'_, '_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let mut text_box = TextBox::in_shape(Arc::from(centered));
-            self.lay_out(&mut text_box, drawable);
+            self.lay_out(&mut text_box, drawable, true);
             object.text = Some(text_box);
         }
         Ok(Some(object))
