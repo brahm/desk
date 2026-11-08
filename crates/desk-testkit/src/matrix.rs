@@ -136,9 +136,11 @@ mod tests {
     fn the_matrix_of_the_corpus_reads() {
         let text = include_str!("../../../corpus/matrix.tsv");
         let rows = parse(text).unwrap();
-        assert_eq!(rows.len(), 271);
-        let pages = rows.iter().filter(|r| !r.id.starts_with("IOP")).count();
-        assert_eq!(pages, 260);
+        assert_eq!(rows.len(), 304);
+        let count = |prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
+        assert_eq!(count("IOP"), 33);
+        assert_eq!(count("GNM"), 11);
+        assert_eq!(rows.len() - count("IOP") - count("GNM"), 260);
         assert!(rows.iter().all(|r| r.phase.is_none_or(|p| p <= 11)));
     }
 }
