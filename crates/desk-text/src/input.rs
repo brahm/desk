@@ -47,6 +47,10 @@ fn hyphen_points(text: &str, language: &str, settings: &TextSettings) -> Vec<usi
 pub(crate) const FI: char = '\u{fb01}';
 /// U+FB02 LATIN SMALL LIGATURE FL.
 pub(crate) const FL: char = '\u{fb02}';
+/// U+FB00 LATIN SMALL LIGATURE FF.
+pub(crate) const FF: char = '\u{fb00}';
+/// U+FB03 LATIN SMALL LIGATURE FFI.
+pub(crate) const FFI: char = '\u{fb03}';
 
 /// The size of synthesized small capitals, relative to the font size.
 ///
@@ -348,11 +352,15 @@ impl ParagraphText {
                     out.formats.len() - 1
                 }
             } as u32;
-            // Pages joins fi and fl, and no other letters, in the fonts of
-            // the Mac that have those ligatures (DOC-05).
-            let ligatures = format.capitalization == Capitalization::None
-                && format.ligatures != Ligatures::None
-                && pages_font(&format.font_family).is_some_and(|f| f.ligatures);
+            // Pages joins fi and fl in the fonts of the Mac that have those
+            // ligatures, and ff and ffi in some faces, and no other letters
+            // (DOC-05).
+            let pages = (format.capitalization == Capitalization::None
+                && format.ligatures != Ligatures::None)
+                .then(|| pages_font(&format.font_family, format.weight.value()))
+                .flatten();
+            let ligatures = pages.is_some_and(|f| f.ligatures);
+            let ff_ligatures = pages.is_some_and(|f| f.ff_ligatures);
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
                 if let Some(field) = &format.field {
@@ -382,19 +390,23 @@ impl ParagraphText {
                     transformed = true;
                 }
                 let start = out.text.len();
-                let ligature = match (c, chars.peek()) {
-                    ('f', Some('i')) if ligatures => Some(FI),
-                    ('f', Some('l')) if ligatures => Some(FL),
+                let mut ahead = chars.clone();
+                let ligature = match (c, ahead.next(), ahead.next()) {
+                    ('f', Some('f'), Some('i')) if ff_ligatures => Some((FFI, 3)),
+                    ('f', Some('f'), _) if ff_ligatures => Some((FF, 2)),
+                    ('f', Some('i'), _) if ligatures => Some((FI, 2)),
+                    ('f', Some('l'), _) if ligatures => Some((FL, 2)),
                     _ => None,
                 };
-                if let Some(ligature) = ligature {
-                    chars.next();
+                if let Some((ligature, letters)) = ligature {
+                    for _ in 1..letters {
+                        previous = chars.next();
+                    }
                     out.text.push(ligature);
                     out.offsets.push((start, model_offset));
                     out.push_range(start..out.text.len(), index, false);
-                    model_offset += 2;
+                    model_offset += letters;
                     transformed = true;
-                    previous = Some('i');
                     continue;
                 }
                 let word_start = !previous.is_some_and(char::is_alphanumeric);
