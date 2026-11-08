@@ -1310,3 +1310,28 @@ fn doc_05_an_empty_space_after_takes_the_space_of_the_parent_away() {
     // Without its own style, the paragraph keeps the space of Body.
     assert_eq!(format(1).space_after, Length::from_points(12));
 }
+
+#[test]
+fn doc_05_an_empty_property_takes_what_pages_starts_from() {
+    // Pages saves a property empty when it holds what Pages starts from
+    // before any style: italic off under the italic Quote, and widow
+    // control on under a parent that turned it off.
+    let anon = r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-90" sfa:ID="A-1"><sf:property-map><sf:italic/></sf:property-map></sf:paragraphstyle>
+<sf:paragraphstyle sf:parent-ident="paragraph-style-90" sfa:ID="A-2"><sf:property-map><sf:widowControl><sf:number sfa:number="0" sfa:type="c"/></sf:widowControl></sf:property-map></sf:paragraphstyle>
+<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-3"><sf:property-map><sf:widowControl/><sf:keepWithNext/></sf:property-map></sf:paragraphstyle>"#;
+    let body = r#"<sf:p sf:style="A-1">Plain<sf:crbr/></sf:p><sf:p sf:style="paragraph-style-90">Italic<sf:crbr/></sf:p><sf:p sf:style="A-2">Widows<sf:crbr/></sf:p><sf:p sf:style="A-3">Kept</sf:p>"#;
+    let document = read_pages(index(STYLES, anon, body).as_bytes()).unwrap();
+    let styles = document.styles();
+    let paragraph = |i: usize| document.body().get(i).unwrap();
+    let format = |i: usize| styles.resolve_paragraph(paragraph(i).style(), paragraph(i).attrs());
+    let italic = |i: usize| {
+        let p = paragraph(i);
+        let run = p.runs().next().unwrap();
+        styles.resolve_character(p.style(), run.style, &run.attrs).italic
+    };
+    assert!(!italic(0));
+    assert!(italic(1));
+    assert!(!format(2).widow_control);
+    assert!(format(3).widow_control);
+    assert!(!format(3).keep_with_next);
+}
