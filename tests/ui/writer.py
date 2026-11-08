@@ -455,6 +455,7 @@ def main():
     drawn_with_the_pen(work)
     editable_shape(work)
     connection_line(work)
+    position_of_a_turned_shape(work)
     media_browser(work)
     master_objects(work)
     page_layout(work)
@@ -1506,6 +1507,47 @@ def connection_line(work):
         writer.terminate()
         writer.wait(timeout=10)
 
+
+def spin_of(app, title):
+    """The spin button of the showing row titled `title`."""
+    row = wait_for(f"the {title} row of the Inspector", lambda: showing_named(app, title))
+    return next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
+
+
+def position_of_a_turned_shape(work):
+    """X and Y of the Metrics place the box that holds a turned shape
+    (OBJ-29)."""
+    writer, app, letter = open_with_a_shape(work, "Turned.odt")
+    try:
+        x = spin_of(app, "X")
+        # The shape is 300 by 200 points, at 96 points from the left, shown
+        # in the units of the preferences.
+        per_point = Atspi.Value.get_current_value(x) / 96
+        Atspi.Value.set_current_value(spin_of(app, "Rotate"), 90)
+        # A quarter turn about its middle: the box that holds it is 200
+        # points wide, 50 points further right.
+        wait_for(
+            "X of the turned shape",
+            lambda: abs(Atspi.Value.get_current_value(x) / per_point - 146) < 0.5 or None,
+        )
+        check("X of a turned shape is where the box that holds it starts (OBJ-29)", True)
+        Atspi.Value.set_current_value(x, 100 * per_point)
+        time.sleep(0.5)
+        press("ctrl+s")
+
+        def moved():
+            # ODF places the turned corner of the frame, here the bottom
+            # left, which a quarter turn takes to the left of the box.
+            found = saved_content(
+                letter, r'<draw:rect[^>]*translate \(([-\d.]+(?:pt|in|cm|mm))'
+            )
+            return found and abs(points(found.group(1)) - 100) < 0.5
+
+        wait_for("the saved shape, turned and moved", moved)
+        check("a turned shape moves so that its box starts at the X typed in (OBJ-29)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
 
 def click_node(node, name):
     """Clicks the middle of a node of the window titled `name`."""
