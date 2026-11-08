@@ -223,8 +223,9 @@ pub struct Drawable {
     pub locked: bool,
     /// The shadow of its style (a `SFIUDropShadow` filter).
     pub shadow: Option<ObjectShadow>,
-    /// Whether its style reflects it (a `SFIUReflection` filter).
-    pub reflection: bool,
+    /// How opaque the reflection of its style is, from 0 to 1, when its
+    /// style reflects it (a `SFIUReflection` filter).
+    pub reflection: Option<f64>,
     /// The layout style of its text (`sf:text sf:layoutstyle`), by its
     /// identifier or object ID: its inset, columns and vertical
     /// alignment.
@@ -415,7 +416,7 @@ impl<'a> Reader<'a, '_> {
 
     /// The shadow and the reflection of a graphic style, from the first
     /// of it and its parents that has filters.
-    fn filters(&self, element: &'a Element) -> (Option<ObjectShadow>, bool) {
+    fn filters(&self, element: &'a Element) -> (Option<ObjectShadow>, Option<f64>) {
         let mut style = element
             .child(SF, "style")
             .and_then(|s| s.elements().next())
@@ -427,7 +428,7 @@ impl<'a> Reader<'a, '_> {
                 .and_then(|m| m.child(SF, "filters"));
             if let Some(filters) = filters {
                 let mut shadow = None;
-                let mut reflection = false;
+                let mut reflection = None;
                 for info in filters
                     .descendants()
                     .filter(|e| e.name.is(SF, "core-image-filter-info"))
@@ -437,19 +438,19 @@ impl<'a> Reader<'a, '_> {
                         .map(|e| self.ids.deref(e))
                         .find(|e| e.name.is(SF, "core-image-filter-descriptor"))
                         .and_then(|d| d.attr(SF, "filterClassName"));
+                    let overrides = info.child(SF, "overrides");
+                    let get = |name: &str| {
+                        overrides?
+                            .child(SF, name)?
+                            .child(SF, "number")?
+                            .attr(SFA, "number")?
+                            .trim()
+                            .parse::<f64>()
+                            .ok()
+                            .filter(|v| v.is_finite())
+                    };
                     match class {
                         Some("SFIUDropShadow") => {
-                            let overrides = info.child(SF, "overrides");
-                            let get = |name: &str| {
-                                overrides?
-                                    .child(SF, name)?
-                                    .child(SF, "number")?
-                                    .attr(SFA, "number")?
-                                    .trim()
-                                    .parse::<f64>()
-                                    .ok()
-                                    .filter(|v| v.is_finite())
-                            };
                             let base = ObjectShadow::default();
                             shadow = Some(ObjectShadow {
                                 color: overrides
@@ -463,7 +464,9 @@ impl<'a> Reader<'a, '_> {
                                 opacity: get("inputOpacity").unwrap_or(base.opacity),
                             });
                         }
-                        Some("SFIUReflection") => reflection = true,
+                        Some("SFIUReflection") => {
+                            reflection = Some(get("inputOpacity").unwrap_or(0.5).clamp(0.0, 1.0));
+                        }
                         _ => {}
                     }
                 }
@@ -473,7 +476,7 @@ impl<'a> Reader<'a, '_> {
                 .attr(SF, "parent-ident")
                 .and_then(|p| self.graphic_styles.get(p).copied());
         }
-        (None, false)
+        (None, None)
     }
 
     /// The text wrap of a graphic style and of its parents.

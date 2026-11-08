@@ -583,6 +583,9 @@ pub struct GraphicStyle {
     pub opacity: u8,
     /// The shadow it casts on the page; none when it casts none.
     pub shadow: Option<ObjectShadow>,
+    /// How opaque its reflection below it is where it starts, in percent;
+    /// none when it is not reflected (OBJ-38).
+    pub reflection: Option<u8>,
 }
 
 impl Default for GraphicStyle {
@@ -592,8 +595,15 @@ impl Default for GraphicStyle {
             stroke: None,
             opacity: 100,
             shadow: None,
+            reflection: None,
         }
     }
+}
+
+impl GraphicStyle {
+    /// How opaque a reflection is where it starts when the Graphic
+    /// inspector turns it on, in percent, as in Pages.
+    pub const REFLECTION: u8 = 50;
 }
 
 /// What fills an object.
@@ -620,6 +630,9 @@ pub enum Fill {
         picture: Picture,
         /// How it is sized to the object.
         mode: ImageFill,
+        /// A color laid over it, with its opacity in its alpha: the
+        /// tinted image fill of Pages (OBJ-42).
+        tint: Option<Rgba>,
     },
 }
 

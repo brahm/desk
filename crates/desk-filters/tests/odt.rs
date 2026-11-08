@@ -1759,6 +1759,7 @@ fn with_objects() -> Document {
                 ..desk_model::ObjectShadow::default()
             });
             square.style.opacity = 80;
+            square.style.reflection = Some(35);
             edit.add_object(square)?;
             let mut ellipse = Object::new(
                 edit.new_id(),
@@ -1803,6 +1804,11 @@ fn with_objects() -> Document {
             tiled.style.fill = Some(Fill::Image {
                 picture: Picture::from_png(pixel_png()).unwrap(),
                 mode: desk_model::ImageFill::ScaleToFit,
+                // A tint at 40 percent (OBJ-42).
+                tint: Some(Rgba {
+                    a: 102,
+                    ..Rgba::rgb(0, 128, 0)
+                }),
             });
             edit.add_object(tiled)?;
             let bold = CharAttrs {

@@ -159,9 +159,24 @@ fn adjustments(properties: &[(String, f64)]) -> desk_model::Adjustments {
 }
 
 /// The style of the model for the properties of a graphic style.
-fn graphic_style(drawable: &Drawable) -> GraphicStyle {
+fn graphic_style(
+    drawable: &Drawable,
+    picture: impl Fn(&str) -> Option<desk_model::Picture>,
+) -> GraphicStyle {
     let properties = &drawable.style;
     let fill = match properties.get("fill") {
+        // A picture that fills it (OBJ-42).
+        Some(Value::TexturedFill { technique, path }) => picture(path).map(|picture| Fill::Image {
+            picture,
+            mode: match technique.as_str() {
+                "fit" => desk_model::ImageFill::ScaleToFit,
+                "stretch" => desk_model::ImageFill::Stretch,
+                "natural" => desk_model::ImageFill::OriginalSize,
+                "tile" => desk_model::ImageFill::Tile,
+                _ => desk_model::ImageFill::ScaleToFill,
+            },
+            tint: None,
+        }),
         Some(Value::Color(color)) => Some(Fill::Color(rgba(*color))),
         Some(Value::Gradient { angle, stops }) => match (stops.first(), stops.last()) {
             (Some(from), Some(to)) => Some(Fill::Gradient {
@@ -196,6 +211,7 @@ fn graphic_style(drawable: &Drawable) -> GraphicStyle {
             .number("opacity")
             .map_or(100, |o| (o * 100.0).round().clamp(0.0, 100.0) as u8),
         shadow: None,
+        reflection: None,
     }
 }
 
@@ -462,7 +478,7 @@ impl Builder<'_, '_> {
         object.rotation = (geometry.angle * 100.0).round().rem_euclid(36_000.0) as i32;
         object.flip_horizontal = geometry.flip_horizontal;
         object.flip_vertical = geometry.flip_vertical;
-        object.style = graphic_style(drawable);
+        object.style = graphic_style(drawable, |path| self.picture(path));
         if swap_ends && let Some(stroke) = &mut object.style.stroke {
             std::mem::swap(&mut stroke.start, &mut stroke.end);
         }
@@ -480,6 +496,9 @@ impl Builder<'_, '_> {
         }
         object.locked = drawable.locked;
         object.picture = picture_settings;
+        object.style.reflection = drawable
+            .reflection
+            .map(|r| (r * 100.0).round().clamp(0.0, 100.0) as u8);
         object.style.shadow = drawable.shadow.map(|shadow| desk_model::ObjectShadow {
             color: rgba(shadow.color),
             // Pages turns it clockwise, the model counterclockwise.

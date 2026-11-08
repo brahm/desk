@@ -78,6 +78,14 @@ pub struct GraphicProperties {
     pub shadow_blur: Option<Length>,
     /// `draw:opacity`, in percent.
     pub opacity: Option<f64>,
+    /// `desk:fill-tint`: the color laid over a picture that fills the
+    /// object (OBJ-42).
+    pub fill_tint: Option<Color>,
+    /// `desk:fill-tint-opacity`, in percent.
+    pub fill_tint_opacity: Option<f64>,
+    /// `desk:reflection`: how opaque the reflection below the object is
+    /// where it starts, in percent (OBJ-38).
+    pub reflection: Option<f64>,
     /// `style:wrap`: `none`, `left`, `right`, `parallel`, `dynamic`,
     /// `run-through` or `biggest`.
     pub wrap: Option<String>,
@@ -493,6 +501,9 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         shadow_opacity: e.attr(DRAW, "shadow-opacity").and_then(parse_percent),
         shadow_blur: length(DESK, "shadow-blur").or_else(|| length(LOEXT, "shadow-blur")),
         opacity: e.attr(DRAW, "opacity").and_then(parse_percent),
+        reflection: e.attr(DESK, "reflection").and_then(parse_percent),
+        fill_tint: e.attr(DESK, "fill-tint").and_then(Color::parse),
+        fill_tint_opacity: e.attr(DESK, "fill-tint-opacity").and_then(parse_percent),
         wrap: text(STYLE, "wrap"),
         wrap_contour: text(STYLE, "wrap-contour").map(|v| v == "true"),
         run_through: text(STYLE, "run-through"),
@@ -575,6 +586,15 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     }
     if let Some(opacity) = g.shadow_opacity {
         w.attr("draw:shadow-opacity", &format!("{}%", decimal(opacity)));
+    }
+    if let Some(tint) = g.fill_tint {
+        w.attr("desk:fill-tint", &tint.to_string());
+    }
+    if let Some(opacity) = g.fill_tint_opacity {
+        w.attr("desk:fill-tint-opacity", &format!("{}%", decimal(opacity)));
+    }
+    if let Some(reflection) = g.reflection {
+        w.attr("desk:reflection", &format!("{}%", decimal(reflection)));
     }
     if let Some(opacity) = g.opacity {
         w.attr("draw:opacity", &format!("{}%", decimal(opacity)));
