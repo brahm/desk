@@ -11,8 +11,8 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{
-    BorderStyle, Fill, Gradient, GradientStop, GraphicStyle, ImageFill, Length, LineEnd,
-    ObjectKind, ObjectShadow, Picture, Rgba, Stroke,
+    BorderStyle, Fill, FrameStyle, Gradient, GradientStop, GraphicStyle, ImageFill, Length,
+    LineEnd, ObjectKind, ObjectShadow, Picture, PictureFrame, Rgba, Stroke,
 };
 
 use crate::editing::ObjectInfo;
@@ -53,6 +53,17 @@ fn image_fill_name(mode: ImageFill) -> String {
 /// The styles of a line, after "None" in its list.
 const STROKES: [BorderStyle; 3] = [BorderStyle::Solid, BorderStyle::Dashed, BorderStyle::Dotted];
 
+/// The name of a picture frame of the library (OBJ-36).
+fn frame_style_name(style: FrameStyle) -> String {
+    match style {
+        FrameStyle::Photo => tr("Photo"),
+        FrameStyle::Gallery => tr("Gallery"),
+        FrameStyle::Classic => tr("Classic"),
+        FrameStyle::Metal => tr("Metal"),
+        FrameStyle::Tape => tr("Tape"),
+    }
+}
+
 /// The color a fill or a line starts with when it is turned on.
 const BLUE: Rgba = Rgba::rgb(0x46, 0x82, 0xb4);
 
@@ -85,6 +96,10 @@ pub struct GraphicGroup {
     stroke_color: gtk::ColorDialogButton,
     stroke_color_row: adw::ActionRow,
     stroke_width: adw::SpinRow,
+    /// The picture frame, which the Stroke list offers after the lines
+    /// (OBJ-36).
+    frame_style: adw::ComboRow,
+    frame_scale: adw::SpinRow,
     start: adw::ComboRow,
     end: adw::ComboRow,
     shadow: adw::SwitchRow,
@@ -203,8 +218,21 @@ impl GraphicGroup {
         center_y.set_subtitle(&tr("Percent"));
         let stroke = combo(
             &tr("Stroke"),
-            &[tr("None"), tr("Solid"), tr("Dashed"), tr("Dotted")],
+            &[
+                tr("None"),
+                tr("Solid"),
+                tr("Dashed"),
+                tr("Dotted"),
+                tr("Picture Frame"),
+            ],
         );
+        let frames: Vec<String> = FrameStyle::ALL
+            .iter()
+            .map(|f| frame_style_name(*f))
+            .collect();
+        let frame_style = combo(&tr("Frame"), &frames);
+        let frame_scale = spin(&tr("Frame Thickness"), 10.0, 400.0, 5.0);
+        frame_scale.set_subtitle(&tr("Percent"));
         let (stroke_color_row, stroke_color) = color_row(&tr("Stroke Color"));
         let stroke_width = spin(&tr("Stroke Width"), 0.5, 100.0, 0.5);
         stroke_width.set_digits(1);
@@ -247,6 +275,8 @@ impl GraphicGroup {
             stroke.upcast_ref(),
             stroke_color_row.upcast_ref(),
             stroke_width.upcast_ref(),
+            frame_style.upcast_ref(),
+            frame_scale.upcast_ref(),
             start.upcast_ref(),
             end.upcast_ref(),
             shadow.upcast_ref(),
@@ -286,6 +316,8 @@ impl GraphicGroup {
             stroke_color,
             stroke_color_row,
             stroke_width,
+            frame_style,
+            frame_scale,
             start,
             end,
             shadow,
@@ -322,6 +354,7 @@ impl GraphicGroup {
                 }
                 let fill = this.fill_value();
                 let stroke = this.stroke_value();
+                let frame = this.frame_value();
                 let shadow = this.shadow_value();
                 let reflection = this
                     .reflection
@@ -335,6 +368,12 @@ impl GraphicGroup {
                         }
                     }
                     Part::Stroke => {
+                        // A line has no frame; the line of another
+                        // object stays, for when its frame goes.
+                        style.frame = frame.filter(|_| !line);
+                        if frame.is_some() {
+                            return;
+                        }
                         style.stroke = stroke.map(|mut s| {
                             if !line {
                                 s.start = LineEnd::None;
@@ -436,7 +475,10 @@ impl GraphicGroup {
                 this.gradient_bar.remove();
             }
         });
-        for row in [&this.stroke, &this.start, &this.end] {
+        let on = changed.clone();
+        this.frame_scale
+            .connect_value_notify(move |_| on("Stroke", Part::Stroke));
+        for row in [&this.stroke, &this.start, &this.end, &this.frame_style] {
             let on = changed.clone();
             row.connect_selected_notify(move |_| on("Stroke", Part::Stroke));
         }
@@ -600,6 +642,17 @@ impl GraphicGroup {
         })
     }
 
+    /// The picture frame that the rows ask for.
+    fn frame_value(&self) -> Option<PictureFrame> {
+        (self.stroke.selected() == 4).then(|| PictureFrame {
+            style: FrameStyle::ALL
+                .get(self.frame_style.selected() as usize)
+                .copied()
+                .unwrap_or_default(),
+            scale: self.frame_scale.value().round().clamp(10.0, 400.0) as u16,
+        })
+    }
+
     /// The shadow that the rows ask for.
     fn shadow_value(&self) -> Option<ObjectShadow> {
         self.shadow.is_active().then(|| ObjectShadow {
@@ -640,9 +693,12 @@ impl GraphicGroup {
             .set_visible(self.fill.is_visible() && fill == 2);
         self.gradient_angle
             .set_visible(shown && (fill == 2 || (fill == 5 && !radial)));
-        let stroked = self.stroke.selected() > 0;
+        let framed = self.stroke.selected() == 4;
+        let stroked = self.stroke.selected() > 0 && !framed;
         self.stroke_color_row.set_visible(stroked);
         self.stroke_width.set_visible(stroked);
+        self.frame_style.set_visible(framed);
+        self.frame_scale.set_visible(framed);
         let line = !self.fill.is_visible();
         self.start.set_visible(stroked && line);
         self.end.set_visible(stroked && line);
@@ -742,7 +798,15 @@ impl GraphicGroup {
         if !matches!(style.fill, Some(Fill::Gradient { .. } | Fill::Advanced(_))) {
             self.gradient_bar.set_stops(Vec::new());
         }
+        let frame = style.frame.unwrap_or(PictureFrame::new(FrameStyle::Photo));
+        let index = FrameStyle::ALL
+            .iter()
+            .position(|f| *f == frame.style)
+            .unwrap_or(0);
+        select(&self.frame_style, index as u32);
+        set(&self.frame_scale, f64::from(frame.scale));
         match style.stroke {
+            _ if style.frame.is_some() && !line => select(&self.stroke, 4),
             Some(stroke) => {
                 let index = STROKES.iter().position(|s| *s == stroke.style).unwrap_or(0);
                 select(&self.stroke, index as u32 + 1);

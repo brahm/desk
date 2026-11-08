@@ -164,6 +164,14 @@ pub enum Value {
     /// What an end of a line ends in (`sf:line-end`), by its
     /// `sf:identifier`, as `filled arrow` or `open circle`.
     LineEnd(String),
+    /// A picture frame of the library of Pages (`sf:frame`), by its
+    /// `sf:name`, with its `sf:asset_scale`.
+    Frame {
+        /// `sf:name`, as `Headlines`.
+        name: String,
+        /// `sf:asset_scale`: how thick it is, where 1 is its own.
+        scale: f64,
+    },
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -375,6 +383,14 @@ impl Value {
                 .attr(SF, "ident")
                 .or_else(|| element.attr(SFA, "ID"))
                 .map_or_else(|| Self::Other("style".into()), |i| Self::StyleRef(i.into())),
+            "frame" => Self::Frame {
+                name: element.attr(SF, "name").unwrap_or_default().to_owned(),
+                scale: element
+                    .attr(SF, "asset_scale")
+                    .and_then(|v| v.trim().parse::<f64>().ok())
+                    .filter(|v| v.is_finite() && *v > 0.0)
+                    .unwrap_or(1.0),
+            },
             "line-end" => Self::LineEnd(
                 element
                     .attr(SF, "identifier")

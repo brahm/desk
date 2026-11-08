@@ -579,6 +579,32 @@ pub enum NewShape {
     TextBox,
 }
 
+impl NewShape {
+    /// The outline of the shape, as Insert and Mask with Shape make it;
+    /// none for a line or a text box.
+    pub fn shape(self) -> Option<Shape> {
+        let s = desk_model::POLYGON_SCALE;
+        let polygon = |points: &[(i32, i32)]| Shape::Polygon(Arc::from(points));
+        Some(match self {
+            Self::Rectangle => Shape::Rectangle,
+            Self::RoundedRectangle => Shape::RoundedRectangle {
+                radius: Length::from_points(10),
+            },
+            Self::Ellipse => Shape::Ellipse,
+            Self::Triangle => Shape::triangle(),
+            Self::RightTriangle => polygon(&[(0, 0), (s, s), (0, s)]),
+            Self::Diamond => polygon(&[(s / 2, 0), (s, s / 2), (s / 2, s), (0, s / 2)]),
+            Self::Arrow => Shape::arrow(false),
+            Self::DoubleArrow => Shape::arrow(true),
+            Self::Star => Shape::star(),
+            Self::Polygon => Shape::regular_polygon(),
+            Self::QuoteBubble => Shape::balloon(true),
+            Self::Callout => Shape::balloon(false),
+            Self::Line | Self::TextBox => return None,
+        })
+    }
+}
+
 /// What the Metrics and Wrap inspectors show of the selected objects.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObjectInfo {
@@ -1229,41 +1255,6 @@ impl TextEditor {
             // The blue that the shapes of Pages are filled with.
             let blue = Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8));
             let (kind, fill, stroke) = match shape {
-                NewShape::Rectangle => (Shape::Rectangle.into(), Some(blue), Some(line)),
-                NewShape::RoundedRectangle => (
-                    Shape::RoundedRectangle {
-                        radius: Length::from_points(10),
-                    }
-                    .into(),
-                    Some(blue),
-                    Some(line),
-                ),
-                NewShape::Ellipse => (Shape::Ellipse.into(), Some(blue), Some(line)),
-                NewShape::Triangle => (Shape::triangle().into(), Some(blue), Some(line)),
-                NewShape::RightTriangle
-                | NewShape::Diamond
-                | NewShape::Arrow
-                | NewShape::DoubleArrow
-                | NewShape::Star
-                | NewShape::Polygon
-                | NewShape::QuoteBubble
-                | NewShape::Callout => {
-                    let s = desk_model::POLYGON_SCALE;
-                    let polygon = |points: &[(i32, i32)]| Shape::Polygon(Arc::from(points));
-                    let outline = match shape {
-                        NewShape::RightTriangle => polygon(&[(0, 0), (s, s), (0, s)]),
-                        NewShape::Diamond => {
-                            polygon(&[(s / 2, 0), (s, s / 2), (s / 2, s), (0, s / 2)])
-                        }
-                        NewShape::Arrow => Shape::arrow(false),
-                        NewShape::DoubleArrow => Shape::arrow(true),
-                        NewShape::Star => Shape::star(),
-                        NewShape::Polygon => Shape::regular_polygon(),
-                        NewShape::QuoteBubble => Shape::balloon(true),
-                        _ => Shape::balloon(false),
-                    };
-                    (outline.into(), Some(blue), Some(line))
-                }
                 NewShape::Line => (Shape::Line { rising: false }.into(), None, Some(line)),
                 NewShape::TextBox => {
                     let style = edit.document().styles().default_paragraph();
@@ -1282,6 +1273,11 @@ impl TextEditor {
                         None,
                     )
                 }
+                other => (
+                    other.shape().unwrap_or(Shape::Rectangle).into(),
+                    Some(blue),
+                    Some(line),
+                ),
             };
             let mut object = Object::new(id, kind, frame);
             object.anchor = Anchor::Page(page as u32);

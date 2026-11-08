@@ -38,6 +38,10 @@ pub struct GraphicProperties {
     /// `desk:mask`: where the whole picture lies from the top left corner
     /// of its frame, as `x y width height` in points.
     pub mask: Option<String>,
+    /// `desk:mask-shape`: the shape of the mask, as `desk:shape` gives a
+    /// shape, or `ellipse`, `rounded` with its radius in points, or
+    /// `outline` with a path in ten-thousandths of the frame.
+    pub mask_shape: Option<String>,
     /// `desk:image-adjust`: the changes of Adjust Image, as six numbers
     /// from -100 to 100: brightness, contrast, saturation, exposure,
     /// temperature and tint.
@@ -86,6 +90,12 @@ pub struct GraphicProperties {
     /// `desk:reflection`: how opaque the reflection below the object is
     /// where it starts, in percent (OBJ-38).
     pub reflection: Option<f64>,
+    /// `desk:picture-frame`: the picture frame of the library of Desk
+    /// around the object, by its name.
+    pub picture_frame: Option<String>,
+    /// `desk:picture-frame-scale`: how thick the picture frame is, in
+    /// percent.
+    pub picture_frame_scale: Option<f64>,
     /// `style:wrap`: `none`, `left`, `right`, `parallel`, `dynamic`,
     /// `run-through` or `biggest`.
     pub wrap: Option<String>,
@@ -543,6 +553,7 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         luminance: e.attr(DRAW, "luminance").and_then(parse_percent),
         contrast: e.attr(DRAW, "contrast").and_then(parse_percent),
         mask: text(DESK, "mask"),
+        mask_shape: text(DESK, "mask-shape"),
         image_adjust: text(DESK, "image-adjust"),
         instant_alpha: text(DESK, "instant-alpha"),
         stroke: text(DRAW, "stroke"),
@@ -561,6 +572,8 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         shadow_blur: length(DESK, "shadow-blur").or_else(|| length(LOEXT, "shadow-blur")),
         opacity: e.attr(DRAW, "opacity").and_then(parse_percent),
         reflection: e.attr(DESK, "reflection").and_then(parse_percent),
+        picture_frame: text(DESK, "picture-frame"),
+        picture_frame_scale: e.attr(DESK, "picture-frame-scale").and_then(parse_percent),
         fill_tint: e.attr(DESK, "fill-tint").and_then(Color::parse),
         fill_tint_opacity: e.attr(DESK, "fill-tint-opacity").and_then(parse_percent),
         wrap: text(STYLE, "wrap"),
@@ -609,6 +622,7 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
         }
     }
     w.attr_opt("desk:mask", g.mask.as_deref());
+    w.attr_opt("desk:mask-shape", g.mask_shape.as_deref());
     w.attr_opt("desk:image-adjust", g.image_adjust.as_deref());
     w.attr_opt("desk:instant-alpha", g.instant_alpha.as_deref());
     w.attr_opt("draw:stroke", g.stroke.as_deref());
@@ -651,6 +665,10 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     }
     if let Some(opacity) = g.fill_tint_opacity {
         w.attr("desk:fill-tint-opacity", &format!("{}%", decimal(opacity)));
+    }
+    w.attr_opt("desk:picture-frame", g.picture_frame.as_deref());
+    if let Some(scale) = g.picture_frame_scale {
+        w.attr("desk:picture-frame-scale", &format!("{}%", decimal(scale)));
     }
     if let Some(reflection) = g.reflection {
         w.attr("desk:reflection", &format!("{}%", decimal(reflection)));

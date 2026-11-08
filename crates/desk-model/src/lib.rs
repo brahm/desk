@@ -101,9 +101,10 @@ pub use list::{
 pub use media::{Media, MediaFormat, Repeat};
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
-    Adjustments, AlphaSeed, Anchor, Fill, Frame, Gradient, GradientStop, GraphicStyle, ImageFill,
-    LineEnd, MAX_SHAPE_SIDES, MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow, Objects,
-    POLYGON_SCALE, PathPoint, PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
+    Adjustments, AlphaSeed, Anchor, Fill, Frame, FrameStyle, Gradient, GradientStop, GraphicStyle,
+    ImageFill, LineEnd, MAX_SHAPE_SIDES, MAX_TEXT_BOX_COLUMNS, Object, ObjectKind, ObjectShadow,
+    Objects, POLYGON_SCALE, PathPoint, PictureFrame, PictureSettings, Shape, Stroke, TextBox,
+    VerticalAlignment, Wrap,
 };
 pub use object_edit::{
     Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, reframed, translated, union,

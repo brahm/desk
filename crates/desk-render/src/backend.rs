@@ -314,21 +314,7 @@ impl Painter {
                 }
                 Item::Path { path, fill, stroke } => {
                     cr.new_path();
-                    for op in path {
-                        match *op {
-                            PathOp::Move(x, y) => cr.move_to(f64::from(x), f64::from(y)),
-                            PathOp::Line(x, y) => cr.line_to(f64::from(x), f64::from(y)),
-                            PathOp::Curve(x1, y1, x2, y2, x, y) => cr.curve_to(
-                                f64::from(x1),
-                                f64::from(y1),
-                                f64::from(x2),
-                                f64::from(y2),
-                                f64::from(x),
-                                f64::from(y),
-                            ),
-                            PathOp::Close => cr.close_path(),
-                        }
-                    }
+                    trace(cr, path);
                     if let Some(paint) = fill {
                         if let Paint::Image {
                             picture,
@@ -376,6 +362,14 @@ impl Painter {
                         continue;
                     };
                     paint_surface(cr, &surface, *rect)?;
+                }
+                Item::ClippedTo { path, items } => {
+                    cr.save()?;
+                    cr.new_path();
+                    trace(cr, path);
+                    cr.clip();
+                    self.paint_items(cr, items)?;
+                    cr.restore()?;
                 }
                 Item::Clipped { rect, items } => {
                     cr.save()?;
@@ -898,6 +892,25 @@ fn set_paint(cr: &Context, paint: &Paint) -> Result<(), RenderError> {
         }
     }
     Ok(())
+}
+
+/// Adds a path to the current one of a context.
+fn trace(cr: &Context, path: &[PathOp]) {
+    for op in path {
+        match *op {
+            PathOp::Move(x, y) => cr.move_to(f64::from(x), f64::from(y)),
+            PathOp::Line(x, y) => cr.line_to(f64::from(x), f64::from(y)),
+            PathOp::Curve(x1, y1, x2, y2, x, y) => cr.curve_to(
+                f64::from(x1),
+                f64::from(y1),
+                f64::from(x2),
+                f64::from(y2),
+                f64::from(x),
+                f64::from(y),
+            ),
+            PathOp::Close => cr.close_path(),
+        }
+    }
 }
 
 fn add_stops(gradient: &cairo::Gradient, stops: &[(f32, Rgba)]) {

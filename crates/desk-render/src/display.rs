@@ -5,8 +5,8 @@
 
 use desk_layout::{DocumentLayout, Page, PlacedBlock, PlacedLine, PlacedObject};
 use desk_model::{
-    BorderSides, Fill, Gradient, ImageFill, LineEnd, LineStyle, ObjectKind, Picture, Rgba, Shape,
-    Wrap,
+    BorderSides, Fill, FrameStyle, Gradient, ImageFill, LineEnd, LineStyle, ObjectKind, Picture,
+    PictureFrame, Rgba, Shape, Wrap,
 };
 use desk_text::FontData;
 
@@ -89,6 +89,14 @@ pub enum Item {
     Clipped {
         /// The left edge, top edge, width and height.
         rect: (f32, f32, f32, f32),
+        /// The items.
+        items: Vec<Item>,
+    },
+    /// Items drawn only inside a path, as a picture inside a mask of
+    /// another shape (OBJ-04).
+    ClippedTo {
+        /// The path.
+        path: Vec<PathOp>,
         /// The items.
         items: Vec<Item>,
     },
@@ -565,19 +573,23 @@ fn object_item(placed: &PlacedObject) -> Item {
         },
         _ => Paint::Color(Rgba::BLACK),
     });
-    let stroke = style.stroke.map(|stroke| {
-        let width = stroke.width.to_pt() as f32;
-        PathStroke {
-            width,
-            color: stroke.color,
-            dashes: stroke
-                .style
-                .dashes(f64::from(width))
-                .into_iter()
-                .map(|d| d as f32)
-                .collect(),
-        }
-    });
+    // A picture frame takes the place of the line (OBJ-36).
+    let stroke = style
+        .stroke
+        .filter(|_| style.frame.is_none())
+        .map(|stroke| {
+            let width = stroke.width.to_pt() as f32;
+            PathStroke {
+                width,
+                color: stroke.color,
+                dashes: stroke
+                    .style
+                    .dashes(f64::from(width))
+                    .into_iter()
+                    .map(|d| d as f32)
+                    .collect(),
+            }
+        });
     let mut flips = true;
     match &object.kind {
         ObjectKind::Shape(Shape::Line { rising }) => {
@@ -660,17 +672,27 @@ fn object_item(placed: &PlacedObject) -> Item {
                     height: rect.3,
                 }
             };
-            list.items.push(if settings.mask.is_some() {
-                Item::Clipped {
+            // The outline of the mask: a rectangle, or the shape of Mask
+            // with Shape (OBJ-04).
+            let outline = settings
+                .mask_shape
+                .as_ref()
+                .filter(|_| settings.mask.is_some())
+                .map(|shape| shape_path(shape, x, y, w, h));
+            list.items.push(match (&outline, settings.mask.is_some()) {
+                (Some(path), _) => Item::ClippedTo {
+                    path: path.clone(),
+                    items: vec![image],
+                },
+                (None, true) => Item::Clipped {
                     rect: (x, y, w, h),
                     items: vec![image],
-                }
-            } else {
-                image
+                },
+                (None, false) => image,
             });
             if stroke.is_some() {
                 list.items.push(Item::Path {
-                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    path: outline.unwrap_or_else(|| shape_path(&Shape::Rectangle, x, y, w, h)),
                     fill: None,
                     stroke,
                 });
@@ -711,6 +733,11 @@ fn object_item(placed: &PlacedObject) -> Item {
             }
         }
         _ => {}
+    }
+    if let Some(frame) = style.frame
+        && !matches!(&object.kind, ObjectKind::Shape(shape) if shape.is_line())
+    {
+        list.items.extend(frame_items(frame, (x, y, w, h)));
     }
     // Rotated counterclockwise around the center, and flipped, on a page
     // whose heights go down.
@@ -778,6 +805,155 @@ fn object_item(placed: &PlacedObject) -> Item {
         opacity,
         items,
     }
+}
+
+/// A band between two rectangles, the outer one `out` beyond the frame
+/// and the inner one `inside` within it: the outer clockwise and the inner
+/// the other way, so that the inner one is a hole.
+fn band(frame: (f32, f32, f32, f32), out: f32, inside: f32) -> Vec<PathOp> {
+    let (x, y, w, h) = frame;
+    let (x0, y0, x1, y1) = (x - out, y - out, x + w + out, y + h + out);
+    let (i0, j0) = (x + inside, y + inside);
+    let (i1, j1) = ((x + w - inside).max(i0), (y + h - inside).max(j0));
+    vec![
+        PathOp::Move(x0, y0),
+        PathOp::Line(x1, y0),
+        PathOp::Line(x1, y1),
+        PathOp::Line(x0, y1),
+        PathOp::Close,
+        PathOp::Move(i0, j0),
+        PathOp::Line(i0, j1),
+        PathOp::Line(i1, j1),
+        PathOp::Line(i1, j0),
+        PathOp::Close,
+    ]
+}
+
+/// The items that draw a picture frame of the library around a frame
+/// (OBJ-36), out from its edges.
+fn frame_items(frame: PictureFrame, rect: (f32, f32, f32, f32)) -> Vec<Item> {
+    let (x, y, w, h) = rect;
+    let d = frame.width().to_pt() as f32;
+    let fill = |path: Vec<PathOp>, paint: Paint| Item::Path {
+        path,
+        fill: Some(paint),
+        stroke: None,
+    };
+    let line = |at: f32, width: f32, color: Rgba| Item::Path {
+        path: shape_path(
+            &Shape::Rectangle,
+            x - at,
+            y - at,
+            w + 2.0 * at,
+            h + 2.0 * at,
+        ),
+        fill: None,
+        stroke: Some(PathStroke {
+            width,
+            color,
+            dashes: Vec::new(),
+        }),
+    };
+    // Lit from the top left, across the band.
+    let across = |stops: &[(f32, Rgba)]| Paint::Linear {
+        start: (x - d, y - d),
+        end: (x + w + d, y + h + d),
+        stops: stops.to_vec(),
+    };
+    let mut items = Vec::new();
+    match frame.style {
+        FrameStyle::Photo | FrameStyle::Tape => {
+            // A soft shadow below and right of the print.
+            let s = (d / 4.0).max(1.0);
+            // Only beyond the print, which it falls from.
+            let mut shadow = band((x + s, y + s, w, h), d, 0.0);
+            shadow.truncate(5);
+            shadow.extend(
+                band((x - d, y - d, w + 2.0 * d, h + 2.0 * d), 0.0, 0.0)[5..]
+                    .iter()
+                    .copied(),
+            );
+            items.push(fill(
+                shadow,
+                Paint::Color(Rgba {
+                    a: 40,
+                    ..Rgba::BLACK
+                }),
+            ));
+            items.push(fill(band(rect, d, 0.0), Paint::Color(Rgba::WHITE)));
+            items.push(line(d, 0.5, Rgba::rgb(0xb0, 0xb0, 0xb0)));
+            items.push(line(0.0, 0.5, Rgba::rgb(0xd0, 0xd0, 0xd0)));
+            if frame.style == FrameStyle::Tape {
+                // A strip across each top corner, along its diagonal.
+                let tape = Rgba {
+                    a: 170,
+                    ..Rgba::rgb(0xf3, 0xe9, 0xc6)
+                };
+                let (half_long, half_wide) = (d * 2.0, d * 0.8);
+                let r = std::f32::consts::FRAC_1_SQRT_2;
+                for (cx, cy, dir) in [
+                    (x - d / 2.0, y - d / 2.0, 1.0),
+                    (x + w + d / 2.0, y - d / 2.0, -1.0),
+                ] {
+                    let (ax, ay) = (dir * r, -r);
+                    let (nx, ny) = (-ay, ax);
+                    let corner = |a: f32, b: f32| (cx + ax * a + nx * b, cy + ay * a + ny * b);
+                    let points = [
+                        corner(-half_long, -half_wide),
+                        corner(half_long, -half_wide),
+                        corner(half_long, half_wide),
+                        corner(-half_long, half_wide),
+                    ];
+                    let mut path = vec![PathOp::Move(points[0].0, points[0].1)];
+                    path.extend(points[1..].iter().map(|p| PathOp::Line(p.0, p.1)));
+                    path.push(PathOp::Close);
+                    items.push(fill(path, Paint::Color(tape)));
+                }
+            }
+        }
+        FrameStyle::Gallery => {
+            let edge = (d * 0.15).max(1.0);
+            items.push(fill(band(rect, d, 0.0), Paint::Color(Rgba::WHITE)));
+            items.push(fill(
+                band(rect, d, -(d - edge)),
+                Paint::Color(Rgba::rgb(0x1a, 0x1a, 0x1a)),
+            ));
+            items.push(line(0.0, 0.75, Rgba::rgb(0xc8, 0xc8, 0xc8)));
+        }
+        FrameStyle::Classic => {
+            let gold = (d * 0.18).max(1.0);
+            items.push(fill(
+                band(rect, d, -gold),
+                across(&[
+                    (0.0, Rgba::rgb(0x7a, 0x4a, 0x24)),
+                    (0.45, Rgba::rgb(0x4a, 0x2a, 0x12)),
+                    (1.0, Rgba::rgb(0x2e, 0x18, 0x0a)),
+                ]),
+            ));
+            items.push(fill(
+                band(rect, gold, 0.0),
+                across(&[
+                    (0.0, Rgba::rgb(0xf0, 0xd0, 0x7a)),
+                    (1.0, Rgba::rgb(0xa8, 0x80, 0x30)),
+                ]),
+            ));
+            items.push(line(d, 0.75, Rgba::rgb(0x1e, 0x0e, 0x04)));
+        }
+        FrameStyle::Metal => {
+            items.push(fill(
+                band(rect, d, 0.0),
+                across(&[
+                    (0.0, Rgba::rgb(0xf4, 0xf4, 0xf4)),
+                    (0.35, Rgba::rgb(0xa8, 0xa8, 0xa8)),
+                    (0.6, Rgba::rgb(0xe0, 0xe0, 0xe0)),
+                    (1.0, Rgba::rgb(0x80, 0x80, 0x80)),
+                ]),
+            ));
+            items.push(line(d, 0.75, Rgba::rgb(0x60, 0x60, 0x60)));
+            items.push(line(0.0, 0.75, Rgba::rgb(0x50, 0x50, 0x50)));
+        }
+    }
+    items
 }
 
 /// The items that draw a line from one point to another with its ends

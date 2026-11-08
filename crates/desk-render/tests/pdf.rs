@@ -910,3 +910,84 @@ fn obj_41_advanced_gradients_of_several_colors_and_radial_ones_are_painted() {
     let (edge, _, _) = pixel(60, 101);
     assert!((60..200).contains(&edge), "between at the edge: {edge}");
 }
+
+#[test]
+fn obj_04_obj_36_pictures_masked_with_a_shape_and_framed_are_painted() {
+    use desk_model::{
+        Document, Editor, Frame, FrameStyle, Object, ObjectKind, Picture, PictureFrame,
+        PictureSettings, Shape, Wrap,
+    };
+    // Red all over, ten pixels square.
+    let png = {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 10, 10).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(1.0, 0.0, 0.0);
+            cr.paint().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        png
+    };
+    let picture = Picture::from_png(png).unwrap();
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            // In an oval: its corners show the page.
+            let mut oval = Object::new(
+                edit.new_id(),
+                ObjectKind::Image(picture.clone()),
+                Frame::from_pt(20.0, 20.0, 60.0, 60.0),
+            );
+            oval.picture = PictureSettings {
+                mask: Some(Frame::from_pt(0.0, 0.0, 60.0, 60.0)),
+                mask_shape: Some(Shape::Ellipse),
+                ..PictureSettings::default()
+            };
+            oval.wrap = Wrap::Through;
+            edit.add_object(oval)?;
+            // In a gallery frame: a white mat, then black at its edge.
+            let mut framed = Object::new(
+                edit.new_id(),
+                ObjectKind::Image(picture.clone()),
+                Frame::from_pt(120.0, 120.0, 40.0, 40.0),
+            );
+            framed.style.frame = Some(PictureFrame::new(FrameStyle::Gallery));
+            framed.wrap = Wrap::Through;
+            edit.add_object(framed)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(0.0, 0.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    assert_eq!(pixel(50, 50), (255, 0, 0), "red in the middle of the oval");
+    assert_eq!(
+        pixel(22, 22),
+        (0, 0, 255),
+        "the page at a corner of the oval"
+    );
+    assert_eq!(pixel(140, 140), (255, 0, 0), "the framed picture");
+    // The frame reaches 20 points out: white near the picture, black at
+    // its outer edge.
+    assert_eq!(pixel(140, 110), (255, 255, 255), "the mat");
+    assert_eq!(pixel(140, 101), (0x1a, 0x1a, 0x1a), "the edge of the frame");
+    assert_eq!(pixel(140, 97), (0, 0, 255), "the page beyond the frame");
+}

@@ -1856,6 +1856,7 @@ fn with_objects() -> Document {
             image.contour = Some(Arc::from([(0, 0), (10_000, 0), (5_000, 10_000)]));
             image.picture = desk_model::PictureSettings {
                 mask: Some(Frame::from_pt(-10.0, -20.0, 120.0, 100.0)),
+                mask_shape: None,
                 alpha: Arc::from([
                     desk_model::AlphaSeed {
                         x: 0,
@@ -3008,4 +3009,62 @@ fn obj_41_advanced_gradients_round_trip_and_round_ones_of_other_programs_are_rea
             center: None,
         }))
     );
+}
+
+#[test]
+fn obj_04_obj_36_masks_of_a_shape_and_picture_frames_round_trip() {
+    use desk_model::{
+        Editor, FrameStyle, Object, ObjectKind, Picture, PictureFrame, PictureSettings, Shape, Wrap,
+    };
+    let s = desk_model::POLYGON_SCALE;
+    let shapes = [
+        Shape::Ellipse,
+        Shape::RoundedRectangle {
+            radius: Length::from_points(10),
+        },
+        Shape::Polygon(std::sync::Arc::from(&[(0, 0), (s, s), (0, s)][..])),
+        Shape::Star {
+            points: 5,
+            inner: 4_000,
+        },
+    ];
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            for (i, shape) in shapes.iter().enumerate() {
+                let mut picture = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Image(Picture::from_png(pixel_png()).unwrap()),
+                    desk_model::Frame::from_pt(10.0 + 70.0 * i as f64, 10.0, 60.0, 40.0),
+                );
+                picture.picture = PictureSettings {
+                    mask: Some(desk_model::Frame::from_pt(-5.0, 0.0, 70.0, 40.0)),
+                    mask_shape: Some(shape.clone()),
+                    ..PictureSettings::default()
+                };
+                picture.style.frame = Some(PictureFrame {
+                    style: FrameStyle::ALL[i],
+                    scale: 50 + 50 * i as u16,
+                });
+                picture.wrap = Wrap::Through;
+                edit.add_object(picture)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("obj-04-36-masks-frames.odt", &bytes);
+    let again = read_odt(&bytes).unwrap();
+    let read: Vec<_> = again
+        .objects()
+        .iter()
+        .map(|o| (o.picture.mask_shape.clone(), o.style.frame))
+        .collect();
+    let written: Vec<_> = editor
+        .document()
+        .objects()
+        .iter()
+        .map(|o| (o.picture.mask_shape.clone(), o.style.frame))
+        .collect();
+    assert_eq!(read, written);
 }
