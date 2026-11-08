@@ -206,7 +206,7 @@ fn doc_09_a_thumbnail_is_a_png_that_fits_its_square() {
 }
 
 #[test]
-fn obj_08_obj_13_objects_are_painted_rotated_and_faded() {
+fn obj_08_obj_13_obj_34_obj_39_objects_are_painted_rotated_and_faded() {
     use desk_model::{
         Document, Editor, Fill, Frame, Object, ObjectKind, Paragraph, Run, Shape, TextBox, Wrap,
     };
@@ -343,7 +343,7 @@ fn obj_08_the_text_of_a_flipped_shape_is_not_mirrored() {
 }
 
 #[test]
-fn obj_09_obj_10_obj_11_gradients_line_ends_and_shadows_are_painted() {
+fn obj_35_obj_37_obj_41_gradients_line_ends_and_shadows_are_painted() {
     use desk_model::{
         Document, Editor, Fill, Frame, LineEnd, Object, ObjectKind, ObjectShadow, Shape, Stroke,
         Wrap,
@@ -472,7 +472,7 @@ fn obj_38_objects_are_reflected_below_fading_away() {
 }
 
 #[test]
-fn obj_09_pictures_fill_objects_as_their_mode_says() {
+fn obj_42_pictures_fill_objects_as_their_mode_says() {
     use desk_model::{
         Document, Editor, Fill, Frame, ImageFill, Object, ObjectKind, Picture, Shape, Wrap,
     };
@@ -561,7 +561,7 @@ fn obj_09_pictures_fill_objects_as_their_mode_says() {
 }
 
 #[test]
-fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
+fn obj_04_obj_06_obj_07_pictures_are_masked_keyed_and_adjusted() {
     use desk_model::{
         Adjustments, AlphaSeed, Document, Editor, Frame, Object, ObjectKind, Picture,
         PictureSettings, Wrap,
@@ -665,7 +665,7 @@ fn obj_04_obj_05_obj_06_pictures_are_masked_keyed_and_adjusted() {
 }
 
 #[test]
-fn obj_06_a_reduced_picture_keeps_what_shows() {
+fn obj_05_a_reduced_picture_keeps_what_shows() {
     use desk_model::{Frame, Picture};
     let png = {
         let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 400, 400).unwrap();
@@ -990,4 +990,140 @@ fn obj_04_obj_36_pictures_masked_with_a_shape_and_framed_are_painted() {
     assert_eq!(pixel(140, 110), (255, 255, 255), "the mat");
     assert_eq!(pixel(140, 101), (0x1a, 0x1a, 0x1a), "the edge of the frame");
     assert_eq!(pixel(140, 97), (0, 0, 255), "the page beyond the frame");
+}
+
+#[test]
+fn iop_07_objects_and_their_effects_look_the_same_on_screen_and_in_the_pdf() {
+    // One model of objects and effects, and one painter for the screen,
+    // the PDF and the print: a page with a gradient, a shadow, a
+    // reflection, an object faded and turned and a line with an arrow is
+    // drawn on an image as the screen draws it and written as PDF, which
+    // poppler rasterizes; the two images agree.
+    use desk_model::{
+        Document, Editor, Fill, Frame, LineEnd, Object, ObjectKind, ObjectShadow, Shape, Stroke,
+        Wrap,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Objects", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(200),
+                ..PageSetup::default()
+            })?;
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(20.0, 20.0, 100.0, 40.0),
+            );
+            square.style.fill = Some(Fill::Gradient {
+                from: Rgba::rgb(255, 0, 0),
+                to: Rgba::rgb(0, 0, 255),
+                angle: 0,
+            });
+            square.style.shadow = Some(ObjectShadow {
+                color: Rgba::BLACK,
+                angle: 31500,
+                offset: Length::from_pt(10.0 * std::f64::consts::SQRT_2),
+                blur: Length::ZERO,
+                opacity: 100,
+            });
+            square.style.reflection = Some(60);
+            square.wrap = Wrap::Through;
+            edit.add_object(square)?;
+            let mut faded = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(130.0, 100.0, 50.0, 50.0),
+            );
+            faded.style.fill = Some(Fill::Color(Rgba::rgb(0, 160, 0)));
+            faded.style.opacity = 50;
+            faded.rotation = 3000;
+            faded.wrap = Wrap::Through;
+            edit.add_object(faded)?;
+            let mut line = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Line { rising: false }),
+                Frame::from_pt(20.0, 170.0, 150.0, 0.0),
+            );
+            line.style.stroke = Some(Stroke {
+                end: LineEnd::Arrow,
+                ..Stroke::new(Rgba::BLACK, Length::from_points(2))
+            });
+            line.wrap = Wrap::Through;
+            edit.add_object(line)
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+
+    // As the screen draws it, a pixel a point.
+    let mut screen = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 200).unwrap();
+    {
+        let cr = cairo::Context::new(&screen).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    screen.flush();
+
+    // The PDF, rasterized at 72 pixels an inch.
+    let pdf = Painter::new()
+        .unwrap()
+        .pdf_bytes(std::slice::from_ref(list), &Metadata::default())
+        .unwrap();
+    let dir = std::env::temp_dir().join(format!("desk-render-{}-iop-07", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("page.pdf"), &pdf).unwrap();
+    let status = Command::new("pdftoppm")
+        .args(["-r", "72", "-png", "-singlefile"])
+        .arg(dir.join("page.pdf"))
+        .arg(dir.join("page"))
+        .status()
+        .unwrap_or_else(|e| panic!("pdftoppm is needed for this test (poppler-utils): {e}"));
+    assert!(status.success());
+    let png = std::fs::read(dir.join("page.png")).unwrap();
+    let mut printed = cairo::ImageSurface::create_from_png(&mut &png[..]).unwrap();
+    assert_eq!((printed.width(), printed.height()), (200, 200));
+
+    let rgb = |surface: &mut cairo::ImageSurface| -> Vec<[u8; 3]> {
+        let stride = surface.stride() as usize;
+        let data = surface.data().unwrap();
+        (0..200)
+            .flat_map(|y| (0..200).map(move |x| (x, y)))
+            .map(|(x, y)| {
+                let p = &data[y * stride + x * 4..][..4];
+                [p[2], p[1], p[0]]
+            })
+            .collect()
+    };
+    let (screen, printed) = (rgb(&mut screen), rgb(&mut printed));
+    // Every effect left its mark on the page.
+    let at = |image: &[[u8; 3]], x: usize, y: usize| image[y * 200 + x];
+    assert_eq!(at(&screen, 125, 65), [0, 0, 0], "the shadow");
+    let reflected = at(&screen, 25, 64);
+    assert!(
+        reflected[0] > 230 && reflected[1] < 200,
+        "the reflection: {reflected:?}"
+    );
+    let faded = at(&screen, 155, 125);
+    assert!(
+        (100..=200).contains(&faded[0]) && faded[1] > 150,
+        "{faded:?}"
+    );
+    // Edges fall a pixel apart at most, where the two rasterizers smooth
+    // them otherwise: few pixels differ, and none in the middle of a shape.
+    let differ = screen
+        .iter()
+        .zip(&printed)
+        .filter(|(a, b)| a.iter().zip(b.iter()).any(|(a, b)| a.abs_diff(*b) > 40))
+        .count();
+    assert!(differ < 200 * 200 / 100, "{differ} pixels differ");
+    for (x, y) in [(70, 40), (125, 65), (155, 125), (25, 64)] {
+        let (a, b) = (at(&screen, x, y), at(&printed, x, y));
+        assert!(
+            a.iter().zip(b.iter()).all(|(a, b)| a.abs_diff(*b) <= 12),
+            "({x}, {y}): {a:?} on screen, {b:?} in the PDF"
+        );
+    }
 }

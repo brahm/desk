@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The image tools of Pages, for a selected picture: its mask (OBJ-04),
-//! Instant Alpha (OBJ-05), Adjust Image and Reduce File Size (OBJ-06).
+//! Instant Alpha (OBJ-06), Adjust Image (OBJ-07) and Reduce File Size
+//! (OBJ-05).
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Objects selected, moved, resized and rotated on the pages, as in Pages
-//! (OBJ-03, OBJ-04, OBJ-05, OBJ-06, OBJ-07).
+//! (OBJ-04, OBJ-06, OBJ-07, OBJ-21, OBJ-23,
+//! OBJ-24, OBJ-26, OBJ-27, OBJ-33).
 //!
 //! A click on an object selects it, with its outline and eight handles;
 //! Shift or Ctrl and a click add it to the selection or take it out. A
@@ -986,7 +987,7 @@ impl TextEditor {
         });
     }
 
-    /// Turns on Instant Alpha for the selected picture (OBJ-05): clicks
+    /// Turns on Instant Alpha for the selected picture (OBJ-06): clicks
     /// on it take colors out, and a drag after a click takes out more or
     /// less. Returns whether it is on.
     pub fn start_instant_alpha(&self) -> bool {
@@ -1977,7 +1978,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_03_handles_resize_from_the_other_side() {
+    fn obj_33_handles_resize_from_the_other_side() {
         let flat = placed(0, Shape::Rectangle);
         let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false);
         assert!(near((x, y, w, h), (100.0, 100.0, 150.0, 70.0)));
@@ -1996,7 +1997,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_03_the_ends_of_a_line_move_and_it_turns() {
+    fn obj_33_the_ends_of_a_line_move_and_it_turns() {
         let line = placed(0, Shape::Line { rising: false });
         let (x, y, w, h, rising) = resize(&line, Handle::End, (50.0, 20.0), false);
         assert!(near((x, y, w, h), (50.0, 20.0, 50.0, 80.0)));
@@ -2023,7 +2024,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_05_drags_snap_to_the_page_and_other_objects() {
+    fn obj_27_drags_snap_to_the_page_and_other_objects() {
         let mut editor = desk_model::Editor::new(desk_model::Document::new_word_processing());
         let other = editor
             .edit("Add", |e| {
@@ -2054,7 +2055,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_03_obj_25_presses_find_objects_but_behind_ones_only_off_the_text() {
+    fn obj_21_obj_25_presses_find_objects_but_behind_ones_only_off_the_text() {
         let mut editor = desk_model::Editor::new(desk_model::Document::new_word_processing());
         let start = editor.document().start();
         let (front, back) = editor

@@ -455,11 +455,13 @@ def main():
     drawn_with_the_pen(work)
     editable_shape(work)
     connection_line(work)
+    position_of_a_turned_shape(work)
     media_browser(work)
     master_objects(work)
     page_layout(work)
     copies_of_a_shape(work)
     objects_between_apps(work)
+    styled_text_between_apps(work)
     guide_from_the_ruler(work)
     pages_as_sections(work)
     reflection_of_a_shape(work)
@@ -739,7 +741,7 @@ def objects_on_the_page(work):
         type_text("zz")
         time.sleep(0.5)
         check(
-            "typing leaves the text alone while a shape is selected",
+            "typing leaves the text alone while a shape is selected (OBJ-21)",
             text_of(document) == "US Letter, landscape\n",
         )
         press("shift+Right", "shift+Down", "ctrl+s")
@@ -749,7 +751,7 @@ def objects_on_the_page(work):
         )
         x = points(re.search(r'svg:x="([^"]+)"', rect).group(1))
         y = points(re.search(r'svg:y="([^"]+)"', rect).group(1))
-        check("Shift and the arrows move the shape by ten points (OBJ-03)", (round(x), round(y)) == (106, 130))
+        check("Shift and the arrows move the shape by ten points (OBJ-23)", (round(x), round(y)) == (106, 130))
         press("Delete", "ctrl+s")
         wait_for("the file without the shape", lambda: saved_rect(False))
         check("Delete removes the selected shape", True)
@@ -1093,7 +1095,7 @@ def objects_in_the_outline(work):
 
 def instant_alpha_of_a_picture(work):
     """Instant Alpha takes out the color clicked in a selected picture,
-    and the click is saved with it (OBJ-05)."""
+    and the click is saved with it (OBJ-06)."""
     picture = (
         b'<draw:frame text:anchor-type="page" text:anchor-page-number="1" '
         b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
@@ -1137,7 +1139,7 @@ def instant_alpha_of_a_picture(work):
             "the saved click of Instant Alpha",
             lambda: saved_content(letter, r'desk:instant-alpha="\d+ \d+ 20"'),
         )
-        check("the color clicked in the picture is taken out and saved (OBJ-05)", True)
+        check("the color clicked in the picture is taken out and saved (OBJ-06)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
@@ -1507,6 +1509,47 @@ def connection_line(work):
         writer.wait(timeout=10)
 
 
+def spin_of(app, title):
+    """The spin button of the showing row titled `title`."""
+    row = wait_for(f"the {title} row of the Inspector", lambda: showing_named(app, title))
+    return next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
+
+
+def position_of_a_turned_shape(work):
+    """X and Y of the Metrics place the box that holds a turned shape
+    (OBJ-29)."""
+    writer, app, letter = open_with_a_shape(work, "Turned.odt")
+    try:
+        x = spin_of(app, "X")
+        # The shape is 300 by 200 points, at 96 points from the left, shown
+        # in the units of the preferences.
+        per_point = Atspi.Value.get_current_value(x) / 96
+        Atspi.Value.set_current_value(spin_of(app, "Rotate"), 90)
+        # A quarter turn about its middle: the box that holds it is 200
+        # points wide, 50 points further right.
+        wait_for(
+            "X of the turned shape",
+            lambda: abs(Atspi.Value.get_current_value(x) / per_point - 146) < 0.5 or None,
+        )
+        check("X of a turned shape is where the box that holds it starts (OBJ-29)", True)
+        Atspi.Value.set_current_value(x, 100 * per_point)
+        time.sleep(0.5)
+        press("ctrl+s")
+
+        def moved():
+            # ODF places the turned corner of the frame, here the bottom
+            # left, which a quarter turn takes to the left of the box.
+            found = saved_content(
+                letter, r'<draw:rect[^>]*translate \(([-\d.]+(?:pt|in|cm|mm))'
+            )
+            return found and abs(points(found.group(1)) - 100) < 0.5
+
+        wait_for("the saved shape, turned and moved", moved)
+        check("a turned shape moves so that its box starts at the X typed in (OBJ-29)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
 def click_node(node, name):
     """Clicks the middle of a node of the window titled `name`."""
     geometry = subprocess.run(
@@ -1752,6 +1795,76 @@ def objects_between_apps(work):
         writer.terminate()
         writer.wait(timeout=10)
 
+
+def styled_text_between_apps(work):
+    """Text copied with its paragraph style in one app of Desk pastes in
+    another, a process of its own, with that style (IOP-17, IOP-25)."""
+    source = work / "StyledSource.odt"
+    subprocess.run([str(CONVERT), str(FIXTURE), str(source)], check=True)
+    with zipfile.ZipFile(source) as package:
+        files = {n: package.read(n) for n in package.namelist()}
+    files["styles.xml"] = files["styles.xml"].replace(
+        b"<office:styles>",
+        b'<office:styles><style:style style:name="Clip_20_Style" style:display-name="Clip Style" '
+        b'style:family="paragraph"><style:text-properties fo:font-weight="bold"/></style:style>',
+        1,
+    )
+    files["content.xml"] = files["content.xml"].replace(
+        b"<office:text>",
+        b'<office:text><text:p text:style-name="Clip_20_Style">Styled words</text:p>',
+        1,
+    )
+    with zipfile.ZipFile(source, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for n, data in files.items():
+            package.writestr(n, data, zipfile.ZIP_DEFLATED)
+    writer = subprocess.Popen([str(WRITER), str(source)])
+    other = None
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for(
+            "the document in the accessibility tree",
+            lambda: find(app, Atspi.Role.TEXT, "StyledSource.odt"),
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "StyledSource.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        # The first paragraph, with its end.
+        press("ctrl+Home", "shift+Down", "ctrl+c")
+        time.sleep(0.5)
+        target = work / "StyledTarget.odt"
+        subprocess.run([str(CONVERT), str(FIXTURE), str(target)], check=True)
+        # A bus of its own, so that it is another process and not a
+        # window of the first.
+        other = subprocess.Popen(
+            ["dbus-run-session", "--", str(WRITER), str(target)],
+            start_new_session=True,
+            env={**os.environ, "GTK_A11Y": "none", "NO_AT_BRIDGE": "1"},
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "StyledTarget.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        time.sleep(1)
+        # In a paragraph of its own at the end.
+        press("ctrl+End", "Return", "ctrl+v")
+        time.sleep(1)
+        press("ctrl+s")
+        found = wait_for(
+            "the pasted text saved with its style in the other app",
+            lambda: saved_content(target, r'<text:p text:style-name="Clip_20_Style">Styled words'),
+        )
+        check(
+            "text copied in one app of Desk pastes in another with its paragraph style (IOP-17, IOP-25)",
+            bool(found),
+        )
+    finally:
+        if other is not None:
+            os.killpg(other.pid, signal.SIGTERM)
+            other.wait(timeout=10)
+        writer.terminate()
+        writer.wait(timeout=10)
 
 def guide_from_the_ruler(work):
     """A drag from the ruler down onto the page leaves a guide across it,

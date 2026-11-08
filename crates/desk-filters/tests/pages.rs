@@ -1291,3 +1291,22 @@ fn est_12_doc_22_headers_of_a_template_with_contacts_are_read_as_pages_shows_the
             || matches!(objects[1].kind, desk_model::ObjectKind::Group(_))
     );
 }
+
+#[test]
+fn doc_05_an_empty_space_after_takes_the_space_of_the_parent_away() {
+    // Pages saves a space of zero empty: a heading whose own style takes
+    // away the 68 points after its parent keeps `<sf:spaceAfter/>`, and
+    // Pages lays out the next paragraph right below it.
+    let anon = r#"<sf:paragraphstyle sf:parent-ident="paragraph-style-32" sfa:ID="A-1"><sf:property-map><sf:spaceAfter/><sf:leftIndent/></sf:property-map></sf:paragraphstyle>"#;
+    let body = r#"<sf:p sf:style="A-1">Título<sf:crbr/></sf:p><sf:p sf:style="paragraph-style-32">Texto</sf:p>"#;
+    let document = read_pages(index(STYLES, anon, body).as_bytes()).unwrap();
+    let styles = document.styles();
+    let format = |i: usize| {
+        let paragraph = document.body().get(i).unwrap();
+        styles.resolve_paragraph(paragraph.style(), paragraph.attrs())
+    };
+    assert_eq!(format(0).space_after, Length::ZERO);
+    assert_eq!(format(0).left_indent, Length::ZERO);
+    // Without its own style, the paragraph keeps the space of Body.
+    assert_eq!(format(1).space_after, Length::from_points(12));
+}

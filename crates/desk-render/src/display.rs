@@ -73,7 +73,7 @@ pub enum Item {
         dashes: Vec<f32>,
     },
     /// A picture with a color taken out or adjusted, scaled into a
-    /// rectangle (OBJ-05, OBJ-06).
+    /// rectangle (OBJ-06, OBJ-07).
     AdjustedImage {
         /// The picture.
         picture: desk_model::Picture,

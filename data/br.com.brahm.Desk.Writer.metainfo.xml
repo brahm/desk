@@ -24,11 +24,13 @@
     </p>
     <p>
       This is a nightly build of an early version: it opens, edits and saves
-      text, but much of Pages is still to come.
+      text with pictures, shapes and text boxes, but much of Pages is still
+      to come.
     </p>
     <p xml:lang="pt-BR">
       Esta é uma versão noturna de uma fase inicial: ela abre, edita e salva
-      texto, mas muito do Pages ainda está por vir.
+      texto com imagens, formas e caixas de texto, mas muito do Pages ainda
+      está por vir.
     </p>
   </description>
   <launchable type="desktop-id">br.com.brahm.Desk.Writer.desktop</launchable>

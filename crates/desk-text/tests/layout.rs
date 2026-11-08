@@ -991,3 +991,46 @@ fn obj_01_an_object_in_the_text_takes_its_room_in_the_line() {
     let under = without.height - (without.baseline - without.top);
     assert!((line.height - 40.0 - under).abs() < 0.01, "{}", line.height);
 }
+
+#[test]
+fn doc_05_a_multiple_spacing_scales_the_text_and_not_the_object() {
+    // A picture as tall as most of the page, in a paragraph spaced at
+    // 130 %: Pages makes the line as tall as the picture plus the text
+    // below the baseline, so that the caption after it fits on the page.
+    let mut system = TextSystem::new();
+    let object = desk_model::NodeId::new(99).unwrap();
+    let mark = CharFormat {
+        field: Some(desk_model::Field::ObjectMark { object }),
+        ..sans()
+    };
+    let sizes = std::collections::HashMap::from([(
+        object,
+        (Length::from_points(400), Length::from_points(600)),
+    )]);
+    let paragraph = ParaFormat {
+        line_spacing: LineSpacing::Multiple { percent: 130 },
+        ..ParaFormat::default()
+    };
+    let values = desk_text::FieldValues {
+        objects: Some(Arc::new(sizes)),
+        ..desk_text::FieldValues::default()
+    };
+    let text = ParagraphText::from_runs_in(
+        &TextSettings::default(),
+        values,
+        paragraph.clone(),
+        sans(),
+        [("\u{fffc}", mark)],
+    );
+    let layout = system.layout(&text, &Column::new(500.0), 0.0);
+    let line = &layout.lines[0];
+    let spaced = plain(&mut system, paragraph, "Legenda");
+    let text_line = &spaced.lines[0];
+    let under = text_line.height - (text_line.baseline - text_line.top);
+    assert!((line.baseline - line.top - 600.0).abs() < 0.01, "{line:?}");
+    assert!(
+        (line.height - 600.0 - under).abs() < 0.51,
+        "{} {under}",
+        line.height
+    );
+}

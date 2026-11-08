@@ -7,8 +7,12 @@
 //! the styles of their text. Any app of Desk reads it back and pastes
 //! the objects, a whole slide or page among them, with their text styled
 //! as it was.
+//!
+//! Text copied with its styles goes the same way (IOP-17, IOP-25): a
+//! document of the text alone, which another app of Desk pastes with its
+//! styles, or with their look only where it keeps no named styles.
 
-use desk_model::{Anchor, Document, Editor, Object, PageSetup};
+use desk_model::{Anchor, Document, Editor, Fragment, Object, PageSetup};
 
 use crate::odt::{FilterError, read_odt, write_odt};
 
@@ -66,4 +70,72 @@ pub fn read_objects(bytes: &[u8]) -> Result<ObjectsClip, FilterError> {
     Ok(ObjectsClip {
         document: read_odt(bytes)?,
     })
+}
+
+/// The media type of text with its styles that an app of Desk puts on
+/// the clipboard.
+pub const TEXT_TYPE: &str = "application/x-desk-text";
+
+/// The bytes that put text copied with its styles on the clipboard: a
+/// document of the text alone, with the styles it names.
+pub fn write_text(fragment: &Fragment) -> Result<Vec<u8>, FilterError> {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor.edit("Copy", |edit| {
+        edit.paste_fragment(start, fragment).map(drop)
+    })?;
+    write_odt(editor.document())
+}
+
+/// The text with its styles that an app of Desk put on the clipboard.
+pub fn read_text(bytes: &[u8]) -> Result<Fragment, FilterError> {
+    let document = read_odt(bytes)?;
+    Ok(document.copy_fragment(document.start(), document.end())?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use desk_model::{Alignment, FontWeight, Length, ParagraphStyle, StyleFamily};
+
+    #[test]
+    fn iop_17_iop_25_text_goes_between_apps_with_its_styles() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Setup", |edit| {
+                edit.insert_text(start, "Título\ntexto")?;
+                let id = edit.new_id();
+                let mut style = ParagraphStyle::new(id, "Heading");
+                style.paragraph.alignment = Some(Alignment::Center);
+                style.character.weight = Some(FontWeight::BOLD);
+                style.character.font_size = Some(Length::from_points(18));
+                edit.apply(desk_model::Op::PutStyle {
+                    style: style.into(),
+                })?;
+                let at = edit.document().start();
+                edit.set_paragraph_style(at, at, id)
+            })
+            .unwrap();
+        let document = editor.document();
+        let fragment = document
+            .copy_fragment(document.start(), document.end())
+            .unwrap();
+        let read = read_text(&write_text(&fragment).unwrap()).unwrap();
+        assert_eq!(read.text(), "Título\ntexto");
+        assert_eq!(&*read.paragraphs[0].style.name, "Heading");
+
+        // Pasted in another document, it brings its style along.
+        let mut target = Editor::new(Document::new_word_processing());
+        let at = target.document().start();
+        target
+            .edit("Paste", |edit| edit.paste_fragment(at, &read).map(drop))
+            .unwrap();
+        let styles = target.document().styles();
+        let heading = styles.by_name(StyleFamily::Paragraph, "Heading").unwrap();
+        let first = target.document().body().get(0).unwrap();
+        assert_eq!(first.style(), heading.id());
+        let format = styles.resolve_character(first.style(), None, &Default::default());
+        assert!(format.weight.is_bold());
+    }
 }

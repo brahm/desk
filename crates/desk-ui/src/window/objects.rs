@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The shapes, text boxes and connection lines of the Insert menu, and
-//! the Arrange menu of Pages, for the selected objects (OBJ-03 to OBJ-08,
-//! OBJ-13, OBJ-25, OBJ-31, EST-21).
+//! the Arrange menu of Pages, for the selected objects (OBJ-04, OBJ-08,
+//! OBJ-13, OBJ-24 to OBJ-26, OBJ-30 to OBJ-34, EST-21).
 
 use std::rc::Rc;
 
@@ -326,7 +326,8 @@ fn named_shape(value: &str) -> NewShape {
     }
 }
 
-/// The Arrange menu of Pages (OBJ-03 to OBJ-07).
+/// The Arrange menu of Pages (OBJ-04, OBJ-24, OBJ-26, OBJ-30, OBJ-32,
+/// OBJ-34).
 pub(super) fn arrange_menu() -> gio::Menu {
     let layers = gio::Menu::new();
     layers.append(Some(&tr("Bring to _Front")), Some("win.bring-to-front"));

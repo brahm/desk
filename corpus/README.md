@@ -2,9 +2,11 @@
 
 The reference corpus of Desk: what Desk must do the same as iWork '09.
 
-- `matrix.tsv` is the parity matrix of Desk Writer: the 271 rows of the
-  survey of Pages '09, each with the phase of the roadmap that completes
-  it.
+- `matrix.tsv` is the parity matrix of Desk Writer, 304 rows, each with
+  the phase of the roadmap that completes it: the 260 rows of the survey
+  of Pages '09, the 33 cases of integration among the three apps of the
+  surveys of Pages, Numbers and Keynote (`IOP`), and 11 rows for what the
+  GNOME HIG and the desktop ask of the apps (`GNM`).
 - Each folder under `writer/` is a case: `case.toml` describes a short
   document, and the reference virtual machine adds the `.pages` file that
   Pages builds from the same description and `reference.pdf`, the PDF that

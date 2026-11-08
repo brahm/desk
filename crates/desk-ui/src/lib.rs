@@ -65,7 +65,7 @@ use adw::prelude::*;
 use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
-pub use desk_model::{Document, Object};
+pub use desk_model::{Document, Fragment, Object};
 use i18n::tr;
 pub use view::DocumentView;
 use window::DocumentWindow;
@@ -112,7 +112,8 @@ pub struct Opener {
     pub objects: Option<ObjectsFormat>,
 }
 
-/// Objects on the clipboard between the apps of Desk (IOP-27, IOP-28).
+/// Objects and styled text on the clipboard between the apps of Desk
+/// (IOP-17, IOP-25, IOP-27, IOP-28).
 #[derive(Clone, Copy)]
 pub struct ObjectsFormat {
     /// The media type of the bytes.
@@ -122,6 +123,15 @@ pub struct ObjectsFormat {
     /// A document with the objects of the bytes, whose styles their text
     /// names.
     pub read: fn(&[u8]) -> Result<Document, String>,
+    /// The media type of text copied with its styles (IOP-17, IOP-25).
+    pub text_type: &'static str,
+    /// The bytes of text copied with its styles.
+    pub write_text: fn(&desk_model::Fragment) -> Result<Vec<u8>, String>,
+    /// The text with its styles of the bytes.
+    pub read_text: fn(&[u8]) -> Result<desk_model::Fragment, String>,
+    /// Whether the app keeps the named styles of text pasted in it; one
+    /// that does not, as Numbers and Keynote, keeps their look only.
+    pub named_styles: bool,
 }
 
 static OBJECTS_FORMAT: std::sync::OnceLock<ObjectsFormat> = std::sync::OnceLock::new();

@@ -765,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_08_text_is_typed_in_the_middle_of_a_shape() {
+    fn obj_08_obj_12_text_is_typed_in_the_middle_of_a_shape() {
         use desk_model::{Frame, Object, Shape};
         let mut editor = Editor::new(Document::new_word_processing());
         let id = editor

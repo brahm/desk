@@ -93,6 +93,7 @@ fn a_case_matches_its_own_pdf_and_not_another() {
         }],
         vec![result],
         &Default::default(),
+        &Default::default(),
     );
     assert_eq!(report.rows[0].status, Status::Differs);
     assert!(report.has_failures());
@@ -149,4 +150,37 @@ fn doc_22_documents_of_pages_import_as_their_cases() {
         };
         assert_eq!(&setup, built_setup, "{}", case.name);
     }
+}
+
+#[test]
+fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let compared = desk_testkit::report::compared_by_row(&crates).unwrap();
+    assert!(compared["EST-07"].contains(&"est_07_est_08_columns_match_pages".to_owned()));
+    // Tests of the layout of text alone do not read documents of Pages.
+    assert!(!compared.contains_key("TXT-03"));
+    let tests = desk_testkit::report::tests_by_row(&crates).unwrap();
+    assert!(tests.contains_key("TXT-03"));
+
+    let row = |id: &str| matrix::Row {
+        id: id.into(),
+        phase: Some(2),
+        feature: String::new(),
+        expected: String::new(),
+        guide_pages: String::new(),
+        odf: String::new(),
+    };
+    let report = Report::new(
+        vec![row("EST-07"), row("TXT-03")],
+        Vec::new(),
+        &tests,
+        &compared,
+    );
+    assert_eq!(report.rows[0].status, Status::Compared);
+    assert_eq!(report.rows[1].status, Status::Tested);
+    assert!(
+        report
+            .to_markdown(Path::new("."))
+            .contains("comparado com o PDF do Pages")
+    );
 }

@@ -849,6 +849,61 @@ impl Edit {
         })
     }
 
+    /// Pastes text copied with its styles into a document that keeps no
+    /// named styles of its own, as Numbers and Keynote paste text of
+    /// Pages (IOP-17, IOP-25): the text keeps its look, as formatting of
+    /// its own over the default paragraph style, and its lists keep their
+    /// levels.
+    pub fn paste_fragment_resolved(
+        &mut self,
+        at: Position,
+        fragment: &Fragment,
+    ) -> Result<Position, ModelError> {
+        let styles = self.document().styles();
+        let default = styles.default_paragraph();
+        let Some(default_style) = styles.paragraph(default).cloned() else {
+            return self.paste_fragment(at, fragment);
+        };
+        let base = styles.resolve_paragraph(default, &ParaAttrs::default());
+        let base_character = styles.resolve_character(default, None, &CharAttrs::default());
+        let paragraphs = fragment
+            .paragraphs
+            .iter()
+            .map(|p| {
+                let mut look = crate::format::ParaFormat::default();
+                p.style.paragraph.apply_to(&mut look);
+                p.attrs.apply_to(&mut look);
+                let runs = p
+                    .runs
+                    .iter()
+                    .map(|(text, character, attrs)| {
+                        let mut look = CharFormat::default();
+                        p.style.character.apply_to(&mut look);
+                        if let Some(c) = character {
+                            c.character.apply_to(&mut look);
+                        }
+                        attrs.apply_to(&mut look);
+                        (
+                            text.clone(),
+                            None,
+                            CharAttrs::from(look).difference(&base_character),
+                        )
+                    })
+                    .collect();
+                FragmentParagraph {
+                    style: default_style.clone(),
+                    attrs: ParaAttrs::from(look).difference(&base),
+                    runs,
+                }
+            })
+            .collect();
+        let resolved = Fragment {
+            paragraphs,
+            ..fragment.clone()
+        };
+        self.paste_fragment(at, &resolved)
+    }
+
     /// Pastes copied text at a position with its styles (TXT-04), and
     /// returns the position after it. Styles that the document does not
     /// have by name come with it. The text of the first paragraph joins

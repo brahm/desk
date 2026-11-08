@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn obj_08_text_is_typed_in_shapes_but_not_in_lines() {
+    fn obj_08_obj_12_text_is_typed_in_shapes_but_not_in_lines() {
         use crate::object::{Frame, Shape, VerticalAlignment};
         let mut document = Document::new_word_processing();
         let ((shape, line), _) = document
