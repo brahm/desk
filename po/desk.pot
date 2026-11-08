@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 18:31+0000\n"
+"POT-Creation-Date: 2026-11-06 19:24+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -185,7 +185,7 @@ msgstr ""
 #: crates/desk-ui/src/graphic_pane.rs:148
 #: crates/desk-ui/src/graphic_pane.rs:167
 #: crates/desk-ui/src/graphic_pane.rs:222 crates/desk-ui/src/lists_pane.rs:58
-#: crates/desk-ui/src/media_pane.rs:84 crates/desk-ui/src/styles_drawer.rs:770
+#: crates/desk-ui/src/media_pane.rs:86 crates/desk-ui/src/styles_drawer.rs:770
 #: crates/desk-ui/src/styles_drawer.rs:924
 #: crates/desk-ui/src/styles_drawer.rs:929
 #: crates/desk-ui/src/styles_drawer.rs:1001 crates/desk-ui/src/tab_stops.rs:49
@@ -236,7 +236,7 @@ msgstr ""
 #: crates/desk-ui/src/graphic_pane.rs:252
 #: crates/desk-ui/src/graphic_pane.rs:256
 #: crates/desk-ui/src/graphic_pane.rs:258 crates/desk-ui/src/lists_pane.rs:213
-#: crates/desk-ui/src/media_pane.rs:92
+#: crates/desk-ui/src/media_pane.rs:94
 msgid "Percent"
 msgstr ""
 
@@ -1464,44 +1464,60 @@ msgstr ""
 msgid "Add a Folder"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:77
+#: crates/desk-ui/src/media_pane.rs:79
 msgid "Seconds"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:81
+#: crates/desk-ui/src/media_pane.rs:83
 msgid "Start"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:82
+#: crates/desk-ui/src/media_pane.rs:84
 msgid "Stop"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:83
+#: crates/desk-ui/src/media_pane.rs:85
 msgid "Poster Frame"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:84
+#: crates/desk-ui/src/media_pane.rs:86
 msgid "Loop"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:84
+#: crates/desk-ui/src/media_pane.rs:86
 msgid "Loop Back and Forth"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:87
+#: crates/desk-ui/src/media_pane.rs:89
 msgid "Repeat"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:91
+#: crates/desk-ui/src/media_pane.rs:93
 msgid "Volume"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:95 crates/desk-ui/src/media_pane.rs:99
+#: crates/desk-ui/src/media_pane.rs:97 crates/desk-ui/src/media_pane.rs:101
 msgid "Play"
 msgstr ""
 
-#: crates/desk-ui/src/media_pane.rs:101
+#: crates/desk-ui/src/media_pane.rs:103
 msgid "Movie and Sound"
+msgstr ""
+
+#: crates/desk-ui/src/media_pane.rs:112
+msgid "Reduce"
+msgstr ""
+
+#: crates/desk-ui/src/media_pane.rs:116
+msgid "Reduce Media"
+msgstr ""
+
+#: crates/desk-ui/src/media_pane.rs:117 crates/desk-ui/src/media_pane.rs:240
+msgid "Removes the parts outside the start and stop"
+msgstr ""
+
+#: crates/desk-ui/src/media_pane.rs:194
+msgid "This file cannot be reduced"
 msgstr ""
 
 #: crates/desk-ui/src/notes_pane.rs:133

@@ -447,6 +447,7 @@ def main():
     instant_alpha_of_a_picture(work)
     chosen_picture(work)
     chosen_movie(work)
+    reduced_movie(work)
     points_of_a_star(work)
     drawn_with_the_pen(work)
     editable_shape(work)
@@ -1200,6 +1201,50 @@ def chosen_movie(work):
         play.do_action(0)
         wait_for("the window that plays the movie", lambda: showing_named(app, "Movie"))
         check("the Inspector plays the movie (OBJ-19)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def reduced_movie(work):
+    """Reduce Media takes out of a movie what comes after its stop, and the
+    smaller movie is saved (OBJ-20)."""
+    movie = work / "movie.mp4"
+    movie.write_bytes((ROOT / "tests" / "ui" / "fixtures" / "movie.mp4").read_bytes())
+    writer, app, letter = opened_without_portals(work, "Reduced.odt")
+    try:
+        choose_file(app, movie)
+        row = wait_for("the Stop row of the Inspector", lambda: showing_named(app, "Stop"))
+        spin = next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
+        Atspi.Value.set_current_value(spin, 0.5)
+        time.sleep(1)
+        reduce = wait_for(
+            "the Reduce button",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.PUSH_BUTTON
+                    and n.get_name() == "Reduce Media"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
+        Atspi.Action.do_action(reduce, 0)
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved movie",
+            lambda: saved_content(letter, r'<draw:plugin xlink:href="Media/object\d+\.mp4"'),
+        )
+        with zipfile.ZipFile(letter) as package:
+            name = next(n for n in package.namelist() if n.endswith(".mp4"))
+            saved = package.read(name)
+        check(
+            "the reduced movie is saved smaller (OBJ-20)",
+            0 < len(saved) < len(movie.read_bytes()) and saved[4:8] == b"ftyp",
+        )
     finally:
         writer.terminate()
         writer.wait(timeout=10)

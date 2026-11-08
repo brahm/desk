@@ -58,6 +58,7 @@ mod inline;
 pub use inline::marks_in;
 mod list;
 mod media;
+mod media_trim;
 mod note;
 mod object;
 mod object_edit;

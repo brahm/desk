@@ -3,7 +3,8 @@
 
 //! The QuickTime inspector of Pages, for a selected movie or sound
 //! (OBJ-19): where it starts and stops, its poster frame, how it repeats,
-//! how loud it plays, and a button to play it.
+//! how loud it plays, and a button to play it. Reduce Media takes out the
+//! parts before the start and after the stop (OBJ-20).
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -27,6 +28,7 @@ pub struct MediaGroup {
     poster: adw::SpinRow,
     repeat: adw::ComboRow,
     volume: adw::SpinRow,
+    reduce: adw::ActionRow,
     updating: Cell<bool>,
 }
 
@@ -106,6 +108,17 @@ impl MediaGroup {
         }
         group.add(&repeat);
         group.add(&volume);
+        let reduce_button = gtk::Button::builder()
+            .label(tr("Reduce"))
+            .valign(gtk::Align::Center)
+            .build();
+        let reduce = adw::ActionRow::builder()
+            .title(tr("Reduce Media"))
+            .subtitle(tr("Removes the parts outside the start and stop"))
+            .activatable_widget(&reduce_button)
+            .build();
+        reduce.add_suffix(&reduce_button);
+        group.add(&reduce);
         let this = Rc::new(Self {
             group,
             start,
@@ -113,6 +126,7 @@ impl MediaGroup {
             poster,
             repeat,
             volume,
+            reduce,
             updating: Cell::new(false),
         });
         this.show(None);
@@ -160,6 +174,27 @@ impl MediaGroup {
                 }
             });
         }
+        {
+            let editor = editor.clone();
+            let weak = Rc::downgrade(&this);
+            reduce_button.connect_clicked(move |_| {
+                let (Some(this), Some(editor)) = (weak.upgrade(), editor()) else {
+                    return;
+                };
+                let reduced = editor
+                    .object_info()
+                    .and_then(|info| match &info.object.kind {
+                        ObjectKind::Media(media) => media.reduced(),
+                        _ => None,
+                    });
+                match reduced {
+                    Some(reduced) => editor.set_object("Reduce Media", |object| {
+                        object.kind = ObjectKind::Media(reduced);
+                    }),
+                    None => this.reduce.set_subtitle(&tr("This file cannot be reduced")),
+                }
+            });
+        }
         play.connect_clicked(move |_| {
             if let Some(editor) = editor() {
                 editor.play_selected_media();
@@ -200,6 +235,9 @@ impl MediaGroup {
         let repeat = REPEATS.iter().position(|r| *r == media.repeat).unwrap_or(0);
         self.repeat.set_selected(repeat as u32);
         self.volume.set_value(f64::from(media.volume));
+        self.reduce.set_sensitive(media.reducible());
+        self.reduce
+            .set_subtitle(&tr("Removes the parts outside the start and stop"));
         self.updating.set(false);
     }
 }
