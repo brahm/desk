@@ -232,6 +232,9 @@ pub enum Status {
     Matches,
     /// One of its cases differs from Pages, or could not run.
     Differs,
+    /// Tests lay out documents that Pages saved and find them as in the
+    /// PDF that Pages made of them.
+    Compared,
     /// It has cases, still without a PDF of Pages.
     AwaitsReference,
     /// Only tests check it.
@@ -245,15 +248,17 @@ impl Status {
         match self {
             Self::Matches => "igual ao Pages",
             Self::Differs => "diferente do Pages",
+            Self::Compared => "comparado com o PDF do Pages",
             Self::AwaitsReference => "sem referência",
             Self::Tested => "só testes",
             Self::Pending => "pendente",
         }
     }
 
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::Matches,
         Self::Differs,
+        Self::Compared,
         Self::AwaitsReference,
         Self::Tested,
         Self::Pending,
@@ -272,6 +277,8 @@ pub struct RowReport {
     pub cases: Vec<String>,
     /// The tests named after it.
     pub tests: Vec<String>,
+    /// Those of them that compare a document of Pages with its PDF.
+    pub compared: Vec<String>,
 }
 
 /// The parity report.
@@ -286,12 +293,13 @@ pub struct Report {
 }
 
 impl Report {
-    /// Builds the report from the results of the cases and the tests
-    /// named after each row.
+    /// Builds the report from the results of the cases, the tests named
+    /// after each row and those of them that compare with Pages.
     pub fn new(
         matrix: Vec<Row>,
         cases: Vec<CaseResult>,
         tests: &BTreeMap<String, Vec<String>>,
+        compared: &BTreeMap<String, Vec<String>>,
     ) -> Self {
         let rows = matrix
             .into_iter()
@@ -299,6 +307,7 @@ impl Report {
                 let checking: Vec<&CaseResult> =
                     cases.iter().filter(|c| c.rows.contains(&row.id)).collect();
                 let tests = tests.get(&row.id).cloned().unwrap_or_default();
+                let compared = compared.get(&row.id).cloned().unwrap_or_default();
                 let status = if checking.iter().any(|c| c.is_failure()) {
                     Status::Differs
                 } else if checking
@@ -306,6 +315,8 @@ impl Report {
                     .any(|c| matches!(c.outcome, Outcome::Pass { .. }))
                 {
                     Status::Matches
+                } else if !compared.is_empty() {
+                    Status::Compared
                 } else if !checking.is_empty() {
                     Status::AwaitsReference
                 } else if !tests.is_empty() {
@@ -317,6 +328,7 @@ impl Report {
                     status,
                     cases: checking.iter().map(|c| c.name.clone()).collect(),
                     tests,
+                    compared,
                     row,
                 }
             })
@@ -426,17 +438,18 @@ impl Report {
             );
         }
 
-        md.push_str("\n## Linhas\n\n| ID | Fase | Funcionalidade | Situação | Casos | Testes |\n|---|---:|---|---|---|---:|\n");
+        md.push_str("\n## Linhas\n\n| ID | Fase | Funcionalidade | Situação | Casos | Testes | Comparados com o Pages |\n|---|---:|---|---|---|---:|---:|\n");
         for row in &self.rows {
             let _ = writeln!(
                 md,
-                "| {} | {} | {} | {} | {} | {} |",
+                "| {} | {} | {} | {} | {} | {} | {} |",
                 row.row.id,
                 row.row.phase.map_or("-".to_owned(), |p| p.to_string()),
                 row.row.feature.replace('|', "\\|"),
                 row.status.label(),
                 row.cases.join(", "),
-                row.tests.len()
+                row.tests.len(),
+                row.compared.len()
             );
         }
         md
@@ -505,6 +518,32 @@ pub fn tests_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<Strin
             let path = entry?.path();
             if path.extension().is_some_and(|e| e == "py") {
                 scan_ui_checks(&std::fs::read_to_string(&path)?, &mut found);
+            }
+        }
+    }
+    for tests in found.values_mut() {
+        tests.sort();
+        tests.dedup();
+    }
+    Ok(found)
+}
+
+/// The tests named after each row that compare with Pages: those of the
+/// files of `crates/desk-testkit/tests` that compare words with
+/// `compare_words`, which lay out documents that Pages saved on the
+/// reference machine and compare them with the PDF that Pages made.
+pub fn compared_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<String>>> {
+    let mut found: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let dir = crates.join("desk-testkit/tests");
+    if !dir.is_dir() {
+        return Ok(found);
+    }
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|e| e == "rs") {
+            let text = std::fs::read_to_string(&path)?;
+            if text.contains("compare_words(") {
+                scan_tests(&text, &mut found);
             }
         }
     }
