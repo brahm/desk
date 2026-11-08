@@ -106,7 +106,7 @@ pub use object::{
     PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
 pub use object_edit::{
-    Distribution, Layer, LayoutPagesClip, ObjectAlignment, reframed, translated, union,
+    Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, reframed, translated, union,
 };
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};

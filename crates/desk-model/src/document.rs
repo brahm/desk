@@ -302,6 +302,9 @@ pub struct Statistics {
     pub characters_without_spaces: usize,
     /// Sections that the text is in (DOC-20, EST-16).
     pub sections: usize,
+    /// Graphics: the objects of the document, floating or in the text, a
+    /// group counting once (DOC-20).
+    pub graphics: usize,
 }
 
 impl Statistics {
@@ -558,11 +561,27 @@ impl Document {
         Position::new(last.id(), last.len())
     }
 
-    /// Counts the whole document.
+    /// Counts the whole document: the text of its body, and that of its
+    /// text boxes and shapes, as Pages counts it (DOC-20).
     pub fn statistics(&self) -> Statistics {
         let mut statistics = Statistics::default();
         for paragraph in self.body().iter() {
             statistics.add_text(&paragraph.text());
+        }
+        let continued: Vec<NodeId> = self
+            .objects()
+            .iter()
+            .filter_map(|o| o.text_box()?.next)
+            .collect();
+        for object in self.objects().iter() {
+            statistics.graphics += 1;
+            // The boxes after the first of linked ones hold no text.
+            if continued.contains(&object.id) {
+                continue;
+            }
+            for paragraph in object.paragraphs() {
+                statistics.add_text(&paragraph.text());
+            }
         }
         statistics.sections = self.sections_between(0, self.body().len().saturating_sub(1));
         statistics
