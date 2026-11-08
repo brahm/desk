@@ -162,10 +162,19 @@ pub struct Preferences {
     /// Whether a saved document holds a picture of its first page, which
     /// file managers show (DOC-09).
     pub include_preview: bool,
+    /// The color of the guides that a drag of objects snaps to (OBJ-27).
+    pub guide_color: Rgba,
+    /// Whether a drag of objects shows where they go, how big they get or
+    /// how far they turn, next to the pointer (OBJ-23).
+    pub show_size_and_position: bool,
 }
 
 /// The color of invisible characters until it is changed.
 pub const INVISIBLES_COLOR: Rgba = Rgba::rgb(64, 115, 217);
+
+/// The color of the alignment guides until it is changed: the yellow of
+/// Pages.
+pub const GUIDE_COLOR: Rgba = Rgba::rgb(245, 194, 18);
 
 impl Default for Preferences {
     fn default() -> Self {
@@ -196,6 +205,8 @@ impl Default for Preferences {
             invisibles_color: INVISIBLES_COLOR,
             show_counts: true,
             include_preview: true,
+            guide_color: GUIDE_COLOR,
+            show_size_and_position: true,
         }
     }
 }
@@ -269,6 +280,15 @@ impl Preferences {
         out.include_preview = file
             .boolean(SAVING, "include-preview")
             .unwrap_or(out.include_preview);
+        if let Some(color) = file
+            .string(EDITING, "guide-color")
+            .ok()
+            .and_then(|c| color_from_key(&c))
+        {
+            out.guide_color = color;
+        }
+        out.show_size_and_position =
+            editing("show-size-and-position", out.show_size_and_position);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -314,6 +334,12 @@ impl Preferences {
         );
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
         file.set_boolean(SAVING, "include-preview", self.include_preview);
+        file.set_string(EDITING, "guide-color", &color_key(self.guide_color));
+        file.set_boolean(
+            EDITING,
+            "show-size-and-position",
+            self.show_size_and_position,
+        );
         let correct = &self.autocorrect;
         file.set_boolean(EDITING, "fix-capitalization", correct.capitalization);
         file.set_boolean(EDITING, "superscript-ordinals", correct.ordinals);
@@ -578,6 +604,30 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         current.include_preview,
         |p, on| p.include_preview = on,
     ));
+    // As the General pane of Pages lays out its alignment guides.
+    let objects = adw::PreferencesGroup::builder().title(tr("Objects")).build();
+    let guide_button = gtk::ColorDialogButton::builder()
+        .dialog(&gtk::ColorDialog::new())
+        .rgba(&crate::formatting::to_gdk(current.guide_color))
+        .valign(gtk::Align::Center)
+        .build();
+    guide_button.connect_rgba_notify(|button| {
+        let color = crate::formatting::from_gdk(&button.rgba());
+        change(|p| p.guide_color = color);
+    });
+    let guides = adw::ActionRow::builder()
+        .title(tr("Alignment Guides Color"))
+        .subtitle(tr("Of the guides that show while objects are dragged"))
+        .build();
+    guides.add_suffix(&guide_button);
+    guides.set_activatable_widget(Some(&guide_button));
+    objects.add(&guides);
+    objects.add(&switch(
+        &tr("Show Size and Position When Moving Objects"),
+        &tr("Next to the pointer, while an object is dragged"),
+        current.show_size_and_position,
+        |p, on| p.show_size_and_position = on,
+    ));
     let page = adw::PreferencesPage::builder()
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
@@ -585,6 +635,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     page.add(&rulers);
     page.add(&editing);
     page.add(&correction);
+    page.add(&objects);
     page.add(&window);
     let dialog = adw::PreferencesDialog::builder()
         .title(tr("Preferences"))
@@ -719,6 +770,8 @@ mod tests {
             },
             show_counts: false,
             include_preview: false,
+            guide_color: Rgba::rgb(10, 200, 30),
+            show_size_and_position: false,
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -732,6 +785,8 @@ mod tests {
         assert!(Preferences::read(&empty).include_preview);
         assert_eq!(Preferences::read(&empty).zoom, 100);
         assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
+        assert_eq!(Preferences::read(&empty).guide_color, GUIDE_COLOR);
+        assert!(Preferences::read(&empty).show_size_and_position);
         assert_eq!(
             Preferences::read(&empty).autocorrect,
             AutoCorrect::default()

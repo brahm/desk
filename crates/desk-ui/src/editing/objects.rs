@@ -9,7 +9,7 @@
 //! Shift or Ctrl and a click add it to the selection or take it out. A
 //! drag of an object moves the selected ones, snapping to the edges and
 //! the middle of the page and of the other objects, with yellow guides;
-//! Shift keeps it straight across or down. A drag of a handle resizes the
+//! Shift keeps it straight across, down or at 45 degrees. A drag of a handle resizes the
 //! object, keeping its proportions with Shift; with Ctrl it rotates the
 //! object around its center, by steps of 45 degrees with Shift. The drag
 //! shows the outline where the objects go, and becomes one action of the
@@ -27,7 +27,8 @@ use desk_model::{
 use gtk::gdk;
 
 use super::TextEditor;
-use crate::view::{Guide, ObjectMark};
+use crate::preferences::Units;
+use crate::view::{DragLabel, Guide, ObjectMark};
 
 /// How near the pointer has to be to a handle or a line, in pixels.
 pub(super) const REACH: f64 = 5.0;
@@ -246,12 +247,15 @@ fn set_line_shape(object: &mut Object, (rising, across, down): LineShape) {
 
 /// An object resized by dragging a handle to a point of the page: the
 /// handles on the other side stay where they are, as the object is
-/// rotated. With `keep`, a corner keeps the proportions of the object.
+/// rotated. With `keep`, a corner keeps the proportions of the object;
+/// with `from_center`, the opposite handles move as far the other way,
+/// and the center stays where it is, as Option resizes in Pages (OBJ-33).
 pub(super) fn resize(
     placed: &PlacedObject,
     handle: Handle,
     point: (f32, f32),
     keep: bool,
+    from_center: bool,
 ) -> (f32, f32, f32, f32, Option<LineShape>) {
     let (fx, fy) = placed.to_frame(point.0, point.1);
     let (w, h) = (placed.width, placed.height);
@@ -297,19 +301,41 @@ pub(super) fn resize(
             if moves_bottom {
                 b = fy.max(t + SMALLEST);
             }
+            if from_center {
+                // The other edge mirrors the one dragged about the center.
+                let mirrored = |near: f32, size: f32| {
+                    let half = (size / 2.0 - near).abs().max(SMALLEST / 2.0);
+                    (size / 2.0 - half, size / 2.0 + half)
+                };
+                if moves_left {
+                    (l, r) = mirrored(l, w);
+                } else if moves_right {
+                    (l, r) = mirrored(r, w);
+                }
+                if moves_top {
+                    (t, b) = mirrored(t, h);
+                } else if moves_bottom {
+                    (t, b) = mirrored(b, h);
+                }
+            }
             let corner = (moves_left || moves_right) && (moves_top || moves_bottom);
             if keep && corner && w > 0.0 && h > 0.0 {
                 let scale = ((r - l) / w).max((b - t) / h);
                 let (nw, nh) = (w * scale, h * scale);
-                if moves_left {
-                    l = r - nw;
+                if from_center {
+                    (l, r) = ((w - nw) / 2.0, (w + nw) / 2.0);
+                    (t, b) = ((h - nh) / 2.0, (h + nh) / 2.0);
                 } else {
-                    r = l + nw;
-                }
-                if moves_top {
-                    t = b - nh;
-                } else {
-                    b = t + nh;
+                    if moves_left {
+                        l = r - nw;
+                    } else {
+                        r = l + nw;
+                    }
+                    if moves_top {
+                        t = b - nh;
+                    } else {
+                        b = t + nh;
+                    }
                 }
             }
         }
@@ -317,6 +343,47 @@ pub(super) fn resize(
     let (nw, nh) = (r - l, b - t);
     let (cx, cy) = placed.to_page((l + r) / 2.0, (t + b) / 2.0);
     (cx - nw / 2.0, cy - nh / 2.0, nw, nh, shape)
+}
+
+/// A move kept across, down or at 45 degrees, as Shift keeps it in Pages
+/// (OBJ-23): the direction nearest to the pointer's, as far along it as
+/// the pointer went.
+pub(super) fn constrained(dx: f32, dy: f32) -> (f32, f32) {
+    let step = std::f32::consts::FRAC_PI_4;
+    let angle = (dy.atan2(dx) / step).round() * step;
+    let along = dx * angle.cos() + dy * angle.sin();
+    let (x, y) = (along * angle.cos(), along * angle.sin());
+    // Straight across or down stays exactly so.
+    let clean = |v: f32| if v.abs() < 1e-4 { 0.0 } else { v };
+    (clean(x), clean(y))
+}
+
+/// What a drag tells next to the pointer, as Pages shows it while the
+/// preference is on (OBJ-23): where the objects moved are, how big the
+/// object resized is, or how far the object is turned.
+pub(super) fn drag_text(kind: DragKind, preview: &[Placement], units: Units) -> Option<String> {
+    let length = |points: f32| {
+        let digits = units.digits() as usize;
+        format!(
+            "{:.*} {}",
+            digits,
+            f64::from(points) / units.points(),
+            units.symbol()
+        )
+    };
+    let first = preview.first()?;
+    Some(match kind {
+        DragKind::Move => {
+            let on_page = preview.iter().filter(|p| p.page == first.page);
+            let x = on_page.clone().map(|p| p.x).fold(f32::MAX, f32::min);
+            let y = on_page.map(|p| p.y).fold(f32::MAX, f32::min);
+            format!("x: {}  y: {}", length(x), length(y))
+        }
+        DragKind::Resize(_) => {
+            format!("w: {}  h: {}", length(first.width), length(first.height))
+        }
+        DragKind::Rotate => format!("{:.0}°", f64::from(first.rotation) / 100.0),
+    })
 }
 
 /// The rotation of an object turned by dragging from one point of the
@@ -1719,6 +1786,9 @@ impl TextEditor {
     pub(super) fn drag_objects(&self, x: f64, y: f64, modifiers: gdk::ModifierType) {
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
         let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
+        // Ctrl hides the guides while it is held, as Command does in
+        // Pages, and the objects go where the pointer takes them (OBJ-27).
+        let unguided = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
         let scale = self.view.scale();
         let Some(drag) = self.state.borrow().object_drag.clone() else {
             return;
@@ -1736,11 +1806,7 @@ impl TextEditor {
             DragKind::Move => {
                 let (mut dx, mut dy) = (point.0 - sx, point.1 - sy);
                 if shift {
-                    if dx.abs() > dy.abs() {
-                        dy = 0.0;
-                    } else {
-                        dx = 0.0;
-                    }
+                    (dx, dy) = constrained(dx, dy);
                 }
                 let fixed = drag
                     .objects
@@ -1769,11 +1835,13 @@ impl TextEditor {
                     .iter()
                     .map(|o| o.bounds())
                     .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
+                    .filter(|_| !unguided)
                 {
                     let fixed = &Self::main_document(&state).text_settings().guides;
                     let snaps = Snaps::new(&state.layout, page, &ids).with_fixed(fixed);
                     let moved = (bounds.0 + dx, bounds.1 + dy, bounds.2 + dx, bounds.3 + dy);
                     let ((ax, ay), found, _) = snaps.snap(moved, (SNAP / scale) as f32);
+                    // Kept to a direction, the move snaps only along it.
                     if !shift || dy == 0.0 {
                         dx += ax;
                     }
@@ -1799,7 +1867,7 @@ impl TextEditor {
                 .objects
                 .iter()
                 .map(|(p, o)| {
-                    let (x, y, width, height, shape) = resize(o, handle, point, shift);
+                    let (x, y, width, height, shape) = resize(o, handle, point, shift, alt);
                     Placement {
                         x,
                         y,
@@ -1819,6 +1887,18 @@ impl TextEditor {
                 })
                 .collect(),
         };
+        let label = crate::preferences::get()
+            .show_size_and_position
+            .then(|| drag_text(drag.kind, &preview, crate::preferences::get().units))
+            .flatten()
+            .map(|text| {
+                let (page, at) = match under {
+                    Some((page, px, py)) => (page, (px, py)),
+                    None => (drag.page, (f64::from(point.0), f64::from(point.1))),
+                };
+                DragLabel { page, at, text }
+            });
+        self.view.set_drag_label(label);
         {
             let mut state = self.state.borrow_mut();
             if let Some(drag) = state.object_drag.as_mut() {
@@ -1836,6 +1916,7 @@ impl TextEditor {
             return;
         };
         self.state.borrow_mut().guides.clear();
+        self.view.set_drag_label(None);
         let changed: Vec<Object> = drag
             .objects
             .iter()
@@ -1996,20 +2077,61 @@ mod tests {
     #[test]
     fn obj_33_handles_resize_from_the_other_side() {
         let flat = placed(0, Shape::Rectangle);
-        let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false);
+        let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false, false);
         assert!(near((x, y, w, h), (100.0, 100.0, 150.0, 70.0)));
-        let (x, y, w, h, _) = resize(&flat, Handle::Left, (80.0, 0.0), false);
+        let (x, y, w, h, _) = resize(&flat, Handle::Left, (80.0, 0.0), false, false);
         assert!(near((x, y, w, h), (80.0, 100.0, 120.0, 50.0)));
         // Shift keeps the proportions, from the corner across.
-        let (x, y, w, h, _) = resize(&flat, Handle::TopLeft, (0.0, 90.0), true);
+        let (x, y, w, h, _) = resize(&flat, Handle::TopLeft, (0.0, 90.0), true, false);
         assert!(near((x, y, w, h), (0.0, 50.0, 200.0, 100.0)));
+        // Alt keeps the center where it is, with Shift too.
+        let (x, y, w, h, _) = resize(&flat, Handle::BottomRight, (250.0, 170.0), false, true);
+        assert!(near((x, y, w, h), (50.0, 80.0, 200.0, 90.0)));
+        let (x, y, w, h, _) = resize(&flat, Handle::TopLeft, (0.0, 90.0), true, true);
+        assert!(near((x, y, w, h), (0.0, 50.0, 300.0, 150.0)));
+        let (x, y, w, h, _) = resize(&flat, Handle::Top, (0.0, 110.0), false, true);
+        assert!(near((x, y, w, h), (100.0, 110.0, 100.0, 30.0)));
         // Turned a quarter, the right handle is at the top: dragging it up
         // makes the object wider, with its bottom where it was.
         let standing = placed(9000, Shape::Rectangle);
         let (hx, hy) = handles(&standing)[3].1;
         assert!((hx - 150.0).abs() < 0.01 && (hy - 75.0).abs() < 0.01);
-        let (x, y, w, h, _) = resize(&standing, Handle::Right, (150.0, 55.0), false);
+        let (x, y, w, h, _) = resize(&standing, Handle::Right, (150.0, 55.0), false, false);
         assert!(near((x, y, w, h), (90.0, 90.0, 120.0, 50.0)));
+    }
+
+    #[test]
+    fn obj_23_a_drag_tells_where_the_objects_go() {
+        let square = placed(0, Shape::Rectangle);
+        let mut placement = Placement::of(0, &square);
+        placement.x = 72.0;
+        placement.y = 36.0;
+        placement.rotation = 4500;
+        let preview = [placement];
+        assert_eq!(
+            drag_text(DragKind::Move, &preview, Units::Points).as_deref(),
+            Some("x: 72.0 pt  y: 36.0 pt")
+        );
+        assert_eq!(
+            drag_text(DragKind::Resize(Handle::Right), &preview, Units::Inches).as_deref(),
+            Some("w: 1.39 in  h: 0.69 in")
+        );
+        assert_eq!(
+            drag_text(DragKind::Rotate, &preview, Units::Points).as_deref(),
+            Some("45°")
+        );
+    }
+
+    #[test]
+    fn obj_23_shift_keeps_a_move_across_down_or_at_45_degrees() {
+        let near = |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01;
+        assert_eq!(constrained(30.0, 4.0), (30.0, 0.0));
+        assert_eq!(constrained(-3.0, -40.0), (0.0, -40.0));
+        // Nearer the diagonal than either axis: along it.
+        let (x, y) = constrained(30.0, 20.0);
+        assert!(near((x, y), (25.0, 25.0)), "{x} {y}");
+        let (x, y) = constrained(-20.0, 30.0);
+        assert!(near((x, y), (-25.0, 25.0)), "{x} {y}");
     }
 
     #[test]
@@ -2026,7 +2148,7 @@ mod tests {
         assert!((flipped_start.0 - end.0).abs() < 0.01 && (flipped_start.1 - start.1).abs() < 0.01);
         assert!((flipped_end.0 - start.0).abs() < 0.01 && (flipped_end.1 - end.1).abs() < 0.01);
         // Dragging the end of the flipped line keeps it flipped.
-        let (x, y, w, h, shape) = resize(&line, Handle::End, (start.0 - 20.0, end.1), false);
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (start.0 - 20.0, end.1), false, false);
         assert!(near((x, y, w, h), (start.0 - 20.0, start.1, end.0 - start.0 + 20.0, end.1 - start.1)));
         assert_eq!(shape, Some((false, true, false)));
     }
@@ -2036,13 +2158,13 @@ mod tests {
         let line = placed(0, Shape::Line { rising: false });
         // Dragged to the left of its start, the end stays the end: the
         // line flips across instead of trading its ends (OBJ-29).
-        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 20.0), false);
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 20.0), false, false);
         assert!(near((x, y, w, h), (50.0, 20.0, 50.0, 80.0)));
         assert_eq!(shape, Some((true, true, false)));
-        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 180.0), false);
+        let (x, y, w, h, shape) = resize(&line, Handle::End, (50.0, 180.0), false, false);
         assert!(near((x, y, w, h), (50.0, 100.0, 50.0, 80.0)));
         assert_eq!(shape, Some((false, true, false)));
-        let (_, _, _, _, shape) = resize(&line, Handle::End, (250.0, 180.0), false);
+        let (_, _, _, _, shape) = resize(&line, Handle::End, (250.0, 180.0), false, false);
         assert_eq!(shape, Some((false, false, false)));
         let square = placed(0, Shape::Rectangle);
         let (cx, cy) = square.center();
