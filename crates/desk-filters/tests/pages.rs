@@ -1337,3 +1337,27 @@ fn doc_05_an_empty_property_takes_what_pages_starts_from() {
     assert!(format(3).widow_control);
     assert!(!format(3).keep_with_next);
 }
+
+#[test]
+fn est_04_a_page_break_at_the_end_of_a_paragraph_starts_the_next_one_on_the_page() {
+    // A page break that ends a paragraph ends it, as a return does: Pages
+    // lays out no empty rest after it, and the next paragraph, here an
+    // empty one, starts the new page.
+    let body = r#"<sf:p sf:style="paragraph-style-32">Antes<sf:pgbr/></sf:p><sf:p sf:style="paragraph-style-32"><sf:crbr/></sf:p><sf:p sf:style="paragraph-style-32">Depois<sf:crbr/></sf:p><sf:p sf:style="paragraph-style-32">Meio<sf:pgbr/>fim</sf:p>"#;
+    let document = read_pages(index(STYLES, "", body).as_bytes()).unwrap();
+    let texts: Vec<(String, bool)> = document
+        .body()
+        .iter()
+        .map(|p| (p.text(), p.attrs().page_break_before == Some(true)))
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            ("Antes".to_owned(), false),
+            (String::new(), true),
+            ("Depois".to_owned(), false),
+            ("Meio".to_owned(), false),
+            ("fim".to_owned(), true),
+        ]
+    );
+}

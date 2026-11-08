@@ -1393,6 +1393,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     // The sections after the first with headers and footers of their
     // own, by their style, with the paragraph that starts each.
     let mut own_sections: HashMap<&str, NodeId> = HashMap::new();
+    // A page break that ends a paragraph ends it, as a return does: Pages
+    // lays out no empty rest after it, and the next paragraph starts the
+    // new page (EST-04).
+    let mut break_before_next = false;
     for (i, paragraph) in source.body.iter().enumerate() {
         importer.next_id = ahead.get(&i).copied();
         let start = match (&paragraph.section, &paragraph.layout) {
@@ -1411,7 +1415,23 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         importer.in_body = true;
         let built = importer.paragraph(paragraph, start.map(std::sync::Arc::new));
         importer.in_body = false;
-        let built = built?;
+        let mut built = built?;
+        if std::mem::take(&mut break_before_next)
+            && let Some(first) = built.first_mut()
+        {
+            let mut attrs = first.attrs().clone();
+            attrs.page_break_before = Some(true);
+            let runs: Vec<Run> = first.runs().cloned().collect();
+            *first = Paragraph::from_runs(first.id(), first.style(), attrs, runs)?;
+        }
+        let next_starts = source
+            .body
+            .get(i + 1)
+            .is_some_and(|n| n.section.is_none() && n.layout.is_none());
+        if built.len() > 1 && next_starts && built.last().is_some_and(Paragraph::is_empty) {
+            built.pop();
+            break_before_next = true;
+        }
         if let (Some(style), Some(first)) = (own, built.first()) {
             own_sections.insert(style, first.id());
         }
