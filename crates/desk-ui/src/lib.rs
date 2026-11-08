@@ -26,6 +26,7 @@ mod find;
 mod fonts;
 mod formatting;
 pub mod geometry;
+mod gradient_bar;
 mod graphic_pane;
 mod headers_pane;
 pub mod i18n;

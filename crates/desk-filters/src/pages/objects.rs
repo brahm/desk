@@ -178,14 +178,41 @@ fn graphic_style(
             tint: None,
         }),
         Some(Value::Color(color)) => Some(Fill::Color(rgba(*color))),
-        Some(Value::Gradient { angle, stops }) => match (stops.first(), stops.last()) {
-            (Some(from), Some(to)) => Some(Fill::Gradient {
-                from: rgba(from.1),
-                to: rgba(to.1),
-                angle: (angle.to_degrees() * 100.0).round().rem_euclid(36_000.0) as i32,
-            }),
-            _ => None,
-        },
+        Some(Value::Gradient {
+            angle,
+            stops,
+            inflections,
+            center,
+        }) => {
+            let angle = (angle.to_degrees() * 100.0).round().rem_euclid(36_000.0) as i32;
+            let plain = stops.len() == 2
+                && center.is_none()
+                && stops[0].0 == 0.0
+                && stops[1].0 == 1.0
+                && inflections.first().is_none_or(|i| (i - 0.5).abs() < 1e-3);
+            let part = |v: f64| (v * 1000.0).round().clamp(0.0, 1000.0) as u16;
+            match (stops.first(), stops.last()) {
+                (Some(from), Some(to)) if plain => Some(Fill::Gradient {
+                    from: rgba(from.1),
+                    to: rgba(to.1),
+                    angle,
+                }),
+                (Some(only), Some(_)) if stops.len() == 1 => Some(Fill::Color(rgba(only.1))),
+                (Some(_), Some(_)) => Some(Fill::Advanced(desk_model::Gradient {
+                    stops: stops
+                        .iter()
+                        .zip(inflections.iter().copied().chain(std::iter::repeat(0.5)))
+                        .map(|(&(at, color), blend)| desk_model::GradientStop {
+                            blend: part(blend),
+                            ..desk_model::GradientStop::new(part(at), rgba(color))
+                        })
+                        .collect(),
+                    angle,
+                    center: center.map(|(x, y)| (part(x), part(y))),
+                })),
+                _ => None,
+            }
+        }
         _ => None,
     };
     let stroke = match properties.get("stroke") {

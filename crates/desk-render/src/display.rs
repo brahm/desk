@@ -5,7 +5,8 @@
 
 use desk_layout::{DocumentLayout, Page, PlacedBlock, PlacedLine, PlacedObject};
 use desk_model::{
-    BorderSides, Fill, ImageFill, LineEnd, LineStyle, ObjectKind, Picture, Rgba, Shape, Wrap,
+    BorderSides, Fill, Gradient, ImageFill, LineEnd, LineStyle, ObjectKind, Picture, Rgba, Shape,
+    Wrap,
 };
 use desk_text::FontData;
 
@@ -170,12 +171,22 @@ pub enum Paint {
     Linear {
         /// Where the first color is.
         start: (f32, f32),
-        /// Where the second color is.
+        /// Where the last color is.
         end: (f32, f32),
-        /// The color at the start.
-        from: Rgba,
-        /// The color at the end.
-        to: Rgba,
+        /// The colors, by where they are from 0 at the start to 1 at the
+        /// end (OBJ-41).
+        stops: Vec<(f32, Rgba)>,
+    },
+    /// Colors that turn into each other in circles out from a point
+    /// (OBJ-41).
+    Radial {
+        /// The point.
+        center: (f32, f32),
+        /// How far the last color is from it.
+        radius: f32,
+        /// The colors, by where they are from 0 at the point to 1 at the
+        /// radius.
+        stops: Vec<(f32, Rgba)>,
     },
     /// A picture, at a place and size, and over and over from there when
     /// it tiles (OBJ-09).
@@ -189,6 +200,41 @@ pub enum Paint {
         /// A color laid over it, with its opacity (OBJ-42).
         tint: Option<Rgba>,
     },
+}
+
+/// How a gradient fills a frame (OBJ-09, OBJ-41).
+fn gradient_paint(gradient: &Gradient, frame: (f32, f32, f32, f32)) -> Paint {
+    let (x, y, w, h) = frame;
+    let stops = gradient
+        .color_stops()
+        .into_iter()
+        .map(|(at, color)| (at as f32, color))
+        .collect();
+    if let Some((cx, cy)) = gradient.center {
+        // Out from the point, as far as the farthest corner.
+        let cx = x + w * f32::from(cx.min(1000)) / 1000.0;
+        let cy = y + h * f32::from(cy.min(1000)) / 1000.0;
+        let radius = [(x, y), (x + w, y), (x, y + h), (x + w, y + h)]
+            .into_iter()
+            .map(|(px, py)| (px - cx).hypot(py - cy))
+            .fold(0.0_f32, f32::max);
+        return Paint::Radial {
+            center: (cx, cy),
+            radius: radius.max(0.5),
+            stops,
+        };
+    }
+    // Across the frame, through its center, as far as its corners reach
+    // along the way it goes.
+    let a = (gradient.angle as f32 / 100.0).to_radians();
+    let (dx, dy) = (a.cos(), -a.sin());
+    let half = (w * dx.abs() + h * dy.abs()) / 2.0;
+    let (cx, cy) = (x + w / 2.0, y + h / 2.0);
+    Paint::Linear {
+        start: (cx - dx * half, cy - dy * half),
+        end: (cx + dx * half, cy + dy * half),
+        stops,
+    }
 }
 
 /// Where a picture that fills a frame lies, as the mode sizes it, a pixel
@@ -496,19 +542,9 @@ fn object_item(placed: &PlacedObject) -> Item {
     let fill = style.fill.clone().map(|fill| match fill {
         Fill::Color(color) => Paint::Color(color),
         Fill::Gradient { from, to, angle } => {
-            // Across the frame, through its center, as far as its corners
-            // reach along the way it goes.
-            let a = (angle as f32 / 100.0).to_radians();
-            let (dx, dy) = (a.cos(), -a.sin());
-            let half = (w * dx.abs() + h * dy.abs()) / 2.0;
-            let (cx, cy) = (x + w / 2.0, y + h / 2.0);
-            Paint::Linear {
-                start: (cx - dx * half, cy - dy * half),
-                end: (cx + dx * half, cy + dy * half),
-                from,
-                to,
-            }
+            gradient_paint(&Gradient::linear(from, to, angle), (x, y, w, h))
         }
+        Fill::Advanced(gradient) => gradient_paint(&gradient, (x, y, w, h)),
         Fill::Image {
             picture,
             mode,

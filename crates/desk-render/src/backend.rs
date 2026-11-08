@@ -876,31 +876,40 @@ fn set_paint(cr: &Context, paint: &Paint) -> Result<(), RenderError> {
         Paint::Color(color) => set_color(cr, color),
         // The painter sets a picture, from its surfaces.
         Paint::Image { .. } => {}
-        Paint::Linear {
-            start,
-            end,
-            from,
-            to,
-        } => {
+        Paint::Linear { start, end, stops } => {
             let gradient = cairo::LinearGradient::new(
                 f64::from(start.0),
                 f64::from(start.1),
                 f64::from(end.0),
                 f64::from(end.1),
             );
-            for (at, color) in [(0.0, from), (1.0, to)] {
-                gradient.add_color_stop_rgba(
-                    at,
-                    f64::from(color.r) / 255.0,
-                    f64::from(color.g) / 255.0,
-                    f64::from(color.b) / 255.0,
-                    f64::from(color.a) / 255.0,
-                );
-            }
+            add_stops(&gradient, &stops);
+            cr.set_source(&gradient)?;
+        }
+        Paint::Radial {
+            center,
+            radius,
+            stops,
+        } => {
+            let (cx, cy) = (f64::from(center.0), f64::from(center.1));
+            let gradient = cairo::RadialGradient::new(cx, cy, 0.0, cx, cy, f64::from(radius));
+            add_stops(&gradient, &stops);
             cr.set_source(&gradient)?;
         }
     }
     Ok(())
+}
+
+fn add_stops(gradient: &cairo::Gradient, stops: &[(f32, Rgba)]) {
+    for &(at, color) in stops {
+        gradient.add_color_stop_rgba(
+            f64::from(at.clamp(0.0, 1.0)),
+            f64::from(color.r) / 255.0,
+            f64::from(color.g) / 255.0,
+            f64::from(color.b) / 255.0,
+            f64::from(color.a) / 255.0,
+        );
+    }
 }
 
 fn set_color(cr: &Context, color: Rgba) {

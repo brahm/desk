@@ -112,6 +112,17 @@ impl Rgba {
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b, a: 255 }
     }
+
+    /// The color halfway between this one and another.
+    pub fn mix(self, other: Self) -> Self {
+        let half = |a: u8, b: u8| ((u16::from(a) + u16::from(b)).div_ceil(2)) as u8;
+        Self {
+            r: half(self.r, other.r),
+            g: half(self.g, other.g),
+            b: half(self.b, other.b),
+            a: half(self.a, other.a),
+        }
+    }
 }
 
 #[cfg(test)]

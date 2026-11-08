@@ -139,6 +139,26 @@ pub struct Gradient {
     /// `draw:border`, in percent: how much of the way at each end has the
     /// color of that end.
     pub border: Option<f64>,
+    /// `draw:cx` and `draw:cy`, in percent of the width and the height:
+    /// the center of a radial gradient.
+    pub center: Option<(f64, f64)>,
+    /// `desk:gradient-stop` children: the colors of an advanced gradient
+    /// of Desk, between the start color and the end color (OBJ-41).
+    pub stops: Vec<GradientStop>,
+}
+
+/// A color of an advanced gradient of Desk (`desk:gradient-stop`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GradientStop {
+    /// `svg:offset`: where it is, from 0 to 1.
+    pub offset: f64,
+    /// `desk:color`.
+    pub color: Option<Color>,
+    /// `desk:opacity`, in percent.
+    pub opacity: Option<f64>,
+    /// `desk:blend`: where it is half blended into the next color, from 0
+    /// to 1 of the way to it.
+    pub blend: Option<f64>,
 }
 
 /// A picture that graphic styles fill with (`draw:fill-image`, in
@@ -212,6 +232,27 @@ pub(crate) fn gradient(e: &Element) -> Option<Gradient> {
         end_color: e.attr(DRAW, "end-color").and_then(Color::parse),
         angle: e.attr(DRAW, "angle").and_then(parse_angle).unwrap_or(0.0),
         border: e.attr(DRAW, "border").and_then(parse_percent),
+        center: e
+            .attr(DRAW, "cx")
+            .and_then(parse_percent)
+            .zip(e.attr(DRAW, "cy").and_then(parse_percent)),
+        stops: e
+            .children_named(DESK, "gradient-stop")
+            .filter_map(|stop| {
+                let offset: f64 = stop.attr(SVG, "offset")?.trim().parse().ok()?;
+                let number = |name| {
+                    stop.attr(DESK, name)
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite())
+                };
+                offset.is_finite().then(|| GradientStop {
+                    offset: offset.clamp(0.0, 1.0),
+                    color: stop.attr(DESK, "color").and_then(Color::parse),
+                    opacity: stop.attr(DESK, "opacity").and_then(parse_percent),
+                    blend: number("blend"),
+                })
+            })
+            .collect(),
     })
 }
 
@@ -245,6 +286,24 @@ pub(crate) fn write_gradient(w: &mut Writer, g: &Gradient) {
     );
     if let Some(border) = g.border {
         w.attr("draw:border", &format!("{}%", decimal(border)));
+    }
+    if let Some((cx, cy)) = g.center {
+        w.attr("draw:cx", &format!("{}%", decimal(cx)))
+            .attr("draw:cy", &format!("{}%", decimal(cy)));
+    }
+    for stop in &g.stops {
+        w.start("desk:gradient-stop")
+            .attr("svg:offset", &decimal(stop.offset));
+        if let Some(color) = stop.color {
+            w.attr("desk:color", &color.to_string());
+        }
+        if let Some(opacity) = stop.opacity {
+            w.attr("desk:opacity", &format!("{}%", decimal(opacity)));
+        }
+        if let Some(blend) = stop.blend {
+            w.attr("desk:blend", &decimal(blend));
+        }
+        w.end();
     }
     w.end();
 }
