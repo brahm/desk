@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! FMT-03, FMT-04, FMT-09, FMT-10, FMT-20 and FMT-21: documents saved by
-//! Pages '09 on the reference machine with shadows, outlines, ligatures,
-//! tracking, backgrounds and rules put their words where Pages put them
-//! in its PDF, and draw their effects where Pages drew them.
+//! FMT-03, FMT-04, FMT-09, FMT-10, FMT-12, FMT-20 and FMT-21: documents
+//! saved by Pages '09 on the reference machine with shadows, outlines,
+//! ligatures, tracking, narrow justified lines, backgrounds and rules put
+//! their words where Pages put them in its PDF, and draw their effects
+//! where Pages drew them.
 
 use std::path::{Path, PathBuf};
 
@@ -50,6 +51,14 @@ fn close(a: f32, b: f32) -> bool {
 #[test]
 fn fmt_10_tracking_spreads_letters_as_pages_does() {
     check("fmt-10-tracking");
+}
+
+#[test]
+fn fmt_12_narrow_justified_lines_spread_their_letters_as_pages_does() {
+    // Liberation Mono, Sans and Serif at 9 to 18 points: the spaces grow
+    // by half an em before the letters spread, and the letters by 0.2892
+    // em at most.
+    check("justify-spacing");
 }
 
 #[test]
