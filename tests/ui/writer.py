@@ -465,6 +465,7 @@ def main():
     reflection_of_a_shape(work)
     advanced_gradient(work)
     mask_and_frame(work)
+    mask_from_the_menu(work)
     print("All UI tests passed.")
 
 
@@ -1392,15 +1393,17 @@ def points_of_a_star(work):
         writer.wait(timeout=10)
 
 
-def activate(action):
+def activate(action, value=None):
     """Activates an action of the first window of Desk Writer, as its menu
     item does, through the actions that GTK puts on the session bus: the
-    items of GTK's menus have no names for the accessibility tree."""
+    items of GTK's menus have no names for the accessibility tree. A value
+    is the string that the item gives the action."""
+    parameter = "[]" if value is None else f"[<'{value}'>]"
     subprocess.run(
         [
             "gdbus", "call", "--session", "--dest", "br.com.brahm.Desk.Writer",
             "--object-path", "/br/com/brahm/Desk/Writer/window/1",
-            "--method", "org.gtk.Actions.Activate", action, "[]", "{}",
+            "--method", "org.gtk.Actions.Activate", action, parameter, "{}",
         ],
         check=True,
         capture_output=True,
@@ -1896,6 +1899,42 @@ def mask_and_frame(work):
             and saved_content(letter, r'desk:picture-frame="photo"'),
         )
         check("a picture masked with an oval and framed is saved (OBJ-04, OBJ-36)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+def mask_from_the_menu(work):
+    """Mask with Shape of the Arrange menu masks the selected picture with
+    a star, and Unmask takes the mask off again (OBJ-04)."""
+    picture = (
+        b'<draw:frame text:anchor-type="page" text:anchor-page-number="1" '
+        b'svg:x="96pt" svg:y="200pt" svg:width="200pt" svg:height="200pt">'
+        b'<draw:image xlink:href="Pictures/gray.png" xlink:type="simple"/></draw:frame>'
+    )
+    writer, app, letter = open_with_a_shape(
+        work,
+        "Starred.odt",
+        picture,
+        {"Pictures/gray.png": png(16, 16, (128, 128, 128))},
+    )
+    try:
+        activate("mask-with-shape", "star")
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved star mask",
+            lambda: saved_content(letter, r'desk:mask-shape="star \d+ \d+"'),
+        )
+        check("Mask with Shape of the menu masks a picture with a star (OBJ-04)", True)
+        activate("unmask")
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved picture without a mask",
+            lambda: saved_content(letter, r"<draw:image")
+            and not saved_content(letter, r"desk:mask"),
+        )
+        check("Unmask takes the mask off the picture (OBJ-04)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
