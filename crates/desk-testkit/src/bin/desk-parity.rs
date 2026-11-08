@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use desk_testkit::report::{Report, compared_by_row, run_case, tests_by_row};
+use desk_testkit::report::{Report, compared_by_row, differing_by_row, run_case, tests_by_row};
 use desk_testkit::{Case, matrix};
 
 fn main() -> ExitCode {
@@ -44,10 +44,11 @@ fn run() -> Result<bool, String> {
     let cases = Case::load_all(corpus.join("writer")).map_err(|e| e.to_string())?;
     let tests = tests_by_row(&root.join("crates")).map_err(|e| e.to_string())?;
     let compared = compared_by_row(&root.join("crates")).map_err(|e| e.to_string())?;
+    let differing = differing_by_row(&root.join("crates")).map_err(|e| e.to_string())?;
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let results = cases.iter().map(|case| run_case(case, &out)).collect();
-    let report = Report::new(rows, results, &tests, &compared);
+    let report = Report::new(rows, results, &tests, &compared, &differing);
     for (name, text) in [
         ("report.md", report.to_markdown(&out)),
         ("report.json", report.to_json()),

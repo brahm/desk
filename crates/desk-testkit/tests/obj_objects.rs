@@ -7,11 +7,9 @@
 //! pixels in a hundred.
 //!
 //! The documents with text in shapes and text boxes, wraps and movies do
-//! not match yet, and are left out until they do: obj-02-image-formats,
-//! obj-12-text-in-shape, obj-13-text-box, obj-14-inline-text-box,
-//! obj-15-linked-boxes, obj-16-fmt-13-19-box-format, obj-17-wrap,
-//! obj-18-audio-video, obj-19-movie-settings and
-//! obj-42-tinted-image-fill.
+//! not match yet: their tests are kept from running with
+//! `#[ignore = "differs from Pages: …"]`, which the parity report reads
+//! to show their rows as different from Pages, until they match.
 
 use std::path::{Path, PathBuf};
 
@@ -146,4 +144,64 @@ fn obj_40_obj_41_fills_match_pages() {
 #[test]
 fn obj_42_image_fills_match_pages() {
     check("obj-42-image-fill");
+}
+
+#[test]
+#[ignore = "differs from Pages: the words come in another order"]
+fn obj_02_picture_formats_match_pages() {
+    check("obj-02-image-formats");
+}
+
+#[test]
+#[ignore = "differs from Pages: the text breaks otherwise and sits 16 pt lower"]
+fn obj_12_text_in_shapes_matches_pages() {
+    check("obj-12-text-in-shape");
+}
+
+#[test]
+#[ignore = "differs from Pages: the first line sits 3.7 pt low"]
+fn obj_13_text_boxes_match_pages() {
+    check("obj-13-text-box");
+}
+
+#[test]
+#[ignore = "differs from Pages: the text of the box moves"]
+fn obj_14_inline_text_boxes_match_pages() {
+    check("obj-14-inline-text-box");
+}
+
+#[test]
+#[ignore = "differs from Pages: the text flows otherwise between the boxes"]
+fn obj_15_linked_text_boxes_match_pages() {
+    check("obj-15-linked-boxes");
+}
+
+#[test]
+#[ignore = "differs from Pages: the text of the boxes moves"]
+fn obj_16_fmt_13_fmt_19_formatted_text_boxes_match_pages() {
+    check("obj-16-fmt-13-19-box-format");
+}
+
+#[test]
+#[ignore = "differs from Pages: words move up to 418 pt and 9 % of the pixels differ"]
+fn obj_17_wraps_match_pages() {
+    check("obj-17-wrap");
+}
+
+#[test]
+#[ignore = "differs from Pages: words move about 350 pt"]
+fn obj_18_sound_and_movies_match_pages() {
+    check("obj-18-audio-video");
+}
+
+#[test]
+#[ignore = "differs from Pages: words move about 350 pt"]
+fn obj_19_movie_settings_match_pages() {
+    check("obj-19-movie-settings");
+}
+
+#[test]
+#[ignore = "differs from Pages: the tint of the fill is drawn otherwise"]
+fn obj_42_tinted_image_fills_match_pages() {
+    check("obj-42-tinted-image-fill");
 }
