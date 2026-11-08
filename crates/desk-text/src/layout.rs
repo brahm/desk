@@ -387,6 +387,10 @@ impl TextSystem {
         let mut runs: Vec<(FontData, f32)> = Vec::new();
         // The box of each run, rounded as the line heights are.
         let mut boxes: Vec<RunBox> = Vec::new();
+        // Whether each run is an object in the text, and the box of the
+        // text of each run: for an object, of the text it stands in.
+        let mut objects: Vec<bool> = Vec::new();
+        let mut text_boxes: Vec<RunBox> = Vec::new();
         let mut clusters: Vec<Cluster> = Vec::new();
         for line in layout.lines() {
             for item in line.items() {
@@ -395,6 +399,23 @@ impl TextSystem {
                     runs.push((run.font().clone(), run.font_size()));
                     let brush = glyph_run.style().brush;
                     let format = &text.formats()[brush as usize];
+                    let object = text.object_box(brush).is_some();
+                    objects.push(object);
+                    text_boxes.push(if object {
+                        // Shaped tiny: measured at the size of its text.
+                        let size = format.font_size.to_pt() as f32;
+                        let k = size / run.font_size().max(f32::MIN_POSITIVE);
+                        let metrics = run.font_metrics();
+                        let scaled = parley::FontMetrics {
+                            ascent: metrics.ascent * k,
+                            descent: metrics.descent * k,
+                            leading: metrics.leading * k,
+                            ..*metrics
+                        };
+                        run_box(format, size, &scaled)
+                    } else {
+                        run_box(format, run.font_size(), run.font_metrics())
+                    });
                     boxes.push(match text.object_box(brush) {
                         // An object stands on the baseline.
                         Some((_, height)) => RunBox {
@@ -567,8 +588,27 @@ impl TextSystem {
                     .or_else(|| boxes.first().copied())
                     .map_or(0.0, |b| b.leading);
                 let pitch = match format.line_spacing {
+                    // An object in the text is not scaled: the multiple
+                    // scales the text of the line, and the object only
+                    // makes it taller above its baseline, as Pages lays
+                    // out a picture as tall as the page (DOC-05).
                     LineSpacing::Multiple { percent } => {
-                        ((height - leading) * percent as f32 / 100.0 + leading).round()
+                        let scale = |h: f32, leading: f32| {
+                            ((h - leading) * percent as f32 / 100.0 + leading).round()
+                        };
+                        let cs = span(pos, line_end);
+                        let object_over = cs
+                            .iter()
+                            .filter(|c| objects[c.run])
+                            .map(|c| boxes[c.run].over)
+                            .reduce(f32::max);
+                        let text_box = cs.iter().map(|c| text_boxes[c.run]).reduce(RunBox::max);
+                        match (object_over, text_box) {
+                            (Some(over), Some(b)) if over > b.over => {
+                                scale(b.over + b.under, b.leading) + over - b.over
+                            }
+                            _ => scale(height, leading),
+                        }
                     }
                     LineSpacing::AtLeast(min) => height.max(min.to_pt() as f32),
                     LineSpacing::Exactly(exact) => {

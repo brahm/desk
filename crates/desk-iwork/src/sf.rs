@@ -520,9 +520,21 @@ pub(crate) fn color(element: &Element) -> Option<Color> {
     })
 }
 
+/// The lengths that Pages saves empty when they are zero.
+const ZERO_WHEN_EMPTY: &[&str] = &[
+    "spaceBefore",
+    "spaceAfter",
+    "leftIndent",
+    "rightIndent",
+    "firstLineIndent",
+];
+
 /// The properties that a style sets, in the order of its property map.
 /// A property saved empty is not set, so it is left out, and one saved
-/// with `sf:null` is set to [`Value::Null`].
+/// with `sf:null` is set to [`Value::Null`]. The exception are the
+/// spaces and indents of paragraphs: Pages saves a length of zero empty,
+/// so a style that takes its parent's space after a heading away keeps
+/// `<sf:spaceAfter/>` (DOC-05).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Properties(pub Vec<(String, Value)>);
 
@@ -532,6 +544,8 @@ impl Properties {
         for property in map.elements() {
             if let Some(value) = property.elements().next() {
                 properties.push((property.name.local.clone(), Value::read(ids, value)));
+            } else if ZERO_WHEN_EMPTY.contains(&property.name.local.as_str()) {
+                properties.push((property.name.local.clone(), Value::Number(0.0)));
             }
         }
         Self(properties)
