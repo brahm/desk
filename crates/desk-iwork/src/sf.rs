@@ -552,7 +552,7 @@ const EMPTY_MEANS: &[(&str, f64)] = &[
 
 /// The properties that a style sets, in the order of its property map.
 /// A property saved with `sf:null` is set to [`Value::Null`]. One saved
-/// empty is set to where Pages starts from, for those in [`EMPTY_MEANS`];
+/// empty is set to where Pages starts from, for those in `EMPTY_MEANS`;
 /// the others are left out, as not set.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Properties(pub Vec<(String, Value)>);
