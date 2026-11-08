@@ -624,6 +624,38 @@ fn lines_flow_around_an_object() {
     assert_eq!(layout.lines.last().unwrap().range.end, TEXT.len());
 }
 
+/// A column with an object on its right half from 21pt down.
+struct Below;
+
+impl LineSpace for Below {
+    fn width(&self) -> f32 {
+        200.0
+    }
+
+    fn segments(&self, top: f32, height: f32) -> Vec<(f32, f32)> {
+        if top + height > 21.0 {
+            vec![(0.0, 90.0)]
+        } else {
+            vec![(0.0, 200.0)]
+        }
+    }
+}
+
+#[test]
+fn obj_17_a_line_shorter_than_its_text_takes_only_its_own_height_from_an_object() {
+    let mut system = TextSystem::new();
+    let paragraph = ParaFormat {
+        line_spacing: LineSpacing::Exactly(Length::from_points(10)),
+        ..ParaFormat::default()
+    };
+    let layout = lay_in(&mut system, paragraph, &[(TEXT, sans())], &Below);
+    // The second line, from 10 to 20 points, is clear of the object,
+    // though its text would be taller.
+    let tops: Vec<(f32, f32)> = layout.lines.iter().map(|l| (l.top, l.width)).collect();
+    assert_eq!(tops[1], (10.0, 200.0), "{tops:?}");
+    assert_eq!(tops[2], (20.0, 90.0), "{tops:?}");
+}
+
 #[test]
 fn indents_wider_than_the_column_overflow_instead_of_hanging() {
     let mut system = TextSystem::new();

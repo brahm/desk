@@ -194,7 +194,7 @@ fn obj_14_inline_text_boxes_match_pages() {
 }
 
 #[test]
-#[ignore = "differs from Pages: words move up to 418 pt and 9 % of the pixels differ"]
+#[ignore = "differs from Pages: the words are where Pages put them, but 7 % of the pixels differ"]
 fn obj_17_wraps_match_pages() {
     check("obj-17-wrap");
 }

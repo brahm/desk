@@ -9,10 +9,10 @@
 //! away. Desk makes as many pages as Pages, and puts the words of most of
 //! them where Pages put them.
 //!
-//! Two things still differ: a note in the second column takes room from
-//! the first one in Pages, which Desk lays out before the note is met
-//! (pages 20 to 28), and the text goes around the round picture further
-//! from it in Pages (pages 32 to 36, as in obj-17-wrap).
+//! One thing still differs: in the narrow lines beside a picture in two
+//! columns (pages 19 to 22), Pages spreads part of the room of a
+//! justified line between the letters, where Desk puts it all between
+//! the words.
 
 use std::path::{Path, PathBuf};
 
@@ -36,14 +36,15 @@ fn pages() -> (Vec<Vec<Word>>, Vec<Vec<Word>>) {
 }
 
 #[test]
-fn est_04_est_05_est_11_est_12_est_16_est_18_est_19_est_22_a_long_document_matches_pages_page_by_page()
+fn est_04_est_05_est_11_est_12_est_13_est_16_est_18_est_19_est_22_a_long_document_matches_pages_page_by_page()
  {
     let (reference, desk) = pages();
     assert_eq!(desk.len(), reference.len(), "pages");
-    // The title page, the contents, the blank page before the second
-    // section, the second section with its pictures, styles and breaks,
-    // and the fourth section before and after the round picture.
-    for pages in [0..18, 28..31, 36..41] {
+    // All but the pages of two columns with a picture: the title page,
+    // the contents, the blank page before the second section, the second
+    // section with its pictures, styles and breaks, the notes of the
+    // columns, and the text around the round picture.
+    for pages in [0..18, 22..41] {
         let diff = compare_words(&reference[pages.clone()], &desk[pages.clone()]);
         assert!(
             diff.passes(DEFAULT_POSITION_TOLERANCE),
@@ -55,7 +56,7 @@ fn est_04_est_05_est_11_est_12_est_16_est_18_est_19_est_22_a_long_document_match
 }
 
 #[test]
-#[ignore = "differs from Pages: a note in the second column takes room from the first, and text goes further around a round picture"]
+#[ignore = "differs from Pages: justified lines beside a picture in two columns spread their room between the letters"]
 fn est_07_a_long_document_matches_pages_to_its_last_page() {
     let (reference, desk) = pages();
     let diff = compare_words(&reference, &desk);
