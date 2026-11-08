@@ -11,9 +11,21 @@
 # their height. "below" puts it under the text, as with fonts that have a
 # line gap of their own. "fi fl" means Pages joins fi and fl into
 # ligatures, and no others, as in Times and Palatino, which have only those
-# two (Courier, fixed in width, has none);
-# "none" means it joins nothing. data/fonts/README.md explains.
-family	ascent	descent	leading	place	ligatures
+# two (Courier, fixed in width, has none); "fi fl ff ffi" adds ff and ffi,
+# as in Helvetica Neue and its bold; "none" means it joins nothing.
+#
+# "spacing", when given, is added between letters, in ems: the free font
+# that stands for the family has the widths of another (Helvetica for
+# Helvetica Neue), and the spacing brings a line of text to the width it
+# has in Pages. Regular and Light, the faces of body text, were measured
+# on the text of a real document of 62 pages; the others on the sentence
+# "The quick brown fox jumps over the lazy dog 0123456789" at 12 pt.
+#
+# A family followed by UltraLight, Light, Medium or Bold is the face of
+# that weight (100, 300, 500, 700 and over), where it lays out otherwise
+# than the family. Pages rounds the ascent, the descent and the leading of
+# each line to whole points. data/fonts/README.md explains.
+family	ascent	descent	leading	place	ligatures	spacing
 Helvetica	0.77002	0.22998	0.2	above	fi fl
 Times	0.75	0.25	0.2	above	fi fl
 Times Roman	0.75	0.25	0.2	above	fi fl
@@ -22,3 +34,8 @@ Palatino	0.82275	0.27734	0.22002	above	fi fl
 Arial	0.90527	0.21191	0.03271	below	none
 Times New Roman	0.89111	0.21631	0.04248	below	none
 Courier New	0.83252	0.30029	0	below	none
+Helvetica Neue	0.952	0.213	0.028	below	fi fl ff ffi	0.00469
+Helvetica Neue UltraLight	0.931	0.213	0.027	below	fi fl	-0.03687
+Helvetica Neue Light	0.967	0.213	0.029	below	fi fl	-0.0129
+Helvetica Neue Medium	0.975	0.217	0.029	below	fi fl	0.01708
+Helvetica Neue Bold	0.975	0.217	0.029	below	fi fl ff ffi	-0.00109
