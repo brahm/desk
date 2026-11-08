@@ -1131,8 +1131,10 @@ fn run_text(
     glyphs: usize,
 ) -> (String, Vec<(u32, u32)>) {
     let mut text = String::new();
-    let mut clusters = Vec::new();
+    let mut clusters: Vec<(u32, u32)> = Vec::new();
     let mut count = 0;
+    // The text of clusters without glyphs before the first with any.
+    let mut pending = 0;
     for cluster in run.visual_clusters() {
         if cluster.style_index() != style {
             continue;
@@ -1153,10 +1155,25 @@ fn run_text(
         }
         let n = cluster.glyphs().count();
         count += n;
-        let bytes = text.len() - start;
-        if bytes > 0 || n > 0 {
-            clusters.push((bytes as u32, n as u32));
+        let bytes = (text.len() - start) as u32;
+        if n == 0 && cluster.is_ligature_continuation() {
+            // A letter that a ligature of the font joins to the one before
+            // it draws no glyph of its own: it goes with that ligature, so
+            // that the ligature reads as all its letters.
+            match clusters.last_mut() {
+                Some(last) => last.0 += bytes,
+                None => pending += bytes,
+            }
+        } else if n > 0 {
+            clusters.push((bytes + std::mem::take(&mut pending), n as u32));
+        } else if bytes > 0 {
+            clusters.push((bytes, 0));
         }
+    }
+    if pending > 0
+        && let Some(last) = clusters.last_mut()
+    {
+        last.0 += pending;
     }
     if count != glyphs {
         clusters.clear();

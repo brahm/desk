@@ -534,6 +534,9 @@ struct Importer<'a> {
     /// line of the text, and the objects met there, by the id of their
     /// marks and the object IDs of their attachments.
     in_body: bool,
+    /// Whether the text read is a header or a footer, which hold objects
+    /// in their lines too.
+    in_margin: bool,
     inline: Vec<(NodeId, String)>,
 }
 
@@ -646,6 +649,7 @@ impl<'a> Importer<'a> {
             marks: HashMap::new(),
             next_id: None,
             in_body: false,
+            in_margin: false,
             inline: Vec::new(),
         };
         importer.styles()?;
@@ -985,8 +989,9 @@ impl<'a> Importer<'a> {
                         Field::NoteMark { note }
                     }
                     iwork::Field::Object { id } => {
-                        // Only the body holds objects in its lines.
-                        if !self.in_body {
+                        // The body and the headers and footers hold objects
+                        // in their lines (EST-12).
+                        if !self.in_body && !self.in_margin {
                             continue;
                         }
                         let object = self.document.new_id();
@@ -1419,6 +1424,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         }
     }
     // The headers and footers, with the styles of the body.
+    let first_style = source.body.first().and_then(|p| p.section.as_deref());
+    // Those named after the style of the first section are its own, over
+    // the default ones, as Pages shows them.
+    let of_first = |name: &str| first_style.is_some_and(|s| name.starts_with(&format!("{s}-")));
     for (kind, parts) in [
         (MarginKind::Header, &source.headers),
         (MarginKind::Footer, &source.footers),
@@ -1429,7 +1438,15 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             };
             // Those of a later section are named after its style; those of
             // a section that uses the headers before it are not shown.
-            let section = if name.starts_with("SFWPDefault") {
+            let section = if of_first(name) {
+                None
+            } else if name.starts_with("SFWPDefault") {
+                let named = parts
+                    .iter()
+                    .any(|(n, _)| of_first(n) && margin_place(kind, n) == Some(place));
+                if named {
+                    continue;
+                }
                 None
             } else {
                 match own_sections
@@ -1441,9 +1458,11 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
                 }
             };
             let mut built = Vec::new();
+            importer.in_margin = true;
             for paragraph in paragraphs {
                 built.extend(importer.paragraph(paragraph, None)?);
             }
+            importer.in_margin = false;
             if built.iter().all(Paragraph::is_empty) {
                 built.clear();
             }
@@ -1487,7 +1506,6 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     }
     // The floating objects, on their pages and on the masters of their
     // sections.
-    let first_style = source.body.first().and_then(|p| p.section.as_deref());
     let (floating, inline) =
         objects::import_objects(&mut importer, source, first_style, &own_sections)?;
     log.add(Warning::Content(Content::FloatingObjects), floating);
