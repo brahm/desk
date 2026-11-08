@@ -1034,3 +1034,57 @@ fn doc_05_a_multiple_spacing_scales_the_text_and_not_the_object() {
         line.height
     );
 }
+
+#[test]
+fn doc_05_an_object_alone_on_a_line_keeps_the_text_below_it_at_any_spacing() {
+    // The line of a picture keeps the part of its text below the
+    // baseline, as with a multiple, when the spacing is at least or
+    // exactly a height: the picture stands on the baseline of the text.
+    let mut system = TextSystem::new();
+    let object = desk_model::NodeId::new(99).unwrap();
+    let mark = CharFormat {
+        field: Some(desk_model::Field::ObjectMark { object }),
+        ..sans()
+    };
+    let sizes = std::collections::HashMap::from([(
+        object,
+        (Length::from_points(100), Length::from_points(60)),
+    )]);
+    let values = desk_text::FieldValues {
+        objects: Some(Arc::new(sizes)),
+        ..desk_text::FieldValues::default()
+    };
+    let lay_out = |system: &mut TextSystem, spacing: LineSpacing| {
+        let paragraph = ParaFormat {
+            line_spacing: spacing,
+            ..ParaFormat::default()
+        };
+        let text = ParagraphText::from_runs_in(
+            &TextSettings::default(),
+            values.clone(),
+            paragraph,
+            sans(),
+            [("\u{fffc}", mark.clone())],
+        );
+        system.layout(&text, &Column::new(500.0), 0.0).lines[0].clone()
+    };
+    let words = plain(&mut system, ParaFormat::default(), "Legenda");
+    let word = &words.lines[0];
+    let under = word.height - (word.baseline - word.top);
+    assert!(under > 1.0);
+    // At least 14 points: the picture and the text below it.
+    let line = lay_out(&mut system, LineSpacing::AtLeast(Length::from_points(14)));
+    assert!((line.baseline - line.top - 60.0).abs() < 0.01, "{line:?}");
+    assert!((line.height - 60.0 - under).abs() < 0.51, "{} {under}", line.height);
+    // At least more than that: the height asked for.
+    let line = lay_out(&mut system, LineSpacing::AtLeast(Length::from_points(90)));
+    assert!((line.height - 90.0).abs() < 0.01, "{line:?}");
+    // Exactly 80 points: the picture stands on the baseline, as high
+    // above the bottom of the line as the text below it.
+    let line = lay_out(&mut system, LineSpacing::Exactly(Length::from_points(80)));
+    assert!((line.height - 80.0).abs() < 0.01, "{line:?}");
+    assert!(
+        (line.top + line.height - line.baseline - under).abs() < 0.51,
+        "{line:?} {under}"
+    );
+}

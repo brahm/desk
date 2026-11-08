@@ -577,7 +577,17 @@ impl TextSystem {
                     .iter()
                     .map(|c| boxes[c.run])
                     .reduce(RunBox::max);
-                let height = line_box.map_or(laid_out, |b| b.over + b.under);
+                // An object stands on the baseline of the text it is in, so
+                // the line keeps the part of that text below the baseline,
+                // whatever the spacing (DOC-05).
+                let height = line_box.map_or(laid_out, |b| {
+                    let under = span(pos, line_end)
+                        .iter()
+                        .filter(|c| objects[c.run])
+                        .map(|c| text_boxes[c.run].under)
+                        .fold(b.under, f32::max);
+                    b.over + under
+                });
                 let mut text_top = y;
                 // As Pages measured on the reference machine (FMT-14): the
                 // text sits at the top of the line and any extra space goes
