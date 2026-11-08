@@ -12,6 +12,7 @@ and types with xdotool.
 
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -456,6 +457,7 @@ def main():
     master_objects(work)
     page_layout(work)
     copies_of_a_shape(work)
+    objects_between_apps(work)
     guide_from_the_ruler(work)
     pages_as_sections(work)
     reflection_of_a_shape(work)
@@ -1634,6 +1636,46 @@ def copies_of_a_shape(work):
             found == [(96, 200), (106, 210), (116, 220)],
         )
     finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def objects_between_apps(work):
+    """A shape copied in one app of Desk pastes in another, a process of
+    its own, through the format that the apps share, and keeps its origin
+    (IOP-27, IOP-28, IOP-33)."""
+    writer, app, letter = open_with_a_shape(work, "Source.odt")
+    other = None
+    try:
+        press("ctrl+c")
+        time.sleep(0.5)
+        target = work / "Target.odt"
+        subprocess.run([str(CONVERT), str(FIXTURE), str(target)], check=True)
+        # A bus of its own, so that it is another process and not a
+        # window of the first.
+        other = subprocess.Popen(
+            ["dbus-run-session", "--", str(WRITER), str(target)],
+            start_new_session=True,
+            # Off the accessibility bus, which the other tests read.
+            env={**os.environ, "GTK_A11Y": "none", "NO_AT_BRIDGE": "1"},
+        )
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Target.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        time.sleep(1)
+        press("ctrl+v")
+        time.sleep(1)
+        press("ctrl+s")
+        found = wait_for(
+            "the pasted shape saved in the other app",
+            lambda: saved_content(target, r'<draw:rect[^>]*desk:origin="[0-9a-f]+"[^>]*svg:x="96pt"'),
+        )
+        check("a shape copied in one app of Desk pastes in another (IOP-27, IOP-28)", bool(found))
+    finally:
+        if other is not None:
+            os.killpg(other.pid, signal.SIGTERM)
+            other.wait(timeout=10)
         writer.terminate()
         writer.wait(timeout=10)
 

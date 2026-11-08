@@ -12,7 +12,7 @@ use std::path::Path;
 
 use desk_ui::gtk::glib;
 use desk_ui::i18n::{n_, tr};
-use desk_ui::{AppInfo, Document, Opened, Opener};
+use desk_ui::{AppInfo, Document, Object, ObjectsFormat, Opened, Opener};
 
 const APP: AppInfo = AppInfo {
     id: "br.com.brahm.Desk.Writer",
@@ -29,7 +29,24 @@ const OPENER: Opener = Opener {
     open,
     saves: (n_("OpenDocument Text"), "odt"),
     save,
+    objects: Some(ObjectsFormat {
+        media_type: desk_filters::clip::OBJECTS_TYPE,
+        write: copy_objects,
+        read: paste_objects,
+    }),
 };
+
+/// Puts objects on the clipboard for the other apps of Desk.
+fn copy_objects(document: &Document, objects: &[Object]) -> Result<Vec<u8>, String> {
+    desk_filters::clip::write_objects(document, objects).map_err(|e| e.to_string())
+}
+
+/// Reads the objects that an app of Desk put on the clipboard.
+fn paste_objects(bytes: &[u8]) -> Result<Document, String> {
+    desk_filters::clip::read_objects(bytes)
+        .map(|clip| clip.document().clone())
+        .map_err(|e| e.to_string())
+}
 
 /// Writes a document as an OpenDocument text, with its preview.
 fn save(document: &Document, thumbnail: Option<&[u8]>) -> Result<Vec<u8>, String> {

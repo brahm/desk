@@ -54,6 +54,10 @@ pub struct Object {
     pub contour: Option<Arc<[(i32, i32)]>>,
     /// Whether it cannot be moved, resized or deleted until unlocked.
     pub locked: bool,
+    /// What the copies of one object share with it, so that Magic Move
+    /// of Desk Slides takes them for the same object on two slides; none
+    /// for an object never copied (IOP-33).
+    pub origin: Option<u64>,
     /// The text inside a shape, as Pages lets one type in any shape but
     /// a line; none until some is typed. Its `next` is always none, as
     /// shapes are not linked.
@@ -165,6 +169,7 @@ impl Object {
             wrap_margin: Length::from_points(12),
             contour: None,
             locked: false,
+            origin: None,
             text: None,
             picture: PictureSettings::default(),
         }

@@ -1186,6 +1186,10 @@ fn import_one(
             .or_else(|| built.shape_contour());
     }
     built.locked = g.protect.as_deref().is_some_and(|p| p.contains("position"));
+    built.origin = object
+        .origin
+        .as_deref()
+        .and_then(|o| u64::from_str_radix(o, 16).ok());
     let mirror = g.mirror.as_deref().unwrap_or_default();
     built.flip_horizontal = mirror.contains("horizontal");
     built.flip_vertical = mirror.contains("vertical");
@@ -1937,6 +1941,7 @@ impl Exporter<'_> {
         let mut out = odf::DrawObject::new(kind);
         out.style = Some(style);
         out.text = text;
+        out.origin = object.origin.map(|o| format!("{o:016x}"));
         if !matches!(object.kind, ObjectKind::Shape(_)) {
             out.contour = object.contour.as_deref().map(<[_]>::to_vec);
         }
