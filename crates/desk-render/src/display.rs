@@ -397,7 +397,10 @@ impl DisplayList {
                     .map(|g| PlacedGlyph {
                         id: g.id,
                         x: g.x + dx,
-                        y: g.y + dy,
+                        // To a 64th of a point, so that the runs of a line
+                        // share one baseline whatever their sums of floats,
+                        // and a PDF reads them as one line (OBJ-02).
+                        y: ((g.y + dy) * 64.0).round() / 64.0,
                     })
                     .collect();
                 if let Some(shadow) = run.shadow {
@@ -723,7 +726,14 @@ fn object_item(placed: &PlacedObject) -> Item {
                     stroke,
                 });
             }
-            list.lines(placed.lines.iter());
+            // As in Pages, the lines that run past the bottom of the box
+            // are not drawn, in the last of linked boxes too (OBJ-13).
+            list.lines(
+                placed
+                    .lines
+                    .iter()
+                    .filter(|line| line.top() + line.line.height <= y + h + 0.5),
+            );
         }
         ObjectKind::Group(_) => {
             list.items.extend(placed.children.iter().map(object_item));

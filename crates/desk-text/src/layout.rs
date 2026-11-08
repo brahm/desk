@@ -438,10 +438,21 @@ impl TextSystem {
         }
         clusters.sort_by_key(|c| c.start);
         clusters.dedup_by_key(|c| c.start);
-        let breaks: Vec<usize> = LineSegmenter::new_auto(LineBreakOptions::default())
+        let mut breaks: Vec<usize> = LineSegmenter::new_auto(LineBreakOptions::default())
             .segment_str(source)
             .filter(|&b| b > 0)
             .collect();
+        // As in Pages, a line may break before an object in the text, even
+        // with no space between it and a word (OBJ-18): an object too wide
+        // for what is left of the line starts the next.
+        breaks.extend(
+            clusters
+                .iter()
+                .filter(|c| objects[c.run] && c.start > 0)
+                .map(|c| c.start),
+        );
+        breaks.sort_unstable();
+        breaks.dedup();
 
         let span = |a: usize, b: usize| {
             let first = clusters.partition_point(|c| c.start < a);
