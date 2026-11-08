@@ -1323,30 +1323,86 @@ impl TextEditor {
         let Some(info) = self.object_info() else {
             return;
         };
-        let original =
-            find(&self.state.borrow().layout, info.object.id).map(|(_, placed)| placed.clone());
+        let mut change = Some(change);
+        self.change_objects(name, &[info.object.id], |object, _| {
+            if let Some(change) = change.take() {
+                change(object);
+            }
+        });
+    }
+
+    /// Changes every selected object that is not locked, as one action:
+    /// `change` gets each with its frame as placed on its page, in points,
+    /// and frames it on the page too, as the Inspector measures them
+    /// (OBJ-33).
+    pub fn set_each_object(&self, name: &str, change: impl FnMut(&mut Object, (f64, f64, f64, f64))) {
+        let ids = self.selected_objects();
+        self.change_objects(name, &ids, change);
+    }
+
+    fn change_objects(
+        &self,
+        name: &str,
+        ids: &[NodeId],
+        mut change: impl FnMut(&mut Object, (f64, f64, f64, f64)),
+    ) {
+        let originals: Vec<(Object, Option<PlacedObject>)> = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            ids.iter()
+                .filter_map(|id| {
+                    let object = document.objects().get(*id)?.clone();
+                    let placed = find(&state.layout, *id).map(|(_, p)| p.clone());
+                    Some((object, placed))
+                })
+                .collect()
+        };
+        if originals.is_empty() {
+            return;
+        }
         self.arrange_objects(name, |edit, _| {
-            let mut object = info.object.clone();
-            if object.locked {
-                return Ok(None);
+            for (before, placed) in &originals {
+                if before.locked {
+                    continue;
+                }
+                let frame = placed.as_ref().map_or(
+                    (
+                        before.frame.x.to_pt(),
+                        before.frame.y.to_pt(),
+                        before.frame.width.to_pt(),
+                        before.frame.height.to_pt(),
+                    ),
+                    |p| {
+                        (
+                            f64::from(p.x),
+                            f64::from(p.y),
+                            f64::from(p.width),
+                            f64::from(p.height),
+                        )
+                    },
+                );
+                let mut object = before.clone();
+                change(&mut object, frame);
+                if let Some(placed) = placed
+                    && object.frame != before.frame
+                {
+                    // The inspector shows the frame on the page; an object
+                    // that moves with a paragraph keeps its anchor.
+                    let shift_x = placed.x as f64 - before.frame.x.to_pt();
+                    let shift_y = placed.y as f64 - before.frame.y.to_pt();
+                    let mut frame = object.frame;
+                    frame.x = Length::from_pt(frame.x.to_pt() - shift_x);
+                    frame.y = Length::from_pt(frame.y.to_pt() - shift_y);
+                    let reframed = desk_model::reframed(before, frame);
+                    object.frame = reframed.frame;
+                    object.kind = reframed.kind;
+                }
+                refresh_contour(&mut object, before);
+                if object != *before {
+                    edit.replace_object(object)?;
+                }
             }
-            change(&mut object);
-            if let Some(placed) = &original
-                && object.frame != info.object.frame
-            {
-                // The inspector shows the frame on the page; an object
-                // that moves with a paragraph keeps its anchor.
-                let shift_x = placed.x as f64 - info.object.frame.x.to_pt();
-                let shift_y = placed.y as f64 - info.object.frame.y.to_pt();
-                let mut frame = object.frame;
-                frame.x = Length::from_pt(frame.x.to_pt() - shift_x);
-                frame.y = Length::from_pt(frame.y.to_pt() - shift_y);
-                let reframed = desk_model::reframed(&info.object, frame);
-                object.frame = reframed.frame;
-                object.kind = reframed.kind;
-            }
-            refresh_contour(&mut object, &info.object);
-            edit.replace_object(object).map(|()| None)
+            Ok(None)
         });
     }
 

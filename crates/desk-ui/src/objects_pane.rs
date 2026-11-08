@@ -45,6 +45,8 @@ pub struct ObjectGroups {
     width: adw::SpinRow,
     height: adw::SpinRow,
     keep_proportions: adw::SwitchRow,
+    /// Sets a picture to the size it was made at (OBJ-33).
+    original_size: adw::ActionRow,
     rotation: adw::SpinRow,
     wrap: adw::ComboRow,
     /// Whether the text goes around the outline of the object rather
@@ -100,6 +102,52 @@ fn frame_to_page(frame: (f64, f64, f64, f64), rotation: i32, p: (f64, f64)) -> (
     let (sin, cos) = (f64::from(rotation) / 100.0).to_radians().sin_cos();
     let (dx, dy) = (p.0 - w / 2.0, p.1 - h / 2.0);
     (cx + dx * cos + dy * sin, cy - dx * sin + dy * cos)
+}
+
+/// The frame on the page that a row asks for, from an object's frame on
+/// the page and its rotation, with the other side keeping the proportions
+/// when they are constrained.
+fn metric_frame(
+    frame: (f64, f64, f64, f64),
+    rotation: i32,
+    metric: Metric,
+    points: f64,
+    keep: bool,
+) -> Frame {
+    let (mut x, mut y, mut w, mut h) = frame;
+    // X and Y place the box that holds the turned object.
+    let (bx, by, _, _) = bounding_box(frame, rotation);
+    match metric {
+        Metric::X => x += points - bx,
+        Metric::Y => y += points - by,
+        Metric::Width => {
+            if keep && w > 0.0 {
+                h *= points / w;
+            }
+            w = points;
+        }
+        Metric::Height => {
+            if keep && h > 0.0 {
+                w *= points / h;
+            }
+            h = points;
+        }
+    }
+    Frame::from_pt(x, y, w, h)
+}
+
+/// The size of a picture as it was made, at 72 pixels to the inch, from
+/// the top left corner of its frame on the page, as Original Size sets
+/// it (OBJ-33). `None` when the object is no picture.
+pub(crate) fn picture_original_size(
+    object: &desk_model::Object,
+    frame: (f64, f64, f64, f64),
+) -> Option<Frame> {
+    let desk_model::ObjectKind::Image(picture) = &object.kind else {
+        return None;
+    };
+    let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
+    Some(Frame::from_pt(frame.0, frame.1, w, h))
 }
 
 /// The start and the end of a line on the page, with its flips and its
@@ -187,6 +235,13 @@ impl ObjectGroups {
             metrics.add(row);
         }
         metrics.add(&keep_proportions);
+        let original_size = adw::ActionRow::builder()
+            .title(tr("Original Size"))
+            .subtitle(tr("The size the picture was made at"))
+            .activatable(true)
+            .build();
+        original_size.add_suffix(&gtk::Image::from_icon_name("view-restore-symbolic"));
+        metrics.add(&original_size);
         metrics.add(&rotation);
         metrics.add(&flip);
 
@@ -252,6 +307,7 @@ impl ObjectGroups {
             width,
             height,
             keep_proportions,
+            original_size,
             rotation,
             wrap,
             tight,
@@ -285,15 +341,17 @@ impl ObjectGroups {
                     return;
                 }
                 let Some(editor) = editor() else { return };
-                let Some(info) = editor.object_info() else {
-                    return;
-                };
-                let frame = this.frame(&info, metric, row.value());
+                let points = tab_stops::from_units(row.value(), this.units.get()).to_pt();
+                let keep = this.keep_proportions.is_active();
                 let name = match metric {
                     Metric::X | Metric::Y => "Move",
                     Metric::Width | Metric::Height => "Resize",
                 };
-                editor.set_object(name, |object| object.frame = frame);
+                // Each of the objects selected, as Pages sizes several
+                // at once (OBJ-33).
+                editor.set_each_object(name, |object, frame| {
+                    object.frame = metric_frame(frame, object.rotation, metric, points, keep);
+                });
             });
         }
         for i in 0..4 {
@@ -313,6 +371,16 @@ impl ObjectGroups {
                 });
             });
         }
+        let size_editor = editor.clone();
+        this.original_size.connect_activated(move |_| {
+            if let Some(editor) = size_editor() {
+                editor.set_each_object("Original Size", |object, frame| {
+                    if let Some(original) = picture_original_size(object, frame) {
+                        object.frame = original;
+                    }
+                });
+            }
+        });
         let weak = Rc::downgrade(&this);
         let rotate_editor = editor.clone();
         this.rotation.connect_value_notify(move |row| {
@@ -322,7 +390,7 @@ impl ObjectGroups {
             }
             if let Some(editor) = rotate_editor() {
                 let rotation = (row.value() * 100.0).round() as i32;
-                editor.set_object("Rotate", |object| object.rotation = rotation);
+                editor.set_each_object("Rotate", |object, _| object.rotation = rotation);
             }
         });
         let weak = Rc::downgrade(&this);
@@ -458,33 +526,6 @@ impl ObjectGroups {
         ]
     }
 
-    /// The frame on the page that a row asks for, with the other side
-    /// keeping the proportions when they are constrained.
-    fn frame(&self, info: &ObjectInfo, metric: Metric, value: f64) -> Frame {
-        let points = tab_stops::from_units(value, self.units.get()).to_pt();
-        let (mut x, mut y, mut w, mut h) = info.frame;
-        let keep = self.keep_proportions.is_active();
-        // X and Y place the box that holds the turned object.
-        let (bx, by, _, _) = bounding_box(info.frame, info.object.rotation);
-        match metric {
-            Metric::X => x += points - bx,
-            Metric::Y => y += points - by,
-            Metric::Width => {
-                if keep && w > 0.0 {
-                    h *= points / w;
-                }
-                w = points;
-            }
-            Metric::Height => {
-                if keep && h > 0.0 {
-                    w *= points / h;
-                }
-                h = points;
-            }
-        }
-        Frame::from_pt(x, y, w, h)
-    }
-
     /// Measures the rows in other units.
     pub fn set_units(&self, units: Units) {
         self.updating.set(true);
@@ -536,15 +577,19 @@ impl ObjectGroups {
         set(&self.width, in_units(w));
         set(&self.height, in_units(h));
         set(&self.rotation, f64::from(info.object.rotation) / 100.0);
-        let one = info.count == 1;
-        let editable = one && !info.object.locked;
-        for row in [&self.x, &self.y, &self.width, &self.height, &self.rotation]
-            .into_iter()
-            .chain(&self.ends)
-        {
+        // Several objects take the same measures, but only one line its
+        // ends.
+        let editable = !info.object.locked;
+        for row in [&self.x, &self.y, &self.width, &self.height, &self.rotation] {
             row.set_sensitive(editable);
         }
+        for row in &self.ends {
+            row.set_sensitive(editable && info.count == 1);
+        }
         self.keep_proportions.set_sensitive(editable);
+        self.original_size
+            .set_visible(matches!(info.object.kind, desk_model::ObjectKind::Image(_)));
+        self.original_size.set_sensitive(editable);
         let index = WRAPS
             .iter()
             .position(|w| *w == info.object.wrap)
@@ -634,6 +679,44 @@ mod tests {
 
     fn close(a: (f64, f64), b: (f64, f64)) -> bool {
         (a.0 - b.0).abs() < 1e-6 && (a.1 - b.1).abs() < 1e-6
+    }
+
+    #[test]
+    fn obj_33_original_size_gives_a_picture_the_size_it_was_made_at() {
+        let surface = gtk::cairo::ImageSurface::create(gtk::cairo::Format::ARgb32, 30, 20).unwrap();
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        let picture = desk_model::Picture::from_png(png).unwrap();
+        let object = Object::new(
+            desk_model::NodeId::new(1).unwrap(),
+            ObjectKind::Image(picture),
+            Frame::from_pt(0.0, 0.0, 300.0, 50.0),
+        );
+        let frame = picture_original_size(&object, (40.0, 60.0, 300.0, 50.0)).unwrap();
+        assert_eq!(frame, Frame::from_pt(40.0, 60.0, 30.0, 20.0));
+        let square = Object::new(
+            desk_model::NodeId::new(2).unwrap(),
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(0.0, 0.0, 10.0, 10.0),
+        );
+        assert!(picture_original_size(&square, (0.0, 0.0, 10.0, 10.0)).is_none());
+    }
+
+    #[test]
+    fn obj_33_sizes_typed_in_keep_the_proportions_when_asked() {
+        let frame = (10.0, 20.0, 100.0, 50.0);
+        assert_eq!(
+            metric_frame(frame, 0, Metric::Width, 200.0, true),
+            Frame::from_pt(10.0, 20.0, 200.0, 100.0)
+        );
+        assert_eq!(
+            metric_frame(frame, 0, Metric::Height, 25.0, false),
+            Frame::from_pt(10.0, 20.0, 100.0, 25.0)
+        );
+        assert_eq!(
+            metric_frame(frame, 0, Metric::X, 0.0, false),
+            Frame::from_pt(0.0, 20.0, 100.0, 50.0)
+        );
     }
 
     #[test]
