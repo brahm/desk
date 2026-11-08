@@ -540,6 +540,21 @@ impl DisplayList {
     }
 }
 
+impl DisplayList {
+    /// The display list of an object alone, as large as its frame, as the
+    /// outline shows it in miniature (TXT-14).
+    pub fn of_object(placed: &PlacedObject) -> Self {
+        let mut alone = placed.clone();
+        alone.x = 0.0;
+        alone.y = 0.0;
+        Self {
+            width: placed.width.max(1.0),
+            height: placed.height.max(1.0),
+            items: vec![object_item(&alone)],
+        }
+    }
+}
+
 /// The items that draw an object: its shape, picture or text, with its
 /// rotation, flips and opacity (OBJ-01, OBJ-08, OBJ-13).
 fn object_item(placed: &PlacedObject) -> Item {

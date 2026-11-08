@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-06 20:22+0000\n"
+"POT-Creation-Date: 2026-11-06 20:56+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -38,11 +38,13 @@ msgstr "Página {page} de {pages}"
 msgid "Auto Page Numbers"
 msgstr "Números de página automáticos"
 
-#: crates/desk-ui/src/auto_numbers.rs:53 crates/desk-ui/src/headers_pane.rs:164
+#: crates/desk-ui/src/auto_numbers.rs:53
+#: crates/desk-ui/src/headers_pane.rs:164
 msgid "Footer"
 msgstr "Rodapé"
 
-#: crates/desk-ui/src/auto_numbers.rs:53 crates/desk-ui/src/headers_pane.rs:161
+#: crates/desk-ui/src/auto_numbers.rs:53
+#: crates/desk-ui/src/headers_pane.rs:161
 msgid "Header"
 msgstr "Cabeçalho"
 
@@ -100,9 +102,10 @@ msgstr "Documento inteiro"
 #: crates/desk-ui/src/auto_numbers.rs:91
 #: crates/desk-ui/src/styles_drawer.rs:600
 #: crates/desk-ui/src/styles_drawer.rs:662
-#: crates/desk-ui/src/styles_drawer.rs:794 crates/desk-ui/src/thumbnails.rs:382
-#: crates/desk-ui/src/window.rs:1046 crates/desk-ui/src/window.rs:1187
-#: crates/desk-ui/src/window.rs:1219 crates/desk-ui/src/window.rs:1248
+#: crates/desk-ui/src/styles_drawer.rs:794
+#: crates/desk-ui/src/thumbnails.rs:382 crates/desk-ui/src/window.rs:1046
+#: crates/desk-ui/src/window.rs:1187 crates/desk-ui/src/window.rs:1219
+#: crates/desk-ui/src/window.rs:1248
 msgid "_Cancel"
 msgstr "_Cancelar"
 
@@ -164,23 +167,23 @@ msgid "Bookmark"
 msgstr "Marcador"
 
 #: crates/desk-ui/src/editing/objects.rs:1272 crates/desk-ui/src/fonts.rs:346
-#: crates/desk-ui/src/outline_view.rs:321
+#: crates/desk-ui/src/outline_view.rs:341
 msgid "Text"
 msgstr "Texto"
 
-#: crates/desk-ui/src/effects.rs:43
+#: crates/desk-ui/src/effects.rs:45
 msgid "Use Default"
 msgstr "Usar padrão"
 
-#: crates/desk-ui/src/effects.rs:44
+#: crates/desk-ui/src/effects.rs:46
 msgid "Use None"
 msgstr "Não usar"
 
-#: crates/desk-ui/src/effects.rs:45
+#: crates/desk-ui/src/effects.rs:47
 msgid "Use All"
 msgstr "Usar todas"
 
-#: crates/desk-ui/src/effects.rs:51 crates/desk-ui/src/fonts.rs:177
+#: crates/desk-ui/src/effects.rs:53 crates/desk-ui/src/fonts.rs:177
 #: crates/desk-ui/src/graphic_pane.rs:148
 #: crates/desk-ui/src/graphic_pane.rs:167
 #: crates/desk-ui/src/graphic_pane.rs:222 crates/desk-ui/src/lists_pane.rs:58
@@ -191,44 +194,44 @@ msgstr "Usar todas"
 msgid "None"
 msgstr "Nenhum"
 
-#: crates/desk-ui/src/effects.rs:52
+#: crates/desk-ui/src/effects.rs:54
 msgid "Rule Above"
 msgstr "Filete acima"
 
-#: crates/desk-ui/src/effects.rs:53
+#: crates/desk-ui/src/effects.rs:55
 msgid "Rule Below"
 msgstr "Filete abaixo"
 
-#: crates/desk-ui/src/effects.rs:54
+#: crates/desk-ui/src/effects.rs:56
 msgid "Rules Above and Below"
 msgstr "Filetes acima e abaixo"
 
-#: crates/desk-ui/src/effects.rs:55
+#: crates/desk-ui/src/effects.rs:57
 msgid "Border Around"
 msgstr "Borda ao redor"
 
-#: crates/desk-ui/src/effects.rs:61 crates/desk-ui/src/graphic_pane.rs:223
+#: crates/desk-ui/src/effects.rs:63 crates/desk-ui/src/graphic_pane.rs:223
 msgid "Solid"
 msgstr "Contínua"
 
-#: crates/desk-ui/src/effects.rs:62 crates/desk-ui/src/graphic_pane.rs:224
+#: crates/desk-ui/src/effects.rs:64 crates/desk-ui/src/graphic_pane.rs:224
 msgid "Dashed"
 msgstr "Tracejada"
 
-#: crates/desk-ui/src/effects.rs:63 crates/desk-ui/src/graphic_pane.rs:225
+#: crates/desk-ui/src/effects.rs:65 crates/desk-ui/src/graphic_pane.rs:225
 msgid "Dotted"
 msgstr "Pontilhada"
 
-#: crates/desk-ui/src/effects.rs:87 crates/desk-ui/src/graphic_pane.rs:674
+#: crates/desk-ui/src/effects.rs:89 crates/desk-ui/src/graphic_pane.rs:674
 msgid "Color"
 msgstr "Cor"
 
-#: crates/desk-ui/src/effects.rs:159
+#: crates/desk-ui/src/effects.rs:167
 msgid "Character Spacing"
 msgstr "Espaçamento entre caracteres"
 
-#: crates/desk-ui/src/effects.rs:160 crates/desk-ui/src/fonts.rs:374
-#: crates/desk-ui/src/graphic_pane.rs:212
+#: crates/desk-ui/src/effects.rs:168 crates/desk-ui/src/effects.rs:224
+#: crates/desk-ui/src/fonts.rs:374 crates/desk-ui/src/graphic_pane.rs:212
 #: crates/desk-ui/src/graphic_pane.rs:216
 #: crates/desk-ui/src/graphic_pane.rs:218
 #: crates/desk-ui/src/graphic_pane.rs:235
@@ -239,39 +242,40 @@ msgstr "Espaçamento entre caracteres"
 msgid "Percent"
 msgstr "Porcentagem"
 
-#: crates/desk-ui/src/effects.rs:162 crates/desk-ui/src/fonts.rs:392
+#: crates/desk-ui/src/effects.rs:170 crates/desk-ui/src/fonts.rs:392
 msgid "Ligatures"
 msgstr "Ligaduras"
 
-#: crates/desk-ui/src/effects.rs:165 crates/desk-ui/src/outline_view.rs:112
+#: crates/desk-ui/src/effects.rs:173 crates/desk-ui/src/outline_view.rs:125
 msgid "Outline"
 msgstr "Contorno"
 
-#: crates/desk-ui/src/effects.rs:166
+#: crates/desk-ui/src/effects.rs:174
 msgid "Character Background"
 msgstr "Fundo dos caracteres"
 
-#: crates/desk-ui/src/effects.rs:168 crates/desk-ui/src/writing_tools.rs:74
+#: crates/desk-ui/src/effects.rs:176 crates/desk-ui/src/writing_tools.rs:74
 msgid "Characters"
 msgstr "Caracteres"
 
-#: crates/desk-ui/src/effects.rs:176 crates/desk-ui/src/fonts.rs:366
+#: crates/desk-ui/src/effects.rs:184 crates/desk-ui/src/fonts.rs:366
 msgid "Paragraph Background"
 msgstr "Fundo do parágrafo"
 
-#: crates/desk-ui/src/effects.rs:178
+#: crates/desk-ui/src/effects.rs:186
 msgid "Borders and Rules"
 msgstr "Bordas e filetes"
 
-#: crates/desk-ui/src/effects.rs:182
+#: crates/desk-ui/src/effects.rs:190
 msgid "Line Style"
 msgstr "Estilo da linha"
 
-#: crates/desk-ui/src/effects.rs:186
+#: crates/desk-ui/src/effects.rs:194
 msgid "Line Width"
 msgstr "Espessura da linha"
 
-#: crates/desk-ui/src/effects.rs:187 crates/desk-ui/src/fonts.rs:375
+#: crates/desk-ui/src/effects.rs:195 crates/desk-ui/src/effects.rs:222
+#: crates/desk-ui/src/effects.rs:223 crates/desk-ui/src/fonts.rs:375
 #: crates/desk-ui/src/fonts.rs:376 crates/desk-ui/src/formatting.rs:463
 #: crates/desk-ui/src/formatting.rs:464 crates/desk-ui/src/graphic_pane.rs:239
 #: crates/desk-ui/src/graphic_pane.rs:248
@@ -280,21 +284,51 @@ msgstr "Espessura da linha"
 msgid "Points"
 msgstr "Pontos"
 
-#: crates/desk-ui/src/effects.rs:189
+#: crates/desk-ui/src/effects.rs:197
 msgid "Line Color"
 msgstr "Cor da linha"
 
-#: crates/desk-ui/src/effects.rs:193
+#: crates/desk-ui/src/effects.rs:201
 msgid "Offset"
 msgstr "Distância"
 
-#: crates/desk-ui/src/effects.rs:194
+#: crates/desk-ui/src/effects.rs:202
 msgid "Distance from the text, in points"
 msgstr "Distância do texto, em pontos"
 
-#: crates/desk-ui/src/effects.rs:197
+#: crates/desk-ui/src/effects.rs:205
 msgid "Background and Borders"
 msgstr "Fundo e bordas"
+
+#: crates/desk-ui/src/effects.rs:214 crates/desk-ui/src/effects.rs:226
+msgid "Text Shadow"
+msgstr "Sombra do Texto"
+
+#: crates/desk-ui/src/effects.rs:221 crates/desk-ui/src/graphic_pane.rs:189
+#: crates/desk-ui/src/graphic_pane.rs:246
+#: crates/desk-ui/src/objects_pane.rs:95
+msgid "Degrees, counterclockwise"
+msgstr "Graus, no sentido anti-horário"
+
+#: crates/desk-ui/src/effects.rs:221 crates/desk-ui/src/fonts.rs:377
+#: crates/desk-ui/src/graphic_pane.rs:245
+msgid "Shadow Angle"
+msgstr "Ângulo da sombra"
+
+#: crates/desk-ui/src/effects.rs:222 crates/desk-ui/src/fonts.rs:376
+#: crates/desk-ui/src/graphic_pane.rs:247
+msgid "Shadow Offset"
+msgstr "Deslocamento da sombra"
+
+#: crates/desk-ui/src/effects.rs:223 crates/desk-ui/src/fonts.rs:375
+#: crates/desk-ui/src/graphic_pane.rs:249
+msgid "Shadow Blur"
+msgstr "Desfoque da sombra"
+
+#: crates/desk-ui/src/effects.rs:224 crates/desk-ui/src/fonts.rs:374
+#: crates/desk-ui/src/graphic_pane.rs:251
+msgid "Shadow Opacity"
+msgstr "Opacidade da sombra"
 
 #: crates/desk-ui/src/eyedropper.rs:25 crates/desk-ui/src/eyedropper.rs:29
 msgid "Pick a Color from the Screen"
@@ -584,25 +618,9 @@ msgstr "Cor do tachado"
 msgid "Shadow"
 msgstr "Sombra"
 
-#: crates/desk-ui/src/fonts.rs:374 crates/desk-ui/src/graphic_pane.rs:251
-msgid "Shadow Opacity"
-msgstr "Opacidade da sombra"
-
-#: crates/desk-ui/src/fonts.rs:375 crates/desk-ui/src/graphic_pane.rs:249
-msgid "Shadow Blur"
-msgstr "Desfoque da sombra"
-
-#: crates/desk-ui/src/fonts.rs:376 crates/desk-ui/src/graphic_pane.rs:247
-msgid "Shadow Offset"
-msgstr "Deslocamento da sombra"
-
 #: crates/desk-ui/src/fonts.rs:377
 msgid "Degrees"
 msgstr "Graus"
-
-#: crates/desk-ui/src/fonts.rs:377 crates/desk-ui/src/graphic_pane.rs:245
-msgid "Shadow Angle"
-msgstr "Ângulo da sombra"
 
 #: crates/desk-ui/src/fonts.rs:380
 msgid "Effects"
@@ -662,8 +680,9 @@ msgid "4 Columns"
 msgstr "4 colunas"
 
 #: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
-#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:179
-#: crates/desk-ui/src/ruler.rs:569 crates/desk-ui/src/ruler.rs:591
+#: crates/desk-ui/src/layout_pane.rs:231
+#: crates/desk-ui/src/objects_pane.rs:179 crates/desk-ui/src/ruler.rs:569
+#: crates/desk-ui/src/ruler.rs:591
 msgid "Columns"
 msgstr "Colunas"
 
@@ -736,7 +755,8 @@ msgstr "Páginas espelhadas"
 msgid "Left and right pages swap their margins, as in a book"
 msgstr "As páginas da esquerda e da direita trocam as margens, como num livro"
 
-#: crates/desk-ui/src/gradient_bar.rs:47 crates/desk-ui/src/graphic_pane.rs:193
+#: crates/desk-ui/src/gradient_bar.rs:47
+#: crates/desk-ui/src/graphic_pane.rs:193
 msgid "Gradient Colors"
 msgstr "Cores do degradê"
 
@@ -845,11 +865,6 @@ msgstr "Cor final do degradê"
 #: crates/desk-ui/src/graphic_pane.rs:188
 msgid "Gradient Angle"
 msgstr "Ângulo do degradê"
-
-#: crates/desk-ui/src/graphic_pane.rs:189
-#: crates/desk-ui/src/graphic_pane.rs:246 crates/desk-ui/src/objects_pane.rs:95
-msgid "Degrees, counterclockwise"
-msgstr "Graus, no sentido anti-horário"
 
 #: crates/desk-ui/src/graphic_pane.rs:190
 msgid "Gradient Type"
@@ -1174,16 +1189,16 @@ msgstr "Margem externa"
 
 #: crates/desk-ui/src/lib.rs:262
 msgid ""
-"The font {requested} is not installed, so {used} is used, which has the same "
-"metrics."
+"The font {requested} is not installed, so {used} is used, which has the same"
+" metrics."
 msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}, que tem as "
 "mesmas métricas."
 
 #: crates/desk-ui/src/lib.rs:265
 msgid ""
-"The font {requested} is not installed, so {used} is used, which looks alike; "
-"lines may break elsewhere."
+"The font {requested} is not installed, so {used} is used, which looks alike;"
+" lines may break elsewhere."
 msgstr ""
 "A fonte {requested} não está instalada, então é usada a {used}, que é "
 "parecida; as linhas podem quebrar em outros pontos."
@@ -1280,8 +1295,8 @@ msgstr "Hiperlinks"
 msgid ""
 "Insert ▸ Hyperlink links the selection. A link to a bookmark starts with #."
 msgstr ""
-"Inserir ▸ Hiperlink cria um link na seleção. Um link para um marcador começa "
-"com #."
+"Inserir ▸ Hiperlink cria um link na seleção. Um link para um marcador começa"
+" com #."
 
 #: crates/desk-ui/src/links_pane.rs:108
 msgid "Bookmarks"
@@ -1345,7 +1360,8 @@ msgid "Table of Contents"
 msgstr "Sumário"
 
 #: crates/desk-ui/src/links_pane.rs:403
-msgid "Insert ▸ Table of Contents adds one before the paragraph of the cursor."
+msgid ""
+"Insert ▸ Table of Contents adds one before the paragraph of the cursor."
 msgstr "Inserir ▸ Sumário adiciona um antes do parágrafo do cursor."
 
 #: crates/desk-ui/src/links_pane.rs:460
@@ -1584,8 +1600,8 @@ msgstr "Notas de rodapé e notas finais"
 #: crates/desk-ui/src/notes_pane.rs:169
 msgid "Insert ▸ Footnote adds a note at the cursor. Its text is edited here."
 msgstr ""
-"Inserir ▸ Nota de rodapé adiciona uma nota no cursor. O texto dela é editado "
-"aqui."
+"Inserir ▸ Nota de rodapé adiciona uma nota no cursor. O texto dela é editado"
+" aqui."
 
 #: crates/desk-ui/src/objects_pane.rs:87
 msgid "X"
@@ -1715,45 +1731,53 @@ msgstr "Alinhamento vertical"
 msgid "Text Box"
 msgstr "Caixa de texto"
 
-#: crates/desk-ui/src/outline_view.rs:59 crates/desk-ui/src/outline_view.rs:60
+#: crates/desk-ui/src/outline_view.rs:65 crates/desk-ui/src/outline_view.rs:66
 msgid "Visible Levels"
 msgstr "Níveis visíveis"
 
-#: crates/desk-ui/src/outline_view.rs:63
+#: crates/desk-ui/src/outline_view.rs:69 crates/desk-ui/src/outline_view.rs:71
 msgid "Show Only the First Line"
 msgstr "Mostrar só a primeira linha"
 
-#: crates/desk-ui/src/outline_view.rs:71
+#: crates/desk-ui/src/outline_view.rs:74 crates/desk-ui/src/outline_view.rs:76
+msgid "Show Objects in Miniature"
+msgstr "Mostrar Objetos em Miniatura"
+
+#: crates/desk-ui/src/outline_view.rs:83
 msgid "Promote"
 msgstr "Promover"
 
-#: crates/desk-ui/src/outline_view.rs:72
+#: crates/desk-ui/src/outline_view.rs:84
 msgid "Demote"
 msgstr "Rebaixar"
 
-#: crates/desk-ui/src/outline_view.rs:73
+#: crates/desk-ui/src/outline_view.rs:85
 msgid "Copy as Outline"
 msgstr "Copiar como estrutura de tópicos"
 
-#: crates/desk-ui/src/outline_view.rs:74
+#: crates/desk-ui/src/outline_view.rs:86
 msgid "Paste as Outline"
 msgstr "Colar como estrutura de tópicos"
 
-#: crates/desk-ui/src/outline_view.rs:85
+#: crates/desk-ui/src/outline_view.rs:97
 msgid "Levels"
 msgstr "Níveis"
 
-#: crates/desk-ui/src/outline_view.rs:270
+#: crates/desk-ui/src/outline_view.rs:290
 msgid "Drag to move the topic"
 msgstr "Arraste para mover o tópico"
 
-#: crates/desk-ui/src/outline_view.rs:287
+#: crates/desk-ui/src/outline_view.rs:307
 msgid "Show or Hide the Subtopics"
 msgstr "Mostrar ou ocultar os subtópicos"
 
-#: crates/desk-ui/src/outline_view.rs:320
+#: crates/desk-ui/src/outline_view.rs:340
 msgid "Topic, level {n}"
 msgstr "Tópico, nível {n}"
+
+#: crates/desk-ui/src/outline_view.rs:581
+msgid "Objects"
+msgstr "Objetos"
 
 #: crates/desk-ui/src/picture_pane.rs:98
 msgid "Mask"
@@ -2415,7 +2439,8 @@ msgstr "Barra lateral de pesquisa"
 msgid "Find the next misspelled word"
 msgstr "Buscar a próxima palavra com erro de ortografia"
 
-#: crates/desk-ui/src/shortcuts.rs:124 crates/desk-ui/src/spelling_window.rs:97
+#: crates/desk-ui/src/shortcuts.rs:124
+#: crates/desk-ui/src/spelling_window.rs:97
 msgid "Spelling and Grammar"
 msgstr "Ortografia e gramática"
 
@@ -3542,7 +3567,8 @@ msgstr "Documentos do Pages"
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""
-"O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages (.pages)."
+"O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages "
+"(.pages)."
 
 #: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:67
 msgid "headers"
@@ -3639,8 +3665,7 @@ msgstr[1] "Não importado: {what}, em {n} parágrafos."
 #~ msgid "columns, whose text flows in one"
 #~ msgstr "colunas, cujo texto corre numa só"
 
-#~ msgid ""
-#~ "Left out facing pages, so left pages have the margins of right pages."
+#~ msgid "Left out facing pages, so left pages have the margins of right pages."
 #~ msgstr ""
 #~ "Não importado: páginas espelhadas, então as páginas da esquerda têm as "
 #~ "margens das da direita."

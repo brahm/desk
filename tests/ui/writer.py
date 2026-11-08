@@ -445,6 +445,8 @@ def main():
     text_in_a_shape(work)
     object_in_the_text(work)
     shadow_of_a_shape(work)
+    shadow_of_the_text(work)
+    objects_in_the_outline(work)
     instant_alpha_of_a_picture(work)
     chosen_picture(work)
     chosen_movie(work)
@@ -1015,6 +1017,74 @@ def shadow_of_a_shape(work):
             lambda: saved_content(letter, r'draw:shadow="visible"'),
         )
         check("the shadow of the shape is saved (OBJ-11)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def shadow_of_the_text(work):
+    """The Inspector gives the selected text a shadow, as the Graphic
+    inspector of Pages does when text is selected, and it is saved with
+    it (FMT-03)."""
+    writer, app, letter = open_with_a_shape(work, "TextShadow.odt")
+    try:
+        press("Escape")
+        press("ctrl+a")
+        def switch():
+            for node in walk(app):
+                if (
+                    node.get_name() == "Text Shadow"
+                    and node.get_role() != Atspi.Role.LABEL
+                    and showing(node)
+                    and Atspi.Action.get_n_actions(node) > 0
+                ):
+                    return node
+            return None
+
+        Atspi.Action.do_action(wait_for("the Text Shadow switch of the Inspector", switch), 0)
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved shadow of the text",
+            lambda: saved_content(letter, r'fo:text-shadow="[^"n]'),
+        )
+        check("the Inspector gives the text a shadow, which is saved (FMT-03)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def objects_in_the_outline(work):
+    """The outline shows the objects of a paragraph in miniature when asked
+    (TXT-14)."""
+    inline = (
+        b'<text:p>A shape <draw:rect text:anchor-type="as-char" '
+        b'svg:width="40pt" svg:height="20pt"/> in the line</text:p>'
+    )
+    writer, app, letter = open_with_a_shape(work, "Outline.odt", inline)
+    try:
+        activate("outline")
+        button = wait_for(
+            "the button that shows objects in miniature",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_name() == "Show Objects in Miniature" and showing(n)
+                ),
+                None,
+            ),
+        )
+        check("the outline shows its bar (TXT-14)", True)
+        Atspi.Action.do_action(button, 0)
+        wait_for(
+            "the objects of the paragraph in miniature",
+            lambda: next(
+                (n for n in walk(app) if n.get_name() == "Objects" and showing(n)),
+                None,
+            ),
+        )
+        check("the outline shows the objects of a paragraph in miniature (TXT-14)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

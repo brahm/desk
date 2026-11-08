@@ -669,3 +669,73 @@ fn int_22_a_missing_font_is_replaced_everywhere() {
     editor.undo().unwrap();
     assert_eq!(&*look(&editor, 1, 3).font_family, "Helvetica");
 }
+
+#[test]
+fn sty_10_text_in_locked_objects_takes_the_imported_style_and_keeps_its_look() {
+    use std::sync::Arc;
+
+    use desk_model::{Frame, Object, ObjectKind, Paragraph, Run, TextBox};
+    let (mut target, heading) = editor();
+    let ids = target
+        .edit("Boxes", |edit| {
+            let mut ids = Vec::new();
+            for locked in [false, true] {
+                let text = Paragraph::from_runs(
+                    edit.new_id(),
+                    heading,
+                    ParaAttrs::default(),
+                    vec![Run::new("Title")],
+                )?;
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::TextBox(TextBox::new(Arc::from([text]), Length::from_points(4))),
+                    Frame::from_pt(72.0, 72.0, 200.0, 80.0),
+                );
+                object.locked = locked;
+                ids.push(object.id);
+                edit.add_object(object)?;
+            }
+            Ok(ids)
+        })
+        .unwrap();
+    // A Heading of 30 points, left aligned, from another document.
+    let (mut source, theirs) = editor();
+    source
+        .edit("Change", |edit| {
+            let mut style = edit.document().styles().paragraph(theirs).unwrap().clone();
+            style.character.font_size = Some(Length::from_points(30));
+            style.paragraph.alignment = Some(Alignment::Left);
+            edit.apply(desk_model::Op::PutStyle {
+                style: style.into(),
+            })
+        })
+        .unwrap();
+    target
+        .edit("Import Styles", |edit| {
+            edit.import_styles(source.document(), &[theirs], true)
+        })
+        .unwrap();
+    let document = target.document();
+    let styles = document.styles();
+    let look = |id| {
+        let object = document.objects().get(id).unwrap();
+        let p = &object.text_box().unwrap().paragraphs[0];
+        let run = p.runs().next().unwrap();
+        (
+            p.style(),
+            styles.resolve_paragraph(p.style(), p.attrs()).alignment,
+            styles
+                .resolve_character(p.style(), run.style, &run.attrs)
+                .font_size,
+        )
+    };
+    // The unlocked box looks as the new style; the locked one as before.
+    assert_eq!(
+        look(ids[0]),
+        (heading, Alignment::Left, Length::from_points(30))
+    );
+    assert_eq!(
+        look(ids[1]),
+        (heading, Alignment::Center, Length::from_points(18))
+    );
+}
