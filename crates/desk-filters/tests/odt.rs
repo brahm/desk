@@ -3266,3 +3266,61 @@ fn est_12_est_13_objects_in_the_lines_of_headers_and_notes_round_trip() {
     kinds.sort_by_key(|a| a.0);
     assert_eq!(kinds, [(false, (12.0, 12.0)), (true, (30.0, 20.0))]);
 }
+
+#[test]
+fn int_22_a_file_of_desk_reads_with_no_warnings() {
+    let bytes = write_odt(&sample()).unwrap();
+    let (_, log) = desk_filters::read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+}
+
+#[test]
+fn int_22_what_a_file_of_another_program_loses_is_listed() {
+    use desk_filters::log::{Content, Warning};
+    use std::io::Write;
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3">
+<office:body><office:text>
+<text:tracked-changes>
+<text:changed-region text:id="c1"><text:deletion><text:p>gone</text:p></text:deletion></text:changed-region>
+<text:changed-region text:id="c2"><text:insertion/></text:changed-region>
+</text:tracked-changes>
+<text:p>Before<office:annotation><dc:creator>Ana</dc:creator><text:p>A note</text:p></office:annotation> <text:change-start text:change-id="c2"/>new<text:change-end text:change-id="c2"/><text:change text:change-id="c1"/></text:p>
+<table:table table:name="T"><table:table-column/><table:table-row><table:table-cell><text:p>Cell</text:p></table:table-cell></table:table-row></table:table>
+<text:p><draw:frame draw:name="Chart" svg:width="5cm" svg:height="3cm" text:anchor-type="as-char"><draw:object xlink:href="./Object 1"/></draw:frame><draw:frame draw:name="Picture" svg:width="1cm" svg:height="1cm" text:anchor-type="as-char"><draw:image xlink:href="Pictures/a.png"/></draw:frame></text:p>
+</office:text></office:body></office:document-content>"#;
+    let mut bytes = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut bytes));
+        let stored = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("mimetype", stored).unwrap();
+        zip.write_all(b"application/vnd.oasis.opendocument.text")
+            .unwrap();
+        zip.start_file("content.xml", stored).unwrap();
+        zip.write_all(content.as_bytes()).unwrap();
+        zip.finish().unwrap();
+    }
+    let (document, log) = desk_filters::read_odt_logged(&bytes).unwrap();
+    let found: Vec<(Warning, usize)> = log
+        .entries()
+        .iter()
+        .map(|e| (e.warning.clone(), e.count))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (Warning::Content(Content::AcceptedChanges), 2),
+            (Warning::Content(Content::Comments), 1),
+            (Warning::Content(Content::Tables), 1),
+            (Warning::Content(Content::UnreadObjects), 1),
+        ]
+    );
+    // The text of the table is kept, as a paragraph.
+    let text: Vec<String> = document
+        .body()
+        .iter()
+        .map(|p| p.runs().map(|r| r.text()).collect())
+        .collect();
+    assert!(text.iter().any(|t| t == "Cell"), "{text:?}");
+}

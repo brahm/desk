@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-08 12:18+0000\n"
+"POT-Creation-Date: 2026-11-09 15:25+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -3600,13 +3600,13 @@ msgstr "Texto OpenDocument"
 msgid "Pages Documents"
 msgstr "Documentos do Pages"
 
-#: crates/desk-writer/src/main.rs:95
+#: crates/desk-writer/src/main.rs:96
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""
 "O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages (.pages)."
 
-#: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:67
+#: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:70
 msgid "headers"
 msgstr "cabeçalhos"
 
@@ -3647,34 +3647,46 @@ msgid "bookmarks, whose text is kept"
 msgstr "marcadores de texto, cujo texto é mantido"
 
 #: crates/desk-writer/src/warnings.rs:27
+msgid "tables, whose text is kept as paragraphs"
+msgstr "tabelas, cujo texto fica como parágrafos"
+
+#: crates/desk-writer/src/warnings.rs:28
+msgid "tracked changes, which are kept as accepted"
+msgstr "alterações controladas, que ficam como aceitas"
+
+#: crates/desk-writer/src/warnings.rs:29
+msgid "objects such as charts and embedded documents"
+msgstr "objetos como gráficos e documentos incorporados"
+
+#: crates/desk-writer/src/warnings.rs:30
 msgid "content of the kind “{name}”"
 msgstr "conteúdo do tipo “{name}”"
 
-#: crates/desk-writer/src/warnings.rs:29
+#: crates/desk-writer/src/warnings.rs:32
 msgid "Left out {what} ({n})."
 msgstr "Não importado: {what} ({n})."
 
-#: crates/desk-writer/src/warnings.rs:33
+#: crates/desk-writer/src/warnings.rs:36
 msgid "image bullets, which are drawn as text bullets"
 msgstr "marcadores de imagem, desenhados como marcadores de texto"
 
-#: crates/desk-writer/src/warnings.rs:34
+#: crates/desk-writer/src/warnings.rs:37
 msgid "lines under or through words only"
 msgstr "linhas só sob ou sobre as palavras"
 
-#: crates/desk-writer/src/warnings.rs:35
+#: crates/desk-writer/src/warnings.rs:38
 msgid "drop caps"
 msgstr "capitulares"
 
-#: crates/desk-writer/src/warnings.rs:36
+#: crates/desk-writer/src/warnings.rs:39
 msgid "hidden text, which is shown"
 msgstr "texto oculto, que é mostrado"
 
-#: crates/desk-writer/src/warnings.rs:37
+#: crates/desk-writer/src/warnings.rs:40
 msgid "font features"
 msgstr "recursos da fonte"
 
-#: crates/desk-writer/src/warnings.rs:40
+#: crates/desk-writer/src/warnings.rs:43
 msgid "Left out {what}, in {n} paragraph."
 msgid_plural "Left out {what}, in {n} paragraphs."
 msgstr[0] "Não importado: {what}, em {n} parágrafo."

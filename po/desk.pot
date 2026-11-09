@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-08 12:18+0000\n"
+"POT-Creation-Date: 2026-11-09 15:25+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -3576,12 +3576,12 @@ msgstr ""
 msgid "Pages Documents"
 msgstr ""
 
-#: crates/desk-writer/src/main.rs:95
+#: crates/desk-writer/src/main.rs:96
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:67
+#: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:70
 msgid "headers"
 msgstr ""
 
@@ -3622,34 +3622,46 @@ msgid "bookmarks, whose text is kept"
 msgstr ""
 
 #: crates/desk-writer/src/warnings.rs:27
-msgid "content of the kind “{name}”"
+msgid "tables, whose text is kept as paragraphs"
+msgstr ""
+
+#: crates/desk-writer/src/warnings.rs:28
+msgid "tracked changes, which are kept as accepted"
 msgstr ""
 
 #: crates/desk-writer/src/warnings.rs:29
+msgid "objects such as charts and embedded documents"
+msgstr ""
+
+#: crates/desk-writer/src/warnings.rs:30
+msgid "content of the kind “{name}”"
+msgstr ""
+
+#: crates/desk-writer/src/warnings.rs:32
 msgid "Left out {what} ({n})."
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:33
+#: crates/desk-writer/src/warnings.rs:36
 msgid "image bullets, which are drawn as text bullets"
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:34
+#: crates/desk-writer/src/warnings.rs:37
 msgid "lines under or through words only"
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:35
+#: crates/desk-writer/src/warnings.rs:38
 msgid "drop caps"
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:36
+#: crates/desk-writer/src/warnings.rs:39
 msgid "hidden text, which is shown"
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:37
+#: crates/desk-writer/src/warnings.rs:40
 msgid "font features"
 msgstr ""
 
-#: crates/desk-writer/src/warnings.rs:40
+#: crates/desk-writer/src/warnings.rs:43
 msgid "Left out {what}, in {n} paragraph."
 msgid_plural "Left out {what}, in {n} paragraphs."
 msgstr[0] ""

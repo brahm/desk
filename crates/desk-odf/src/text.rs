@@ -77,6 +77,13 @@ pub struct TextDocument {
     pub markers: Vec<crate::draw::Marker>,
     /// The pictures that graphic styles fill with, by name.
     pub fill_images: Vec<crate::draw::FillImage>,
+    /// What the reader left out of the body and of the headers and
+    /// footers, by the name of its element, with how many times: tables
+    /// (`table`, whose text is read as paragraphs), comments
+    /// (`annotation`), tracked changes (`changed-region`) and drawing
+    /// objects that Desk does not read, as charts and embedded objects
+    /// (`object`).
+    pub skipped: Vec<(String, usize)>,
 }
 
 /// The configuration of the footnotes or the endnotes of a document

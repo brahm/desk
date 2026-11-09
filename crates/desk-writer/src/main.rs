@@ -77,10 +77,11 @@ fn open(path: &Path) -> Result<Opened, String> {
     match extension.as_deref() {
         Some("odt" | "ott") => {
             let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-            let document = desk_filters::read_odt(&bytes).map_err(|e| e.to_string())?;
+            let (document, log) =
+                desk_filters::read_odt_logged(&bytes).map_err(|e| e.to_string())?;
             Ok(Opened {
                 document,
-                warnings: Vec::new(),
+                warnings: log.entries().iter().map(warnings::describe).collect(),
             })
         }
         Some("pages" | "template") => {

@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use crate::error::OdfError;
-use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TEXT, XLINK};
+use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK};
 use crate::text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
@@ -123,6 +123,13 @@ pub fn read_streams(
             &mut document.page_objects,
         );
         document.toc_levels = toc_levels(text);
+        left_out(text, &mut document.skipped);
+    }
+    if let Some(masters) = styles
+        .as_ref()
+        .and_then(|s| s.child(OFFICE, "master-styles"))
+    {
+        left_out(masters, &mut document.skipped);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
         document.meta = read_meta(meta);
@@ -753,6 +760,42 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
         }
     });
     found
+}
+
+/// Counts what the reader leaves out of `e`, by the name of its element:
+/// tables, whose text it reads as paragraphs, comments, tracked changes
+/// and the drawing objects it cannot read, as charts and embedded objects.
+fn left_out(e: &Element, out: &mut Vec<(String, usize)>) {
+    for child in e.elements() {
+        let name = &child.name;
+        let skipped = if name.is(TABLE, "table") {
+            Some("table")
+        } else if name.is(OFFICE, "annotation") {
+            Some("annotation")
+        } else if name.is(TEXT, "changed-region") {
+            Some("changed-region")
+        } else if name.ns == DRAW && name.local != "a" {
+            // Only objects that the reader drops: what is inside the
+            // others is theirs.
+            if crate::draw::draw_object(child, &|_| Paragraph::default()).is_none() {
+                Some("object")
+            } else {
+                continue;
+            }
+        } else {
+            None
+        };
+        if let Some(skipped) = skipped {
+            match out.iter_mut().find(|(n, _)| n == skipped) {
+                Some((_, count)) => *count += 1,
+                None => out.push((skipped.to_owned(), 1)),
+            }
+        }
+        // The text of tables is read, and so is what is in it.
+        if !matches!(skipped, Some("annotation" | "changed-region" | "object")) {
+            left_out(child, out);
+        }
+    }
 }
 
 fn visit(e: &Element, f: &mut impl FnMut(&Element)) {
