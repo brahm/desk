@@ -277,12 +277,17 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
         .enumerate()
         .map(|(i, p)| (p.id(), i))
         .collect();
+    let marks = document.object_marks();
     Arc::new(
         objects
             .iter()
-            // Objects in the text are placed with their lines, and those
-            // of the masters on every page of their sections.
-            .filter(|object| object.anchor != Anchor::InText && !object.anchor.is_master())
+            // Objects in the text are placed with their lines, but those
+            // that float with their paragraph, and those of the masters on
+            // every page of their sections.
+            .filter(|object| {
+                (object.anchor != Anchor::InText || floats_in_text(object))
+                    && !object.anchor.is_master()
+            })
             .map(|object| Floating {
                 object: object.clone(),
                 anchor: match object.anchor {
@@ -290,7 +295,11 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
                     Anchor::Paragraph(id) => indexes
                         .get(&id)
                         .map_or(Place::Page(0), |&i| Place::Paragraph(i)),
-                    Anchor::InText | Anchor::Master(..) => Place::Page(0),
+                    Anchor::InText => marks
+                        .get(&object.id)
+                        .and_then(|at| indexes.get(&at.paragraph))
+                        .map_or(Place::Page(0), |&i| Place::Paragraph(i)),
+                    Anchor::Master(..) => Place::Page(0),
                 },
             })
             .collect(),
@@ -469,6 +478,16 @@ fn hangs(object: &Object) -> bool {
     matches!(object.kind, ObjectKind::TextBox(_))
 }
 
+/// Whether an object in the text floats with its paragraph instead: a
+/// text box that the text wraps around, which Pages centers in the column
+/// at the top of its paragraph, and the text of the paragraph goes around
+/// it (OBJ-14).
+pub(crate) fn floats_in_text(object: &Object) -> bool {
+    object.anchor == Anchor::InText
+        && hangs(object)
+        && !matches!(object.wrap, Wrap::Through | Wrap::Behind)
+}
+
 /// The width and height of the objects in the text of a document, by
 /// object, for the marks that hold their places (OBJ-01); none when it has
 /// none.
@@ -481,13 +500,19 @@ pub(crate) fn inline_sizes(
         .filter(|o| o.anchor == Anchor::InText)
         .map(|o| {
             // A text box in the text hangs from the top of its line, as in
-            // Pages, and does not make the line taller (OBJ-14).
+            // Pages, and does not make the line taller; one that floats
+            // with its paragraph takes no room in the line (OBJ-14).
             let height = if hangs(o) {
                 desk_model::Length::ZERO
             } else {
                 o.frame.height
             };
-            (o.id, (o.frame.width, height))
+            let width = if floats_in_text(o) {
+                desk_model::Length::ZERO
+            } else {
+                o.frame.width
+            };
+            (o.id, (width, height))
         })
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
@@ -511,6 +536,7 @@ pub fn place_inline_objects(document: &Document, layout: &mut DocumentLayout) {
         if let (Some(&paragraph), Some(object)) =
             (indexes.get(&at.paragraph), document.objects().get(id))
             && object.anchor == Anchor::InText
+            && !floats_in_text(object)
         {
             marks
                 .entry(paragraph)

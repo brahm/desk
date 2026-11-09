@@ -6,10 +6,9 @@
 //! as many pages, and draw their objects as Pages drew them, to a few
 //! pixels in a hundred.
 //!
-//! The documents with text in an oval and a text box in the text do not
-//! match yet: their tests are kept from running with
+//! The document with text in an oval does not match yet: its test is kept from running with
 //! `#[ignore = "differs from Pages: …"]`, which the parity report reads
-//! to show their rows as different from Pages, until they match.
+//! to show its row as different from Pages, until it matches.
 
 use std::path::{Path, PathBuf};
 
@@ -188,9 +187,17 @@ fn obj_12_text_in_shapes_matches_pages() {
 }
 
 #[test]
-#[ignore = "differs from Pages: the text of the box in the text moves"]
 fn obj_14_inline_text_boxes_match_pages() {
     check("obj-14-inline-text-box");
+}
+
+#[test]
+fn obj_14_text_boxes_in_the_text_float_in_the_middle_of_the_column() {
+    // With no text before them, after a few words or a long sentence,
+    // smaller, and in a centered paragraph: Pages puts each box in the
+    // middle of the column, at the top of its paragraph but its wrap
+    // margin below the text above, and the text goes around it.
+    check("inline-text-box-cases");
 }
 
 #[test]
