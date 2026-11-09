@@ -526,8 +526,11 @@ pub(crate) fn color(element: &Element) -> Option<Color> {
 /// `<sf:spaceAfter/>`, and the TOC styles keep `<sf:outlineLevel/>` under
 /// the headings they list (DOC-05). Widow control and hyphenation are on
 /// before any style says otherwise, as the default paragraph style saves
-/// them empty and Pages keeps widows away in it (EST-05).
+/// them empty and Pages keeps widows away in it (EST-05). A style that
+/// saves its font size empty sets it to the 12 points Pages starts from,
+/// whatever its parent's size, as Pages lays it out (FMT-12).
 const EMPTY_MEANS: &[(&str, f64)] = &[
+    ("fontSize", 12.0),
     ("spaceBefore", 0.0),
     ("spaceAfter", 0.0),
     ("leftIndent", 0.0),

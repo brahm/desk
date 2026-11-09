@@ -24,7 +24,7 @@ use parley::{
     VerticalAlign,
 };
 
-use crate::fonts::{FontChoice, PagesFont, choose, pages_font};
+use crate::fonts::{FontChoice, FontMatch, PagesFont, choose, pages_font};
 use crate::input::{FF, FFI, FI, FL, ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
 use crate::tabs::{Piece, TabPlace, TabRuler};
@@ -269,6 +269,17 @@ impl TextSystem {
         }
     }
 
+    /// Adds the fonts of a font file to those that lay out text, as if
+    /// they were installed, such as the test fonts of the corpus. Gives
+    /// back how many fonts the data held.
+    pub fn add_fonts(&mut self, data: Vec<u8>) -> usize {
+        let blob = parley::fontique::Blob::new(std::sync::Arc::new(data));
+        let added = self.fonts.collection.register_fonts(blob, None);
+        // A family chosen before may now be installed.
+        self.choices.clear();
+        added.iter().map(|(_, fonts)| fonts.len()).sum()
+    }
+
     /// The font that lays out a family: the family itself when it is
     /// installed, or the free font that stands for it (DOC-05).
     pub fn font_choice(&mut self, family: &str) -> FontChoice {
@@ -276,7 +287,31 @@ impl TextSystem {
             return choice.clone();
         }
         let collection = &mut self.fonts.collection;
-        let choice = choose(family, |name| collection.family_id(name).is_some());
+        // The family from a PostScript name may be spaced otherwise than
+        // the installed one: DeskSansSpace60 for "DeskSans Space60".
+        let squeezed = |name: &str| -> String {
+            name.chars()
+                .filter(|c| !c.is_whitespace())
+                .flat_map(char::to_lowercase)
+                .collect()
+        };
+        let installed = if collection.family_id(family).is_none() {
+            let want = squeezed(family);
+            collection
+                .family_names()
+                .find(|name| squeezed(name) == want)
+                .map(str::to_owned)
+        } else {
+            None
+        };
+        let choice = match installed {
+            Some(name) => FontChoice {
+                requested: family.into(),
+                used: name.into(),
+                kind: FontMatch::Installed,
+            },
+            None => choose(family, |name| collection.family_id(name).is_some()),
+        };
         self.choices.insert(family.into(), choice.clone());
         choice
     }

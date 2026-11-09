@@ -59,8 +59,10 @@ fn doc_22_reads_paragraphs_spans_and_their_styles() {
     assert_eq!(body.name.as_deref(), Some("Body"));
     assert_eq!(body.family, Family::Paragraph);
     assert_eq!(body.properties.string("fontName"), Some("LiberationSans"));
-    // A property saved empty is not set.
-    assert_eq!(body.properties.get("fontSize"), None);
+    // A property saved empty is not set, unless Pages starts it from a
+    // value of its own, as the font size from 12 points.
+    assert_eq!(body.properties.get("lineSpacing"), None);
+    assert_eq!(body.properties.number("fontSize"), Some(12.0));
 
     let bold = first.runs[1].style.as_deref().unwrap();
     assert_eq!(first.runs[1].text, "negrito");

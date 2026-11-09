@@ -2,7 +2,8 @@
 
 Fonts that a document in `../pages` uses and that are not on the
 reference machine. Install them before opening that document in Pages
-or in Desk; the PDF next to the document already embeds them.
+or in Desk; the PDF next to the document already embeds them. The tests
+of `desk-testkit` load them from here without installing them.
 
 | File | Family | What changes | Used by |
 |---|---|---|---|
