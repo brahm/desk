@@ -138,18 +138,20 @@ impl Painter {
         &mut self,
         picture: &desk_model::Picture,
         alpha: &[desk_model::AlphaSeed],
+        kept: Option<&desk_model::AlphaOutline>,
         adjust: desk_model::Adjustments,
     ) -> Option<cairo::ImageSurface> {
         let key = AdjustedKey {
             picture: picture.clone(),
             alpha: alpha.to_vec(),
+            kept: kept.cloned(),
             adjust,
         };
         if let Some((_, surface)) = self.adjusted.iter().find(|(k, _)| *k == key) {
             return Some(surface.clone());
         }
         let source = self.picture(picture)?;
-        let surface = adjusted_surface(&source, alpha, adjust).ok()?;
+        let surface = adjusted_surface(&source, alpha, kept, adjust).ok()?;
         if self.adjusted.len() > 16 {
             self.adjusted.clear();
         }
@@ -355,10 +357,13 @@ impl Painter {
                 Item::AdjustedImage {
                     picture,
                     alpha,
+                    kept,
                     adjust,
                     rect,
                 } => {
-                    let Some(surface) = self.adjusted_picture(picture, alpha, *adjust) else {
+                    let Some(surface) =
+                        self.adjusted_picture(picture, alpha, kept.as_ref(), *adjust)
+                    else {
                         continue;
                     };
                     paint_surface(cr, &surface, *rect)?;
@@ -721,6 +726,7 @@ fn blur_line(line: &[u8], radius: usize, mut out: impl FnMut(usize, u8)) {
 struct AdjustedKey {
     picture: desk_model::Picture,
     alpha: Vec<desk_model::AlphaSeed>,
+    kept: Option<desk_model::AlphaOutline>,
     adjust: desk_model::Adjustments,
 }
 
@@ -748,6 +754,7 @@ fn paint_surface(
 pub fn adjusted_surface(
     source: &cairo::ImageSurface,
     alpha: &[desk_model::AlphaSeed],
+    kept: Option<&desk_model::AlphaOutline>,
     adjust: desk_model::Adjustments,
 ) -> Result<cairo::ImageSurface, RenderError> {
     let (width, height) = (source.width(), source.height());
@@ -795,7 +802,41 @@ pub fn adjusted_surface(
         }
     }
     surface.mark_dirty();
-    Ok(surface)
+    match kept {
+        Some(kept) => keep_inside(&surface, kept),
+        None => Ok(surface),
+    }
+}
+
+/// The part of a picture inside the polygons that Instant Alpha keeps, by
+/// the even-odd rule, as Pages saves it (OBJ-06).
+fn keep_inside(
+    surface: &cairo::ImageSurface,
+    kept: &desk_model::AlphaOutline,
+) -> Result<cairo::ImageSurface, RenderError> {
+    let (width, height) = (surface.width(), surface.height());
+    let out = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height)?;
+    {
+        let cr = Context::new(&out)?;
+        let scale = f64::from(desk_model::POLYGON_SCALE);
+        let (sx, sy) = (f64::from(width) / scale, f64::from(height) / scale);
+        for polygon in kept.iter() {
+            for (i, &(x, y)) in polygon.iter().enumerate() {
+                let (x, y) = (f64::from(x) * sx, f64::from(y) * sy);
+                if i == 0 {
+                    cr.move_to(x, y);
+                } else {
+                    cr.line_to(x, y);
+                }
+            }
+            cr.close_path();
+        }
+        cr.set_fill_rule(cairo::FillRule::EvenOdd);
+        cr.clip();
+        cr.set_source_surface(surface, 0.0, 0.0)?;
+        cr.paint()?;
+    }
+    Ok(out)
 }
 
 /// How much of each pixel Instant Alpha keeps, from 0 to 1: each click

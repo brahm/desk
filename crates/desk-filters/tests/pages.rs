@@ -952,6 +952,12 @@ fn obj_01_obj_02_obj_18_obj_19_pictures_and_movies_saved_by_pages_are_read() {
     assert_eq!(kinds, [(true, false), (false, true)]);
     let (_, objects) = fixture_objects("obj-19-movie-settings.pages");
     assert!(matches!(&objects[0].kind, ObjectKind::Media(m) if m.repeat == Repeat::BackAndForth));
+    // Its poster frame, at 5744 of the 600 units a second of the movie.
+    assert!(
+        matches!(&objects[0].kind, ObjectKind::Media(m) if m.poster_time == 9573),
+        "{:?}",
+        objects[0].kind
+    );
 }
 
 #[test]
@@ -1364,4 +1370,34 @@ fn est_04_a_page_break_at_the_end_of_a_paragraph_starts_the_next_one_on_the_page
             ("fim".to_owned(), true),
         ]
     );
+}
+
+#[test]
+fn obj_06_obj_17_instant_alpha_and_the_threshold_saved_by_pages_are_read() {
+    use desk_model::ObjectKind;
+    let (_, objects) = fixture_objects("obj-06-instant-alpha.pages");
+    let picture = objects
+        .iter()
+        .find(|o| matches!(o.kind, ObjectKind::Image(_)))
+        .expect("a picture");
+    // The whole picture, less the part Instant Alpha took out.
+    let kept = picture.picture.alpha_kept.as_ref().expect("an outline");
+    assert_eq!(kept.len(), 2, "{kept:?}");
+    let inside = |polygon: &[(i32, i32)], (x, y): (i32, i32)| {
+        let mut odd = false;
+        for (i, &(x1, y1)) in polygon.iter().enumerate() {
+            let (x2, y2) = polygon[(i + 1) % polygon.len()];
+            if (y1 > y) != (y2 > y) && x < x1 + (y - y1) * (x2 - x1) / (y2 - y1) {
+                odd = !odd;
+            }
+        }
+        odd
+    };
+    let kept_at = |p| kept.iter().filter(|polygon| inside(polygon, p)).count() % 2 == 1;
+    // Its corner stays; the middle of the hole, at 52 by 33 of 96 by 64,
+    // is gone.
+    assert!(kept_at((500, 500)));
+    assert!(!kept_at((5417, 5156)));
+    // Pages traces the opaque part at half.
+    assert_eq!(picture.wrap_threshold, 50);
 }

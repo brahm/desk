@@ -185,6 +185,9 @@ pub enum DrawableKind {
         /// `sf:traced-path`: the outline of the opaque part of the
         /// picture, in its natural size, that text wraps tightly around.
         traced: Option<String>,
+        /// `sf:alpha-mask-path`: the part of the picture that Instant
+        /// Alpha keeps, in its natural size, inside by the even-odd rule.
+        alpha_mask: Option<String>,
     },
     /// A movie or a sound (`sf:media` with `sf:movie-media`).
     Media {
@@ -195,6 +198,9 @@ pub enum DrawableKind {
         /// The path of the picture that stands for a movie
         /// (`sf:poster-image`).
         poster: Option<String>,
+        /// `sf:poster`: where the poster frame was taken, in the units of
+        /// the time scale of the movie.
+        poster_time: Option<u64>,
         /// `sf:looping`: `no`, `loop`, or `palindrome` for back and forth.
         looping: String,
         /// `sf:volume`, from 0 to 1.
@@ -286,6 +292,9 @@ pub struct TextWrap {
     /// Whether `sf:wrap-style` is `tight`: around the outline of the
     /// object rather than its box.
     pub tight: bool,
+    /// `sf:alpha-threshold`, from 0 to 1: how opaque a pixel of a picture
+    /// must be for the text that wraps tightly to go around it.
+    pub alpha_threshold: Option<f64>,
 }
 
 /// How many of an object and the objects of its group the reader does
@@ -344,6 +353,10 @@ fn media(ids: &Ids<'_>, element: &Element) -> DrawableKind {
                             .collect()
                     })
                     .unwrap_or_default(),
+                alpha_mask: content
+                    .child(SF, "alpha-mask-path")
+                    .and_then(|t| t.attr(SFA, "path"))
+                    .map(str::to_owned),
                 traced: content
                     .child(SF, "traced-path")
                     .and_then(|t| t.attr(SFA, "path"))
@@ -365,6 +378,9 @@ fn media(ids: &Ids<'_>, element: &Element) -> DrawableKind {
                 poster: content
                     .child(SF, "poster-image")
                     .and_then(|p| data_path(ids, p)),
+                poster_time: content
+                    .attr(SF, "poster")
+                    .and_then(|t| t.trim().parse::<u64>().ok()),
                 looping: content.attr(SF, "looping").unwrap_or("no").to_owned(),
                 volume: content
                     .attr(SF, "volume")
@@ -511,6 +527,10 @@ impl<'a> Reader<'a, '_> {
                         .to_owned(),
                     margin: number(wrap, SF, "margin"),
                     tight: wrap.attr(SF, "wrap-style") == Some("tight"),
+                    alpha_threshold: wrap
+                        .attr(SF, "alpha-threshold")
+                        .and_then(|t| t.trim().parse::<f64>().ok())
+                        .filter(|t| t.is_finite()),
                 });
             }
             style = current

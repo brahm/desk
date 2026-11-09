@@ -79,6 +79,8 @@ pub enum Item {
         picture: desk_model::Picture,
         /// The color taken out of it.
         alpha: std::sync::Arc<[desk_model::AlphaSeed]>,
+        /// The part of it that Instant Alpha keeps, as Pages saved it.
+        kept: Option<desk_model::AlphaOutline>,
         /// The changes of its colors.
         adjust: desk_model::Adjustments,
         /// The left edge, top edge, width and height.
@@ -674,10 +676,14 @@ fn object_item(placed: &PlacedObject) -> Item {
                     m.height.to_pt() as f32,
                 )
             });
-            let image = if !settings.alpha.is_empty() || !settings.adjust.is_none() {
+            let image = if !settings.alpha.is_empty()
+                || settings.alpha_kept.is_some()
+                || !settings.adjust.is_none()
+            {
                 Item::AdjustedImage {
                     picture: picture.clone(),
                     alpha: settings.alpha.clone(),
+                    kept: settings.alpha_kept.clone(),
                     adjust: settings.adjust,
                     rect,
                 }

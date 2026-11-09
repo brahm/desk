@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-09 15:25+0000\n"
+"POT-Creation-Date: 2026-11-09 15:34+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -304,7 +304,7 @@ msgstr ""
 
 #: crates/desk-ui/src/effects.rs:221 crates/desk-ui/src/graphic_pane.rs:189
 #: crates/desk-ui/src/graphic_pane.rs:246
-#: crates/desk-ui/src/objects_pane.rs:202
+#: crates/desk-ui/src/objects_pane.rs:205
 msgid "Degrees, counterclockwise"
 msgstr ""
 
@@ -678,7 +678,7 @@ msgid "4 Columns"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
-#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:293
+#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:301
 #: crates/desk-ui/src/ruler.rs:569 crates/desk-ui/src/ruler.rs:591
 msgid "Columns"
 msgstr ""
@@ -768,7 +768,7 @@ msgstr ""
 msgid "Stretch"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:48 crates/desk-ui/src/objects_pane.rs:239
+#: crates/desk-ui/src/graphic_pane.rs:48 crates/desk-ui/src/objects_pane.rs:242
 msgid "Original Size"
 msgstr ""
 
@@ -1586,151 +1586,159 @@ msgstr ""
 msgid "Insert ▸ Footnote adds a note at the cursor. Its text is edited here."
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:188
+#: crates/desk-ui/src/objects_pane.rs:191
 msgid "X"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:189
+#: crates/desk-ui/src/objects_pane.rs:192
 msgid "Y"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:190
+#: crates/desk-ui/src/objects_pane.rs:193
 msgid "Width"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:191
+#: crates/desk-ui/src/objects_pane.rs:194
 msgid "Height"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:193
+#: crates/desk-ui/src/objects_pane.rs:196
 msgid "Start X"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:194
+#: crates/desk-ui/src/objects_pane.rs:197
 msgid "Start Y"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:195
+#: crates/desk-ui/src/objects_pane.rs:198
 msgid "End X"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:196
+#: crates/desk-ui/src/objects_pane.rs:199
 msgid "End Y"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:199
+#: crates/desk-ui/src/objects_pane.rs:202
 msgid "Constrain Proportions"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:201
+#: crates/desk-ui/src/objects_pane.rs:204
 msgid "Rotate"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:211
+#: crates/desk-ui/src/objects_pane.rs:214
 msgid "Flip Horizontally"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:216
+#: crates/desk-ui/src/objects_pane.rs:219
 msgid "Flip Vertically"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:229
+#: crates/desk-ui/src/objects_pane.rs:232
 msgid "Flip"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:232
+#: crates/desk-ui/src/objects_pane.rs:235
 msgid "Metrics"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:240
+#: crates/desk-ui/src/objects_pane.rs:243
 msgid "The size the picture was made at"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:249
+#: crates/desk-ui/src/objects_pane.rs:252
 msgid "Both Sides"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:250
+#: crates/desk-ui/src/objects_pane.rs:253
 msgid "Largest Side"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:251
+#: crates/desk-ui/src/objects_pane.rs:254
 msgid "Left Side"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:252
+#: crates/desk-ui/src/objects_pane.rs:255
 msgid "Right Side"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:253
+#: crates/desk-ui/src/objects_pane.rs:256
 msgid "Above and Below"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:254
+#: crates/desk-ui/src/objects_pane.rs:257
 msgid "In Front of the Text"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:255
+#: crates/desk-ui/src/objects_pane.rs:258
 msgid "Behind the Text"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:260
+#: crates/desk-ui/src/objects_pane.rs:263
 msgid "Text Wrap"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:264
+#: crates/desk-ui/src/objects_pane.rs:267
 msgid "Tight"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:266
+#: crates/desk-ui/src/objects_pane.rs:269
 msgid "Around the outline of a shape or the opaque part of a picture"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:269
-msgid "Extra Space"
-msgstr ""
-
-#: crates/desk-ui/src/objects_pane.rs:271
-msgid "Locked"
-msgstr ""
-
 #: crates/desk-ui/src/objects_pane.rs:272
-msgid "Cannot be moved, resized or deleted"
+msgid "Alpha"
 msgstr ""
 
 #: crates/desk-ui/src/objects_pane.rs:274
-msgid "Inset"
+msgid "How opaque the picture must be for the text to go around it, in percent"
 msgstr ""
 
 #: crates/desk-ui/src/objects_pane.rs:276
-msgid "Inline with Text"
+msgid "Extra Space"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:277
-msgid "Moves with the text, as a character"
+#: crates/desk-ui/src/objects_pane.rs:278
+msgid "Locked"
 msgstr ""
 
 #: crates/desk-ui/src/objects_pane.rs:279
+msgid "Cannot be moved, resized or deleted"
+msgstr ""
+
+#: crates/desk-ui/src/objects_pane.rs:281
+msgid "Inset"
+msgstr ""
+
+#: crates/desk-ui/src/objects_pane.rs:283
+msgid "Inline with Text"
+msgstr ""
+
+#: crates/desk-ui/src/objects_pane.rs:284
+msgid "Moves with the text, as a character"
+msgstr ""
+
+#: crates/desk-ui/src/objects_pane.rs:286
 msgid "Wrap"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:285
+#: crates/desk-ui/src/objects_pane.rs:293
 msgid "Bottom"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:285
+#: crates/desk-ui/src/objects_pane.rs:293
 msgid "Middle"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:285
+#: crates/desk-ui/src/objects_pane.rs:293
 msgid "Top"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:288
+#: crates/desk-ui/src/objects_pane.rs:296
 msgid "Vertical Alignment"
 msgstr ""
 
-#: crates/desk-ui/src/objects_pane.rs:295
+#: crates/desk-ui/src/objects_pane.rs:303
 msgid "Text Box"
 msgstr ""
 

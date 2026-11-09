@@ -296,6 +296,49 @@ fn frame_style(name: &str) -> desk_model::FrameStyle {
     }
 }
 
+/// The part of a picture that Instant Alpha keeps, from the
+/// `sf:alpha-mask-path` that Pages saves in its `natural` size: each part
+/// of the path a polygon, in parts of [`POLYGON_SCALE`] of the picture.
+fn alpha_outline(path: &str, natural: (f64, f64)) -> Option<desk_model::AlphaOutline> {
+    let (nw, nh) = natural;
+    if nw <= 0.0 || nh <= 0.0 {
+        return None;
+    }
+    let scale = f64::from(POLYGON_SCALE);
+    // Each part starts with a move.
+    let mut parts: Vec<String> = Vec::new();
+    for token in path.split_whitespace() {
+        if token == "M" || parts.is_empty() {
+            parts.push(String::new());
+        }
+        let part = parts.last_mut().expect("one part");
+        part.push_str(token);
+        part.push(' ');
+    }
+    let polygons: Vec<Arc<[(i32, i32)]>> = parts
+        .iter()
+        // Against hostile files.
+        .take(1024)
+        .filter_map(|part| {
+            let shape = crate::odt::objects::path_shape(part, Some((0.0, 0.0, nw, nh)))?;
+            let edges = desk_model::flattened(&shape.outline(scale, scale));
+            let mut points: Vec<(i32, i32)> = edges
+                .iter()
+                .map(|((x, y), _)| (x.round() as i32, y.round() as i32))
+                .collect();
+            points.dedup();
+            (points.len() >= 3).then(|| points.into())
+        })
+        .collect();
+    // A picture kept whole needs no outline.
+    let whole = polygons.len() == 1
+        && polygons[0].iter().all(|&(x, y)| {
+            let edge = |v: i32| v == 0 || v == POLYGON_SCALE;
+            edge(x) || edge(y)
+        });
+    (!polygons.is_empty() && !whole).then(|| polygons.into())
+}
+
 /// The contour of a picture, in parts of its frame `shown`, from the
 /// `traced` outline of its opaque part in its `natural` size, the picture
 /// filling `whole`.
@@ -510,6 +553,7 @@ impl Builder<'_, '_> {
                 mask_path,
                 adjust,
                 traced,
+                alpha_mask,
             } => {
                 let Some(picture) = self.picture(path) else {
                     return Ok(None);
@@ -541,6 +585,9 @@ impl Builder<'_, '_> {
                     }
                 }
                 picture_settings.adjust = adjustments(adjust);
+                picture_settings.alpha_kept = alpha_mask
+                    .as_deref()
+                    .and_then(|m| alpha_outline(m, geometry.natural));
                 traced_contour = traced
                     .as_deref()
                     .and_then(|t| traced_outline(t, geometry.natural, whole, frame));
@@ -549,6 +596,7 @@ impl Builder<'_, '_> {
             DrawableKind::Media {
                 path,
                 poster,
+                poster_time,
                 looping,
                 volume,
             } => {
@@ -560,6 +608,14 @@ impl Builder<'_, '_> {
                     return Ok(None);
                 };
                 media.poster = poster.as_deref().and_then(|p| self.picture(p));
+                // Pages counts it in the time scale of the movie, as
+                // QuickTime does, 600 a second unless the movie says.
+                if let Some(time) = poster_time {
+                    let scale = media.time_scale().unwrap_or(600);
+                    let ms = time.saturating_mul(1000) / scale;
+                    media.poster_time =
+                        ms.min(u64::from(media.duration.unwrap_or(u32::MAX))) as u32;
+                }
                 media.repeat = match looping.as_str() {
                     "loop" => desk_model::Repeat::Loop,
                     "palindrome" => desk_model::Repeat::BackAndForth,
@@ -582,6 +638,9 @@ impl Builder<'_, '_> {
         }
         object.wrap = wrap;
         object.wrap_margin = wrap_margin;
+        if let Some(threshold) = drawable.wrap.as_ref().and_then(|w| w.alpha_threshold) {
+            object.wrap_threshold = (threshold * 100.0).round().clamp(0.0, 100.0) as u8;
+        }
         if drawable.wrap.as_ref().is_some_and(|w| w.tight)
             && matches!(wrap, Wrap::Both | Wrap::Left | Wrap::Right | Wrap::Largest)
         {

@@ -1747,6 +1747,7 @@ fn with_objects() -> Document {
             square.locked = true;
             square.wrap = Wrap::Left;
             square.wrap_margin = Length::from_points(6);
+            square.wrap_threshold = 30;
             square.contour = square.shape_contour();
             square.style.fill = Some(Fill::Color(Rgba::rgb(200, 10, 20)));
             square.style.stroke = Some(Stroke {
@@ -1883,6 +1884,10 @@ fn with_objects() -> Document {
                         tolerance: 40,
                     },
                 ]),
+                alpha_kept: Some(Arc::from([
+                    Arc::from([(0, 0), (10_000, 0), (10_000, 10_000), (0, 10_000)]),
+                    Arc::from([(2_000, 2_000), (4_000, 2_000), (3_000, 4_000)]),
+                ])),
                 adjust: desk_model::Adjustments {
                     brightness: 10,
                     contrast: -20,

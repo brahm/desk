@@ -304,6 +304,7 @@ impl PictureGroup {
             if let Some(editor) = restore_editor() {
                 editor.set_object("Restore Colors", |object| {
                     object.picture.alpha = std::sync::Arc::from([]);
+                    object.picture.alpha_kept = None;
                 });
             }
         });
@@ -327,6 +328,7 @@ impl PictureGroup {
                 editor.set_object("Reset Image", |object| {
                     object.picture.adjust = Adjustments::default();
                     object.picture.alpha = std::sync::Arc::from([]);
+                    object.picture.alpha_kept = None;
                 });
             }
         });
@@ -420,7 +422,8 @@ impl PictureGroup {
         if self.alpha.is_active() != picking {
             self.alpha.set_active(picking);
         }
-        self.restore.set_sensitive(!settings.alpha.is_empty());
+        self.restore
+            .set_sensitive(!settings.alpha.is_empty() || settings.alpha_kept.is_some());
         let a = settings.adjust;
         for (row, value) in self.adjust.iter().zip([
             a.brightness,

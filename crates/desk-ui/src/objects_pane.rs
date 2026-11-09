@@ -52,6 +52,9 @@ pub struct ObjectGroups {
     /// Whether the text goes around the outline of the object rather
     /// than its box (OBJ-17).
     tight: adw::SwitchRow,
+    /// How opaque a pixel of a picture must be, in percent, for the text
+    /// that wraps tightly to go around it (OBJ-17).
+    threshold: adw::SpinRow,
     margin: adw::SpinRow,
     locked: adw::SwitchRow,
     /// Whether the object is in the line of the text (OBJ-01).
@@ -266,6 +269,10 @@ impl ObjectGroups {
                 "Around the outline of a shape or the opaque part of a picture",
             ))
             .build();
+        let threshold = spin(&tr("Alpha"), 0.0, 100.0);
+        threshold.set_subtitle(&tr(
+            "How opaque the picture must be for the text to go around it, in percent",
+        ));
         let margin = spin(&tr("Extra Space"), 0.0, 1584.0);
         let locked = adw::SwitchRow::builder()
             .title(tr("Locked"))
@@ -280,6 +287,7 @@ impl ObjectGroups {
         wrap_group.add(&inline);
         wrap_group.add(&wrap);
         wrap_group.add(&tight);
+        wrap_group.add(&threshold);
         wrap_group.add(&margin);
         wrap_group.add(&locked);
         let vertical_names = [tr("Top"), tr("Middle"), tr("Bottom")];
@@ -311,6 +319,7 @@ impl ObjectGroups {
             rotation,
             wrap,
             tight,
+            threshold,
             margin,
             locked,
             inline,
@@ -423,6 +432,19 @@ impl ObjectGroups {
                         None
                     };
                 });
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let threshold_editor = editor.clone();
+        this.threshold.connect_value_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let threshold = row.value().round().clamp(0.0, 100.0) as u8;
+            if let Some(editor) = threshold_editor() {
+                // The contour is traced again with it.
+                editor.set_object("Text Wrap", |object| object.wrap_threshold = threshold);
             }
         });
         let weak = Rc::downgrade(&this);
@@ -628,6 +650,11 @@ impl ObjectGroups {
         }
         self.tight.set_visible(outlined);
         self.tight.set_sensitive(editable && !inline && beside);
+        set(&self.threshold, f64::from(info.object.wrap_threshold));
+        self.threshold
+            .set_visible(matches!(info.object.kind, desk_model::ObjectKind::Image(_)));
+        self.threshold
+            .set_sensitive(editable && !inline && beside && tight);
         self.margin.set_sensitive(editable && !inline);
         let shape_text = desk_model::TextBox::in_shape(std::sync::Arc::from([]));
         let text = info

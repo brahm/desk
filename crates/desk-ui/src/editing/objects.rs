@@ -2105,6 +2105,7 @@ pub(super) fn refresh_contour(object: &mut Object, before: &Object) {
     }
     let changed = object.kind != before.kind
         || object.picture != before.picture
+        || object.wrap_threshold != before.wrap_threshold
         || object.frame.width != before.frame.width
         || object.frame.height != before.frame.height;
     if changed {
