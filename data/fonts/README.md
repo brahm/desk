@@ -60,6 +60,7 @@ it, as each license requires.
 
 | Font | Stands for | License | Source |
 |---|---|---|---|
+| Desk Neue (`desk-neue/`), built from TeX Gyre Heros | Helvetica Neue | GUST Font License (LPPL 1.3c) | This repository, made by `desk-neue/make-desk-neue.py` |
 | Liberation Sans, Serif, Mono | Arial and Helvetica, Times New Roman and Times, Courier New and Courier | SIL Open Font License 1.1 | <https://github.com/liberationfonts/liberation-fonts> (Debian: `fonts-liberation`) |
 | TeX Gyre Heros, Termes, Cursor, Pagella, Bonum, Schola, Adventor, Chorus | Helvetica, Times, Courier, Palatino, Bookman, New Century Schoolbook, Avant Garde, Zapf Chancery | GUST Font License (LPPL 1.3c) | <https://www.gust.org.pl/projects/e-foundry/tex-gyre> (Debian: `fonts-texgyre`) |
 | Nimbus Sans, Nimbus Roman, Nimbus Mono PS, P052, URW Bookman, C059, URW Gothic, Z003 | The same 35 PostScript fonts | AGPL 3.0 with the font exception | <https://github.com/ArtifexSoftware/urw-base35-fonts> (Debian: `fonts-urw-base35`) |
@@ -76,3 +77,26 @@ from its own repository, at the commit that Google Fonts names for it,
 with its license. It bundles the
 Hunspell dictionaries and hyphenation patterns of American and British
 English and Brazilian Portuguese the same way.
+
+## Helvetica Neue metrics
+
+`helvetica-neue/` holds the advance widths, vertical metrics and kerning
+of each Helvetica Neue face, as Pages lays them out on the reference
+machine (macOS 10.14.4 with iWork '09 9.3), one tab-separated file per
+face. `helvetica-neue/measure.py` took them with CoreText; the files
+record only numbers, never the fonts, and serve to build
+metric-compatible substitutes from TeX Gyre Heros.
+
+## Desk Neue
+
+No free font has the widths of Helvetica Neue, so Desk makes one:
+`desk-neue/make-desk-neue.py` copies each face of TeX Gyre Heros, gives
+it the advance widths, kerning and vertical metrics measured above, and
+renames it Desk Neue, as the GUST Font License asks of derived works.
+Its outlines stay those of TeX Gyre Heros: the light faces are drawn as
+the regular one and the medium as the bold, but each lays out as wide as
+in Pages, so lines and pages break where they did on the Mac. The
+condensed and thin faces are left out, as Desk does not tell them from
+the bold and the ultralight. `desk-text` brings the ten faces inside the
+program and loads them before the system fonts are consulted, and
+`substitutes.tsv` puts Desk Neue first for Helvetica Neue.

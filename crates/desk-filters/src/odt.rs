@@ -26,6 +26,7 @@ use desk_model::{
 };
 use desk_odf as odf;
 
+use crate::log::{Content, ImportLog, Warning};
 use crate::sections;
 
 pub(crate) mod objects;
@@ -85,6 +86,23 @@ impl From<ModelError> for FilterError {
 /// Reads an ODT file into a document.
 pub fn read_odt(bytes: &[u8]) -> Result<Document, FilterError> {
     import(&odf::read_odt(bytes)?)
+}
+
+/// Reads an ODT file into a document, with what was left out (INT-22).
+pub fn read_odt_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterError> {
+    let source = odf::read_odt(bytes)?;
+    let mut log = ImportLog::default();
+    for (element, count) in &source.skipped {
+        let content = match element.as_str() {
+            "table" => Content::Tables,
+            "annotation" => Content::Comments,
+            "changed-region" => Content::AcceptedChanges,
+            "object" => Content::UnreadObjects,
+            other => Content::Other(other.to_owned()),
+        };
+        log.add(Warning::Content(content), *count);
+    }
+    Ok((import(&source)?, log))
 }
 
 /// Writes a document as an ODT file.

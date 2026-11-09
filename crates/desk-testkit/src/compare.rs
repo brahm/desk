@@ -54,9 +54,19 @@ pub struct Word {
     pub text: String,
     /// The left edge.
     pub x: f64,
-    /// The bottom edge, near the baseline.
+    /// The bottom edge, near the baseline: the depth of the font below
+    /// the baseline, as the font says, is under it.
     pub y: f64,
+    /// The height of the box of the word, as the font says.
+    pub height: f64,
 }
+
+/// How much deeper below the baseline the box of a word may go in one PDF
+/// than in the other, in parts of the height of the smaller box: the fonts
+/// that stand for those of the Mac say they go deeper, by up to a tenth of
+/// the size of the text for TeX Gyre Heros against Helvetica Neue, even
+/// where the baselines are the same.
+const DEPTH_SLACK: f64 = 0.07;
 
 /// The words of each page of a PDF.
 pub fn words(pdf: &Path) -> Result<Vec<Vec<Word>>, CompareError> {
@@ -82,8 +92,15 @@ fn parse_bbox(html: &str) -> Vec<Vec<Word>> {
                 .and_then(|(_, t)| t.strip_suffix("</word>"))
                 .map(unescape)
                 .unwrap_or_default();
-            if let (Some(page), Some(x), Some(y)) = (pages.last_mut(), attr("xMin"), attr("yMax")) {
-                page.push(Word { text, x, y });
+            if let (Some(page), Some(x), Some(top), Some(y)) =
+                (pages.last_mut(), attr("xMin"), attr("yMin"), attr("yMax"))
+            {
+                page.push(Word {
+                    text,
+                    x,
+                    y,
+                    height: y - top,
+                });
             }
         }
     }
@@ -154,7 +171,9 @@ pub fn compare_words(reference: &[Vec<Word>], desk: &[Vec<Word>]) -> LayoutDiff 
         for index in 0..r.len().max(d.len()) {
             match (r.get(index), d.get(index)) {
                 (Some(a), Some(b)) if a.text == b.text => {
-                    let offset = (a.x - b.x).abs().max((a.y - b.y).abs());
+                    let depth = DEPTH_SLACK * a.height.min(b.height).max(0.0);
+                    let dy = ((a.y - b.y).abs() - depth).max(0.0);
+                    let offset = (a.x - b.x).abs().max(dy);
                     if offset > diff.max_offset {
                         diff.max_offset = offset;
                         diff.max_offset_at = Some((page + 1, index));
@@ -343,6 +362,7 @@ mod tests {
             text: text.into(),
             x,
             y,
+            height: 0.0,
         }
     }
 
@@ -359,7 +379,16 @@ mod tests {
         assert_eq!(
             parse_bbox(html),
             [
-                vec![word("Ol&á", 72.0, 75.25), word("mundo", 104.0, 75.25)],
+                vec![
+                    Word {
+                        height: 15.25,
+                        ..word("Ol&á", 72.0, 75.25)
+                    },
+                    Word {
+                        height: 15.25,
+                        ..word("mundo", 104.0, 75.25)
+                    }
+                ],
                 vec![]
             ]
         );

@@ -71,6 +71,7 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             mask_shape,
             image_adjust,
             instant_alpha,
+            alpha_kept,
             marker_start,
             marker_start_width,
             marker_end,
@@ -90,6 +91,7 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             opacity,
             wrap,
             wrap_contour,
+            wrap_threshold,
             run_through,
             margin,
             padding,
@@ -344,6 +346,16 @@ fn odf_picture_settings(
             .collect();
         g.instant_alpha = Some(seeds.join(", "));
     }
+    if let Some(kept) = &settings.alpha_kept {
+        let polygons: Vec<String> = kept
+            .iter()
+            .map(|polygon| {
+                let points: Vec<String> = polygon.iter().map(|(x, y)| format!("{x} {y}")).collect();
+                points.join(" ")
+            })
+            .collect();
+        g.alpha_kept = Some(polygons.join("; "));
+    }
     let a = settings.adjust;
     if !a.is_none() {
         if a.brightness != 0 {
@@ -498,6 +510,9 @@ fn model_picture_settings(
             // Against hostile files.
             .take(256)
             .collect();
+    }
+    if let Some(value) = g.alpha_kept.as_deref() {
+        settings.alpha_kept = alpha_kept(value);
     }
     let unit = |v: f64| v.round().clamp(-100.0, 100.0) as i8;
     let numbers: Option<Vec<i8>> = g.image_adjust.as_deref().and_then(|v| {
@@ -1172,6 +1187,9 @@ fn import_one(
         built.wrap = Wrap::AboveAndBelow;
     }
     built.wrap_margin = g.margin.map_or(Length::ZERO, length);
+    built.wrap_threshold = g.wrap_threshold.map_or(Object::WRAP_THRESHOLD, |t| {
+        t.round().clamp(0.0, 100.0) as u8
+    });
     if g.wrap_contour == Some(true)
         && !matches!(
             built.wrap,
@@ -1751,6 +1769,9 @@ impl Exporter<'_> {
         g.wrap = Some(wrap.into());
         g.run_through = through.map(Into::into);
         g.margin = Some(odf_length(object.wrap_margin));
+        if object.wrap_threshold != Object::WRAP_THRESHOLD {
+            g.wrap_threshold = Some(f64::from(object.wrap_threshold));
+        }
         if object.contour.is_some() {
             g.wrap_contour = Some(true);
         }
@@ -2276,6 +2297,32 @@ pub(super) fn import_master_objects(
         }
     }
     Ok(())
+}
+
+/// The polygons of `desk:alpha-kept`: each of `x y` pairs, separated by
+/// semicolons; none when there is no polygon of three points or more.
+fn alpha_kept(value: &str) -> Option<desk_model::AlphaOutline> {
+    let scale = POLYGON_SCALE;
+    let polygons: Vec<Arc<[(i32, i32)]>> = value
+        .split(';')
+        // Against hostile files.
+        .take(1024)
+        .filter_map(|polygon| {
+            let numbers: Vec<i32> = polygon
+                .split_whitespace()
+                .map(|n| n.parse().ok())
+                .collect::<Option<_>>()?;
+            let points: Vec<(i32, i32)> = numbers
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .take(65_536)
+                .map(|&[x, y]| (x.clamp(-scale, 2 * scale), y.clamp(-scale, 2 * scale)))
+                .collect();
+            (points.len() >= 3).then(|| points.into())
+        })
+        .collect();
+    (!polygons.is_empty()).then(|| polygons.into())
 }
 
 #[cfg(test)]

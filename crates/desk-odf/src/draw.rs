@@ -50,6 +50,11 @@ pub struct GraphicProperties {
     /// order, each as `x y tolerance` with `x` and `y` in ten-thousandths
     /// of its width and height, separated by commas.
     pub instant_alpha: Option<String>,
+    /// `desk:alpha-kept`: the part of a picture that Instant Alpha keeps,
+    /// as Pages saves it: polygons separated by semicolons, each as
+    /// `x y` pairs in ten-thousandths of the picture, inside by the
+    /// even-odd rule.
+    pub alpha_kept: Option<String>,
     /// `draw:stroke`: `none`, `solid` or `dash`.
     pub stroke: Option<String>,
     /// `svg:stroke-color`.
@@ -110,6 +115,9 @@ pub struct GraphicProperties {
     /// `fo:margin-left`, which Desk writes on every side: the room
     /// between the object and the text around it.
     pub margin: Option<Length>,
+    /// `desk:wrap-threshold`: how opaque a pixel of a picture must be,
+    /// in percent, for the text that wraps tightly to go around it.
+    pub wrap_threshold: Option<f64>,
     /// `fo:padding`: the room between the frame and its text.
     pub padding: Option<Length>,
     /// `style:protect`, as `position size`.
@@ -563,6 +571,7 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         mask_shape: text(DESK, "mask-shape"),
         image_adjust: text(DESK, "image-adjust"),
         instant_alpha: text(DESK, "instant-alpha"),
+        alpha_kept: text(DESK, "alpha-kept"),
         stroke: text(DRAW, "stroke"),
         stroke_color: e.attr(SVG, "stroke-color").and_then(Color::parse),
         stroke_width: length(SVG, "stroke-width"),
@@ -588,6 +597,7 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         wrap_contour: text(STYLE, "wrap-contour").map(|v| v == "true"),
         run_through: text(STYLE, "run-through"),
         margin: length(FO, "margin-left").or_else(|| length(FO, "margin")),
+        wrap_threshold: e.attr(DESK, "wrap-threshold").and_then(parse_percent),
         padding: length(FO, "padding").or_else(|| length(FO, "padding-left")),
         protect: text(STYLE, "protect"),
         mirror: text(STYLE, "mirror"),
@@ -633,6 +643,7 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     w.attr_opt("desk:mask-shape", g.mask_shape.as_deref());
     w.attr_opt("desk:image-adjust", g.image_adjust.as_deref());
     w.attr_opt("desk:instant-alpha", g.instant_alpha.as_deref());
+    w.attr_opt("desk:alpha-kept", g.alpha_kept.as_deref());
     w.attr_opt("draw:stroke", g.stroke.as_deref());
     if let Some(color) = g.stroke_color {
         w.attr("svg:stroke-color", &color.to_string());
@@ -690,6 +701,9 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
         w.attr("style:wrap-contour", if contour { "true" } else { "false" });
     }
     w.attr_opt("style:run-through", g.run_through.as_deref());
+    if let Some(threshold) = g.wrap_threshold {
+        w.attr("desk:wrap-threshold", &format!("{}%", decimal(threshold)));
+    }
     if let Some(margin) = g.margin {
         let margin = margin.to_string();
         for side in [

@@ -47,6 +47,10 @@ pub struct Object {
     pub wrap: Wrap,
     /// The room left between the object and the text around it.
     pub wrap_margin: Length,
+    /// How opaque a pixel of a picture must be, in percent, for the text
+    /// that wraps tightly to go around it: the transparency threshold of
+    /// the Wrap Inspector (OBJ-17).
+    pub wrap_threshold: u8,
     /// The outline that the text goes around when it wraps tightly, in
     /// parts of [`POLYGON_SCALE`] of the frame from its top left corner:
     /// that of a shape, or the edge of the opaque part of a picture
@@ -82,9 +86,18 @@ pub struct PictureSettings {
     /// Where Instant Alpha was clicked, in order: each click takes out
     /// the color under it and the colors near it around it (OBJ-06).
     pub alpha: Arc<[AlphaSeed]>,
+    /// The part of the picture that Instant Alpha keeps, as Pages saves
+    /// it: closed polygons in parts of [`POLYGON_SCALE`] of the picture
+    /// from its top left corner, inside by the even-odd rule. None when
+    /// only `alpha` says what is taken out (OBJ-06).
+    pub alpha_kept: Option<AlphaOutline>,
     /// The changes of Adjust Image (OBJ-07).
     pub adjust: Adjustments,
 }
+
+/// Closed polygons whose inside, by the even-odd rule, is the part of a
+/// picture that Instant Alpha keeps.
+pub type AlphaOutline = Arc<[Arc<[(i32, i32)]>]>;
 
 /// A click of Instant Alpha on a picture: the region of the color under
 /// it, as far as the colors stay near it, is taken out (OBJ-06).
@@ -186,6 +199,9 @@ impl Object {
         self.flip_vertical = false;
     }
 
+    /// The transparency threshold of a new object, as in Pages: half.
+    pub const WRAP_THRESHOLD: u8 = 50;
+
     /// An object with a frame on the first page, no fill and no line,
     /// that the text goes around on both sides.
     pub fn new(id: NodeId, kind: ObjectKind, frame: Frame) -> Self {
@@ -200,6 +216,7 @@ impl Object {
             style: GraphicStyle::default(),
             wrap: Wrap::Both,
             wrap_margin: Length::from_points(12),
+            wrap_threshold: Self::WRAP_THRESHOLD,
             contour: None,
             locked: false,
             origin: None,

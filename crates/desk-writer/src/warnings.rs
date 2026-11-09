@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What an import of Pages left out, in the language of the interface, as
+//! What an import of Pages or ODT left out, in the language of the interface, as
 //! the Warnings window lists it (INT-22).
 
 use desk_filters::log::{Content, Entry, Formatting, Warning};
@@ -24,6 +24,9 @@ pub fn describe(entry: &Entry) -> String {
                 Content::TablesOfContents => tr("tables of contents"),
                 Content::TrackedChanges => tr("tracked changes, whose text is kept as plain text"),
                 Content::Bookmarks => tr("bookmarks, whose text is kept"),
+                Content::Tables => tr("tables, whose text is kept as paragraphs"),
+                Content::AcceptedChanges => tr("tracked changes, which are kept as accepted"),
+                Content::UnreadObjects => tr("objects such as charts and embedded documents"),
                 Content::Other(name) => tr("content of the kind “{name}”").replace("{name}", name),
             };
             n(tr("Left out {what} ({n}).")).replace("{what}", &what)

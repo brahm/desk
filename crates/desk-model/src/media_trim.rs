@@ -26,6 +26,20 @@ struct Kept {
 }
 
 impl Media {
+    /// The units of a second that the times of a QuickTime or MPEG-4 file
+    /// count, from its movie header; none for other files.
+    pub fn time_scale(&self) -> Option<u64> {
+        if !matches!(
+            self.format(),
+            MediaFormat::QuickTime | MediaFormat::Mp4 | MediaFormat::M4a
+        ) {
+            return None;
+        }
+        let top = atoms(self.data())?;
+        let moov = atoms(find(&top, b"moov")?)?;
+        time_scale(find(&moov, b"mvhd")?)
+    }
+
     /// Whether Reduce Media would take anything out: its start or stop
     /// leaves out part of a file whose format Desk can cut.
     pub fn reducible(&self) -> bool {

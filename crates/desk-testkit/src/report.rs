@@ -371,6 +371,7 @@ impl Report {
         let differ = count(&|s| s == Status::Differs);
         let rest = match differ {
             0 => "all of them alike".to_string(),
+            1 => "of which 1 still differs".to_string(),
             differ => format!("of which {differ} still differ"),
         };
         format!(

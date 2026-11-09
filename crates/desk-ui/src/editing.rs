@@ -823,6 +823,12 @@ impl TextEditor {
         if keep && self.paste_text_of_other_apps() {
             return;
         }
+        if self.paste_picture_of_other_programs() {
+            return;
+        }
+        if keep && self.paste_formatted_text_of_other_programs() {
+            return;
+        }
         let weak = self.downgrade();
         self.view
             .area()
@@ -885,6 +891,73 @@ impl TextEditor {
             };
             if let Some(this) = weak.upgrade() {
                 this.paste_fragment(&fragment);
+            }
+        });
+        true
+    }
+
+    /// Pastes the formatted text that another program put on the
+    /// clipboard, as LibreOffice and web browsers do, with its emphasis,
+    /// sizes, colors and links (TXT-04).
+    fn paste_formatted_text_of_other_programs(&self) -> bool {
+        let clipboard = self.view.area().clipboard();
+        let Some(format) = crate::objects_format() else {
+            return false;
+        };
+        if clipboard.is_local() {
+            return false;
+        }
+        let formats = clipboard.formats();
+        let Some(&media_type) = format
+            .foreign_text_types
+            .iter()
+            .find(|t| formats.contain_mime_type(t))
+        else {
+            return false;
+        };
+        let weak = self.downgrade();
+        gtk::glib::spawn_future_local(async move {
+            let fragment = match clipboard_bytes(&clipboard, media_type).await {
+                Ok(bytes) => (format.read_foreign_text)(media_type, &bytes),
+                Err(error) => Err(error),
+            };
+            let Some(this) = weak.upgrade() else { return };
+            match fragment {
+                Ok(fragment) if !fragment.text().is_empty() => this.paste_fragment(&fragment),
+                // Nothing to read: the text alone.
+                _ => {
+                    clipboard.read_text_async(gtk::gio::Cancellable::NONE, move |result| {
+                        if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
+                            this.replace_selection("Paste", &text);
+                        }
+                    });
+                }
+            }
+        });
+        true
+    }
+
+    /// Pastes the picture that another program put on the clipboard with
+    /// no text, in the line of the text at the cursor (TXT-04).
+    fn paste_picture_of_other_programs(&self) -> bool {
+        let clipboard = self.view.area().clipboard();
+        let formats = clipboard.formats();
+        if clipboard.is_local()
+            || !formats.contains_type(gdk::Texture::static_type())
+            || formats.contain_mime_type("text/plain")
+            || formats.contain_mime_type("text/plain;charset=utf-8")
+        {
+            return false;
+        }
+        let weak = self.downgrade();
+        clipboard.read_texture_async(gtk::gio::Cancellable::NONE, move |result| {
+            let (Ok(Some(texture)), Some(this)) = (result, weak.upgrade()) else {
+                return;
+            };
+            let png = texture.save_to_png_bytes();
+            match desk_model::Picture::from_png(png.to_vec()) {
+                Some(picture) => this.insert_picture_in_line(picture),
+                None => gtk::glib::g_warning!("desk", "cannot paste the picture"),
             }
         });
         true
@@ -3495,6 +3568,27 @@ impl TextEditor {
             glib::ControlFlow::Continue
         });
     }
+}
+
+/// The bytes of the clipboard as `media_type`.
+async fn clipboard_bytes(
+    clipboard: &gdk::Clipboard,
+    media_type: &str,
+) -> Result<glib::Bytes, String> {
+    let (stream, _) = clipboard
+        .read_future(&[media_type], glib::Priority::DEFAULT)
+        .await
+        .map_err(|e| e.to_string())?;
+    let out = gtk::gio::MemoryOutputStream::new_resizable();
+    out.splice_future(
+        &stream,
+        gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
+            | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
+        glib::Priority::DEFAULT,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(out.steal_as_bytes())
 }
 
 #[cfg(test)]

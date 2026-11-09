@@ -16,6 +16,10 @@ use desk_testkit::compare::{compare_pixels, compare_words, words};
 /// substitutes of the fonts of Pages and the smoothing of edges.
 const PIXEL_TOLERANCE: f64 = 2.0;
 
+/// The share for a page mostly of text, where the glyphs of the fonts that
+/// stand for those of the Mac differ from them, in percent.
+const TEXT_PAGE_PIXEL_TOLERANCE: f64 = 7.0;
+
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/pages")
 }
@@ -23,6 +27,12 @@ fn fixtures() -> PathBuf {
 /// Lays out a fixture, writes it as PDF, and compares its words and its
 /// pixels with the PDF of Pages.
 fn check(name: &str) {
+    check_with(name, PIXEL_TOLERANCE);
+}
+
+/// Compares a fixture with Pages, allowing a share of its pixels to
+/// differ, in percent.
+fn check_with(name: &str, pixel_tolerance: f64) {
     let fixtures = fixtures();
     let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
     let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
@@ -43,10 +53,11 @@ fn check(name: &str) {
         "{name}: {diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
     );
     let pixels = compare_pixels(&pdf, &out, &tmp.join(format!("{name}-pixels"))).unwrap();
+    let worst = pixels.worst();
     assert!(
-        pixels.worst() <= PIXEL_TOLERANCE,
-        "{name}: {:.1} % of the pixels differ, see {:?}",
-        pixels.worst(),
+        worst <= pixel_tolerance,
+        "{name}: {worst:.1} % of the pixels differ ({:?}), see {:?}",
+        pixels.pages,
         pixels.images
     );
 }
@@ -207,4 +218,16 @@ fn obj_14_text_boxes_in_the_text_float_in_the_middle_of_the_column() {
 #[test]
 fn obj_17_wraps_match_pages() {
     check("obj-17-wrap");
+}
+
+#[test]
+fn int_03_obj_15_obj_16_obj_17_obj_37_est_05_a_newsletter_in_page_layout_matches_pages() {
+    // Two pages of Page Layout, the reference of phase 6: a title over a
+    // rectangle, a rule, an article in two linked boxes around a picture
+    // with a shadow and its caption, and a box of three columns around a
+    // picture across a gutter, which keeps the first and the last line of
+    // a paragraph with another, above a callout. The pages are mostly
+    // text, whose glyphs differ in the fonts that stand for those of the
+    // Mac; its words are compared one by one.
+    check_with("phase6-newsletter", TEXT_PAGE_PIXEL_TOLERANCE);
 }

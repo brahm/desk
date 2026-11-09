@@ -11,9 +11,6 @@ use desk_model::{Object, ObjectKind, POLYGON_SCALE};
 /// How many bands of the picture the outline follows at most.
 const MAX_BANDS: usize = 64;
 
-/// How opaque a pixel is to count, from 0 to 255: half.
-const OPAQUE: u8 = 128;
-
 /// The contour that text wraps tightly around for an object: the outline
 /// of a shape, or of the opaque part of a picture after Instant Alpha, in
 /// parts of [`POLYGON_SCALE`] of its frame. None for other objects, and
@@ -24,13 +21,18 @@ pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
     };
     let source = crate::picture_surface(picture)?;
     let settings = &object.picture;
-    let surface = if settings.alpha.is_empty() {
+    let surface = if settings.alpha.is_empty() && settings.alpha_kept.is_none() {
         source
     } else {
-        crate::adjusted_surface(&source, &settings.alpha, desk_model::Adjustments::default())
-            .ok()?
+        crate::adjusted_surface(
+            &source,
+            &settings.alpha,
+            settings.alpha_kept.as_ref(),
+            desk_model::Adjustments::default(),
+        )
+        .ok()?
     };
-    let spans = opaque_spans(surface)?;
+    let spans = opaque_spans(surface, object.wrap_threshold)?;
     let (fw, fh) = (object.frame.width.to_pt(), object.frame.height.to_pt());
     if fw <= 0.0 || fh <= 0.0 {
         return None;
@@ -73,8 +75,14 @@ pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
 
 /// The bands of a picture that have opaque pixels, from top to bottom: the
 /// top and bottom of each band and the left and right of its opaque
-/// pixels, in parts of the picture.
-fn opaque_spans(mut surface: cairo::ImageSurface) -> Option<Vec<(f64, f64, f64, f64)>> {
+/// pixels, in parts of the picture. A pixel counts when it is more opaque
+/// than `threshold` percent.
+fn opaque_spans(
+    mut surface: cairo::ImageSurface,
+    threshold: u8,
+) -> Option<Vec<(f64, f64, f64, f64)>> {
+    // 50% counts the pixels from 128 up, as Pages does.
+    let least = (f64::from(threshold.min(100)) * 255.0 / 100.0).floor() as u16 + 1;
     surface.flush();
     let (w, h) = (surface.width() as usize, surface.height() as usize);
     if w == 0 || h == 0 {
@@ -91,7 +99,9 @@ fn opaque_spans(mut surface: cairo::ImageSurface) -> Option<Vec<(f64, f64, f64, 
         let mut right = 0;
         for row in first..last {
             let pixels = &data[row * stride..][..w * 4];
-            let opaque = |x: &usize| format != cairo::Format::ARgb32 || pixels[x * 4 + 3] >= OPAQUE;
+            let opaque = |x: &usize| {
+                format != cairo::Format::ARgb32 || u16::from(pixels[x * 4 + 3]) >= least
+            };
             if let Some(l) = (0..w).find(opaque) {
                 left = left.min(l);
                 right = right.max((0..w).rev().find(opaque).unwrap_or(l) + 1);
@@ -158,5 +168,33 @@ mod tests {
         // Nothing opaque in the frame: no contour.
         object.picture.mask = Some(Frame::from_pt(0.0, 0.0, 80.0, 40.0));
         assert_eq!(object_contour(&object), None);
+    }
+
+    #[test]
+    fn obj_17_the_transparency_threshold_sets_what_text_goes_around() {
+        // The left half a third opaque, the right half opaque.
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 4, 4).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgba(1.0, 0.0, 0.0, 0.3);
+            cr.rectangle(0.0, 0.0, 2.0, 4.0);
+            cr.fill().unwrap();
+            cr.set_source_rgb(1.0, 0.0, 0.0);
+            cr.rectangle(2.0, 0.0, 2.0, 4.0);
+            cr.fill().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Image(Picture::from_png(png).unwrap()),
+            Frame::from_pt(0.0, 0.0, 40.0, 40.0),
+        );
+        // At half, the text goes around the right half only.
+        let left = |object: &Object| object_contour(object).unwrap().iter().map(|p| p.0).min();
+        assert_eq!(left(&object), Some(5_000));
+        // At a fifth, around the whole picture.
+        object.wrap_threshold = 20;
+        assert_eq!(left(&object), Some(0));
     }
 }

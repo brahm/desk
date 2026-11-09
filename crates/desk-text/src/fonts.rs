@@ -11,6 +11,22 @@
 
 use std::sync::{Arc, OnceLock};
 
+/// The fonts that Desk brings, which `data/fonts/desk-neue` makes: Desk
+/// Neue, TeX Gyre Heros with the advance widths and kerning of Helvetica
+/// Neue as Pages lays it out, in each of its weights (DOC-05).
+pub(crate) const BUNDLED: [&[u8]; 10] = [
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Regular.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Italic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Bold.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-BoldItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Light.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-LightItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLight.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLightItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Medium.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-MediumItalic.otf"),
+];
+
 /// How a font was chosen for a family that a document names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FontMatch {
@@ -241,9 +257,20 @@ mod tests {
         assert_eq!(neue(100).ascent, 0.931);
         assert_eq!((neue(500).ascent, neue(500).descent), (0.975, 0.217));
         assert_eq!(neue(700), neue(900));
-        assert_eq!((neue(400).spacing, neue(300).spacing), (0.00469, -0.0129));
+        // Desk Neue has the widths of each face, so none needs spacing.
+        assert_eq!((neue(400).spacing, neue(300).spacing), (0.0, 0.0));
         assert_eq!(helvetica.spacing, 0.0);
         assert!(neue(700).ff_ligatures);
+    }
+
+    #[test]
+    fn doc_05_desk_neue_stands_for_helvetica_neue_in_each_weight() {
+        let mut system = crate::TextSystem::new();
+        let choice = system.font_choice("Helvetica Neue");
+        assert_eq!(
+            (&*choice.used, choice.kind),
+            ("Desk Neue", FontMatch::Metric)
+        );
     }
 
     #[test]

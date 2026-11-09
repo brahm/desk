@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-08 12:18+0000\n"
+"POT-Creation-Date: 2026-11-09 15:34+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -303,7 +303,7 @@ msgstr "Sombra do Texto"
 
 #: crates/desk-ui/src/effects.rs:221 crates/desk-ui/src/graphic_pane.rs:189
 #: crates/desk-ui/src/graphic_pane.rs:246
-#: crates/desk-ui/src/objects_pane.rs:202
+#: crates/desk-ui/src/objects_pane.rs:205
 msgid "Degrees, counterclockwise"
 msgstr "Graus, no sentido anti-horário"
 
@@ -677,7 +677,7 @@ msgid "4 Columns"
 msgstr "4 colunas"
 
 #: crates/desk-ui/src/formatting.rs:196 crates/desk-ui/src/formatting.rs:198
-#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:293
+#: crates/desk-ui/src/layout_pane.rs:231 crates/desk-ui/src/objects_pane.rs:301
 #: crates/desk-ui/src/ruler.rs:569 crates/desk-ui/src/ruler.rs:591
 msgid "Columns"
 msgstr "Colunas"
@@ -767,7 +767,7 @@ msgstr "Ajustar"
 msgid "Stretch"
 msgstr "Esticar"
 
-#: crates/desk-ui/src/graphic_pane.rs:48 crates/desk-ui/src/objects_pane.rs:239
+#: crates/desk-ui/src/graphic_pane.rs:48 crates/desk-ui/src/objects_pane.rs:242
 msgid "Original Size"
 msgstr "Tamanho original"
 
@@ -1597,151 +1597,159 @@ msgstr ""
 "Inserir ▸ Nota de rodapé adiciona uma nota no cursor. O texto dela é editado "
 "aqui."
 
-#: crates/desk-ui/src/objects_pane.rs:188
+#: crates/desk-ui/src/objects_pane.rs:191
 msgid "X"
 msgstr "X"
 
-#: crates/desk-ui/src/objects_pane.rs:189
+#: crates/desk-ui/src/objects_pane.rs:192
 msgid "Y"
 msgstr "Y"
 
-#: crates/desk-ui/src/objects_pane.rs:190
+#: crates/desk-ui/src/objects_pane.rs:193
 msgid "Width"
 msgstr "Largura"
 
-#: crates/desk-ui/src/objects_pane.rs:191
+#: crates/desk-ui/src/objects_pane.rs:194
 msgid "Height"
 msgstr "Altura"
 
-#: crates/desk-ui/src/objects_pane.rs:193
+#: crates/desk-ui/src/objects_pane.rs:196
 msgid "Start X"
 msgstr "X do início"
 
-#: crates/desk-ui/src/objects_pane.rs:194
+#: crates/desk-ui/src/objects_pane.rs:197
 msgid "Start Y"
 msgstr "Y do início"
 
-#: crates/desk-ui/src/objects_pane.rs:195
+#: crates/desk-ui/src/objects_pane.rs:198
 msgid "End X"
 msgstr "X do fim"
 
-#: crates/desk-ui/src/objects_pane.rs:196
+#: crates/desk-ui/src/objects_pane.rs:199
 msgid "End Y"
 msgstr "Y do fim"
 
-#: crates/desk-ui/src/objects_pane.rs:199
+#: crates/desk-ui/src/objects_pane.rs:202
 msgid "Constrain Proportions"
 msgstr "Manter proporções"
 
-#: crates/desk-ui/src/objects_pane.rs:201
+#: crates/desk-ui/src/objects_pane.rs:204
 msgid "Rotate"
 msgstr "Girar"
 
-#: crates/desk-ui/src/objects_pane.rs:211
+#: crates/desk-ui/src/objects_pane.rs:214
 msgid "Flip Horizontally"
 msgstr "Espelhar horizontalmente"
 
-#: crates/desk-ui/src/objects_pane.rs:216
+#: crates/desk-ui/src/objects_pane.rs:219
 msgid "Flip Vertically"
 msgstr "Espelhar verticalmente"
 
-#: crates/desk-ui/src/objects_pane.rs:229
+#: crates/desk-ui/src/objects_pane.rs:232
 msgid "Flip"
 msgstr "Espelhar"
 
-#: crates/desk-ui/src/objects_pane.rs:232
+#: crates/desk-ui/src/objects_pane.rs:235
 msgid "Metrics"
 msgstr "Métricas"
 
-#: crates/desk-ui/src/objects_pane.rs:240
+#: crates/desk-ui/src/objects_pane.rs:243
 msgid "The size the picture was made at"
 msgstr "O tamanho com que a imagem foi feita"
 
-#: crates/desk-ui/src/objects_pane.rs:249
+#: crates/desk-ui/src/objects_pane.rs:252
 msgid "Both Sides"
 msgstr "Dos dois lados"
 
-#: crates/desk-ui/src/objects_pane.rs:250
+#: crates/desk-ui/src/objects_pane.rs:253
 msgid "Largest Side"
 msgstr "Do lado maior"
 
-#: crates/desk-ui/src/objects_pane.rs:251
+#: crates/desk-ui/src/objects_pane.rs:254
 msgid "Left Side"
 msgstr "Do lado esquerdo"
 
-#: crates/desk-ui/src/objects_pane.rs:252
+#: crates/desk-ui/src/objects_pane.rs:255
 msgid "Right Side"
 msgstr "Do lado direito"
 
-#: crates/desk-ui/src/objects_pane.rs:253
+#: crates/desk-ui/src/objects_pane.rs:256
 msgid "Above and Below"
 msgstr "Acima e abaixo"
 
-#: crates/desk-ui/src/objects_pane.rs:254
+#: crates/desk-ui/src/objects_pane.rs:257
 msgid "In Front of the Text"
 msgstr "Na frente do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:255
+#: crates/desk-ui/src/objects_pane.rs:258
 msgid "Behind the Text"
 msgstr "Atrás do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:260
+#: crates/desk-ui/src/objects_pane.rs:263
 msgid "Text Wrap"
 msgstr "Ajuste do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:264
+#: crates/desk-ui/src/objects_pane.rs:267
 msgid "Tight"
 msgstr "Justo"
 
-#: crates/desk-ui/src/objects_pane.rs:266
+#: crates/desk-ui/src/objects_pane.rs:269
 msgid "Around the outline of a shape or the opaque part of a picture"
 msgstr "Em volta do contorno de uma forma ou da parte opaca de uma imagem"
 
-#: crates/desk-ui/src/objects_pane.rs:269
+#: crates/desk-ui/src/objects_pane.rs:272
+msgid "Alpha"
+msgstr "Alfa"
+
+#: crates/desk-ui/src/objects_pane.rs:274
+msgid "How opaque the picture must be for the text to go around it, in percent"
+msgstr "Quão opaca a imagem precisa ser para o texto contorná-la, em porcentagem"
+
+#: crates/desk-ui/src/objects_pane.rs:276
 msgid "Extra Space"
 msgstr "Espaço extra"
 
-#: crates/desk-ui/src/objects_pane.rs:271
+#: crates/desk-ui/src/objects_pane.rs:278
 msgid "Locked"
 msgstr "Travado"
 
-#: crates/desk-ui/src/objects_pane.rs:272
+#: crates/desk-ui/src/objects_pane.rs:279
 msgid "Cannot be moved, resized or deleted"
 msgstr "Não pode ser movido, redimensionado nem apagado"
 
-#: crates/desk-ui/src/objects_pane.rs:274
+#: crates/desk-ui/src/objects_pane.rs:281
 msgid "Inset"
 msgstr "Margem interna"
 
-#: crates/desk-ui/src/objects_pane.rs:276
+#: crates/desk-ui/src/objects_pane.rs:283
 msgid "Inline with Text"
 msgstr "Na linha do texto"
 
-#: crates/desk-ui/src/objects_pane.rs:277
+#: crates/desk-ui/src/objects_pane.rs:284
 msgid "Moves with the text, as a character"
 msgstr "Anda com o texto, como um caractere"
 
-#: crates/desk-ui/src/objects_pane.rs:279
+#: crates/desk-ui/src/objects_pane.rs:286
 msgid "Wrap"
 msgstr "Ajuste"
 
-#: crates/desk-ui/src/objects_pane.rs:285
+#: crates/desk-ui/src/objects_pane.rs:293
 msgid "Bottom"
 msgstr "Base"
 
-#: crates/desk-ui/src/objects_pane.rs:285
+#: crates/desk-ui/src/objects_pane.rs:293
 msgid "Middle"
 msgstr "Meio"
 
-#: crates/desk-ui/src/objects_pane.rs:285
+#: crates/desk-ui/src/objects_pane.rs:293
 msgid "Top"
 msgstr "Topo"
 
-#: crates/desk-ui/src/objects_pane.rs:288
+#: crates/desk-ui/src/objects_pane.rs:296
 msgid "Vertical Alignment"
 msgstr "Alinhamento vertical"
 
-#: crates/desk-ui/src/objects_pane.rs:295
+#: crates/desk-ui/src/objects_pane.rs:303
 msgid "Text Box"
 msgstr "Caixa de texto"
 
@@ -3600,13 +3608,13 @@ msgstr "Texto OpenDocument"
 msgid "Pages Documents"
 msgstr "Documentos do Pages"
 
-#: crates/desk-writer/src/main.rs:95
+#: crates/desk-writer/src/main.rs:96
 msgid ""
 "Desk Writer opens OpenDocument texts (.odt) and Pages documents (.pages)."
 msgstr ""
 "O Desk Writer abre textos OpenDocument (.odt) e documentos do Pages (.pages)."
 
-#: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:67
+#: crates/desk-writer/src/warnings.rs:17 crates/desk-writer/src/warnings.rs:70
 msgid "headers"
 msgstr "cabeçalhos"
 
@@ -3647,34 +3655,46 @@ msgid "bookmarks, whose text is kept"
 msgstr "marcadores de texto, cujo texto é mantido"
 
 #: crates/desk-writer/src/warnings.rs:27
+msgid "tables, whose text is kept as paragraphs"
+msgstr "tabelas, cujo texto fica como parágrafos"
+
+#: crates/desk-writer/src/warnings.rs:28
+msgid "tracked changes, which are kept as accepted"
+msgstr "alterações controladas, que ficam como aceitas"
+
+#: crates/desk-writer/src/warnings.rs:29
+msgid "objects such as charts and embedded documents"
+msgstr "objetos como gráficos e documentos incorporados"
+
+#: crates/desk-writer/src/warnings.rs:30
 msgid "content of the kind “{name}”"
 msgstr "conteúdo do tipo “{name}”"
 
-#: crates/desk-writer/src/warnings.rs:29
+#: crates/desk-writer/src/warnings.rs:32
 msgid "Left out {what} ({n})."
 msgstr "Não importado: {what} ({n})."
 
-#: crates/desk-writer/src/warnings.rs:33
+#: crates/desk-writer/src/warnings.rs:36
 msgid "image bullets, which are drawn as text bullets"
 msgstr "marcadores de imagem, desenhados como marcadores de texto"
 
-#: crates/desk-writer/src/warnings.rs:34
+#: crates/desk-writer/src/warnings.rs:37
 msgid "lines under or through words only"
 msgstr "linhas só sob ou sobre as palavras"
 
-#: crates/desk-writer/src/warnings.rs:35
+#: crates/desk-writer/src/warnings.rs:38
 msgid "drop caps"
 msgstr "capitulares"
 
-#: crates/desk-writer/src/warnings.rs:36
+#: crates/desk-writer/src/warnings.rs:39
 msgid "hidden text, which is shown"
 msgstr "texto oculto, que é mostrado"
 
-#: crates/desk-writer/src/warnings.rs:37
+#: crates/desk-writer/src/warnings.rs:40
 msgid "font features"
 msgstr "recursos da fonte"
 
-#: crates/desk-writer/src/warnings.rs:40
+#: crates/desk-writer/src/warnings.rs:43
 msgid "Left out {what}, in {n} paragraph."
 msgid_plural "Left out {what}, in {n} paragraphs."
 msgstr[0] "Não importado: {what}, em {n} parágrafo."

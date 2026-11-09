@@ -175,6 +175,9 @@ pub enum Value {
         /// `sf:asset_scale`: how thick it is, where 1 is its own.
         scale: f64,
     },
+    /// Bytes saved in the XML (`sf:mdata`, with `sl:b64data`), as the
+    /// font features of a style are (`atsuFontFeatures`).
+    Data(Vec<u8>),
     /// A value the reader does not interpret yet, by the local name of its
     /// element.
     Other(String),
@@ -238,6 +241,12 @@ impl Value {
         };
         match element.name.local.as_str() {
             "null" => Self::Null,
+            "mdata" => element
+                .attrs
+                .iter()
+                .find(|(name, _)| name.local == "b64data")
+                .and_then(|(_, value)| base64(value))
+                .map_or_else(|| Self::Other("mdata".into()), Self::Data),
             "number" | "decimal-number" => number("number").map_or(Self::Null, Self::Number),
             "string" => Self::String(element.attr(SFA, "string").unwrap_or_default().to_owned()),
             "color" => color(element).map_or_else(|| Self::Other("color".into()), Self::Color),
@@ -473,6 +482,31 @@ impl Value {
             other => Self::Other(other.to_owned()),
         }
     }
+}
+
+/// The bytes of base64 text, or `None` when it is not base64.
+fn base64(text: &str) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let mut bits = 0u32;
+    let mut count = 0;
+    for c in text.bytes().filter(|c| !c.is_ascii_whitespace()) {
+        let value = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => break,
+            _ => return None,
+        };
+        bits = bits << 6 | u32::from(value);
+        count += 6;
+        if count >= 8 {
+            count -= 8;
+            bytes.push((bits >> count) as u8);
+        }
+    }
+    Some(bytes)
 }
 
 /// A color element, in any of the color spaces that iWork saves.

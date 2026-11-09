@@ -1562,18 +1562,26 @@ impl TextEditor {
         }
     }
 
-    /// Puts a picture in the line of the header, the footer or the note
-    /// being edited, at the cursor or in place of the selection (EST-12,
-    /// EST-13): no wider than the text, and no taller than two inches.
-    fn insert_picture_in_line(&self, picture: desk_model::Picture) {
+    /// Puts a picture in the line of the text being edited, at the cursor
+    /// or in place of the selection (EST-12, EST-13, TXT-04): no wider
+    /// than the text, and no taller than two inches in a header, a footer
+    /// or a note.
+    pub(super) fn insert_picture_in_line(&self, picture: desk_model::Picture) {
         let before = self.selection();
         let (start, end) = before.ordered();
-        let width = {
+        let (width, height) = {
             let state = self.state.borrow();
             let setup = state.layout.setup;
-            setup.body_width().to_pt()
+            (setup.body_width().to_pt(), setup.body_height().to_pt())
         };
-        let (w, h) = picture_size(&picture, (width.max(1.0), 144.0));
+        // In a header, a footer or a note, no taller than two inches; in
+        // the body, as tall as the page lets it be.
+        let tallest = if matches!(self.story(), Some(Story::Margin { .. } | Story::Note(_))) {
+            144.0
+        } else {
+            height
+        };
+        let (w, h) = picture_size(&picture, (width.max(1.0), tallest.max(1.0)));
         let result = self.state.borrow_mut().editor.edit("Insert Image", |edit| {
             let from = super::at_spot(edit.document(), start)?;
             let to = super::at_spot(edit.document(), end)?;
@@ -2105,6 +2113,7 @@ pub(super) fn refresh_contour(object: &mut Object, before: &Object) {
     }
     let changed = object.kind != before.kind
         || object.picture != before.picture
+        || object.wrap_threshold != before.wrap_threshold
         || object.frame.width != before.frame.width
         || object.frame.height != before.frame.height;
     if changed {

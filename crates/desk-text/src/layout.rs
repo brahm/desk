@@ -266,13 +266,18 @@ struct Placed {
 }
 
 impl TextSystem {
-    /// Loads the system fonts through fontconfig.
+    /// Loads the system fonts through fontconfig, and the fonts that Desk
+    /// brings for those of the Mac that no free font has the metrics of.
     pub fn new() -> Self {
-        Self {
+        let mut system = Self {
             fonts: FontContext::new(),
             layouts: LayoutContext::new(),
             choices: HashMap::new(),
+        };
+        for data in crate::fonts::BUNDLED {
+            system.add_fonts(data.to_vec());
         }
+        system
     }
 
     /// Adds the fonts of a font file to those that lay out text, as if
