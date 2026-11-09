@@ -111,13 +111,13 @@
         <li>The document engine is separate from the interface, in libraries that other projects can use. There is already a command-line converter that runs with no graphical interface at all.</li>
         <li>And if the community asks really nicely, we will port it to Plasma. <span aria-label="smile">:)</span></li>
       </ul>
-      <p>Desk is being built by me together with Claude, Anthropic's AI. That is no excuse for shortcuts: every feature of Pages, Numbers and Keynote '09 became a row in a parity matrix (585 of them), every change goes through review and a CI that checks formatting, lints, tests and licenses, and the output is compared, pixel by pixel, with PDFs made by the real iWork 9.3 in a virtual machine.</p>
+      <p>Desk is being built by me together with Claude, Anthropic's AI. That is no excuse for shortcuts: every feature of Pages, Numbers and Keynote '09 became a row in a parity matrix (629 of them), every change goes through review and a CI that checks formatting, lints, tests and licenses, and the output is compared, pixel by pixel, with PDFs made by the real iWork 9.3 in a virtual machine.</p>
     </section>
 
     <section id="roadmap" aria-labelledby="roadmap-title">
       <h2 id="roadmap-title">What comes next</h2>
       <div class="card">
-        <p class="card-intro">We are starting with Desk Writer, because the text engine is the hardest part and the other two apps depend on it. Its first five stages are done, and you can already try it in beta. More will follow bit by bit as each stage is done.</p>
+        <p class="card-intro">We are starting with Desk Writer, because the text engine is the hardest part and the other two apps depend on it. Its first six stages are done: you can try the first five in the beta, and the objects in the nightly builds. More will follow bit by bit as each stage is done.</p>
         <ol class="timeline">
           <li class="done">
             <h3>Foundation <span class="tag done">done</span></h3>
@@ -135,13 +135,17 @@
             <h3>Minimal editor and test version <span class="tag done">done</span></h3>
             <p>Opening, editing and saving formatted text in Desk Writer, with a screen reader too, shipped as a nightly Flatpak.</p>
           </li>
-          <li class="current">
+          <li class="done">
             <h3>Styles, lists and document structure <span class="tag done">beta</span></h3>
             <p>Styles, lists, spelling and grammar, sections, columns, headers and footers, footnotes, tables of contents, page thumbnails and the outline, released as the first beta.</p>
           </li>
-          <li>
-            <h3>Objects, tables, formulas and charts</h3>
-            <p>Images, shapes and effects, and the table and chart engine that Desk Slides and Desk Tables build on.</p>
+          <li class="done">
+            <h3>Objects <span class="tag done">nightly</span></h3>
+            <p>Pictures, shapes, text boxes, movies and sounds, with masks, Instant Alpha, effects and text wrap, laid out page by page as Pages lays them out. Pasting from other programs, too.</p>
+          </li>
+          <li class="current">
+            <h3>Tables, formulas and charts <span class="tag current">next</span></h3>
+            <p>The table and chart engine that Desk Slides and Desk Tables build on, whose features are already mapped in their own parity matrices.</p>
           </li>
           <li>
             <h3>Review, templates, printing and formats</h3>

@@ -30,12 +30,13 @@ document compatibility with Apple iWork '09 (Pages, Numbers and Keynote
 extensions for what standard ODF cannot hold.
 
 The project is in development, starting with Desk Writer. Its text
-engine, its document structure and its writing tools are done, and its
-objects nearly so (the first six phases of the plan;
+engine, its document structure, its writing tools and its objects are
+done (the first six phases of the plan;
 <!-- parity -->155 of the 304 rows of its parity matrix have tests, 81 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
 
-- It opens ODT documents and Pages '09 documents, listing what a Pages
-  document holds that Desk cannot show yet, and saves as ODT.
+- It opens ODT documents and Pages '09 documents, listing what they
+  hold that Desk cannot keep yet, and saves as ODT.
+- It pastes formatted text and pictures from other programs.
 - It edits and formats text with undo and the clipboard, with
   paragraph, character and list styles, and works with a screen reader.
 - It checks spelling and grammar as you type, hyphenates, and finds and
@@ -49,10 +50,15 @@ objects nearly so (the first six phases of the plan;
   or in the text, with masks, Instant Alpha, image adjustments, fills,
   strokes, shadows, reflections and picture frames; moves, resizes,
   turns, flips, layers, aligns, groups and locks them; and wraps the
-  text around them.
+  text around them, matching Pages page by page.
+- It lays out Helvetica Neue with Desk Neue, a free font with its
+  widths and kerning, so that lines break where Pages breaks them.
 - `desk-convert` exports documents to PDF from the command line.
 
-Tables and charts come next, then review and collaboration.
+Tables and charts come next, then review and collaboration. Desk Slides
+and Desk Tables have their own parity matrices, with 161 rows for
+Keynote and 164 for Numbers, and start once the table and chart engine
+is ready.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
 has a nightly branch built from `main` every night:
