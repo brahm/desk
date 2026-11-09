@@ -89,6 +89,7 @@ fn a_case_matches_its_own_pdf_and_not_another() {
             feature: "Alinhamento".into(),
             expected: String::new(),
             guide_pages: String::new(),
+            shared: String::new(),
             odf: String::new(),
         }],
         vec![result],
@@ -169,6 +170,7 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
         feature: String::new(),
         expected: String::new(),
         guide_pages: String::new(),
+        shared: String::new(),
         odf: String::new(),
     };
     let report = Report::new(
@@ -208,6 +210,7 @@ fn the_report_tells_documents_of_pages_that_still_differ() {
             feature: String::new(),
             expected: String::new(),
             guide_pages: String::new(),
+            shared: String::new(),
             odf: String::new(),
         }],
         Vec::new(),
