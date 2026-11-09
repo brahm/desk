@@ -1401,3 +1401,30 @@ fn obj_06_obj_17_instant_alpha_and_the_threshold_saved_by_pages_are_read() {
     // Pages traces the opaque part at half.
     assert_eq!(picture.wrap_threshold, 50);
 }
+
+#[test]
+fn fmt_08_font_features_saved_by_pages_are_read_as_opentype_features() {
+    let formats = fixture_formats("fmt-08-font-features.pages");
+    let features = |i: usize| -> Vec<(String, u16)> {
+        let format: &CharFormat = &formats[i].2;
+        format
+            .font_features
+            .features()
+            .iter()
+            .map(|f| (f.tag().to_owned(), f.value))
+            .collect()
+    };
+    assert!(features(0).is_empty());
+    // Historical Ligatures and Lower Case Numbers, on a character style.
+    assert_eq!(features(1), [("hlig".into(), 1), ("onum".into(), 1)]);
+    // Lower Case Numbers on the paragraph style.
+    assert_eq!(features(2), [("onum".into(), 1)]);
+    let (_, log) =
+        desk_filters::read_pages_at_logged(&fixture("fmt-08-font-features.pages")).unwrap();
+    assert!(
+        !log.entries()
+            .iter()
+            .any(|e| e.warning == Warning::Formatting(Formatting::FontFeatures)),
+        "{log:?}"
+    );
+}

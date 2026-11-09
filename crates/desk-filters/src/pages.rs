@@ -29,7 +29,7 @@ use desk_model::{
     StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_model::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
-use desk_model::{Field, MarginKind, MarginPages, MarginPlace};
+use desk_model::{Field, FontFeature, FontFeatures, MarginKind, MarginPages, MarginPlace};
 use desk_model::{NodeId, Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings};
 use desk_model::{TocLevel, TocSettings};
 
@@ -102,7 +102,13 @@ fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
             }
             "dropCap" => differs(value, 0.0).then_some(Formatting::DropCaps),
             "hidden" => differs(value, 0.0).then_some(Formatting::HiddenText),
-            "atsuFontFeatures" => differs(value, 0.0).then_some(Formatting::FontFeatures),
+            // Features with no OpenType tag are lost; the others are read
+            // (FMT-08).
+            "atsuFontFeatures" => match value {
+                Value::Data(data) => (font_features(data).features().len() * 4 < data.len())
+                    .then_some(Formatting::FontFeatures),
+                value => differs(value, 0.0).then_some(Formatting::FontFeatures),
+            },
             _ => None,
         };
         out.extend(lost);
@@ -282,9 +288,114 @@ fn char_attrs(properties: &Properties) -> CharAttrs {
         2 => Ligatures::All,
         _ => Ligatures::Default,
     });
+    attrs.font_features = match properties.get("atsuFontFeatures") {
+        Some(Value::Data(data)) => Some(font_features(data)),
+        Some(Value::Null) => Some(FontFeatures::none()),
+        _ => None,
+    };
     attrs.background = color_or_none(properties, "textBackground");
     attrs
 }
+
+/// The OpenType features of the font features that Pages saves from the
+/// Typography panel (FMT-08): the feature types of Apple Advanced
+/// Typography, as 16-bit big-endian numbers, and then a selector for each.
+/// Pages '09 keeps them but does not draw them; Desk draws them, as the
+/// panel that set them did.
+fn font_features(data: &[u8]) -> FontFeatures {
+    let numbers: Vec<u16> = data
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&pair| u16::from_be_bytes(pair))
+        .collect();
+    let (types, selectors) = numbers.split_at(numbers.len() / 2);
+    FontFeatures::new(
+        types
+            .iter()
+            .zip(selectors)
+            .filter_map(|(&kind, &selector)| opentype_feature(kind, selector))
+            .filter_map(|(tag, value)| FontFeature::new(tag, value)),
+    )
+}
+
+/// The OpenType feature of a feature type and selector of Apple Advanced
+/// Typography, as the OpenType and AAT tables of HarfBuzz pair them. Most
+/// types turn a feature on with an even selector and off with the next.
+fn opentype_feature(kind: u16, selector: u16) -> Option<(&'static str, u16)> {
+    let on_off = |pairs: &[(u16, &'static str)]| {
+        pairs.iter().find_map(|&(on, tag)| {
+            (selector == on || selector == on + 1).then_some((tag, u16::from(selector == on)))
+        })
+    };
+    match kind {
+        // Ligatures.
+        1 => on_off(&[
+            (0, "rlig"),
+            (2, "liga"),
+            (4, "dlig"),
+            (18, "clig"),
+            (20, "hlig"),
+        ]),
+        // Number spacing: monospaced or proportional.
+        6 => match selector {
+            0 => Some(("tnum", 1)),
+            1 => Some(("pnum", 1)),
+            _ => None,
+        },
+        // Vertical position.
+        10 => match selector {
+            1 => Some(("sups", 1)),
+            2 => Some(("subs", 1)),
+            3 => Some(("ordn", 1)),
+            4 => Some(("sinf", 1)),
+            _ => None,
+        },
+        // Fractions: vertical or diagonal.
+        11 => match selector {
+            1 => Some(("afrc", 1)),
+            2 => Some(("frac", 1)),
+            _ => None,
+        },
+        // Number case: old style or lining figures.
+        21 => match selector {
+            0 => Some(("onum", 1)),
+            1 => Some(("lnum", 1)),
+            _ => None,
+        },
+        // Case sensitive layout and spacing.
+        33 => on_off(&[(0, "case"), (2, "cpsp")]),
+        // Stylistic alternatives one to twenty.
+        35 => {
+            let set = selector / 2;
+            (1..=20).contains(&set).then(|| {
+                let tag: &'static str = STYLISTIC_SETS[usize::from(set) - 1];
+                (tag, u16::from(selector.is_multiple_of(2)))
+            })
+        }
+        // Contextual alternates and swashes.
+        36 => on_off(&[(0, "calt"), (2, "swsh"), (4, "cswh")]),
+        // Lower case: small or petite capitals.
+        37 => match selector {
+            1 => Some(("smcp", 1)),
+            2 => Some(("pcap", 1)),
+            _ => None,
+        },
+        // Upper case: small or petite capitals.
+        38 => match selector {
+            1 => Some(("c2sc", 1)),
+            2 => Some(("c2pc", 1)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The tags of the stylistic sets of OpenType.
+const STYLISTIC_SETS: [&str; 20] = [
+    "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09", "ss10", "ss11", "ss12",
+    "ss13", "ss14", "ss15", "ss16", "ss17", "ss18", "ss19", "ss20",
+];
 
 /// A color property, or none when it is set to nothing.
 fn color_or_none(properties: &Properties, name: &str) -> Option<Option<Rgba>> {
