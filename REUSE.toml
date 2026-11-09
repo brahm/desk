@@ -19,3 +19,10 @@ SPDX-License-Identifier = "MPL-2.0"
 path = "corpus/fixtures/fonts/*.ttf"
 SPDX-FileCopyrightText = ["Digitized data copyright (c) 2010 Google Corporation", "2012 Red Hat, Inc.", "2026 Desk contributors"]
 SPDX-License-Identifier = "OFL-1.1"
+
+# Desk Neue, derived from TeX Gyre Heros under its license, the GUST Font
+# License, an instance of the LaTeX Project Public License 1.3c.
+[[annotations]]
+path = "data/fonts/desk-neue/*.otf"
+SPDX-FileCopyrightText = ["2007-2009 B. Jackowski and J.M. Nowacki (on behalf of TeX Users Groups), for TeX Gyre", "2026 Desk contributors"]
+SPDX-License-Identifier = "LPPL-1.3c"

@@ -511,7 +511,9 @@
                 "install -Dm644 data/br.com.brahm.Desk.Writer.desktop -t /app/share/applications",
                 "install -Dm644 data/br.com.brahm.Desk.Writer.metainfo.xml -t /app/share/metainfo",
                 "install -Dm644 data/icons/hicolor/scalable/apps/br.com.brahm.Desk.Writer.svg -t /app/share/icons/hicolor/scalable/apps",
-                "install -Dm644 data/icons/hicolor/symbolic/apps/br.com.brahm.Desk.Writer-symbolic.svg -t /app/share/icons/hicolor/symbolic/apps"
+                "install -Dm644 data/icons/hicolor/symbolic/apps/br.com.brahm.Desk.Writer-symbolic.svg -t /app/share/icons/hicolor/symbolic/apps",
+                "install -Dm644 data/fonts/desk-neue/README.md /app/share/licenses/br.com.brahm.Desk.Writer/desk-neue/README.md",
+                "install -Dm644 LICENSES/LPPL-1.3c.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-neue/LPPL-1.3c.txt"
             ],
             "sources": [
                 {

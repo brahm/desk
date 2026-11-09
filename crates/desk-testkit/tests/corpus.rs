@@ -191,13 +191,14 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
 
 #[test]
 fn the_report_tells_documents_of_pages_that_still_differ() {
-    // The newsletter of phase 6 is the one document that still differs
-    // from Pages, by a line of its caption in a font that stands for one
-    // of the Mac; its test is kept from running and its row shown as
-    // different.
+    // Every document compared with Pages matches it now, so no test is
+    // kept from running; a row whose test would be is shown as different.
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let differing = desk_testkit::report::differing_by_row(&crates).unwrap();
-    assert_eq!(differing.keys().collect::<Vec<_>>(), ["INT-03"]);
+    assert!(
+        desk_testkit::report::differing_by_row(&crates)
+            .unwrap()
+            .is_empty()
+    );
     let compared = desk_testkit::report::compared_by_row(&crates).unwrap();
     let differing = [("OBJ-12".to_string(), vec!["obj_12_test".to_string()])]
         .into_iter()

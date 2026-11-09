@@ -27,12 +27,12 @@ fn fixtures() -> PathBuf {
 /// Lays out a fixture, writes it as PDF, and compares its words and its
 /// pixels with the PDF of Pages.
 fn check(name: &str) {
-    check_pages(name, None, PIXEL_TOLERANCE);
+    check_with(name, PIXEL_TOLERANCE);
 }
 
-/// Compares the pages of a fixture with those of Pages, all of them or
-/// only some, by number from 1.
-fn check_pages(name: &str, only: Option<&[usize]>, pixel_tolerance: f64) {
+/// Compares a fixture with Pages, allowing a share of its pixels to
+/// differ, in percent.
+fn check_with(name: &str, pixel_tolerance: f64) {
     let fixtures = fixtures();
     let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
     let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
@@ -44,30 +44,16 @@ fn check_pages(name: &str, only: Option<&[usize]>, pixel_tolerance: f64) {
         .write_pdf(&pages, document.metadata(), &out)
         .unwrap();
     let pdf = fixtures.join(format!("{name}.pdf"));
-    let mut reference = words(&pdf).unwrap();
-    let mut desk = words(&out).unwrap();
+    let reference = words(&pdf).unwrap();
+    let desk = words(&out).unwrap();
     assert_eq!(desk.len(), reference.len(), "{name}: pages");
-    let wanted = |page: usize| only.is_none_or(|only| only.contains(&(page + 1)));
-    for pages in [&mut reference, &mut desk] {
-        for (page, words) in pages.iter_mut().enumerate() {
-            if !wanted(page) {
-                words.clear();
-            }
-        }
-    }
     let diff = compare_words(&reference, &desk);
     assert!(
         diff.passes(DEFAULT_POSITION_TOLERANCE),
         "{name}: {diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
     );
     let pixels = compare_pixels(&pdf, &out, &tmp.join(format!("{name}-pixels"))).unwrap();
-    let worst = pixels
-        .pages
-        .iter()
-        .enumerate()
-        .filter(|(page, _)| wanted(*page))
-        .map(|(_, share)| *share)
-        .fold(0.0, f64::max);
+    let worst = pixels.worst();
     assert!(
         worst <= pixel_tolerance,
         "{name}: {worst:.1} % of the pixels differ ({:?}), see {:?}",
@@ -235,20 +221,13 @@ fn obj_17_wraps_match_pages() {
 }
 
 #[test]
-fn obj_16_obj_17_est_05_columns_of_a_box_go_around_a_picture_as_in_pages() {
-    // The second page of the newsletter: a box of three columns goes
-    // around a picture across a gutter, with tight wrap, and keeps the
-    // first and the last line of a paragraph with another; a callout below.
-    // The page is mostly text, whose glyphs differ in the fonts that
-    // stand for those of the Mac; its words are compared one by one.
-    check_pages("phase6-newsletter", Some(&[2]), TEXT_PAGE_PIXEL_TOLERANCE);
-}
-
-#[test]
-#[ignore = "differs from Pages: the caption breaks a word later, as the font that stands for Helvetica Neue Italic draws drop 0.7 pt narrower"]
-fn int_03_a_newsletter_in_page_layout_matches_pages() {
-    // Two pages of Page Layout: a title over a rectangle, a rule, an
-    // article in two linked boxes around a picture with a shadow and its
-    // caption, and the page above (phase 6 reference).
-    check("phase6-newsletter");
+fn int_03_obj_15_obj_16_obj_17_obj_37_est_05_a_newsletter_in_page_layout_matches_pages() {
+    // Two pages of Page Layout, the reference of phase 6: a title over a
+    // rectangle, a rule, an article in two linked boxes around a picture
+    // with a shadow and its caption, and a box of three columns around a
+    // picture across a gutter, which keeps the first and the last line of
+    // a paragraph with another, above a callout. The pages are mostly
+    // text, whose glyphs differ in the fonts that stand for those of the
+    // Mac; its words are compared one by one.
+    check_with("phase6-newsletter", TEXT_PAGE_PIXEL_TOLERANCE);
 }

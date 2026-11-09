@@ -32,7 +32,7 @@ extensions for what standard ODF cannot hold.
 The project is in development, starting with Desk Writer. Its text
 engine, its document structure and its writing tools are done, and its
 objects nearly so (the first six phases of the plan;
-<!-- parity -->155 of the 304 rows of its parity matrix have tests, 81 of them against what Pages itself laid out, of which 1 still differs<!-- /parity -->):
+<!-- parity -->155 of the 304 rows of its parity matrix have tests, 81 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
 
 - It opens ODT documents and Pages '09 documents, listing what a Pages
   document holds that Desk cannot show yet, and saves as ODT.
