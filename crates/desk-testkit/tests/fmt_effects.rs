@@ -210,3 +210,13 @@ fn fmt_21_rules_and_borders_fall_where_pages_drew_them() {
         );
     }
 }
+
+#[test]
+fn fmt_12_harder_justified_lines_spread_as_pages_does() {
+    // At 150 points: lines of 12 and 20 points, where the spaces and the
+    // letters grow by their own size; tracking, which Pages leaves after
+    // the last letter of a line; text after a tab, justified from its
+    // stop; hyphenation on, which Pages '09 never does on the reference
+    // machine; and a text box.
+    check("justify-cases");
+}

@@ -420,6 +420,8 @@ impl TextSystem {
         // manual line break).
         layout.break_all_lines(None);
         let mut runs: Vec<(FontData, f32)> = Vec::new();
+        // The tracking of each run, in points after each of its letters.
+        let mut tracking: Vec<f32> = Vec::new();
         // The box of each run, rounded as the line heights are.
         let mut boxes: Vec<RunBox> = Vec::new();
         // Whether each run is an object in the text, and the box of the
@@ -435,6 +437,11 @@ impl TextSystem {
                     let brush = glyph_run.style().brush;
                     let format = &text.formats()[brush as usize];
                     let object = text.object_box(brush).is_some();
+                    tracking.push(if object {
+                        0.0
+                    } else {
+                        format.tracking as f32 / 1000.0 * run.font_size()
+                    });
                     objects.push(object);
                     text_boxes.push(if object {
                         // Shaped tiny: measured at the size of its text.
@@ -747,26 +754,71 @@ impl TextSystem {
             } else {
                 Vec::new()
             };
-            // How far justification between the letters moves each
-            // cluster, when the spaces alone would grow too wide.
+            // How far justification moves each cluster from where Parley
+            // put it, as Pages spreads the spaces and the letters. In a
+            // line with tabs, only the text after a last left tab is
+            // justified, from its stop.
+            let last_tab = tabs.last();
             let spread = if format.alignment == Alignment::Justify
-                && !has_tabs
+                && last_tab.is_none_or(|t| t.place.stop.alignment == desk_model::TabAlignment::Left)
                 && !matches!(
                     line.break_reason(),
                     BreakReason::None | BreakReason::Explicit
                 ) {
                 let range = line.text_range();
-                let extra = place.width
-                    - place.hyphen.as_ref().map_or(0.0, |h| h.3)
-                    - (metrics.advance - metrics.hanging_advance);
-                let clusters = span(range.start, trim(range.start, range.end));
-                // The size of the text, from its first space.
-                let em = clusters
-                    .iter()
-                    .find(|c| source[c.start..].starts_with([' ', '\u{a0}']))
-                    .and_then(|c| runs.get(c.run))
-                    .map_or(0.0, |r| r.1);
-                letter_spread(clusters, source, extra, em)
+                let from = last_tab.map_or(range.start, |t| t.offset + '\t'.len_utf8());
+                let clusters = span(from, trim(range.start, range.end));
+                // Pages tracks no letter after the last of the line.
+                let last = clusters
+                    .last()
+                    .filter(|c| !source[c.start..].starts_with([' ', '\u{a0}']))
+                    .and_then(|c| tracking.get(c.run))
+                    .copied()
+                    .unwrap_or(0.0);
+                let hyphen = place.hyphen.as_ref().map_or(0.0, |h| h.3);
+                let (given, extra) = match last_tab {
+                    None => {
+                        let given =
+                            place.width - hyphen - (metrics.advance - metrics.hanging_advance);
+                        (given, given + last)
+                    }
+                    Some(tab) => {
+                        // Where Parley put the text after the tab, and how
+                        // much it widened its spaces.
+                        let spans: Vec<ClusterSpan> = line
+                            .items()
+                            .filter_map(|item| match item {
+                                PositionedLayoutItem::GlyphRun(g) => Some(cluster_spans(&g)),
+                                _ => None,
+                            })
+                            .flatten()
+                            .collect();
+                        let x = |c: &Cluster| {
+                            spans.iter().find(|s| s.range.start == c.start).map(|s| s.x)
+                        };
+                        match (clusters.first(), clusters.last()) {
+                            (Some(first), Some(end)) if clusters.len() > 1 => {
+                                match (x(first), x(end)) {
+                                    (Some(start), Some(stop)) => {
+                                        let widths: f32 = clusters.iter().map(|c| c.advance).sum();
+                                        let given = stop - start - (widths - end.advance);
+                                        let extra = place.x + place.width
+                                            - hyphen
+                                            - (start + tab.moved)
+                                            - widths
+                                            + last;
+                                        (given, extra)
+                                    }
+                                    _ => (0.0, 0.0),
+                                }
+                            }
+                            _ => (0.0, 0.0),
+                        }
+                    }
+                };
+                letter_spread(clusters, source, given, extra, |c| {
+                    runs.get(c.run).map_or(0.0, |r| r.1)
+                })
             } else {
                 Vec::new()
             };
@@ -996,49 +1048,82 @@ impl TextSystem {
 }
 
 /// The widest that each space of a justified line grows before the
-/// letters are spread too, in ems of the text (FMT-12).
+/// letters are spread too, in ems of the space (FMT-12).
 const WIDEST_SPACE_GROWTH: f32 = 0.5;
 
 /// The most that the gap between two letters of a justified line grows,
-/// in ems of the text; past it the rest goes to the spaces again (FMT-12).
+/// in ems of the letter; past it the rest goes to the spaces again (FMT-12).
 const WIDEST_LETTER_GROWTH: f32 = 0.2892;
 
-/// How Pages justifies a line whose spaces would grow by more than half
-/// an em (`em` is the size of its text), as measured on the reference
-/// machine: each space grows that much and half as much again as the gap
-/// between two letters, and the rest of the `extra` room goes between the
-/// letters of the words, alike in the whole line, up to 0.2892 em; past
-/// that, the spaces take the rest. Gives, for each cluster from which the
-/// text moves, the offset where it starts and how far it and what comes
-/// after it move from where Parley put them, with all the room in the
-/// spaces; nothing when the spaces are wide enough.
-fn letter_spread(clusters: &[Cluster], source: &str, extra: f32, em: f32) -> Vec<(usize, f32)> {
+/// How Pages justifies a line, as measured on the reference machine
+/// (FMT-12). Each space grows in proportion to its own size, up to half
+/// of it. Past that, the letters of the words spread too: before each
+/// letter that follows another the gap grows by `l` times the size of the
+/// letter, and each space by half its size and half `l` times the size of
+/// what follows it, `l` being alike in the whole line and at most 0.2892;
+/// past that the spaces take the rest, again in proportion to their size.
+/// `size` gives the size of the text of a cluster. Gives, for each cluster
+/// from which the text moves, the offset where it starts and how far it
+/// and what comes after it move from where Parley put them, with the
+/// `given` room alike in the spaces, when Pages has `extra` room to spread;
+/// nothing when Parley put them right.
+fn letter_spread(
+    clusters: &[Cluster],
+    source: &str,
+    given: f32,
+    extra: f32,
+    size: impl Fn(&Cluster) -> f32,
+) -> Vec<(usize, f32)> {
     let is_space = |c: &Cluster| source[c.start..].starts_with([' ', '\u{a0}']);
     let words = clusters.iter().filter(|c| is_space(c)).count() as f32;
-    let letters = clusters
-        .windows(2)
-        .filter(|p| !is_space(&p[0]) && !is_space(&p[1]))
-        .count() as f32;
-    let each = extra / words;
-    let widest = WIDEST_SPACE_GROWTH * em;
-    if words == 0.0 || letters == 0.0 || each <= widest {
+    if words == 0.0 || extra <= 0.0 {
         return Vec::new();
     }
-    let mut between = (extra - words * widest) / (letters + words / 2.0);
-    let mut word = widest + between / 2.0;
-    if between > WIDEST_LETTER_GROWTH * em {
-        between = WIDEST_LETTER_GROWTH * em;
-        word = (extra - letters * between) / words;
+    // The sizes of the spaces, of what follows them and of the letters
+    // that follow letters.
+    let spaces: f32 = clusters.iter().filter(|c| is_space(c)).map(&size).sum();
+    let after_spaces: f32 = clusters
+        .windows(2)
+        .filter(|p| is_space(&p[0]) && !is_space(&p[1]))
+        .map(|p| size(&p[1]))
+        .sum();
+    let letters: f32 = clusters
+        .windows(2)
+        .filter(|p| !is_space(&p[0]) && !is_space(&p[1]))
+        .map(|p| size(&p[1]))
+        .sum();
+    if spaces <= 0.0 {
+        return Vec::new();
     }
+    // How much each point of a space grows, and each point of a letter.
+    let (mut grow, mut between) = (extra / spaces, 0.0);
+    if grow > WIDEST_SPACE_GROWTH && letters > 0.0 {
+        between = (extra - WIDEST_SPACE_GROWTH * spaces) / (letters + after_spaces / 2.0);
+        grow = WIDEST_SPACE_GROWTH;
+        if between > WIDEST_LETTER_GROWTH {
+            between = WIDEST_LETTER_GROWTH;
+            grow = (extra - between * (letters + after_spaces / 2.0)) / spaces;
+        }
+    }
+    let each = given / words;
     let mut moved = 0.0;
     let mut spread = Vec::new();
-    for pair in clusters.windows(2) {
-        moved += match (is_space(&pair[0]), is_space(&pair[1])) {
-            (false, false) => between,
-            (true, _) => word - each,
+    let mut previous: Option<&Cluster> = None;
+    for cluster in clusters {
+        let Some(before) = previous.replace(cluster) else {
+            continue;
+        };
+        moved += match (is_space(before), is_space(cluster)) {
+            (false, false) => between * size(cluster),
+            (true, false) => grow * size(before) + between * size(cluster) / 2.0 - each,
+            // A space after a space, at the end of what is spread.
+            (true, true) => grow * size(before) - each,
             (false, true) => continue,
         };
-        spread.push((pair[1].start, moved));
+        spread.push((cluster.start, moved));
+    }
+    if spread.iter().all(|s| s.1.abs() < 1e-3) {
+        return Vec::new();
     }
     spread
 }
