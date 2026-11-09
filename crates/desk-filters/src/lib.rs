@@ -12,6 +12,7 @@
 //! and reads the text of Pages documents, in the [`pages`] module.
 
 pub mod clip;
+pub mod html;
 pub mod log;
 pub mod odt;
 pub mod pages;

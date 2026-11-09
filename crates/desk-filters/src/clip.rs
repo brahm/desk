@@ -87,6 +87,35 @@ pub fn write_text(fragment: &Fragment) -> Result<Vec<u8>, FilterError> {
     write_odt(editor.document())
 }
 
+/// The media types of formatted text that other programs put on the
+/// clipboard and Desk reads, the better first: the ODF document that
+/// LibreOffice puts there, and HTML (TXT-04).
+pub const FOREIGN_TEXT_TYPES: [&str; 2] = [
+    "application/x-openoffice-embed-source-xml;windows_formatname=\"Star Embed Source (XML)\"",
+    crate::html::HTML_TYPE,
+];
+
+/// The formatted text that another program put on the clipboard as
+/// `media_type`, one of [`FOREIGN_TEXT_TYPES`] (TXT-04).
+pub fn read_foreign_text(media_type: &str, bytes: &[u8]) -> Result<Fragment, FilterError> {
+    if media_type == crate::html::HTML_TYPE {
+        // UTF-8, or UTF-16 as some programs put it, with its byte order mark.
+        let text = match bytes {
+            [0xff, 0xfe, rest @ ..] => String::from_utf16_lossy(
+                &rest
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|&b| u16::from_le_bytes(b))
+                    .collect::<Vec<_>>(),
+            ),
+            _ => String::from_utf8_lossy(bytes).into_owned(),
+        };
+        return crate::html::read_html(&text);
+    }
+    read_text(bytes)
+}
+
 /// The text with its styles that an app of Desk put on the clipboard.
 pub fn read_text(bytes: &[u8]) -> Result<Fragment, FilterError> {
     let document = read_odt(bytes)?;

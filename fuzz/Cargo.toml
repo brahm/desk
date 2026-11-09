@@ -16,6 +16,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4.10"
 desk-filters = { path = "../crates/desk-filters" }
 desk-odf = { path = "../crates/desk-odf" }
+desk-model = { path = "../crates/desk-model" }
 
 # Not part of the main workspace.
 [workspace]
@@ -47,6 +48,13 @@ bench = false
 [[bin]]
 name = "pages_import"
 path = "fuzz_targets/pages_import.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "html_paste"
+path = "fuzz_targets/html_paste.rs"
 test = false
 doc = false
 bench = false

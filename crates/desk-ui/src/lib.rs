@@ -129,6 +129,11 @@ pub struct ObjectsFormat {
     pub write_text: fn(&desk_model::Fragment) -> Result<Vec<u8>, String>,
     /// The text with its styles of the bytes.
     pub read_text: fn(&[u8]) -> Result<desk_model::Fragment, String>,
+    /// The media types of formatted text of other programs that the app
+    /// reads, the better first (TXT-04).
+    pub foreign_text_types: &'static [&'static str],
+    /// The formatted text of another program, by its media type.
+    pub read_foreign_text: fn(&str, &[u8]) -> Result<desk_model::Fragment, String>,
     /// Whether the app keeps the named styles of text pasted in it; one
     /// that does not, as Numbers and Keynote, keeps their look only.
     pub named_styles: bool,

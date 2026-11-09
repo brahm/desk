@@ -36,6 +36,8 @@ const OPENER: Opener = Opener {
         text_type: desk_filters::clip::TEXT_TYPE,
         write_text: copy_text,
         read_text: paste_text,
+        foreign_text_types: &desk_filters::clip::FOREIGN_TEXT_TYPES,
+        read_foreign_text: paste_foreign_text,
         named_styles: true,
     }),
 };
@@ -61,6 +63,11 @@ fn copy_text(fragment: &Fragment) -> Result<Vec<u8>, String> {
 /// clipboard.
 fn paste_text(bytes: &[u8]) -> Result<Fragment, String> {
     desk_filters::clip::read_text(bytes).map_err(|e| e.to_string())
+}
+
+/// Reads formatted text that another program put on the clipboard.
+fn paste_foreign_text(media_type: &str, bytes: &[u8]) -> Result<Fragment, String> {
+    desk_filters::clip::read_foreign_text(media_type, bytes).map_err(|e| e.to_string())
 }
 
 /// Writes a document as an OpenDocument text, with its preview.
