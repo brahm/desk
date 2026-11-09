@@ -16,6 +16,8 @@ fuzz_target!(|data: &[u8]| {
     let mut editor = Editor::new(Document::new_word_processing());
     let start = editor.document().start();
     editor
-        .edit("Paste", |edit| edit.paste_fragment(start, &fragment).map(drop))
+        .edit("Paste", |edit| {
+            edit.paste_fragment(start, &fragment).map(drop)
+        })
         .expect("what HTML reads as pastes");
 });
