@@ -76,3 +76,12 @@ from its own repository, at the commit that Google Fonts names for it,
 with its license. It bundles the
 Hunspell dictionaries and hyphenation patterns of American and British
 English and Brazilian Portuguese the same way.
+
+## Helvetica Neue metrics
+
+`helvetica-neue/` holds the advance widths, vertical metrics and kerning
+of each Helvetica Neue face, as Pages lays them out on the reference
+machine (macOS 10.14.4 with iWork '09 9.3), one tab-separated file per
+face. `helvetica-neue/measure.py` took them with CoreText; the files
+record only numbers, never the fonts, and serve to build
+metric-compatible substitutes from TeX Gyre Heros.
