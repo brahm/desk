@@ -131,6 +131,9 @@ pub struct Line {
     /// leading or any extra space below. Pages fits a line on a page when
     /// this fits (EST-05).
     pub text_bottom: f32,
+    /// How much of the ascent of its text Pages rounded off the line box:
+    /// it draws the background of a paragraph that much higher (FMT-20).
+    pub rise: f32,
     /// The glyphs, in runs.
     pub runs: Vec<GlyphRun>,
     /// Underlines and strikethroughs.
@@ -232,6 +235,8 @@ struct RunBox {
     under: f32,
     leading: f32,
     descent: f32,
+    /// How much of the ascent the rounding took off, at most.
+    rise: f32,
 }
 
 impl RunBox {
@@ -241,6 +246,7 @@ impl RunBox {
             under: self.under.max(other.under),
             leading: self.leading.max(other.leading),
             descent: self.descent.max(other.descent),
+            rise: self.rise.max(other.rise),
         }
     }
 }
@@ -465,6 +471,7 @@ impl TextSystem {
                             under: 0.0,
                             leading: 0.0,
                             descent: 0.0,
+                            rise: 0.0,
                         },
                         None => run_box(format, run.font_size(), run.font_metrics()),
                     });
@@ -1000,6 +1007,7 @@ impl TextSystem {
                 height: place.height,
                 baseline,
                 text_bottom: descent.map_or(place.top + place.height, |d| baseline + d),
+                rise: place.line_box.map_or(0.0, |b| b.rise),
                 runs: glyph_runs,
                 decorations,
                 hyphenated: place.hyphenated,
@@ -1012,13 +1020,14 @@ impl TextSystem {
             let baseline = first.baseline - raise;
             if let Some((picture, height)) = image {
                 // As Pages draws it: a third of the picture below the
-                // baseline.
+                // baseline of the line, which the offset of the label
+                // does not move (LST-03).
                 let width = height * picture.aspect() as f32;
                 first.label = Some(x..x + width);
                 first.label_image = Some(LabelImage {
                     picture,
                     x,
-                    y: baseline - height * 2.0 / 3.0,
+                    y: first.baseline - height * 2.0 / 3.0,
                     width,
                     height,
                 });
@@ -1403,8 +1412,8 @@ fn vertical_metrics(
 /// and the leading each to a whole point. A shift of the baseline moves
 /// the box.
 fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> RunBox {
-    let (ascent, descent, leading, place) = vertical_metrics(format, size, metrics);
-    let (ascent, descent, leading) = (ascent.round(), descent.round(), leading.round());
+    let (exact, descent, leading, place) = vertical_metrics(format, size, metrics);
+    let (ascent, descent, leading) = (exact.round(), descent.round(), leading.round());
     let over = match place {
         LeadingPlace::Above => ascent + leading,
         LeadingPlace::Below => ascent,
@@ -1416,6 +1425,7 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
         under: ascent + descent + leading - over - raise,
         leading,
         descent,
+        rise: (exact - ascent).max(0.0),
     }
 }
 

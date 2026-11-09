@@ -469,8 +469,8 @@ impl DisplayList {
         } else {
             0.0
         };
-        let top = block.text_top - if block.first { inset } else { 0.0 };
-        let bottom = block.text_bottom + if block.last { inset } else { 0.0 };
+        let top = block.text_top - block.rise.0 - if block.first { inset } else { 0.0 };
+        let bottom = block.text_bottom - block.rise.1 + if block.last { inset } else { 0.0 };
         self.items.push(Item::Rect {
             x: block.left - inset,
             y: top,

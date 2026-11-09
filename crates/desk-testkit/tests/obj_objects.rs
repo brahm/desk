@@ -6,8 +6,8 @@
 //! as many pages, and draw their objects as Pages drew them, to a few
 //! pixels in a hundred.
 //!
-//! The documents with text in an oval, a text box in the text and wraps
-//! do not match yet: their tests are kept from running with
+//! The documents with text in an oval and a text box in the text do not
+//! match yet: their tests are kept from running with
 //! `#[ignore = "differs from Pages: …"]`, which the parity report reads
 //! to show their rows as different from Pages, until they match.
 
@@ -194,7 +194,6 @@ fn obj_14_inline_text_boxes_match_pages() {
 }
 
 #[test]
-#[ignore = "differs from Pages: the words are where Pages put them, but 7 % of the pixels differ"]
 fn obj_17_wraps_match_pages() {
     check("obj-17-wrap");
 }
