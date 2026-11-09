@@ -49,6 +49,9 @@ pub struct PlacedObject {
     pub lines: Vec<PlacedLine>,
     /// The objects of a group, placed.
     pub children: Vec<PlacedObject>,
+    /// What the objects above a text box on its page take from its text,
+    /// which goes around them as body text does (OBJ-13, OBJ-17).
+    pub(crate) wraps: Arc<[Exclusion]>,
 }
 
 impl PlacedObject {
@@ -72,6 +75,7 @@ impl PlacedObject {
             height: frame.height.to_pt() as f32,
             lines: Vec::new(),
             children,
+            wraps: Arc::from([]),
         }
     }
 
@@ -623,6 +627,31 @@ pub fn place_object_text(
             at.insert(placed.object.id, (p, i));
         }
     }
+    // Pages takes from the text of a box the room of the objects above it
+    // on its page that the text wraps around, other than the boxes linked
+    // to it.
+    for page in &mut layout.pages {
+        let objects = &page.objects;
+        let wraps: Vec<Arc<[Exclusion]>> = (0..objects.len())
+            .map(|i| {
+                if !matches!(objects[i].object.kind, ObjectKind::TextBox(_)) {
+                    return Arc::from([]);
+                }
+                let head = document.text_box_head(objects[i].object.id);
+                objects[i + 1..]
+                    .iter()
+                    .filter(|o| {
+                        !matches!(o.object.kind, ObjectKind::TextBox(_))
+                            || document.text_box_head(o.object.id) != head
+                    })
+                    .filter_map(PlacedObject::exclusion)
+                    .collect()
+            })
+            .collect();
+        for (placed, wraps) in page.objects.iter_mut().zip(wraps) {
+            placed.wraps = wraps;
+        }
+    }
     for p in 0..layout.pages.len() {
         for i in 0..layout.pages[p].objects.len() {
             let placed = &layout.pages[p].objects[i];
@@ -759,7 +788,6 @@ pub fn flow_text_boxes(
     let mut slot = 0;
     let mut y = 0.0f32;
     let mut after = 0.0f32;
-    let mut lowest = vec![0.0f32; boxes.len()];
     for (i, paragraph) in paragraphs.iter().enumerate() {
         let text = ParagraphText::new_in_document_with(
             styles,
@@ -776,37 +804,115 @@ pub fn flow_text_boxes(
         // Linked boxes may have columns of other widths; the paragraph is
         // laid out at the width of the column it starts in.
         let width = slots[slot].1.2;
-        let laid = system.layout(&text, &Column::new(width), 0.0).lines;
+        // Where the paragraph is in each column it goes through, for the
+        // objects that its text goes around.
+        let piece = |slot: usize, from: f32, origin: f32| {
+            let (b, (left, top, _)) = slots[slot];
+            Piece {
+                from,
+                left,
+                origin: top + origin,
+                exclusions: boxes[b].wraps.to_vec(),
+            }
+        };
+        let mut pieces = vec![piece(slot, f32::NEG_INFINITY, y)];
+        let lay_out = |system: &mut TextSystem, pieces: &[Piece]| {
+            if pieces.iter().all(|p| p.exclusions.is_empty()) {
+                system.layout(&text, &Column::new(width), 0.0).lines
+            } else {
+                let space = WrapSpace { width, pieces };
+                system.layout(&text, &space, 0.0).lines
+            }
+        };
+        let mut laid = lay_out(system, &pieces);
         let first_top = laid.first().map_or(0.0, |l| l.top);
         // The lines of the paragraph keep their spacing from its first.
         let mut start = y - first_top;
-        for (n, line) in laid.into_iter().enumerate() {
+        let mut n = 0;
+        // The lines of the paragraph in the column it is in now, and
+        // whether the paragraph starts there below other text.
+        let mut here = 0;
+        let mut below_text = y > 0.0;
+        while let Some(line) = laid.get(n).cloned() {
             let mut line_top = start + line.top;
             let bottom = line_top + line.height;
             // A line that does not fit goes to the top of the next column,
             // unless it is the first of its column or the last column.
             let height = rooms[slots[slot].0].height;
             if bottom > height && line_top > 0.0 && slot + 1 < slots.len() {
+                // With widow control, the first line of a paragraph is not
+                // left alone at the bottom of a column, nor its last at the
+                // top of the next: the line before goes with it (EST-05).
+                let mut back = 0;
+                if format.widow_control {
+                    if laid.len() - n == 1 && here >= 2 {
+                        back = 1;
+                    }
+                    if here - back == 1 && below_text {
+                        back = here;
+                    }
+                }
+                if back > 0 {
+                    let b = slots[slot].0;
+                    let keep = out[b].len() - back;
+                    out[b].truncate(keep);
+                    n -= back;
+                    let line = &laid[n];
+                    slot += 1;
+                    start = -line.top;
+                    here = 0;
+                    below_text = false;
+                    if !pieces.iter().all(|p| p.exclusions.is_empty())
+                        || !piece(slot, line.top, start).exclusions.is_empty()
+                    {
+                        let from = line.top;
+                        pieces.retain(|p| p.from < from);
+                        pieces.push(piece(slot, from, start));
+                        laid = lay_out(system, &pieces);
+                        let Some(line) = laid.get(n) else { break };
+                        start = -line.top;
+                    }
+                    continue;
+                }
+                here = 0;
+                below_text = false;
                 slot += 1;
                 start = -line.top;
                 line_top = 0.0;
+                // The rest of the paragraph goes around what is in the
+                // next column.
+                let next = piece(slot, line.top, start);
+                if !next.exclusions.is_empty() || pieces.iter().any(|p| !p.exclusions.is_empty()) {
+                    pieces.retain(|p| p.from < line.top);
+                    pieces.push(next);
+                    laid = lay_out(system, &pieces);
+                    let Some(line) = laid.get(n) else { break };
+                    start = -line.top;
+                    continue;
+                }
             }
             let (b, (x, top, _)) = slots[slot];
             y = line_top + line.height;
-            lowest[b] = lowest[b].max(y);
             out[b].push(PlacedLine {
                 paragraph: i,
                 index: n,
                 line,
                 origin: (x, top + start),
             });
+            n += 1;
+            here += 1;
         }
     }
     // Text that does not fill a box sits where its alignment says. Pages
     // centers the text from the top of its first line to the baseline of
     // its last, without the descent below it (FMT-19).
     for (b, lines) in out.iter_mut().enumerate() {
-        let room = (rooms[b].height - lowest[b]).max(0.0);
+        let top = rooms[b].columns.first().map_or(0.0, |c| c.1);
+        let lowest = lines
+            .iter()
+            .map(|l| l.top() + l.line.height - top)
+            .fold(0.0f32, f32::max);
+        let room = (rooms[b].height - lowest).max(0.0);
         let below = lines
             .iter()
             .max_by(|a, c| a.bottom().total_cmp(&c.bottom()))
