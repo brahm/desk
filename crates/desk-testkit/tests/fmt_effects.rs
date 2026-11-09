@@ -20,9 +20,14 @@ fn fixtures() -> PathBuf {
 /// Lays out a fixture, writes it as PDF and checks its words against the
 /// PDF of Pages; gives back the display list of its first page.
 fn check(name: &str) -> DisplayList {
+    check_with(name, &mut desk_text::TextSystem::new())
+}
+
+/// The same, laying out with the fonts of a text system.
+fn check_with(name: &str, system: &mut desk_text::TextSystem) -> DisplayList {
     let fixtures = fixtures();
     let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
-    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let layout = desk_layout::paginate(&document, system);
     let pages = DisplayList::pages(&layout);
     let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.pdf"));
     desk_render::Painter::new()
@@ -59,6 +64,24 @@ fn fmt_12_narrow_justified_lines_spread_their_letters_as_pages_does() {
     // by half an em before the letters spread, and the letters by 0.2892
     // em at most.
     check("justify-spacing");
+}
+
+#[test]
+fn fmt_12_spaces_stop_growing_at_half_an_em_whatever_their_width() {
+    // Copies of Liberation whose spaces are 0.1, 0.278 and 0.6 em wide,
+    // which the corpus keeps for this document.
+    let mut system = desk_text::TextSystem::new();
+    let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/fonts");
+    for name in ["DeskSansSpace60", "DeskSansSpace10", "DeskMonoSpace28"] {
+        let data = std::fs::read(fonts.join(format!("{name}.ttf"))).unwrap();
+        assert_eq!(system.add_fonts(data), 1, "{name}");
+    }
+    check_with("justify-space-limit", &mut system);
+    assert!(
+        system.substitutions().is_empty(),
+        "{:?}",
+        system.substitutions()
+    );
 }
 
 #[test]
@@ -186,4 +209,14 @@ fn fmt_21_rules_and_borders_fall_where_pages_drew_them() {
             "{points:?} is not {want:?}"
         );
     }
+}
+
+#[test]
+fn fmt_12_harder_justified_lines_spread_as_pages_does() {
+    // At 150 points: lines of 12 and 20 points, where the spaces and the
+    // letters grow by their own size; tracking, which Pages leaves after
+    // the last letter of a line; text after a tab, justified from its
+    // stop; hyphenation on, which Pages '09 never does on the reference
+    // machine; and a text box.
+    check("justify-cases");
 }

@@ -79,6 +79,15 @@ headers and footers, a table of contents, footnotes, pictures, columns
 and page breaks, whose text is filler, so that the tests of
 `desk-testkit` check a long document against Pages in public.
 
+`justify-spacing.pages`, `justify-space-limit.pages` and
+`justify-cases.pages` hold justified lines narrow enough for Pages to
+spread their letters: in Liberation, in the test fonts of
+[`fixtures/fonts/`](fixtures/fonts/README.md), whose spaces have other
+widths, and with sizes mixed in a line, tracking, tabs, hyphenation and a
+text box. The tests of `desk-testkit` add those
+fonts to the ones Desk lays out with, so they need not be installed,
+and compare the documents with the PDF of Pages word by word (FMT-12).
+
 The tests of `desk-filters` open every one of them and check that the
 import names what it leaves out. `lossy-import.pages` has one of each
 thing that Desk does not import yet, such as headers, images, footnotes,
