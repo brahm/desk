@@ -5,11 +5,6 @@
 //! reference machine put their words where Pages put them in its PDF, on
 //! as many pages, and draw their objects as Pages drew them, to a few
 //! pixels in a hundred.
-//!
-//! The documents with text in an oval, a text box in the text and wraps
-//! do not match yet: their tests are kept from running with
-//! `#[ignore = "differs from Pages: …"]`, which the parity report reads
-//! to show their rows as different from Pages, until they match.
 
 use std::path::{Path, PathBuf};
 
@@ -182,19 +177,34 @@ fn obj_42_tinted_image_fills_match_pages() {
 }
 
 #[test]
-#[ignore = "differs from Pages: the text in the oval breaks otherwise"]
 fn obj_12_text_in_shapes_matches_pages() {
     check("obj-12-text-in-shape");
 }
 
 #[test]
-#[ignore = "differs from Pages: the text of the box in the text moves"]
+fn obj_12_text_follows_the_outline_of_its_shape() {
+    // Ovals of three sizes, aligned to the top and to the bottom, a
+    // rectangle, a rounded rectangle, a triangle and a diamond, with more
+    // text than fits: each line takes the room that the outline leaves
+    // across its height, the inset in from it.
+    check("shape-text-cases");
+}
+
+#[test]
 fn obj_14_inline_text_boxes_match_pages() {
     check("obj-14-inline-text-box");
 }
 
 #[test]
-#[ignore = "differs from Pages: the words are where Pages put them, but 7 % of the pixels differ"]
+fn obj_14_text_boxes_in_the_text_float_in_the_middle_of_the_column() {
+    // With no text before them, after a few words or a long sentence,
+    // smaller, and in a centered paragraph: Pages puts each box in the
+    // middle of the column, at the top of its paragraph but its wrap
+    // margin below the text above, and the text goes around it.
+    check("inline-text-box-cases");
+}
+
+#[test]
 fn obj_17_wraps_match_pages() {
     check("obj-17-wrap");
 }

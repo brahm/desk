@@ -362,15 +362,19 @@ impl Report {
 
     /// What the README says of the matrix: how many rows have tests,
     /// how many of them check what Pages laid out, and how many of those
-    /// still differ.
+    /// still differ, or that all of them match.
     pub fn summary(&self) -> String {
         let count =
             |keep: &dyn Fn(Status) -> bool| self.rows.iter().filter(|r| keep(r.status)).count();
         let tested = count(&|s| s != Status::Pending);
         let against = count(&|s| matches!(s, Status::Matches | Status::Compared | Status::Differs));
         let differ = count(&|s| s == Status::Differs);
+        let rest = match differ {
+            0 => "all of them alike".to_string(),
+            differ => format!("of which {differ} still differ"),
+        };
         format!(
-            "{tested} of the {} rows of its parity matrix have tests, {against} of them against what Pages itself laid out, of which {differ} still differ",
+            "{tested} of the {} rows of its parity matrix have tests, {against} of them against what Pages itself laid out, {rest}",
             self.rows.len()
         )
     }

@@ -189,18 +189,18 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
 
 #[test]
 fn the_report_tells_documents_of_pages_that_still_differ() {
-    // The documents with text in shapes do not match Pages yet: their
-    // tests are kept from running, and their rows are different.
+    // Every document compared with Pages matches it now, so no test is
+    // kept from running; a row whose test would be is shown as different.
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let differing = desk_testkit::report::differing_by_row(&crates).unwrap();
-    assert!(differing.contains_key("OBJ-12"), "{differing:?}");
-    let compared = desk_testkit::report::compared_by_row(&crates).unwrap();
     assert!(
-        compared
-            .values()
-            .flatten()
-            .all(|t| !differing.values().flatten().any(|d| d == t))
+        desk_testkit::report::differing_by_row(&crates)
+            .unwrap()
+            .is_empty()
     );
+    let compared = desk_testkit::report::compared_by_row(&crates).unwrap();
+    let differing = [("OBJ-12".to_string(), vec!["obj_12_test".to_string()])]
+        .into_iter()
+        .collect();
     let report = Report::new(
         vec![matrix::Row {
             id: "OBJ-12".into(),

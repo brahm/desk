@@ -606,22 +606,10 @@ impl Builder<'_, '_> {
             opacity: (shadow.opacity * 100.0).round().clamp(0.0, 100.0) as u8,
         });
         if object.holds_text() && !text.iter().all(desk_model::Paragraph::is_empty) {
-            // Pages centers the text of a shape that does not say how it
-            // is aligned.
-            let centered = text
-                .into_iter()
-                .map(|p| {
-                    if p.attrs().alignment.is_some() {
-                        return Ok(p);
-                    }
-                    let attrs = desk_model::ParaAttrs {
-                        alignment: Some(desk_model::Alignment::Center),
-                        ..p.attrs().clone()
-                    };
-                    desk_model::Paragraph::from_runs(p.id(), p.style(), attrs, p.runs().cloned())
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let mut text_box = TextBox::in_shape(Arc::from(centered));
+            // Pages lays the text of a shape out from its top, aligned as
+            // its paragraphs say (OBJ-12).
+            let mut text_box = TextBox::in_shape(Arc::from(text));
+            text_box.vertical = VerticalAlignment::Top;
             self.lay_out(&mut text_box, drawable, true);
             object.text = Some(text_box);
         }

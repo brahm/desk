@@ -787,12 +787,16 @@ fn obj_08_obj_11_shapes_saved_by_pages_are_read() {
 }
 
 #[test]
-fn obj_12_the_text_of_a_shape_saved_by_pages_is_centered_in_it() {
+fn obj_12_the_text_of_a_shape_saved_by_pages_starts_at_its_top_on_the_left() {
     let (_, objects) = fixture_objects("obj-12-text-in-shape.pages");
     let paragraphs: Vec<&desk_model::Paragraph> = objects[0].paragraphs().collect();
     assert_eq!(paragraphs.len(), 1);
     assert_eq!(paragraphs[0].text(), "Text inside the shape");
-    assert_eq!(paragraphs[0].attrs().alignment, Some(Alignment::Center));
+    // As its paragraph style says, as Pages laid it out.
+    assert_eq!(paragraphs[0].attrs().alignment, None);
+    let text = objects[0].text_box().unwrap();
+    assert_eq!(text.vertical, desk_model::VerticalAlignment::Top);
+    assert_eq!(text.inset, Length::from_points(8));
 }
 
 #[test]

@@ -62,6 +62,10 @@ pub struct PlacedBlock {
     pub text_top: f32,
     /// The bottom of the last line.
     pub text_bottom: f32,
+    /// How much higher than its lines Pages draws the background of the
+    /// part, at its top and at its bottom: the part of the ascent of the
+    /// first and last lines that their boxes round off (FMT-20).
+    pub rise: (f32, f32),
     /// The bottom of the part, below the space of a rule below.
     pub bottom: f32,
     /// The left edge of the text column.
@@ -287,8 +291,8 @@ fn layout_pages(document: &Document, layout: &mut DocumentLayout, count: u32) {
     let setup = layout.setup;
     let body = layout.pages.first().map_or(
         (
-            setup.margin_top.to_pt() as f32,
-            (setup.height - setup.margin_bottom).to_pt() as f32,
+            setup.margin_top.to_pt().round() as f32,
+            (setup.height - setup.margin_bottom).to_pt().round() as f32,
         ),
         |p| p.body,
     );
@@ -550,7 +554,8 @@ impl MarginRoom {
             );
             self.heights.get(&(margins, place.index())).copied()
         };
-        let mut top = setup.margin_top.to_pt() as f32;
+        // Pages puts the frame of the body on whole points.
+        let mut top = setup.margin_top.to_pt().round() as f32;
         if let Some(h) = reach(MarginKind::Header) {
             top = top.max(setup.header_margin.to_pt() as f32 + h);
         }
@@ -558,7 +563,7 @@ impl MarginRoom {
         if let Some(h) = reach(MarginKind::Footer) {
             bottom = bottom.max(setup.footer_margin.to_pt() as f32 + h);
         }
-        (top, setup.height.to_pt() as f32 - bottom)
+        (top, (setup.height.to_pt() as f32 - bottom).round())
     }
 }
 
@@ -1008,7 +1013,7 @@ struct Paginator<'a> {
 
 impl Paginator<'_> {
     fn top(&self) -> f32 {
-        self.setup.margin_top.to_pt() as f32
+        self.setup.margin_top.to_pt().round() as f32
     }
 
     /// The left and right margins of a page, by its index: they swap on
@@ -1070,12 +1075,31 @@ impl Paginator<'_> {
     }
 
     /// The objects that move with paragraph `paragraph`, placed with the
-    /// top of the paragraph at `top` on the page.
-    fn anchored(&self, paragraph: usize, top: f32) -> Vec<PlacedObject> {
+    /// top of the paragraph at `top` on the page. A text box of the text
+    /// that floats goes in the middle of the column from `left` of
+    /// `width`, on a whole point, at the top of the paragraph, but no
+    /// nearer to the text above, which ends at `above`, than its wrap
+    /// margin (OBJ-14).
+    fn anchored(
+        &self,
+        paragraph: usize,
+        top: f32,
+        (left, width): (f32, f32),
+        above: Option<f32>,
+    ) -> Vec<PlacedObject> {
         self.floats
             .iter()
             .filter(|f| f.anchor == Place::Paragraph(paragraph))
-            .map(|f| PlacedObject::new(&f.object, Some(paragraph), top))
+            .map(|f| {
+                if !crate::objects::floats_in_text(&f.object) {
+                    return PlacedObject::new(&f.object, Some(paragraph), top);
+                }
+                let mut placed = PlacedObject::new(&f.object, Some(paragraph), 0.0);
+                placed.x = (left + (width - placed.width) / 2.0).floor();
+                let margin = f.object.wrap_margin.to_pt() as f32;
+                placed.y = above.map_or(top, |a| top.max(a + margin));
+                placed
+            })
             .collect()
     }
 
@@ -1383,7 +1407,8 @@ impl Paginator<'_> {
             let origin = top + cursor.y + space - base;
             // The objects that move with the paragraph go where it starts.
             let anchored = if a == 0 {
-                self.anchored(i, origin)
+                let above = (!at_top).then_some(top + cursor.y);
+                self.anchored(i, origin, (x, width), above)
             } else {
                 Vec::new()
             };
@@ -1519,6 +1544,7 @@ impl Paginator<'_> {
                 top: top + cursor.y + collapsed,
                 text_top: top + cursor.y + space,
                 text_bottom: top + cursor.y + space + height,
+                rise: (block.lines[a].rise, block.lines[a + k - 1].rise),
                 bottom: top + cursor.y + space + height + below,
                 left: x,
                 right: x + width,
