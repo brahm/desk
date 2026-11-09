@@ -736,6 +736,11 @@ pub fn flow_text_boxes(
     paragraphs: &[desk_model::Paragraph],
     system: &mut TextSystem,
 ) -> Vec<Vec<PlacedLine>> {
+    if let [placed] = boxes
+        && let Some(space) = ShapeSpace::of(placed)
+    {
+        return vec![shape_lines(document, placed, &space, paragraphs, system)];
+    }
     let rooms: Vec<BoxRoom> = boxes.iter().map(|b| box_room(b)).collect();
     let slots: Vec<(usize, (f32, f32, f32))> = rooms
         .iter()
@@ -820,6 +825,270 @@ pub fn flow_text_boxes(
         }
     }
     out
+}
+
+/// The narrowest room of a line in a shape, half a point above the line:
+/// Pages moves the text down until a line has at least this much
+/// (OBJ-12).
+const SHAPE_MIN_WIDTH: f32 = 21.25;
+
+/// The room for the text inside a shape, as Pages lays it out (OBJ-12):
+/// each line takes what the outline of the shape leaves free across its
+/// height, its inset and half its stroke in from the outline, and the
+/// text starts at the top and stops where no line fits any more. Points
+/// are from the top left corner of the frame, and the column starts at
+/// the inset.
+struct ShapeSpace {
+    edges: Vec<((f32, f32), (f32, f32))>,
+    inset: f32,
+    width: f32,
+    height: f32,
+    vertical: VerticalAlignment,
+}
+
+impl ShapeSpace {
+    /// The room of a shape with text, but a text box.
+    fn of(placed: &PlacedObject) -> Option<Self> {
+        let ObjectKind::Shape(shape) = &placed.object.kind else {
+            return None;
+        };
+        let text = placed.object.text_box()?;
+        let (w, h) = (f64::from(placed.width), f64::from(placed.height));
+        let point = |(x, y): (f64, f64)| (x as f32, y as f32);
+        let edges: Vec<_> = desk_model::flattened(&shape.outline(w, h))
+            .into_iter()
+            .map(|(a, b)| (point(a), point(b)))
+            .collect();
+        if edges.is_empty() {
+            return None;
+        }
+        let stroke = placed
+            .object
+            .style
+            .stroke
+            .as_ref()
+            .map_or(0.0, |s| s.width.to_pt() as f32 / 2.0);
+        let inset = text.inset.to_pt() as f32 + stroke;
+        Some(Self {
+            edges,
+            inset,
+            width: (placed.width - 2.0 * inset).max(1.0),
+            height: placed.height,
+            vertical: text.vertical,
+        })
+    }
+
+    /// The pieces of a line across the shape at height `y` that are at
+    /// least the inset from its outline, from left to right.
+    fn across(&self, y: f32) -> Vec<(f32, f32)> {
+        let mut crossings: Vec<f32> = self
+            .edges
+            .iter()
+            .filter(|((_, y0), (_, y1))| (*y0 > y) != (*y1 > y))
+            .map(|&((x0, y0), (x1, y1))| x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+            .collect();
+        crossings.sort_by(f32::total_cmp);
+        let mut free: Vec<(f32, f32)> = crossings
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&[u, v]| (u, v))
+            .collect();
+        let d = self.inset;
+        for &(a, b) in &self.edges {
+            // What is within the inset of the edge, on this line: the
+            // edge widened into a capsule, which is convex.
+            let Some((cut0, cut1)) = capsule_span(a, b, d, y) else {
+                continue;
+            };
+            free = free
+                .into_iter()
+                .flat_map(|(s, t)| {
+                    let mut out = Vec::with_capacity(2);
+                    if cut0 > s {
+                        out.push((s, cut0.min(t)));
+                    }
+                    if cut1 < t {
+                        out.push((cut1.max(s), t));
+                    }
+                    out
+                })
+                .filter(|(s, t)| t > s)
+                .collect();
+        }
+        free
+    }
+}
+
+/// Where a horizontal line at `y` meets the points within `d` of the
+/// segment from `a` to `b`, if it does.
+fn capsule_span(a: (f32, f32), b: (f32, f32), d: f32, y: f32) -> Option<(f32, f32)> {
+    let mut span: Option<(f32, f32)> = None;
+    let mut add = |x0: f32, x1: f32| {
+        span = Some(span.map_or((x0, x1), |(s, t)| (s.min(x0), t.max(x1))));
+    };
+    for (cx, cy) in [a, b] {
+        let dy = y - cy;
+        if dy.abs() <= d {
+            let dx = (d * d - dy * dy).sqrt();
+            add(cx - dx, cx + dx);
+        }
+    }
+    // The band along the segment: a parallelogram, its sides the
+    // segment moved by `d` either way.
+    let (ex, ey) = (b.0 - a.0, b.1 - a.1);
+    let length = (ex * ex + ey * ey).sqrt();
+    if length > 0.0 {
+        let (nx, ny) = (-ey / length * d, ex / length * d);
+        let corners = [
+            (a.0 + nx, a.1 + ny),
+            (b.0 + nx, b.1 + ny),
+            (b.0 - nx, b.1 - ny),
+            (a.0 - nx, a.1 - ny),
+        ];
+        let mut xs = Vec::new();
+        for i in 0..4 {
+            let (p, q) = (corners[i], corners[(i + 1) % 4]);
+            if (p.1 > y) != (q.1 > y) {
+                xs.push(p.0 + (y - p.1) * (q.0 - p.0) / (q.1 - p.1));
+            } else if p.1 == y {
+                xs.push(p.0);
+            }
+        }
+        if let (Some(lo), Some(hi)) = (
+            xs.iter().copied().reduce(f32::min),
+            xs.iter().copied().reduce(f32::max),
+        ) {
+            add(lo, hi);
+        }
+    }
+    span
+}
+
+impl LineSpace for ShapeSpace {
+    fn width(&self) -> f32 {
+        self.width
+    }
+
+    fn segments(&self, top: f32, height: f32) -> Vec<(f32, f32)> {
+        if top + height > self.height - self.inset + 0.01 || top < self.inset - 0.01 {
+            return Vec::new();
+        }
+        // Pages measures whether a line has room half a point above it.
+        if !self
+            .across((top - 0.5).max(self.inset + 0.01))
+            .iter()
+            .any(|(s, t)| t - s >= SHAPE_MIN_WIDTH)
+        {
+            return Vec::new();
+        }
+        // What is free all across the height of the line.
+        let steps = (height * 2.0).ceil().max(1.0) as usize;
+        let mut free = self.across(top);
+        for k in 1..=steps {
+            let y = (top + height * k as f32 / steps as f32).min(self.height);
+            let row = self.across(y);
+            free = free
+                .into_iter()
+                .flat_map(|(s, t)| {
+                    row.iter()
+                        .map(move |&(u, v)| (s.max(u), t.min(v)))
+                        .filter(|&(u, v)| u < v)
+                })
+                .collect();
+        }
+        free.into_iter()
+            .map(|(s, t)| (s - self.inset, t - s))
+            .collect()
+    }
+
+    fn is_exhausted(&self, top: f32) -> bool {
+        top > self.height - self.inset
+    }
+}
+
+/// The lines of the text of a shape, from the top of its room down, as
+/// many as fit (OBJ-12). Text aligned to the middle or the bottom that
+/// fits is laid out again lower, by half or all of the room left below
+/// it; text that does not fit then starts a point lower than its first
+/// line, as Pages lays it out.
+fn shape_lines(
+    document: &Document,
+    placed: &PlacedObject,
+    space: &ShapeSpace,
+    paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
+) -> Vec<PlacedLine> {
+    let (lines, end, fits) = shape_lines_from(
+        document,
+        placed,
+        space,
+        paragraphs,
+        system,
+        space.inset.ceil(),
+    );
+    let start = lines.first().map_or(space.inset.ceil(), |l| l.line.top);
+    let room = (space.height - space.inset - end).max(0.0);
+    let lower = match (space.vertical, fits) {
+        (VerticalAlignment::Top, _) => 0.0,
+        (_, false) => 1.0,
+        (VerticalAlignment::Middle, true) => (room / 2.0).floor(),
+        (VerticalAlignment::Bottom, true) => room.floor(),
+    };
+    if lower > 0.0 {
+        return shape_lines_from(document, placed, space, paragraphs, system, start + lower).0;
+    }
+    lines
+}
+
+/// The lines of the text of a shape from `y` down, where the last ends,
+/// and whether all the text fits.
+fn shape_lines_from(
+    document: &Document,
+    placed: &PlacedObject,
+    space: &ShapeSpace,
+    paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
+    mut y: f32,
+) -> (Vec<PlacedLine>, f32, bool) {
+    let styles = document.styles();
+    let settings = document.text_settings();
+    let items = styles.list_items(paragraphs.iter());
+    let origin = (placed.x + space.inset, placed.y);
+    let mut out = Vec::new();
+    let mut after = 0.0f32;
+    for (i, paragraph) in paragraphs.iter().enumerate() {
+        let text = ParagraphText::new_in_document_with(
+            styles,
+            settings,
+            paragraph,
+            items[i].as_ref(),
+            Default::default(),
+        );
+        let format = text.paragraph();
+        if i > 0 {
+            y += after.max(format.space_before.to_pt() as f32);
+        }
+        after = format.space_after.to_pt() as f32;
+        let laid = system.layout(&text, space, y).lines;
+        let Some(last) = laid.last() else {
+            return (out, y, false);
+        };
+        y = last.top + last.height;
+        let cut = last.range.end < text.to_model(text.text().len());
+        for (n, line) in laid.into_iter().enumerate() {
+            out.push(PlacedLine {
+                paragraph: i,
+                index: n,
+                line,
+                origin,
+            });
+        }
+        if cut || (i + 1 < paragraphs.len() && space.is_exhausted(y)) {
+            return (out, y, false);
+        }
+    }
+    (out, y, true)
 }
 
 /// How far a point is from a segment.

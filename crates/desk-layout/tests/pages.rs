@@ -974,7 +974,7 @@ fn obj_15_text_goes_on_in_linked_boxes() {
 }
 
 #[test]
-fn obj_12_fmt_13_text_sits_in_the_middle_of_a_shape() {
+fn obj_12_fmt_13_text_sits_in_the_middle_of_a_shape_on_the_left() {
     use desk_model::{Frame, Object, ParaAttrs, Paragraph, Run, TextBox};
     let mut system = TextSystem::new();
     let mut document = Document::new_word_processing();
@@ -997,12 +997,19 @@ fn obj_12_fmt_13_text_sits_in_the_middle_of_a_shape() {
     let layout = paginate(&document, &mut system);
     let lines = &layout.pages[0].objects[0].lines;
     assert_eq!(lines.len(), 1);
-    // In the rectangle inside the oval, and in the middle from top to
-    // bottom, from the top of the line to its baseline.
-    let side = (1.0 - std::f32::consts::FRAC_1_SQRT_2) / 2.0;
-    assert!((lines[0].origin.0 - (104.0 + 200.0 * side)).abs() < 0.01);
-    let middle = (lines[0].top() + lines[0].baseline()) / 2.0;
-    assert!((middle - 150.0).abs() < 0.01, "{middle}");
+    // In the middle of the oval from top to bottom, to the point below,
+    // and on the left of the chord of the oval across the top of the line,
+    // inside its padding.
+    let line = &lines[0];
+    let middle = (line.top() + line.bottom()) / 2.0;
+    assert!((149.0..=150.0).contains(&middle), "{middle}");
+    let dy = (line.top() - 150.0) / 50.0;
+    let chord_left = 200.0 - 100.0 * (1.0 - dy * dy).sqrt();
+    let left = line.origin.0 + line.line.x;
+    assert!(
+        left >= chord_left && left < chord_left + 12.0,
+        "{left} {chord_left}"
+    );
 }
 
 #[test]

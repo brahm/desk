@@ -5,10 +5,6 @@
 //! reference machine put their words where Pages put them in its PDF, on
 //! as many pages, and draw their objects as Pages drew them, to a few
 //! pixels in a hundred.
-//!
-//! The document with text in an oval does not match yet: its test is kept from running with
-//! `#[ignore = "differs from Pages: …"]`, which the parity report reads
-//! to show its row as different from Pages, until it matches.
 
 use std::path::{Path, PathBuf};
 
@@ -181,9 +177,17 @@ fn obj_42_tinted_image_fills_match_pages() {
 }
 
 #[test]
-#[ignore = "differs from Pages: the text in the oval breaks otherwise"]
 fn obj_12_text_in_shapes_matches_pages() {
     check("obj-12-text-in-shape");
+}
+
+#[test]
+fn obj_12_text_follows_the_outline_of_its_shape() {
+    // Ovals of three sizes, aligned to the top and to the bottom, a
+    // rectangle, a rounded rectangle, a triangle and a diamond, with more
+    // text than fits: each line takes the room that the outline leaves
+    // across its height, the inset in from it.
+    check("shape-text-cases");
 }
 
 #[test]
