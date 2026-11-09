@@ -168,7 +168,11 @@ fn parse(html: &str) -> Vec<Para> {
         }
         let text = decode(raw);
         if preformatted > 0 {
-            for (i, line) in text.split('\n').enumerate() {
+            // Every character the model takes as the end of a paragraph
+            // ends one here too, so that the runs keep their offsets.
+            let text = text.replace("\r\n", "\n");
+            let ends = ['\n', '\r', '\u{0b}', '\u{0c}', '\u{85}', '\u{2029}'];
+            for (i, line) in text.split(ends).enumerate() {
                 if i > 0 {
                     new_paragraph(&mut out, &stack, &mut space);
                 }
@@ -610,5 +614,20 @@ mod tests {
         let deep = "<b>".repeat(10_000) + "x" + "&#99999999;&;<";
         let fragment = read_html(&deep).unwrap();
         assert!(fragment.text().starts_with('x'));
+    }
+
+    #[test]
+    fn txt_04_what_the_fuzzer_found_pastes() {
+        let fragment = read_html("<pre>a\u{b}b\r\nc\u{2029}d</pre>").unwrap();
+        assert_eq!(fragment.text(), "a\nb\nc\nd");
+        let html = include_str!("../../../fuzz/seeds/html_paste/crash-vertical-tab.html");
+        let fragment = read_html(html).unwrap();
+        let mut editor = desk_model::Editor::new(desk_model::Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Paste", |edit| {
+                edit.paste_fragment(start, &fragment).map(drop)
+            })
+            .unwrap();
     }
 }
