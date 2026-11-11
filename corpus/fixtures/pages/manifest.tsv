@@ -315,3 +315,6 @@ IOP-09		Modelos e espaços reservados	skipped	Not a row of its own for Pages: se
 IOP-10		Exportar e compartilhar	skipped	Export and sharing are not held in a document.
 IOP-11		Senha e versões	skipped	Not made: the password needs a dialog, as DOC-08; versions are not held in a document.
 -	lossy-import.pages	Content Desk does not import, to check the warning log	made	All the items asked for; not tied to one row.
+-	est-12-headers-footers-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of est-12-headers-footers.pages.
+-	fmt-01-02-emphasis-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of fmt-01-02-emphasis.pages.
+-	tab-01-basic-pages08.pages	An iWork '08 copy (sl:version 72007061400) saved with Save copy as	made	Saved copy of tab-01-basic.pages.
