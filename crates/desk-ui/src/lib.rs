@@ -358,7 +358,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.search", &["<Control><Shift>f"]),
             ("win.check-spelling", &["<Control>semicolon"]),
             ("win.spelling", &["<Control>colon"]),
-            ("win.show-help-overlay", &["<Control>question"]),
+            ("win.shortcuts", &["<Control>question"]),
         ] {
             app.set_accels_for_action(action, keys);
         }

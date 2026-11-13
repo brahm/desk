@@ -79,18 +79,29 @@ with PDFs made by iWork 9.3 itself.
 
 ## Building
 
-Desk needs Rust 1.92 or later, and the development files of GTK 4.14
-and Libadwaita 1.5 or later. On Debian and Ubuntu:
+Desk is distributed only as a Flatpak, on the GNOME 51 runtime, and
+the code uses what that runtime has: GTK 4.24 and Libadwaita 1.10. To
+build it outside Flatpak you need Rust 1.100 or later and the
+development files of those versions or later, which Fedora 45 and
+Ubuntu 26.10 have. Packagers of other systems need to meet these
+requirements too, or keep a fork that adapts the code to older
+libraries.
+
+On Ubuntu 26.10 or later:
 
 ```sh
 sudo apt install libgtk-4-dev libadwaita-1-dev
 ```
 
-On Fedora:
+On Fedora 45 or later:
 
 ```sh
 sudo dnf install gtk4-devel libadwaita-devel
 ```
+
+On an older Ubuntu, [ci/setup-env.sh](ci/setup-env.sh) puts an Ubuntu
+26.10 with these libraries in `/opt/gnome-51`, and `desk-gnome-51 cargo
+run --package desk-writer` builds and runs Desk there.
 
 The build also runs `glib-compile-resources`, which comes with the GLib
 development files that these packages install, to build the app icons

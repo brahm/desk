@@ -498,8 +498,17 @@ impl DocumentWindow {
         }
         this.connect_fullscreen(&leave_fullscreen, &backdrop);
         this.connect_context_menu();
-        this.window
-            .set_help_overlay(Some(&crate::shortcuts::window(opener.is_some())));
+        {
+            let window = this.window.downgrade();
+            let opens = opener.is_some();
+            let shortcuts = gio::SimpleAction::new("shortcuts", None);
+            shortcuts.connect_activate(move |_, _| {
+                if let Some(window) = window.upgrade() {
+                    crate::shortcuts::dialog(opens).present(Some(&window));
+                }
+            });
+            this.window.add_action(&shortcuts);
+        }
         {
             let weak = Rc::downgrade(&this);
             this.window.connect_close_request(move |_| {
@@ -2570,10 +2579,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     menu.append_section(None, &close);
     let help = gio::Menu::new();
     help.append(Some(&tr("_Preferences")), Some("app.preferences"));
-    help.append(
-        Some(&tr("_Keyboard Shortcuts")),
-        Some("win.show-help-overlay"),
-    );
+    help.append(Some(&tr("_Keyboard Shortcuts")), Some("win.shortcuts"));
     help.append(
         Some(&tr("_About {app}").replace("{app}", info.name)),
         Some("app.about"),

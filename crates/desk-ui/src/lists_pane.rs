@@ -465,7 +465,7 @@ impl ListsGroup {
             }
             let filter = gtk::FileFilter::new();
             filter.set_name(Some(&tr("Images")));
-            filter.add_pixbuf_formats();
+            filter.add_mime_type("image/*");
             let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
             filters.append(&filter);
             let dialog = gtk::FileDialog::builder()
