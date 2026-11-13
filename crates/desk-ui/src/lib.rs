@@ -18,6 +18,7 @@ mod access;
 mod area;
 mod auto_numbers;
 mod bullet_pictures;
+mod compact;
 mod editing;
 mod effects;
 mod eyedropper;
@@ -43,6 +44,7 @@ mod outline_view;
 mod picture_pane;
 mod preferences;
 mod properties;
+mod recovery;
 mod ruler;
 mod shape_pane;
 mod shortcuts;
@@ -67,7 +69,7 @@ use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
 pub use desk_model::{Document, Fragment, Object};
-use i18n::tr;
+use i18n::{tr, trn};
 pub use view::DocumentView;
 use window::DocumentWindow;
 
@@ -320,19 +322,20 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         load_css();
         add_actions(app, info, opener);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
-        app.set_accels_for_action("app.new-window", &["<Control>n"]);
+        app.set_accels_for_action("app.new-window", &["<Control><Shift>n"]);
         app.set_accels_for_action("app.preferences", &["<Control>comma"]);
         app.set_accels_for_action("win.ruler", &["<Control>r"]);
         app.set_accels_for_action("window.close", &["<Control>w"]);
         app.set_accels_for_action("app.close-all", &["<Control><Alt>w"]);
         if opener.is_some() {
             app.set_accels_for_action("app.open", &["<Control>o"]);
+            app.set_accels_for_action("app.new-document", &["<Control>n"]);
             app.set_accels_for_action("win.save", &["<Control>s"]);
             app.set_accels_for_action("win.save-as", &["<Control><Shift>s"]);
             app.set_accels_for_action("win.duplicate", &["<Control><Shift>d"]);
             app.set_accels_for_action("win.properties", &["<Alt>Return"]);
         }
-        app.set_accels_for_action("win.fullscreen", &["F11", "<Control><Alt>f"]);
+        app.set_accels_for_action("win.fullscreen", &["F11"]);
         for (action, keys) in [
             ("win.bold", &["<Control>b"][..]),
             ("win.italic", &["<Control>i"]),
@@ -355,10 +358,12 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.find-previous", &["<Control><Shift>g"]),
             ("win.use-selection-for-find", &["<Control>e"]),
             ("win.jump-to-selection", &["<Control>j"]),
-            ("win.search", &["<Control><Shift>f"]),
+            ("win.search", &["<Control><Alt>f"]),
+            ("win.colors", &["<Control><Shift>c"]),
+            ("win.format-bar", &["<Control><Shift>r"]),
             ("win.check-spelling", &["<Control>semicolon"]),
             ("win.spelling", &["<Control>colon"]),
-            ("win.show-help-overlay", &["<Control>question"]),
+            ("win.shortcuts", &["<Control>question"]),
         ] {
             app.set_accels_for_action(action, keys);
         }
@@ -376,7 +381,11 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         app.set_accels_for_action("win.select-all", &["<Control>a"]);
         app.set_accels_for_action("win.special-characters", &["<Control>period"]);
     });
-    app.connect_activate(move |app| DocumentWindow::new(app, info, opener).window().present());
+    app.connect_activate(move |app| {
+        let window = DocumentWindow::new(app, info, opener);
+        window.window().present();
+        offer_recovery(app, info, opener, &window);
+    });
     // Files opened from outside: by double click, from the recent files or
     // by dropping them on the icon of the app (DOC-03).
     app.connect_open(move |app, files, _| {
@@ -385,6 +394,9 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             if let Some(path) = file.path() {
                 open_in_window(app, info, opener, &path);
             }
+        }
+        if let Some(window) = DocumentWindow::last() {
+            offer_recovery(app, info, Some(opener), &window);
         }
     });
 
@@ -402,13 +414,25 @@ fn load_css() {
     };
     let provider = gtk::CssProvider::new();
     provider.load_from_string(
-        ".desk-document { background-color: alpha(@window_fg_color, 0.1); }\n\
-         .desk-ruler { background-color: @headerbar_bg_color; \
-         box-shadow: inset 0 -1px alpha(@window_fg_color, 0.15); }\n\
-         .desk-thumb-section { padding: 6px; border-radius: 8px; \
-         border: 2px solid transparent; }\n\
-         .desk-thumb-section.selected { border-color: #f5c211; \
-         background-color: alpha(#f5c211, 0.15); }",
+        // The colors are the named ones of Adwaita, which follow the
+        // accent, the dark style and high contrast. The section chosen in
+        // the thumbnails has a thin outline and no fill, as in Pages
+        // (EST-17), in the accent color in place of its yellow.
+        ".desk-document { background-color: color-mix(in srgb, var(--window-fg-color) 10%, transparent); }\n\
+         .desk-ruler { background-color: var(--headerbar-bg-color); \
+         box-shadow: inset 0 -1px color-mix(in srgb, var(--window-fg-color) 15%, transparent); }\n\
+         .desk-thumb-section { padding: 6px; border: 1px solid transparent; }\n\
+         .desk-thumb-section.selected { border-color: var(--accent-color); }\n\
+         .desk-compact-group { padding-top: 3px; padding-bottom: 3px; }\n\
+         .desk-compact-row { min-height: 30px; }\n\
+         .desk-compact-row spinbutton, .desk-compact-row dropdown > button, \
+         .desk-compact-row entry { min-height: 26px; }\n\
+         .desk-template { padding: 9px; }\n\
+         .desk-template-page { background-color: white; border-radius: 3px; \
+         box-shadow: 0 1px 3px 1px color-mix(in srgb, black 20%, transparent); }\n\
+         .desk-template-layout { background-image: linear-gradient(to bottom, \
+         transparent 18px, color-mix(in srgb, var(--accent-bg-color) 25%, transparent) 18px, \
+         color-mix(in srgb, var(--accent-bg-color) 25%, transparent) 80px, transparent 80px); }",
     );
     gtk::style_context_add_provider_for_display(
         &display,
@@ -467,6 +491,19 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
             DocumentWindow::new(app, info, opener).window().present();
         })
         .build();
+    // Ctrl+N starts a document from the Blank template at once; a new
+    // window shows the template gallery (INT-01).
+    let new_document = gio::ActionEntry::builder("new-document")
+        .activate(move |app: &adw::Application, _, _| {
+            let window = DocumentWindow::new(app, info, opener);
+            gio::prelude::ActionGroupExt::activate_action(
+                window.window(),
+                "new-from-template",
+                Some(&"blank".to_variant()),
+            );
+            window.window().present();
+        })
+        .build();
     let preferences = gio::ActionEntry::builder("preferences")
         .activate(move |app: &adw::Application, _, _| {
             if let Some(window) = app.active_window() {
@@ -474,13 +511,89 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
             }
         })
         .build();
-    app.add_action_entries([about, quit, close_windows, new_window, preferences]);
+    app.add_action_entries([
+        about,
+        quit,
+        close_windows,
+        new_window,
+        new_document,
+        preferences,
+    ]);
     if let Some(opener) = opener {
         let open = gio::ActionEntry::builder("open")
             .activate(move |app: &adw::Application, _, _| show_open_dialog(app, info, opener))
             .build();
         app.add_action_entries([open]);
     }
+}
+
+thread_local! {
+    /// Whether the drafts that a crash left were offered already.
+    static RECOVERY_OFFERED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Offers back, once, the documents whose recovery drafts a crash left:
+/// Recover opens each in a window as a new document, Discard drops them.
+fn offer_recovery(
+    app: &adw::Application,
+    info: AppInfo,
+    opener: Option<&'static Opener>,
+    over: &std::rc::Rc<DocumentWindow>,
+) {
+    if opener.is_none() || RECOVERY_OFFERED.with(|o| o.replace(true)) {
+        return;
+    }
+    let drafts = recovery::leftovers();
+    if drafts.is_empty() {
+        return;
+    }
+    let names: Vec<String> = drafts
+        .iter()
+        .map(|d| d.name())
+        .map(|n| if n.is_empty() { tr("Untitled") } else { n })
+        .collect();
+    let dialog = adw::AlertDialog::new(
+        Some(&tr("Recover Unsaved Changes?")),
+        Some(
+            &trn(
+                "{app} closed unexpectedly. The changes to this document were kept: {names}.",
+                "{app} closed unexpectedly. The changes to these documents were kept: {names}.",
+                drafts.len() as u64,
+            )
+            .replace("{app}", info.name)
+            .replace("{names}", &names.join(", ")),
+        ),
+    );
+    dialog.add_response("discard", &tr("_Discard"));
+    dialog.add_response("recover", &tr("_Recover"));
+    dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+    dialog.set_response_appearance("recover", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("recover"));
+    dialog.set_close_response("recover");
+    let app = app.clone();
+    let first = over.clone();
+    dialog.choose(
+        Some(over.window()),
+        gio::Cancellable::NONE,
+        move |response| {
+            if response == "discard" {
+                for draft in &drafts {
+                    draft.remove();
+                }
+                return;
+            }
+            for draft in &drafts {
+                let window = if first.is_empty() {
+                    first.clone()
+                } else {
+                    DocumentWindow::new(&app, info, opener)
+                };
+                if window.recover(draft) {
+                    window.window().present();
+                }
+            }
+        },
+    );
 }
 
 /// The Open dialog, through the file chooser portal in Flatpak (DOC-03).

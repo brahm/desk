@@ -14,15 +14,14 @@ use desk_model::{CharAttrs, Document, Field, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
 use crate::editing::{BreakKind, FieldKind, TextEditor};
-use crate::find::{self, FindSlot, Search, SearchSidebar};
+use crate::find::{self, FindWindow, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
-use crate::i18n::{tr, trn};
+use crate::i18n::{n_, tr, trn};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
 use crate::spelling::MistakeKind;
-use crate::spelling_window::SpellingSlot;
 use crate::styles_drawer::StylesDrawer;
 use crate::view::DocumentView;
 use crate::writing_tools::{self, Lookup};
@@ -53,7 +52,8 @@ pub struct DocumentWindow {
     view: DocumentView,
     zoom_button: gtk::MenuButton,
     counts_label: gtk::Label,
-    warnings_button: gtk::Button,
+    /// Says that the document has warnings, with a button to see them.
+    warnings_banner: adw::Banner,
     /// The file of the document; none for an untitled one.
     path: RefCell<Option<PathBuf>>,
     /// The name of the document, which is its file's unless untitled.
@@ -71,7 +71,7 @@ pub struct DocumentWindow {
     /// The search of the window (TXT-12, TXT-13).
     search: Rc<Search>,
     /// The Find & Replace window, made when first shown.
-    find: FindSlot,
+    find: Rc<FindWindow>,
     search_sidebar: Rc<SearchSidebar>,
     search_split: adw::OverlaySplitView,
     navigate_by: gtk::MenuButton,
@@ -79,8 +79,11 @@ pub struct DocumentWindow {
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
     outline: Rc<crate::outline_view::OutlineView>,
     thumbnails_split: adw::OverlaySplitView,
-    /// The Spelling and Grammar window, made when first shown.
-    spelling: SpellingSlot,
+    /// The pages of the right sidebar: the Inspector, the Media Browser
+    /// and Spelling and Grammar, one at a time.
+    side: gtk::Stack,
+    /// Spelling and Grammar, made when first shown.
+    spelling: std::cell::OnceCell<Rc<crate::spelling_window::SpellingWindow>>,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     format_revealer: gtk::Revealer,
@@ -91,6 +94,10 @@ pub struct DocumentWindow {
     /// Whether closing was asked for and answered, so that the window
     /// closes without asking again.
     closing: Cell<bool>,
+    /// The recovery draft of the document, once one is written.
+    draft: RefCell<Option<crate::recovery::Draft>>,
+    /// Whether the document changed since the last draft.
+    draft_due: Cell<bool>,
 }
 
 thread_local! {
@@ -100,8 +107,10 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 61] = [
+const DOCUMENT_ACTIONS: [&str; 63] = [
     "outline",
+    "colors",
+    "format-bar",
     "navigate",
     "thumbnails",
     "delete-page",
@@ -201,6 +210,48 @@ impl DocumentWindow {
         }
         formatting::labelled(&menu_button, &tr("Main Menu"));
         header.pack_end(&menu_button);
+        // The View and Insert menus at the start, and the toggles of the
+        // right sidebar at the end, for a document only.
+        let view_button = gtk::MenuButton::builder()
+            .label(tr("_View"))
+            .use_underline(true)
+            .menu_model(&view_menu())
+            .tooltip_text(tr("View"))
+            .visible(false)
+            .build();
+        view_button.set_always_show_arrow(true);
+        let insert_button = gtk::MenuButton::builder()
+            .label(tr("_Insert"))
+            .use_underline(true)
+            .menu_model(&insert_menu())
+            .tooltip_text(tr("Insert"))
+            .visible(false)
+            .build();
+        insert_button.set_always_show_arrow(true);
+        let media_toggle = gtk::ToggleButton::builder()
+            .icon_name("folder-pictures-symbolic")
+            .action_name("win.media-browser")
+            .tooltip_text(tr("Media Browser"))
+            .visible(false)
+            .build();
+        formatting::labelled(&media_toggle, &tr("Media Browser"));
+        let inspector_toggle = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-right-symbolic")
+            .action_name("win.inspector")
+            .tooltip_text(tr("Inspector"))
+            .visible(false)
+            .build();
+        formatting::labelled(&inspector_toggle, &tr("Inspector"));
+        let document_buttons: [gtk::Widget; 4] = [
+            view_button.clone().upcast(),
+            insert_button.clone().upcast(),
+            media_toggle.clone().upcast(),
+            inspector_toggle.clone().upcast(),
+        ];
+        header.pack_start(&view_button);
+        header.pack_start(&insert_button);
+        header.pack_end(&inspector_toggle);
+        header.pack_end(&media_toggle);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -219,31 +270,25 @@ impl DocumentWindow {
             .build();
         formatting::labelled(&backdrop, &tr("Background"));
         header.pack_end(&backdrop);
-        let warnings_button = gtk::Button::builder()
-            .icon_name("dialog-warning-symbolic")
-            .tooltip_text(tr("Document Warnings"))
+        let warnings_banner = adw::Banner::builder()
+            .title(tr("Some of the document might not show as it was made"))
+            .button_label(tr("_See Warnings"))
             .action_name("win.warnings")
-            .visible(false)
             .build();
-        formatting::labelled(&warnings_button, &tr("Document Warnings"));
-        header.pack_end(&warnings_button);
 
         let status = adw::StatusPage::builder()
             .icon_name(info.id)
             .title(info.name)
             .build();
         if opener.is_some() {
+            // The template gallery, as the window shows when it has no
+            // document (INT-01, INT-03).
+            status.set_icon_name(None);
+            status.set_title(&tr("Choose a Template"));
             status.set_description(Some(&tr(
-                "Open an OpenDocument text or a Pages document to edit it.",
+                "Start a new document, or open an OpenDocument text or a Pages document.",
             )));
-            let open = gtk::Button::builder()
-                .label(tr("_Open a Document…"))
-                .use_underline(true)
-                .action_name("app.open")
-                .halign(gtk::Align::Center)
-                .css_classes(["pill", "suggested-action"])
-                .build();
-            status.set_child(Some(&open));
+            status.set_child(Some(&template_gallery()));
         } else {
             status.set_description(Some(&tr(
                 "This app is at an early stage of development and cannot open documents yet.",
@@ -341,8 +386,14 @@ impl DocumentWindow {
         // The document as an outline (TXT-14).
         let outline = crate::outline_view::OutlineView::new(editor_of());
         stack.add_named(outline.widget(), Some("outline"));
-        let format_revealer = gtk::Revealer::builder()
+        // The format bar scrolls when the window is narrower than it.
+        let format_scroller = gtk::ScrolledWindow::builder()
             .child(format_bar.widget())
+            .vscrollbar_policy(gtk::PolicyType::Never)
+            .propagate_natural_height(true)
+            .build();
+        let format_revealer = gtk::Revealer::builder()
+            .child(&format_scroller)
             .reveal_child(false)
             .build();
         // The page thumbnails, beside the pages (INT-19, EST-17).
@@ -359,9 +410,14 @@ impl DocumentWindow {
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
+        let side = gtk::Stack::builder()
+            .transition_type(gtk::StackTransitionType::Crossfade)
+            .build();
+        side.add_named(inspector.widget(), Some("inspector"));
         let split = adw::OverlaySplitView::builder()
             .content(&search_split)
-            .sidebar(inspector.widget())
+            .sidebar(&side)
+            .min_sidebar_width(300.0)
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
@@ -374,7 +430,10 @@ impl DocumentWindow {
 
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
+        toolbar_view.add_top_bar(&warnings_banner);
         toolbar_view.add_top_bar(&format_revealer);
+        let find = FindWindow::new(editor_of(), search.clone());
+        toolbar_view.add_top_bar(find.widget());
         toolbar_view.set_content(Some(&drawer_split));
         toolbar_view.add_bottom_bar(&bottom_bar);
 
@@ -385,6 +444,40 @@ impl DocumentWindow {
             .default_height(700)
             .content(&toolbar_view)
             .build();
+
+        // On a narrow window the sidebars cover the pages instead of
+        // pushing them, and the format bar keeps what matters most.
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            860.0,
+            adw::LengthUnit::Sp,
+        ));
+        for split in [&thumbnails_split, &search_split, &split, &drawer_split] {
+            narrow.add_setter(split, "collapsed", Some(&true.to_value()));
+        }
+        {
+            let bar = format_bar.clone();
+            narrow.connect_apply(move |_| bar.set_compact(true));
+            let bar = format_bar.clone();
+            narrow.connect_unapply(move |_| bar.set_compact(false));
+        }
+        window.add_breakpoint(narrow);
+        // One sidebar a side when they cover the pages.
+        for (a, b) in [(&thumbnails_split, &drawer_split), (&search_split, &split)] {
+            for (one, other) in [(a, b), (b, a)] {
+                let other = other.downgrade();
+                one.connect_show_sidebar_notify(move |one| {
+                    if let Some(other) = other.upgrade()
+                        && one.is_collapsed()
+                        && one.shows_sidebar()
+                    {
+                        other.set_show_sidebar(false);
+                    }
+                });
+            }
+        }
+        window.set_width_request(360);
+        window.set_height_request(294);
 
         let this = Rc::new(Self {
             window,
@@ -397,7 +490,7 @@ impl DocumentWindow {
             view,
             zoom_button,
             counts_label,
-            warnings_button,
+            warnings_banner,
             path: RefCell::new(None),
             name: RefCell::new(String::new()),
             warnings: RefCell::new(Vec::new()),
@@ -409,7 +502,7 @@ impl DocumentWindow {
             fonts: FontsSlot::default(),
             split,
             search,
-            find: FindSlot::default(),
+            find,
             search_sidebar,
             search_split,
             navigate_by,
@@ -417,13 +510,16 @@ impl DocumentWindow {
             thumbnails,
             thumbnails_split,
             outline,
-            spelling: SpellingSlot::default(),
+            side,
+            spelling: std::cell::OnceCell::new(),
             media_browser: std::cell::OnceCell::new(),
             format_revealer,
             ruler,
             vertical_ruler,
             ruler_corner,
             closing: Cell::new(false),
+            draft: RefCell::new(None),
+            draft_due: Cell::new(false),
         });
         this.add_actions();
         this.show_rulers();
@@ -491,20 +587,48 @@ impl DocumentWindow {
         {
             let bar = bottom_bar.downgrade();
             this.stack.connect_visible_child_name_notify(move |stack| {
+                let document = stack.visible_child_name().as_deref() != Some("empty");
                 if let Some(bar) = bar.upgrade() {
-                    bar.set_revealed(stack.visible_child_name().as_deref() != Some("empty"));
+                    bar.set_revealed(document);
+                }
+                for button in &document_buttons {
+                    button.set_visible(document);
                 }
             });
         }
         this.connect_fullscreen(&leave_fullscreen, &backdrop);
         this.connect_context_menu();
-        this.window
-            .set_help_overlay(Some(&crate::shortcuts::window(opener.is_some())));
+        {
+            let window = this.window.downgrade();
+            let opens = opener.is_some();
+            let shortcuts = gio::SimpleAction::new("shortcuts", None);
+            shortcuts.connect_activate(move |_, _| {
+                if let Some(window) = window.upgrade() {
+                    crate::shortcuts::dialog(opens).present(Some(&window));
+                }
+            });
+            this.window.add_action(&shortcuts);
+        }
         {
             let weak = Rc::downgrade(&this);
             this.window.connect_close_request(move |_| {
-                weak.upgrade()
-                    .map_or(glib::Propagation::Proceed, |this| this.close_request())
+                weak.upgrade().map_or(glib::Propagation::Proceed, |this| {
+                    let propagation = this.close_request();
+                    if propagation == glib::Propagation::Proceed {
+                        this.drop_draft();
+                    }
+                    propagation
+                })
+            });
+        }
+        {
+            let weak = Rc::downgrade(&this);
+            glib::timeout_add_seconds_local(crate::recovery::INTERVAL_SECONDS, move || {
+                let Some(this) = weak.upgrade() else {
+                    return glib::ControlFlow::Break;
+                };
+                this.keep_draft();
+                glib::ControlFlow::Continue
             });
         }
         {
@@ -545,6 +669,11 @@ impl DocumentWindow {
         WINDOWS.with(|w| w.borrow().iter().find(|w| w.is_empty()).cloned())
     }
 
+    /// The window opened last.
+    pub fn last() -> Option<Rc<Self>> {
+        WINDOWS.with(|w| w.borrow().last().cloned())
+    }
+
     fn editor(&self) -> Option<TextEditor> {
         self.editor.borrow().clone()
     }
@@ -572,12 +701,13 @@ impl DocumentWindow {
                 *self.path.borrow_mut() = Some(path.to_owned());
                 *self.name.borrow_mut() = display_name(path);
                 self.show_document(shown.document);
-                self.warnings_button.set_visible(!shown.warnings.is_empty());
+                // A banner says when something may not show as it was made;
+                // fonts with the same metrics in place of others are only
+                // in Document Warnings of the main menu.
+                self.warnings_banner.set_revealed(shown.lossy);
                 *self.warnings.borrow_mut() = shown.warnings;
+                self.enable_warnings();
                 remember_recent(path);
-                if shown.lossy {
-                    self.show_warnings();
-                }
             }
             Err(message) => {
                 self.alert(
@@ -638,6 +768,7 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         editor.connect_changed(move || {
             if let Some(this) = weak.upgrade() {
+                this.draft_due.set(true);
                 this.refresh();
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
@@ -672,7 +803,8 @@ impl DocumentWindow {
                 }
             });
         }
-        self.format_revealer.set_reveal_child(true);
+        self.format_revealer
+            .set_reveal_child(self.action_state("format-bar"));
         self.refresh();
         self.show_format();
     }
@@ -811,8 +943,10 @@ impl DocumentWindow {
             this.warnings
                 .borrow_mut()
                 .retain(|w| w.font.as_deref() != Some(from));
-            this.warnings_button
-                .set_visible(!this.warnings.borrow().is_empty());
+            if this.warnings.borrow().is_empty() {
+                this.warnings_banner.set_revealed(false);
+            }
+            this.enable_warnings();
             true
         };
         crate::warnings::show(
@@ -914,7 +1048,73 @@ impl DocumentWindow {
         });
     }
 
+    /// Writes the recovery draft of the document, when it has changes
+    /// that are not saved nor in the draft yet.
+    fn keep_draft(&self) {
+        let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
+            return;
+        };
+        if !self.draft_due.get() || !editor.is_modified() {
+            return;
+        }
+        let draft = self
+            .draft
+            .borrow_mut()
+            .get_or_insert_with(|| crate::recovery::Draft::new(opener.saves.1))
+            .clone();
+        let written = draft.name_file(&self.name.borrow()).is_ok()
+            && crate::save_document(opener, &editor.document(), None, &draft.path).is_ok();
+        if written {
+            self.draft_due.set(false);
+        }
+    }
+
+    /// Document Warnings is there when the document has warnings.
+    fn enable_warnings(&self) {
+        if let Some(action) = self
+            .window
+            .lookup_action("warnings")
+            .and_downcast::<gio::SimpleAction>()
+        {
+            action.set_enabled(!self.warnings.borrow().is_empty());
+        }
+    }
+
+    /// Drops the recovery draft, when what it kept is saved or given up.
+    fn drop_draft(&self) {
+        if let Some(draft) = self.draft.borrow_mut().take() {
+            draft.remove();
+        }
+        self.draft_due.set(false);
+    }
+
+    /// Shows a document that a recovery draft kept, as a new document
+    /// with the name it had.
+    pub fn recover(self: &Rc<Self>, draft: &crate::recovery::Draft) -> bool {
+        let Some(opener) = self.opener else {
+            return false;
+        };
+        match crate::open_document(opener, &draft.path) {
+            Ok(shown) => {
+                let name = draft.name();
+                let name = if name.is_empty() {
+                    tr("Untitled")
+                } else {
+                    name
+                };
+                self.load_untitled(
+                    shown.document,
+                    tr("{name} (recovered)").replace("{name}", &name),
+                );
+                draft.remove();
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
     fn saved_as(&self, path: &Path) {
+        self.drop_draft();
         *self.path.borrow_mut() = Some(path.to_owned());
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {
@@ -1419,6 +1619,15 @@ impl DocumentWindow {
                 this.window.close();
             }),
         ];
+        let template = gio::SimpleAction::new("new-from-template", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        template.connect_activate(move |_, target| {
+            let (Some(this), Some(target)) = (weak.upgrade(), target.and_then(|t| t.str())) else {
+                return;
+            };
+            this.load_untitled(from_template(target), tr("Untitled"));
+        });
+        self.window.add_action(&template);
         for (name, run) in simple {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
@@ -1429,6 +1638,7 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+        self.enable_warnings();
 
         let weak = Rc::downgrade(self);
         let zoom = gio::SimpleAction::new("zoom", Some(glib::VariantTy::STRING));
@@ -1695,14 +1905,13 @@ impl DocumentWindow {
         self.window.add_action(&delete_page);
 
         let inspector = gio::SimpleAction::new_stateful("inspector", None, &false.to_variant());
-        let split = self.split.downgrade();
-        inspector.connect_change_state(move |action, value| {
-            let (Some(split), Some(on)) = (split.upgrade(), value.and_then(|v| v.get::<bool>()))
+        let weak = Rc::downgrade(self);
+        inspector.connect_change_state(move |_, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
             else {
                 return;
             };
-            action.set_state(&on.to_variant());
-            split.set_show_sidebar(on);
+            this.show_side("inspector", on);
         });
         self.window.add_action(&inspector);
 
@@ -1712,13 +1921,39 @@ impl DocumentWindow {
             let Some(this) = weak.upgrade() else { return };
             let Some(editor) = this.editor() else { return };
             let cell = this.editor.clone();
-            let window = this
-                .fonts
-                .present(&this.window, Rc::new(move || cell.borrow().clone()));
+            this.format_revealer.set_reveal_child(true);
+            let window = this.fonts.present(
+                this.format_bar.font_button(),
+                Rc::new(move || cell.borrow().clone()),
+            );
             let format = editor.format();
             window.show(&format.character, &format.paragraph);
         });
         self.window.add_action(&fonts);
+        let colors = gio::SimpleAction::new("colors", None);
+        let weak = Rc::downgrade(self);
+        colors.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.format_bar.choose_color();
+            }
+        });
+        self.window.add_action(&colors);
+        // The format bar can be hidden for more room (Ctrl+Shift+R).
+        let format_bar = gio::SimpleAction::new_stateful("format-bar", None, &true.to_variant());
+        let revealer = self.format_revealer.downgrade();
+        let stack = self.stack.downgrade();
+        format_bar.connect_change_state(move |action, value| {
+            let (Some(revealer), Some(stack), Some(on)) = (
+                revealer.upgrade(),
+                stack.upgrade(),
+                value.and_then(|v| v.get::<bool>()),
+            ) else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            revealer.set_reveal_child(on && stack.visible_child_name().as_deref() != Some("empty"));
+        });
+        self.window.add_action(&format_bar);
 
         let drawer = gio::SimpleAction::new_stateful("styles-drawer", None, &false.to_variant());
         let weak = Rc::downgrade(self);
@@ -1907,12 +2142,57 @@ impl DocumentWindow {
         });
         self.window.add_action(&import);
         // The sidebar also closes by itself on a narrow window.
-        let window = self.window.downgrade();
-        self.split.connect_show_sidebar_notify(move |split| {
-            if let Some(window) = window.upgrade() {
-                formatting::set_state(&window, "inspector", split.shows_sidebar().to_variant());
+        let weak = Rc::downgrade(self);
+        self.split.connect_show_sidebar_notify(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.sync_side();
             }
         });
+    }
+
+    /// Shows `page` in the right sidebar, or hides the sidebar if it shows
+    /// that page and `on` is false. Media and spelling are made the first
+    /// time they are asked for.
+    fn show_side(self: &Rc<Self>, page: &str, on: bool) {
+        if self.side.child_by_name(page).is_none() {
+            match page {
+                "media" => {
+                    let browser = self.media_browser();
+                    self.side.add_named(browser.widget(), Some("media"));
+                }
+                "spelling" => {
+                    let cell = self.editor.clone();
+                    let spelling = self
+                        .spelling
+                        .get_or_init(|| {
+                            crate::spelling_window::SpellingWindow::new(Rc::new(move || {
+                                cell.borrow().clone()
+                            }))
+                        })
+                        .clone();
+                    self.side.add_named(spelling.widget(), Some("spelling"));
+                }
+                _ => {}
+            }
+        }
+        if on {
+            self.side.set_visible_child_name(page);
+            self.split.set_show_sidebar(true);
+        } else if self.side.visible_child_name().as_deref() == Some(page) {
+            self.split.set_show_sidebar(false);
+        }
+        self.sync_side();
+    }
+
+    /// Puts the states of the toggles of the right sidebar in step with
+    /// what it shows.
+    fn sync_side(&self) {
+        let shown = self.split.shows_sidebar();
+        let page = self.side.visible_child_name();
+        for (action, name) in [("inspector", "inspector"), ("media-browser", "media")] {
+            let on = shown && page.as_deref() == Some(name);
+            formatting::set_state(&self.window, action, on.to_variant());
+        }
     }
 
     /// The formats of the field at the cursor, from its context menu
@@ -2026,12 +2306,7 @@ impl DocumentWindow {
     fn add_find_actions(self: &Rc<Self>) {
         let simple: [(&str, WindowAction); 9] = [
             ("find", |this| {
-                let cell = this.editor.clone();
-                this.find.present(
-                    &this.window,
-                    Rc::new(move || cell.borrow().clone()),
-                    this.search.clone(),
-                );
+                this.find.present();
             }),
             ("find-next", |this| {
                 if let Some(editor) = this.editor() {
@@ -2129,9 +2404,10 @@ impl DocumentWindow {
                 }
             }),
             ("spelling", |this| {
-                let cell = this.editor.clone();
-                this.spelling
-                    .present(&this.window, Rc::new(move || cell.borrow().clone()));
+                this.show_side("spelling", true);
+                if let Some(spelling) = this.spelling.get() {
+                    spelling.present();
+                }
             }),
             ("ignore-spelling", |this| {
                 if let Some(editor) = this.editor() {
@@ -2269,7 +2545,12 @@ impl DocumentWindow {
         menu.append_section(None, &style);
         let tools = gio::Menu::new();
         tools.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
+        tools.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
+        tools.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
         menu.append_section(None, &tools);
+        let page = gio::Menu::new();
+        page.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
+        menu.append_section(None, &page);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(self.view.area());
         popover.set_has_arrow(false);
@@ -2514,6 +2795,9 @@ fn function_key(key: gdk::Key) -> Option<u8> {
 fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     let file = gio::Menu::new();
+    if opens {
+        file.append(Some(&tr("_New Document")), Some("app.new-document"));
+    }
     file.append(Some(&tr("_New Window")), Some("app.new-window"));
     if opens {
         file.append(Some(&tr("_Open…")), Some("app.open"));
@@ -2528,41 +2812,10 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         save.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
         menu.append_section(None, &save);
         let document = gio::Menu::new();
-        document.append(Some(&tr("Show _Fonts")), Some("win.fonts"));
-        document.append(Some(&tr("Show _Styles Drawer")), Some("win.styles-drawer"));
-        document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
-        document.append(Some(&tr("Show _Layout")), Some("win.show-layout"));
-        document.append(Some(&tr("Show Page _Thumbnails")), Some("win.thumbnails"));
-        document.append(Some(&tr("Show as _Outline")), Some("win.outline"));
-        document.append(Some(&tr("Show _Media Browser")), Some("win.media-browser"));
-        document.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
-        document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
+        document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
+        document.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
         menu.append_section(None, &document);
-        let find = gio::Menu::new();
-        find.append(Some(&tr("_Find & Replace…")), Some("win.find"));
-        find.append(Some(&tr("_Search…")), Some("win.search"));
-        find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
-        find.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
-        find.append_submenu(Some(&tr("_Insert")), &insert_menu());
-        find.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
-        find.append(
-            Some(&tr("Special _Characters…")),
-            Some("win.special-characters"),
-        );
-        menu.append_section(None, &find);
-        let styles = gio::Menu::new();
-        styles.append(
-            Some(&tr("Copy _Paragraph Style")),
-            Some("win.copy-paragraph-style"),
-        );
-        styles.append(
-            Some(&tr("Copy C_haracter Style")),
-            Some("win.copy-character-style"),
-        );
-        styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
-        styles.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
-        menu.append_section(None, &styles);
     }
     let close = gio::Menu::new();
     close.append(Some(&tr("C_lose")), Some("win.close"));
@@ -2570,10 +2823,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     menu.append_section(None, &close);
     let help = gio::Menu::new();
     help.append(Some(&tr("_Preferences")), Some("app.preferences"));
-    help.append(
-        Some(&tr("_Keyboard Shortcuts")),
-        Some("win.show-help-overlay"),
-    );
+    help.append(Some(&tr("_Keyboard Shortcuts")), Some("win.shortcuts"));
     help.append(
         Some(&tr("_About {app}").replace("{app}", info.name)),
         Some("app.about"),
@@ -2586,6 +2836,119 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
 /// (DOC-14).
 fn copy_name(name: &str) -> String {
     tr("{name} copy").replace("{name}", name)
+}
+
+/// The templates of the gallery: their action targets and names.
+const TEMPLATES: [(&str, &str); 2] = [("blank", n_("Blank")), ("layout", n_("Blank Layout"))];
+
+/// The template gallery of an empty window: a card for each template,
+/// and Open.
+fn template_gallery() -> gtk::Box {
+    let cards = gtk::Box::builder()
+        .spacing(18)
+        .homogeneous(true)
+        .halign(gtk::Align::Center)
+        .build();
+    for (target, name) in TEMPLATES {
+        let page = gtk::Box::builder()
+            .width_request(120)
+            .height_request(170)
+            .css_classes(["desk-template-page"])
+            .build();
+        if target == "layout" {
+            page.add_css_class("desk-template-layout");
+        }
+        let label = gtk::Label::new(Some(&tr(name)));
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(9)
+            .build();
+        content.append(&page);
+        content.append(&label);
+        let button = gtk::Button::builder()
+            .child(&content)
+            .action_name("win.new-from-template")
+            .action_target(&target.to_variant())
+            .css_classes(["flat", "desk-template"])
+            .build();
+        formatting::labelled(&button, &tr(name));
+        cards.append(&button);
+    }
+    let open = gtk::Button::builder()
+        .label(tr("_Open a Document…"))
+        .use_underline(true)
+        .action_name("app.open")
+        .halign(gtk::Align::Center)
+        .css_classes(["pill"])
+        .build();
+    let gallery = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(24)
+        .build();
+    gallery.append(&cards);
+    gallery.append(&open);
+    gallery
+}
+
+/// A new document from a template of the gallery.
+fn from_template(target: &str) -> Document {
+    match target {
+        "layout" => Document::new_page_layout(),
+        _ => Document::new_word_processing(),
+    }
+}
+
+/// The View menu of the header bar: what the window shows.
+fn view_menu() -> gio::Menu {
+    let panes = gio::Menu::new();
+    panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
+    panes.append(Some(&tr("_Styles Drawer")), Some("win.styles-drawer"));
+    panes.append(Some(&tr("Se_arch Sidebar")), Some("win.search"));
+    panes.append(Some(&tr("Spe_lling and Grammar")), Some("win.spelling"));
+    let document = gio::Menu::new();
+    document.append(Some(&tr("As _Outline")), Some("win.outline"));
+    document.append(Some(&tr("_Ruler")), Some("win.ruler"));
+    document.append(Some(&tr("_Layout")), Some("win.show-layout"));
+    document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
+    document.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
+    let window = gio::Menu::new();
+    window.append_submenu(Some(&tr("_Zoom")), &zoom_menu());
+    window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
+    let menu = gio::Menu::new();
+    menu.append_section(None, &panes);
+    menu.append_section(None, &document);
+    menu.append_section(None, &window);
+    menu
+}
+
+/// The Format menu at the end of the format bar: fonts, colors and
+/// styles.
+pub(crate) fn format_menu() -> gio::Menu {
+    let fonts = gio::Menu::new();
+    fonts.append(Some(&tr("_Fonts…")), Some("win.fonts"));
+    fonts.append(Some(&tr("_Colors…")), Some("win.colors"));
+    fonts.append(
+        Some(&tr("Special _Characters…")),
+        Some("win.special-characters"),
+    );
+    let styles = gio::Menu::new();
+    styles.append(
+        Some(&tr("Copy _Paragraph Style")),
+        Some("win.copy-paragraph-style"),
+    );
+    styles.append(
+        Some(&tr("Copy C_haracter Style")),
+        Some("win.copy-character-style"),
+    );
+    styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
+    styles.append(
+        Some(&tr("Paste and _Match Style")),
+        Some("win.paste-match-style"),
+    );
+    let menu = gio::Menu::new();
+    menu.append_section(None, &fonts);
+    menu.append_section(None, &styles);
+    menu
 }
 
 /// The breaks, fields, notes, tables of contents, links and bookmarks of
@@ -2630,7 +2993,7 @@ fn insert_menu() -> gio::Menu {
     menu
 }
 
-/// Spelling and Grammar, in the main menu (TXT-10, TXT-11).
+/// Spelling and Grammar, in the context menu (TXT-10, TXT-11).
 fn spelling_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(
@@ -2651,7 +3014,7 @@ fn spelling_menu() -> gio::Menu {
     menu
 }
 
-/// The Writing Tools of the main and context menus (INT-20).
+/// The Writing Tools of the context menu (INT-20).
 fn writing_tools_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(

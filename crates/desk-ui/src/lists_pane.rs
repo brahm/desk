@@ -11,6 +11,7 @@
 //! style, as Pages does, which shows the style with a red arrow in the
 //! Styles drawer until it is redefined from the selection.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -145,22 +146,22 @@ const MAX_SIZE: f64 = 400.0;
 
 /// The bullets and numbering of the Inspector.
 pub struct ListsGroup {
-    group: adw::PreferencesGroup,
-    kind: adw::ComboRow,
-    level: adw::SpinRow,
-    bullet: adw::EntryRow,
+    group: compact::Group,
+    kind: compact::ComboRow,
+    level: compact::SpinRow,
+    bullet: compact::EntryRow,
     /// The picture of an image bullet, and the button that chooses one.
-    image: adw::ActionRow,
+    image: compact::ActionRow,
     image_menu: gtk::MenuButton,
     image_preview: gtk::Image,
-    number: adw::ComboRow,
-    continues: adw::SwitchRow,
-    start: adw::SpinRow,
-    label_indent: adw::SpinRow,
-    text_indent: adw::SpinRow,
-    size: adw::SpinRow,
-    scale: adw::SwitchRow,
-    raise: adw::SpinRow,
+    number: compact::ComboRow,
+    continues: compact::SwitchRow,
+    start: compact::SpinRow,
+    label_indent: compact::SpinRow,
+    text_indent: compact::SpinRow,
+    size: compact::SpinRow,
+    scale: compact::SwitchRow,
+    raise: compact::SpinRow,
     color: ColorRow,
     /// The list style and the level shown, which the rows change, and
     /// the definition of the level that the item has.
@@ -173,16 +174,16 @@ pub struct ListsGroup {
 impl ListsGroup {
     /// The bullets and numbering of the Inspector of a window.
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
-        let group = adw::PreferencesGroup::builder()
+        let group = compact::Group::builder()
             .title(gtk::glib::markup_escape_text(&tr("Bullets & Numbering")))
             .build();
-        let kind = adw::ComboRow::builder()
+        let kind = compact::ComboRow::builder()
             .title(tr("List"))
             .model(&string_list(KINDS.map(Kind::name)))
             .build();
-        let level = adw::SpinRow::with_range(1.0, desk_model::LIST_LEVELS as f64, 1.0);
+        let level = compact::SpinRow::with_range(1.0, desk_model::LIST_LEVELS as f64, 1.0);
         level.set_title(&tr("Indent Level"));
-        let bullet = adw::EntryRow::builder()
+        let bullet = compact::EntryRow::builder()
             .title(tr("Bullet"))
             .show_apply_button(true)
             .build();
@@ -192,35 +193,35 @@ impl ListsGroup {
             .valign(gtk::Align::Center)
             .tooltip_text(tr("Choose the Picture of the Bullets"))
             .build();
-        let image = adw::ActionRow::builder().title(tr("Image")).build();
+        let image = compact::ActionRow::builder().title(tr("Image")).build();
         image.add_suffix(&image_menu);
         image.set_activatable_widget(Some(&image_menu));
-        let number = adw::ComboRow::builder()
+        let number = compact::ComboRow::builder()
             .title(tr("Number Format"))
             .model(&string_list(NUMBERS.map(number_name)))
             .build();
-        let continues = adw::SwitchRow::builder()
+        let continues = compact::SwitchRow::builder()
             .title(tr("Continue from Previous"))
             .build();
-        let start = adw::SpinRow::with_range(1.0, 9999.0, 1.0);
+        let start = compact::SpinRow::with_range(1.0, 9999.0, 1.0);
         start.set_title(&tr("Start At"));
-        let label_indent = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+        let label_indent = compact::SpinRow::with_range(0.0, 1.0, 1.0);
         label_indent.set_title(&tr("Bullet Indent"));
-        let text_indent = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+        let text_indent = compact::SpinRow::with_range(0.0, 1.0, 1.0);
         text_indent.set_title(&tr("Text Indent"));
-        let size = adw::SpinRow::with_range(1.0, MAX_SIZE, 1.0);
+        let size = compact::SpinRow::with_range(1.0, MAX_SIZE, 1.0);
         size.set_title(&tr("Size"));
         size.set_subtitle(&tr("Percent"));
-        let scale = adw::SwitchRow::builder()
+        let scale = compact::SwitchRow::builder()
             .title(tr("Scale with Text"))
             .build();
-        let raise = adw::SpinRow::with_range(-100.0, 100.0, 0.5);
+        let raise = compact::SpinRow::with_range(-100.0, 100.0, 0.5);
         raise.set_title(&tr("Align"));
         raise.set_subtitle(&tr("Points above the baseline"));
         raise.set_digits(1);
         let color = ColorRow::new(&tr("Label Color"), desk_model::Rgba::BLACK);
         for row in [
-            kind.upcast_ref::<gtk::Widget>(),
+            kind.upcast_ref(),
             level.upcast_ref(),
             bullet.upcast_ref(),
             image.upcast_ref(),
@@ -465,7 +466,7 @@ impl ListsGroup {
             }
             let filter = gtk::FileFilter::new();
             filter.set_name(Some(&tr("Images")));
-            filter.add_pixbuf_formats();
+            filter.add_mime_type("image/*");
             let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
             filters.append(&filter);
             let dialog = gtk::FileDialog::builder()
@@ -539,7 +540,7 @@ impl ListsGroup {
     }
 
     /// The group to put in the Inspector.
-    pub fn widget(&self) -> &adw::PreferencesGroup {
+    pub fn widget(&self) -> &compact::Group {
         &self.group
     }
 
@@ -629,7 +630,7 @@ impl ListsGroup {
         for row in self.rows() {
             row.set_visible(true);
         }
-        let set = |row: &adw::SpinRow, value: f64| {
+        let set = |row: &compact::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
             }

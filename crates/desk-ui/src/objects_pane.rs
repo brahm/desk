@@ -6,6 +6,7 @@
 //! is rotated and whether it is flipped; how the text goes around it, and
 //! whether it is locked.
 
+use crate::compact;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -34,37 +35,37 @@ const LARGEST: f64 = 10_000.0;
 
 /// The Metrics and Wrap groups of the Inspector.
 pub struct ObjectGroups {
-    metrics: adw::PreferencesGroup,
-    wrap_group: adw::PreferencesGroup,
+    metrics: compact::Group,
+    wrap_group: compact::Group,
     /// The top left corner of the box that holds the object as it is
     /// turned (OBJ-29).
-    x: adw::SpinRow,
-    y: adw::SpinRow,
+    x: compact::SpinRow,
+    y: compact::SpinRow,
     /// Where a line starts and ends on the page, in place of its box.
-    ends: [adw::SpinRow; 4],
-    width: adw::SpinRow,
-    height: adw::SpinRow,
-    keep_proportions: adw::SwitchRow,
+    ends: [compact::SpinRow; 4],
+    width: compact::SpinRow,
+    height: compact::SpinRow,
+    keep_proportions: compact::SwitchRow,
     /// Sets a picture to the size it was made at (OBJ-33).
-    original_size: adw::ActionRow,
-    rotation: adw::SpinRow,
-    wrap: adw::ComboRow,
+    original_size: compact::ActionRow,
+    rotation: compact::SpinRow,
+    wrap: compact::ComboRow,
     /// Whether the text goes around the outline of the object rather
     /// than its box (OBJ-17).
-    tight: adw::SwitchRow,
+    tight: compact::SwitchRow,
     /// How opaque a pixel of a picture must be, in percent, for the text
     /// that wraps tightly to go around it (OBJ-17).
-    threshold: adw::SpinRow,
-    margin: adw::SpinRow,
-    locked: adw::SwitchRow,
+    threshold: compact::SpinRow,
+    margin: compact::SpinRow,
+    locked: compact::SwitchRow,
     /// Whether the object is in the line of the text (OBJ-01).
-    inline: adw::SwitchRow,
+    inline: compact::SwitchRow,
     /// The room between the frame of a text box and its text (OBJ-13).
-    inset: adw::SpinRow,
+    inset: compact::SpinRow,
     /// Where the text of a text box sits, and its columns.
-    text_group: adw::PreferencesGroup,
-    vertical: adw::ComboRow,
-    columns: adw::SpinRow,
+    text_group: compact::Group,
+    vertical: compact::ComboRow,
+    columns: compact::SpinRow,
     /// What fills the objects, their lines and their shadows.
     graphic: Rc<crate::graphic_pane::GraphicGroup>,
     /// The mask, Instant Alpha and adjustments of a picture.
@@ -184,7 +185,7 @@ pub(crate) fn set_line_ends(object: &mut desk_model::Object, start: (f64, f64), 
 impl ObjectGroups {
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
         let spin = |title: &str, min: f64, max: f64| {
-            let row = adw::SpinRow::with_range(min, max, 1.0);
+            let row = compact::SpinRow::with_range(min, max, 1.0);
             row.set_title(title);
             row
         };
@@ -198,7 +199,7 @@ impl ObjectGroups {
             spin(&tr("End X"), -LARGEST, LARGEST),
             spin(&tr("End Y"), -LARGEST, LARGEST),
         ];
-        let keep_proportions = adw::SwitchRow::builder()
+        let keep_proportions = compact::SwitchRow::builder()
             .title(tr("Constrain Proportions"))
             .build();
         let rotation = spin(&tr("Rotate"), 0.0, 359.0);
@@ -229,16 +230,14 @@ impl ObjectGroups {
             crate::formatting::labelled(&button, &label);
             flips.append(&button);
         }
-        let flip = adw::ActionRow::builder().title(tr("Flip")).build();
+        let flip = compact::ActionRow::builder().title(tr("Flip")).build();
         flip.add_suffix(&flips);
-        let metrics = adw::PreferencesGroup::builder()
-            .title(tr("Metrics"))
-            .build();
+        let metrics = compact::Group::builder().title(tr("Metrics")).build();
         for row in [&x, &y].into_iter().chain(&ends).chain([&width, &height]) {
             metrics.add(row);
         }
         metrics.add(&keep_proportions);
-        let original_size = adw::ActionRow::builder()
+        let original_size = compact::ActionRow::builder()
             .title(tr("Original Size"))
             .subtitle(tr("The size the picture was made at"))
             .activatable(true)
@@ -259,11 +258,11 @@ impl ObjectGroups {
         ]
         .into();
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
-        let wrap = adw::ComboRow::builder()
+        let wrap = compact::ComboRow::builder()
             .title(tr("Text Wrap"))
             .model(&gtk::StringList::new(&names))
             .build();
-        let tight = adw::SwitchRow::builder()
+        let tight = compact::SwitchRow::builder()
             .title(tr("Tight"))
             .subtitle(tr(
                 "Around the outline of a shape or the opaque part of a picture",
@@ -274,16 +273,16 @@ impl ObjectGroups {
             "How opaque the picture must be for the text to go around it, in percent",
         ));
         let margin = spin(&tr("Extra Space"), 0.0, 1584.0);
-        let locked = adw::SwitchRow::builder()
+        let locked = compact::SwitchRow::builder()
             .title(tr("Locked"))
             .subtitle(tr("Cannot be moved, resized or deleted"))
             .build();
         let inset = spin(&tr("Inset"), 0.0, 1584.0);
-        let inline = adw::SwitchRow::builder()
+        let inline = compact::SwitchRow::builder()
             .title(tr("Inline with Text"))
             .subtitle(tr("Moves with the text, as a character"))
             .build();
-        let wrap_group = adw::PreferencesGroup::builder().title(tr("Wrap")).build();
+        let wrap_group = compact::Group::builder().title(tr("Wrap")).build();
         wrap_group.add(&inline);
         wrap_group.add(&wrap);
         wrap_group.add(&tight);
@@ -292,16 +291,14 @@ impl ObjectGroups {
         wrap_group.add(&locked);
         let vertical_names = [tr("Top"), tr("Middle"), tr("Bottom")];
         let vertical_names: Vec<&str> = vertical_names.iter().map(String::as_str).collect();
-        let vertical = adw::ComboRow::builder()
+        let vertical = compact::ComboRow::builder()
             .title(tr("Vertical Alignment"))
             .model(&gtk::StringList::new(&vertical_names))
             .build();
         let columns =
-            adw::SpinRow::with_range(1.0, f64::from(desk_model::MAX_TEXT_BOX_COLUMNS), 1.0);
+            compact::SpinRow::with_range(1.0, f64::from(desk_model::MAX_TEXT_BOX_COLUMNS), 1.0);
         columns.set_title(&tr("Columns"));
-        let text_group = adw::PreferencesGroup::builder()
-            .title(tr("Text Box"))
-            .build();
+        let text_group = compact::Group::builder().title(tr("Text Box")).build();
         text_group.add(&inset);
         text_group.add(&vertical);
         text_group.add(&columns);
@@ -373,7 +370,8 @@ impl ObjectGroups {
                 }
                 let Some(editor) = editor() else { return };
                 let units = this.units.get();
-                let points = |row: &adw::SpinRow| tab_stops::from_units(row.value(), units).to_pt();
+                let points =
+                    |row: &compact::SpinRow| tab_stops::from_units(row.value(), units).to_pt();
                 let [sx, sy, ex, ey] = this.ends.each_ref().map(points);
                 editor.set_object("Move", |object| {
                     set_line_ends(object, (sx, sy), (ex, ey));
@@ -536,7 +534,7 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 7] {
+    pub fn groups(&self) -> [&compact::Group; 7] {
         [
             &self.metrics,
             self.shape.group(),
@@ -577,7 +575,7 @@ impl ObjectGroups {
         };
         self.updating.set(true);
         let units = self.units.get();
-        let set = |row: &adw::SpinRow, value: f64| {
+        let set = |row: &compact::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
             }

@@ -10,6 +10,7 @@
 //! its own replaces the number of the note; an empty one gives the number
 //! back.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -113,13 +114,13 @@ const NUMBERINGS: [NoteNumbering; 3] = [
 
 /// The Notes group of the Inspector.
 pub struct NotesGroup {
-    group: adw::PreferencesGroup,
-    kind: adw::ComboRow,
-    format: adw::ComboRow,
-    numbering: adw::ComboRow,
-    gap: adw::SpinRow,
-    text: adw::EntryRow,
-    mark: adw::EntryRow,
+    group: compact::Group,
+    kind: compact::ComboRow,
+    format: compact::ComboRow,
+    numbering: compact::ComboRow,
+    gap: compact::SpinRow,
+    text: compact::EntryRow,
+    mark: compact::EntryRow,
     units: Cell<Units>,
     shown: RefCell<(NoteSettings, Option<Note>)>,
     updating: Cell<bool>,
@@ -129,7 +130,7 @@ pub struct NotesGroup {
 impl NotesGroup {
     /// The group for the editor of a window.
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
-        let kind = adw::ComboRow::builder()
+        let kind = compact::ComboRow::builder()
             .title(tr("Notes"))
             .model(&string_list([
                 tr("Footnotes"),
@@ -137,7 +138,7 @@ impl NotesGroup {
                 tr("Endnotes at the End of Each Section"),
             ]))
             .build();
-        let format = adw::ComboRow::builder()
+        let format = compact::ComboRow::builder()
             .title(tr("Format"))
             .model(&string_list([
                 "1, 2, 3".to_owned(),
@@ -145,7 +146,7 @@ impl NotesGroup {
                 "*, †, ‡".to_owned(),
             ]))
             .build();
-        let numbering = adw::ComboRow::builder()
+        let numbering = compact::ComboRow::builder()
             .title(tr("Numbering"))
             .model(&string_list([
                 tr("Continuous"),
@@ -153,17 +154,17 @@ impl NotesGroup {
                 tr("Restart on Each Section"),
             ]))
             .build();
-        let gap = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+        let gap = compact::SpinRow::with_range(0.0, 1.0, 1.0);
         gap.set_title(&tr("Space Between Notes"));
-        let text = adw::EntryRow::builder()
+        let text = compact::EntryRow::builder()
             .title(tr("Note at the Cursor"))
             .show_apply_button(true)
             .build();
-        let mark = adw::EntryRow::builder()
+        let mark = compact::EntryRow::builder()
             .title(tr("Mark of Its Own"))
             .show_apply_button(true)
             .build();
-        let group = adw::PreferencesGroup::builder()
+        let group = compact::Group::builder()
             .title(tr("Footnotes and Endnotes"))
             .description(tr(
                 "Insert ▸ Footnote adds a note at the cursor. Its text is edited here.",
@@ -233,7 +234,7 @@ impl NotesGroup {
     }
 
     /// The group.
-    pub fn widget(&self) -> &adw::PreferencesGroup {
+    pub fn widget(&self) -> &compact::Group {
         &self.group
     }
 
@@ -256,7 +257,7 @@ impl NotesGroup {
     fn show_parts(&self, settings: NoteSettings, note: Option<Note>) {
         *self.shown.borrow_mut() = (settings, note.clone());
         self.updating.set(true);
-        let select = |row: &adw::ComboRow, index: Option<usize>| {
+        let select = |row: &compact::ComboRow, index: Option<usize>| {
             let index = index.unwrap_or(0) as u32;
             if row.selected() != index {
                 row.set_selected(index);
@@ -292,7 +293,7 @@ impl NotesGroup {
 
     fn settings_changed(&self) {
         let (shown, _) = self.shown.borrow().clone();
-        let pick = |row: &adw::ComboRow| row.selected() as usize;
+        let pick = |row: &compact::ComboRow| row.selected() as usize;
         let settings = NoteSettings {
             kind: KINDS.get(pick(&self.kind)).copied().unwrap_or(shown.kind),
             format: FORMATS

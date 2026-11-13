@@ -9,9 +9,9 @@
 //! and alignment) are actions of the window, which the keyboard shortcuts
 //! also run; the rest calls the editor through `editor`.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::Arc;
 
 use adw::prelude::*;
 use desk_model::{Alignment, CharAttrs, Length, LineSpacing, ParaAttrs, Rgba, StyleId};
@@ -83,6 +83,9 @@ pub struct FormatBar {
     font: gtk::Button,
     size: gtk::SpinButton,
     color: gtk::ColorDialogButton,
+    /// What a narrow window leaves out: the alignments and the columns,
+    /// which the Inspector and the Format menu also have.
+    secondary: [gtk::Widget; 2],
     /// Set while the bar shows the formatting at the selection, so that
     /// showing it does not change it.
     updating: Cell<bool>,
@@ -109,6 +112,7 @@ impl FormatBar {
         root.append(&styles);
 
         let font = gtk::Button::builder()
+            .action_name("win.fonts")
             .tooltip_text(tr("Font"))
             .width_request(140)
             .build();
@@ -200,13 +204,13 @@ impl FormatBar {
 
         let spacer = gtk::Box::builder().hexpand(true).build();
         root.append(&spacer);
-        let inspector = gtk::ToggleButton::builder()
-            .icon_name("sidebar-show-right-symbolic")
-            .action_name("win.inspector")
-            .tooltip_text(tr("Inspector"))
+        let format = gtk::MenuButton::builder()
+            .label(tr("Format"))
+            .menu_model(&crate::window::format_menu())
+            .tooltip_text(tr("Format"))
             .build();
-        labelled(&inspector, &tr("Inspector"));
-        root.append(&inspector);
+        format.set_always_show_arrow(true);
+        root.append(&format);
 
         let this = Rc::new(Self {
             root,
@@ -215,10 +219,28 @@ impl FormatBar {
             font,
             size,
             color,
+            secondary: [alignments.upcast(), columns.upcast()],
             updating: Cell::new(false),
         });
         this.connect(editor);
         this
+    }
+
+    /// Leaves out the secondary controls, on a narrow window.
+    pub fn set_compact(&self, compact: bool) {
+        for widget in &self.secondary {
+            widget.set_visible(!compact);
+        }
+    }
+
+    /// The font button, where the Fonts popover opens.
+    pub fn font_button(&self) -> &gtk::Button {
+        &self.font
+    }
+
+    /// Opens the color chooser of the text color.
+    pub fn choose_color(&self) {
+        self.color.activate();
     }
 
     /// The widget to put under the header bar.
@@ -243,40 +265,6 @@ impl FormatBar {
                 editor.set_paragraph_style(id);
                 editor.focus();
             }
-        });
-
-        let of = editor.clone();
-        self.font.connect_clicked(move |button| {
-            let current = button.label().unwrap_or_default();
-            let installed = button
-                .pango_context()
-                .list_families()
-                .into_iter()
-                .find(|f| f.name().eq_ignore_ascii_case(&current));
-            let window = button.root().and_downcast::<gtk::Window>();
-            let of = of.clone();
-            gtk::FontDialog::builder()
-                .title(tr("Font"))
-                .modal(true)
-                .build()
-                .choose_family(
-                    window.as_ref(),
-                    installed.as_ref(),
-                    gtk::gio::Cancellable::NONE,
-                    move |result| {
-                        let (Ok(family), Some(editor)) = (result, of()) else {
-                            return;
-                        };
-                        editor.set_character_attrs(
-                            "Font",
-                            &CharAttrs {
-                                font_family: Some(Arc::from(family.name().as_str())),
-                                ..CharAttrs::default()
-                            },
-                        );
-                        editor.focus();
-                    },
-                );
         });
 
         let weak = Rc::downgrade(self);
@@ -367,20 +355,22 @@ impl FormatBar {
 /// The Inspector: the spacing and indents of the paragraphs (the Text
 /// inspector of Pages).
 pub struct Inspector {
-    root: gtk::ScrolledWindow,
-    line_spacing: adw::SpinRow,
-    before: adw::SpinRow,
-    after: adw::SpinRow,
-    first_line: adw::SpinRow,
-    left: adw::SpinRow,
-    right: adw::SpinRow,
+    root: gtk::Box,
+    /// The panes, kept for the handlers that follow what is selected.
+    _panes: Rc<InspectorPanes>,
+    line_spacing: compact::SpinRow,
+    before: compact::SpinRow,
+    after: compact::SpinRow,
+    first_line: compact::SpinRow,
+    left: compact::SpinRow,
+    right: compact::SpinRow,
     /// Whether words break with hyphens (TXT-09).
-    hyphenate: adw::SwitchRow,
+    hyphenate: compact::SwitchRow,
     /// Whether the document is hyphenated and has ligatures at all.
-    document_hyphenation: adw::SwitchRow,
-    document_ligatures: adw::SwitchRow,
+    document_hyphenation: compact::SwitchRow,
+    document_ligatures: compact::SwitchRow,
     /// Whether pages face each other (EST-11).
-    facing_pages: adw::SwitchRow,
+    facing_pages: compact::SwitchRow,
     tabs: Rc<TabStopsGroup>,
     layouts: Rc<LayoutGroups>,
     headers: Rc<crate::headers_pane::HeadersGroup>,
@@ -453,7 +443,7 @@ impl Inspector {
     /// An Inspector for the editor of a window.
     pub fn new(editor: EditorOf) -> Rc<Self> {
         let row = |title: &str, subtitle: &str, min: f64, max: f64, step: f64, digits: u32| {
-            let row = adw::SpinRow::with_range(min, max, step);
+            let row = compact::SpinRow::with_range(min, max, step);
             row.set_title(title);
             row.set_subtitle(subtitle);
             row.set_digits(digits);
@@ -476,81 +466,109 @@ impl Inspector {
         let toc = crate::links_pane::TocGroup::new(editor.clone());
         let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
 
-        let spacing = adw::PreferencesGroup::builder()
-            .title(tr("Spacing"))
-            .build();
+        let spacing = compact::Group::builder().title(tr("Spacing")).build();
         spacing.add(&line_spacing);
         spacing.add(&before);
         spacing.add(&after);
-        let indents = adw::PreferencesGroup::builder()
-            .title(tr("Indents"))
-            .build();
+        let indents = compact::Group::builder().title(tr("Indents")).build();
         indents.add(&first_line);
         indents.add(&left);
         indents.add(&right);
-        let hyphenate = adw::SwitchRow::builder()
+        let hyphenate = compact::SwitchRow::builder()
             .title(tr("Hyphenate Words"))
             .subtitle(tr("At the ends of lines, in the language of the text"))
             .build();
-        let hyphenation = adw::PreferencesGroup::builder()
-            .title(tr("Hyphenation"))
-            .build();
+        let hyphenation = compact::Group::builder().title(tr("Hyphenation")).build();
         hyphenation.add(&hyphenate);
-        let document_hyphenation = adw::SwitchRow::builder()
+        let document_hyphenation = compact::SwitchRow::builder()
             .title(tr("Hyphenate the Document"))
             .subtitle(tr("In every paragraph that allows it"))
             .build();
-        let document_ligatures = adw::SwitchRow::builder()
+        let document_ligatures = compact::SwitchRow::builder()
             .title(tr("Use Ligatures"))
             .subtitle(tr("In the whole document"))
             .build();
-        let facing_pages = adw::SwitchRow::builder()
+        let facing_pages = compact::SwitchRow::builder()
             .title(tr("Facing Pages"))
             .subtitle(tr("Left and right pages swap their margins, as in a book"))
             .build();
-        let document = adw::PreferencesGroup::builder()
-            .title(tr("Document"))
-            .build();
+        let document = compact::Group::builder().title(tr("Document")).build();
         document.add(&document_hyphenation);
         document.add(&document_ligatures);
         document.add(&facing_pages);
-        let content = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(18)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
-            .build();
-        for group in objects.groups() {
-            content.append(group);
-        }
-        content.append(&spacing);
-        content.append(&indents);
-        content.append(&hyphenation);
-        content.append(tabs.widget());
-        content.append(lists.widget());
-        for group in effects.groups() {
-            content.append(group);
-        }
-        for group in layouts.groups() {
-            content.append(group);
-        }
-        content.append(headers.widget());
-        content.append(notes.widget());
-        content.append(toc.widget());
-        for group in links.groups() {
-            content.append(group);
-        }
-        content.append(&document);
-        let root = gtk::ScrolledWindow::builder()
-            .child(&content)
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .width_request(280)
-            .build();
+        // The panes of the Inspector of Pages, in its order (C of the
+        // interface plan). Table, Chart and QuickTime show only when such
+        // an object is selected; Desk Writer has QuickTime so far.
+        let [metrics, shape, picture, media, graphic, wrap, text_box] = objects.groups();
+        let [character, text_shadow, borders] = effects.groups();
+        let [page, layout, section] = layouts.groups();
+        let [link, bookmarks] = links.groups();
+        let panes = InspectorPanes::new(&[
+            (
+                "document",
+                n_("Document"),
+                "x-office-document-symbolic",
+                &[
+                    page,
+                    &document,
+                    headers.widget(),
+                    notes.widget(),
+                    toc.widget(),
+                ],
+            ),
+            (
+                "layout",
+                n_("Layout"),
+                "view-dual-symbolic",
+                &[layout, section],
+            ),
+            ("wrap", n_("Wrap"), "format-indent-more-symbolic", &[wrap]),
+            (
+                "text",
+                n_("Text"),
+                "insert-text-symbolic",
+                &[
+                    &spacing,
+                    &indents,
+                    lists.widget(),
+                    tabs.widget(),
+                    &hyphenation,
+                    character,
+                    borders,
+                    text_box,
+                ],
+            ),
+            (
+                "graphic",
+                n_("Graphic"),
+                "applications-graphics-symbolic",
+                &[graphic, shape, picture, text_shadow],
+            ),
+            (
+                "metrics",
+                n_("Metrics"),
+                "zoom-fit-best-symbolic",
+                &[metrics],
+            ),
+            (
+                "link",
+                n_("Link"),
+                "insert-link-symbolic",
+                &[link, bookmarks],
+            ),
+            (
+                "quicktime",
+                n_("QuickTime"),
+                "video-x-generic-symbolic",
+                &[media],
+            ),
+        ]);
+        panes.show_only_with("quicktime", media);
+        let root = panes.widget().clone();
 
         let this = Rc::new(Self {
             root,
+            _panes: panes,
             line_spacing,
             before,
             after,
@@ -658,7 +676,7 @@ impl Inspector {
     }
 
     /// The widget to put at the side of the window.
-    pub fn widget(&self) -> &gtk::ScrolledWindow {
+    pub fn widget(&self) -> &gtk::Box {
         &self.root
     }
 
@@ -688,7 +706,7 @@ impl Inspector {
         self.objects.show_format(format);
         self.updating.set(true);
         let paragraph = &format.paragraph;
-        let set = |row: &adw::SpinRow, value: f64| {
+        let set = |row: &compact::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
             }
@@ -763,6 +781,165 @@ pub fn set_state(window: &impl IsA<gtk::gio::ActionMap>, name: &str, value: glib
         && action.state().as_ref() != Some(&value)
     {
         action.set_state(&value);
+    }
+}
+
+/// The panes of the Inspector, one at a time, chosen by a row of toggles at
+/// its top as in Pages. A pane whose groups all hide says that nothing it
+/// sets is selected.
+/// The toggle of a pane of the Inspector.
+fn pane_toggle(name: &str, title: &str, icon: &str) -> adw::Toggle {
+    adw::Toggle::builder()
+        .name(name)
+        .icon_name(icon)
+        .tooltip(title)
+        .build()
+}
+
+struct InspectorPanes {
+    root: gtk::Box,
+    toggles: adw::ToggleGroup,
+    stack: gtk::Stack,
+    /// The names, titles and icons of the panes, in order.
+    panes: Vec<(String, String, String)>,
+    /// The panes left out while nothing they set is selected.
+    hidden: RefCell<std::collections::HashSet<String>>,
+}
+
+impl InspectorPanes {
+    /// The panes: their names, titles, icons and groups.
+    #[allow(clippy::type_complexity)]
+    fn new(panes: &[(&str, &str, &str, &[&compact::Group])]) -> Rc<Self> {
+        let toggles = adw::ToggleGroup::builder()
+            .halign(gtk::Align::Center)
+            .css_classes(["flat"])
+            .build();
+        let stack = gtk::Stack::builder().vhomogeneous(false).build();
+        for (name, title, icon, groups) in panes {
+            let title = tr(title);
+            toggles.add(pane_toggle(name, &title, icon));
+            let content = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .spacing(18)
+                .margin_top(12)
+                .margin_bottom(12)
+                .margin_start(12)
+                .margin_end(12)
+                .build();
+            let heading = gtk::Label::builder()
+                .label(&title)
+                .xalign(0.0)
+                .css_classes(["title-4"])
+                .build();
+            content.append(&heading);
+            let empty = gtk::Label::builder()
+                .label(tr("Nothing that this pane sets is selected."))
+                .wrap(true)
+                .xalign(0.0)
+                .css_classes(["dim-label"])
+                .build();
+            content.append(&empty);
+            for group in *groups {
+                content.append(group.widget());
+            }
+            let all: Vec<compact::Group> = groups.iter().map(|g| (*g).clone()).collect();
+            let show_empty = {
+                let empty = empty.downgrade();
+                let all = all.clone();
+                move || {
+                    if let Some(empty) = empty.upgrade() {
+                        empty.set_visible(!all.iter().any(compact::Group::is_visible));
+                    }
+                }
+            };
+            show_empty();
+            let show_empty = Rc::new(show_empty);
+            for group in &all {
+                let show_empty = show_empty.clone();
+                group.connect_visible_notify(move |_| show_empty());
+            }
+            let scrolled = gtk::ScrolledWindow::builder()
+                .child(&content)
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .vexpand(true)
+                .build();
+            stack.add_titled(&scrolled, Some(name), &title);
+        }
+        toggles.set_active_name(Some("text"));
+        stack.set_visible_child_name("text");
+        let shown = stack.downgrade();
+        toggles.connect_active_name_notify(move |toggles| {
+            if let (Some(stack), Some(name)) = (shown.upgrade(), toggles.active_name()) {
+                stack.set_visible_child_name(&name);
+            }
+        });
+        let bar = gtk::Box::builder()
+            .margin_top(6)
+            .margin_bottom(6)
+            .margin_start(6)
+            .margin_end(6)
+            .build();
+        toggles.set_hexpand(true);
+        bar.append(&toggles);
+        let root = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .width_request(300)
+            .build();
+        root.append(&bar);
+        root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        root.append(&stack);
+        Rc::new(Self {
+            root,
+            toggles,
+            stack,
+            panes: panes
+                .iter()
+                .map(|(name, title, icon, _)| ((*name).to_owned(), tr(title), (*icon).to_owned()))
+                .collect(),
+            hidden: RefCell::new(std::collections::HashSet::new()),
+        })
+    }
+
+    fn widget(&self) -> &gtk::Box {
+        &self.root
+    }
+
+    /// Shows the toggle of a pane only while `group` shows, as Pages
+    /// shows the QuickTime inspector only for a movie or a sound.
+    fn show_only_with(self: &Rc<Self>, name: &str, group: &compact::Group) {
+        let weak = Rc::downgrade(self);
+        let name = name.to_owned();
+        let update = move |visible: bool| {
+            let Some(this) = weak.upgrade() else { return };
+            let changed = if visible {
+                this.hidden.borrow_mut().remove(&name)
+            } else {
+                this.hidden.borrow_mut().insert(name.clone())
+            };
+            if changed {
+                this.refresh_toggles();
+            }
+        };
+        update(group.is_visible());
+        group.connect_visible_notify(move |group| update(group.is_visible()));
+    }
+
+    /// Puts back the toggles of the panes that are not left out, in their
+    /// order, keeping the pane shown unless it is left out.
+    fn refresh_toggles(&self) {
+        let active = self.toggles.active_name();
+        let hidden = self.hidden.borrow();
+        self.toggles.remove_all();
+        for (name, title, icon) in &self.panes {
+            if !hidden.contains(name) {
+                self.toggles.add(pane_toggle(name, title, icon));
+            }
+        }
+        let active = active
+            .filter(|name| !hidden.contains(name.as_str()))
+            .map_or_else(|| "metrics".to_owned(), |name| name.to_string());
+        self.toggles.set_active_name(Some(&active));
+        self.stack.set_visible_child_name(&active);
     }
 }
 

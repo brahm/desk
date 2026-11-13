@@ -93,8 +93,21 @@ def caret_of(node):
     return Atspi.Text.get_caret_offset(node)
 
 
+# The keysyms of the function keys.
+FUNCTION_KEYS = {f"F{n}": 0xFFBD + n for n in range(1, 13)}
+
+
 def press(*keys):
-    subprocess.run(["xdotool", "key", "--delay", "80", *keys], check=True)
+    for key in keys:
+        if key in FUNCTION_KEYS:
+            # The xdotool of Ubuntu 26.10 sends a function key with Alt,
+            # at the level of the key that has the same keysym; AT-SPI
+            # sends it plain.
+            Atspi.generate_keyboard_event(FUNCTION_KEYS[key], None, Atspi.KeySynthType.SYM)
+            time.sleep(0.08)
+        else:
+            subprocess.run(["xdotool", "key", key], check=True)
+            time.sleep(0.08)
     time.sleep(0.3)
 
 
@@ -232,45 +245,36 @@ def main():
         press("Return")
         wait_for("the list to end", lambda: not showing(find_named(app, "Indent Level")))
         check("Return on an empty item ends the list", True)
-        wait_for(
-            "the effects in the Inspector",
-            lambda: showing(find_named(app, "Character Spacing"))
-            and showing(find_named(app, "Borders and Rules"))
-            and showing(find_named(app, "Hyphenate Words"))
-            and showing(find_named(app, "Hyphenate the Document"))
-            and showing(find_named(app, "Header Margin"))
-            and showing(find_named(app, "Space Between Notes"))
-            and showing(find_named(app, "Styles to Include"))
-            and showing(find_named(app, "Make Links Inactive")),
-        )
+        for name in (
+            "Character Spacing",
+            "Borders and Rules",
+            "Hyphenate Words",
+            "Hyphenate the Document",
+            "Header Margin",
+            "Space Between Notes",
+            "Styles to Include",
+            "Make Links Inactive",
+        ):
+            wait_for(f"{name} in the Inspector", lambda: inspector_node(app, name))
         check("the Inspector shows spacing, hyphenation, borders and rules", True)
         check("the Inspector shows the headers and footers (EST-01)", True)
         check("the Inspector shows how notes show (EST-13)", True)
         check("the Inspector shows the table of contents and links (EST-23, EST-25)", True)
         press("ctrl+alt+i")
 
-        # Ctrl+T shows the Fonts window, with its effects and typography
+        # Ctrl+T shows the Fonts popover, with its effects and typography
         # (INT-15, FMT-08).
         press("ctrl+t")
-        fonts = wait_for(
-            "the Fonts window",
-            lambda: next(
-                (
-                    n
-                    for n in walk(app)
-                    if n.get_role() == Atspi.Role.FRAME and n.get_name() == "Fonts"
-                ),
-                None,
-            ),
-        )
-        check("Ctrl+T shows the Fonts window (INT-15, IOP-06)", showing(fonts))
-        check("it has the shadow", find_named(fonts, "Shadow") is not None)
+        wait_for("the Fonts popover", lambda: showing_named(app, "Ligatures"))
+        check("Ctrl+T shows the Fonts popover (INT-15, IOP-06)", True)
+        check("it has the shadow", showing_named(app, "Shadow") is not None)
         check(
             "it has the colors of the underline and the strikethrough (FMT-01, FMT-02)",
-            find_named(fonts, "Underline Color") is not None
-            and find_named(fonts, "Strikethrough Color") is not None,
+            showing_named(app, "Underline Color") is not None
+            and showing_named(app, "Strikethrough Color") is not None,
         )
-        check("it has the typography", find_named(fonts, "Ligatures") is not None)
+        check("it has the typography", True)
+        press("Escape")
 
         # Ctrl+Shift+T shows the Styles drawer, with the style of the
         # paragraph chosen in its list (INT-18).
@@ -342,7 +346,7 @@ def main():
         press("End")
 
         # The Search sidebar lists the matches as they are typed (TXT-13).
-        press("ctrl+shift+f")
+        press("ctrl+alt+f")
         results = wait_for(
             "the Search sidebar",
             lambda: next(
@@ -363,25 +367,29 @@ def main():
         )
         check("the Search sidebar lists the match", True)
 
-        # Find & Replace replaces every match (TXT-12).
+        # Find & Replace replaces every match (TXT-12), from the bar that
+        # Ctrl+F reveals.
         press("ctrl+f")
-        dialog = wait_for(
-            "the Find & Replace window",
+        bar = wait_for(
+            "the Find & Replace bar",
             lambda: next(
                 (
                     n
                     for n in walk(app)
-                    if n.get_role() == Atspi.Role.FRAME and n.get_name() == "Find & Replace"
+                    if n.get_name() == "Find & Replace" and showing(n) and n.get_child_count() > 0
                 ),
                 None,
             ),
         )
         type_text("hi")
-        press("Tab")
+        Atspi.Action.do_action(
+            next(n for n in walk(bar) if n.get_name() == "Show Replace"), 0
+        )
+        wait_for("the Replace field", lambda: showing(find_named(bar, "Replace All")))
         type_text("hello")
         replace_all = next(
             n
-            for n in walk(dialog)
+            for n in walk(bar)
             if n.get_role() == Atspi.Role.PUSH_BUTTON and n.get_name() == "Replace All"
         )
         Atspi.Action.do_action(replace_all, 0)
@@ -390,21 +398,16 @@ def main():
             lambda: "\u201chello\u201d" in text_of(document),
         )
         check("Replace All replaces the matches", True)
+        press("Escape")
 
-        # Ctrl+: shows the Spelling and Grammar window (TXT-10).
+        # Ctrl+: shows Spelling and Grammar beside the pages (TXT-10).
         subprocess.run(
             ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
             check=True,
         )
         press("ctrl+colon")
-        wait_for(
-            "the Spelling and Grammar window",
-            lambda: any(
-                n.get_role() == Atspi.Role.FRAME and n.get_name() == "Spelling and Grammar"
-                for n in walk(app)
-            ),
-        )
-        check("Ctrl+: shows the Spelling and Grammar window", True)
+        wait_for("Spelling and Grammar", lambda: showing_named(app, "Spelling and Grammar"))
+        check("Ctrl+: shows Spelling and Grammar", True)
 
         # Ctrl+. shows the emoji and symbols at the cursor (TXT-05).
         subprocess.run(
@@ -1001,14 +1004,11 @@ def open_with_a_shape(work, name, shape=SHAPE, extra=None):
 
 def toggle_switch_row(app, title, what):
     """Turns the switch of the first showing row titled `title`."""
-    def row():
-        for node in walk(app):
-            if node.get_name() == title and showing(node):
-                return node
-        return None
+    def has_switch(node):
+        return any(n.get_role() in SWITCHES for n in walk(node))
 
-    switch = wait_for(what, row)
-    toggle = next(node for node in walk(switch) if node.get_role() == Atspi.Role.CHECK_BOX)
+    switch = wait_for(what, lambda: inspector_node(app, title, has_switch))
+    toggle = next(node for node in walk(switch) if node.get_role() in SWITCHES)
     Atspi.Action.do_action(toggle, 0)
 
 
@@ -1072,15 +1072,11 @@ def shadow_of_the_text(work):
         press("Escape")
         press("ctrl+a")
         def switch():
-            for node in walk(app):
-                if (
-                    node.get_name() == "Text Shadow"
-                    and node.get_role() != Atspi.Role.LABEL
-                    and showing(node)
-                    and Atspi.Action.get_n_actions(node) > 0
-                ):
-                    return node
-            return None
+            return inspector_node(
+                app,
+                "Text Shadow",
+                lambda n: n.get_role() != Atspi.Role.LABEL and Atspi.Action.get_n_actions(n) > 0,
+            )
 
         Atspi.Action.do_action(wait_for("the Text Shadow switch of the Inspector", switch), 0)
         time.sleep(1)
@@ -1148,14 +1144,7 @@ def instant_alpha_of_a_picture(work):
     try:
         button = wait_for(
             "the Image group of the Inspector",
-            lambda: next(
-                (
-                    n
-                    for n in walk(app)
-                    if n.get_name() == "Take Out a Color" and showing(n)
-                ),
-                None,
-            ),
+            lambda: inspector_node(app, "Take Out a Color"),
         )
         check("a selected picture offers Instant Alpha", True)
         Atspi.Action.do_action(button, 0)
@@ -1254,6 +1243,46 @@ def showing_named(app, name):
         return None
 
 
+# The roles of switches: AT-SPI 2.52 has its own.
+SWITCHES = {Atspi.Role.CHECK_BOX, getattr(Atspi.Role, "SWITCH", Atspi.Role.CHECK_BOX)}
+
+# The panes of the Inspector, by the names of their toggles.
+PANES = ("Document", "Layout", "Wrap", "Text", "Graphic", "Metrics", "Link", "QuickTime")
+
+
+def inspector_node(app, name, accept=None):
+    """The showing node of a name in the Inspector, going through its
+    panes until one shows it. `accept` narrows the nodes."""
+    def look():
+        try:
+            return next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_name() == name and showing(n) and (accept is None or accept(n))
+                ),
+                None,
+            )
+        except GLib.GError:
+            return None
+
+    found = look()
+    if found is not None:
+        return found
+    toggles = [
+        n
+        for n in walk(app)
+        if n.get_role() == Atspi.Role.RADIO_BUTTON and n.get_name() in PANES and showing(n)
+    ]
+    for toggle in toggles:
+        Atspi.Action.do_action(toggle, 0)
+        time.sleep(0.3)
+        found = look()
+        if found is not None:
+            return found
+    return None
+
+
 def opened_without_portals(work, name):
     """Opens a document with a shape, with the file dialog of GTK, which is
     on the accessibility bus with the app, and not the one of a portal."""
@@ -1273,7 +1302,7 @@ def chosen_picture(work):
     try:
         choose_file(app, photo)
         check("Insert, Choose… asks for an image", True)
-        wait_for("the Image group of the Inspector", lambda: showing_named(app, "Take Out a Color"))
+        wait_for("the Image group of the Inspector", lambda: inspector_node(app, "Take Out a Color"))
         check("the chosen picture is on the page and selected", True)
         press("ctrl+s")
         wait_for(
@@ -1296,7 +1325,7 @@ def chosen_movie(work):
     writer, app, letter = opened_without_portals(work, "Movie.odt")
     try:
         choose_file(app, movie)
-        wait_for("the Movie and Sound group of the Inspector", lambda: showing_named(app, "Poster Frame"))
+        wait_for("the Movie and Sound group of the Inspector", lambda: inspector_node(app, "Poster Frame"))
         check("the chosen movie is on the page and selected (OBJ-18)", True)
         press("ctrl+s")
         wait_for(
@@ -1310,7 +1339,7 @@ def chosen_movie(work):
             "its first frame is saved as its poster (OBJ-19)",
             saved_content(letter, r'</draw:plugin><draw:image xlink:href="Pictures/object\d+\.png"'),
         )
-        play = wait_for("the Play button of the Inspector", lambda: showing_named(app, "Play"))
+        play = wait_for("the Play button of the Inspector", lambda: inspector_node(app, "Play"))
         play.do_action(0)
         wait_for("the window that plays the movie", lambda: showing_named(app, "Movie"))
         check("the Inspector plays the movie (OBJ-19)", True)
@@ -1327,7 +1356,7 @@ def reduced_movie(work):
     writer, app, letter = opened_without_portals(work, "Reduced.odt")
     try:
         choose_file(app, movie)
-        row = wait_for("the Stop row of the Inspector", lambda: showing_named(app, "Stop"))
+        row = wait_for("the Stop row of the Inspector", lambda: inspector_node(app, "Stop"))
         spin = next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
         Atspi.Value.set_current_value(spin, 0.5)
         time.sleep(1)
@@ -1379,12 +1408,8 @@ def media_browser(work):
         activate("media-browser")
         cell = wait_for("the photograph in the Media Browser", lambda: showing_named(app, "browsed.jpg"))
         check("the Media Browser shows the Pictures folder (INT-14)", True)
-        subprocess.run(
-            ["xdotool", "search", "--sync", "--name", "Media Browser", "windowfocus", "--sync"],
-            check=True,
-        )
         geometry = subprocess.run(
-            ["xdotool", "search", "--name", "Media Browser", "getwindowgeometry", "--shell"],
+            ["xdotool", "search", "--name", "Browsed.odt", "getwindowgeometry", "--shell"],
             capture_output=True,
             text=True,
             check=True,
@@ -1393,7 +1418,9 @@ def media_browser(work):
         box = Atspi.Component.get_extents(cell, Atspi.CoordType.WINDOW)
         # A double click activates it, as in the browser of Pages.
         click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2, 2)
-        wait_for("the Image group of the Inspector", lambda: showing_named(app, "Take Out a Color"))
+        # The Inspector takes the place of the browser at the side.
+        activate("inspector")
+        wait_for("the Image group of the Inspector", lambda: inspector_node(app, "Take Out a Color"))
         check("an activated photograph goes on the page (INT-14)", True)
     finally:
         dirs.unlink(missing_ok=True)
@@ -1412,13 +1439,14 @@ def points_of_a_star(work):
     )
     writer, app, letter = open_with_a_shape(work, "Star.odt", star)
     try:
-        def points_row():
-            for node in walk(app):
-                if node.get_name() == "Star Points" and showing(node):
-                    return node
-            return None
-
-        row = wait_for("the Shape group of the Inspector", points_row)
+        row = wait_for(
+            "the Shape group of the Inspector",
+            lambda: inspector_node(
+                app,
+                "Star Points",
+                lambda n: any(c.get_role() == Atspi.Role.SPIN_BUTTON for c in walk(n)),
+            ),
+        )
         check("a selected star shows its points", True)
         spin = next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
         Atspi.Value.set_current_value(spin, 7.0)
@@ -1489,7 +1517,7 @@ def editable_shape(work):
     try:
         wait_for(
             "the Metrics group of the Inspector",
-            lambda: (lambda n: n if n and showing(n) else None)(find_named(app, "Width")),
+            lambda: inspector_node(app, "Width"),
         )
         activate("make-editable")
         time.sleep(0.5)
@@ -1527,7 +1555,7 @@ def connection_line(work):
     try:
         wait_for(
             "the Metrics group of the Inspector",
-            lambda: (lambda n: n if n and showing(n) else None)(find_named(app, "Width")),
+            lambda: inspector_node(app, "Width"),
         )
         # Ten points left, and the line's start with it.
         press("shift+Left")
@@ -1551,7 +1579,10 @@ def connection_line(work):
 
 def spin_of(app, title):
     """The spin button of the showing row titled `title`."""
-    row = wait_for(f"the {title} row of the Inspector", lambda: showing_named(app, title))
+    def has_spin(node):
+        return any(n.get_role() == Atspi.Role.SPIN_BUTTON for n in walk(node))
+
+    row = wait_for(f"the {title} row of the Inspector", lambda: inspector_node(app, title, has_spin))
     return next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
 
 
@@ -1628,16 +1659,7 @@ def choose_in_list(app, title, name, keys):
     window titled `name`, and picks an item with keys."""
     row = wait_for(
         f"the {title} row",
-        lambda: next(
-            (
-                n
-                for n in walk(app)
-                if n.get_name() == title
-                and n.get_role() == Atspi.Role.COMBO_BOX
-                and showing(n)
-            ),
-            None,
-        ),
+        lambda: inspector_node(app, title, lambda n: n.get_role() == Atspi.Role.COMBO_BOX),
     )
     reveal(row, name)
     click_node(row, name)
@@ -1664,7 +1686,7 @@ def master_objects(work):
     writer, app, letter = open_with_a_shape(work, "Master.odt")
     try:
         def width_row():
-            return (lambda n: n if n and showing(n) else None)(find_named(app, "Width"))
+            return inspector_node(app, "Width")
 
         wait_for("the Metrics group of the Inspector", width_row)
         activate("move-to-master")

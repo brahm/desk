@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The Fonts window (INT-15), as the Fonts panel that Pages opens with
+//! The Fonts popover (INT-15), on the font button of the format bar, with
+//! what the Fonts panel that Pages opens with
 //! Show Fonts: collections, families, typefaces and sizes, a bar of
 //! effects (underline, strikethrough, text and paragraph colors and a
 //! shadow with opacity, blur, offset and angle, FMT-03), and the
@@ -10,6 +11,7 @@
 //! It stays open beside the document, and shows and changes the
 //! formatting at the selection.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -232,9 +234,9 @@ fn select_named(list: &gtk::ListBox, name: &str) {
     list.unselect_all();
 }
 
-/// The Fonts window of a document window.
+/// The Fonts popover of a document window.
 pub struct FontsWindow {
-    window: gtk::Window,
+    window: gtk::Popover,
     collections: gtk::ListBox,
     families: gtk::ListBox,
     faces: gtk::ListBox,
@@ -251,13 +253,13 @@ pub struct FontsWindow {
     underline_color: ColorRow,
     strikethrough_color: ColorRow,
     background: ColorRow,
-    shadow: adw::SwitchRow,
-    opacity: adw::SpinRow,
-    blur: adw::SpinRow,
-    offset: adw::SpinRow,
-    angle: adw::SpinRow,
-    ligatures: adw::ComboRow,
-    features: Vec<(&'static str, adw::SwitchRow)>,
+    shadow: compact::SwitchRow,
+    opacity: compact::SpinRow,
+    blur: compact::SpinRow,
+    offset: compact::SpinRow,
+    angle: compact::SpinRow,
+    ligatures: compact::ComboRow,
+    features: Vec<(&'static str, compact::SwitchRow)>,
     /// Every installed family and whether it has a fixed width.
     installed: Vec<(String, bool)>,
     shown: RefCell<Option<(CharFormat, ParaFormat)>>,
@@ -265,10 +267,10 @@ pub struct FontsWindow {
 }
 
 impl FontsWindow {
-    /// The Fonts window over a window, for its editor.
-    pub fn new(parent: &impl IsA<gtk::Window>, editor: EditorOf) -> Rc<Self> {
+    /// The Fonts popover on a widget, for its editor.
+    pub fn new(parent: &impl IsA<gtk::Widget>, editor: EditorOf) -> Rc<Self> {
         let mut installed: Vec<(String, bool)> = parent
-            .upcast_ref::<gtk::Window>()
+            .upcast_ref::<gtk::Widget>()
             .pango_context()
             .list_families()
             .iter()
@@ -364,9 +366,9 @@ impl FontsWindow {
             .row
             .set_subtitle(&tr("Otherwise the color of the text"));
         let background = ColorRow::new(&tr("Paragraph Background"), Rgba::rgb(255, 255, 117));
-        let shadow = adw::SwitchRow::builder().title(tr("Shadow")).build();
+        let shadow = compact::SwitchRow::builder().title(tr("Shadow")).build();
         let spin = |title: String, subtitle: String, min: f64, max: f64, step: f64| {
-            let row = adw::SpinRow::with_range(min, max, step);
+            let row = compact::SpinRow::with_range(min, max, step);
             row.set_title(&title);
             row.set_subtitle(&subtitle);
             row
@@ -376,9 +378,7 @@ impl FontsWindow {
         let offset = spin(tr("Shadow Offset"), tr("Points"), 0.0, 100.0, 1.0);
         let angle = spin(tr("Shadow Angle"), tr("Degrees"), 0.0, 359.0, 1.0);
         angle.set_wrap(true);
-        let effects = adw::PreferencesGroup::builder()
-            .title(tr("Effects"))
-            .build();
+        let effects = compact::Group::builder().title(tr("Effects")).build();
         effects.add(&underline_color.row);
         effects.add(&strikethrough_color.row);
         effects.add(&background.row);
@@ -388,22 +388,25 @@ impl FontsWindow {
         effects.add(&offset);
         effects.add(&angle);
 
-        let ligatures = adw::ComboRow::builder()
+        let ligatures = compact::ComboRow::builder()
             .title(tr("Ligatures"))
             .model(&string_list(LIGATURES.map(ligatures_name)))
             .build();
-        let typography = adw::PreferencesGroup::builder()
+        let typography = compact::Group::builder()
             .title(tr("Typography"))
             .description(tr("Features of the font, where it has them"))
             .build();
         typography.add(&ligatures);
-        let expander = adw::ExpanderRow::builder()
+        let expander = compact::ExpanderRow::builder()
             .title(tr("Font Features"))
             .build();
-        let features: Vec<(&'static str, adw::SwitchRow)> = features()
+        let features: Vec<(&'static str, compact::SwitchRow)> = features()
             .into_iter()
             .map(|(tag, name)| {
-                let row = adw::SwitchRow::builder().title(name).subtitle(tag).build();
+                let row = compact::SwitchRow::builder()
+                    .title(name)
+                    .subtitle(tag)
+                    .build();
                 expander.add_row(&row);
                 (tag, row)
             })
@@ -420,24 +423,30 @@ impl FontsWindow {
             .build();
         content.append(&bar);
         content.append(&lists);
-        content.append(&effects);
-        content.append(&typography);
+        content.append(effects.widget());
+        content.append(typography.widget());
         let scrolled = gtk::ScrolledWindow::builder()
             .child(&content)
             .hscrollbar_policy(gtk::PolicyType::Never)
+            .min_content_width(680)
+            .min_content_height(420)
+            .max_content_height(640)
             .propagate_natural_height(true)
             .build();
-        let toolbar = adw::ToolbarView::new();
-        toolbar.add_top_bar(&adw::HeaderBar::new());
-        toolbar.set_content(Some(&scrolled));
-        let window = gtk::Window::builder()
-            .title(tr("Fonts"))
-            .transient_for(parent)
-            .default_width(640)
-            .default_height(640)
-            .hide_on_close(true)
-            .child(&toolbar)
-            .build();
+        let window = gtk::Popover::builder().child(&scrolled).build();
+        labelled(&window, &tr("Fonts"));
+        window.set_parent(parent);
+        // Back to the text when the popover closes.
+        let of = editor.clone();
+        window.connect_closed(move |_| {
+            // Once GTK has given the focus back to the button.
+            let of = of.clone();
+            gtk::glib::idle_add_local_once(move || {
+                if let Some(editor) = of() {
+                    editor.focus();
+                }
+            });
+        });
 
         let this = Rc::new(Self {
             window,
@@ -720,12 +729,12 @@ impl FontsWindow {
         }
     }
 
-    /// Shows the window, over its document window.
+    /// Shows the popover, on its button.
     pub fn present(&self) {
-        self.window.present();
+        self.window.popup();
     }
 
-    /// Whether the window is showing.
+    /// Whether the popover is showing.
     pub fn is_visible(&self) -> bool {
         self.window.is_visible()
     }
@@ -802,13 +811,13 @@ impl FontsWindow {
     }
 }
 
-/// Keeps the Fonts window of a document window, made when first shown.
+/// Keeps the Fonts popover of a document window, made when first shown.
 #[derive(Default)]
 pub struct FontsSlot(RefCell<Option<Rc<FontsWindow>>>);
 
 impl FontsSlot {
-    /// Shows the Fonts window, making it the first time.
-    pub fn present(&self, parent: &impl IsA<gtk::Window>, editor: EditorOf) -> Rc<FontsWindow> {
+    /// Shows the Fonts popover, making it the first time.
+    pub fn present(&self, parent: &impl IsA<gtk::Widget>, editor: EditorOf) -> Rc<FontsWindow> {
         let fonts = self
             .0
             .borrow_mut()
@@ -818,7 +827,7 @@ impl FontsSlot {
         fonts
     }
 
-    /// The Fonts window, if it is showing.
+    /// The Fonts popover, if it is showing.
     pub fn visible(&self) -> Option<Rc<FontsWindow>> {
         self.0.borrow().clone().filter(|f| f.is_visible())
     }

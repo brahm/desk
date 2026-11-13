@@ -1,10 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The Keyboard Shortcuts window, which Help lists in Pages (INT-21).
+//! The Keyboard Shortcuts dialog, which Help lists in Pages (INT-21).
 
 use crate::i18n::{n_, tr};
-use std::fmt::Write;
 
 /// A section: its title, whether it needs a document, and each shortcut's
 /// keys as GTK writes accelerators, with what it does.
@@ -27,7 +26,8 @@ const SECTIONS: &[Section] = &[
         n_("Windows"),
         false,
         &[
-            ("<Control>n", n_("New window")),
+            ("<Control>n", n_("New document")),
+            ("<Control><Shift>n", n_("New window")),
             ("<Control>w", n_("Close the window")),
             ("<Control><Alt>w", n_("Close all windows")),
             ("<Control>q", n_("Quit")),
@@ -82,6 +82,7 @@ const SECTIONS: &[Section] = &[
             ("<Control><Alt>i", n_("Inspector")),
             ("F9", n_("Page Thumbnails")),
             ("<Control>t", n_("Show fonts")),
+            ("<Control><Shift>c", n_("Show colors")),
             ("<Control><Shift>t", n_("Show the Styles drawer")),
             ("<Control><Alt>c", n_("Copy paragraph style")),
             ("<Control><Shift><Alt>c", n_("Copy character style")),
@@ -93,6 +94,7 @@ const SECTIONS: &[Section] = &[
             ),
             ("<Control>r", n_("Show ruler")),
             ("<Control><Shift>l", n_("Show layout")),
+            ("<Control><Shift>r", n_("Show the format bar")),
         ],
     ),
     (
@@ -105,7 +107,7 @@ const SECTIONS: &[Section] = &[
             ("<Control><Shift>bracketleft", n_("Send to back")),
             ("<Control><Alt>g", n_("Group")),
             ("<Control><Shift><Alt>g", n_("Ungroup")),
-            ("<Control><Alt>l", n_("Lock")),
+            ("<Control>l", n_("Lock")),
             ("<Control><Shift><Alt>l", n_("Unlock")),
             ("Left Right Up Down", n_("Nudge the selected objects")),
             ("Escape", n_("Deselect the objects")),
@@ -120,7 +122,7 @@ const SECTIONS: &[Section] = &[
             ("<Control><Shift>g", n_("Find previous")),
             ("<Control>e", n_("Use selection for Find")),
             ("<Control>j", n_("Jump to the selection")),
-            ("<Control><Shift>f", n_("Search sidebar")),
+            ("<Control><Alt>f", n_("Search sidebar")),
             ("<Control>semicolon", n_("Find the next misspelled word")),
             ("<Control>colon", n_("Spelling and Grammar")),
         ],
@@ -132,58 +134,36 @@ const SECTIONS: &[Section] = &[
             ("<Control>plus", n_("Zoom in")),
             ("<Control>minus", n_("Zoom out")),
             ("<Control>0", n_("Actual size")),
+            ("F11", n_("Fullscreen")),
         ],
     ),
 ];
 
-fn escape(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-/// The UI definition of the window. An app that opens no documents leaves
-/// out what needs one.
-fn definition(opens: bool) -> String {
-    let mut ui = String::from(
-        "<interface><object class=\"GtkShortcutsWindow\" id=\"shortcuts\">\
-         <property name=\"modal\">1</property>\
-         <child><object class=\"GtkShortcutsSection\">\
-         <property name=\"section-name\">main</property>",
-    );
+/// The Keyboard Shortcuts dialog, for `win.shortcuts`. An app that opens
+/// no documents leaves out what needs one.
+pub fn dialog(opens: bool) -> adw::ShortcutsDialog {
+    let dialog = adw::ShortcutsDialog::new();
     for (title, needs_document, shortcuts) in SECTIONS {
         if *needs_document && !opens {
             continue;
         }
-        let _ = write!(
-            ui,
-            "<child><object class=\"GtkShortcutsGroup\">\
-             <property name=\"title\">{}</property>",
-            escape(&tr(title))
-        );
+        let section = adw::ShortcutsSection::new(Some(&tr(title)));
         for (keys, what) in *shortcuts {
-            let _ = write!(
-                ui,
-                "<child><object class=\"GtkShortcutsShortcut\">\
-                 <property name=\"accelerator\">{}</property>\
-                 <property name=\"title\">{}</property></object></child>",
-                escape(keys),
-                escape(&tr(what))
-            );
+            section.add(adw::ShortcutsItem::new(&tr(what), keys));
         }
-        ui.push_str("</object></child>");
+        dialog.add(section);
     }
-    ui.push_str("</object></child></object></interface>");
-    ui
+    dialog
 }
 
-/// The Keyboard Shortcuts window, for `win.show-help-overlay`.
-#[allow(deprecated, reason = "GtkShortcutsWindow is current in GTK 4.14")]
-pub fn window(opens: bool) -> gtk::ShortcutsWindow {
-    gtk::Builder::from_string(&definition(opens))
-        .object("shortcuts")
-        .expect("the definition names the window")
+/// The titles of the shortcuts the dialog lists, for the tests.
+#[cfg(test)]
+fn titles(opens: bool) -> Vec<&'static str> {
+    SECTIONS
+        .iter()
+        .filter(|(_, needs_document, _)| opens || !needs_document)
+        .flat_map(|(_, _, shortcuts)| shortcuts.iter().map(|(_, what)| *what))
+        .collect()
 }
 
 #[cfg(test)]
@@ -204,7 +184,7 @@ mod tests {
                 }
             }
         }
-        assert!(definition(true).contains("Bold"));
-        assert!(!definition(false).contains("Bold"));
+        assert!(titles(true).contains(&"Bold"));
+        assert!(!titles(false).contains(&"Bold"));
     }
 }

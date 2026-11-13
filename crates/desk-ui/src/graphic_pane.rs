@@ -6,6 +6,7 @@
 //! the ends of a line, their shadow and reflection and how opaque they
 //! are.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -69,74 +70,74 @@ const BLUE: Rgba = Rgba::rgb(0x46, 0x82, 0xb4);
 
 /// The Graphic group of the Inspector.
 pub struct GraphicGroup {
-    group: adw::PreferencesGroup,
-    fill: adw::ComboRow,
+    group: compact::Group,
+    fill: compact::ComboRow,
     fill_color: gtk::ColorDialogButton,
-    fill_color_row: adw::ActionRow,
-    image_row: adw::ActionRow,
+    fill_color_row: compact::ActionRow,
+    image_row: compact::ActionRow,
     image_button: gtk::Button,
-    image_mode: adw::ComboRow,
+    image_mode: compact::ComboRow,
     /// The picture that fills, or that an image fill would fill with.
     picture: RefCell<Option<Picture>>,
     /// Sets the fill after a picture is chosen.
     on_picture: RefCell<Option<Rc<dyn Fn()>>>,
     gradient_end: gtk::ColorDialogButton,
-    gradient_end_row: adw::ActionRow,
-    gradient_angle: adw::SpinRow,
+    gradient_end_row: compact::ActionRow,
+    gradient_angle: compact::SpinRow,
     /// The rows of the advanced gradient (OBJ-41).
-    gradient_kind: adw::ComboRow,
+    gradient_kind: compact::ComboRow,
     gradient_bar: Rc<GradientBar>,
-    gradient_colors_row: adw::ActionRow,
+    gradient_colors_row: compact::ActionRow,
     gradient_remove: gtk::Button,
-    stop_position: adw::SpinRow,
-    stop_blend: adw::SpinRow,
-    center_x: adw::SpinRow,
-    center_y: adw::SpinRow,
-    stroke: adw::ComboRow,
+    stop_position: compact::SpinRow,
+    stop_blend: compact::SpinRow,
+    center_x: compact::SpinRow,
+    center_y: compact::SpinRow,
+    stroke: compact::ComboRow,
     stroke_color: gtk::ColorDialogButton,
-    stroke_color_row: adw::ActionRow,
-    stroke_width: adw::SpinRow,
+    stroke_color_row: compact::ActionRow,
+    stroke_width: compact::SpinRow,
     /// The picture frame, which the Stroke list offers after the lines
     /// (OBJ-36).
-    frame_style: adw::ComboRow,
-    frame_scale: adw::SpinRow,
-    start: adw::ComboRow,
-    end: adw::ComboRow,
-    shadow: adw::SwitchRow,
+    frame_style: compact::ComboRow,
+    frame_scale: compact::SpinRow,
+    start: compact::ComboRow,
+    end: compact::ComboRow,
+    shadow: compact::SwitchRow,
     shadow_color: gtk::ColorDialogButton,
-    shadow_color_row: adw::ActionRow,
-    shadow_angle: adw::SpinRow,
-    shadow_offset: adw::SpinRow,
-    shadow_blur: adw::SpinRow,
-    shadow_opacity: adw::SpinRow,
-    reflection: adw::SwitchRow,
-    reflection_opacity: adw::SpinRow,
-    opacity: adw::SpinRow,
+    shadow_color_row: compact::ActionRow,
+    shadow_angle: compact::SpinRow,
+    shadow_offset: compact::SpinRow,
+    shadow_blur: compact::SpinRow,
+    shadow_opacity: compact::SpinRow,
+    reflection: compact::SwitchRow,
+    reflection_opacity: compact::SpinRow,
+    opacity: compact::SpinRow,
     updating: Cell<bool>,
 }
 
 /// A row with a color button at its end.
-fn color_row(title: &str) -> (adw::ActionRow, gtk::ColorDialogButton) {
+fn color_row(title: &str) -> (compact::ActionRow, gtk::ColorDialogButton) {
     let button = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::builder().title(title).build())
         .valign(gtk::Align::Center)
         .build();
     labelled(&button, title);
-    let row = adw::ActionRow::builder().title(title).build();
+    let row = compact::ActionRow::builder().title(title).build();
     row.add_suffix(&crate::eyedropper::button(&button));
     row.add_suffix(&button);
     (row, button)
 }
 
-fn spin(title: &str, min: f64, max: f64, step: f64) -> adw::SpinRow {
-    let row = adw::SpinRow::with_range(min, max, step);
+fn spin(title: &str, min: f64, max: f64, step: f64) -> compact::SpinRow {
+    let row = compact::SpinRow::with_range(min, max, step);
     row.set_title(title);
     row
 }
 
-fn combo(title: &str, names: &[String]) -> adw::ComboRow {
+fn combo(title: &str, names: &[String]) -> compact::ComboRow {
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
-    adw::ComboRow::builder()
+    compact::ComboRow::builder()
         .title(title)
         .model(&gtk::StringList::new(&names))
         .build()
@@ -179,7 +180,7 @@ impl GraphicGroup {
             .label(tr("Choose…"))
             .valign(gtk::Align::Center)
             .build();
-        let image_row = adw::ActionRow::builder().title(tr("Image")).build();
+        let image_row = compact::ActionRow::builder().title(tr("Image")).build();
         image_row.add_suffix(&image_button);
         let modes: Vec<String> = IMAGE_FILLS.iter().map(|m| image_fill_name(*m)).collect();
         let image_mode = combo(&tr("Image Size"), &modes);
@@ -189,7 +190,7 @@ impl GraphicGroup {
         gradient_angle.set_subtitle(&tr("Degrees, counterclockwise"));
         let gradient_kind = combo(&tr("Gradient Type"), &[tr("Linear"), tr("Radial")]);
         let gradient_bar = GradientBar::new();
-        let gradient_colors_row = adw::ActionRow::builder()
+        let gradient_colors_row = compact::ActionRow::builder()
             .title(tr("Gradient Colors"))
             .subtitle(tr("Click to add a color, drag to move it"))
             .build();
@@ -240,7 +241,7 @@ impl GraphicGroup {
         let ends: Vec<String> = LINE_ENDS.iter().map(|e| line_end_name(*e)).collect();
         let start = combo(&tr("Start of the Line"), &ends);
         let end = combo(&tr("End of the Line"), &ends);
-        let shadow = adw::SwitchRow::builder().title(tr("Shadow")).build();
+        let shadow = compact::SwitchRow::builder().title(tr("Shadow")).build();
         let (shadow_color_row, shadow_color) = color_row(&tr("Shadow Color"));
         let shadow_angle = spin(&tr("Shadow Angle"), 0.0, 359.0, 1.0);
         shadow_angle.set_subtitle(&tr("Degrees, counterclockwise"));
@@ -251,16 +252,16 @@ impl GraphicGroup {
         let shadow_opacity = spin(&tr("Shadow Opacity"), 0.0, 100.0, 1.0);
         shadow_opacity.set_subtitle(&tr("Percent"));
         // A reflection below the object, as in Pages (OBJ-38).
-        let reflection = adw::SwitchRow::builder().title(tr("Reflection")).build();
+        let reflection = compact::SwitchRow::builder()
+            .title(tr("Reflection"))
+            .build();
         let reflection_opacity = spin(&tr("Reflection Opacity"), 0.0, 100.0, 1.0);
         reflection_opacity.set_subtitle(&tr("Percent"));
         let opacity = spin(&tr("Opacity"), 0.0, 100.0, 1.0);
         opacity.set_subtitle(&tr("Percent"));
-        let group = adw::PreferencesGroup::builder()
-            .title(tr("Graphic"))
-            .build();
+        let group = compact::Group::builder().title(tr("Graphic")).build();
         for row in [
-            fill.upcast_ref::<gtk::Widget>(),
+            fill.upcast_ref(),
             fill_color_row.upcast_ref(),
             image_row.upcast_ref(),
             image_mode.upcast_ref(),
@@ -516,7 +517,7 @@ impl GraphicGroup {
     }
 
     /// The group, to put in the Inspector.
-    pub fn group(&self) -> &adw::PreferencesGroup {
+    pub fn group(&self) -> &compact::Group {
         &self.group
     }
 
@@ -556,7 +557,8 @@ impl GraphicGroup {
     /// Sets the color chosen in the bar of the advanced gradient from the
     /// rows that show it.
     fn take_stop(&self) {
-        let percent = |row: &adw::SpinRow| (row.value() * 10.0).round().clamp(0.0, 1000.0) as u16;
+        let percent =
+            |row: &compact::SpinRow| (row.value() * 10.0).round().clamp(0.0, 1000.0) as u16;
         self.gradient_bar.set_current(GradientStop {
             at: percent(&self.stop_position),
             color: from_gdk(&self.fill_color.rgba()),
@@ -612,8 +614,9 @@ impl GraphicGroup {
                 stops: self.gradient_bar.stops(),
                 angle: (self.gradient_angle.value() * 100.0).round() as i32,
                 center: (self.gradient_kind.selected() == 1).then(|| {
-                    let part =
-                        |row: &adw::SpinRow| (row.value() * 10.0).round().clamp(0.0, 1000.0) as u16;
+                    let part = |row: &compact::SpinRow| {
+                        (row.value() * 10.0).round().clamp(0.0, 1000.0) as u16
+                    };
                     (part(&self.center_x), part(&self.center_y))
                 }),
             })),
@@ -625,7 +628,7 @@ impl GraphicGroup {
     fn stroke_value(&self) -> Option<Stroke> {
         let selected = self.stroke.selected() as usize;
         let style = *STROKES.get(selected.checked_sub(1)?)?;
-        let end = |row: &adw::ComboRow| {
+        let end = |row: &compact::ComboRow| {
             LINE_ENDS
                 .get(row.selected() as usize)
                 .copied()
@@ -704,7 +707,7 @@ impl GraphicGroup {
         self.end.set_visible(stroked && line);
         let shadow = self.shadow.is_active();
         for row in [
-            self.shadow_angle.upcast_ref::<gtk::Widget>(),
+            self.shadow_angle.upcast_ref(),
             self.shadow_offset.upcast_ref(),
             self.shadow_blur.upcast_ref(),
             self.shadow_opacity.upcast_ref(),
@@ -735,12 +738,12 @@ impl GraphicGroup {
                 button.set_rgba(&color);
             }
         };
-        let set = |row: &adw::SpinRow, value: f64| {
+        let set = |row: &compact::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
             }
         };
-        let select = |row: &adw::ComboRow, index: u32| {
+        let select = |row: &compact::ComboRow, index: u32| {
             if row.selected() != index {
                 row.set_selected(index);
             }

@@ -178,11 +178,11 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
 }
 
 /// The filters of the dialogs that choose a picture for a document: the
-/// formats that GTK reads and PDF, with movies and sounds when `media`.
+/// images and PDF, with movies and sounds when `media`.
 pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
     let images = gtk::FileFilter::new();
     images.set_name(Some(&crate::i18n::tr("Images")));
-    images.add_pixbuf_formats();
+    images.add_mime_type("image/*");
     images.add_mime_type("application/pdf");
     images.add_suffix("pdf");
     let media = gtk::FileFilter::new();
@@ -192,7 +192,7 @@ pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
     }
     let all = gtk::FileFilter::new();
     all.set_name(Some(&crate::i18n::tr("Images, Movies and Sounds")));
-    all.add_pixbuf_formats();
+    all.add_mime_type("image/*");
     for kind in ["application/pdf", "video/*", "audio/*"] {
         all.add_mime_type(kind);
     }

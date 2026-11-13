@@ -14,17 +14,25 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  DEBIAN_FRONTEND: noninteractive
+
+# The jobs that build the apps run in Ubuntu 26.10, whose GTK 4.24 and
+# Libadwaita 1.10 are those of the GNOME 51 runtime that the Flatpak of
+# Desk uses. The container runs as root, so apt-get needs no sudo, and it
+# starts bare, so the first step installs what the others need.
 
 jobs:
   rust:
     name: Format, lint and test
     runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.10
     steps:
-      - uses: actions/checkout@v5
       - name: Install GTK, Libadwaita, the test fonts and Poppler
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br
+          apt-get update
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -56,16 +64,18 @@ jobs:
   msrv:
     name: Build with the minimum Rust version
     runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.10
     steps:
-      - uses: actions/checkout@v5
       - name: Install GTK and Libadwaita
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev
+          apt-get update
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           # Keep in sync with rust-version in Cargo.toml.
-          toolchain: "1.92"
+          toolchain: "1.100"
       - uses: Swatinem/rust-cache@v2
       - name: Check the workspace
         run: cargo check --workspace --all-targets --locked
@@ -73,12 +83,14 @@ jobs:
   odf:
     name: Validate the ODF that Desk writes
     runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.10
     steps:
-      - uses: actions/checkout@v5
       - name: Install GTK, Libadwaita, the test fonts and Jing
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation jing unzip
+          apt-get update
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation jing unzip
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/cache@v4
@@ -91,12 +103,14 @@ jobs:
   ui:
     name: UI tests through the accessibility tree
     runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:26.10
     steps:
-      - uses: actions/checkout@v5
       - name: Install GTK, Libadwaita, a display and AT-SPI
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us libgtk-4-media-gstreamer gstreamer1.0-plugins-good gstreamer1.0-libav
+          apt-get update
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us gstreamer1.0-plugins-good gstreamer1.0-libav
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Drive Desk Writer as a screen reader sees it

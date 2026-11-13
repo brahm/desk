@@ -158,13 +158,15 @@ pub fn context_markup(text: &str, range: std::ops::Range<usize>) -> String {
     )
 }
 
-/// The Find & Replace window of a document window.
+/// The Find & Replace bar of a document window, under the header bar,
+/// with Replace on a second row and Match Case and Whole Words in the
+/// Advanced popover.
 pub struct FindWindow {
-    window: adw::Window,
+    window: gtk::SearchBar,
     find: gtk::Entry,
     replace: gtk::Entry,
-    advanced: gtk::ToggleButton,
-    options: gtk::Box,
+    replace_row: gtk::Box,
+    replace_toggle: gtk::ToggleButton,
     match_case: gtk::CheckButton,
     whole_words: gtk::CheckButton,
     status: gtk::Label,
@@ -174,23 +176,11 @@ pub struct FindWindow {
 }
 
 impl FindWindow {
-    /// The window, over a document window.
-    pub fn new(parent: &impl IsA<gtk::Window>, editor: EditorOf, search: Rc<Search>) -> Rc<Self> {
-        let simple = gtk::ToggleButton::builder()
-            .label(tr("Simple"))
-            .active(true)
-            .build();
-        let advanced = gtk::ToggleButton::builder()
-            .label(tr("Advanced"))
-            .group(&simple)
-            .build();
-        let modes = gtk::Box::builder().css_classes(["linked"]).build();
-        modes.append(&simple);
-        modes.append(&advanced);
-        let header = adw::HeaderBar::builder().title_widget(&modes).build();
-
+    /// The bar, for the editor of a document window.
+    pub fn new(editor: EditorOf, search: Rc<Search>) -> Rc<Self> {
         let find = gtk::Entry::builder()
             .placeholder_text(tr("Find"))
+            .primary_icon_name("system-search-symbolic")
             .hexpand(true)
             .build();
         labelled(&find, &tr("Find"));
@@ -201,9 +191,18 @@ impl FindWindow {
         labelled(&replace, &tr("Replace"));
         let match_case = gtk::CheckButton::with_label(&tr("Match Case"));
         let whole_words = gtk::CheckButton::with_label(&tr("Whole Words"));
-        let options = gtk::Box::builder().spacing(12).visible(false).build();
+        let options = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .build();
         options.append(&match_case);
         options.append(&whole_words);
+        let advanced = gtk::MenuButton::builder()
+            .icon_name("emblem-system-symbolic")
+            .popover(&gtk::Popover::builder().child(&options).build())
+            .tooltip_text(tr("Advanced"))
+            .build();
+        labelled(&advanced, &tr("Advanced"));
 
         let button = |label: &str| {
             gtk::Button::builder()
@@ -215,64 +214,66 @@ impl FindWindow {
         let replace_one = button(&tr("_Replace"));
         let replace_find = button(&tr("Replace & _Find"));
         let previous = gtk::Button::builder()
-            .icon_name("go-previous-symbolic")
+            .icon_name("go-up-symbolic")
             .tooltip_text(tr("Previous"))
             .build();
         labelled(&previous, &tr("Previous"));
         let next = gtk::Button::builder()
-            .icon_name("go-next-symbolic")
+            .icon_name("go-down-symbolic")
             .tooltip_text(tr("Next"))
-            .css_classes(["suggested-action"])
             .build();
         labelled(&next, &tr("Next"));
         let arrows = gtk::Box::builder().css_classes(["linked"]).build();
         arrows.append(&previous);
         arrows.append(&next);
-        let buttons = gtk::Box::builder().spacing(6).build();
-        buttons.append(&replace_all);
-        buttons.append(&replace_one);
-        buttons.append(&replace_find);
-        let spacer = gtk::Box::builder().hexpand(true).build();
-        buttons.append(&spacer);
-        buttons.append(&arrows);
+        let replace_toggle = gtk::ToggleButton::builder()
+            .icon_name("edit-find-replace-symbolic")
+            .tooltip_text(tr("Replace"))
+            .build();
+        labelled(&replace_toggle, &tr("Show Replace"));
         let status = gtk::Label::builder()
             .xalign(0.0)
+            .width_chars(10)
             .css_classes(["dim-label", "caption"])
             .build();
         status.set_accessible_role(gtk::AccessibleRole::Status);
 
+        let find_row = gtk::Box::builder().spacing(6).build();
+        find_row.append(&find);
+        find_row.append(&arrows);
+        find_row.append(&status);
+        find_row.append(&replace_toggle);
+        find_row.append(&advanced);
+        let replace_row = gtk::Box::builder().spacing(6).visible(false).build();
+        replace_row.append(&replace);
+        replace_row.append(&replace_one);
+        replace_row.append(&replace_find);
+        replace_row.append(&replace_all);
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
+            .spacing(6)
+            .width_request(360)
             .build();
-        content.append(&find);
-        content.append(&replace);
-        content.append(&options);
-        content.append(&buttons);
-        content.append(&status);
-        let view = adw::ToolbarView::new();
-        view.add_top_bar(&header);
-        view.set_content(Some(&content));
-        let window = adw::Window::builder()
-            .title(tr("Find & Replace"))
-            .transient_for(parent)
-            .hide_on_close(true)
-            .resizable(false)
-            .default_width(460)
-            .content(&view)
+        content.append(&find_row);
+        content.append(&replace_row);
+        let clamp = adw::Clamp::builder()
+            .maximum_size(720)
+            .hexpand(true)
+            .child(&content)
             .build();
-        window.set_default_widget(Some(&next));
+        let window = gtk::SearchBar::builder()
+            .child(&clamp)
+            .show_close_button(true)
+            .build();
+        labelled(&window, &tr("Find & Replace"));
+        window.connect_entry(&find);
 
         let this = Rc::new(Self {
             window,
             find,
             replace,
-            advanced,
-            options,
+            replace_row,
+            replace_toggle,
             match_case,
             whole_words,
             status,
@@ -282,10 +283,12 @@ impl FindWindow {
         });
 
         let weak = Rc::downgrade(&this);
-        this.advanced.connect_toggled(move |button| {
+        this.replace_toggle.connect_toggled(move |button| {
             let Some(this) = weak.upgrade() else { return };
-            this.options.set_visible(button.is_active());
-            this.store();
+            this.replace_row.set_visible(button.is_active());
+            if button.is_active() {
+                this.replace.grab_focus();
+            }
         });
         for check in [&this.match_case, &this.whole_words] {
             let weak = Rc::downgrade(&this);
@@ -309,6 +312,22 @@ impl FindWindow {
                 this.go(false);
             }
         });
+        let weak = Rc::downgrade(&this);
+        this.replace.connect_activate(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.replace_selected();
+                this.go(false);
+            }
+        });
+        // Back to the text when the bar closes.
+        let weak = Rc::downgrade(&this);
+        this.window.connect_search_mode_enabled_notify(move |bar| {
+            if let (false, Some(this)) = (bar.is_search_mode(), weak.upgrade())
+                && let Some(editor) = (this.editor)()
+            {
+                editor.focus();
+            }
+        });
         let connect = |button: &gtk::Button, run: fn(&FindWindow)| {
             let weak = Rc::downgrade(&this);
             button.connect_clicked(move |_| {
@@ -330,14 +349,17 @@ impl FindWindow {
         this
     }
 
-    /// The query that the fields set: Match Case and Whole Words only in
-    /// the advanced mode.
+    /// The bar, to put under the header bar.
+    pub fn widget(&self) -> &gtk::SearchBar {
+        &self.window
+    }
+
+    /// The query that the fields set.
     fn query(&self) -> Query {
-        let advanced = self.advanced.is_active();
         Query {
             text: self.find.text().to_string(),
-            match_case: advanced && self.match_case.is_active(),
-            whole_words: advanced && self.whole_words.is_active(),
+            match_case: self.match_case.is_active(),
+            whole_words: self.whole_words.is_active(),
         }
     }
 
@@ -351,8 +373,8 @@ impl FindWindow {
         self.status.set_label("");
     }
 
-    /// Shows the window with the search of the window, and the keyboard
-    /// in the field to find.
+    /// Shows the bar with the search of the window, and the keyboard in
+    /// the field to find.
     pub fn present(&self) {
         self.updating.set(true);
         let query = self.search.query.borrow().clone();
@@ -363,13 +385,10 @@ impl FindWindow {
         if self.replace.text() != replacement {
             self.replace.set_text(&replacement);
         }
-        if query.match_case || query.whole_words {
-            self.advanced.set_active(true);
-        }
         self.match_case.set_active(query.match_case);
         self.whole_words.set_active(query.whole_words);
         self.updating.set(false);
-        self.window.present();
+        self.window.set_search_mode(true);
         self.find.grab_focus();
     }
 
@@ -411,22 +430,6 @@ impl FindWindow {
             trn("Replaced {n} match", "Replaced {n} matches", count as u64)
                 .replace("{n}", &count.to_string())
         });
-    }
-}
-
-/// Makes the Find & Replace window when it is first shown.
-#[derive(Default)]
-pub struct FindSlot(RefCell<Option<Rc<FindWindow>>>);
-
-impl FindSlot {
-    /// Shows the window, making it the first time.
-    pub fn present(&self, parent: &impl IsA<gtk::Window>, editor: EditorOf, search: Rc<Search>) {
-        let window = self
-            .0
-            .borrow_mut()
-            .get_or_insert_with(|| FindWindow::new(parent, editor, search))
-            .clone();
-        window.present();
     }
 }
 
