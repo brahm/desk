@@ -185,6 +185,10 @@ impl PageSetup {
     /// of the paper: half an inch.
     pub const DEFAULT_HEADER_MARGIN: Length = Length::from_points(36);
 
+    /// The distance of the footer from the bottom of the paper in the
+    /// Blank template of Pages: 0.6 inch (EST-01).
+    pub const BLANK_FOOTER_MARGIN: Length = Length::from_millipoints(43_200);
+
     /// A page of the given size with the default margins.
     pub const fn with_size(width: Length, height: Length) -> Self {
         Self {
@@ -377,11 +381,21 @@ impl Document {
         Self {
             ids,
             metadata: Metadata::default(),
-            text_settings: TextSettings::default(),
+            // As the Blank template of Pages: words are not hyphenated
+            // until the document says so (EST-01).
+            text_settings: TextSettings {
+                hyphenation: false,
+                ..TextSettings::default()
+            },
             view: None,
             styles: Styles::new(ParagraphStyle::new(body_style, "Body")),
             container: Container::Pages(PagedFlow {
-                page: PageSetup::default(),
+                // The footer of the Blank template is 0.6 inch from the
+                // bottom of the paper, the header half an inch from the top.
+                page: PageSetup {
+                    footer_margin: PageSetup::BLANK_FOOTER_MARGIN,
+                    ..PageSetup::default()
+                },
                 body: TextFlow::new(Paragraph::new(first, body_style)),
                 margins: HeadersFooters::default(),
                 section_margins: imbl::OrdMap::new(),
