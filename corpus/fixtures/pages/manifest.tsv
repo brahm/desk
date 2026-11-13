@@ -64,6 +64,12 @@ TXT-11		Revisor gramatical (Proofreader)	skipped	Only about the application, its
 TXT-12		Localizar e substituir	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-13		Barra lateral de busca	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-14	txt-14-doc-16-outline.pages	A document saved in outline view with three levels	made	Levels entered with Tab in outline view; Pages keeps them as paragraph styles.
+TXT-14	txt-14-outline-long.pages	Saved and exported in outline view: US Letter, margins 72/54/90/72, 20 topics in Heading 1 to 4 with wrapping Body paragraphs, a Body before the first topic, a Body with space before 12, after 6 and line spacing 1.5, a Heading 1 at 24 pt, a Body in Times 10 pt italic, a centered Body, three bullets and an inline picture	made	The PDF prints the outline (4 pages). In outline view the centered paragraph prints left aligned.
+TXT-14	txt-14-outline-long-normal.pages	The same document with outline view turned off	made	
+TXT-14	txt-14-outline-first-line.pages	The same document in outline view showing only the first line of each paragraph	made	kSFWPNLinesOutlinerProperty 1; the PDF prints the truncated outline (2 pages).
+TXT-14	txt-14-outline-levels.pages	The same document in outline view with Levels set to 2	made	kSFWPOutlineFilterLevelProperty 1 (the menu's 2, counted from 0); the PDF prints only the topics of the first two levels, no body text.
+TXT-14	txt-14-outline-thumbnails.pages	The same document in outline view with pictures shown as thumbnails	made	kSFWPOutlinerThumbnailAttachmentsProperty 1; the PDF prints the picture small.
+TXT-14	txt-14-outline-a4-default.pages	A4 with the default margins in outline view: 30 one-line Heading 1 topics, each with a one-line Body paragraph	made	Page 1 ends after Topic 20; Body line 20 starts page 2.
 REV-01	rev-01-04-tracked-changes.pages	Tracked insertion, deletion and format change, with author and date	made	REV-06: accepting and rejecting are actions; the document holds changes still to accept or reject. Text in the body here and a cell in rev-05-cell-tracked; not headers, notes or shapes.
 REV-02		Barra de controle de alterações	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 REV-03	rev-03-tracking-paused.pages	Tracked changes with tracking paused and an untracked edit	made	
