@@ -2,18 +2,20 @@
 # SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Measures the Helvetica Neue faces installed with macOS, using CoreText,
-# and writes one tab-separated file per face. It reads only metrics: no
-# outline or font file is copied. Desk uses the numbers to build
-# metric-compatible substitutes from TeX Gyre Heros.
+# Measures every installed face of a font family with CoreText and writes
+# one tab-separated file per face. It reads only metrics: no outline or
+# font file is copied. Desk uses the numbers to build metric-compatible
+# substitutes (Desk Neue for Helvetica Neue, from TeX Gyre Heros).
 #
 # Run it on the reference machine (macOS Mojave with iWork '09) with the
 # system Python, which ships PyObjC:
 #
-#     /usr/bin/python measure.py OUTPUT_DIR
+#     /usr/bin/python measure.py "FAMILY NAME" OUTPUT_DIR
 #
-# It also prints the width of a check string set in Helvetica Neue Italic
-# 9 pt, to compare with the layout of Pages.
+# for example `measure.py "Gill Sans" gill-sans`. It exits with status 2
+# when no face of the family is installed. For Helvetica Neue it also
+# prints the width of a check string set in Helvetica Neue Italic 9 pt, to
+# compare with the layout of Pages.
 #
 # File format: lines starting with "#" are comments; every other line is a
 # record whose first field names its type:
@@ -40,7 +42,6 @@ try:
 except NameError:  # Python 3
     unichr = chr
 
-FAMILY = u"Helvetica Neue"
 KERN_SIZE = 1000.0
 
 ADVANCE_CHARS = (
@@ -57,7 +58,7 @@ HEADER = u"""\
 #
 # Metrics of {ps} ({family} {style}),
 # measured with CoreText on the Desk reference machine (macOS {macos}, iWork '09
-# 9.3) by measure.py in this folder. Only numbers are recorded here, never the font itself.
+# 9.3) by data/fonts/measure.py. Only numbers are recorded here, never the font itself.
 #
 # Records: face KEY VALUE | advance U+XXXX WIDTH | kern U+XXXX U+XXXX KERN
 # All lengths are in font units ({upem} per em). Kerning is the CTLine
@@ -66,7 +67,7 @@ HEADER = u"""\
 """
 
 
-def faces():
+def faces(FAMILY):
     desc = CT.CTFontDescriptorCreateWithAttributes(
         {CT.kCTFontFamilyNameAttribute: FAMILY})
     found = CT.CTFontDescriptorCreateMatchingFontDescriptors(desc, None) or []
@@ -101,7 +102,7 @@ def glyph(font, ch):
     return glyphs[0]
 
 
-def measure(ps, style, macos):
+def measure(FAMILY, ps, style, macos):
     probe = CT.CTFontCreateWithName(ps, 12.0, None)
     upem = CT.CTFontGetUnitsPerEm(probe)
     font = CT.CTFontCreateWithName(ps, float(upem), None)  # 1 pt = 1 unit
@@ -174,18 +175,34 @@ def check():
 
 
 def main():
-    outdir = sys.argv[1] if len(sys.argv) > 1 else u"."
-    if not os.path.isdir(outdir):
-        os.makedirs(outdir)
+    if len(sys.argv) != 3:
+        print(u"usage: measure.py FAMILY OUTPUT_DIR", file=sys.stderr)
+        sys.exit(1)
+    family = sys.argv[1]
+    if not isinstance(family, type(u"")):
+        family = family.decode(u"utf-8")
+    outdir = sys.argv[2]
     import platform
     macos = platform.mac_ver()[0]
-    for ps, style in faces():
-        text, count, kerns = measure(ps, style, macos)
-        path = os.path.join(outdir, slug(style) + u".tsv")
+    found = sorted(faces(family))
+    if not found:
+        print(u"%s: no face installed" % family, file=sys.stderr)
+        sys.exit(2)
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+    written = set()
+    for ps, style in found:
+        name = slug(style)
+        if name in written:
+            name = slug(ps)
+        written.add(name)
+        text, count, kerns = measure(family, ps, style, macos)
+        path = os.path.join(outdir, name + u".tsv")
         with io.open(path, u"w", encoding=u"utf-8", newline=u"\n") as f:
             f.write(text)
         print(u"%s\t%s\t%d advances\t%d kerning pairs" % (path, ps, count, kerns))
-    check()
+    if family == u"Helvetica Neue":
+        check()
 
 
 if __name__ == u"__main__":

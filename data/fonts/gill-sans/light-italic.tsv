@@ -1,0 +1,425 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: CC0-1.0
+#
+# Metrics of GillSans-LightItalic (Gill Sans Light Italic),
+# measured with CoreText on the Desk reference machine (macOS 10.14.4, iWork '09
+# 9.3) by data/fonts/measure.py. Only numbers are recorded here, never the font itself.
+#
+# Records: face KEY VALUE | advance U+XXXX WIDTH | kern U+XXXX U+XXXX KERN
+# All lengths are in font units (2048 per em). Kerning is the CTLine
+# width of the pair at 1000 pt minus the widths of each character alone,
+# with ligatures off; only nonzero pairs are listed.
+face	family	Gill Sans
+face	style	Light Italic
+face	postscript	GillSans-LightItalic
+face	full	Gill Sans Light Italic
+face	unitsPerEm	2048
+face	ascent	1832
+face	descent	488
+face	leading	0
+face	xHeight	929
+face	capHeight	1406
+face	italicAngle	-8
+face	underlinePosition	-154
+face	underlineThickness	102
+advance	U+0020	569
+advance	U+0021	342
+advance	U+0022	569
+advance	U+0023	1352
+advance	U+0024	918
+advance	U+0025	1430
+advance	U+0026	1343
+advance	U+0027	455
+advance	U+0028	618
+advance	U+0029	618
+advance	U+002A	961
+advance	U+002B	1352
+advance	U+002C	342
+advance	U+002D	555
+advance	U+002E	342
+advance	U+002F	575
+advance	U+0030	1067
+advance	U+0031	1069
+advance	U+0032	1067
+advance	U+0033	1067
+advance	U+0034	1067
+advance	U+0035	1067
+advance	U+0036	1067
+advance	U+0037	1067
+advance	U+0038	1067
+advance	U+0039	1067
+advance	U+003A	342
+advance	U+003B	342
+advance	U+003C	1352
+advance	U+003D	1352
+advance	U+003E	1352
+advance	U+003F	598
+advance	U+0040	1638
+advance	U+0041	1110
+advance	U+0042	1087
+advance	U+0043	1130
+advance	U+0044	1343
+advance	U+0045	1087
+advance	U+0046	854
+advance	U+0047	1260
+advance	U+0048	1430
+advance	U+0049	406
+advance	U+004A	406
+advance	U+004B	1110
+advance	U+004C	854
+advance	U+004D	1642
+advance	U+004E	1409
+advance	U+004F	1343
+advance	U+0050	961
+advance	U+0051	1343
+advance	U+0052	1067
+advance	U+0053	854
+advance	U+0054	938
+advance	U+0055	1300
+advance	U+0056	981
+advance	U+0057	1835
+advance	U+0058	1323
+advance	U+0059	981
+advance	U+005A	1300
+advance	U+005B	618
+advance	U+005C	575
+advance	U+005D	618
+advance	U+005E	1352
+advance	U+005F	1024
+advance	U+0060	682
+advance	U+0061	981
+advance	U+0062	961
+advance	U+0063	788
+advance	U+0064	961
+advance	U+0065	918
+advance	U+0066	512
+advance	U+0067	874
+advance	U+0068	938
+advance	U+0069	362
+advance	U+006A	362
+advance	U+006B	874
+advance	U+006C	362
+advance	U+006D	1516
+advance	U+006E	938
+advance	U+006F	918
+advance	U+0070	1024
+advance	U+0071	938
+advance	U+0072	555
+advance	U+0073	725
+advance	U+0074	575
+advance	U+0075	938
+advance	U+0076	748
+advance	U+0077	1260
+advance	U+0078	938
+advance	U+0079	768
+advance	U+007A	874
+advance	U+007B	682
+advance	U+007C	455
+advance	U+007D	682
+advance	U+007E	1352
+advance	U+00A0	569
+advance	U+00A1	342
+advance	U+00A2	788
+advance	U+00A3	961
+advance	U+00A4	1139
+advance	U+00A5	1139
+advance	U+00A6	455
+advance	U+00A7	1004
+advance	U+00A8	682
+advance	U+00A9	1638
+advance	U+00AA	662
+advance	U+00AB	918
+advance	U+00AC	1352
+advance	U+00AD	555
+advance	U+00AE	1638
+advance	U+00AF	1024
+advance	U+00B0	819
+advance	U+00B1	1352
+advance	U+00B2	662
+advance	U+00B3	662
+advance	U+00B4	682
+advance	U+00B5	1139
+advance	U+00B6	1331
+advance	U+00B7	683
+advance	U+00B8	682
+advance	U+00B9	662
+advance	U+00BA	618
+advance	U+00BB	918
+advance	U+00BC	1665
+advance	U+00BD	1665
+advance	U+00BE	1665
+advance	U+00BF	598
+advance	U+00C0	1110
+advance	U+00C1	1110
+advance	U+00C2	1110
+advance	U+00C3	1110
+advance	U+00C4	1110
+advance	U+00C5	1110
+advance	U+00C6	1599
+advance	U+00C7	1130
+advance	U+00C8	1087
+advance	U+00C9	1087
+advance	U+00CA	1087
+advance	U+00CB	1087
+advance	U+00CC	406
+advance	U+00CD	406
+advance	U+00CE	406
+advance	U+00CF	406
+advance	U+00D0	1343
+advance	U+00D1	1409
+advance	U+00D2	1343
+advance	U+00D3	1343
+advance	U+00D4	1343
+advance	U+00D5	1343
+advance	U+00D6	1343
+advance	U+00D7	1352
+advance	U+00D8	1343
+advance	U+00D9	1300
+advance	U+00DA	1300
+advance	U+00DB	1300
+advance	U+00DC	1300
+advance	U+00DD	981
+advance	U+00DE	961
+advance	U+00DF	961
+advance	U+00E0	981
+advance	U+00E1	981
+advance	U+00E2	981
+advance	U+00E3	981
+advance	U+00E4	981
+advance	U+00E5	981
+advance	U+00E6	1343
+advance	U+00E7	788
+advance	U+00E8	918
+advance	U+00E9	918
+advance	U+00EA	918
+advance	U+00EB	918
+advance	U+00EC	362
+advance	U+00ED	362
+advance	U+00EE	362
+advance	U+00EF	362
+advance	U+00F0	918
+advance	U+00F1	938
+advance	U+00F2	918
+advance	U+00F3	918
+advance	U+00F4	918
+advance	U+00F5	918
+advance	U+00F6	918
+advance	U+00F7	1352
+advance	U+00F8	918
+advance	U+00F9	938
+advance	U+00FA	938
+advance	U+00FB	938
+advance	U+00FC	938
+advance	U+00FD	768
+advance	U+00FE	1024
+advance	U+00FF	768
+advance	U+0104	1110
+advance	U+0105	981
+advance	U+0106	1130
+advance	U+0107	788
+advance	U+0118	1087
+advance	U+0119	918
+advance	U+0131	362
+advance	U+0141	854
+advance	U+0142	362
+advance	U+0143	1409
+advance	U+0144	938
+advance	U+0152	1962
+advance	U+0153	1450
+advance	U+015A	854
+advance	U+015B	725
+advance	U+0160	854
+advance	U+0161	725
+advance	U+0178	981
+advance	U+0179	1300
+advance	U+017A	874
+advance	U+017B	1300
+advance	U+017C	874
+advance	U+017D	1300
+advance	U+017E	874
+advance	U+2013	1024
+advance	U+2014	2048
+advance	U+2018	342
+advance	U+2019	342
+advance	U+201A	342
+advance	U+201C	768
+advance	U+201D	768
+advance	U+201E	768
+advance	U+2020	981
+advance	U+2021	918
+advance	U+2022	1024
+advance	U+2026	2048
+advance	U+2030	2154
+advance	U+2039	469
+advance	U+203A	469
+advance	U+20AC	1030
+advance	U+2122	1925
+advance	U+FB01	961
+advance	U+FB02	961
+kern	U+0020	U+0041	-164
+kern	U+0020	U+0054	-256
+kern	U+0020	U+0056	-205
+kern	U+0020	U+0057	-205
+kern	U+0020	U+0059	-328
+kern	U+002C	U+0020	-164
+kern	U+002E	U+0020	-164
+kern	U+003A	U+0020	-164
+kern	U+003B	U+0020	-164
+kern	U+0041	U+0043	-41
+kern	U+0041	U+0047	-51
+kern	U+0041	U+004F	-61
+kern	U+0041	U+0051	-61
+kern	U+0041	U+0054	-164
+kern	U+0041	U+0055	-41
+kern	U+0041	U+0056	-174
+kern	U+0041	U+0057	-164
+kern	U+0041	U+0059	-205
+kern	U+0041	U+0076	-31
+kern	U+0041	U+0077	-31
+kern	U+0042	U+0041	41
+kern	U+0043	U+002C	92
+kern	U+0043	U+002E	92
+kern	U+0043	U+0041	102
+kern	U+0044	U+002C	-82
+kern	U+0044	U+002E	-82
+kern	U+0044	U+0041	-31
+kern	U+0044	U+0056	-154
+kern	U+0044	U+0057	-154
+kern	U+0044	U+0059	-236
+kern	U+0046	U+002C	-205
+kern	U+0046	U+002E	-205
+kern	U+0046	U+0041	-20
+kern	U+0046	U+0061	-41
+kern	U+004A	U+0041	41
+kern	U+004B	U+004F	-41
+kern	U+004B	U+0065	-31
+kern	U+004B	U+0075	20
+kern	U+004C	U+0054	-61
+kern	U+004C	U+0056	-154
+kern	U+004C	U+0057	-154
+kern	U+004C	U+0059	-154
+kern	U+004F	U+002C	-82
+kern	U+004F	U+002E	-82
+kern	U+004F	U+0054	-123
+kern	U+004F	U+0056	-61
+kern	U+004F	U+0057	-82
+kern	U+004F	U+0058	-82
+kern	U+004F	U+0059	-154
+kern	U+0050	U+002C	-287
+kern	U+0050	U+002E	-287
+kern	U+0050	U+0041	-102
+kern	U+0050	U+0061	-82
+kern	U+0050	U+0065	-82
+kern	U+0050	U+006F	-82
+kern	U+0051	U+002C	133
+kern	U+0051	U+002E	61
+kern	U+0052	U+004F	-31
+kern	U+0052	U+0054	-113
+kern	U+0052	U+0056	-102
+kern	U+0052	U+0057	-102
+kern	U+0052	U+0059	-184
+kern	U+0054	U+002C	-164
+kern	U+0054	U+002D	-266
+kern	U+0054	U+002E	-164
+kern	U+0054	U+0041	-82
+kern	U+0054	U+004F	-51
+kern	U+0054	U+0061	-205
+kern	U+0054	U+0065	-205
+kern	U+0054	U+006F	-205
+kern	U+0054	U+0072	-123
+kern	U+0054	U+0075	-143
+kern	U+0054	U+0077	-174
+kern	U+0054	U+0079	-154
+kern	U+0055	U+002C	-41
+kern	U+0055	U+002E	-41
+kern	U+0056	U+002C	-123
+kern	U+0056	U+002D	-113
+kern	U+0056	U+002E	-123
+kern	U+0056	U+003A	61
+kern	U+0056	U+003B	61
+kern	U+0056	U+0061	-61
+kern	U+0056	U+0065	-61
+kern	U+0056	U+0069	41
+kern	U+0056	U+006F	-61
+kern	U+0057	U+002C	-164
+kern	U+0057	U+002D	-133
+kern	U+0057	U+002E	-164
+kern	U+0057	U+003A	61
+kern	U+0057	U+003B	61
+kern	U+0057	U+0041	-20
+kern	U+0057	U+0061	-82
+kern	U+0057	U+0065	-82
+kern	U+0057	U+0069	41
+kern	U+0057	U+006F	-82
+kern	U+0057	U+0075	-20
+kern	U+0059	U+002C	-123
+kern	U+0059	U+002D	-225
+kern	U+0059	U+002E	-123
+kern	U+0059	U+0041	-51
+kern	U+0059	U+004F	-31
+kern	U+0059	U+0061	-154
+kern	U+0059	U+0065	-154
+kern	U+0059	U+006F	-154
+kern	U+0059	U+0075	-102
+kern	U+0062	U+002C	-41
+kern	U+0062	U+002E	-41
+kern	U+0062	U+0062	-20
+kern	U+0062	U+006C	-20
+kern	U+0062	U+0079	-20
+kern	U+0063	U+002C	82
+kern	U+0063	U+002E	82
+kern	U+0065	U+002C	20
+kern	U+0065	U+002E	20
+kern	U+0065	U+0067	-20
+kern	U+0065	U+0076	-31
+kern	U+0065	U+0077	-31
+kern	U+0065	U+0078	-31
+kern	U+0066	U+002C	-31
+kern	U+0066	U+002E	-31
+kern	U+0066	U+0061	-41
+kern	U+0066	U+0065	-41
+kern	U+0066	U+006F	-20
+kern	U+0067	U+002E	-20
+kern	U+006B	U+0065	-31
+kern	U+006E	U+0076	-20
+kern	U+006F	U+002C	-31
+kern	U+006F	U+002E	-31
+kern	U+006F	U+0076	-20
+kern	U+006F	U+0077	-20
+kern	U+006F	U+0078	-31
+kern	U+0070	U+002C	-31
+kern	U+0070	U+002E	-31
+kern	U+0070	U+0079	-31
+kern	U+0072	U+002C	-82
+kern	U+0072	U+002D	-82
+kern	U+0072	U+002E	-82
+kern	U+0072	U+003A	154
+kern	U+0072	U+003B	154
+kern	U+0072	U+0061	-41
+kern	U+0072	U+0067	31
+kern	U+0072	U+0069	51
+kern	U+0072	U+006B	61
+kern	U+0072	U+006C	61
+kern	U+0072	U+006D	51
+kern	U+0072	U+006E	61
+kern	U+0072	U+0071	-20
+kern	U+0072	U+0072	51
+kern	U+0072	U+0073	51
+kern	U+0072	U+0074	51
+kern	U+0072	U+0075	61
+kern	U+0072	U+0076	154
+kern	U+0072	U+0079	154
+kern	U+0073	U+002C	51
+kern	U+0073	U+002E	51
+kern	U+0076	U+002C	-61
+kern	U+0076	U+002E	-61
+kern	U+0076	U+0061	-31
+kern	U+0077	U+002C	-82
+kern	U+0077	U+002E	-82
+kern	U+0077	U+0061	-31
+kern	U+0078	U+0065	-61
+kern	U+0079	U+002C	-82
+kern	U+0079	U+002E	-82
+kern	U+0079	U+0061	-41
+kern	U+0079	U+0065	-20
+kern	U+007A	U+0065	-20

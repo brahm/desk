@@ -3,7 +3,7 @@
 #
 # Metrics of HelveticaNeue-Bold (Helvetica Neue Bold),
 # measured with CoreText on the Desk reference machine (macOS 10.14.4, iWork '09
-# 9.3) by measure.py in this folder. Only numbers are recorded here, never the font itself.
+# 9.3) by data/fonts/measure.py. Only numbers are recorded here, never the font itself.
 #
 # Records: face KEY VALUE | advance U+XXXX WIDTH | kern U+XXXX U+XXXX KERN
 # All lengths are in font units (1000 per em). Kerning is the CTLine
