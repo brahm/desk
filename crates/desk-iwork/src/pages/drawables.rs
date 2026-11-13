@@ -35,6 +35,19 @@ pub enum Place {
     },
 }
 
+/// A guide fixed on a page (`sl:alignment-guide`), that objects snap to
+/// (OBJ-28).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AlignmentGuide {
+    /// The page, from 0.
+    pub page: u32,
+    /// Whether it runs down the page rather than across it.
+    pub vertical: bool,
+    /// How far it is from the left or the top edge of the paper, in
+    /// points.
+    pub offset: f64,
+}
+
 /// The size and place of an object (`sf:geometry`), in points.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Geometry {
@@ -591,6 +604,21 @@ impl<'a> Reader<'a, '_> {
                 "page-group" => {
                     let page = number(child, SL, "page").max(1.0) as u32 - 1;
                     self.group(child, &Place::Page(page), out);
+                }
+                // A guide dragged out of a ruler onto a page (OBJ-28).
+                "alignment-guide" => {
+                    if let Place::Page(page) = place {
+                        let vertical = match child.attr(SF, "orientation") {
+                            Some("vertical") => true,
+                            Some("horizontal") => false,
+                            _ => continue,
+                        };
+                        self.document.guides.push(AlignmentGuide {
+                            page: *page,
+                            vertical,
+                            offset: number(child, SF, "offset"),
+                        });
+                    }
                 }
                 "textbox-chain" | "style" => {}
                 _ => {

@@ -1925,9 +1925,9 @@ def guide_from_the_ruler(work):
         press("ctrl+s")
         wait_for(
             "the guide saved in the settings",
-            lambda: saved_part(letter, "settings.xml", r'config:name="Guides"[^>]*>h [0-9.]+(pt|in|cm|mm)<'),
+            lambda: saved_part(letter, "settings.xml", r'config:name="Guides"[^>]*>h [0-9.]+(pt|in|cm|mm) 1<'),
         )
-        check("a drag from the ruler leaves a guide on the page, saved with it (OBJ-28)", True)
+        check("a drag from the ruler leaves a guide on its page, saved with it (OBJ-28)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

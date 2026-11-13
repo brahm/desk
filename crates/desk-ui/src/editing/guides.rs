@@ -196,11 +196,11 @@ impl TextEditor {
     }
 
     /// Takes a fixed guide that a press on a page is on, to move it.
-    pub(super) fn press_guide(&self, x: f32, y: f32) -> bool {
+    pub(super) fn press_guide(&self, page: usize, x: f32, y: f32) -> bool {
         let reach = REACH / self.view.scale();
         let found = self.main_guides().iter().position(|g| {
             let along = if g.vertical { x } else { y };
-            (f64::from(along) - g.at.to_pt()).abs() <= reach
+            g.is_on(page) && (f64::from(along) - g.at.to_pt()).abs() <= reach
         });
         let Some(index) = found else {
             return false;
@@ -242,6 +242,7 @@ impl TextEditor {
         let on =
             x >= top_x && y >= top_y && x <= top_x + width * scale && y <= top_y + height * scale;
         on.then(|| FixedGuide {
+            page: Some(page as u32),
             vertical,
             at: Length::from_pt(if vertical { px } else { py }),
         })
@@ -289,11 +290,21 @@ mod tests {
         let editor = Editor::new(Document::new_word_processing());
         let layout = crate::lay_out(editor.document());
         let guide = FixedGuide {
+            page: Some(0),
             vertical: true,
             at: Length::from_pt(201.0),
         };
         let snaps = super::super::objects::Snaps::new(&layout, 0, &[]).with_fixed(&[guide]);
         let ((dx, _), _, _) = snaps.snap((199.0, 300.0, 230.0, 320.0), 5.0);
         assert!((dx - 2.0).abs() < 0.01);
+        // A guide belongs to its page, as in Pages: the objects of another
+        // page do not snap to it.
+        let other = FixedGuide {
+            page: Some(1),
+            ..guide
+        };
+        let snaps = super::super::objects::Snaps::new(&layout, 0, &[]).with_fixed(&[other]);
+        let ((dx, _), _, _) = snaps.snap((199.0, 300.0, 230.0, 320.0), 5.0);
+        assert_eq!(dx, 0.0);
     }
 }

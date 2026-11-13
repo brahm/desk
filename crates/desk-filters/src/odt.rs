@@ -2511,11 +2511,11 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .guides
                 .iter()
                 .map(|g| {
-                    format!(
-                        "{} {}",
-                        if g.vertical { "v" } else { "h" },
-                        odf_length(g.at)
-                    )
+                    let kind = if g.vertical { "v" } else { "h" };
+                    match g.page {
+                        Some(page) => format!("{kind} {} {}", odf_length(g.at), page + 1),
+                        None => format!("{kind} {}", odf_length(g.at)),
+                    }
                 })
                 .collect(),
             ..odf_note_settings(settings.notes)
@@ -2984,19 +2984,25 @@ pub fn export(document: &Document) -> odf::TextDocument {
 }
 
 /// The guides fixed on the pages, from the settings of the document
-/// (OBJ-28). One that cannot be read is left out.
+/// (OBJ-28): `h` or `v`, the distance from the edge of the paper, and the
+/// page from 1, which a guide on every page has not. One that cannot be
+/// read is left out.
 fn fixed_guides(guides: &[String]) -> Vec<desk_model::FixedGuide> {
     let mut out: Vec<desk_model::FixedGuide> = guides
         .iter()
         .filter_map(|g| {
-            let (kind, at) = g.split_once(' ')?;
-            let vertical = match kind {
+            let mut words = g.split_whitespace();
+            let vertical = match words.next()? {
                 "v" => true,
                 "h" => false,
                 _ => return None,
             };
-            let at = length(odf::Length::parse(at.trim())?);
-            Some(desk_model::FixedGuide { vertical, at })
+            let at = length(odf::Length::parse(words.next()?)?);
+            let page = match words.next() {
+                Some(page) => Some(page.parse::<u32>().ok()?.checked_sub(1)?),
+                None => None,
+            };
+            Some(desk_model::FixedGuide { page, vertical, at })
         })
         .collect();
     out.sort();

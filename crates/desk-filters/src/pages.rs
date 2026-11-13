@@ -115,6 +115,21 @@ fn lost_formatting(properties: &Properties, out: &mut BTreeSet<Formatting>) {
     }
 }
 
+/// The guides fixed on the pages, each on its own (OBJ-28).
+fn fixed_guides(guides: &[desk_iwork::pages::AlignmentGuide]) -> Vec<desk_model::FixedGuide> {
+    let mut out: Vec<_> = guides
+        .iter()
+        .map(|g| desk_model::FixedGuide {
+            page: Some(g.page),
+            vertical: g.vertical,
+            at: Length::from_pt(g.offset),
+        })
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// The defaults of Pages for what no style sets.
 fn pages_paragraph_defaults() -> ParaFormat {
     ParaFormat {
@@ -1677,6 +1692,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             ligatures: source.use_ligatures,
             notes: note_settings(source.note_properties),
             toc: toc_settings(&source.stylesheet, &toc_ids, source.toc_links),
+            guides: fixed_guides(&source.guides),
             ..TextSettings::default()
         },
     })?;

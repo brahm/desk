@@ -17,7 +17,9 @@ use crate::xml::{self, Element, Node};
 
 mod drawables;
 
-pub use drawables::{Drawable, DrawableKind, Geometry, ObjectShadow, Place, ShapePath, TextWrap};
+pub use drawables::{
+    AlignmentGuide, Drawable, DrawableKind, Geometry, ObjectShadow, Place, ShapePath, TextWrap,
+};
 
 /// A line break inside a paragraph (`sf:lnbr`), as the model writes it.
 pub const LINE_BREAK: char = '\u{2028}';
@@ -252,6 +254,8 @@ pub struct PagesDocument {
     /// The floating objects, of the pages and of the masters of the
     /// sections, in the order they are saved.
     pub drawables: Vec<Drawable>,
+    /// The guides fixed on the pages (OBJ-28).
+    pub guides: Vec<AlignmentGuide>,
     /// The objects in the line of the text (`sf:attachment` of kind
     /// `drawable-attachment`) that the reader reads, by object ID.
     pub attachments: Vec<(String, Drawable)>,

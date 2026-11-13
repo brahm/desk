@@ -96,15 +96,25 @@ pub struct TextSettings {
     pub guides: Vec<FixedGuide>,
 }
 
-/// A guide fixed on every page, dragged out of a ruler, that objects snap
-/// to (OBJ-28).
+/// A guide fixed on a page, dragged out of a ruler, that objects snap to
+/// (OBJ-28). As in Pages, a guide belongs to the page it was dragged onto.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FixedGuide {
+    /// The page it is on, from 0; none for a guide on every page, as
+    /// documents saved before guides had pages have them.
+    pub page: Option<u32>,
     /// Whether it runs down the page, at a distance from its left edge,
     /// rather than across it, at a distance from its top.
     pub vertical: bool,
     /// How far it is from the left or the top edge of the paper.
     pub at: Length,
+}
+
+impl FixedGuide {
+    /// Whether the guide is on a page, counted from 0.
+    pub fn is_on(&self, page: usize) -> bool {
+        self.page.is_none_or(|p| p as usize == page)
+    }
 }
 
 /// How the space after a paragraph and the space before the next make the

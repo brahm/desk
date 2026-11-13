@@ -963,12 +963,13 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
         );
     }
     cr.stroke().ok();
-    // The fixed guides, across the whole page (OBJ-28).
+    // The fixed guides of the page, across the whole of it (OBJ-28).
     let guides = state
         .fixed_guides
         .iter()
         .map(|g| (g, 0.7))
-        .chain(state.dragged_guide.iter().map(|g| (g, 1.0)));
+        .chain(state.dragged_guide.iter().map(|g| (g, 1.0)))
+        .filter(|(g, _)| g.is_on(page));
     for (guide, alpha) in guides {
         cr.set_source_rgba(0.21, 0.52, 0.89, alpha);
         let at = guide.at.to_pt() * scale;

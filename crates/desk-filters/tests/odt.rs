@@ -2885,14 +2885,23 @@ fn int_03_page_layout_documents_keep_their_pages_and_have_no_body() {
 fn obj_28_fixed_guides_are_kept_in_the_settings() {
     use desk_model::{Editor, FixedGuide, Length};
     let mut editor = Editor::new(Document::new_word_processing());
+    // Each guide is on its page, as in Pages; one of a document saved
+    // before guides had pages is on all of them.
     let guides = vec![
         FixedGuide {
+            page: None,
             vertical: false,
             at: Length::from_pt(144.5),
         },
         FixedGuide {
+            page: Some(0),
             vertical: true,
             at: Length::from_pt(72.0),
+        },
+        FixedGuide {
+            page: Some(2),
+            vertical: false,
+            at: Length::from_pt(102.0),
         },
     ];
     editor
@@ -2904,7 +2913,7 @@ fn obj_28_fixed_guides_are_kept_in_the_settings() {
         .unwrap();
     let bytes = write_odt(editor.document()).unwrap();
     let odf = desk_odf::read_odt(&bytes).unwrap();
-    assert_eq!(odf.text_settings.guides.len(), 2);
+    assert_eq!(odf.text_settings.guides.len(), 3);
     let read = read_odt(&bytes).unwrap();
     assert_eq!(read.text_settings().guides, guides);
 }

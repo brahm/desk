@@ -420,6 +420,8 @@ pub(super) struct Snaps {
     down: Vec<(f32, Target)>,
     width: f32,
     height: f32,
+    /// The page, from 0, whose fixed guides count.
+    page: usize,
 }
 
 impl Snaps {
@@ -447,12 +449,13 @@ impl Snaps {
             down,
             width,
             height,
+            page,
         }
     }
 
-    /// The same, and the guides fixed on the pages too (OBJ-28).
+    /// The same, and the guides fixed on its page too (OBJ-28).
     pub fn with_fixed(mut self, guides: &[desk_model::FixedGuide]) -> Self {
-        for guide in guides {
+        for guide in guides.iter().filter(|g| g.is_on(self.page)) {
             let at = guide.at.to_pt() as f32;
             if guide.vertical {
                 self.across.push((at, Target::Fixed));
@@ -1775,7 +1778,7 @@ impl TextEditor {
             // A press on a fixed guide moves it (OBJ-28).
             if presses == 1
                 && !on_text(&self.state.borrow().layout, page, px, py)
-                && self.press_guide(px, py)
+                && self.press_guide(page, px, py)
             {
                 return true;
             }

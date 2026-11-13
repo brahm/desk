@@ -1428,3 +1428,31 @@ fn fmt_08_font_features_saved_by_pages_are_read_as_opentype_features() {
         "{log:?}"
     );
 }
+
+#[test]
+fn obj_28_the_guides_of_each_page_stay_on_it() {
+    let drawables = r#"<sl:drawables><sl:page-group sl:page="1"><sl:alignment-guide sf:offset="102" sf:orientation="horizontal"/></sl:page-group><sl:page-group sl:page="3"><sl:alignment-guide sf:offset="200.5" sf:orientation="vertical"/></sl:page-group></sl:drawables>
+"#;
+    let source = index(STYLES, &anon(), BODY).replace(
+        "<sf:text-storage sf:kind=\"body\"",
+        &format!("{drawables}<sf:text-storage sf:kind=\"body\""),
+    );
+    let document = read_pages(source.as_bytes()).unwrap();
+    let guides = &document.text_settings().guides;
+    assert_eq!(
+        guides,
+        &[
+            desk_model::FixedGuide {
+                page: Some(0),
+                vertical: false,
+                at: Length::from_pt(102.0),
+            },
+            desk_model::FixedGuide {
+                page: Some(2),
+                vertical: true,
+                at: Length::from_pt(200.5),
+            },
+        ]
+    );
+    assert!(guides[0].is_on(0) && !guides[0].is_on(2));
+}
