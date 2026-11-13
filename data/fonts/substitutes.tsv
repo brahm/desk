@@ -53,18 +53,27 @@ Tahoma	DejaVu Sans	style
 Lucida Grande	DejaVu Sans	style
 Geneva	DejaVu Sans	style
 Trebuchet MS	DejaVu Sans	style
+Gill Sans	Desk Humanist	metric
 Gill Sans	TeX Gyre Heros	style
+Futura	Desk Geometric	metric
 Futura	TeX Gyre Adventor	style
 Avenir	TeX Gyre Adventor	style
+Optima	Desk Flare	metric
 Optima	TeX Gyre Heros	style
+Baskerville	Desk Transitional	metric
 Baskerville	TeX Gyre Pagella	style
 Big Caslon	TeX Gyre Pagella	style
+Hoefler Text	Desk Oldstyle	metric
 Hoefler Text	TeX Gyre Pagella	style
+Cochin	Desk Engraver	metric
 Cochin	TeX Gyre Pagella	style
+Didot	Desk Didone	metric
 Didot	TeX Gyre Termes	style
 Bodoni 72	TeX Gyre Termes	style
+American Typewriter	Desk Typewriter	metric
 American Typewriter	TeX Gyre Cursor	style
 American Typewriter	Liberation Mono	style
+Marker Felt	Desk Marker	metric
 Marker Felt	TeX Gyre Chorus	style
 Zapfino	TeX Gyre Chorus	style
 Snell Roundhand	TeX Gyre Chorus	style

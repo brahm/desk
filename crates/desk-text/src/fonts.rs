@@ -11,20 +11,63 @@
 
 use std::sync::{Arc, OnceLock};
 
-/// The fonts that Desk brings, which `data/fonts/desk-neue` makes: Desk
-/// Neue, TeX Gyre Heros with the advance widths and kerning of Helvetica
-/// Neue as Pages lays it out, in each of its weights (DOC-05).
-pub(crate) const BUNDLED: [&[u8]; 10] = [
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Regular.otf"),
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Italic.otf"),
+/// The fonts that Desk brings, each with the advance widths and kerning
+/// of a font of the Mac as Pages lays it out, in each of its weights
+/// (DOC-05): Desk Neue, which `data/fonts/desk-neue` makes from TeX Gyre
+/// Heros for Helvetica Neue, and those that `data/fonts/make-substitutes.py`
+/// makes from free fonts for the fonts of the Pages templates.
+pub(crate) const BUNDLED: [&[u8]; 51] = [
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Bold.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-BoldItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Italic.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Light.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-LightItalic.otf"),
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLight.otf"),
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLightItalic.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Medium.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-MediumItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Regular.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLight.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLightItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Light.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-LightItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-SemiBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-SemiBoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-UltraBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-ExtraBlack.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-CondensedExtraBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-Medium.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-MediumItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-SemiBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-SemiBoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-Black.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-BlackItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-didone/DeskDidone-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-didone/DeskDidone-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-didone/DeskDidone-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-Light.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-SemiBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-marker/DeskMarker-Thin.ttf"),
+    include_bytes!("../../../data/fonts/desk-marker/DeskMarker-Wide.ttf"),
 ];
 
 /// How a font was chosen for a family that a document names.
@@ -230,8 +273,9 @@ mod tests {
         assert!(table().len() > 40);
         let helvetica: Vec<_> = substitutes("helvetica").collect();
         assert_eq!(helvetica[0], ("Liberation Sans", true));
+        assert_eq!(substitutes("Optima").next(), Some(("Desk Flare", true)));
         assert_eq!(
-            substitutes("Optima").next(),
+            substitutes("Optima").nth(1),
             Some(("TeX Gyre Heros", false))
         );
         assert_eq!(substitutes("Unknown").count(), 0);
@@ -271,6 +315,29 @@ mod tests {
             (&*choice.used, choice.kind),
             ("Desk Neue", FontMatch::Metric)
         );
+    }
+
+    #[test]
+    fn doc_05_fonts_of_desk_stand_for_the_fonts_of_the_pages_templates() {
+        let mut system = crate::TextSystem::new();
+        for (family, stands) in [
+            ("Gill Sans", "Desk Humanist"),
+            ("Optima", "Desk Flare"),
+            ("Futura", "Desk Geometric"),
+            ("Baskerville", "Desk Transitional"),
+            ("Hoefler Text", "Desk Oldstyle"),
+            ("Didot", "Desk Didone"),
+            ("Cochin", "Desk Engraver"),
+            ("American Typewriter", "Desk Typewriter"),
+            ("Marker Felt", "Desk Marker"),
+        ] {
+            let choice = system.font_choice(family);
+            assert_eq!(
+                (&*choice.used, choice.kind),
+                (stands, FontMatch::Metric),
+                "{family}"
+            );
+        }
     }
 
     #[test]
