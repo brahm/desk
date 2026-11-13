@@ -94,6 +94,10 @@ pub struct DocumentWindow {
     /// Whether closing was asked for and answered, so that the window
     /// closes without asking again.
     closing: Cell<bool>,
+    /// The recovery draft of the document, once one is written.
+    draft: RefCell<Option<crate::recovery::Draft>>,
+    /// Whether the document changed since the last draft.
+    draft_due: Cell<bool>,
 }
 
 thread_local! {
@@ -514,6 +518,8 @@ impl DocumentWindow {
             vertical_ruler,
             ruler_corner,
             closing: Cell::new(false),
+            draft: RefCell::new(None),
+            draft_due: Cell::new(false),
         });
         this.add_actions();
         this.show_rulers();
@@ -606,8 +612,23 @@ impl DocumentWindow {
         {
             let weak = Rc::downgrade(&this);
             this.window.connect_close_request(move |_| {
-                weak.upgrade()
-                    .map_or(glib::Propagation::Proceed, |this| this.close_request())
+                weak.upgrade().map_or(glib::Propagation::Proceed, |this| {
+                    let propagation = this.close_request();
+                    if propagation == glib::Propagation::Proceed {
+                        this.drop_draft();
+                    }
+                    propagation
+                })
+            });
+        }
+        {
+            let weak = Rc::downgrade(&this);
+            glib::timeout_add_seconds_local(crate::recovery::INTERVAL_SECONDS, move || {
+                let Some(this) = weak.upgrade() else {
+                    return glib::ControlFlow::Break;
+                };
+                this.keep_draft();
+                glib::ControlFlow::Continue
             });
         }
         {
@@ -646,6 +667,11 @@ impl DocumentWindow {
     /// An open window that shows no document, if any.
     pub fn find_empty() -> Option<Rc<Self>> {
         WINDOWS.with(|w| w.borrow().iter().find(|w| w.is_empty()).cloned())
+    }
+
+    /// The window opened last.
+    pub fn last() -> Option<Rc<Self>> {
+        WINDOWS.with(|w| w.borrow().last().cloned())
     }
 
     fn editor(&self) -> Option<TextEditor> {
@@ -742,6 +768,7 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         editor.connect_changed(move || {
             if let Some(this) = weak.upgrade() {
+                this.draft_due.set(true);
                 this.refresh();
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
@@ -1019,7 +1046,62 @@ impl DocumentWindow {
         });
     }
 
+    /// Writes the recovery draft of the document, when it has changes
+    /// that are not saved nor in the draft yet.
+    fn keep_draft(&self) {
+        let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
+            return;
+        };
+        if !self.draft_due.get() || !editor.is_modified() {
+            return;
+        }
+        let draft = self
+            .draft
+            .borrow_mut()
+            .get_or_insert_with(|| crate::recovery::Draft::new(opener.saves.1))
+            .clone();
+        let written = draft.name_file(&self.name.borrow()).is_ok()
+            && crate::save_document(opener, &editor.document(), None, &draft.path).is_ok();
+        if written {
+            self.draft_due.set(false);
+        }
+    }
+
+    /// Drops the recovery draft, when what it kept is saved or given up.
+    fn drop_draft(&self) {
+        if let Some(draft) = self.draft.borrow_mut().take() {
+            draft.remove();
+        }
+        self.draft_due.set(false);
+    }
+
+    /// Shows a document that a recovery draft kept, as a new document
+    /// with the name it had.
+    pub fn recover(self: &Rc<Self>, draft: &crate::recovery::Draft) -> bool {
+        let Some(opener) = self.opener else {
+            return false;
+        };
+        match crate::open_document(opener, &draft.path) {
+            Ok(shown) => {
+                let name = draft.name();
+                let name = if name.is_empty() {
+                    tr("Untitled")
+                } else {
+                    name
+                };
+                self.load_untitled(
+                    shown.document,
+                    tr("{name} (recovered)").replace("{name}", &name),
+                );
+                draft.remove();
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
     fn saved_as(&self, path: &Path) {
+        self.drop_draft();
         *self.path.borrow_mut() = Some(path.to_owned());
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {

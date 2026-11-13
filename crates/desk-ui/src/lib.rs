@@ -44,6 +44,7 @@ mod outline_view;
 mod picture_pane;
 mod preferences;
 mod properties;
+mod recovery;
 mod ruler;
 mod shape_pane;
 mod shortcuts;
@@ -68,7 +69,7 @@ use desk_text::{FontChoice, FontMatch, TextSystem};
 use gtk::gio;
 
 pub use desk_model::{Document, Fragment, Object};
-use i18n::tr;
+use i18n::{tr, trn};
 pub use view::DocumentView;
 use window::DocumentWindow;
 
@@ -380,7 +381,11 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         app.set_accels_for_action("win.select-all", &["<Control>a"]);
         app.set_accels_for_action("win.special-characters", &["<Control>period"]);
     });
-    app.connect_activate(move |app| DocumentWindow::new(app, info, opener).window().present());
+    app.connect_activate(move |app| {
+        let window = DocumentWindow::new(app, info, opener);
+        window.window().present();
+        offer_recovery(app, info, opener, &window);
+    });
     // Files opened from outside: by double click, from the recent files or
     // by dropping them on the icon of the app (DOC-03).
     app.connect_open(move |app, files, _| {
@@ -389,6 +394,9 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             if let Some(path) = file.path() {
                 open_in_window(app, info, opener, &path);
             }
+        }
+        if let Some(window) = DocumentWindow::last() {
+            offer_recovery(app, info, Some(opener), &window);
         }
     });
 
@@ -517,6 +525,75 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
             .build();
         app.add_action_entries([open]);
     }
+}
+
+thread_local! {
+    /// Whether the drafts that a crash left were offered already.
+    static RECOVERY_OFFERED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Offers back, once, the documents whose recovery drafts a crash left:
+/// Recover opens each in a window as a new document, Discard drops them.
+fn offer_recovery(
+    app: &adw::Application,
+    info: AppInfo,
+    opener: Option<&'static Opener>,
+    over: &std::rc::Rc<DocumentWindow>,
+) {
+    if opener.is_none() || RECOVERY_OFFERED.with(|o| o.replace(true)) {
+        return;
+    }
+    let drafts = recovery::leftovers();
+    if drafts.is_empty() {
+        return;
+    }
+    let names: Vec<String> = drafts
+        .iter()
+        .map(|d| d.name())
+        .map(|n| if n.is_empty() { tr("Untitled") } else { n })
+        .collect();
+    let dialog = adw::AlertDialog::new(
+        Some(&tr("Recover Unsaved Changes?")),
+        Some(
+            &trn(
+                "{app} closed unexpectedly. The changes to this document were kept: {names}.",
+                "{app} closed unexpectedly. The changes to these documents were kept: {names}.",
+                drafts.len() as u64,
+            )
+            .replace("{app}", info.name)
+            .replace("{names}", &names.join(", ")),
+        ),
+    );
+    dialog.add_response("discard", &tr("_Discard"));
+    dialog.add_response("recover", &tr("_Recover"));
+    dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+    dialog.set_response_appearance("recover", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("recover"));
+    dialog.set_close_response("recover");
+    let app = app.clone();
+    let first = over.clone();
+    dialog.choose(
+        Some(over.window()),
+        gio::Cancellable::NONE,
+        move |response| {
+            if response == "discard" {
+                for draft in &drafts {
+                    draft.remove();
+                }
+                return;
+            }
+            for draft in &drafts {
+                let window = if first.is_empty() {
+                    first.clone()
+                } else {
+                    DocumentWindow::new(&app, info, opener)
+                };
+                if window.recover(draft) {
+                    window.window().present();
+                }
+            }
+        },
+    );
 }
 
 /// The Open dialog, through the file chooser portal in Flatpak (DOC-03).
