@@ -289,9 +289,9 @@ fn fmt_12_alignment() {
     }
     // Justified lines reach the right edge, except the last one.
     let n = justify.lines.len();
-    for line in 0..n - 1 {
+    for (line, justified) in justify.lines.iter().enumerate().take(n - 1) {
         // The run ends after the trailing space, which hangs past the edge.
-        let end = justify.lines[line].runs.last().unwrap();
+        let end = justified.runs.last().unwrap();
         let end = end.x + end.advance;
         assert!((200.0..204.0).contains(&end), "line {line}: {end}");
     }
