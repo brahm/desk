@@ -2445,6 +2445,14 @@ fn view_settings(view: &odf::ViewSettings) -> Option<desk_model::ViewSettings> {
         zoom,
         two_pages: view.columns.is_some_and(|c| c >= 2),
         outline: view.outline.unwrap_or(false),
+        outline_options: desk_model::OutlineOptions {
+            levels: view
+                .outline_levels
+                .and_then(|l| u8::try_from(l).ok())
+                .filter(|l| (1..=desk_model::MAX_OUTLINE_LEVEL).contains(l)),
+            first_line: view.outline_first_line.unwrap_or(false),
+            thumbnails: view.outline_thumbnails.unwrap_or(false),
+        },
     })
 }
 
@@ -2459,6 +2467,9 @@ fn odf_view(view: desk_model::ViewSettings) -> odf::ViewSettings {
         zoom_factor: Some(factor),
         columns: Some(if view.two_pages { 2 } else { 1 }),
         outline: Some(view.outline),
+        outline_levels: view.outline_options.levels.map(i16::from),
+        outline_first_line: Some(view.outline_options.first_line),
+        outline_thumbnails: Some(view.outline_options.thumbnails),
     }
 }
 
@@ -2500,11 +2511,11 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .guides
                 .iter()
                 .map(|g| {
-                    format!(
-                        "{} {}",
-                        if g.vertical { "v" } else { "h" },
-                        odf_length(g.at)
-                    )
+                    let kind = if g.vertical { "v" } else { "h" };
+                    match g.page {
+                        Some(page) => format!("{kind} {} {}", odf_length(g.at), page + 1),
+                        None => format!("{kind} {}", odf_length(g.at)),
+                    }
                 })
                 .collect(),
             ..odf_note_settings(settings.notes)
@@ -2973,19 +2984,25 @@ pub fn export(document: &Document) -> odf::TextDocument {
 }
 
 /// The guides fixed on the pages, from the settings of the document
-/// (OBJ-28). One that cannot be read is left out.
+/// (OBJ-28): `h` or `v`, the distance from the edge of the paper, and the
+/// page from 1, which a guide on every page has not. One that cannot be
+/// read is left out.
 fn fixed_guides(guides: &[String]) -> Vec<desk_model::FixedGuide> {
     let mut out: Vec<desk_model::FixedGuide> = guides
         .iter()
         .filter_map(|g| {
-            let (kind, at) = g.split_once(' ')?;
-            let vertical = match kind {
+            let mut words = g.split_whitespace();
+            let vertical = match words.next()? {
                 "v" => true,
                 "h" => false,
                 _ => return None,
             };
-            let at = length(odf::Length::parse(at.trim())?);
-            Some(desk_model::FixedGuide { vertical, at })
+            let at = length(odf::Length::parse(words.next()?)?);
+            let page = match words.next() {
+                Some(page) => Some(page.parse::<u32>().ok()?.checked_sub(1)?),
+                None => None,
+            };
+            Some(desk_model::FixedGuide { page, vertical, at })
         })
         .collect();
     out.sort();

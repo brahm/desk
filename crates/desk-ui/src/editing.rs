@@ -2614,7 +2614,7 @@ impl TextEditor {
             return;
         }
         self.format_ranges("Paragraph Style", |edit, from, to| {
-            edit.set_paragraph_style(from, to, style)
+            edit.apply_paragraph_style(from, to, style)
         });
     }
 
@@ -3173,7 +3173,9 @@ impl TextEditor {
             }
             gdk::Key::Up | gdk::Key::KP_Up | gdk::Key::Down | gdk::Key::KP_Down => {
                 let down = matches!(key, gdk::Key::Down | gdk::Key::KP_Down);
-                if control {
+                // Alt, as Option in Pages, goes to the edge of the
+                // paragraph too (TXT-03).
+                if control || modifiers.contains(gdk::ModifierType::ALT_MASK) {
                     self.move_to(
                         text_nav::paragraph_edge(&document, focus, down),
                         shift,

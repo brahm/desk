@@ -26,7 +26,7 @@ fn fixtures() -> PathBuf {
 fn check(name: &str) {
     let fixtures = fixtures();
     let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
-    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let layout = desk_layout::paginate_view(&document, &mut desk_text::TextSystem::new());
     let pages = DisplayList::pages(&layout);
     let tmp = Path::new(env!("CARGO_TARGET_TMPDIR"));
     let out = tmp.join(format!("{name}.pdf"));
@@ -114,4 +114,44 @@ fn doc_05_the_fonts_of_the_templates_match_pages() {
 #[test]
 fn doc_05_the_fonts_of_the_templates_at_other_sizes_match_pages() {
     check("doc-05-apple-fonts-sizes");
+}
+
+#[test]
+fn txt_14_doc_16_an_outline_prints_as_in_pages() {
+    check("txt-14-outline-long");
+}
+
+#[test]
+fn txt_14_the_same_document_out_of_outline_prints_as_in_pages() {
+    check("txt-14-outline-long-normal");
+}
+
+#[test]
+fn txt_14_an_outline_of_the_first_lines_prints_as_in_pages() {
+    check("txt-14-outline-first-line");
+}
+
+#[test]
+fn txt_14_an_outline_of_two_levels_prints_as_in_pages() {
+    check("txt-14-outline-levels");
+}
+
+#[test]
+fn txt_14_an_outline_with_miniatures_prints_as_in_pages() {
+    check("txt-14-outline-thumbnails");
+}
+
+#[test]
+fn txt_14_an_a4_outline_breaks_pages_as_in_pages() {
+    check("txt-14-outline-a4-default");
+}
+
+#[test]
+fn txt_14_doc_16_a_document_saved_as_an_outline_prints_as_in_pages() {
+    check("txt-14-doc-16-outline");
+}
+
+#[test]
+fn fmt_14_line_spacing_matches_pages() {
+    check("fmt-14-line-spacing");
 }

@@ -8,7 +8,7 @@
 //! A click on an object selects it, with its outline and eight handles;
 //! Shift or Ctrl and a click add it to the selection or take it out. A
 //! drag of an object moves the selected ones, snapping to the edges and
-//! the middle of the page and of the other objects, with yellow guides;
+//! the middle of the page and of the other objects, with blue guides;
 //! Shift keeps it straight across, down or at 45 degrees. A drag of a handle resizes the
 //! object, keeping its proportions with Shift; with Ctrl it rotates the
 //! object around its center, by steps of 45 degrees with Shift. The drag
@@ -403,33 +403,45 @@ pub(super) fn rotate(placed: &PlacedObject, from: (f32, f32), to: (f32, f32), st
     rotation.rem_euclid(36_000)
 }
 
+/// What a drag snaps to: a middle, an edge, or a guide fixed on the
+/// pages, which the middle and the edges of what is dragged snap to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Target {
+    Middle,
+    Edge,
+    Fixed,
+}
+
 /// The edges and middles that a drag snaps to, across and down, on a
 /// page: those of the paper and of its margins, and those of the objects
 /// that are not dragged.
 pub(super) struct Snaps {
-    across: Vec<f32>,
-    down: Vec<f32>,
+    across: Vec<(f32, Target)>,
+    down: Vec<(f32, Target)>,
     width: f32,
     height: f32,
+    /// The page, from 0, whose fixed guides count.
+    page: usize,
 }
 
 impl Snaps {
     pub fn new(layout: &DocumentLayout, page: usize, moving: &[NodeId]) -> Self {
+        use Target::{Edge, Middle};
         let width = layout.setup.width.to_pt() as f32;
         let height = layout.setup.height.to_pt() as f32;
-        let mut across = vec![0.0, width / 2.0, width];
-        let mut down = vec![0.0, height / 2.0, height];
+        let mut across = vec![(0.0, Edge), (width / 2.0, Middle), (width, Edge)];
+        let mut down = vec![(0.0, Edge), (height / 2.0, Middle), (height, Edge)];
         if let Some(page) = layout.pages.get(page) {
-            across.extend([page.margins.0, width - page.margins.1]);
-            down.extend([page.body.0, page.body.1]);
+            across.extend([(page.margins.0, Edge), (width - page.margins.1, Edge)]);
+            down.extend([(page.body.0, Edge), (page.body.1, Edge)]);
             for other in page
                 .objects
                 .iter()
                 .filter(|o| !moving.contains(&o.object.id))
             {
                 let (x0, y0, x1, y1) = other.bounds();
-                across.extend([x0, (x0 + x1) / 2.0, x1]);
-                down.extend([y0, (y0 + y1) / 2.0, y1]);
+                across.extend([(x0, Edge), ((x0 + x1) / 2.0, Middle), (x1, Edge)]);
+                down.extend([(y0, Edge), ((y0 + y1) / 2.0, Middle), (y1, Edge)]);
             }
         }
         Self {
@@ -437,19 +449,33 @@ impl Snaps {
             down,
             width,
             height,
+            page,
         }
     }
 
-    /// The same, and the guides fixed on the pages too (OBJ-28).
+    /// The same, and the guides fixed on its page too (OBJ-28).
     pub fn with_fixed(mut self, guides: &[desk_model::FixedGuide]) -> Self {
-        for guide in guides {
+        for guide in guides.iter().filter(|g| g.is_on(self.page)) {
             let at = guide.at.to_pt() as f32;
             if guide.vertical {
-                self.across.push(at);
+                self.across.push((at, Target::Fixed));
             } else {
-                self.down.push(at);
+                self.down.push((at, Target::Fixed));
             }
         }
+        self
+    }
+
+    /// Only the middles, the edges, both or neither, as the preferences
+    /// show guides at them (OBJ-27); the fixed guides stay.
+    pub fn at(mut self, middles: bool, edges: bool) -> Self {
+        let keep = |(_, target): &(f32, Target)| match target {
+            Target::Middle => middles,
+            Target::Edge => edges,
+            Target::Fixed => true,
+        };
+        self.across.retain(keep);
+        self.down.retain(keep);
         self
     }
 
@@ -462,11 +488,17 @@ impl Snaps {
         reach: f32,
     ) -> ((f32, f32), Vec<Guide>, usize) {
         let (x0, y0, x1, y1) = bounds;
-        let nearest = |own: [f32; 3], targets: &[f32]| {
+        // Middles meet middles and edges meet edges, as in Pages; a fixed
+        // guide takes either.
+        let nearest = |own: [f32; 3], targets: &[(f32, Target)]| {
             let mut best: Option<(f32, f32)> = None;
-            for edge in own {
-                for &target in targets {
-                    let shift = target - edge;
+            for (i, point) in own.into_iter().enumerate() {
+                let kind = if i == 1 { Target::Middle } else { Target::Edge };
+                for &(target, of) in targets {
+                    if of != kind && of != Target::Fixed {
+                        continue;
+                    }
+                    let shift = target - point;
                     if shift.abs() <= reach && best.is_none_or(|(s, _)| shift.abs() < s.abs()) {
                         best = Some((shift, target));
                     }
@@ -1746,7 +1778,7 @@ impl TextEditor {
             // A press on a fixed guide moves it (OBJ-28).
             if presses == 1
                 && !on_text(&self.state.borrow().layout, page, px, py)
-                && self.press_guide(px, py)
+                && self.press_guide(page, px, py)
             {
                 return true;
             }
@@ -1908,7 +1940,10 @@ impl TextEditor {
                     .filter(|_| !unguided)
                 {
                     let fixed = &Self::main_document(&state).text_settings().guides;
-                    let snaps = Snaps::new(&state.layout, page, &ids).with_fixed(fixed);
+                    let preferences = crate::preferences::get();
+                    let snaps = Snaps::new(&state.layout, page, &ids)
+                        .with_fixed(fixed)
+                        .at(preferences.guides_at_center, preferences.guides_at_edges);
                     let moved = (bounds.0 + dx, bounds.1 + dy, bounds.2 + dx, bounds.3 + dy);
                     let ((ax, ay), found, _) = snaps.snap(moved, (SNAP / scale) as f32);
                     // Kept to a direction, the move snaps only along it.
@@ -2293,6 +2328,13 @@ mod tests {
         let alone = Snaps::new(&layout, 0, &[other]);
         let ((_, dy), _, _) = alone.snap((10.0, 448.0, 20.0, 460.0), 5.0);
         assert_eq!(dy, 0.0);
+        // As Pages comes, only middles snap: the edges do not meet, and
+        // the middle of a box meets the middle of the other object.
+        let middles = Snaps::new(&layout, 0, &[]).at(true, false);
+        let ((_, dy), _, _) = middles.snap((10.0, 448.0, 20.0, 460.0), 5.0);
+        assert_eq!(dy, 0.0);
+        let ((_, dy), _, _) = middles.snap((10.0, 419.0, 20.0, 429.0), 5.0);
+        assert!((dy - 1.0).abs() < 0.01);
     }
 
     #[test]
@@ -2302,18 +2344,24 @@ mod tests {
         let (front, back) = editor
             .edit("Add", |e| {
                 e.insert_text(start, "Some text at the top of the page.")?;
+                // Filled, as shapes are inserted: an unfilled one is
+                // found only on its outline.
+                let fill = Some(Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8)));
                 let front = e.new_id();
-                e.add_object(Object::new(
+                let mut ellipse = Object::new(
                     front,
                     Shape::Ellipse.into(),
                     Frame::from_pt(300.0, 400.0, 100.0, 50.0),
-                ))?;
+                );
+                ellipse.style.fill = fill.clone();
+                e.add_object(ellipse)?;
                 let back = e.new_id();
                 let mut behind = Object::new(
                     back,
                     Shape::Rectangle.into(),
                     Frame::from_pt(0.0, 0.0, 600.0, 800.0),
                 );
+                behind.style.fill = fill;
                 behind.wrap = Wrap::Behind;
                 e.insert_object(0, behind)?;
                 Ok((front, back))

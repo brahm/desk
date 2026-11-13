@@ -51,6 +51,21 @@ pub struct ViewSettings {
     pub two_pages: bool,
     /// Whether it shows as an outline (TXT-14).
     pub outline: bool,
+    /// What the outline shows, which is also what prints while the
+    /// document shows as an outline (TXT-14).
+    pub outline_options: OutlineOptions,
+}
+
+/// What the outline of a document shows (TXT-14).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OutlineOptions {
+    /// How many levels of topics show, from 1 to 9, without the text
+    /// under them; none for every topic and its text.
+    pub levels: Option<u8>,
+    /// Whether each paragraph shows only its first line.
+    pub first_line: bool,
+    /// Whether pictures and other objects show in miniature.
+    pub thumbnails: bool,
 }
 
 /// Settings of the text of the whole document: whether words are
@@ -81,15 +96,25 @@ pub struct TextSettings {
     pub guides: Vec<FixedGuide>,
 }
 
-/// A guide fixed on every page, dragged out of a ruler, that objects snap
-/// to (OBJ-28).
+/// A guide fixed on a page, dragged out of a ruler, that objects snap to
+/// (OBJ-28). As in Pages, a guide belongs to the page it was dragged onto.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FixedGuide {
+    /// The page it is on, from 0; none for a guide on every page, as
+    /// documents saved before guides had pages have them.
+    pub page: Option<u32>,
     /// Whether it runs down the page, at a distance from its left edge,
     /// rather than across it, at a distance from its top.
     pub vertical: bool,
     /// How far it is from the left or the top edge of the paper.
     pub at: Length,
+}
+
+impl FixedGuide {
+    /// Whether the guide is on a page, counted from 0.
+    pub fn is_on(&self, page: usize) -> bool {
+        self.page.is_none_or(|p| p as usize == page)
+    }
 }
 
 /// How the space after a paragraph and the space before the next make the
@@ -169,6 +194,10 @@ impl PageSetup {
     /// The default distance of the header and of the footer from the edge
     /// of the paper: half an inch.
     pub const DEFAULT_HEADER_MARGIN: Length = Length::from_points(36);
+
+    /// The distance of the footer from the bottom of the paper in the
+    /// Blank template of Pages: 0.6 inch (EST-01).
+    pub const BLANK_FOOTER_MARGIN: Length = Length::from_millipoints(43_200);
 
     /// A page of the given size with the default margins.
     pub const fn with_size(width: Length, height: Length) -> Self {
@@ -362,11 +391,21 @@ impl Document {
         Self {
             ids,
             metadata: Metadata::default(),
-            text_settings: TextSettings::default(),
+            // As the Blank template of Pages: words are not hyphenated
+            // until the document says so (EST-01).
+            text_settings: TextSettings {
+                hyphenation: false,
+                ..TextSettings::default()
+            },
             view: None,
             styles: Styles::new(ParagraphStyle::new(body_style, "Body")),
             container: Container::Pages(PagedFlow {
-                page: PageSetup::default(),
+                // The footer of the Blank template is 0.6 inch from the
+                // bottom of the paper, the header half an inch from the top.
+                page: PageSetup {
+                    footer_margin: PageSetup::BLANK_FOOTER_MARGIN,
+                    ..PageSetup::default()
+                },
                 body: TextFlow::new(Paragraph::new(first, body_style)),
                 margins: HeadersFooters::default(),
                 section_margins: imbl::OrdMap::new(),

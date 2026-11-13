@@ -7,7 +7,7 @@
 use desk_model::FontWeight;
 use desk_model::{
     Alignment, CharAttrs, CharacterStyle, Document, Editor, Length, ModelError, ParaAttrs,
-    ParagraphStyle, Position, Style, StyleFamily, StyleId,
+    ParagraphStyle, Position, Style, StyleFamily, StyleId, StyleParts,
 };
 
 /// A document with "one two three" in a paragraph and "four" in another,
@@ -465,6 +465,53 @@ fn sty_08_paste_style_brings_the_style_into_another_document() {
     assert_eq!(format.font_size, Length::from_points(18));
     // The text after the selection only takes the paragraph style.
     assert!(!look(&target, 0, 7).italic);
+}
+
+#[test]
+fn sty_08_paragraph_and_character_styles_are_copied_apart() {
+    let (mut source, heading) = editor();
+    let (a, b) = (at(&source, 0, 4), at(&source, 0, 7));
+    source
+        .edit("Setup", |edit| {
+            edit.set_paragraph_style(a, a, heading)?;
+            edit.new_character_style("Slanted", italic(), a, b, true)?;
+            Ok(())
+        })
+        .unwrap();
+    let copied = source.document().copy_style(a).unwrap();
+    let paste = |parts| {
+        let mut target = Editor::new(Document::new_word_processing());
+        let start = target.document().start();
+        target
+            .edit("Typing", |edit| {
+                edit.insert_text(start, "plain text").map(drop)
+            })
+            .unwrap();
+        let (x, y) = (at(&target, 0, 0), at(&target, 0, 5));
+        let copied = copied.clone().only(parts);
+        target
+            .edit("Paste Style", |edit| edit.paste_style(x, y, &copied))
+            .unwrap();
+        target
+    };
+    // A character style pasted leaves the paragraph alone.
+    let target = paste(StyleParts::Character);
+    let body = target.document().styles().default_paragraph();
+    assert_eq!(paragraph(&target, 0).style(), body);
+    assert!(look(&target, 0, 0).italic);
+    assert_ne!(look(&target, 0, 0).font_size, Length::from_points(18));
+    assert!(
+        target
+            .document()
+            .styles()
+            .by_name(StyleFamily::Paragraph, "Heading")
+            .is_none()
+    );
+    // A paragraph style pasted leaves the characters alone.
+    let target = paste(StyleParts::Paragraph);
+    assert_ne!(paragraph(&target, 0).style(), body);
+    assert!(!look(&target, 0, 0).italic);
+    assert_eq!(look(&target, 0, 0).font_size, Length::from_points(18));
 }
 
 #[test]

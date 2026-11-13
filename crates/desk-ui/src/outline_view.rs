@@ -197,6 +197,24 @@ impl OutlineView {
         this
     }
 
+    /// What the outline shows, to keep with the document (TXT-14).
+    pub fn options(&self) -> desk_model::OutlineOptions {
+        let levels = self.levels.value() as u8;
+        desk_model::OutlineOptions {
+            levels: (levels <= desk_model::MAX_OUTLINE_LEVEL).then_some(levels),
+            first_line: self.truncate.is_active(),
+            thumbnails: self.miniatures.is_active(),
+        }
+    }
+
+    /// Shows what a document's outline showed when it was saved.
+    pub fn set_options(&self, options: desk_model::OutlineOptions) {
+        let levels = options.levels.unwrap_or(desk_model::MAX_OUTLINE_LEVEL + 1);
+        self.levels.set_value(f64::from(levels));
+        self.truncate.set_active(options.first_line);
+        self.miniatures.set_active(options.thumbnails);
+    }
+
     /// The widget.
     pub fn widget(&self) -> &gtk::Box {
         &self.root

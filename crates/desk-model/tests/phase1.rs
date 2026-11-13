@@ -232,6 +232,8 @@ fn est_02_page_size_and_orientation() {
     assert_eq!(landscape.rotated(), page);
 
     let mut editor = Editor::new(Document::new_word_processing());
+    let blank = *editor.document().page_setup();
+    assert_eq!(blank.width, PageSetup::a4().width);
     editor
         .edit("Page Setup", |edit| {
             edit.set_page_setup(PageSetup::letter())
@@ -239,7 +241,19 @@ fn est_02_page_size_and_orientation() {
         .unwrap();
     assert_eq!(editor.document().page_setup(), &PageSetup::letter());
     editor.undo().unwrap();
-    assert_eq!(editor.document().page_setup(), &PageSetup::a4());
+    assert_eq!(editor.document().page_setup(), &blank);
+}
+
+#[test]
+fn est_01_a_blank_document_is_set_up_as_the_blank_template_of_pages() {
+    let document = Document::new_word_processing();
+    // Hyphenation is off, the header half an inch from the top of the
+    // paper and the footer 0.6 inch from its bottom.
+    assert!(!document.text_settings().hyphenation);
+    assert!(document.text_settings().ligatures);
+    let page = document.page_setup();
+    assert_eq!(page.header_margin, Length::from_in(0.5));
+    assert_eq!(page.footer_margin, Length::from_in(0.6));
 }
 
 #[test]

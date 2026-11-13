@@ -717,6 +717,9 @@ pub(crate) fn view_settings(settings: &str) -> crate::text::ViewSettings {
             Some("ZoomFactor") => out.zoom_factor = text.parse().ok(),
             Some("ViewLayoutColumns") => out.columns = text.parse().ok(),
             Some("DeskOutlineView") => out.outline = Some(text == "true"),
+            Some("DeskOutlineLevels") => out.outline_levels = text.parse().ok(),
+            Some("DeskOutlineFirstLine") => out.outline_first_line = Some(text == "true"),
+            Some("DeskOutlineThumbnails") => out.outline_thumbnails = Some(text == "true"),
             _ => {}
         }
     }

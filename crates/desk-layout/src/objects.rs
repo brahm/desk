@@ -123,7 +123,8 @@ impl PlacedObject {
 
     /// Whether a point of the page is on the object, or within
     /// `tolerance` of a line (OBJ-21). A shape is hit anywhere in its
-    /// frame, as Pages selects it.
+    /// frame, but one without a fill or text only on its outline, as
+    /// Pages selects it.
     pub fn contains(&self, x: f32, y: f32, tolerance: f32) -> bool {
         let (fx, fy) = self.to_frame(x, y);
         let (w, h) = (f64::from(self.width), f64::from(self.height));
@@ -139,10 +140,32 @@ impl PlacedObject {
                 .into_iter()
                 .any(|(a, b)| distance_to_segment((fx, fy), point(a), point(b)) <= tolerance);
         }
-        fx >= -tolerance
+        let in_frame = fx >= -tolerance
             && fy >= -tolerance
             && fx <= self.width + tolerance
-            && fy <= self.height + tolerance
+            && fy <= self.height + tolerance;
+        if let ObjectKind::Shape(shape) = &self.object.kind
+            && self.object.style.fill.is_none()
+            && self
+                .object
+                .text
+                .as_ref()
+                .is_none_or(|t| t.paragraphs.iter().all(|p| p.is_empty()))
+        {
+            let stroke = self
+                .object
+                .style
+                .stroke
+                .as_ref()
+                .map_or(0.0, |s| s.width.to_pt() as f32 / 2.0);
+            let outline = shape.outline(f64::from(self.width), f64::from(self.height));
+            let point = |(x, y): (f64, f64)| (x as f32, y as f32);
+            return in_frame
+                && desk_model::flattened(&outline).into_iter().any(|(a, b)| {
+                    distance_to_segment((fx, fy), point(a), point(b)) <= tolerance + stroke
+                });
+        }
+        in_frame
     }
 
     /// The room the object takes from the text, if it takes any.
@@ -1360,9 +1383,18 @@ mod tests {
                 Frame::from_pt(100.0, 100.0, 100.0, 20.0),
             );
             object.rotation = rotation;
+            object.style.fill = Some(desk_model::Fill::Color(desk_model::Rgba::rgb(200, 0, 0)));
             PlacedObject::new(&object, None, 0.0)
         };
         let flat = shape(1, Shape::Rectangle, 0);
+        // Without a fill, a shape is hit only on its outline, as in
+        // Pages.
+        let mut empty = flat.object.clone();
+        empty.style.fill = None;
+        let empty = PlacedObject::new(&empty, None, 0.0);
+        assert!(!empty.contains(150.0, 110.0, 2.0));
+        assert!(empty.contains(150.0, 101.0, 2.0));
+        assert!(empty.contains(199.0, 110.0, 2.0));
         assert!(flat.contains(190.0, 115.0, 0.0));
         assert!(!flat.contains(150.0, 150.0, 0.0));
         // Turned a quarter, it stands from 60 to 160 down the page.

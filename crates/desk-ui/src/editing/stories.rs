@@ -777,6 +777,9 @@ mod tests {
                     Frame::from_pt(300.0, 400.0, 150.0, 60.0),
                 );
                 shape.wrap = desk_model::Wrap::Through;
+                shape.style.fill = Some(desk_model::Fill::Color(desk_model::Rgba::rgb(
+                    0x6c, 0x9f, 0xd8,
+                )));
                 edit.add_object(shape)?;
                 Ok(id)
             })

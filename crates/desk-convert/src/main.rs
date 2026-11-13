@@ -106,7 +106,7 @@ fn convert(input: &Path, output: &Path) -> Result<(), String> {
         }
         Some(Format::Pdf) => {
             let mut system = desk_text::TextSystem::new();
-            let layout = desk_layout::paginate(&document, &mut system);
+            let layout = desk_layout::paginate_view(&document, &mut system);
             for choice in system.substitutions() {
                 eprintln!("desk-convert: warning: {}", substitution(&choice));
             }

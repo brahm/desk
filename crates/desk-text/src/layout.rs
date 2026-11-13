@@ -234,6 +234,10 @@ struct RunBox {
     over: f32,
     under: f32,
     leading: f32,
+    /// The part of the leading that a multiple of line spacing leaves as
+    /// it is: all of it under the text, none of it over the text, which
+    /// Pages scales with the line (FMT-14).
+    fixed: f32,
     descent: f32,
     /// How much of the ascent the rounding took off, at most.
     rise: f32,
@@ -245,6 +249,7 @@ impl RunBox {
             over: self.over.max(other.over),
             under: self.under.max(other.under),
             leading: self.leading.max(other.leading),
+            fixed: self.fixed.max(other.fixed),
             descent: self.descent.max(other.descent),
             rise: self.rise.max(other.rise),
         }
@@ -485,6 +490,7 @@ impl TextSystem {
                             over: height,
                             under: 0.0,
                             leading: 0.0,
+                            fixed: 0.0,
                             descent: 0.0,
                             rise: 0.0,
                         },
@@ -720,18 +726,20 @@ impl TextSystem {
                 // text sits at the top of the line and any extra space goes
                 // below it, except with exact spacing, where the text sits
                 // on the bottom less its descent and leading. A multiple
-                // scales the line without its leading, to a whole point.
-                let leading = line_box
+                // scales the line to a whole point: with the leading over
+                // the text, as 1.5 makes the 14 points of Helvetica at 12
+                // points 21, and without the leading under it (FMT-14).
+                let fixed = line_box
                     .or_else(|| boxes.first().copied())
-                    .map_or(0.0, |b| b.leading);
+                    .map_or(0.0, |b| b.fixed);
                 let pitch = match format.line_spacing {
                     // An object in the text is not scaled: the multiple
                     // scales the text of the line, and the object only
                     // makes it taller above its baseline, as Pages lays
                     // out a picture as tall as the page (DOC-05).
                     LineSpacing::Multiple { percent } => {
-                        let scale = |h: f32, leading: f32| {
-                            ((h - leading) * percent as f32 / 100.0 + leading).round()
+                        let scale = |h: f32, fixed: f32| {
+                            ((h - fixed) * percent as f32 / 100.0 + fixed).round()
                         };
                         let cs = span(pos, line_end);
                         let object_over = cs
@@ -742,9 +750,9 @@ impl TextSystem {
                         let text_box = cs.iter().map(|c| text_boxes[c.run]).reduce(RunBox::max);
                         match (object_over, text_box) {
                             (Some(over), Some(b)) if over > b.over => {
-                                scale(b.over + b.under, b.leading) + over - b.over
+                                scale(b.over + b.under, b.fixed) + over - b.over
                             }
-                            _ => scale(height, leading),
+                            _ => scale(height, fixed),
                         }
                     }
                     LineSpacing::AtLeast(min) => height.max(min.to_pt() as f32),
@@ -1503,6 +1511,10 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
         over: over + raise,
         under: ascent + descent + leading - over - raise,
         leading,
+        fixed: match place {
+            LeadingPlace::Above => 0.0,
+            LeadingPlace::Below | LeadingPlace::Around => leading,
+        },
         descent,
         rise: (exact - ascent).max(0.0),
     }

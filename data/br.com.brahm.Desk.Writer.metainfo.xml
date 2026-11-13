@@ -70,6 +70,10 @@
           <li>Text that wraps around objects, linked text boxes and page layout documents</li>
           <li>Formatted text and pictures pasted from other programs</li>
           <li>Desk Neue, a font with the widths of Helvetica Neue, so that lines break where Pages breaks them</li>
+          <li>Fonts with the widths of those of the Pages templates, such as Gill Sans, Optima, Futura and Baskerville</li>
+          <li>Text copied to other programs with its formatting</li>
+          <li>Documents saved as an outline print as their outline</li>
+          <li>Alignment guides, autocorrection and style commands that work as in Pages</li>
         </ul>
       </description>
     </release>

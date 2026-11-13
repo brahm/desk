@@ -31,7 +31,7 @@ use std::path::Path;
 
 pub use error::IworkError;
 pub use package::{INDEX, INDEX_GZ, MAX_INDEX, read_index, read_index_at};
-pub use pages::{PagesDocument, parse_pages};
+pub use pages::{Outliner, PagesDocument, parse_pages};
 
 /// Reads a Pages document from the bytes of a flat file or of its index,
 /// with the files of the package that it uses.
