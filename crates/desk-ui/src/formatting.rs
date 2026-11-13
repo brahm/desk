@@ -12,7 +12,6 @@
 use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::Arc;
 
 use adw::prelude::*;
 use desk_model::{Alignment, CharAttrs, Length, LineSpacing, ParaAttrs, Rgba, StyleId};
@@ -110,6 +109,7 @@ impl FormatBar {
         root.append(&styles);
 
         let font = gtk::Button::builder()
+            .action_name("win.fonts")
             .tooltip_text(tr("Font"))
             .width_request(140)
             .build();
@@ -201,13 +201,13 @@ impl FormatBar {
 
         let spacer = gtk::Box::builder().hexpand(true).build();
         root.append(&spacer);
-        let inspector = gtk::ToggleButton::builder()
-            .icon_name("sidebar-show-right-symbolic")
-            .action_name("win.inspector")
-            .tooltip_text(tr("Inspector"))
+        let format = gtk::MenuButton::builder()
+            .label(tr("Format"))
+            .menu_model(&crate::window::format_menu())
+            .tooltip_text(tr("Format"))
             .build();
-        labelled(&inspector, &tr("Inspector"));
-        root.append(&inspector);
+        format.set_always_show_arrow(true);
+        root.append(&format);
 
         let this = Rc::new(Self {
             root,
@@ -220,6 +220,16 @@ impl FormatBar {
         });
         this.connect(editor);
         this
+    }
+
+    /// The font button, where the Fonts popover opens.
+    pub fn font_button(&self) -> &gtk::Button {
+        &self.font
+    }
+
+    /// Opens the color chooser of the text color.
+    pub fn choose_color(&self) {
+        self.color.activate();
     }
 
     /// The widget to put under the header bar.
@@ -244,40 +254,6 @@ impl FormatBar {
                 editor.set_paragraph_style(id);
                 editor.focus();
             }
-        });
-
-        let of = editor.clone();
-        self.font.connect_clicked(move |button| {
-            let current = button.label().unwrap_or_default();
-            let installed = button
-                .pango_context()
-                .list_families()
-                .into_iter()
-                .find(|f| f.name().eq_ignore_ascii_case(&current));
-            let window = button.root().and_downcast::<gtk::Window>();
-            let of = of.clone();
-            gtk::FontDialog::builder()
-                .title(tr("Font"))
-                .modal(true)
-                .build()
-                .choose_family(
-                    window.as_ref(),
-                    installed.as_ref(),
-                    gtk::gio::Cancellable::NONE,
-                    move |result| {
-                        let (Ok(family), Some(editor)) = (result, of()) else {
-                            return;
-                        };
-                        editor.set_character_attrs(
-                            "Font",
-                            &CharAttrs {
-                                font_family: Some(Arc::from(family.name().as_str())),
-                                ..CharAttrs::default()
-                            },
-                        );
-                        editor.focus();
-                    },
-                );
         });
 
         let weak = Rc::downgrade(self);

@@ -333,7 +333,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             app.set_accels_for_action("win.duplicate", &["<Control><Shift>d"]);
             app.set_accels_for_action("win.properties", &["<Alt>Return"]);
         }
-        app.set_accels_for_action("win.fullscreen", &["F11", "<Control><Alt>f"]);
+        app.set_accels_for_action("win.fullscreen", &["F11"]);
         for (action, keys) in [
             ("win.bold", &["<Control>b"][..]),
             ("win.italic", &["<Control>i"]),
@@ -356,7 +356,9 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.find-previous", &["<Control><Shift>g"]),
             ("win.use-selection-for-find", &["<Control>e"]),
             ("win.jump-to-selection", &["<Control>j"]),
-            ("win.search", &["<Control><Shift>f"]),
+            ("win.search", &["<Control><Alt>f"]),
+            ("win.colors", &["<Control><Shift>c"]),
+            ("win.format-bar", &["<Control><Shift>r"]),
             ("win.check-spelling", &["<Control>semicolon"]),
             ("win.spelling", &["<Control>colon"]),
             ("win.shortcuts", &["<Control>question"]),

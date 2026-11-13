@@ -57,7 +57,7 @@ pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 10] = [
     ("win.send-to-back", &["<Control><Shift>bracketleft"]),
     ("win.group", &["<Control><Alt>g"]),
     ("win.ungroup", &["<Control><Shift><Alt>g"]),
-    ("win.lock", &["<Control><Alt>l"]),
+    ("win.lock", &["<Control>l"]),
     ("win.unlock", &["<Control><Shift><Alt>l"]),
 ];
 

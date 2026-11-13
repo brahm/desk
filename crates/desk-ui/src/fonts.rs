@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The Fonts window (INT-15), as the Fonts panel that Pages opens with
+//! The Fonts popover (INT-15), on the font button of the format bar, with
+//! what the Fonts panel that Pages opens with
 //! Show Fonts: collections, families, typefaces and sizes, a bar of
 //! effects (underline, strikethrough, text and paragraph colors and a
 //! shadow with opacity, blur, offset and angle, FMT-03), and the
@@ -233,9 +234,9 @@ fn select_named(list: &gtk::ListBox, name: &str) {
     list.unselect_all();
 }
 
-/// The Fonts window of a document window.
+/// The Fonts popover of a document window.
 pub struct FontsWindow {
-    window: gtk::Window,
+    window: gtk::Popover,
     collections: gtk::ListBox,
     families: gtk::ListBox,
     faces: gtk::ListBox,
@@ -266,10 +267,10 @@ pub struct FontsWindow {
 }
 
 impl FontsWindow {
-    /// The Fonts window over a window, for its editor.
-    pub fn new(parent: &impl IsA<gtk::Window>, editor: EditorOf) -> Rc<Self> {
+    /// The Fonts popover on a widget, for its editor.
+    pub fn new(parent: &impl IsA<gtk::Widget>, editor: EditorOf) -> Rc<Self> {
         let mut installed: Vec<(String, bool)> = parent
-            .upcast_ref::<gtk::Window>()
+            .upcast_ref::<gtk::Widget>()
             .pango_context()
             .list_families()
             .iter()
@@ -427,19 +428,14 @@ impl FontsWindow {
         let scrolled = gtk::ScrolledWindow::builder()
             .child(&content)
             .hscrollbar_policy(gtk::PolicyType::Never)
+            .min_content_width(680)
+            .min_content_height(420)
+            .max_content_height(640)
             .propagate_natural_height(true)
             .build();
-        let toolbar = adw::ToolbarView::new();
-        toolbar.add_top_bar(&adw::HeaderBar::new());
-        toolbar.set_content(Some(&scrolled));
-        let window = gtk::Window::builder()
-            .title(tr("Fonts"))
-            .transient_for(parent)
-            .default_width(640)
-            .default_height(640)
-            .hide_on_close(true)
-            .child(&toolbar)
-            .build();
+        let window = gtk::Popover::builder().child(&scrolled).build();
+        labelled(&window, &tr("Fonts"));
+        window.set_parent(parent);
 
         let this = Rc::new(Self {
             window,
@@ -722,12 +718,12 @@ impl FontsWindow {
         }
     }
 
-    /// Shows the window, over its document window.
+    /// Shows the popover, on its button.
     pub fn present(&self) {
-        self.window.present();
+        self.window.popup();
     }
 
-    /// Whether the window is showing.
+    /// Whether the popover is showing.
     pub fn is_visible(&self) -> bool {
         self.window.is_visible()
     }
@@ -804,13 +800,13 @@ impl FontsWindow {
     }
 }
 
-/// Keeps the Fonts window of a document window, made when first shown.
+/// Keeps the Fonts popover of a document window, made when first shown.
 #[derive(Default)]
 pub struct FontsSlot(RefCell<Option<Rc<FontsWindow>>>);
 
 impl FontsSlot {
-    /// Shows the Fonts window, making it the first time.
-    pub fn present(&self, parent: &impl IsA<gtk::Window>, editor: EditorOf) -> Rc<FontsWindow> {
+    /// Shows the Fonts popover, making it the first time.
+    pub fn present(&self, parent: &impl IsA<gtk::Widget>, editor: EditorOf) -> Rc<FontsWindow> {
         let fonts = self
             .0
             .borrow_mut()
@@ -820,7 +816,7 @@ impl FontsSlot {
         fonts
     }
 
-    /// The Fonts window, if it is showing.
+    /// The Fonts popover, if it is showing.
     pub fn visible(&self) -> Option<Rc<FontsWindow>> {
         self.0.borrow().clone().filter(|f| f.is_visible())
     }

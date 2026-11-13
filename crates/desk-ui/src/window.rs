@@ -102,8 +102,10 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 61] = [
+const DOCUMENT_ACTIONS: [&str; 63] = [
     "outline",
+    "colors",
+    "format-bar",
     "navigate",
     "thumbnails",
     "delete-page",
@@ -203,6 +205,48 @@ impl DocumentWindow {
         }
         formatting::labelled(&menu_button, &tr("Main Menu"));
         header.pack_end(&menu_button);
+        // The View and Insert menus at the start, and the toggles of the
+        // right sidebar at the end, for a document only.
+        let view_button = gtk::MenuButton::builder()
+            .label(tr("_View"))
+            .use_underline(true)
+            .menu_model(&view_menu())
+            .tooltip_text(tr("View"))
+            .visible(false)
+            .build();
+        view_button.set_always_show_arrow(true);
+        let insert_button = gtk::MenuButton::builder()
+            .label(tr("_Insert"))
+            .use_underline(true)
+            .menu_model(&insert_menu())
+            .tooltip_text(tr("Insert"))
+            .visible(false)
+            .build();
+        insert_button.set_always_show_arrow(true);
+        let media_toggle = gtk::ToggleButton::builder()
+            .icon_name("folder-pictures-symbolic")
+            .action_name("win.media-browser")
+            .tooltip_text(tr("Media Browser"))
+            .visible(false)
+            .build();
+        formatting::labelled(&media_toggle, &tr("Media Browser"));
+        let inspector_toggle = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-right-symbolic")
+            .action_name("win.inspector")
+            .tooltip_text(tr("Inspector"))
+            .visible(false)
+            .build();
+        formatting::labelled(&inspector_toggle, &tr("Inspector"));
+        let document_buttons: [gtk::Widget; 4] = [
+            view_button.clone().upcast(),
+            insert_button.clone().upcast(),
+            media_toggle.clone().upcast(),
+            inspector_toggle.clone().upcast(),
+        ];
+        header.pack_start(&view_button);
+        header.pack_start(&insert_button);
+        header.pack_end(&inspector_toggle);
+        header.pack_end(&media_toggle);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -499,8 +543,12 @@ impl DocumentWindow {
         {
             let bar = bottom_bar.downgrade();
             this.stack.connect_visible_child_name_notify(move |stack| {
+                let document = stack.visible_child_name().as_deref() != Some("empty");
                 if let Some(bar) = bar.upgrade() {
-                    bar.set_revealed(stack.visible_child_name().as_deref() != Some("empty"));
+                    bar.set_revealed(document);
+                }
+                for button in &document_buttons {
+                    button.set_visible(document);
                 }
             });
         }
@@ -689,7 +737,8 @@ impl DocumentWindow {
                 }
             });
         }
-        self.format_revealer.set_reveal_child(true);
+        self.format_revealer
+            .set_reveal_child(self.action_state("format-bar"));
         self.refresh();
         self.show_format();
     }
@@ -1728,13 +1777,39 @@ impl DocumentWindow {
             let Some(this) = weak.upgrade() else { return };
             let Some(editor) = this.editor() else { return };
             let cell = this.editor.clone();
-            let window = this
-                .fonts
-                .present(&this.window, Rc::new(move || cell.borrow().clone()));
+            this.format_revealer.set_reveal_child(true);
+            let window = this.fonts.present(
+                this.format_bar.font_button(),
+                Rc::new(move || cell.borrow().clone()),
+            );
             let format = editor.format();
             window.show(&format.character, &format.paragraph);
         });
         self.window.add_action(&fonts);
+        let colors = gio::SimpleAction::new("colors", None);
+        let weak = Rc::downgrade(self);
+        colors.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.format_bar.choose_color();
+            }
+        });
+        self.window.add_action(&colors);
+        // The format bar can be hidden for more room (Ctrl+Shift+R).
+        let format_bar = gio::SimpleAction::new_stateful("format-bar", None, &true.to_variant());
+        let revealer = self.format_revealer.downgrade();
+        let stack = self.stack.downgrade();
+        format_bar.connect_change_state(move |action, value| {
+            let (Some(revealer), Some(stack), Some(on)) = (
+                revealer.upgrade(),
+                stack.upgrade(),
+                value.and_then(|v| v.get::<bool>()),
+            ) else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            revealer.set_reveal_child(on && stack.visible_child_name().as_deref() != Some("empty"));
+        });
+        self.window.add_action(&format_bar);
 
         let drawer = gio::SimpleAction::new_stateful("styles-drawer", None, &false.to_variant());
         let weak = Rc::downgrade(self);
@@ -2331,7 +2406,12 @@ impl DocumentWindow {
         menu.append_section(None, &style);
         let tools = gio::Menu::new();
         tools.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
+        tools.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
+        tools.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
         menu.append_section(None, &tools);
+        let page = gio::Menu::new();
+        page.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
+        menu.append_section(None, &page);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(self.view.area());
         popover.set_has_arrow(false);
@@ -2590,41 +2670,9 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         save.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
         menu.append_section(None, &save);
         let document = gio::Menu::new();
-        document.append(Some(&tr("Show _Fonts")), Some("win.fonts"));
-        document.append(Some(&tr("Show _Styles Drawer")), Some("win.styles-drawer"));
-        document.append(Some(&tr("Show _Ruler")), Some("win.ruler"));
-        document.append(Some(&tr("Show _Layout")), Some("win.show-layout"));
-        document.append(Some(&tr("Show Page _Thumbnails")), Some("win.thumbnails"));
-        document.append(Some(&tr("Show as _Outline")), Some("win.outline"));
-        document.append(Some(&tr("Show _Media Browser")), Some("win.media-browser"));
-        document.append(Some(&tr("Delete _Page…")), Some("win.delete-page"));
-        document.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
+        document.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
         menu.append_section(None, &document);
-        let find = gio::Menu::new();
-        find.append(Some(&tr("_Find & Replace…")), Some("win.find"));
-        find.append(Some(&tr("_Search…")), Some("win.search"));
-        find.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
-        find.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
-        find.append_submenu(Some(&tr("_Insert")), &insert_menu());
-        find.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
-        find.append(
-            Some(&tr("Special _Characters…")),
-            Some("win.special-characters"),
-        );
-        menu.append_section(None, &find);
-        let styles = gio::Menu::new();
-        styles.append(
-            Some(&tr("Copy _Paragraph Style")),
-            Some("win.copy-paragraph-style"),
-        );
-        styles.append(
-            Some(&tr("Copy C_haracter Style")),
-            Some("win.copy-character-style"),
-        );
-        styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
-        styles.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
-        menu.append_section(None, &styles);
     }
     let close = gio::Menu::new();
     close.append(Some(&tr("C_lose")), Some("win.close"));
@@ -2645,6 +2693,59 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
 /// (DOC-14).
 fn copy_name(name: &str) -> String {
     tr("{name} copy").replace("{name}", name)
+}
+
+/// The View menu of the header bar: what the window shows.
+fn view_menu() -> gio::Menu {
+    let panes = gio::Menu::new();
+    panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
+    panes.append(Some(&tr("_Styles Drawer")), Some("win.styles-drawer"));
+    panes.append(Some(&tr("Se_arch Sidebar")), Some("win.search"));
+    panes.append(Some(&tr("Spe_lling and Grammar")), Some("win.spelling"));
+    let document = gio::Menu::new();
+    document.append(Some(&tr("As _Outline")), Some("win.outline"));
+    document.append(Some(&tr("_Ruler")), Some("win.ruler"));
+    document.append(Some(&tr("_Layout")), Some("win.show-layout"));
+    document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
+    document.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
+    let window = gio::Menu::new();
+    window.append_submenu(Some(&tr("_Zoom")), &zoom_menu());
+    window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
+    let menu = gio::Menu::new();
+    menu.append_section(None, &panes);
+    menu.append_section(None, &document);
+    menu.append_section(None, &window);
+    menu
+}
+
+/// The Format menu at the end of the format bar: fonts, colors and
+/// styles.
+pub(crate) fn format_menu() -> gio::Menu {
+    let fonts = gio::Menu::new();
+    fonts.append(Some(&tr("_Fonts…")), Some("win.fonts"));
+    fonts.append(Some(&tr("_Colors…")), Some("win.colors"));
+    fonts.append(
+        Some(&tr("Special _Characters…")),
+        Some("win.special-characters"),
+    );
+    let styles = gio::Menu::new();
+    styles.append(
+        Some(&tr("Copy _Paragraph Style")),
+        Some("win.copy-paragraph-style"),
+    );
+    styles.append(
+        Some(&tr("Copy C_haracter Style")),
+        Some("win.copy-character-style"),
+    );
+    styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
+    styles.append(
+        Some(&tr("Paste and _Match Style")),
+        Some("win.paste-match-style"),
+    );
+    let menu = gio::Menu::new();
+    menu.append_section(None, &fonts);
+    menu.append_section(None, &styles);
+    menu
 }
 
 /// The breaks, fields, notes, tables of contents, links and bookmarks of
@@ -2689,7 +2790,7 @@ fn insert_menu() -> gio::Menu {
     menu
 }
 
-/// Spelling and Grammar, in the main menu (TXT-10, TXT-11).
+/// Spelling and Grammar, in the context menu (TXT-10, TXT-11).
 fn spelling_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(
@@ -2710,7 +2811,7 @@ fn spelling_menu() -> gio::Menu {
     menu
 }
 
-/// The Writing Tools of the main and context menus (INT-20).
+/// The Writing Tools of the context menu (INT-20).
 fn writing_tools_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(
