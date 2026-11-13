@@ -2235,6 +2235,10 @@ impl DocumentWindow {
         // The format of the field at the cursor (EST-27).
         let field = gio::Menu::new();
         menu.append_section(None, &field);
+        // Undo and Redo, with the name of the change, filled when the menu
+        // opens (DOC-12).
+        let undo = gio::Menu::new();
+        menu.append_section(None, &undo);
         let edit = gio::Menu::new();
         edit.append(Some(&tr("Cu_t")), Some("win.cut"));
         edit.append(Some(&tr("_Copy")), Some("win.copy"));
@@ -2278,6 +2282,7 @@ impl DocumentWindow {
         let menu_guesses = guesses.clone();
         let menu_hyphenation = hyphenation.clone();
         let menu_field = field.clone();
+        let menu_undo = undo.clone();
         let window = self.window.downgrade();
         click.connect_pressed(move |gesture, _, x, y| {
             if let Some(popover) = menu_popover.upgrade() {
@@ -2288,6 +2293,7 @@ impl DocumentWindow {
                     editor.as_ref().and_then(|e| e.mistake_at(x, y)),
                 );
                 fill_hyphenation(&menu_hyphenation, editor.as_ref());
+                fill_undo(&menu_undo, editor.as_ref());
                 if let Some(editor) = &editor {
                     editor.select_field_at(x, y);
                 }
@@ -2331,6 +2337,7 @@ impl DocumentWindow {
                     }),
                 );
                 fill_hyphenation(&hyphenation, current.as_ref());
+                fill_undo(&undo, current.as_ref());
                 if let Some(window) = window.upgrade() {
                     fill_field(&field, &window, current.as_ref());
                 }
@@ -2344,6 +2351,22 @@ impl DocumentWindow {
         });
         self.view.area().add_controller(keys);
     }
+}
+
+/// Fills the section of the context menu with Undo and Redo, named by the
+/// changes they take back and bring back, as in Pages (DOC-12).
+fn fill_undo(menu: &gio::Menu, editor: Option<&TextEditor>) {
+    menu.remove_all();
+    let undo = editor.and_then(TextEditor::undo_name);
+    let redo = editor.and_then(TextEditor::redo_name);
+    menu.append(
+        Some(&crate::undo_names::undo_label(undo.as_deref())),
+        Some("win.undo"),
+    );
+    menu.append(
+        Some(&crate::undo_names::redo_label(redo.as_deref())),
+        Some("win.redo"),
+    );
 }
 
 /// Fills the section of the context menu with the guesses for a mistake,

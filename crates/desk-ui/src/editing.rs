@@ -637,6 +637,27 @@ impl TextEditor {
                 .is_some_and(|m| m.main.undo_name().is_some())
     }
 
+    /// The name of the change that Undo takes back, if any (DOC-12).
+    pub fn undo_name(&self) -> Option<String> {
+        let state = self.state.borrow();
+        let main = state.story.as_ref().and_then(|m| m.main.undo_name());
+        match (state.story.is_some() && state.undo.is_empty(), main) {
+            // Nothing left of the visit: Undo goes on in the body.
+            (true, Some(main)) => Some(main.to_owned()),
+            _ => state.editor.undo_name().map(str::to_owned),
+        }
+    }
+
+    /// The name of the change that Redo brings back, if any.
+    pub fn redo_name(&self) -> Option<String> {
+        let state = self.state.borrow();
+        state
+            .editor
+            .redo_name()
+            .or_else(|| state.story.as_ref().and_then(|m| m.main.redo_name()))
+            .map(str::to_owned)
+    }
+
     /// Whether Redo has something to bring back.
     pub fn can_redo(&self) -> bool {
         let state = self.state.borrow();

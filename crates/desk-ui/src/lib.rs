@@ -52,6 +52,7 @@ mod styles_drawer;
 mod tab_stops;
 pub mod text_nav;
 mod thumbnails;
+mod undo_names;
 mod view;
 mod warnings;
 mod window;
