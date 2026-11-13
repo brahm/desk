@@ -29,6 +29,8 @@ DOC-02		Preferência para documentos novos	skipped	Only about the application, i
 DOC-03		Abrir documentos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-04		Abrir versões anteriores	skipped	Out of scope in the matrix: Desk reads only the format of Pages '09.
 DOC-05	doc-05-missing-fonts.pages	A document that names a font not installed	made	Copied from the case made for the corpus earlier (corpus/writer/doc-05-missing-fonts), not rebuilt in this run.
+DOC-05	doc-05-apple-fonts.pages	One 12 pt paragraph in each of 41 faces of the fonts of the Pages templates (Gill Sans, Optima, Futura, Baskerville, Hoefler Text, Didot, Cochin, American Typewriter, Marker Felt), US Letter, hyphenation removed	made	To check the metric substitutes against data/fonts. Each paragraph names its face and also has the bold and italic flags of that face: Pages draws the family's face that the flags pick, so a font name such as GillSans-Italic without the italic flag prints upright GillSans.
+DOC-05	doc-05-apple-fonts-sizes.pages	The regular face of each of those nine families at 9, 18 and 36 pt, to see how line heights round at other sizes	made	
 DOC-06		Importar outros formatos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-07		Tela cheia	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-08		Senha para abrir	skipped	Not made: it needs a password typed into a dialog, which I did not do, even a throwaway one. Can be made by hand.
