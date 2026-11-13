@@ -83,9 +83,19 @@ English and Brazilian Portuguese the same way.
 `helvetica-neue/` holds the advance widths, vertical metrics and kerning
 of each Helvetica Neue face, as Pages lays them out on the reference
 machine (macOS 10.14.4 with iWork '09 9.3), one tab-separated file per
-face. `helvetica-neue/measure.py` took them with CoreText; the files
+face. `measure.py` took them with CoreText; the files
 record only numbers, never the fonts, and serve to build
 metric-compatible substitutes from TeX Gyre Heros.
+
+## Metrics of the fonts of the Pages templates
+
+The same script, run as `measure.py "FAMILY" OUTPUT_DIR`, measured every
+face installed on the reference machine of the other families that the
+Pages '09 templates use, into one folder per family in the same format:
+`gill-sans/`, `optima/`, `futura/`, `baskerville/`, `hoefler-text/`,
+`didot/`, `cochin/`, `american-typewriter/` and `marker-felt/`. They are
+there to build metric-compatible substitutes the way Desk Neue was built;
+no substitute uses them yet.
 
 ## Desk Neue
 

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: CC0-1.0
+#
+# Metrics of HoeflerText-Ornaments (Hoefler Text Ornaments),
+# measured with CoreText on the Desk reference machine (macOS 10.14.4, iWork '09
+# 9.3) by data/fonts/measure.py. Only numbers are recorded here, never the font itself.
+#
+# Records: face KEY VALUE | advance U+XXXX WIDTH | kern U+XXXX U+XXXX KERN
+# All lengths are in font units (2000 per em). Kerning is the CTLine
+# width of the pair at 1000 pt minus the widths of each character alone,
+# with ligatures off; only nonzero pairs are listed.
+face	family	Hoefler Text
+face	style	Ornaments
+face	postscript	HoeflerText-Ornaments
+face	full	Hoefler Text Ornaments
+face	unitsPerEm	2000
+face	ascent	1613.007
+face	descent	415.985
+face	leading	0
+face	xHeight	1075
+face	capHeight	1433
+face	italicAngle	0
+face	underlinePosition	0
+face	underlineThickness	98.239
+advance	U+0020	2000
+advance	U+00A0	2000
