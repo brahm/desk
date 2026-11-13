@@ -6,10 +6,10 @@
 //! a polygon, the head and tail of an arrow and the tail of a balloon
 //! (OBJ-11).
 
+use crate::compact;
 use std::cell::Cell;
 use std::rc::Rc;
 
-use adw::prelude::*;
 use desk_model::{Length, MAX_SHAPE_SIDES, ObjectKind, POLYGON_SCALE, Shape};
 
 use crate::editing::ObjectInfo;
@@ -31,8 +31,8 @@ enum Setting {
 
 /// The Shape group of the Inspector.
 pub struct ShapeGroup {
-    group: adw::PreferencesGroup,
-    rows: Vec<(Setting, adw::SpinRow)>,
+    group: compact::Group,
+    rows: Vec<(Setting, compact::SpinRow)>,
     updating: Cell<bool>,
 }
 
@@ -97,7 +97,7 @@ fn changed(shape: &Shape, setting: Setting, value: f64) -> Shape {
 impl ShapeGroup {
     pub fn new(editor: EditorOf) -> Rc<Self> {
         let row = |title: String, subtitle: String, min: f64, max: f64, digits: u32| {
-            let row = adw::SpinRow::with_range(min, max, 1.0);
+            let row = compact::SpinRow::with_range(min, max, 1.0);
             row.set_title(&title);
             row.set_subtitle(&subtitle);
             row.set_digits(digits);
@@ -150,7 +150,7 @@ impl ShapeGroup {
                 row(tr("Tail Length"), tr("Percent of the height"), 0.0, 90.0, 0),
             ),
         ];
-        let group = adw::PreferencesGroup::builder().title(tr("Shape")).build();
+        let group = compact::Group::builder().title(tr("Shape")).build();
         for (_, row) in &rows {
             group.add(row);
         }
@@ -183,7 +183,7 @@ impl ShapeGroup {
     }
 
     /// The group, to put in the Inspector.
-    pub fn group(&self) -> &adw::PreferencesGroup {
+    pub fn group(&self) -> &compact::Group {
         &self.group
     }
 

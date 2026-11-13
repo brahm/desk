@@ -5,6 +5,7 @@
 //! stops, and each stop with its position, alignment, leader and decimal
 //! separator, as the Text inspector of Pages has them.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -70,7 +71,7 @@ pub fn from_units(value: f64, units: Units) -> Length {
 }
 
 /// Sets a field in units: its range, step and digits.
-pub fn set_units(row: &adw::SpinRow, units: Units, min_points: f64, max_points: f64) {
+pub fn set_units(row: &compact::SpinRow, units: Units, min_points: f64, max_points: f64) {
     let adjustment = row.adjustment();
     adjustment.set_lower(min_points / units.points());
     adjustment.set_upper(max_points / units.points());
@@ -82,17 +83,17 @@ pub fn set_units(row: &adw::SpinRow, units: Units, min_points: f64, max_points: 
 
 /// The rows of one stop.
 struct StopRows {
-    expander: adw::ExpanderRow,
-    position: adw::SpinRow,
-    alignment: adw::ComboRow,
-    leader: adw::ComboRow,
-    decimal: adw::EntryRow,
+    expander: compact::ExpanderRow,
+    position: compact::SpinRow,
+    alignment: compact::ComboRow,
+    leader: compact::ComboRow,
+    decimal: compact::EntryRow,
 }
 
 /// The tab stops of the Inspector.
 pub struct TabStopsGroup {
-    group: adw::PreferencesGroup,
-    default_interval: adw::SpinRow,
+    group: compact::Group,
+    default_interval: compact::SpinRow,
     rows: RefCell<Vec<StopRows>>,
     /// The stops shown.
     stops: RefCell<TabStops>,
@@ -104,7 +105,7 @@ pub struct TabStopsGroup {
 impl TabStopsGroup {
     /// The tab stops of the Inspector of a window.
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
-        let group = adw::PreferencesGroup::builder().title(tr("Tabs")).build();
+        let group = compact::Group::builder().title(tr("Tabs")).build();
         let add = gtk::Button::builder()
             .icon_name("list-add-symbolic")
             .tooltip_text(tr("Add Tab Stop"))
@@ -113,7 +114,7 @@ impl TabStopsGroup {
             .build();
         labelled(&add, &tr("Add Tab Stop"));
         group.set_header_suffix(Some(&add));
-        let default_interval = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+        let default_interval = compact::SpinRow::with_range(0.0, 1.0, 1.0);
         default_interval.set_title(&tr("Default Tabs"));
         group.add(&default_interval);
 
@@ -156,7 +157,7 @@ impl TabStopsGroup {
     }
 
     /// The widget to put in the Inspector.
-    pub fn widget(&self) -> &adw::PreferencesGroup {
+    pub fn widget(&self) -> &compact::Group {
         &self.group
     }
 
@@ -233,18 +234,18 @@ impl TabStopsGroup {
         }
         let units = self.units.get();
         for index in 0..count {
-            let expander = adw::ExpanderRow::new();
-            let position = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+            let expander = compact::ExpanderRow::new();
+            let position = compact::SpinRow::with_range(0.0, 1.0, 1.0);
             position.set_title(&tr("Position"));
             set_units(&position, units, 0.0, MAX_POSITION);
-            let alignment = adw::ComboRow::builder()
+            let alignment = compact::ComboRow::builder()
                 .title(tr("Alignment"))
                 .model(&string_list(ALIGNMENTS.map(alignment_name)))
                 .build();
-            let decimal = adw::EntryRow::builder()
+            let decimal = compact::EntryRow::builder()
                 .title(tr("Decimal Character"))
                 .build();
-            let leader = adw::ComboRow::builder()
+            let leader = compact::ComboRow::builder()
                 .title(tr("Leader"))
                 .model(&string_list(LEADERS.map(leader_name)))
                 .build();

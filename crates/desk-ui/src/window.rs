@@ -22,7 +22,6 @@ use crate::i18n::{tr, trn};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
 use crate::spelling::MistakeKind;
-use crate::spelling_window::SpellingSlot;
 use crate::styles_drawer::StylesDrawer;
 use crate::view::DocumentView;
 use crate::writing_tools::{self, Lookup};
@@ -79,8 +78,11 @@ pub struct DocumentWindow {
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
     outline: Rc<crate::outline_view::OutlineView>,
     thumbnails_split: adw::OverlaySplitView,
-    /// The Spelling and Grammar window, made when first shown.
-    spelling: SpellingSlot,
+    /// The pages of the right sidebar: the Inspector, the Media Browser
+    /// and Spelling and Grammar, one at a time.
+    side: gtk::Stack,
+    /// Spelling and Grammar, made when first shown.
+    spelling: std::cell::OnceCell<Rc<crate::spelling_window::SpellingWindow>>,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     format_revealer: gtk::Revealer,
@@ -359,9 +361,14 @@ impl DocumentWindow {
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
+        let side = gtk::Stack::builder()
+            .transition_type(gtk::StackTransitionType::Crossfade)
+            .build();
+        side.add_named(inspector.widget(), Some("inspector"));
         let split = adw::OverlaySplitView::builder()
             .content(&search_split)
-            .sidebar(inspector.widget())
+            .sidebar(&side)
+            .min_sidebar_width(300.0)
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
@@ -417,7 +424,8 @@ impl DocumentWindow {
             thumbnails,
             thumbnails_split,
             outline,
-            spelling: SpellingSlot::default(),
+            side,
+            spelling: std::cell::OnceCell::new(),
             media_browser: std::cell::OnceCell::new(),
             format_revealer,
             ruler,
@@ -1704,14 +1712,13 @@ impl DocumentWindow {
         self.window.add_action(&delete_page);
 
         let inspector = gio::SimpleAction::new_stateful("inspector", None, &false.to_variant());
-        let split = self.split.downgrade();
-        inspector.connect_change_state(move |action, value| {
-            let (Some(split), Some(on)) = (split.upgrade(), value.and_then(|v| v.get::<bool>()))
+        let weak = Rc::downgrade(self);
+        inspector.connect_change_state(move |_, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
             else {
                 return;
             };
-            action.set_state(&on.to_variant());
-            split.set_show_sidebar(on);
+            this.show_side("inspector", on);
         });
         self.window.add_action(&inspector);
 
@@ -1916,12 +1923,57 @@ impl DocumentWindow {
         });
         self.window.add_action(&import);
         // The sidebar also closes by itself on a narrow window.
-        let window = self.window.downgrade();
-        self.split.connect_show_sidebar_notify(move |split| {
-            if let Some(window) = window.upgrade() {
-                formatting::set_state(&window, "inspector", split.shows_sidebar().to_variant());
+        let weak = Rc::downgrade(self);
+        self.split.connect_show_sidebar_notify(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.sync_side();
             }
         });
+    }
+
+    /// Shows `page` in the right sidebar, or hides the sidebar if it shows
+    /// that page and `on` is false. Media and spelling are made the first
+    /// time they are asked for.
+    fn show_side(self: &Rc<Self>, page: &str, on: bool) {
+        if self.side.child_by_name(page).is_none() {
+            match page {
+                "media" => {
+                    let browser = self.media_browser();
+                    self.side.add_named(browser.widget(), Some("media"));
+                }
+                "spelling" => {
+                    let cell = self.editor.clone();
+                    let spelling = self
+                        .spelling
+                        .get_or_init(|| {
+                            crate::spelling_window::SpellingWindow::new(Rc::new(move || {
+                                cell.borrow().clone()
+                            }))
+                        })
+                        .clone();
+                    self.side.add_named(spelling.widget(), Some("spelling"));
+                }
+                _ => {}
+            }
+        }
+        if on {
+            self.side.set_visible_child_name(page);
+            self.split.set_show_sidebar(true);
+        } else if self.side.visible_child_name().as_deref() == Some(page) {
+            self.split.set_show_sidebar(false);
+        }
+        self.sync_side();
+    }
+
+    /// Puts the states of the toggles of the right sidebar in step with
+    /// what it shows.
+    fn sync_side(&self) {
+        let shown = self.split.shows_sidebar();
+        let page = self.side.visible_child_name();
+        for (action, name) in [("inspector", "inspector"), ("media-browser", "media")] {
+            let on = shown && page.as_deref() == Some(name);
+            formatting::set_state(&self.window, action, on.to_variant());
+        }
     }
 
     /// The formats of the field at the cursor, from its context menu
@@ -2138,9 +2190,10 @@ impl DocumentWindow {
                 }
             }),
             ("spelling", |this| {
-                let cell = this.editor.clone();
-                this.spelling
-                    .present(&this.window, Rc::new(move || cell.borrow().clone()));
+                this.show_side("spelling", true);
+                if let Some(spelling) = this.spelling.get() {
+                    spelling.present();
+                }
             }),
             ("ignore-spelling", |this| {
                 if let Some(editor) = this.editor() {

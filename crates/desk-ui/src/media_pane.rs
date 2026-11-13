@@ -6,6 +6,7 @@
 //! how loud it plays, and a button to play it. Reduce Media takes out the
 //! parts before the start and after the stop (OBJ-20).
 
+use crate::compact;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -22,13 +23,13 @@ const LONGEST: f64 = 24.0 * 3600.0;
 
 /// The Media group of the Inspector.
 pub struct MediaGroup {
-    group: adw::PreferencesGroup,
-    start: adw::SpinRow,
-    stop: adw::SpinRow,
-    poster: adw::SpinRow,
-    repeat: adw::ComboRow,
-    volume: adw::SpinRow,
-    reduce: adw::ActionRow,
+    group: compact::Group,
+    start: compact::SpinRow,
+    stop: compact::SpinRow,
+    poster: compact::SpinRow,
+    repeat: compact::ComboRow,
+    volume: compact::SpinRow,
+    reduce: compact::ActionRow,
     updating: Cell<bool>,
 }
 
@@ -74,7 +75,7 @@ fn changed(media: &Media, setting: Setting, value: f64) -> Media {
 impl MediaGroup {
     pub fn new(editor: EditorOf) -> Rc<Self> {
         let seconds = |title: String| {
-            let row = adw::SpinRow::with_range(0.0, LONGEST, 0.1);
+            let row = compact::SpinRow::with_range(0.0, LONGEST, 0.1);
             row.set_title(&title);
             row.set_subtitle(&tr("Seconds"));
             row.set_digits(1);
@@ -85,11 +86,11 @@ impl MediaGroup {
         let poster = seconds(tr("Poster Frame"));
         let names = [tr("None"), tr("Loop"), tr("Loop Back and Forth")];
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
-        let repeat = adw::ComboRow::builder()
+        let repeat = compact::ComboRow::builder()
             .title(tr("Repeat"))
             .model(&gtk::StringList::new(&names))
             .build();
-        let volume = adw::SpinRow::with_range(0.0, 100.0, 5.0);
+        let volume = compact::SpinRow::with_range(0.0, 100.0, 5.0);
         volume.set_title(&tr("Volume"));
         volume.set_subtitle(&tr("Percent"));
         let play = gtk::Button::builder()
@@ -99,7 +100,7 @@ impl MediaGroup {
             .build();
         play.add_css_class("flat");
         play.update_property(&[gtk::accessible::Property::Label(&tr("Play"))]);
-        let group = adw::PreferencesGroup::builder()
+        let group = compact::Group::builder()
             .title(tr("Movie and Sound"))
             .header_suffix(&play)
             .build();
@@ -112,7 +113,7 @@ impl MediaGroup {
             .label(tr("Reduce"))
             .valign(gtk::Align::Center)
             .build();
-        let reduce = adw::ActionRow::builder()
+        let reduce = compact::ActionRow::builder()
             .title(tr("Reduce Media"))
             .subtitle(tr("Removes the parts outside the start and stop"))
             .activatable_widget(&reduce_button)
@@ -204,7 +205,7 @@ impl MediaGroup {
     }
 
     /// The group, to put in the Inspector.
-    pub fn group(&self) -> &adw::PreferencesGroup {
+    pub fn group(&self) -> &compact::Group {
         &self.group
     }
 

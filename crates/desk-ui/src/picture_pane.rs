@@ -5,6 +5,7 @@
 //! Instant Alpha (OBJ-06), Adjust Image (OBJ-07) and Reduce File Size
 //! (OBJ-05).
 
+use crate::compact;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -43,19 +44,19 @@ pub(crate) fn whole_mask(frame: Frame) -> Frame {
 
 /// The Image group of the Inspector.
 pub struct PictureGroup {
-    group: adw::PreferencesGroup,
-    mask: adw::SwitchRow,
+    group: compact::Group,
+    mask: compact::SwitchRow,
     /// The shape of the mask: Mask with Shape (OBJ-04).
-    mask_shape: adw::ComboRow,
-    scale: adw::SpinRow,
-    left: adw::SpinRow,
-    top: adw::SpinRow,
+    mask_shape: compact::ComboRow,
+    scale: compact::SpinRow,
+    left: compact::SpinRow,
+    top: compact::SpinRow,
     /// Turns Instant Alpha on and off for clicks on the picture.
     alpha: gtk::ToggleButton,
     /// Puts back the colors that Instant Alpha took out.
     restore: gtk::Button,
     editor: EditorOf,
-    adjust: [adw::SpinRow; 6],
+    adjust: [compact::SpinRow; 6],
     reset: gtk::Button,
     reduce: gtk::Button,
     /// How far the selected picture is placed on its page from its frame
@@ -65,14 +66,14 @@ pub struct PictureGroup {
     updating: Cell<bool>,
 }
 
-fn spin(title: &str, min: f64, max: f64) -> adw::SpinRow {
-    let row = adw::SpinRow::with_range(min, max, 1.0);
+fn spin(title: &str, min: f64, max: f64) -> compact::SpinRow {
+    let row = compact::SpinRow::with_range(min, max, 1.0);
     row.set_title(title);
     row
 }
 
 /// The changes that the rows of Adjust Image ask for.
-fn adjustments(rows: &[adw::SpinRow; 6]) -> Adjustments {
+fn adjustments(rows: &[compact::SpinRow; 6]) -> Adjustments {
     let [
         brightness,
         contrast,
@@ -95,7 +96,7 @@ fn adjustments(rows: &[adw::SpinRow; 6]) -> Adjustments {
 
 impl PictureGroup {
     pub fn new(editor: EditorOf) -> Rc<Self> {
-        let mask = adw::SwitchRow::builder()
+        let mask = compact::SwitchRow::builder()
             .title(tr("Mask"))
             .subtitle(tr("Shows only the part of the picture inside its frame"))
             .build();
@@ -116,7 +117,7 @@ impl PictureGroup {
             tr("Other Shape"),
         ];
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
-        let mask_shape = adw::ComboRow::builder()
+        let mask_shape = compact::ComboRow::builder()
             .title(tr("Mask Shape"))
             .model(&gtk::StringList::new(&names))
             .build();
@@ -137,7 +138,7 @@ impl PictureGroup {
             .label(tr("Restore Colors"))
             .valign(gtk::Align::Center)
             .build();
-        let alpha_row = adw::ActionRow::builder()
+        let alpha_row = compact::ActionRow::builder()
             .title(tr("Instant Alpha"))
             .subtitle(tr(
                 "Click a color in the picture, and drag to take out more or less",
@@ -165,10 +166,10 @@ impl PictureGroup {
                 "Keeps only the part of the picture that shows, at the size it is shown",
             ))
             .build();
-        let buttons = adw::ActionRow::new();
+        let buttons = compact::ActionRow::new();
         buttons.add_suffix(&reduce);
         buttons.add_suffix(&reset);
-        let group = adw::PreferencesGroup::builder().title(tr("Image")).build();
+        let group = compact::Group::builder().title(tr("Image")).build();
         group.add(&mask);
         group.add(&mask_shape);
         group.add(&scale);
@@ -358,7 +359,7 @@ impl PictureGroup {
     }
 
     /// The group, to put in the Inspector.
-    pub fn group(&self) -> &adw::PreferencesGroup {
+    pub fn group(&self) -> &compact::Group {
         &self.group
     }
 
@@ -390,7 +391,7 @@ impl PictureGroup {
             info.frame.0 - info.object.frame.x.to_pt(),
             info.frame.1 - info.object.frame.y.to_pt(),
         ));
-        let set = |row: &adw::SpinRow, value: f64| {
+        let set = |row: &compact::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
             }

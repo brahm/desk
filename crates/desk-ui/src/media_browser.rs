@@ -3,7 +3,11 @@
 
 //! The Media Browser of Pages (INT-14): the photos, music and movies in
 //! the folders of the user, and in folders added to it, found by name.
-//! An item is dragged to the page, or put there with a double click.
+//! An item is dragged to the page, or put there with a double click. It is
+//! a pane at the side of the document window, which it shares with the
+//! Inspector, in place of a window of its own (H of the interface plan).
+//! In the Flatpak, the folders of the user are open to it read only; a
+//! folder added comes through the portal of the file chooser.
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -136,7 +140,7 @@ struct Page {
 
 /// The Media Browser of a window.
 pub struct MediaBrowser {
-    window: adw::Window,
+    root: gtk::Box,
     stack: adw::ViewStack,
     pages: Vec<Rc<Page>>,
 }
@@ -144,9 +148,9 @@ pub struct MediaBrowser {
 impl MediaBrowser {
     /// The browser, which puts an activated item on the page with
     /// `insert`.
-    pub fn new(parent: &gtk::Window, insert: impl Fn(&gio::File) + 'static) -> Rc<Self> {
+    pub fn new(insert: impl Fn(&gio::File) + 'static) -> Rc<Self> {
         let insert: Rc<dyn Fn(&gio::File)> = Rc::new(insert);
-        let stack = adw::ViewStack::new();
+        let stack = adw::ViewStack::builder().vexpand(true).build();
         let mut pages = Vec::new();
         for kind in Kind::ALL {
             let (page, widget) = page(kind, insert.clone());
@@ -155,33 +159,47 @@ impl MediaBrowser {
                 .set_icon_name(Some(kind.icon()));
             pages.push(page);
         }
-        let switcher = adw::ViewSwitcher::builder()
+        let switcher = adw::InlineViewSwitcher::builder()
             .stack(&stack)
-            .policy(adw::ViewSwitcherPolicy::Wide)
+            .hexpand(true)
+            .display_mode(adw::InlineViewSwitcherDisplayMode::Icons)
             .build();
-        let header = adw::HeaderBar::builder().title_widget(&switcher).build();
         let add = gtk::Button::builder()
             .icon_name("folder-new-symbolic")
             .tooltip_text(tr("Add Folder…"))
+            .css_classes(["flat"])
             .build();
         add.update_property(&[gtk::accessible::Property::Label(&tr("Add Folder…"))]);
-        header.pack_start(&add);
-        let view = adw::ToolbarView::new();
-        view.add_top_bar(&header);
-        view.set_content(Some(&stack));
-        let window = adw::Window::builder()
-            .title(tr("Media Browser"))
-            .default_width(420)
-            .default_height(520)
-            .transient_for(parent)
-            .hide_on_close(true)
-            .content(&view)
+        let heading = gtk::Label::builder()
+            .label(tr("Media Browser"))
+            .xalign(0.0)
+            .hexpand(true)
+            .css_classes(["title-4"])
             .build();
-        let this = Rc::new(Self {
-            window,
-            stack,
-            pages,
-        });
+        let top = gtk::Box::builder()
+            .spacing(6)
+            .margin_top(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        top.append(&heading);
+        top.append(&add);
+        let bar = gtk::Box::builder()
+            .margin_start(12)
+            .margin_end(12)
+            .margin_top(6)
+            .build();
+        bar.append(&switcher);
+        let root = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .accessible_role(gtk::AccessibleRole::Group)
+            .build();
+        root.update_property(&[gtk::accessible::Property::Label(&tr("Media Browser"))]);
+        root.append(&top);
+        root.append(&bar);
+        root.append(&stack);
+        let this = Rc::new(Self { root, stack, pages });
         let weak = Rc::downgrade(&this);
         add.connect_clicked(move |_| {
             if let Some(this) = weak.upgrade() {
@@ -189,7 +207,7 @@ impl MediaBrowser {
             }
         });
         let weak = Rc::downgrade(&this);
-        this.window.connect_show(move |_| {
+        this.root.connect_map(move |_| {
             if let Some(this) = weak.upgrade() {
                 for page in &this.pages {
                     if page.files.n_items() == 0 {
@@ -201,23 +219,9 @@ impl MediaBrowser {
         this
     }
 
-    /// Shows the browser, or hides it when it shows.
-    pub fn toggle(&self) {
-        if self.window.is_visible() {
-            self.window.set_visible(false);
-        } else {
-            self.window.present();
-        }
-    }
-
-    /// Whether the browser shows.
-    pub fn showing(&self) -> bool {
-        self.window.is_visible()
-    }
-
-    /// The window, whose visibility the menu follows.
-    pub fn window(&self) -> &adw::Window {
-        &self.window
+    /// The pane, to put at the side of the window.
+    pub fn widget(&self) -> &gtk::Box {
+        &self.root
     }
 
     /// Asks for a folder to look in for the kind of media shown.
@@ -235,7 +239,8 @@ impl MediaBrowser {
             .title(tr("Add a Folder"))
             .modal(true)
             .build();
-        dialog.select_folder(Some(&self.window), gio::Cancellable::NONE, move |result| {
+        let parent = self.root.root().and_downcast::<gtk::Window>();
+        dialog.select_folder(parent.as_ref(), gio::Cancellable::NONE, move |result| {
             if let Some(path) = result.ok().and_then(|f| f.path()) {
                 page.folders.borrow_mut().push(path);
                 refresh(&page);

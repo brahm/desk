@@ -8,6 +8,7 @@
 //! shadow of the text, which Pages sets in its Graphic inspector when
 //! text is selected (FMT-03).
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -69,7 +70,7 @@ fn style_name(style: BorderStyle) -> String {
 /// A row with a switch that turns a color on and the color.
 pub struct ColorRow {
     /// The row.
-    pub row: adw::ActionRow,
+    pub row: compact::ActionRow,
     /// Whether there is a color.
     pub switch: gtk::Switch,
     /// The color.
@@ -87,7 +88,7 @@ impl ColorRow {
             .valign(gtk::Align::Center)
             .build();
         labelled(&button, &format!("{title}: {}", tr("Color")));
-        let row = adw::ActionRow::builder().title(title).build();
+        let row = compact::ActionRow::builder().title(title).build();
         let picker = crate::eyedropper::button(&button);
         // A color picked from the screen turns the color on.
         let on = switch.downgrade();
@@ -136,24 +137,24 @@ impl ColorRow {
 
 /// The groups of effects in the Inspector.
 pub struct Effects {
-    character: adw::PreferencesGroup,
-    paragraph: adw::PreferencesGroup,
-    tracking: adw::SpinRow,
-    ligatures: adw::ComboRow,
-    outline: adw::SwitchRow,
+    character: compact::Group,
+    paragraph: compact::Group,
+    tracking: compact::SpinRow,
+    ligatures: compact::ComboRow,
+    outline: compact::SwitchRow,
     text_background: ColorRow,
     paragraph_background: ColorRow,
-    sides: adw::ComboRow,
-    style: adw::ComboRow,
-    width: adw::SpinRow,
+    sides: compact::ComboRow,
+    style: compact::ComboRow,
+    width: compact::SpinRow,
     color: ColorRow,
-    offset: adw::SpinRow,
-    shadow_group: adw::PreferencesGroup,
+    offset: compact::SpinRow,
+    shadow_group: compact::Group,
     shadow: ColorRow,
-    shadow_angle: adw::SpinRow,
-    shadow_offset: adw::SpinRow,
-    shadow_blur: adw::SpinRow,
-    shadow_opacity: adw::SpinRow,
+    shadow_angle: compact::SpinRow,
+    shadow_offset: compact::SpinRow,
+    shadow_blur: compact::SpinRow,
+    shadow_opacity: compact::SpinRow,
     /// The border shown, which a change of one of its rows changes.
     border: Cell<ParaBorder>,
     shown: RefCell<Option<(CharFormat, ParaFormat)>>,
@@ -163,18 +164,16 @@ pub struct Effects {
 impl Effects {
     /// The effects for the editor of a window.
     pub fn new(editor: EditorOf) -> Rc<Self> {
-        let tracking = adw::SpinRow::with_range(-50.0, 500.0, 1.0);
+        let tracking = compact::SpinRow::with_range(-50.0, 500.0, 1.0);
         tracking.set_title(&tr("Character Spacing"));
         tracking.set_subtitle(&tr("Percent"));
-        let ligatures = adw::ComboRow::builder()
+        let ligatures = compact::ComboRow::builder()
             .title(tr("Ligatures"))
             .model(&string_list(LIGATURES.map(ligatures_name)))
             .build();
-        let outline = adw::SwitchRow::builder().title(tr("Outline")).build();
+        let outline = compact::SwitchRow::builder().title(tr("Outline")).build();
         let text_background = ColorRow::new(&tr("Character Background"), Rgba::rgb(255, 255, 0));
-        let character = adw::PreferencesGroup::builder()
-            .title(tr("Characters"))
-            .build();
+        let character = compact::Group::builder().title(tr("Characters")).build();
         character.add(&tracking);
         character.add(&ligatures);
         character.add(&outline);
@@ -182,26 +181,26 @@ impl Effects {
 
         let paragraph_background =
             ColorRow::new(&tr("Paragraph Background"), Rgba::rgb(255, 255, 117));
-        let sides = adw::ComboRow::builder()
+        let sides = compact::ComboRow::builder()
             .title(tr("Borders and Rules"))
             .model(&string_list(SIDES.map(sides_name)))
             .build();
-        let style = adw::ComboRow::builder()
+        let style = compact::ComboRow::builder()
             .title(tr("Line Style"))
             .model(&string_list(STYLES.map(style_name)))
             .build();
-        let width = adw::SpinRow::with_range(0.25, 20.0, 0.25);
+        let width = compact::SpinRow::with_range(0.25, 20.0, 0.25);
         width.set_title(&tr("Line Width"));
         width.set_subtitle(&tr("Points"));
         width.set_digits(2);
         let color = ColorRow::new(&tr("Line Color"), Rgba::BLACK);
         // The line always has a color: the switch only says it.
         color.switch.set_visible(false);
-        let offset = adw::SpinRow::with_range(0.0, 100.0, 1.0);
+        let offset = compact::SpinRow::with_range(0.0, 100.0, 1.0);
         offset.set_title(&tr("Offset"));
         offset.set_subtitle(&tr("Distance from the text, in points"));
         offset.set_digits(1);
-        let paragraph = adw::PreferencesGroup::builder()
+        let paragraph = compact::Group::builder()
             .title(tr("Background and Borders"))
             .build();
         paragraph.add(&paragraph_background.row);
@@ -213,7 +212,7 @@ impl Effects {
 
         let shadow = ColorRow::new(&tr("Text Shadow"), Rgba::BLACK);
         let spin = |title: String, max: f64, subtitle: String| {
-            let row = adw::SpinRow::with_range(0.0, max, 1.0);
+            let row = compact::SpinRow::with_range(0.0, max, 1.0);
             row.set_title(&title);
             row.set_subtitle(&subtitle);
             row
@@ -222,9 +221,7 @@ impl Effects {
         let shadow_offset = spin(tr("Shadow Offset"), 100.0, tr("Points"));
         let shadow_blur = spin(tr("Shadow Blur"), 100.0, tr("Points"));
         let shadow_opacity = spin(tr("Shadow Opacity"), 100.0, tr("Percent"));
-        let shadow_group = adw::PreferencesGroup::builder()
-            .title(tr("Text Shadow"))
-            .build();
+        let shadow_group = compact::Group::builder().title(tr("Text Shadow")).build();
         shadow_group.add(&shadow.row);
         for row in [&shadow_angle, &shadow_offset, &shadow_blur, &shadow_opacity] {
             shadow_group.add(row);
@@ -410,7 +407,7 @@ impl Effects {
     }
 
     /// The groups, to add to the Inspector.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 3] {
+    pub fn groups(&self) -> [&compact::Group; 3] {
         [&self.character, &self.shadow_group, &self.paragraph]
     }
 
@@ -431,7 +428,7 @@ impl Effects {
     fn show_border_rows(&self, border: ParaBorder) {
         let on = border.sides != BorderSides::None;
         for row in [
-            self.style.upcast_ref::<gtk::Widget>(),
+            self.style.upcast_ref(),
             self.width.upcast_ref(),
             self.color.row.upcast_ref(),
             self.offset.upcast_ref(),

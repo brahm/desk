@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The Spelling and Grammar window (TXT-10, TXT-11): the mistake at the
+//! The Spelling and Grammar pane (TXT-10, TXT-11): the mistake at the
 //! selection, what is wrong with it and how to fix it, with the actions of
 //! the Spelling window of the Mac: Change, Find Next, Ignore, Learn and
-//! Forget.
+//! Forget. It is a pane at the side of the document window, which it
+//! shares with the Inspector and the Media Browser, in place of a window
+//! of its own (I of the interface plan).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,9 +17,9 @@ use crate::formatting::{EditorOf, labelled};
 use crate::i18n::tr;
 use crate::spelling::{self, Mistake, MistakeKind};
 
-/// The Spelling and Grammar window of a document window.
+/// The Spelling and Grammar pane of a document window.
 pub struct SpellingWindow {
-    window: adw::Window,
+    root: gtk::Box,
     description: gtk::Label,
     language: gtk::Label,
     entry: gtk::Entry,
@@ -32,8 +34,8 @@ pub struct SpellingWindow {
 }
 
 impl SpellingWindow {
-    /// The window, over a document window.
-    pub fn new(parent: &impl IsA<gtk::Window>, editor: EditorOf) -> Rc<Self> {
+    /// The pane, for the editor of a document window.
+    pub fn new(editor: EditorOf) -> Rc<Self> {
         let description = gtk::Label::builder()
             .xalign(0.0)
             .wrap(true)
@@ -71,10 +73,17 @@ impl SpellingWindow {
         let ignore = button(&tr("_Ignore"));
         let learn = button(&tr("_Learn"));
         let forget = button(&tr("F_orget"));
-        let actions = gtk::Box::builder().spacing(6).homogeneous(true).build();
-        for b in [&change, &next, &ignore, &learn, &forget] {
-            actions.append(b);
-        }
+        // Two rows of buttons, to fit the width of the pane.
+        let actions = gtk::Grid::builder()
+            .column_spacing(6)
+            .row_spacing(6)
+            .column_homogeneous(true)
+            .build();
+        actions.attach(&change, 0, 0, 2, 1);
+        actions.attach(&next, 2, 0, 1, 1);
+        actions.attach(&ignore, 0, 1, 1, 1);
+        actions.attach(&learn, 1, 1, 1, 1);
+        actions.attach(&forget, 2, 1, 1, 1);
 
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -90,19 +99,20 @@ impl SpellingWindow {
         content.append(&scroll);
         content.append(&grammar);
         content.append(&actions);
-        let view = adw::ToolbarView::new();
-        view.add_top_bar(&adw::HeaderBar::new());
-        view.set_content(Some(&content));
-        let window = adw::Window::builder()
-            .title(tr("Spelling and Grammar"))
-            .transient_for(parent)
-            .hide_on_close(true)
-            .default_width(440)
-            .content(&view)
+        let heading = gtk::Label::builder()
+            .label(tr("Spelling and Grammar"))
+            .xalign(0.0)
+            .css_classes(["title-4"])
             .build();
+        content.prepend(&heading);
+        content.update_property(&[gtk::accessible::Property::Label(&tr(
+            "Spelling and Grammar",
+        ))]);
+        content.set_accessible_role(gtk::AccessibleRole::Group);
+        let root = content;
 
         let this = Rc::new(Self {
-            window,
+            root,
             description,
             language,
             entry,
@@ -176,9 +186,13 @@ impl SpellingWindow {
         }
     }
 
-    /// Shows the window with the mistake at the selection, or the next.
+    /// The pane, to put at the side of the window.
+    pub fn widget(&self) -> &gtk::Box {
+        &self.root
+    }
+
+    /// Shows the mistake at the selection, or the next.
     pub fn present(&self) {
-        self.window.present();
         let grammar = self.grammar.is_active();
         let Some(editor) = (self.editor)() else {
             return;
@@ -248,21 +262,5 @@ impl SpellingWindow {
         self.forget.set_sensitive(spelling::is_learned(&word));
         *self.suggestions.borrow_mut() = suggestions;
         *self.shown.borrow_mut() = Some((mistake, word));
-    }
-}
-
-/// Makes the window when it is first shown.
-#[derive(Default)]
-pub struct SpellingSlot(RefCell<Option<Rc<SpellingWindow>>>);
-
-impl SpellingSlot {
-    /// Shows the window, making it the first time.
-    pub fn present(&self, parent: &impl IsA<gtk::Window>, editor: EditorOf) {
-        let window = self
-            .0
-            .borrow_mut()
-            .get_or_insert_with(|| SpellingWindow::new(parent, editor))
-            .clone();
-        window.present();
     }
 }

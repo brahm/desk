@@ -12,10 +12,10 @@
 //! one that started at a break before it, or the first one of the
 //! document.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use adw::prelude::*;
 use desk_model::{Columns, Layout, Length, MAX_COLUMNS, PARTS, PageSetup, Section, SectionStart};
 
 use crate::editing::Format;
@@ -166,38 +166,38 @@ pub const MIN_COLUMN: f64 = 18.0;
 
 /// The Page, Layout and Section groups of the Inspector.
 pub struct LayoutGroups {
-    page_group: adw::PreferencesGroup,
-    paper: adw::ComboRow,
-    landscape: adw::SwitchRow,
-    margin_top: adw::SpinRow,
-    margin_bottom: adw::SpinRow,
-    margin_left: adw::SpinRow,
-    margin_right: adw::SpinRow,
-    layout_group: adw::PreferencesGroup,
-    section_group: adw::PreferencesGroup,
-    columns: adw::SpinRow,
-    gap: adw::SpinRow,
+    page_group: compact::Group,
+    paper: compact::ComboRow,
+    landscape: compact::SwitchRow,
+    margin_top: compact::SpinRow,
+    margin_bottom: compact::SpinRow,
+    margin_left: compact::SpinRow,
+    margin_right: compact::SpinRow,
+    layout_group: compact::Group,
+    section_group: compact::Group,
+    columns: compact::SpinRow,
+    gap: compact::SpinRow,
     /// Whether the columns are as wide as each other (EST-07).
-    equal: adw::SwitchRow,
+    equal: compact::SwitchRow,
     /// The width of each column and the gap after it, which uneven
     /// columns have.
-    column_rows: adw::ExpanderRow,
-    widths: Vec<adw::SpinRow>,
-    gaps: Vec<adw::SpinRow>,
-    before: adw::SpinRow,
-    after: adw::SpinRow,
-    left: adw::SpinRow,
-    right: adw::SpinRow,
-    start: adw::ComboRow,
-    continues: adw::SwitchRow,
-    first_number: adw::SpinRow,
+    column_rows: compact::ExpanderRow,
+    widths: Vec<compact::SpinRow>,
+    gaps: Vec<compact::SpinRow>,
+    before: compact::SpinRow,
+    after: compact::SpinRow,
+    left: compact::SpinRow,
+    right: compact::SpinRow,
+    start: compact::ComboRow,
+    continues: compact::SwitchRow,
+    first_number: compact::SpinRow,
     /// Whether the first page has a header and footer of its own (EST-19).
-    first_different: adw::SwitchRow,
+    first_different: compact::SwitchRow,
     /// Whether left pages have a header and footer of their own (EST-19).
-    left_right_different: adw::SwitchRow,
+    left_right_different: compact::SwitchRow,
     /// Whether the section shows the headers and footers of the one
     /// before (EST-12).
-    previous_margins: adw::SwitchRow,
+    previous_margins: compact::SwitchRow,
     units: Cell<Units>,
     /// The page setup, layout and section shown.
     shown: RefCell<(PageSetup, Layout, Section)>,
@@ -209,20 +209,20 @@ impl LayoutGroups {
     /// The groups for the editor of a window.
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
         let spin = |title: String, min: f64, max: f64| {
-            let row = adw::SpinRow::with_range(min, max, 1.0);
+            let row = compact::SpinRow::with_range(min, max, 1.0);
             row.set_title(&title);
             row
         };
-        let paper = adw::ComboRow::builder()
+        let paper = compact::ComboRow::builder()
             .title(tr("Paper"))
             .model(&string_list(paper_names()))
             .build();
-        let landscape = adw::SwitchRow::builder().title(tr("Landscape")).build();
+        let landscape = compact::SwitchRow::builder().title(tr("Landscape")).build();
         let margin_top = spin(tr("Top Margin"), 0.0, 1.0);
         let margin_bottom = spin(tr("Bottom Margin"), 0.0, 1.0);
         let margin_left = spin(tr("Left Page Margin"), 0.0, 1.0);
         let margin_right = spin(tr("Right Page Margin"), 0.0, 1.0);
-        let page_group = adw::PreferencesGroup::builder().title(tr("Page")).build();
+        let page_group = compact::Group::builder().title(tr("Page")).build();
         for row in [&margin_top, &margin_bottom, &margin_left, &margin_right] {
             page_group.add(row);
         }
@@ -230,11 +230,11 @@ impl LayoutGroups {
         page_group.add(&landscape);
         let columns = spin(tr("Columns"), 1.0, MAX_COLUMNS as f64);
         let gap = spin(tr("Gap Between Columns"), 0.0, 1.0);
-        let equal = adw::SwitchRow::builder()
+        let equal = compact::SwitchRow::builder()
             .title(tr("Equal Column Width"))
             .active(true)
             .build();
-        let column_rows = adw::ExpanderRow::builder()
+        let column_rows = compact::ExpanderRow::builder()
             .title(tr("Column Widths"))
             .build();
         let mut widths = Vec::new();
@@ -254,7 +254,7 @@ impl LayoutGroups {
         let after = spin(tr("After Layout"), 0.0, 1.0);
         let left = spin(tr("Left Margin"), 0.0, 1.0);
         let right = spin(tr("Right Margin"), 0.0, 1.0);
-        let layout_group = adw::PreferencesGroup::builder()
+        let layout_group = compact::Group::builder()
             .title(tr("Layout"))
             .description(tr("The columns and margins of the layout at the cursor"))
             .build();
@@ -265,7 +265,7 @@ impl LayoutGroups {
         for row in [&before, &after, &left, &right] {
             layout_group.add(row);
         }
-        let start = adw::ComboRow::builder()
+        let start = compact::ComboRow::builder()
             .title(tr("Section Starts On"))
             .model(&string_list([
                 tr("Any Page"),
@@ -273,27 +273,25 @@ impl LayoutGroups {
                 tr("Right Page"),
             ]))
             .build();
-        let continues = adw::SwitchRow::builder()
+        let continues = compact::SwitchRow::builder()
             .title(tr("Continue Page Numbers"))
             .subtitle(tr("From the section before"))
             .build();
         let first_number = spin(tr("Start Page Numbers At"), 1.0, 9999.0);
-        let first_different = adw::SwitchRow::builder()
+        let first_different = compact::SwitchRow::builder()
             .title(tr("Different First Page"))
             .subtitle(tr("With a header and footer of its own"))
             .build();
-        let left_right_different = adw::SwitchRow::builder()
+        let left_right_different = compact::SwitchRow::builder()
             .title(tr("Different Left and Right Pages"))
             .subtitle(tr("Left pages have a header and footer of their own"))
             .build();
-        let previous_margins = adw::SwitchRow::builder()
+        let previous_margins = compact::SwitchRow::builder()
             .title(tr("Use Previous Headers and Footers"))
             .subtitle(tr("Those of the section before, rather than its own"))
             .active(true)
             .build();
-        let section_group = adw::PreferencesGroup::builder()
-            .title(tr("Section"))
-            .build();
+        let section_group = compact::Group::builder().title(tr("Section")).build();
         section_group.add(&start);
         section_group.add(&continues);
         section_group.add(&first_number);
@@ -464,7 +462,7 @@ impl LayoutGroups {
     }
 
     /// The groups, in order.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 3] {
+    pub fn groups(&self) -> [&compact::Group; 3] {
         [&self.page_group, &self.layout_group, &self.section_group]
     }
 
@@ -506,7 +504,7 @@ impl LayoutGroups {
         *self.shown.borrow_mut() = (setup, layout, section);
         self.updating.set(true);
         let units = self.units.get();
-        let set = |row: &adw::SpinRow, value: f64| {
+        let set = |row: &compact::SpinRow, value: f64| {
             if (row.value() - value).abs() > 0.001 {
                 row.set_value(value);
             }
@@ -606,7 +604,7 @@ impl LayoutGroups {
     fn page_changed(&self) {
         let (shown, _, _) = *self.shown.borrow();
         let units = self.units.get();
-        let length = |row: &adw::SpinRow| tab_stops::from_units(row.value(), units);
+        let length = |row: &compact::SpinRow| tab_stops::from_units(row.value(), units);
         let mut setup = PageSetup {
             margin_top: length(&self.margin_top),
             margin_bottom: length(&self.margin_bottom),
@@ -634,7 +632,7 @@ impl LayoutGroups {
     fn layout_changed(&self) {
         let (setup, shown, _) = *self.shown.borrow();
         let units = self.units.get();
-        let length = |row: &adw::SpinRow| tab_stops::from_units(row.value(), units);
+        let length = |row: &compact::SpinRow| tab_stops::from_units(row.value(), units);
         let margins = Layout {
             before: length(&self.before),
             after: length(&self.after),

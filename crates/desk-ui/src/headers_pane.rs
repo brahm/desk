@@ -11,6 +11,7 @@
 //! paragraph and of the first text of the header or footer, and its date
 //! and file name fields, whose values stay.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -142,14 +143,14 @@ pub fn paragraphs(
 
 /// The Headers and Footers group of the Inspector.
 pub struct HeadersGroup {
-    group: adw::PreferencesGroup,
-    headers: adw::SwitchRow,
-    footers: adw::SwitchRow,
-    header_margin: adw::SpinRow,
-    footer_margin: adw::SpinRow,
+    group: compact::Group,
+    headers: compact::SwitchRow,
+    footers: compact::SwitchRow,
+    header_margin: compact::SpinRow,
+    footer_margin: compact::SpinRow,
     /// The rows of the text of each header and footer, as
     /// [`MarginPlace::ALL`] lists them.
-    texts: Vec<adw::EntryRow>,
+    texts: Vec<compact::EntryRow>,
     units: Cell<Units>,
     shown: RefCell<(PageSetup, Section, HeadersFooters)>,
     updating: Cell<bool>,
@@ -170,15 +171,15 @@ fn title(place: MarginPlace) -> String {
 impl HeadersGroup {
     /// The group for the editor of a window.
     pub fn new(editor: EditorOf, units: Units) -> Rc<Self> {
-        let headers = adw::SwitchRow::builder().title(tr("Headers")).build();
-        let footers = adw::SwitchRow::builder().title(tr("Footers")).build();
-        let header_margin = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+        let headers = compact::SwitchRow::builder().title(tr("Headers")).build();
+        let footers = compact::SwitchRow::builder().title(tr("Footers")).build();
+        let header_margin = compact::SpinRow::with_range(0.0, 1.0, 1.0);
         header_margin.set_title(&tr("Header Margin"));
         header_margin.set_subtitle(&tr("From the top of the paper"));
-        let footer_margin = adw::SpinRow::with_range(0.0, 1.0, 1.0);
+        let footer_margin = compact::SpinRow::with_range(0.0, 1.0, 1.0);
         footer_margin.set_title(&tr("Footer Margin"));
         footer_margin.set_subtitle(&tr("From the bottom of the paper"));
-        let group = adw::PreferencesGroup::builder()
+        let group = compact::Group::builder()
             .title(tr("Headers and Footers"))
             .description(tr(
                 "Fields: {page} for the page number, {pages} for the page count, {date} and {file}",
@@ -188,10 +189,10 @@ impl HeadersGroup {
         group.add(&header_margin);
         group.add(&footers);
         group.add(&footer_margin);
-        let texts: Vec<adw::EntryRow> = MarginPlace::ALL
+        let texts: Vec<compact::EntryRow> = MarginPlace::ALL
             .iter()
             .map(|&place| {
-                let row = adw::EntryRow::builder()
+                let row = compact::EntryRow::builder()
                     .title(title(place))
                     .show_apply_button(true)
                     .build();
@@ -250,7 +251,7 @@ impl HeadersGroup {
     }
 
     /// The group.
-    pub fn widget(&self) -> &adw::PreferencesGroup {
+    pub fn widget(&self) -> &compact::Group {
         &self.group
     }
 
@@ -317,7 +318,7 @@ impl HeadersGroup {
     fn setup_changed(&self) {
         let (shown, _, _) = *self.shown.borrow();
         let units = self.units.get();
-        let length = |row: &adw::SpinRow| tab_stops::from_units(row.value(), units);
+        let length = |row: &compact::SpinRow| tab_stops::from_units(row.value(), units);
         let setup = PageSetup {
             headers: self.headers.is_active(),
             footers: self.footers.is_active(),

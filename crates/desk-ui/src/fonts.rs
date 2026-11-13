@@ -10,6 +10,7 @@
 //! It stays open beside the document, and shows and changes the
 //! formatting at the selection.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -251,13 +252,13 @@ pub struct FontsWindow {
     underline_color: ColorRow,
     strikethrough_color: ColorRow,
     background: ColorRow,
-    shadow: adw::SwitchRow,
-    opacity: adw::SpinRow,
-    blur: adw::SpinRow,
-    offset: adw::SpinRow,
-    angle: adw::SpinRow,
-    ligatures: adw::ComboRow,
-    features: Vec<(&'static str, adw::SwitchRow)>,
+    shadow: compact::SwitchRow,
+    opacity: compact::SpinRow,
+    blur: compact::SpinRow,
+    offset: compact::SpinRow,
+    angle: compact::SpinRow,
+    ligatures: compact::ComboRow,
+    features: Vec<(&'static str, compact::SwitchRow)>,
     /// Every installed family and whether it has a fixed width.
     installed: Vec<(String, bool)>,
     shown: RefCell<Option<(CharFormat, ParaFormat)>>,
@@ -364,9 +365,9 @@ impl FontsWindow {
             .row
             .set_subtitle(&tr("Otherwise the color of the text"));
         let background = ColorRow::new(&tr("Paragraph Background"), Rgba::rgb(255, 255, 117));
-        let shadow = adw::SwitchRow::builder().title(tr("Shadow")).build();
+        let shadow = compact::SwitchRow::builder().title(tr("Shadow")).build();
         let spin = |title: String, subtitle: String, min: f64, max: f64, step: f64| {
-            let row = adw::SpinRow::with_range(min, max, step);
+            let row = compact::SpinRow::with_range(min, max, step);
             row.set_title(&title);
             row.set_subtitle(&subtitle);
             row
@@ -376,9 +377,7 @@ impl FontsWindow {
         let offset = spin(tr("Shadow Offset"), tr("Points"), 0.0, 100.0, 1.0);
         let angle = spin(tr("Shadow Angle"), tr("Degrees"), 0.0, 359.0, 1.0);
         angle.set_wrap(true);
-        let effects = adw::PreferencesGroup::builder()
-            .title(tr("Effects"))
-            .build();
+        let effects = compact::Group::builder().title(tr("Effects")).build();
         effects.add(&underline_color.row);
         effects.add(&strikethrough_color.row);
         effects.add(&background.row);
@@ -388,22 +387,25 @@ impl FontsWindow {
         effects.add(&offset);
         effects.add(&angle);
 
-        let ligatures = adw::ComboRow::builder()
+        let ligatures = compact::ComboRow::builder()
             .title(tr("Ligatures"))
             .model(&string_list(LIGATURES.map(ligatures_name)))
             .build();
-        let typography = adw::PreferencesGroup::builder()
+        let typography = compact::Group::builder()
             .title(tr("Typography"))
             .description(tr("Features of the font, where it has them"))
             .build();
         typography.add(&ligatures);
-        let expander = adw::ExpanderRow::builder()
+        let expander = compact::ExpanderRow::builder()
             .title(tr("Font Features"))
             .build();
-        let features: Vec<(&'static str, adw::SwitchRow)> = features()
+        let features: Vec<(&'static str, compact::SwitchRow)> = features()
             .into_iter()
             .map(|(tag, name)| {
-                let row = adw::SwitchRow::builder().title(name).subtitle(tag).build();
+                let row = compact::SwitchRow::builder()
+                    .title(name)
+                    .subtitle(tag)
+                    .build();
                 expander.add_row(&row);
                 (tag, row)
             })
@@ -420,8 +422,8 @@ impl FontsWindow {
             .build();
         content.append(&bar);
         content.append(&lists);
-        content.append(&effects);
-        content.append(&typography);
+        content.append(effects.widget());
+        content.append(typography.widget());
         let scrolled = gtk::ScrolledWindow::builder()
             .child(&content)
             .hscrollbar_policy(gtk::PolicyType::Never)

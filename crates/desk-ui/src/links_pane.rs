@@ -10,6 +10,7 @@
 //! Contents group chooses the paragraph styles that tables list, and
 //! whether their entries show page numbers.
 
+use crate::compact;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -39,21 +40,21 @@ type Shown = (Option<Arc<str>>, Vec<Arc<str>>);
 
 /// The Links and Bookmarks group of the Inspector.
 pub struct LinksGroup {
-    group: adw::PreferencesGroup,
+    group: compact::Group,
     /// What the link at the cursor points to: a web page, an e-mail
     /// message, a document or a bookmark (EST-25).
-    kind: adw::ComboRow,
+    kind: compact::ComboRow,
     /// Its address, whom the message is to, the file or the bookmark.
-    link: adw::EntryRow,
+    link: compact::EntryRow,
     /// The subject of the message, or the bookmark of the document.
-    second: adw::EntryRow,
+    second: compact::EntryRow,
     choose: gtk::Button,
-    inactive: adw::SwitchRow,
-    bookmarks: adw::PreferencesGroup,
+    inactive: compact::SwitchRow,
+    bookmarks: compact::Group,
     /// Whether the bookmarks are listed by name, rather than in the order
     /// of their pages (EST-26).
     by_name: gtk::DropDown,
-    rows: RefCell<Vec<adw::EntryRow>>,
+    rows: RefCell<Vec<compact::EntryRow>>,
     /// The link at the cursor and the names of the bookmarks shown.
     shown: RefCell<Shown>,
     updating: Cell<bool>,
@@ -70,7 +71,7 @@ impl LinksGroup {
             tr("Bookmark"),
         ];
         let kinds: Vec<&str> = kinds.iter().map(String::as_str).collect();
-        let kind = adw::ComboRow::builder()
+        let kind = compact::ComboRow::builder()
             .title(tr("Link To"))
             .model(&gtk::StringList::new(&kinds))
             .build();
@@ -78,23 +79,23 @@ impl LinksGroup {
         let remove = icon_button("user-trash-symbolic", &tr("Remove Link"));
         kind.add_suffix(&open);
         kind.add_suffix(&remove);
-        let link = adw::EntryRow::builder()
+        let link = compact::EntryRow::builder()
             .title(tr("Address"))
             .show_apply_button(true)
             .build();
         let choose = icon_button("document-open-symbolic", &tr("Choose Document"));
         link.add_suffix(&choose);
-        let second = adw::EntryRow::builder()
+        let second = compact::EntryRow::builder()
             .title(tr("Subject"))
             .show_apply_button(true)
             .build();
-        let inactive = adw::SwitchRow::builder()
+        let inactive = compact::SwitchRow::builder()
             .title(tr("Make Links Inactive"))
             .subtitle(tr(
                 "A click puts the cursor in a link instead of following it",
             ))
             .build();
-        let group = adw::PreferencesGroup::builder()
+        let group = compact::Group::builder()
             .title(tr("Hyperlinks"))
             .description(tr(
                 "Insert ▸ Hyperlink links the selection. A link to a bookmark starts with #.",
@@ -104,7 +105,7 @@ impl LinksGroup {
         group.add(&link);
         group.add(&second);
         group.add(&inactive);
-        let bookmarks = adw::PreferencesGroup::builder()
+        let bookmarks = compact::Group::builder()
             .title(tr("Bookmarks"))
             .description(tr(
                 "Insert ▸ Bookmark marks the selection. An empty name takes a bookmark away.",
@@ -188,7 +189,7 @@ impl LinksGroup {
     }
 
     /// The groups.
-    pub fn groups(&self) -> [&adw::PreferencesGroup; 2] {
+    pub fn groups(&self) -> [&compact::Group; 2] {
         [&self.group, &self.bookmarks]
     }
 
@@ -200,10 +201,7 @@ impl LinksGroup {
             self.inactive.set_active(inactive);
         }
         let changed = self.shown.borrow().0 != format.link;
-        for row in [
-            self.kind.upcast_ref::<gtk::Widget>(),
-            self.link.upcast_ref(),
-        ] {
+        for row in [self.kind.upcast_ref(), self.link.upcast_ref()] {
             row.set_visible(format.link.is_some());
         }
         if let Some(link) = &format.link
@@ -334,8 +332,8 @@ impl LinksGroup {
         );
     }
 
-    fn bookmark_row(self: &Rc<Self>, name: &Arc<str>) -> adw::EntryRow {
-        let row = adw::EntryRow::builder()
+    fn bookmark_row(self: &Rc<Self>, name: &Arc<str>) -> compact::EntryRow {
+        let row = compact::EntryRow::builder()
             .title(tr("Bookmark"))
             .text(&**name)
             .show_apply_button(true)
@@ -372,12 +370,12 @@ impl LinksGroup {
 
 /// The Table of Contents group of the Inspector.
 pub struct TocGroup {
-    group: adw::PreferencesGroup,
-    page_links: adw::SwitchRow,
-    styles: adw::ExpanderRow,
+    group: compact::Group,
+    page_links: compact::SwitchRow,
+    styles: compact::ExpanderRow,
     /// For each paragraph style, whether it is listed, and whether its
     /// entries show their page number: Pages' "#" column.
-    rows: RefCell<Vec<(StyleId, adw::SwitchRow, gtk::ToggleButton)>>,
+    rows: RefCell<Vec<(StyleId, compact::SwitchRow, gtk::ToggleButton)>>,
     shown: RefCell<(TocSettings, Vec<(StyleId, String)>)>,
     updating: Cell<bool>,
     editor: EditorOf,
@@ -386,18 +384,18 @@ pub struct TocGroup {
 impl TocGroup {
     /// The group for the editor of a window.
     pub fn new(editor: EditorOf) -> Rc<Self> {
-        let page_links = adw::SwitchRow::builder()
+        let page_links = compact::SwitchRow::builder()
             .title(tr("Make Page Numbers Links"))
             .active(true)
             .build();
-        let styles = adw::ExpanderRow::builder()
+        let styles = compact::ExpanderRow::builder()
             .title(tr("Styles to Include"))
             .build();
         let update = gtk::Button::builder()
             .label(tr("Update Now"))
             .valign(gtk::Align::Center)
             .build();
-        let group = adw::PreferencesGroup::builder()
+        let group = compact::Group::builder()
             .title(tr("Table of Contents"))
             .description(tr(
                 "Insert ▸ Table of Contents adds one before the paragraph of the cursor.",
@@ -435,7 +433,7 @@ impl TocGroup {
     }
 
     /// The group.
-    pub fn widget(&self) -> &adw::PreferencesGroup {
+    pub fn widget(&self) -> &compact::Group {
         &self.group
     }
 
@@ -452,7 +450,7 @@ impl TocGroup {
             }
             for (id, name) in &styles {
                 // A style's name is text, not markup: "Header & Footer".
-                let row = adw::SwitchRow::builder()
+                let row = compact::SwitchRow::builder()
                     .title(gtk::glib::markup_escape_text(name))
                     .build();
                 let number = gtk::ToggleButton::builder()

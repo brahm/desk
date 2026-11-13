@@ -18,6 +18,7 @@ mod access;
 mod area;
 mod auto_numbers;
 mod bullet_pictures;
+mod compact;
 mod editing;
 mod effects;
 mod eyedropper;
@@ -402,13 +403,19 @@ fn load_css() {
     };
     let provider = gtk::CssProvider::new();
     provider.load_from_string(
-        ".desk-document { background-color: alpha(@window_fg_color, 0.1); }\n\
-         .desk-ruler { background-color: @headerbar_bg_color; \
-         box-shadow: inset 0 -1px alpha(@window_fg_color, 0.15); }\n\
-         .desk-thumb-section { padding: 6px; border-radius: 8px; \
-         border: 2px solid transparent; }\n\
-         .desk-thumb-section.selected { border-color: #f5c211; \
-         background-color: alpha(#f5c211, 0.15); }",
+        // The colors are the named ones of Adwaita, which follow the
+        // accent, the dark style and high contrast. The section chosen in
+        // the thumbnails has a thin outline and no fill, as in Pages
+        // (EST-17), in the accent color in place of its yellow.
+        ".desk-document { background-color: color-mix(in srgb, var(--window-fg-color) 10%, transparent); }\n\
+         .desk-ruler { background-color: var(--headerbar-bg-color); \
+         box-shadow: inset 0 -1px color-mix(in srgb, var(--window-fg-color) 15%, transparent); }\n\
+         .desk-thumb-section { padding: 6px; border: 1px solid transparent; }\n\
+         .desk-thumb-section.selected { border-color: var(--accent-color); }\n\
+         .desk-compact-group { padding-top: 3px; padding-bottom: 3px; }\n\
+         .desk-compact-row { min-height: 30px; }\n\
+         .desk-compact-row spinbutton, .desk-compact-row dropdown > button, \
+         .desk-compact-row entry { min-height: 26px; }",
     );
     gtk::style_context_add_provider_for_display(
         &display,

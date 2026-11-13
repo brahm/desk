@@ -229,41 +229,23 @@ impl DocumentWindow {
             else {
                 return;
             };
-            let browser = this.media_browser();
-            if browser.showing() != on {
-                browser.toggle();
-            }
             action.set_state(&on.to_variant());
+            this.show_side("media", on);
         });
         self.window.add_action(&action);
     }
 
     /// The Media Browser, made the first time it is asked for.
-    fn media_browser(self: &Rc<Self>) -> Rc<crate::media_browser::MediaBrowser> {
+    pub(super) fn media_browser(self: &Rc<Self>) -> Rc<crate::media_browser::MediaBrowser> {
         self.media_browser
             .get_or_init(|| {
                 let weak = Rc::downgrade(self);
-                let browser = crate::media_browser::MediaBrowser::new(
-                    self.window.upcast_ref(),
-                    move |file| {
-                        let Some(this) = weak.upgrade() else { return };
-                        if let Some(editor) = this.editor() {
-                            editor.insert_file(file, None);
-                        }
-                    },
-                );
-                // The menu follows the window, closed by its own button.
-                let window = self.window.downgrade();
-                browser.window().connect_visible_notify(move |browser| {
-                    if let Some(window) = window.upgrade() {
-                        crate::formatting::set_state(
-                            &window,
-                            "media-browser",
-                            browser.is_visible().to_variant(),
-                        );
+                crate::media_browser::MediaBrowser::new(move |file| {
+                    let Some(this) = weak.upgrade() else { return };
+                    if let Some(editor) = this.editor() {
+                        editor.insert_file(file, None);
                     }
-                });
-                browser
+                })
             })
             .clone()
     }
