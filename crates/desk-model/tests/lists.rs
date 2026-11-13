@@ -368,3 +368,28 @@ fn lst_03_items_change_over_their_list_style() {
         .unwrap();
     assert!(!overrides(&editor, a).list);
 }
+
+#[test]
+fn sty_02_a_paragraph_style_chosen_takes_the_place_of_a_list() {
+    let mut editor = editor();
+    let bullet = add(&mut editor, ListStyle::bullet, "Bullet");
+    let (a, b) = (at(&editor, 0), at(&editor, 1));
+    let heading = editor
+        .edit("Style", |edit| {
+            let id = edit.new_id();
+            edit.apply(desk_model::Op::PutStyle {
+                style: ParagraphStyle::new(id, "Heading 2").into(),
+            })?;
+            edit.set_list_style(a, b, Some(bullet))?;
+            Ok(id)
+        })
+        .unwrap();
+    assert_eq!(labels(&editor)[..2], ["\u{2022}", "\u{2022}"]);
+    // As in Pages, the heading is no longer an item; the other one is.
+    editor
+        .edit("Paragraph Style", |edit| {
+            edit.apply_paragraph_style(a, a, heading)
+        })
+        .unwrap();
+    assert_eq!(labels(&editor)[..2], ["", "\u{2022}"]);
+}

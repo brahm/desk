@@ -510,6 +510,37 @@ impl Edit {
         Ok(())
     }
 
+    /// Gives the paragraphs between two positions a paragraph style, as
+    /// choosing it does (STY-02): a paragraph whose style changes takes
+    /// the list of the new style in place of a list set on it, as in
+    /// Pages, where a heading applied to a bulleted item is no longer one.
+    pub fn apply_paragraph_style(
+        &mut self,
+        start: Position,
+        end: Position,
+        style: StyleId,
+    ) -> Result<(), ModelError> {
+        for (id, _) in self.document().paragraph_ranges(start, end)? {
+            let paragraph = self.document().paragraph(id)?;
+            if paragraph.style() == style {
+                continue;
+            }
+            let attrs = ParaAttrs {
+                list_style: None,
+                list_level: None,
+                list_start: None,
+                list_override: None,
+                ..paragraph.attrs().clone()
+            };
+            self.apply(Op::SetParagraphFormat {
+                paragraph: id,
+                style,
+                attrs,
+            })?;
+        }
+        Ok(())
+    }
+
     /// Gives the paragraphs between two positions a paragraph style and
     /// removes every attribute set over their styles, as a style shortcut
     /// with Option does (STY-04). Character styles stay.
