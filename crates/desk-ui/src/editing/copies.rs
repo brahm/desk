@@ -315,6 +315,14 @@ impl TextEditor {
     /// right, in front of the others, and selects them (Edit ▸ Duplicate,
     /// OBJ-22). Objects in the line of the text are not duplicated.
     pub fn duplicate_objects(&self) {
+        let offset = Length::from_pt(COPY_OFFSET);
+        self.duplicate_objects_by("Duplicate", offset, offset);
+    }
+
+    /// Puts copies of the selected objects at a distance from them, in
+    /// front of the others, and selects them, as one change with a name:
+    /// Duplicate, or Nudge for the arrows with Alt (OBJ-22).
+    pub(super) fn duplicate_objects_by(&self, name: &str, dx: Length, dy: Length) {
         let ids: Vec<NodeId> = {
             let state = self.state.borrow();
             let document = state.editor.document();
@@ -333,9 +341,8 @@ impl TextEditor {
         if ids.is_empty() {
             return;
         }
-        let offset = Length::from_pt(COPY_OFFSET);
-        self.arrange_objects("Duplicate", |edit, _| {
-            edit.duplicate_objects(&ids, offset, offset).map(Some)
+        self.arrange_objects(name, |edit, _| {
+            edit.duplicate_objects(&ids, dx, dy).map(Some)
         });
     }
 

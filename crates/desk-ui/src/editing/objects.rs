@@ -2088,7 +2088,8 @@ impl TextEditor {
     }
 
     /// Answers a key while objects are selected: the arrows nudge them,
-    /// Delete removes them and Escape deselects them.
+    /// with Alt copies of them as in Pages (OBJ-22), Delete removes them
+    /// and Escape deselects them.
     pub(super) fn object_key(&self, key: gdk::Key, modifiers: gdk::ModifierType) -> bool {
         if !self.has_selected_objects() {
             return false;
@@ -2098,11 +2099,16 @@ impl TextEditor {
         } else {
             1.0
         };
+        let copy = modifiers.contains(gdk::ModifierType::ALT_MASK);
         let nudge = |dx: f64, dy: f64| {
-            self.arrange_objects("Move", |edit, ids| {
-                edit.move_objects(ids, Length::from_pt(dx), Length::from_pt(dy))
-                    .map(|()| None)
-            });
+            let (dx, dy) = (Length::from_pt(dx), Length::from_pt(dy));
+            if copy {
+                self.duplicate_objects_by("Nudge", dx, dy);
+            } else {
+                self.arrange_objects("Move", |edit, ids| {
+                    edit.move_objects(ids, dx, dy).map(|()| None)
+                });
+            }
         };
         match key {
             gdk::Key::Left | gdk::Key::KP_Left => nudge(-step, 0.0),

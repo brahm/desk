@@ -766,6 +766,17 @@ def objects_on_the_page(work):
         press("ctrl+z", "ctrl+s")
         wait_for("the shape back in the file", saved_rect)
         check("Undo brings it back", True)
+        # Alt and an arrow leave a copy a point away, as in Pages (OBJ-22).
+        click(
+            int(window["X"]) + int(window["WIDTH"]) // 2,
+            int(window["Y"]) + int(window["HEIGHT"]) // 2,
+        )
+        press("alt+Right", "ctrl+s")
+        wait_for(
+            "the copy in the saved file",
+            lambda: saved_content(letter, r"(?s)<draw:rect .*<draw:rect "),
+        )
+        check("Alt and an arrow copy the shape (OBJ-22)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
