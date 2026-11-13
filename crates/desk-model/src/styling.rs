@@ -855,6 +855,122 @@ impl Edit {
         Ok(count)
     }
 
+    /// Gives all the text that uses a paragraph or a character style the
+    /// look of the style as attributes of its own, and no longer the
+    /// style: the "Free Form" of Pages that a deleted style can be
+    /// replaced with (STY-05). The paragraphs take the default paragraph
+    /// style, the text no character style. In the body and in some
+    /// headers, footers, notes, text boxes and shapes. Gives back how
+    /// many pieces of text used it.
+    pub fn free_form_style_uses(
+        &mut self,
+        id: StyleId,
+        stories: &[crate::story::Story],
+    ) -> Result<usize, ModelError> {
+        match self.document().styles().get(id).map(Style::family) {
+            Some(StyleFamily::Paragraph | StyleFamily::Character) => {}
+            Some(StyleFamily::List) => return Err(ModelError::StyleInUse(id)),
+            None => return Err(ModelError::UnknownStyle(id)),
+        }
+        let mut count = self.document().style_uses(id).len();
+        self.free_form_in_body(id)?;
+        for &story in stories {
+            let paragraphs = self.document().story_paragraphs(story);
+            let copy = self.document().with_body(paragraphs);
+            let uses = copy.style_uses(id).len();
+            if uses == 0 {
+                continue;
+            }
+            count += uses;
+            let mut copy = copy;
+            copy.transact("Free Form", |edit| edit.free_form_in_body(id))?;
+            self.set_story(story, copy.body().iter().cloned().collect())?;
+        }
+        Ok(count)
+    }
+
+    /// Gives the text of the body that uses a style its look, without
+    /// the style.
+    fn free_form_in_body(&mut self, id: StyleId) -> Result<(), ModelError> {
+        let document = self.document();
+        let styles = document.styles().clone();
+        let base = styles.default_paragraph();
+        let none = ParaAttrs::default();
+        let plain = CharAttrs::default();
+        match styles.get(id).map(Style::family) {
+            Some(StyleFamily::Paragraph) => {
+                // What the style sets, over what the default style does.
+                let paragraph = ParaAttrs::from(styles.resolve_paragraph(id, &none))
+                    .difference(&styles.resolve_paragraph(base, &none));
+                let character = CharAttrs::from(styles.resolve_character(id, None, &plain))
+                    .difference(&styles.resolve_character(base, None, &plain));
+                let ids: Vec<NodeId> = document
+                    .body()
+                    .iter()
+                    .filter(|p| p.style() == id)
+                    .map(Paragraph::id)
+                    .collect();
+                for paragraph_id in ids {
+                    let own = self.document().paragraph(paragraph_id)?.attrs().clone();
+                    let mut attrs = paragraph.clone();
+                    attrs.merge(&own);
+                    self.apply(Op::SetParagraphFormat {
+                        paragraph: paragraph_id,
+                        style: base,
+                        attrs,
+                    })?;
+                    let len = self.document().paragraph(paragraph_id)?.len();
+                    if len == 0 {
+                        continue;
+                    }
+                    let flat = |style: StyleId| {
+                        self.document()
+                            .flat_character_style(style)
+                            .map(|s| s.character)
+                    };
+                    // A character style keeps what it sets over the look
+                    // of the paragraph style.
+                    let styled: HashMap<StyleId, CharAttrs> = self
+                        .document()
+                        .paragraph(paragraph_id)?
+                        .runs()
+                        .filter_map(|r| r.style)
+                        .filter_map(|s| Some((s, flat(s)?)))
+                        .collect();
+                    self.map_runs(
+                        Position::new(paragraph_id, 0),
+                        Position::new(paragraph_id, len),
+                        |run| {
+                            let mut attrs = character.clone();
+                            if let Some(set) = run.style.and_then(|s| styled.get(&s)) {
+                                attrs.remove(set);
+                            }
+                            attrs.merge(&run.attrs);
+                            run.attrs = attrs;
+                        },
+                    )?;
+                }
+            }
+            Some(StyleFamily::Character) => {
+                let character = document
+                    .flat_character_style(id)
+                    .map(|s| s.character)
+                    .unwrap_or_default();
+                let uses = document.style_uses(id);
+                self.map_ranges(&uses, |run| {
+                    if run.style == Some(id) {
+                        let mut attrs = character.clone();
+                        attrs.merge(&run.attrs);
+                        run.attrs = attrs;
+                        run.style = None;
+                    }
+                })?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     /// Replaces a font family with another in every style and all the
     /// text, as the Warnings window does for a missing font (INT-22).
     pub fn replace_font_family(&mut self, from: &str, to: &str) -> Result<(), ModelError> {
