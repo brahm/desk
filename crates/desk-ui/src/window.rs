@@ -14,7 +14,7 @@ use desk_model::{CharAttrs, Document, Field, LineStyle, ParaAttrs};
 use gtk::{gdk, gio, glib};
 
 use crate::editing::{BreakKind, FieldKind, TextEditor};
-use crate::find::{self, FindSlot, Search, SearchSidebar};
+use crate::find::{self, FindWindow, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
@@ -70,7 +70,7 @@ pub struct DocumentWindow {
     /// The search of the window (TXT-12, TXT-13).
     search: Rc<Search>,
     /// The Find & Replace window, made when first shown.
-    find: FindSlot,
+    find: Rc<FindWindow>,
     search_sidebar: Rc<SearchSidebar>,
     search_split: adw::OverlaySplitView,
     navigate_by: gtk::MenuButton,
@@ -426,6 +426,8 @@ impl DocumentWindow {
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
         toolbar_view.add_top_bar(&format_revealer);
+        let find = FindWindow::new(editor_of(), search.clone());
+        toolbar_view.add_top_bar(find.widget());
         toolbar_view.set_content(Some(&drawer_split));
         toolbar_view.add_bottom_bar(&bottom_bar);
 
@@ -460,7 +462,7 @@ impl DocumentWindow {
             fonts: FontsSlot::default(),
             split,
             search,
-            find: FindSlot::default(),
+            find,
             search_sidebar,
             search_split,
             navigate_by,
@@ -2162,12 +2164,7 @@ impl DocumentWindow {
     fn add_find_actions(self: &Rc<Self>) {
         let simple: [(&str, WindowAction); 9] = [
             ("find", |this| {
-                let cell = this.editor.clone();
-                this.find.present(
-                    &this.window,
-                    Rc::new(move || cell.borrow().clone()),
-                    this.search.clone(),
-                );
+                this.find.present();
             }),
             ("find-next", |this| {
                 if let Some(editor) = this.editor() {
