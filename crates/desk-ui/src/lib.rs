@@ -134,10 +134,17 @@ pub struct ObjectsFormat {
     pub foreign_text_types: &'static [&'static str],
     /// The formatted text of another program, by its media type.
     pub read_foreign_text: fn(&str, &[u8]) -> Result<desk_model::Fragment, String>,
+    /// What puts text copied with its styles on the clipboard for other
+    /// programs: media types with their bytes, the better first (TXT-04).
+    pub write_foreign_text: ForeignTextFn,
     /// Whether the app keeps the named styles of text pasted in it; one
     /// that does not, as Numbers and Keynote, keeps their look only.
     pub named_styles: bool,
 }
+
+/// Writes text copied with its styles as other programs read it: media
+/// types with their bytes.
+pub type ForeignTextFn = fn(&desk_model::Fragment) -> Result<Vec<(&'static str, Vec<u8>)>, String>;
 
 static OBJECTS_FORMAT: std::sync::OnceLock<ObjectsFormat> = std::sync::OnceLock::new();
 

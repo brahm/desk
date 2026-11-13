@@ -739,8 +739,9 @@ impl TextEditor {
         text
     }
 
-    /// Copies the selection to the clipboard, as text for other apps and
-    /// with its styles for Desk (TXT-04).
+    /// Copies the selection to the clipboard: with its styles for Desk,
+    /// with its formatting for the other programs that read it, and as
+    /// text alone for the rest (TXT-04).
     pub fn copy(&self) {
         if self.has_selected_objects() {
             self.copy_objects();
@@ -759,34 +760,45 @@ impl TextEditor {
                 .and_then(|(a, b)| document.copy_fragment(a, b))
                 .ok()
         };
-        // The other apps of Desk get the text with its styles too (IOP-17,
-        // IOP-25).
-        let styled = fragment
-            .as_ref()
-            .zip(crate::objects_format())
-            .and_then(|(f, format)| match (format.write_text)(f) {
-                Ok(bytes) => Some(gdk::ContentProvider::for_bytes(
+        let mut contents = vec![gdk::ContentProvider::for_value(&text.to_value())];
+        if let Some((fragment, format)) = fragment.as_ref().zip(crate::objects_format()) {
+            // The other apps of Desk get the text with its styles (IOP-17,
+            // IOP-25).
+            match (format.write_text)(fragment) {
+                Ok(bytes) => contents.push(gdk::ContentProvider::for_bytes(
                     format.text_type,
                     &gtk::glib::Bytes::from_owned(bytes),
                 )),
                 Err(error) => {
                     gtk::glib::g_warning!("desk", "cannot copy the styles of the text: {error}");
-                    None
                 }
-            });
+            }
+            // Other programs get it with its formatting, as a word
+            // processor or a web browser reads it.
+            match (format.write_foreign_text)(fragment) {
+                Ok(flavors) => contents.extend(flavors.into_iter().map(|(media_type, bytes)| {
+                    gdk::ContentProvider::for_bytes(
+                        media_type,
+                        &gtk::glib::Bytes::from_owned(bytes),
+                    )
+                })),
+                Err(error) => {
+                    gtk::glib::g_warning!(
+                        "desk",
+                        "cannot copy the formatting of the text: {error}"
+                    );
+                }
+            }
+        }
         COPIED.with(|c| *c.borrow_mut() = fragment.map(|f| (text.clone(), f)));
         copies::forget_copied_objects();
         let clipboard = self.view.area().clipboard();
-        match styled {
-            Some(styled) => {
-                let plain = gdk::ContentProvider::for_value(&text.to_value());
-                if let Err(error) =
-                    clipboard.set_content(Some(&gdk::ContentProvider::new_union(&[plain, styled])))
-                {
-                    gtk::glib::g_warning!("desk", "cannot copy: {error}");
-                }
-            }
-            None => clipboard.set_text(&text),
+        if contents.len() == 1 {
+            clipboard.set_text(&text);
+        } else if let Err(error) =
+            clipboard.set_content(Some(&gdk::ContentProvider::new_union(&contents)))
+        {
+            gtk::glib::g_warning!("desk", "cannot copy: {error}");
         }
     }
 
