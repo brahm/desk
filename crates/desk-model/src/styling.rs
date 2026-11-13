@@ -38,6 +38,28 @@ pub struct CopiedStyle {
     pub character_attrs: CharAttrs,
     /// The list styles that the paragraph style and the paragraph name.
     pub lists: Vec<ListStyle>,
+    /// Which of its parts Paste Style puts on text.
+    pub parts: StyleParts,
+}
+
+/// Which parts of a copied style Paste Style puts on text: Pages copies
+/// the style of the paragraph and that of the characters apart (STY-08).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum StyleParts {
+    /// Both the paragraph and the character parts.
+    #[default]
+    Both,
+    /// The paragraph style and attributes only: Copy Paragraph Style.
+    Paragraph,
+    /// The character style and attributes only: Copy Character Style.
+    Character,
+}
+
+impl CopiedStyle {
+    /// The same style, of which Paste Style puts only some parts on text.
+    pub fn only(self, parts: StyleParts) -> Self {
+        Self { parts, ..self }
+    }
 }
 
 /// How a paragraph looks, and each of its runs.
@@ -191,6 +213,7 @@ impl Document {
         }
         Ok(CopiedStyle {
             lists,
+            parts: StyleParts::Both,
             paragraph: self
                 .flat_paragraph_style(paragraph.style())
                 .ok_or(ModelError::UnknownStyle(paragraph.style()))?,
@@ -1077,43 +1100,46 @@ impl Edit {
     /// the paragraphs take its paragraph style and attributes, and the
     /// text, when there is a selection, its character style and
     /// attributes. A style that the document does not have by name comes
-    /// with it.
+    /// with it. A style copied as a paragraph or a character style puts
+    /// only that part on the text.
     pub fn paste_style(
         &mut self,
         start: Position,
         end: Position,
         copied: &CopiedStyle,
     ) -> Result<(), ModelError> {
-        let mut lists: HashMap<StyleId, StyleId> = HashMap::new();
-        for list in &copied.lists {
-            lists.insert(
-                list.id,
-                self.style_by_name_or_add(Style::List(list.clone()))?,
-            );
-        }
-        let relink = |attrs: &mut ParaAttrs| {
-            if let Some(Some(list)) = attrs.list_style {
-                attrs.list_style = Some(lists.get(&list).copied());
-            }
-        };
-        let mut paragraph = copied.paragraph.clone();
-        relink(&mut paragraph.paragraph);
-        let mut paragraph_attrs = copied.paragraph_attrs.without_structure();
-        relink(&mut paragraph_attrs);
-        let paragraph_style = self.style_by_name_or_add(Style::Paragraph(paragraph))?;
-        let character_style = match &copied.character {
-            Some(style) => Some(self.style_by_name_or_add(Style::Character(style.clone()))?),
-            None => None,
-        };
         let ranges = self.document().paragraph_ranges(start, end)?;
-        for (id, _) in &ranges {
-            let p = Position::new(*id, 0);
-            self.set_paragraph_style(p, p, paragraph_style)?;
-            let mut attrs = paragraph_attrs.clone();
-            attrs.merge(&self.document().paragraph(*id)?.attrs().structure());
-            self.set_own_paragraph_attrs(*id, attrs)?;
+        if copied.parts != StyleParts::Character {
+            let mut lists: HashMap<StyleId, StyleId> = HashMap::new();
+            for list in &copied.lists {
+                lists.insert(
+                    list.id,
+                    self.style_by_name_or_add(Style::List(list.clone()))?,
+                );
+            }
+            let relink = |attrs: &mut ParaAttrs| {
+                if let Some(Some(list)) = attrs.list_style {
+                    attrs.list_style = Some(lists.get(&list).copied());
+                }
+            };
+            let mut paragraph = copied.paragraph.clone();
+            relink(&mut paragraph.paragraph);
+            let mut paragraph_attrs = copied.paragraph_attrs.without_structure();
+            relink(&mut paragraph_attrs);
+            let paragraph_style = self.style_by_name_or_add(Style::Paragraph(paragraph))?;
+            for (id, _) in &ranges {
+                let p = Position::new(*id, 0);
+                self.set_paragraph_style(p, p, paragraph_style)?;
+                let mut attrs = paragraph_attrs.clone();
+                attrs.merge(&self.document().paragraph(*id)?.attrs().structure());
+                self.set_own_paragraph_attrs(*id, attrs)?;
+            }
         }
-        if start != end {
+        if copied.parts != StyleParts::Paragraph && start != end {
+            let character_style = match &copied.character {
+                Some(style) => Some(self.style_by_name_or_add(Style::Character(style.clone()))?),
+                None => None,
+            };
             let attrs = copied.character_attrs.clone();
             self.map_ranges(&ranges, |run| {
                 run.style = character_style;

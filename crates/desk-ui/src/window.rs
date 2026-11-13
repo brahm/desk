@@ -124,8 +124,8 @@ const DOCUMENT_ACTIONS: [&str; 61] = [
     "inspector",
     "fonts",
     "styles-drawer",
-    "copy-style",
-    "paste-style",
+    "copy-paragraph-style",
+    "copy-character-style",
     "import-styles",
     "insert-page-break",
     "insert-column-break",
@@ -783,6 +783,9 @@ impl DocumentWindow {
         for action in DOCUMENT_ACTIONS.iter().chain(&objects::OBJECT_ACTIONS) {
             self.enable(action, has_document);
         }
+        // Paste Style is off until a style is copied, as in Pages.
+        let copied = COPIED_STYLE.with(|c| c.borrow().is_some());
+        self.enable("paste-style", has_document && copied);
     }
 
     fn enable(&self, name: &str, enabled: bool) {
@@ -993,43 +996,75 @@ impl DocumentWindow {
             Some(&tr("Import Styles")),
             Some(&tr("Choose the styles of “{name}” to import.").replace("{name}", name)),
         );
-        let list = gtk::ListBox::builder()
-            .selection_mode(gtk::SelectionMode::None)
-            .css_classes(["boxed-list"])
+        // The styles in groups by their kind, none chosen at first, as in
+        // Pages: Import stays off until one is.
+        let groups = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
             .build();
         let mut checks = Vec::new();
-        let own = self.editor().map(|e| e.styles());
-        for family in [
-            desk_model::StyleFamily::Paragraph,
-            desk_model::StyleFamily::Character,
-            desk_model::StyleFamily::List,
+        for (family, heading) in [
+            (desk_model::StyleFamily::Paragraph, tr("Paragraph Styles")),
+            (desk_model::StyleFamily::Character, tr("Character Styles")),
+            (desk_model::StyleFamily::List, tr("List Styles")),
         ] {
-            for style in crate::styles_drawer::sorted(source.styles(), family) {
-                // The styles that the document lacks are chosen at first.
-                let new = own
-                    .as_ref()
-                    .is_none_or(|own| own.by_name(family, style.name()).is_none());
-                let check = gtk::CheckButton::builder().active(new).build();
+            let styles = crate::styles_drawer::sorted(source.styles(), family);
+            if styles.is_empty() {
+                continue;
+            }
+            let label = gtk::Label::builder()
+                .label(heading)
+                .xalign(0.0)
+                .css_classes(["heading"])
+                .margin_top(if checks.is_empty() { 0 } else { 12 })
+                .build();
+            let list = gtk::ListBox::builder()
+                .selection_mode(gtk::SelectionMode::None)
+                .css_classes(["boxed-list"])
+                .build();
+            for style in styles {
+                let check = gtk::CheckButton::new();
                 let row = adw::ActionRow::builder()
                     .title(glib::markup_escape_text(style.name()))
-                    .subtitle(match family {
-                        desk_model::StyleFamily::Paragraph => tr("Paragraph Style"),
-                        desk_model::StyleFamily::Character => tr("Character Style"),
-                        desk_model::StyleFamily::List => tr("List Style"),
-                    })
                     .activatable_widget(&check)
                     .build();
                 row.add_prefix(&check);
                 list.append(&row);
                 checks.push((style.id(), check));
             }
+            groups.append(&label);
+            groups.append(&list);
         }
+        let checks = Rc::new(checks);
         let scrolled = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .propagate_natural_height(true)
             .max_content_height(320)
-            .child(&list)
+            .child(&groups)
             .build();
+        let select_all = gtk::Button::builder()
+            .label(tr("_Select All"))
+            .use_underline(true)
+            .build();
+        let deselect_all = gtk::Button::builder()
+            .label(tr("_Deselect All"))
+            .use_underline(true)
+            .build();
+        for (button, active) in [(&select_all, true), (&deselect_all, false)] {
+            let checks = Rc::clone(&checks);
+            button.connect_clicked(move |_| {
+                for (_, check) in checks.iter() {
+                    check.set_active(active);
+                }
+            });
+        }
+        let buttons = gtk::Box::builder()
+            .spacing(6)
+            .halign(gtk::Align::End)
+            .margin_top(12)
+            .build();
+        buttons.append(&select_all);
+        buttons.append(&deselect_all);
         let replace = adw::SwitchRow::builder()
             .title(tr("Replace Duplicates"))
             .subtitle(tr("Styles with the same names take the imported ones"))
@@ -1044,13 +1079,24 @@ impl DocumentWindow {
             .orientation(gtk::Orientation::Vertical)
             .build();
         content.append(&scrolled);
+        content.append(&buttons);
         content.append(&options);
         dialog.set_extra_child(Some(&content));
         dialog.add_response("cancel", &tr("_Cancel"));
         dialog.add_response("import", &tr("_Import"));
         dialog.set_response_appearance("import", adw::ResponseAppearance::Suggested);
+        dialog.set_response_enabled("import", false);
         dialog.set_default_response(Some("import"));
         dialog.set_close_response("cancel");
+        for (_, check) in checks.iter() {
+            let (dialog, checks) = (dialog.downgrade(), Rc::downgrade(&checks));
+            check.connect_toggled(move |_| {
+                if let (Some(dialog), Some(checks)) = (dialog.upgrade(), checks.upgrade()) {
+                    let any = checks.iter().any(|(_, c)| c.is_active());
+                    dialog.set_response_enabled("import", any);
+                }
+            });
+        }
         let weak = Rc::downgrade(self);
         dialog.connect_response(None, move |_, response| {
             let (Some(this), "import") = (weak.upgrade(), response) else {
@@ -1549,6 +1595,9 @@ impl DocumentWindow {
             if let Some(editor) = this.editor() {
                 editor.set_show_layout(on);
             }
+            // As in Pages, Show Layout shows the rulers too, and Hide
+            // Layout hides them.
+            this.window.change_action_state("ruler", &on.to_variant());
         });
         self.window.add_action(&layout);
 
@@ -1689,18 +1738,29 @@ impl DocumentWindow {
             }
         });
 
-        let copy_style = gio::SimpleAction::new("copy-style", None);
-        let weak = Rc::downgrade(self);
-        copy_style.connect_activate(move |_, _| {
-            if let Some(copied) = weak
-                .upgrade()
-                .and_then(|this| this.editor())
-                .and_then(|editor| editor.copy_style())
-            {
-                COPIED_STYLE.with(|c| *c.borrow_mut() = Some(copied));
-            }
-        });
-        self.window.add_action(&copy_style);
+        // Pages copies the style of the paragraph and that of the
+        // characters apart, and pastes only what was copied (STY-08).
+        for (name, parts) in [
+            ("copy-paragraph-style", desk_model::StyleParts::Paragraph),
+            ("copy-character-style", desk_model::StyleParts::Character),
+        ] {
+            let copy_style = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            copy_style.connect_activate(move |_, _| {
+                if let Some(copied) = weak
+                    .upgrade()
+                    .and_then(|this| this.editor())
+                    .and_then(|editor| editor.copy_style())
+                {
+                    COPIED_STYLE.with(|c| *c.borrow_mut() = Some(copied.only(parts)));
+                    let windows = WINDOWS.with(|w| w.borrow().clone());
+                    for window in windows {
+                        window.refresh();
+                    }
+                }
+            });
+            self.window.add_action(&copy_style);
+        }
         let paste_style = gio::SimpleAction::new("paste-style", None);
         let weak = Rc::downgrade(self);
         paste_style.connect_activate(move |_, _| {
@@ -2192,7 +2252,14 @@ impl DocumentWindow {
         format.append(Some(&tr("_Underline")), Some("win.underline"));
         menu.append_section(None, &format);
         let style = gio::Menu::new();
-        style.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
+        style.append(
+            Some(&tr("Copy _Paragraph Style")),
+            Some("win.copy-paragraph-style"),
+        );
+        style.append(
+            Some(&tr("Copy C_haracter Style")),
+            Some("win.copy-character-style"),
+        );
         style.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
         menu.append_section(None, &style);
         let tools = gio::Menu::new();
@@ -2461,7 +2528,14 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         );
         menu.append_section(None, &find);
         let styles = gio::Menu::new();
-        styles.append(Some(&tr("Copy St_yle")), Some("win.copy-style"));
+        styles.append(
+            Some(&tr("Copy _Paragraph Style")),
+            Some("win.copy-paragraph-style"),
+        );
+        styles.append(
+            Some(&tr("Copy C_haracter Style")),
+            Some("win.copy-character-style"),
+        );
         styles.append(Some(&tr("Paste Sty_le")), Some("win.paste-style"));
         styles.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
         menu.append_section(None, &styles);

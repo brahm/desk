@@ -701,9 +701,10 @@ def objects_on_the_page(work):
         files = {name: package.read(name) for name in package.namelist()}
     # A large rectangle in the middle of the page, under the middle of the
     # window.
-    files["content.xml"] = files["content.xml"].replace(
+    files["content.xml"] = with_filled_style(files["content.xml"]).replace(
         b"<office:text>",
-        b'<office:text><draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+        b'<office:text><draw:rect draw:style-name="Filled" text:anchor-type="page" '
+        b'text:anchor-page-number="1" '
         b'svg:x="96pt" svg:y="120pt" svg:width="600pt" svg:height="400pt"/>',
         1,
     )
@@ -842,9 +843,10 @@ def text_in_a_shape(work):
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
     with zipfile.ZipFile(letter) as package:
         files = {name: package.read(name) for name in package.namelist()}
-    files["content.xml"] = files["content.xml"].replace(
+    files["content.xml"] = with_filled_style(files["content.xml"]).replace(
         b"<office:text>",
-        b'<office:text><draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+        b'<office:text><draw:rect draw:style-name="Filled" text:anchor-type="page" '
+        b'text:anchor-page-number="1" '
         b'svg:x="96pt" svg:y="120pt" svg:width="600pt" svg:height="400pt"/>',
         1,
     )
@@ -899,9 +901,27 @@ def text_in_a_shape(work):
 
 
 SHAPE = (
-    b'<draw:rect text:anchor-type="page" text:anchor-page-number="1" '
+    b'<draw:rect draw:style-name="Filled" text:anchor-type="page" text:anchor-page-number="1" '
     b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt"/>'
 )
+
+# The blue that shapes are inserted with. A shape with no fill is selected
+# only on its outline, as in Pages (OBJ-21).
+FILLED = (
+    b'<style:style style:name="Filled" style:family="graphic">'
+    b'<style:graphic-properties draw:fill="solid" draw:fill-color="#6c9fd8"/></style:style>'
+)
+
+
+def with_filled_style(content):
+    """The content of a document with the style of filled shapes."""
+    if b"<office:automatic-styles/>" in content:
+        return content.replace(
+            b"<office:automatic-styles/>",
+            b"<office:automatic-styles>" + FILLED + b"</office:automatic-styles>",
+            1,
+        )
+    return content.replace(b"<office:automatic-styles>", b"<office:automatic-styles>" + FILLED, 1)
 
 
 def png(width, height, rgb):
@@ -930,7 +950,7 @@ def open_with_a_shape(work, name, shape=SHAPE, extra=None):
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
     with zipfile.ZipFile(letter) as package:
         files = {n: package.read(n) for n in package.namelist()}
-    files["content.xml"] = files["content.xml"].replace(
+    files["content.xml"] = with_filled_style(files["content.xml"]).replace(
         b"<office:text>", b"<office:text>" + shape, 1
     )
     files.update(extra or {})
@@ -1374,7 +1394,8 @@ def points_of_a_star(work):
     """The Shape group of the Inspector sets the points of a selected
     star, which are saved with it (OBJ-11)."""
     star = (
-        b'<draw:custom-shape text:anchor-type="page" text:anchor-page-number="1" '
+        b'<draw:custom-shape draw:style-name="Filled" text:anchor-type="page" '
+        b'text:anchor-page-number="1" '
         b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
         b'<draw:enhanced-geometry draw:type="star5"/></draw:custom-shape>'
     )
@@ -1484,7 +1505,8 @@ def connection_line(work):
     """A connection line follows the shape it joins when the shape moves,
     and is saved joined to it (OBJ-31)."""
     joined = SHAPE.replace(b"<draw:rect ", b'<draw:rect draw:id="a" ', 1) + (
-        b'<draw:rect draw:id="b" text:anchor-type="page" text:anchor-page-number="1" '
+        b'<draw:rect draw:id="b" draw:style-name="Filled" text:anchor-type="page" '
+        b'text:anchor-page-number="1" '
         b'svg:x="450pt" svg:y="250pt" svg:width="100pt" svg:height="100pt"/>'
         b'<draw:connector text:anchor-type="page" text:anchor-page-number="1" '
         b'draw:start-shape="a" draw:end-shape="b" '
@@ -1897,7 +1919,9 @@ def guide_from_the_ruler(work):
             time.sleep(0.05)
         subprocess.run(["xdotool", "mouseup", "1"], check=True)
         time.sleep(0.5)
+        # Hide Layout hides the rulers too, as in Pages (INT-09).
         activate("show-layout")
+        wait_for("the ruler hidden with the layout", lambda: showing_named(app, "Ruler") is None)
         press("ctrl+s")
         wait_for(
             "the guide saved in the settings",

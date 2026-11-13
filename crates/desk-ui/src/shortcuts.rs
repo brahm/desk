@@ -83,7 +83,8 @@ const SECTIONS: &[Section] = &[
             ("F9", n_("Page Thumbnails")),
             ("<Control>t", n_("Show fonts")),
             ("<Control><Shift>t", n_("Show the Styles drawer")),
-            ("<Control><Alt>c", n_("Copy style")),
+            ("<Control><Alt>c", n_("Copy paragraph style")),
+            ("<Control><Shift><Alt>c", n_("Copy character style")),
             ("<Control><Alt>v", n_("Paste style")),
             ("F1 F2 F3 F4 F5 F6 F7 F8", n_("Apply the style of the key")),
             (
