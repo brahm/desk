@@ -2341,18 +2341,24 @@ mod tests {
         let (front, back) = editor
             .edit("Add", |e| {
                 e.insert_text(start, "Some text at the top of the page.")?;
+                // Filled, as shapes are inserted: an unfilled one is
+                // found only on its outline.
+                let fill = Some(Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8)));
                 let front = e.new_id();
-                e.add_object(Object::new(
+                let mut ellipse = Object::new(
                     front,
                     Shape::Ellipse.into(),
                     Frame::from_pt(300.0, 400.0, 100.0, 50.0),
-                ))?;
+                );
+                ellipse.style.fill = fill.clone();
+                e.add_object(ellipse)?;
                 let back = e.new_id();
                 let mut behind = Object::new(
                     back,
                     Shape::Rectangle.into(),
                     Frame::from_pt(0.0, 0.0, 600.0, 800.0),
                 );
+                behind.style.fill = fill;
                 behind.wrap = Wrap::Behind;
                 e.insert_object(0, behind)?;
                 Ok((front, back))
