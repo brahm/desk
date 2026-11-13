@@ -80,8 +80,8 @@ pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
 pub use connection::{Connection, bend_through, bent_controls, bent_middle, connect, flattened};
 pub use document::{
-    Container, Document, FixedGuide, Metadata, PageSetup, PagedFlow, ParagraphSpacing, Statistics,
-    TextSettings, ViewSettings, ViewZoom,
+    Container, Document, FixedGuide, Metadata, OutlineOptions, PageSetup, PagedFlow,
+    ParagraphSpacing, Statistics, TextSettings, ViewSettings, ViewZoom,
 };
 pub use error::ModelError;
 pub use find::{Found, Query};

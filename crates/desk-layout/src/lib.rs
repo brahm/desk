@@ -24,9 +24,11 @@
 
 mod notes;
 mod objects;
+mod outline;
 mod pages;
 
 pub use objects::{PlacedObject, flow_text_boxes, object_at, place_object_text, text_box_lines};
+pub use outline::{outline_document, paginate_outline, paginate_view};
 
 pub use pages::{
     DocumentLayout, NOTE_RULE_LENGTH, NOTE_RULE_WIDTH, Page, PlacedBlock, PlacedLine, margin_lines,

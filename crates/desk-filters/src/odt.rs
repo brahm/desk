@@ -2445,6 +2445,14 @@ fn view_settings(view: &odf::ViewSettings) -> Option<desk_model::ViewSettings> {
         zoom,
         two_pages: view.columns.is_some_and(|c| c >= 2),
         outline: view.outline.unwrap_or(false),
+        outline_options: desk_model::OutlineOptions {
+            levels: view
+                .outline_levels
+                .and_then(|l| u8::try_from(l).ok())
+                .filter(|l| (1..=desk_model::MAX_OUTLINE_LEVEL).contains(l)),
+            first_line: view.outline_first_line.unwrap_or(false),
+            thumbnails: view.outline_thumbnails.unwrap_or(false),
+        },
     })
 }
 
@@ -2459,6 +2467,9 @@ fn odf_view(view: desk_model::ViewSettings) -> odf::ViewSettings {
         zoom_factor: Some(factor),
         columns: Some(if view.two_pages { 2 } else { 1 }),
         outline: Some(view.outline),
+        outline_levels: view.outline_options.levels.map(i16::from),
+        outline_first_line: Some(view.outline_options.first_line),
+        outline_thumbnails: Some(view.outline_options.thumbnails),
     }
 }
 

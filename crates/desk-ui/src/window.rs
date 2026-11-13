@@ -606,6 +606,7 @@ impl DocumentWindow {
             zoom,
             two_pages: self.view.columns() == 2,
             outline: self.action_state("outline"),
+            outline_options: self.outline.options(),
         }
     }
 
@@ -620,6 +621,7 @@ impl DocumentWindow {
             desk_model::ViewZoom::FitPage => self.view.set_fit(Some(geometry::Fit::Page)),
             desk_model::ViewZoom::Percent(p) => self.view.set_zoom(f64::from(p) / 100.0),
         }
+        self.outline.set_options(view.outline_options);
         if let Some(action) = self.window.lookup_action("outline") {
             action.change_state(&view.outline.to_variant());
         }

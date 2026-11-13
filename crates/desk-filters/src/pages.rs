@@ -1680,6 +1680,24 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
             ..TextSettings::default()
         },
     })?;
+    // A document saved in outline view opens in it, and prints as it
+    // (TXT-14, DOC-16).
+    let outliner = source.outliner;
+    if outliner.shown {
+        document.set_view(Some(desk_model::ViewSettings {
+            zoom: desk_model::ViewZoom::Percent(100),
+            two_pages: false,
+            outline: true,
+            outline_options: desk_model::OutlineOptions {
+                levels: outliner
+                    .filter_level
+                    .and_then(|l| u8::try_from(l + 1).ok())
+                    .filter(|l| *l <= desk_model::MAX_OUTLINE_LEVEL),
+                first_line: outliner.lines.is_some(),
+                thumbnails: outliner.thumbnails,
+            },
+        }));
+    }
     let meta = &source.metadata;
     document.apply(Op::SetMetadata {
         metadata: Metadata {

@@ -524,6 +524,9 @@ fn full_document() -> TextDocument {
             zoom_factor: Some(100),
             columns: Some(2),
             outline: Some(true),
+            outline_levels: Some(3),
+            outline_first_line: Some(true),
+            outline_thumbnails: Some(false),
         },
         ..Default::default()
     }

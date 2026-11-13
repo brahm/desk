@@ -246,6 +246,9 @@ pub struct PagesDocument {
     /// Whether the text uses ligatures (Document Inspector, "Use
     /// ligatures"), true when the document does not say.
     pub use_ligatures: bool,
+    /// Whether the document was saved in outline view, and what the
+    /// outline showed (TXT-14, DOC-16).
+    pub outliner: Outliner,
     /// The floating objects, of the pages and of the masters of the
     /// sections, in the order they are saved.
     pub drawables: Vec<Drawable>,
@@ -332,6 +335,41 @@ fn publication_number(root: &Element, name: &str) -> Option<f64> {
         .and_then(|n| n.trim().parse().ok())
 }
 
+/// The outline view of a document as it was saved (TXT-14, DOC-16).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Outliner {
+    /// Whether the document shows as an outline
+    /// (`kSFWPShowOutlinerProperty`).
+    pub shown: bool,
+    /// The deepest level of topics that shows, counted from 0, without
+    /// the text under them; none for all of them and their text
+    /// (`kSFWPOutlineFilterLevelProperty`, 2147483647 for All).
+    pub filter_level: Option<u32>,
+    /// How many lines of each paragraph show; none for all of them
+    /// (`kSFWPNLinesOutlinerProperty`).
+    pub lines: Option<u32>,
+    /// Whether objects show in miniature
+    /// (`kSFWPOutlinerThumbnailAttachmentsProperty`).
+    pub thumbnails: bool,
+}
+
+/// The outline view of a document, from its publication info.
+fn outliner(root: &Element) -> Outliner {
+    // Pages says "all" with the largest 32-bit number.
+    let limited = |name: &str| {
+        publication_number(root, name)
+            .filter(|n| *n >= 0.0 && *n < f64::from(i32::MAX))
+            .map(|n| n as u32)
+    };
+    Outliner {
+        shown: publication_flag(root, "kSFWPShowOutlinerProperty").unwrap_or(false),
+        filter_level: limited("kSFWPOutlineFilterLevelProperty"),
+        lines: limited("kSFWPNLinesOutlinerProperty"),
+        thumbnails: publication_flag(root, "kSFWPOutlinerThumbnailAttachmentsProperty")
+            .unwrap_or(false),
+    }
+}
+
 /// Reads a Pages document from the text of its index.
 pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
     let root = xml::parse(index)?;
@@ -364,6 +402,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             .unwrap_or_default(),
         auto_hyphenation: publication_flag(&root, "kSFWPAutoHyphenationProperty").unwrap_or(false),
         use_ligatures: publication_flag(&root, "kSFWPUseLigaturesProperty").unwrap_or(true),
+        outliner: outliner(&root),
         note_properties: NoteProperties {
             kind: publication_number(&root, "kSFWPFootnoteKindProperty").unwrap_or(0.0) as u8,
             format: publication_number(&root, "kSFWPFootnoteFormatProperty").unwrap_or(0.0) as u8,

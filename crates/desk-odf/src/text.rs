@@ -237,6 +237,15 @@ pub struct ViewSettings {
     pub columns: Option<i16>,
     /// `DeskOutlineView`: whether Desk shows the document as an outline.
     pub outline: Option<bool>,
+    /// `DeskOutlineLevels`: how many levels of topics the outline shows,
+    /// without the text under them.
+    pub outline_levels: Option<i16>,
+    /// `DeskOutlineFirstLine`: whether the outline shows only the first
+    /// line of each paragraph.
+    pub outline_first_line: Option<bool>,
+    /// `DeskOutlineThumbnails`: whether the outline shows objects in
+    /// miniature.
+    pub outline_thumbnails: Option<bool>,
 }
 
 impl ViewSettings {

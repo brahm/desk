@@ -212,9 +212,18 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if view.columns.is_some() {
             config_item(&mut w, "ViewLayoutBookMode", "boolean", "false");
         }
-        if let Some(outline) = view.outline {
-            let value = if outline { "true" } else { "false" };
-            config_item(&mut w, "DeskOutlineView", "boolean", value);
+        for (name, value) in [
+            ("DeskOutlineView", view.outline),
+            ("DeskOutlineFirstLine", view.outline_first_line),
+            ("DeskOutlineThumbnails", view.outline_thumbnails),
+        ] {
+            if let Some(value) = value {
+                let value = if value { "true" } else { "false" };
+                config_item(&mut w, name, "boolean", value);
+            }
+        }
+        if let Some(levels) = view.outline_levels {
+            config_item(&mut w, "DeskOutlineLevels", "short", &levels.to_string());
         }
         w.end().end().end();
     }

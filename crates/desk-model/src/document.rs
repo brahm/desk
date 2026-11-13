@@ -51,6 +51,21 @@ pub struct ViewSettings {
     pub two_pages: bool,
     /// Whether it shows as an outline (TXT-14).
     pub outline: bool,
+    /// What the outline shows, which is also what prints while the
+    /// document shows as an outline (TXT-14).
+    pub outline_options: OutlineOptions,
+}
+
+/// What the outline of a document shows (TXT-14).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OutlineOptions {
+    /// How many levels of topics show, from 1 to 9, without the text
+    /// under them; none for every topic and its text.
+    pub levels: Option<u8>,
+    /// Whether each paragraph shows only its first line.
+    pub first_line: bool,
+    /// Whether pictures and other objects show in miniature.
+    pub thumbnails: bool,
 }
 
 /// Settings of the text of the whole document: whether words are

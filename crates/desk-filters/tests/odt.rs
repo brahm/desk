@@ -1682,16 +1682,25 @@ fn int_08_doc_16_the_view_is_kept_in_the_settings() {
             zoom: desk_model::ViewZoom::Percent(150),
             two_pages: true,
             outline: false,
+            outline_options: desk_model::OutlineOptions::default(),
         },
         desk_model::ViewSettings {
             zoom: desk_model::ViewZoom::FitWidth,
             two_pages: false,
             outline: true,
+            // What the outline shows, which is also what it prints
+            // (TXT-14).
+            outline_options: desk_model::OutlineOptions {
+                levels: Some(2),
+                first_line: true,
+                thumbnails: true,
+            },
         },
         desk_model::ViewSettings {
             zoom: desk_model::ViewZoom::FitPage,
             two_pages: false,
             outline: false,
+            outline_options: desk_model::OutlineOptions::default(),
         },
     ] {
         document.set_view(Some(view));
