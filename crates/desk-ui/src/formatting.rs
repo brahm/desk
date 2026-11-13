@@ -83,6 +83,9 @@ pub struct FormatBar {
     font: gtk::Button,
     size: gtk::SpinButton,
     color: gtk::ColorDialogButton,
+    /// What a narrow window leaves out: the alignments and the columns,
+    /// which the Inspector and the Format menu also have.
+    secondary: [gtk::Widget; 2],
     /// Set while the bar shows the formatting at the selection, so that
     /// showing it does not change it.
     updating: Cell<bool>,
@@ -216,10 +219,18 @@ impl FormatBar {
             font,
             size,
             color,
+            secondary: [alignments.upcast(), columns.upcast()],
             updating: Cell::new(false),
         });
         this.connect(editor);
         this
+    }
+
+    /// Leaves out the secondary controls, on a narrow window.
+    pub fn set_compact(&self, compact: bool) {
+        for widget in &self.secondary {
+            widget.set_visible(!compact);
+        }
     }
 
     /// The font button, where the Fonts popover opens.

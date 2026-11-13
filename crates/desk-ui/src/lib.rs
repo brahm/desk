@@ -321,13 +321,14 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         load_css();
         add_actions(app, info, opener);
         app.set_accels_for_action("app.quit", &["<Control>q"]);
-        app.set_accels_for_action("app.new-window", &["<Control>n"]);
+        app.set_accels_for_action("app.new-window", &["<Control><Shift>n"]);
         app.set_accels_for_action("app.preferences", &["<Control>comma"]);
         app.set_accels_for_action("win.ruler", &["<Control>r"]);
         app.set_accels_for_action("window.close", &["<Control>w"]);
         app.set_accels_for_action("app.close-all", &["<Control><Alt>w"]);
         if opener.is_some() {
             app.set_accels_for_action("app.open", &["<Control>o"]);
+            app.set_accels_for_action("app.new-document", &["<Control>n"]);
             app.set_accels_for_action("win.save", &["<Control>s"]);
             app.set_accels_for_action("win.save-as", &["<Control><Shift>s"]);
             app.set_accels_for_action("win.duplicate", &["<Control><Shift>d"]);
@@ -417,7 +418,13 @@ fn load_css() {
          .desk-compact-group { padding-top: 3px; padding-bottom: 3px; }\n\
          .desk-compact-row { min-height: 30px; }\n\
          .desk-compact-row spinbutton, .desk-compact-row dropdown > button, \
-         .desk-compact-row entry { min-height: 26px; }",
+         .desk-compact-row entry { min-height: 26px; }\n\
+         .desk-template { padding: 9px; }\n\
+         .desk-template-page { background-color: white; border-radius: 3px; \
+         box-shadow: 0 1px 3px 1px color-mix(in srgb, black 20%, transparent); }\n\
+         .desk-template-layout { background-image: linear-gradient(to bottom, \
+         transparent 18px, color-mix(in srgb, var(--accent-bg-color) 25%, transparent) 18px, \
+         color-mix(in srgb, var(--accent-bg-color) 25%, transparent) 80px, transparent 80px); }",
     );
     gtk::style_context_add_provider_for_display(
         &display,
@@ -476,6 +483,19 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
             DocumentWindow::new(app, info, opener).window().present();
         })
         .build();
+    // Ctrl+N starts a document from the Blank template at once; a new
+    // window shows the template gallery (INT-01).
+    let new_document = gio::ActionEntry::builder("new-document")
+        .activate(move |app: &adw::Application, _, _| {
+            let window = DocumentWindow::new(app, info, opener);
+            gio::prelude::ActionGroupExt::activate_action(
+                window.window(),
+                "new-from-template",
+                Some(&"blank".to_variant()),
+            );
+            window.window().present();
+        })
+        .build();
     let preferences = gio::ActionEntry::builder("preferences")
         .activate(move |app: &adw::Application, _, _| {
             if let Some(window) = app.active_window() {
@@ -483,7 +503,14 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
             }
         })
         .build();
-    app.add_action_entries([about, quit, close_windows, new_window, preferences]);
+    app.add_action_entries([
+        about,
+        quit,
+        close_windows,
+        new_window,
+        new_document,
+        preferences,
+    ]);
     if let Some(opener) = opener {
         let open = gio::ActionEntry::builder("open")
             .activate(move |app: &adw::Application, _, _| show_open_dialog(app, info, opener))

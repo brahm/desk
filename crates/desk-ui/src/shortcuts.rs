@@ -26,7 +26,8 @@ const SECTIONS: &[Section] = &[
         n_("Windows"),
         false,
         &[
-            ("<Control>n", n_("New window")),
+            ("<Control>n", n_("New document")),
+            ("<Control><Shift>n", n_("New window")),
             ("<Control>w", n_("Close the window")),
             ("<Control><Alt>w", n_("Close all windows")),
             ("<Control>q", n_("Quit")),

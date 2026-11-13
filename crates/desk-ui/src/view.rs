@@ -888,8 +888,8 @@ fn draw_marks(
     cr.stroke().ok();
 }
 
-/// What a drag of objects tells, in a dark box below and right of the
-/// pointer, as Pages shows it (OBJ-23).
+/// What a drag of objects tells, below and right of the pointer, as Pages
+/// shows it (OBJ-23), in the rounded dark box of Adwaita tooltips.
 fn draw_drag_label(
     cr: &gtk::cairo::Context,
     state: &State,
@@ -908,22 +908,28 @@ fn draw_drag_label(
     );
     cr.set_font_size(11.0);
     let (x, y) = (
-        rect.x + label.at.0 * scale + 14.0,
-        rect.y + label.at.1 * scale + 18.0,
+        (rect.x + label.at.0 * scale + 14.0).round(),
+        (rect.y + label.at.1 * scale + 18.0).round(),
     );
-    const PAD: f64 = 4.0;
+    const PAD_X: f64 = 10.0;
+    const PAD_Y: f64 = 6.0;
+    const RADIUS: f64 = 6.0;
     if let Ok(extents) = cr.text_extents(&label.text) {
-        let (w, h) = (extents.x_advance(), 11.0);
-        cr.rectangle(
-            x.round(),
-            y.round(),
-            (w + 2.0 * PAD).round(),
-            (h + 2.0 * PAD).round(),
+        let (w, h) = (
+            (extents.x_advance() + 2.0 * PAD_X).round(),
+            (11.0 + 2.0 * PAD_Y).round(),
         );
-        cr.set_source_rgba(0.1, 0.1, 0.1, 0.85);
+        let quarter = std::f64::consts::FRAC_PI_2;
+        cr.new_sub_path();
+        cr.arc(x + w - RADIUS, y + RADIUS, RADIUS, -quarter, 0.0);
+        cr.arc(x + w - RADIUS, y + h - RADIUS, RADIUS, 0.0, quarter);
+        cr.arc(x + RADIUS, y + h - RADIUS, RADIUS, quarter, 2.0 * quarter);
+        cr.arc(x + RADIUS, y + RADIUS, RADIUS, 2.0 * quarter, 3.0 * quarter);
+        cr.close_path();
+        cr.set_source_rgba(0.0, 0.0, 0.0, 0.8);
         cr.fill().ok();
         cr.set_source_rgb(1.0, 1.0, 1.0);
-        cr.move_to(x.round() + PAD, y.round() + PAD + h - 2.0);
+        cr.move_to(x + PAD_X, y + PAD_Y + 11.0 - 2.0);
         cr.show_text(&label.text).ok();
     }
     cr.restore().ok();

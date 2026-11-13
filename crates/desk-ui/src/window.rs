@@ -18,7 +18,7 @@ use crate::find::{self, FindWindow, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
-use crate::i18n::{tr, trn};
+use crate::i18n::{n_, tr, trn};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
 use crate::spelling::MistakeKind;
@@ -52,7 +52,8 @@ pub struct DocumentWindow {
     view: DocumentView,
     zoom_button: gtk::MenuButton,
     counts_label: gtk::Label,
-    warnings_button: gtk::Button,
+    /// Says that the document has warnings, with a button to see them.
+    warnings_banner: adw::Banner,
     /// The file of the document; none for an untitled one.
     path: RefCell<Option<PathBuf>>,
     /// The name of the document, which is its file's unless untitled.
@@ -265,31 +266,25 @@ impl DocumentWindow {
             .build();
         formatting::labelled(&backdrop, &tr("Background"));
         header.pack_end(&backdrop);
-        let warnings_button = gtk::Button::builder()
-            .icon_name("dialog-warning-symbolic")
-            .tooltip_text(tr("Document Warnings"))
+        let warnings_banner = adw::Banner::builder()
+            .title(tr("Some of the document might not show as it was made"))
+            .button_label(tr("_See Warnings"))
             .action_name("win.warnings")
-            .visible(false)
             .build();
-        formatting::labelled(&warnings_button, &tr("Document Warnings"));
-        header.pack_end(&warnings_button);
 
         let status = adw::StatusPage::builder()
             .icon_name(info.id)
             .title(info.name)
             .build();
         if opener.is_some() {
+            // The template gallery, as the window shows when it has no
+            // document (INT-01, INT-03).
+            status.set_icon_name(None);
+            status.set_title(&tr("Choose a Template"));
             status.set_description(Some(&tr(
-                "Open an OpenDocument text or a Pages document to edit it.",
+                "Start a new document, or open an OpenDocument text or a Pages document.",
             )));
-            let open = gtk::Button::builder()
-                .label(tr("_Open a Document…"))
-                .use_underline(true)
-                .action_name("app.open")
-                .halign(gtk::Align::Center)
-                .css_classes(["pill", "suggested-action"])
-                .build();
-            status.set_child(Some(&open));
+            status.set_child(Some(&template_gallery()));
         } else {
             status.set_description(Some(&tr(
                 "This app is at an early stage of development and cannot open documents yet.",
@@ -387,8 +382,14 @@ impl DocumentWindow {
         // The document as an outline (TXT-14).
         let outline = crate::outline_view::OutlineView::new(editor_of());
         stack.add_named(outline.widget(), Some("outline"));
-        let format_revealer = gtk::Revealer::builder()
+        // The format bar scrolls when the window is narrower than it.
+        let format_scroller = gtk::ScrolledWindow::builder()
             .child(format_bar.widget())
+            .vscrollbar_policy(gtk::PolicyType::Never)
+            .propagate_natural_height(true)
+            .build();
+        let format_revealer = gtk::Revealer::builder()
+            .child(&format_scroller)
             .reveal_child(false)
             .build();
         // The page thumbnails, beside the pages (INT-19, EST-17).
@@ -425,6 +426,7 @@ impl DocumentWindow {
 
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
+        toolbar_view.add_top_bar(&warnings_banner);
         toolbar_view.add_top_bar(&format_revealer);
         let find = FindWindow::new(editor_of(), search.clone());
         toolbar_view.add_top_bar(find.widget());
@@ -439,6 +441,40 @@ impl DocumentWindow {
             .content(&toolbar_view)
             .build();
 
+        // On a narrow window the sidebars cover the pages instead of
+        // pushing them, and the format bar keeps what matters most.
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            860.0,
+            adw::LengthUnit::Sp,
+        ));
+        for split in [&thumbnails_split, &search_split, &split, &drawer_split] {
+            narrow.add_setter(split, "collapsed", Some(&true.to_value()));
+        }
+        {
+            let bar = format_bar.clone();
+            narrow.connect_apply(move |_| bar.set_compact(true));
+            let bar = format_bar.clone();
+            narrow.connect_unapply(move |_| bar.set_compact(false));
+        }
+        window.add_breakpoint(narrow);
+        // One sidebar a side when they cover the pages.
+        for (a, b) in [(&thumbnails_split, &drawer_split), (&search_split, &split)] {
+            for (one, other) in [(a, b), (b, a)] {
+                let other = other.downgrade();
+                one.connect_show_sidebar_notify(move |one| {
+                    if let Some(other) = other.upgrade()
+                        && one.is_collapsed()
+                        && one.shows_sidebar()
+                    {
+                        other.set_show_sidebar(false);
+                    }
+                });
+            }
+        }
+        window.set_width_request(360);
+        window.set_height_request(294);
+
         let this = Rc::new(Self {
             window,
             info,
@@ -450,7 +486,7 @@ impl DocumentWindow {
             view,
             zoom_button,
             counts_label,
-            warnings_button,
+            warnings_banner,
             path: RefCell::new(None),
             name: RefCell::new(String::new()),
             warnings: RefCell::new(Vec::new()),
@@ -639,7 +675,8 @@ impl DocumentWindow {
                 *self.path.borrow_mut() = Some(path.to_owned());
                 *self.name.borrow_mut() = display_name(path);
                 self.show_document(shown.document);
-                self.warnings_button.set_visible(!shown.warnings.is_empty());
+                self.warnings_banner
+                    .set_revealed(!shown.warnings.is_empty());
                 *self.warnings.borrow_mut() = shown.warnings;
                 remember_recent(path);
                 if shown.lossy {
@@ -879,8 +916,8 @@ impl DocumentWindow {
             this.warnings
                 .borrow_mut()
                 .retain(|w| w.font.as_deref() != Some(from));
-            this.warnings_button
-                .set_visible(!this.warnings.borrow().is_empty());
+            this.warnings_banner
+                .set_revealed(!this.warnings.borrow().is_empty());
             true
         };
         crate::warnings::show(
@@ -1487,6 +1524,15 @@ impl DocumentWindow {
                 this.window.close();
             }),
         ];
+        let template = gio::SimpleAction::new("new-from-template", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        template.connect_activate(move |_, target| {
+            let (Some(this), Some(target)) = (weak.upgrade(), target.and_then(|t| t.str())) else {
+                return;
+            };
+            this.load_untitled(from_template(target), tr("Untitled"));
+        });
+        self.window.add_action(&template);
         for (name, run) in simple {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
@@ -2653,6 +2699,9 @@ fn function_key(key: gdk::Key) -> Option<u8> {
 fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     let file = gio::Menu::new();
+    if opens {
+        file.append(Some(&tr("_New Document")), Some("app.new-document"));
+    }
     file.append(Some(&tr("_New Window")), Some("app.new-window"));
     if opens {
         file.append(Some(&tr("_Open…")), Some("app.open"));
@@ -2690,6 +2739,66 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
 /// (DOC-14).
 fn copy_name(name: &str) -> String {
     tr("{name} copy").replace("{name}", name)
+}
+
+/// The templates of the gallery: their action targets and names.
+const TEMPLATES: [(&str, &str); 2] = [("blank", n_("Blank")), ("layout", n_("Blank Layout"))];
+
+/// The template gallery of an empty window: a card for each template,
+/// and Open.
+fn template_gallery() -> gtk::Box {
+    let cards = gtk::Box::builder()
+        .spacing(18)
+        .homogeneous(true)
+        .halign(gtk::Align::Center)
+        .build();
+    for (target, name) in TEMPLATES {
+        let page = gtk::Box::builder()
+            .width_request(120)
+            .height_request(170)
+            .css_classes(["desk-template-page"])
+            .build();
+        if target == "layout" {
+            page.add_css_class("desk-template-layout");
+        }
+        let label = gtk::Label::new(Some(&tr(name)));
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(9)
+            .build();
+        content.append(&page);
+        content.append(&label);
+        let button = gtk::Button::builder()
+            .child(&content)
+            .action_name("win.new-from-template")
+            .action_target(&target.to_variant())
+            .css_classes(["flat", "desk-template"])
+            .build();
+        formatting::labelled(&button, &tr(name));
+        cards.append(&button);
+    }
+    let open = gtk::Button::builder()
+        .label(tr("_Open a Document…"))
+        .use_underline(true)
+        .action_name("app.open")
+        .halign(gtk::Align::Center)
+        .css_classes(["pill"])
+        .build();
+    let gallery = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(24)
+        .build();
+    gallery.append(&cards);
+    gallery.append(&open);
+    gallery
+}
+
+/// A new document from a template of the gallery.
+fn from_template(target: &str) -> Document {
+    match target {
+        "layout" => Document::new_page_layout(),
+        _ => Document::new_word_processing(),
+    }
 }
 
 /// The View menu of the header bar: what the window shows.
