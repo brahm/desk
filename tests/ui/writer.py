@@ -219,7 +219,8 @@ def main():
         press("Return")
         wait_for(
             "the item of the list in the accessibility tree",
-            lambda: text_of(document) == "US Letter, landscape ação\tx\nOne\n\n",
+            # Capitals are not fixed on a new install, as in Pages (TXT-07).
+            lambda: text_of(document) == "US Letter, landscape ação\tx\none\n\n",
         )
         check("a marker starts a list", True)
 
