@@ -839,3 +839,43 @@ fn iop_17_iop_25_text_pasted_where_styles_are_not_kept_keeps_its_look() {
     let format = document.styles().resolve_paragraph(p.style(), p.attrs());
     assert_eq!(format.alignment, Alignment::Center);
 }
+
+#[test]
+fn sty_05_a_style_deleted_for_free_form_leaves_the_text_as_it_looked() {
+    let (mut editor, heading) = editor();
+    let (a, b) = (at(&editor, 0, 4), at(&editor, 0, 7));
+    let slanted = editor
+        .edit("Setup", |edit| {
+            edit.set_paragraph_style(a, a, heading)?;
+            edit.new_character_style("Slanted", italic(), a, b, true)
+        })
+        .unwrap();
+    let before = (look(&editor, 0, 0), look(&editor, 0, 5));
+    let alignment = |editor: &Editor| {
+        let p = paragraph(editor, 0);
+        editor
+            .document()
+            .styles()
+            .resolve_paragraph(p.style(), p.attrs())
+            .alignment
+    };
+    assert_eq!(alignment(&editor), Alignment::Center);
+    editor
+        .edit("Delete Style", |edit| {
+            edit.free_form_style_uses(heading, &[])?;
+            edit.delete_style(heading, None)?;
+            edit.free_form_style_uses(slanted, &[])?;
+            edit.delete_style(slanted, None)
+        })
+        .unwrap();
+    let body = editor.document().styles().default_paragraph();
+    assert_eq!(paragraph(&editor, 0).style(), body);
+    assert!(paragraph(&editor, 0).runs().all(|r| r.style.is_none()));
+    // The text looks as it did: bold, 18 pt, centered, and the slanted
+    // words still italic.
+    assert_eq!((look(&editor, 0, 0), look(&editor, 0, 5)), before);
+    assert!(before.0.weight.is_bold() && !before.0.italic && before.1.italic);
+    assert_eq!(alignment(&editor), Alignment::Center);
+    // The other paragraph is as it was.
+    assert!(!look(&editor, 1, 0).weight.is_bold());
+}

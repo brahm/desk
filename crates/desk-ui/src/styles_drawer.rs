@@ -113,6 +113,16 @@ fn look(styles: &Styles, style: &Style) -> CharFormat {
     }
 }
 
+/// What takes the place of a style that is deleted or replaced.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Replacement {
+    /// No style: the text keeps its look as attributes of its own, the
+    /// "Free Form" of Pages (STY-05).
+    FreeForm,
+    /// Another style, or none for no character style.
+    Style(Option<StyleId>),
+}
+
 /// The styles of a family by name.
 pub fn sorted(styles: &Styles, family: StyleFamily) -> Vec<Style> {
     let mut list: Vec<Style> = styles
@@ -703,22 +713,33 @@ impl StylesDrawer {
             self.report(&tr("Cannot Delete the Style"), result);
             return;
         }
+        // As in Pages, the text can keep its look without a style ("Free
+        // Form"), which comes first and chosen.
         self.ask_replacement(
             editor,
             id,
             &tr("Delete “{name}”?").replace("{name}", style.name()),
-            &tr("The style is in use. Choose a style to replace it."),
-            ("_Delete", true),
+            &tr("The style you want to delete is used in the document. Choose a style to replace it."),
+            ("_Replace", true),
+            family != StyleFamily::List,
             move |this, editor, choice| {
                 let stories = editor.all_stories();
                 let result = editor.style_edit(&tr("Delete Style"), |edit, _, _| {
-                    let to = match family {
-                        StyleFamily::Paragraph => {
-                            choice.or(Some(edit.document().styles().default_paragraph()))
+                    let choice = match choice {
+                        Replacement::FreeForm => {
+                            edit.free_form_style_uses(id, &stories)?;
+                            None
                         }
-                        _ => choice,
+                        Replacement::Style(choice) => {
+                            let to = match family {
+                                StyleFamily::Paragraph => choice
+                                    .or(Some(edit.document().styles().default_paragraph())),
+                                _ => choice,
+                            };
+                            edit.replace_style_uses(id, to, &stories)?;
+                            choice
+                        }
                     };
-                    edit.replace_style_uses(id, to, &stories)?;
                     edit.delete_style(id, choice)
                 });
                 this.report(&tr("Cannot Delete the Style"), result);
@@ -738,7 +759,11 @@ impl StylesDrawer {
             &tr("Replace “{name}”?").replace("{name}", style.name()),
             &tr("All the text that uses the style, in text boxes and shapes too, takes the style chosen."),
             ("_Replace", false),
+            false,
             move |this, editor, choice| {
+                let Replacement::Style(choice) = choice else {
+                    return;
+                };
                 let stories = editor.all_stories();
                 let result = editor.style_edit(&tr("Replace Style"), |edit, _, _| {
                     edit.replace_style_uses(id, choice, &stories)
@@ -748,8 +773,10 @@ impl StylesDrawer {
         );
     }
 
-    /// Asks for a style of the family of another to take its place, and
-    /// then does `then` with it, or with none for no character style.
+    /// Asks for a style of the family of another to take its place, or
+    /// Free Form when `free_form` is true, and then does `then` with it,
+    /// or with none for no character style.
+    #[allow(clippy::too_many_arguments)]
     fn ask_replacement(
         self: &Rc<Self>,
         editor: &TextEditor,
@@ -757,28 +784,35 @@ impl StylesDrawer {
         heading: &str,
         body: &str,
         (verb, destructive): (&str, bool),
-        then: impl Fn(&Rc<Self>, &TextEditor, Option<StyleId>) + 'static,
+        free_form: bool,
+        then: impl Fn(&Rc<Self>, &TextEditor, Replacement) + 'static,
     ) {
         let styles = editor.styles();
         let Some(family) = styles.get(id).map(Style::family) else {
             return;
         };
-        let mut choices: Vec<Option<StyleId>> = Vec::new();
+        let mut choices: Vec<Replacement> = Vec::new();
         let mut names: Vec<String> = Vec::new();
+        if free_form {
+            choices.push(Replacement::FreeForm);
+            names.push(tr("Free Form"));
+        }
         if family == StyleFamily::Character {
-            choices.push(None);
+            choices.push(Replacement::Style(None));
             names.push(tr("None"));
         }
         for other in sorted(&styles, family) {
             if other.id() != id {
-                choices.push(Some(other.id()));
+                choices.push(Replacement::Style(Some(other.id())));
                 names.push(other.name().to_owned());
             }
         }
-        let start = if family == StyleFamily::Paragraph {
+        let start = if free_form {
+            0
+        } else if family == StyleFamily::Paragraph {
             choices
                 .iter()
-                .position(|c| *c == Some(styles.default_paragraph()))
+                .position(|c| *c == Replacement::Style(Some(styles.default_paragraph())))
                 .unwrap_or(0)
         } else {
             0
@@ -810,7 +844,7 @@ impl StylesDrawer {
             let choice = choices
                 .get(replacement.selected() as usize)
                 .copied()
-                .flatten();
+                .unwrap_or(Replacement::Style(None));
             then(&this, &editor, choice);
         });
         self.present(&dialog);
