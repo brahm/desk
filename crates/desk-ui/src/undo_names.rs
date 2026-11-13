@@ -77,10 +77,28 @@ fn shown(name: &str) -> Option<String> {
         .map(|known| tr(known))
 }
 
+/// A label of the form `format`, with the name of a change in place of
+/// `{action}`. In English the name keeps its capitals ("Undo Typing"); a
+/// translation follows the capitalization of GNOME in its language, with
+/// only the first word capitalized ("Desfazer digitação").
+fn label(format: &str, name: &str) -> String {
+    let translated = tr(format);
+    let name = if translated == format {
+        name.to_owned()
+    } else {
+        let mut chars = name.chars();
+        chars
+            .next()
+            .map(|first| first.to_lowercase().chain(chars).collect())
+            .unwrap_or_default()
+    };
+    translated.replace("{action}", &name)
+}
+
 /// The label of Undo for the change it takes back.
 pub fn undo_label(name: Option<&str>) -> String {
     match name.and_then(shown) {
-        Some(name) => tr("_Undo {action}").replace("{action}", &name),
+        Some(name) => label("_Undo {action}", &name),
         None => tr("_Undo"),
     }
 }
@@ -88,7 +106,7 @@ pub fn undo_label(name: Option<&str>) -> String {
 /// The label of Redo for the change it brings back.
 pub fn redo_label(name: Option<&str>) -> String {
     match name.and_then(shown) {
-        Some(name) => tr("_Redo {action}").replace("{action}", &name),
+        Some(name) => label("_Redo {action}", &name),
         None => tr("_Redo"),
     }
 }

@@ -1287,15 +1287,16 @@ impl DocumentWindow {
         if self.closing.get() || !self.needs_saving() {
             return glib::Propagation::Proceed;
         }
+        // The dialog of GNOME apps, rather than Don't Save of Pages.
         let dialog = adw::AlertDialog::new(
             Some(&tr("Save Changes?")),
             Some(
-                &tr("“{name}” has changes that are not saved. If you close it without saving, they are lost.")
+                &tr("“{name}” contains unsaved changes. Changes which are not saved will be permanently lost.")
                     .replace("{name}", &self.name.borrow()),
             ),
         );
         dialog.add_response("cancel", &tr("_Cancel"));
-        dialog.add_response("discard", &tr("_Don’t Save"));
+        dialog.add_response("discard", &tr("_Discard"));
         dialog.add_response("save", &tr("_Save"));
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
