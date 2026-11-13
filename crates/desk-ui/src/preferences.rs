@@ -164,6 +164,12 @@ pub struct Preferences {
     pub include_preview: bool,
     /// The color of the guides that a drag of objects snaps to (OBJ-27).
     pub guide_color: Rgba,
+    /// Whether a drag of objects snaps their middles to the middles of the
+    /// page and of other objects, with a guide (OBJ-27).
+    pub guides_at_center: bool,
+    /// Whether a drag of objects snaps their edges to the edges of the
+    /// page, its margins and other objects, with a guide (OBJ-27).
+    pub guides_at_edges: bool,
     /// Whether a drag of objects shows where they go, how big they get or
     /// how far they turn, next to the pointer (OBJ-23).
     pub show_size_and_position: bool,
@@ -173,9 +179,9 @@ pub struct Preferences {
 /// Pages, #2E88EB.
 pub const INVISIBLES_COLOR: Rgba = Rgba::rgb(46, 136, 235);
 
-/// The color of the alignment guides until it is changed: the yellow of
+/// The color of the alignment guides until it is changed: the blue of
 /// Pages.
-pub const GUIDE_COLOR: Rgba = Rgba::rgb(245, 194, 18);
+pub const GUIDE_COLOR: Rgba = Rgba::rgb(0, 0, 255);
 
 impl Default for Preferences {
     fn default() -> Self {
@@ -207,6 +213,9 @@ impl Default for Preferences {
             show_counts: true,
             include_preview: true,
             guide_color: GUIDE_COLOR,
+            // As in Pages: at the middles, and not at the edges.
+            guides_at_center: true,
+            guides_at_edges: false,
             show_size_and_position: true,
         }
     }
@@ -289,6 +298,8 @@ impl Preferences {
             out.guide_color = color;
         }
         out.show_size_and_position = editing("show-size-and-position", out.show_size_and_position);
+        out.guides_at_center = editing("guides-at-center", out.guides_at_center);
+        out.guides_at_edges = editing("guides-at-edges", out.guides_at_edges);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -335,6 +346,8 @@ impl Preferences {
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
         file.set_boolean(SAVING, "include-preview", self.include_preview);
         file.set_string(EDITING, "guide-color", &color_key(self.guide_color));
+        file.set_boolean(EDITING, "guides-at-center", self.guides_at_center);
+        file.set_boolean(EDITING, "guides-at-edges", self.guides_at_edges);
         file.set_boolean(
             EDITING,
             "show-size-and-position",
@@ -552,7 +565,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     ));
     correction.add(&switch(
         &tr("Fix Capitalization"),
-        &tr("Sentences start with a capital, and words with one capital"),
+        &tr("Sentences start with a capital"),
         current.autocorrect.capitalization,
         |p, on| p.autocorrect.capitalization = on,
     ));
@@ -624,6 +637,18 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     guides.add_suffix(&guide_button);
     guides.set_activatable_widget(Some(&guide_button));
     objects.add(&guides);
+    objects.add(&switch(
+        &tr("Show Guides at Object Center"),
+        &tr("A dragged object snaps to the middles of the page and of other objects"),
+        current.guides_at_center,
+        |p, on| p.guides_at_center = on,
+    ));
+    objects.add(&switch(
+        &tr("Show Guides at Object Edges"),
+        &tr("A dragged object snaps to the edges of the page, its margins and other objects"),
+        current.guides_at_edges,
+        |p, on| p.guides_at_edges = on,
+    ));
     objects.add(&switch(
         &tr("Show Size and Position When Moving Objects"),
         &tr("Next to the pointer, while an object is dragged"),
@@ -773,6 +798,8 @@ mod tests {
             show_counts: false,
             include_preview: false,
             guide_color: Rgba::rgb(10, 200, 30),
+            guides_at_center: false,
+            guides_at_edges: true,
             show_size_and_position: false,
         };
         let file = glib::KeyFile::new();
@@ -788,6 +815,8 @@ mod tests {
         assert_eq!(Preferences::read(&empty).zoom, 125);
         assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
         assert_eq!(Preferences::read(&empty).guide_color, GUIDE_COLOR);
+        assert!(Preferences::read(&empty).guides_at_center);
+        assert!(!Preferences::read(&empty).guides_at_edges);
         assert!(Preferences::read(&empty).show_size_and_position);
         assert_eq!(
             Preferences::read(&empty).autocorrect,
