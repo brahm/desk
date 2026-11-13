@@ -51,6 +51,8 @@ pub(crate) const FL: char = '\u{fb02}';
 pub(crate) const FF: char = '\u{fb00}';
 /// U+FB03 LATIN SMALL LIGATURE FFI.
 pub(crate) const FFI: char = '\u{fb03}';
+/// U+FB04 LATIN SMALL LIGATURE FFL.
+pub(crate) const FFL: char = '\u{fb04}';
 
 /// The size of synthesized small capitals, relative to the font size.
 ///
@@ -353,14 +355,15 @@ impl ParagraphText {
                 }
             } as u32;
             // Pages joins fi and fl in the fonts of the Mac that have those
-            // ligatures, and ff and ffi in some faces, and no other letters
-            // (DOC-05).
+            // ligatures, ff and ffi in some faces, and ffl in fewer, and no
+            // other letters (DOC-05).
             let pages = (format.capitalization == Capitalization::None
                 && format.ligatures != Ligatures::None)
-                .then(|| pages_font(&format.font_family, format.weight.value()))
+                .then(|| pages_font(&format.font_family, format.weight.value(), format.italic))
                 .flatten();
             let ligatures = pages.is_some_and(|f| f.ligatures);
             let ff_ligatures = pages.is_some_and(|f| f.ff_ligatures);
+            let ffl_ligatures = pages.is_some_and(|f| f.ffl_ligatures);
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
                 if let Some(field) = &format.field {
@@ -393,6 +396,7 @@ impl ParagraphText {
                 let mut ahead = chars.clone();
                 let ligature = match (c, ahead.next(), ahead.next()) {
                     ('f', Some('f'), Some('i')) if ff_ligatures => Some((FFI, 3)),
+                    ('f', Some('f'), Some('l')) if ffl_ligatures => Some((FFL, 3)),
                     ('f', Some('f'), _) if ff_ligatures => Some((FF, 2)),
                     ('f', Some('i'), _) if ligatures => Some((FI, 2)),
                     ('f', Some('l'), _) if ligatures => Some((FL, 2)),

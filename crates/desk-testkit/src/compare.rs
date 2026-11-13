@@ -107,12 +107,20 @@ fn parse_bbox(html: &str) -> Vec<Vec<Word>> {
     pages
 }
 
+/// The text of a word, with a ligature as its letters: a PDF names the
+/// glyph of one by its letters or by its own character, as its font has
+/// it, whatever was drawn.
 fn unescape(text: &str) -> String {
     text.replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&apos;", "'")
         .replace("&amp;", "&")
+        .replace('\u{fb00}', "ff")
+        .replace('\u{fb01}', "fi")
+        .replace('\u{fb02}', "fl")
+        .replace('\u{fb03}', "ffi")
+        .replace('\u{fb04}', "ffl")
 }
 
 /// How the words of Desk compare with those of Pages.

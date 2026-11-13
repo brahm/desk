@@ -18,11 +18,12 @@ versions, and stay under the SIL Open Font License.
 
 SOURCES_DIR holds one folder per source family, as in the `ofl` folder of
 https://github.com/google/fonts (cabin, lato, jost, baskervville,
-ebgaramond, bodonimoda, cormorantgaramond, zillaslab, kalam), with its
+ebgaramond, bodonimoda, cormorantgaramond, zillaslab, boogaloo, kalam), with its
 font files and its OFL.txt. OUT_DIR defaults to the folder of this
 script: each family goes to its own folder there, with the license of its
 source. Needs fontTools.
 """
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -220,13 +221,13 @@ FAMILIES = [
     (
         "marker-felt",
         "Desk Marker",
-        "kalam",
-        "Kalam",
+        "boogaloo",
+        "Boogaloo",
         [
             # Desk reads MarkerFelt-Thin as weight 100 and MarkerFelt-Wide
-            # as the regular weight.
-            ("thin", "Kalam-Regular.ttf", None, "Thin", 100, False),
-            ("wide", "Kalam-Bold.ttf", None, "Wide", 400, False),
+            # as the regular weight. Both are as heavy as a marker.
+            ("thin", "Boogaloo-Regular.ttf", None, "Thin", 100, False),
+            ("wide", "Boogaloo-Regular.ttf", None, "Wide", 400, False),
         ],
     ),
 ]
@@ -239,6 +240,11 @@ DROPPED = [
     "FFTM", "PfEd", "TSI0", "TSI1", "TSI2", "TSI3", "TSI5", "prop",
 ]  # fmt: skip
 
+
+# A second source for the characters that the first lacks, by folder: its
+# folder, its file and its name. Boogaloo has no letters of Central
+# Europe.
+SECOND = {"marker-felt": ("kalam", "Kalam-Bold.ttf", "Kalam")}
 
 # The families whose figures are old style in the original.
 OLD_STYLE_FIGURES = {"hoefler-text"}
@@ -253,7 +259,25 @@ SAME = {0x2010: 0x2D, 0x2011: 0x2D, 0xAD: 0x2D, 0x2015: 0x2014, 0x2024: 0x2E}
 
 # The ligatures that Pages joins, drawn as their letters side by side
 # when a source has no glyph for them.
-LIGATURES = {0xFB01: "fi", 0xFB02: "fl"}
+LIGATURES = {0xFB00: "ff", 0xFB01: "fi", 0xFB02: "fl", 0xFB03: "ffi", 0xFB04: "ffl"}
+
+# What Pages draws otherwise than the characters of a face measure, read
+# in the PDF that Pages wrote of corpus/fixtures/pages/doc-05-apple-fonts,
+# by folder and measured face, in the units of the face. The figures of
+# Didot are its lining ones, all of one width, where the font gives its
+# old style ones to the characters. Hoefler Text joins ff, ffi and ffl
+# too, with glyphs that no character of its own names.
+DRAWN = {
+    ("didot", "regular"): {code: 520 for code in range(0x30, 0x3A)},
+    ("hoefler-text", "regular"): {0xFB00: 1232, 0xFB03: 1730, 0xFB04: 1732},
+    ("hoefler-text", "italic"): {0xFB00: 1158, 0xFB03: 1624, 0xFB04: 1624},
+    ("hoefler-text", "black"): {0xFB00: 1448, 0xFB03: 1970, 0xFB04: 1972},
+    ("hoefler-text", "black-italic"): {0xFB00: 1434, 0xFB03: 1982, 0xFB04: 2036},
+}
+
+# The faces in which Pages joins no letters, though they have the glyphs
+# of fi and fl: every face of a folder, or one of them.
+NO_LIGATURES = {("baskerville", None), ("marker-felt", "wide")}
 
 
 def measured(path):
@@ -312,12 +336,46 @@ def cap_height(font):
     return glyph.yMax
 
 
-def make(src, location, metrics, family, source_name, oldstyle, style, weight, italic, out_dir):
+def borrow(font, second, codes):
+    """Gives a font the glyphs of a second one for the characters it lacks,
+    with capitals as tall as its own."""
+    scale = cap_height(font) / cap_height(second)
+    cmap, glyphs = second.getBestCmap(), second.getGlyphSet()
+    order = font.getGlyphOrder()
+    for code in sorted(codes):
+        if code in font.getBestCmap() or code not in cmap:
+            continue
+        name = f"uni{code:04X}"
+        recording = DecomposingRecordingPen(glyphs)
+        glyphs[cmap[code]].draw(recording)
+        pen = TTGlyphPen(None)
+        recording.replay(TransformPen(pen, (scale, 0, 0, scale, 0, 0)))
+        glyph = pen.glyph()
+        font["glyf"][name] = glyph
+        glyph.recalcBounds(font["glyf"])
+        font["hmtx"][name] = (otRound(second["hmtx"][cmap[code]][0] * scale), glyph.xMin)
+        order.append(name)
+        for table in font["cmap"].tables:
+            if table.isUnicode():
+                table.cmap[code] = name
+    font.setGlyphOrder(order)
+
+
+def make(
+    src, second, location, metrics, family, source_name, oldstyle, style, weight, italic, out_dir
+):
     face, advances, kerning = measured(metrics)
+    folder = metrics.parent.name
+    advances.update(DRAWN.get((folder, metrics.stem), {}))
+    ligatures = not NO_LIGATURES & {(folder, None), (folder, metrics.stem)}
     font = TTFont(src)
     if "fvar" in font:
         font = instancer.instantiateVariableFont(font, location)
     old_copyright = font["name"].getDebugName(0) or ""
+    if second:
+        second = TTFont(second)
+        borrow(font, second, advances)
+        old_copyright += " " + (second["name"].getDebugName(0) or "")
     choose_figures(font, advances, oldstyle)
 
     # Only what was measured stays, with no layout tables of the source.
@@ -429,7 +487,7 @@ def make(src, location, metrics, family, source_name, oldstyle, style, weight, i
         for second, code in (("i", 0xFB01), ("l", 0xFB02))
         if code in cmap and letter["f"] and letter[second]
     ]
-    if joined:
+    if joined and ligatures:
         rules += "feature liga {\n" + "\n".join(joined) + "\n} liga;\n"
     pairs = [
         f"    pos {cmap[a]} {cmap[b]} {k};"
@@ -476,6 +534,8 @@ def make(src, location, metrics, family, source_name, oldstyle, style, weight, i
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
+    # The same fonts byte for byte whenever they are made.
+    os.environ.setdefault("SOURCE_DATE_EPOCH", "1767225600")
     sources = Path(sys.argv[1])
     here = Path(__file__).resolve().parent
     out_root = Path(sys.argv[2]) if len(sys.argv) > 2 else here
@@ -483,9 +543,17 @@ def main():
         out_dir = out_root / family.lower().replace(" ", "-")
         out_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(sources / source / "OFL.txt", out_dir / "OFL.txt")
+        second = None
+        if folder in SECOND:
+            second_source, second_file, second_name = SECOND[folder]
+            second = sources / second_source / second_file
+            shutil.copyfile(
+                sources / second_source / "OFL.txt", out_dir / f"OFL-{second_name}.txt"
+            )
         for metrics, file, location, style, weight, italic in faces:
             out = make(
                 sources / source / file,
+                second,
                 location,
                 here / folder / f"{metrics}.tsv",
                 family,

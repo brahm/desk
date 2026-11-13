@@ -113,7 +113,7 @@ design, under the SIL Open Font License:
 | Desk Didone (`desk-didone/`) | Didot | Bodoni Moda |
 | Desk Engraver (`desk-engraver/`) | Cochin | Cormorant Garamond |
 | Desk Typewriter (`desk-typewriter/`) | American Typewriter | Zilla Slab |
-| Desk Marker (`desk-marker/`) | Marker Felt | Kalam |
+| Desk Marker (`desk-marker/`) | Marker Felt | Boogaloo, and Kalam for the letters it lacks |
 
 The sources come from the `ofl` folder of
 <https://github.com/google/fonts>. Each face is given the advance widths,
@@ -127,6 +127,25 @@ letters side by side when the source has no glyph for them. Only the
 characters that were measured are kept, so text in another script falls
 to another font.
 
+The fonts were then checked against two documents that Pages wrote in
+these faces (`corpus/fixtures/pages/doc-05-apple-fonts` and
+`doc-05-apple-fonts-sizes`), whose PDF holds the glyphs that Pages drew
+and their widths. Every width measured was the width drawn, but for four
+things that the measures could not show, which `make-substitutes.py`
+and `originals.tsv` now record:
+
+- Pages joins no letters in Baskerville and in Marker Felt Wide, though
+  they have the glyphs of fi and fl.
+- Hoefler Text joins ff, ffi and ffl too.
+- The figures of Didot are its lining ones, all of one width.
+- A line of Hoefler Text, of Didot and its bold, and of the bold of
+  Futura gets a fifth of its height above the text.
+
+Those documents also showed that Pages keeps on a line the space that a
+font kerns with the character before it, as Gill Sans and Didot do after
+a comma or a period: a line that ends there must have room for the
+space. `desk-text` breaks its lines the same way.
+
 The outlines are not those of the originals: a page looks different, but
 its lines and pages break where they did on the Mac. A weight that the
 source lacks is drawn with the nearest one: the light faces of Gill Sans
@@ -137,7 +156,8 @@ ornaments of Hoefler Text are left out.
 
 The fonts are renamed, as the license asks of modified versions, and none
 uses a reserved font name. Each folder has the license of its source,
-`OFL.txt`, with its copyright notice, and the Flatpak installs it.
+`OFL.txt`, with its copyright notice, and the Flatpak installs it; Desk
+Marker has that of its second source too, `OFL-Kalam.txt`.
 `desk-text` brings the faces inside the program, and `substitutes.tsv`
 puts each first for its family. To make them again:
 
@@ -147,7 +167,7 @@ python3 data/fonts/make-substitutes.py SOURCES_DIR
 
 where `SOURCES_DIR` has the folders `cabin`, `lato`, `jost`,
 `baskervville`, `ebgaramond`, `bodonimoda`, `cormorantgaramond`,
-`zillaslab` and `kalam` of the `ofl` folder of Google Fonts.
+`zillaslab`, `boogaloo` and `kalam` of the `ofl` folder of Google Fonts.
 
 ## Desk Neue
 

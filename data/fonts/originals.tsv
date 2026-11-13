@@ -19,10 +19,19 @@
 # Pages. No family needs it now: Helvetica Neue, which had it, is laid out
 # with Desk Neue (desk-neue/), which has its widths and kerning.
 #
-# A family followed by UltraLight, Light, Medium or Bold is the face of
-# that weight (100, 300, 500, 700 and over), where it lays out otherwise
-# than the family. Pages rounds the ascent, the descent and the leading of
-# each line to whole points. data/fonts/README.md explains.
+# A family followed by UltraLight, Light, Medium, Bold or ExtraBold is the
+# face of that weight (100, 300, 500, 700 and over, 800), where it lays
+# out otherwise than the family, and one followed by Italic is its italic
+# face. Pages rounds the ascent, the descent and the leading of each line
+# to whole points. data/fonts/README.md explains.
+#
+# The fonts of the Pages templates have fonts of Desk with their heights
+# and widths (desk-humanist/ and the others), so only the faces that Pages
+# lays out otherwise than those say are here. "fifth" is a face whose line
+# gets a fifth of its height above the text where its leading rounds to
+# nothing, and its leading below otherwise: Didot and its bold, but not
+# its italic, and the bold of Futura, but not its condensed extra bold.
+# Hoefler Text gets the fifth at every size and joins ffl too.
 family	ascent	descent	leading	place	ligatures	spacing
 Helvetica	0.77002	0.22998	0.2	above	fi fl
 Times	0.75	0.25	0.2	above	fi fl
@@ -37,3 +46,9 @@ Helvetica Neue UltraLight	0.931	0.213	0.027	below	fi fl
 Helvetica Neue Light	0.967	0.213	0.029	below	fi fl
 Helvetica Neue Medium	0.975	0.217	0.029	below	fi fl
 Helvetica Neue Bold	0.975	0.217	0.029	below	fi fl ff ffi
+Hoefler Text	0.721	0.279	0.2	above	fi fl ff ffi ffl
+Didot	0.941	0.299	0.024	fifth	fi fl
+Didot Italic	0.942	0.29	0.025	below	fi fl
+Didot Bold	0.969	0.294	0.026	fifth	fi fl
+Futura Bold	1.039	0.26	0.03	fifth	fi fl
+Futura ExtraBold	1.00342	0.27002	0.02734	below	fi fl

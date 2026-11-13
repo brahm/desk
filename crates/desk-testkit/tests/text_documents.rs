@@ -105,3 +105,13 @@ fn a_document_saved_with_its_view_state_matches_pages() {
 fn a_document_with_its_information_filled_in_matches_pages() {
     check("doc-19-20-info");
 }
+
+#[test]
+fn doc_05_the_fonts_of_the_templates_match_pages() {
+    check("doc-05-apple-fonts");
+}
+
+#[test]
+fn doc_05_the_fonts_of_the_templates_at_other_sizes_match_pages() {
+    check("doc-05-apple-fonts-sizes");
+}

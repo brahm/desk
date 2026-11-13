@@ -117,18 +117,26 @@ pub struct PagesFont {
     /// Whether the leading goes above the text, as with Apple's own fonts,
     /// rather than below it.
     pub leading_above: bool,
+    /// Whether a line whose leading rounds to nothing gets a fifth of its
+    /// height above the text in its place, as in some faces of Didot and
+    /// Futura.
+    pub fifth: bool,
     /// Whether fi and fl are joined into ligatures.
     pub ligatures: bool,
-    /// Whether ff and ffi are joined too. No other letters are.
+    /// Whether ff and ffi are joined too.
     pub ff_ligatures: bool,
+    /// Whether ffl is joined too, as in Hoefler Text. No other letters
+    /// are.
+    pub ffl_ligatures: bool,
     /// The space added between letters, in ems, so that a line of the font
     /// that stands for the family is as wide as in Pages.
     pub spacing: f32,
 }
 
-/// How Pages lays out a family at a weight, when it was measured: the face
-/// of that weight when it lays out otherwise, or else the family.
-pub fn pages_font(family: &str, weight: u16) -> Option<PagesFont> {
+/// How Pages lays out a face of a family, when it was measured: the face
+/// of that weight and slant when it lays out otherwise, or else the
+/// family.
+pub fn pages_font(family: &str, weight: u16, italic: bool) -> Option<PagesFont> {
     static TABLE: OnceLock<Vec<(&'static str, PagesFont)>> = OnceLock::new();
     let table = TABLE.get_or_init(|| {
         include_str!("../../../data/fonts/originals.tsv")
@@ -154,8 +162,10 @@ pub fn pages_font(family: &str, weight: u16) -> Option<PagesFont> {
                         descent: descent.parse().ok()?,
                         leading: leading.parse().ok()?,
                         leading_above: place == "above",
+                        fifth: place == "fifth",
                         ligatures: ligatures.starts_with("fi fl"),
-                        ff_ligatures: ligatures == "fi fl ff ffi",
+                        ff_ligatures: ligatures.starts_with("fi fl ff ffi"),
+                        ffl_ligatures: ligatures == "fi fl ff ffi ffl",
                         spacing: spacing.parse().ok()?,
                     },
                 ))
@@ -169,15 +179,24 @@ pub fn pages_font(family: &str, weight: u16) -> Option<PagesFont> {
             .find(|(name, _)| name.eq_ignore_ascii_case(wanted))
             .map(|&(_, font)| font)
     };
-    let face = match weight {
-        0..=200 => Some("UltraLight"),
-        201..=350 => Some("Light"),
-        351..=450 => None,
-        451..=550 => Some("Medium"),
-        _ => Some("Bold"),
+    let weights: &[&str] = match weight {
+        0..=200 => &["UltraLight"],
+        201..=350 => &["Light"],
+        351..=450 => &[],
+        451..=550 => &["Medium"],
+        751..=850 => &["ExtraBold", "Bold"],
+        _ => &["Bold"],
     };
-    face.and_then(|face| find(&format!("{family} {face}")))
-        .or_else(|| find(family))
+    let faces = || {
+        weights
+            .iter()
+            .map(|face| format!("{family} {face}"))
+            .chain([family.to_owned()])
+    };
+    italic
+        .then(|| faces().find_map(|face| find(&format!("{face} Italic"))))
+        .flatten()
+        .or_else(|| faces().find_map(|face| find(&face)))
 }
 
 /// A row of the table.
@@ -283,17 +302,17 @@ mod tests {
 
     #[test]
     fn the_fonts_of_pages_read() {
-        let helvetica = pages_font("helvetica", 400).unwrap();
+        let helvetica = pages_font("helvetica", 400, false).unwrap();
         assert_eq!(helvetica.ascent, 0.77002);
         assert!(helvetica.leading_above && helvetica.ligatures && !helvetica.ff_ligatures);
-        assert_eq!(pages_font("Helvetica", 700), Some(helvetica));
-        let arial = pages_font("Arial", 400).unwrap();
+        assert_eq!(pages_font("Helvetica", 700, true), Some(helvetica));
+        let arial = pages_font("Arial", 400, false).unwrap();
         assert!(!arial.leading_above && !arial.ligatures);
-        assert_eq!(pages_font("Optima", 400), None);
+        assert_eq!(pages_font("Optima", 400, false), None);
 
         // Each face of Helvetica Neue has its own height, measured on the
         // reference machine, and its leading below the text.
-        let neue = |weight| pages_font("Helvetica Neue", weight).unwrap();
+        let neue = |weight| pages_font("Helvetica Neue", weight, false).unwrap();
         assert_eq!((neue(400).ascent, neue(400).leading), (0.952, 0.028));
         assert!(!neue(400).leading_above && neue(400).ff_ligatures);
         assert_eq!(neue(300).ascent, 0.967);
@@ -305,6 +324,18 @@ mod tests {
         assert_eq!((neue(400).spacing, neue(300).spacing), (0.0, 0.0));
         assert_eq!(helvetica.spacing, 0.0);
         assert!(neue(700).ff_ligatures);
+
+        // The faces of the fonts of the templates that lay out otherwise
+        // than the font that stands for them says.
+        let hoefler = pages_font("Hoefler Text", 900, true).unwrap();
+        assert!(hoefler.leading_above && hoefler.ffl_ligatures && hoefler.ff_ligatures);
+        assert!(pages_font("Didot", 400, false).unwrap().fifth);
+        assert!(pages_font("Didot", 700, false).unwrap().fifth);
+        assert!(!pages_font("Didot", 400, true).unwrap().fifth);
+        assert!(pages_font("Futura", 700, false).unwrap().fifth);
+        assert!(!pages_font("Futura", 800, false).unwrap().fifth);
+        assert_eq!(pages_font("Futura", 500, false), None);
+        assert!(!neue(400).fifth && !neue(400).ffl_ligatures);
     }
 
     #[test]

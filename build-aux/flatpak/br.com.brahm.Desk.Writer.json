@@ -522,7 +522,8 @@
                 "install -Dm644 data/fonts/desk-didone/OFL.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-didone/OFL.txt",
                 "install -Dm644 data/fonts/desk-engraver/OFL.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-engraver/OFL.txt",
                 "install -Dm644 data/fonts/desk-typewriter/OFL.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-typewriter/OFL.txt",
-                "install -Dm644 data/fonts/desk-marker/OFL.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-marker/OFL.txt"
+                "install -Dm644 data/fonts/desk-marker/OFL.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-marker/OFL.txt",
+                "install -Dm644 data/fonts/desk-marker/OFL-Kalam.txt /app/share/licenses/br.com.brahm.Desk.Writer/desk-marker/OFL-Kalam.txt"
             ],
             "sources": [
                 {
