@@ -701,13 +701,13 @@ impl DocumentWindow {
                 *self.path.borrow_mut() = Some(path.to_owned());
                 *self.name.borrow_mut() = display_name(path);
                 self.show_document(shown.document);
-                self.warnings_banner
-                    .set_revealed(!shown.warnings.is_empty());
+                // A banner says when something may not show as it was made;
+                // fonts with the same metrics in place of others are only
+                // in Document Warnings of the main menu.
+                self.warnings_banner.set_revealed(shown.lossy);
                 *self.warnings.borrow_mut() = shown.warnings;
+                self.enable_warnings();
                 remember_recent(path);
-                if shown.lossy {
-                    self.show_warnings();
-                }
             }
             Err(message) => {
                 self.alert(
@@ -943,8 +943,10 @@ impl DocumentWindow {
             this.warnings
                 .borrow_mut()
                 .retain(|w| w.font.as_deref() != Some(from));
-            this.warnings_banner
-                .set_revealed(!this.warnings.borrow().is_empty());
+            if this.warnings.borrow().is_empty() {
+                this.warnings_banner.set_revealed(false);
+            }
+            this.enable_warnings();
             true
         };
         crate::warnings::show(
@@ -1064,6 +1066,17 @@ impl DocumentWindow {
             && crate::save_document(opener, &editor.document(), None, &draft.path).is_ok();
         if written {
             self.draft_due.set(false);
+        }
+    }
+
+    /// Document Warnings is there when the document has warnings.
+    fn enable_warnings(&self) {
+        if let Some(action) = self
+            .window
+            .lookup_action("warnings")
+            .and_downcast::<gio::SimpleAction>()
+        {
+            action.set_enabled(!self.warnings.borrow().is_empty());
         }
     }
 
@@ -1625,6 +1638,7 @@ impl DocumentWindow {
             });
             self.window.add_action(&action);
         }
+        self.enable_warnings();
 
         let weak = Rc::downgrade(self);
         let zoom = gio::SimpleAction::new("zoom", Some(glib::VariantTy::STRING));
@@ -2799,6 +2813,7 @@ fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
         menu.append_section(None, &save);
         let document = gio::Menu::new();
         document.append(Some(&tr("Document _Info")), Some("win.properties"));
+        document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
         document.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
         menu.append_section(None, &document);
     }

@@ -436,6 +436,17 @@ impl FontsWindow {
         let window = gtk::Popover::builder().child(&scrolled).build();
         labelled(&window, &tr("Fonts"));
         window.set_parent(parent);
+        // Back to the text when the popover closes.
+        let of = editor.clone();
+        window.connect_closed(move |_| {
+            // Once GTK has given the focus back to the button.
+            let of = of.clone();
+            gtk::glib::idle_add_local_once(move || {
+                if let Some(editor) = of() {
+                    editor.focus();
+                }
+            });
+        });
 
         let this = Rc::new(Self {
             window,

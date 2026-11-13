@@ -356,6 +356,8 @@ impl FormatBar {
 /// inspector of Pages).
 pub struct Inspector {
     root: gtk::Box,
+    /// The panes, kept for the handlers that follow what is selected.
+    _panes: Rc<InspectorPanes>,
     line_spacing: compact::SpinRow,
     before: compact::SpinRow,
     after: compact::SpinRow,
@@ -566,6 +568,7 @@ impl Inspector {
 
         let this = Rc::new(Self {
             root,
+            _panes: panes,
             line_spacing,
             before,
             after,
@@ -784,10 +787,23 @@ pub fn set_state(window: &impl IsA<gtk::gio::ActionMap>, name: &str, value: glib
 /// The panes of the Inspector, one at a time, chosen by a row of toggles at
 /// its top as in Pages. A pane whose groups all hide says that nothing it
 /// sets is selected.
+/// The toggle of a pane of the Inspector.
+fn pane_toggle(name: &str, title: &str, icon: &str) -> adw::Toggle {
+    adw::Toggle::builder()
+        .name(name)
+        .icon_name(icon)
+        .tooltip(title)
+        .build()
+}
+
 struct InspectorPanes {
     root: gtk::Box,
     toggles: adw::ToggleGroup,
     stack: gtk::Stack,
+    /// The names, titles and icons of the panes, in order.
+    panes: Vec<(String, String, String)>,
+    /// The panes left out while nothing they set is selected.
+    hidden: RefCell<std::collections::HashSet<String>>,
 }
 
 impl InspectorPanes {
@@ -801,13 +817,7 @@ impl InspectorPanes {
         let stack = gtk::Stack::builder().vhomogeneous(false).build();
         for (name, title, icon, groups) in panes {
             let title = tr(title);
-            toggles.add(
-                adw::Toggle::builder()
-                    .name(*name)
-                    .icon_name(*icon)
-                    .tooltip(&title)
-                    .build(),
-            );
+            toggles.add(pane_toggle(name, &title, icon));
             let content = gtk::Box::builder()
                 .orientation(gtk::Orientation::Vertical)
                 .spacing(18)
@@ -882,6 +892,11 @@ impl InspectorPanes {
             root,
             toggles,
             stack,
+            panes: panes
+                .iter()
+                .map(|(name, title, icon, _)| ((*name).to_owned(), tr(title), (*icon).to_owned()))
+                .collect(),
+            hidden: RefCell::new(std::collections::HashSet::new()),
         })
     }
 
@@ -892,32 +907,39 @@ impl InspectorPanes {
     /// Shows the toggle of a pane only while `group` shows, as Pages
     /// shows the QuickTime inspector only for a movie or a sound.
     fn show_only_with(self: &Rc<Self>, name: &str, group: &compact::Group) {
-        let Some(toggle) = self.toggles.toggle_by_name(name) else {
-            return;
-        };
         let weak = Rc::downgrade(self);
         let name = name.to_owned();
         let update = move |visible: bool| {
             let Some(this) = weak.upgrade() else { return };
-            let present = this.toggles.toggle_by_name(&name).is_some();
-            if visible && !present {
-                this.toggles.add(toggle.clone());
-            } else if !visible && present {
-                if this.toggles.active_name().as_deref() == Some(name.as_str()) {
-                    this.toggles.set_active_name(Some("metrics"));
-                }
-                this.toggles.remove(&toggle);
+            let changed = if visible {
+                this.hidden.borrow_mut().remove(&name)
+            } else {
+                this.hidden.borrow_mut().insert(name.clone())
+            };
+            if changed {
+                this.refresh_toggles();
             }
         };
         update(group.is_visible());
         group.connect_visible_notify(move |group| update(group.is_visible()));
     }
 
-    /// Shows a pane, by its name.
-    #[allow(dead_code)]
-    fn show_pane(&self, name: &str) {
-        self.toggles.set_active_name(Some(name));
-        self.stack.set_visible_child_name(name);
+    /// Puts back the toggles of the panes that are not left out, in their
+    /// order, keeping the pane shown unless it is left out.
+    fn refresh_toggles(&self) {
+        let active = self.toggles.active_name();
+        let hidden = self.hidden.borrow();
+        self.toggles.remove_all();
+        for (name, title, icon) in &self.panes {
+            if !hidden.contains(name) {
+                self.toggles.add(pane_toggle(name, title, icon));
+            }
+        }
+        let active = active
+            .filter(|name| !hidden.contains(name.as_str()))
+            .map_or_else(|| "metrics".to_owned(), |name| name.to_string());
+        self.toggles.set_active_name(Some(&active));
+        self.stack.set_visible_child_name(&active);
     }
 }
 

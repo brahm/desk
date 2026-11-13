@@ -34,6 +34,25 @@ pub trait Row {
     fn title_label(&self) -> Option<&gtk::Label>;
 }
 
+/// The symbol of the unit that a subtitle starts with, such as “pt” for
+/// “Points” or “Points above the baseline”.
+fn unit_symbol(subtitle: &str) -> Option<String> {
+    use crate::i18n::tr;
+    let units = [
+        (tr("Points"), tr("pt")),
+        (tr("Centimeters"), tr("cm")),
+        (tr("Inches"), tr("in")),
+        (tr("Picas"), tr("pc")),
+        (tr("Percent"), "%".to_owned()),
+        (tr("Degrees"), "°".to_owned()),
+        (tr("Seconds"), tr("s")),
+    ];
+    units.into_iter().find_map(|(name, symbol)| {
+        let rest = subtitle.strip_prefix(name.as_str())?;
+        (rest.is_empty() || rest.starts_with([' ', ','])).then_some(symbol)
+    })
+}
+
 /// What every row has: its line, the title, and the subtitle.
 #[derive(Clone)]
 struct Line {
@@ -391,15 +410,26 @@ impl SpinRow {
         let line = Line::new("");
         line.root.append(&line.title);
         line.root.append(&spin);
+        spin.update_relation(&[gtk::accessible::Relation::LabelledBy(&[line
+            .title
+            .upcast_ref()])]);
         line.subtitle.set_valign(gtk::Align::Center);
         line.root.append(&line.subtitle);
         Self { line, spin }
     }
 
-    /// Sets the unit after the value.
+    /// Sets what the value measures. A unit shows after the value as its
+    /// symbol, as in the fields of Pages, and the whole text is the
+    /// tooltip and the description of the spin button.
     pub fn set_subtitle(&self, subtitle: &str) {
-        self.line.subtitle.set_label(subtitle);
-        self.line.subtitle.set_visible(!subtitle.is_empty());
+        let symbol = unit_symbol(subtitle);
+        let shown = symbol.as_deref().unwrap_or(subtitle);
+        self.line.subtitle.set_label(shown);
+        self.line.subtitle.set_visible(!shown.is_empty());
+        let explained = (!subtitle.is_empty() && shown != subtitle).then_some(subtitle);
+        self.line.root.set_tooltip_text(explained);
+        self.spin
+            .update_property(&[gtk::accessible::Property::Description(subtitle)]);
     }
 
     /// Sets the title and gives the spin button the same name.
@@ -442,6 +472,9 @@ impl SwitchRow {
         let line = Line::new("");
         line.root.append(&line.title);
         line.root.append(&switch);
+        switch.update_relation(&[gtk::accessible::Relation::LabelledBy(&[line
+            .title
+            .upcast_ref()])]);
         Self { line, switch }
     }
 
@@ -546,6 +579,9 @@ impl ComboRow {
         let line = Line::new("");
         line.root.append(&line.title);
         line.root.append(&dropdown);
+        dropdown.update_relation(&[gtk::accessible::Relation::LabelledBy(&[line
+            .title
+            .upcast_ref()])]);
         Self { line, dropdown }
     }
 
@@ -730,6 +766,13 @@ impl ActionRow {
     /// Makes a click on the title activate a widget of the row.
     pub fn set_activatable_widget(&self, widget: Option<&impl IsA<gtk::Widget>>) {
         let Some(widget) = widget else { return };
+        // The control is named by the row, as in Libadwaita.
+        widget
+            .as_ref()
+            .update_relation(&[gtk::accessible::Relation::LabelledBy(&[self
+                .line
+                .title
+                .upcast_ref()])]);
         let target = widget.as_ref().downgrade();
         let click = gtk::GestureClick::new();
         click.connect_released(move |gesture, _, _, _| {
@@ -833,6 +876,9 @@ impl EntryRow {
         let line = Line::new("");
         line.root.append(&line.title);
         line.root.append(&entry);
+        entry.update_relation(&[gtk::accessible::Relation::LabelledBy(&[line
+            .title
+            .upcast_ref()])]);
         Self { line, entry }
     }
 

@@ -41,7 +41,7 @@ packages=(
     fonts-liberation fonts-dejavu-core fonts-texgyre fonts-urw-base35
     fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils jing unzip
     xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 gettext
-    libgtk-4-media-gstreamer gstreamer1.0-plugins-good gstreamer1.0-libav
+    gstreamer1.0-plugins-good gstreamer1.0-libav
     desktop-file-utils appstream
     hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br
 )

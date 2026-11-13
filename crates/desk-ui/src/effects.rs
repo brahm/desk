@@ -198,7 +198,7 @@ impl Effects {
         color.switch.set_visible(false);
         let offset = compact::SpinRow::with_range(0.0, 100.0, 1.0);
         offset.set_title(&tr("Offset"));
-        offset.set_subtitle(&tr("Distance from the text, in points"));
+        offset.set_subtitle(&tr("Points from the text"));
         offset.set_digits(1);
         let paragraph = compact::Group::builder()
             .title(tr("Background and Borders"))

@@ -109,7 +109,7 @@ jobs:
       - name: Install GTK, Libadwaita, a display and AT-SPI
         run: |
           apt-get update
-          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us libgtk-4-media-gstreamer gstreamer1.0-plugins-good gstreamer1.0-libav
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us gstreamer1.0-plugins-good gstreamer1.0-libav
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
