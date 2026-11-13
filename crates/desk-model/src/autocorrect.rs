@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Corrections made while typing (TXT-06, TXT-07): smart quotes, capitals
-//! at the start of sentences, two capitals at the start of a word, raised
-//! ordinal suffixes, and a table of replacements such as "(c)" for "©".
+//! at the start of sentences, raised ordinal suffixes, and a table of
+//! replacements such as "(c)" for "©".
 //!
 //! The functions here look at the text before the cursor and say what to
 //! change; the editor makes the change as part of the typing.
@@ -32,35 +32,49 @@ impl Replacement {
         }
     }
 
-    /// The table of a new install, as the symbols that Pages replaces.
+    /// The table of a new install, as Pages has it: the symbols on and the
+    /// fractions off.
     pub fn defaults() -> Vec<Self> {
-        [
+        let on = [
             ("(c)", "\u{a9}"),
+            ("(p)", "\u{2117}"),
             ("(r)", "\u{ae}"),
-            ("(tm)", "\u{2122}"),
+            ("TM", "\u{2122}"),
             ("c/o", "\u{2105}"),
             ("...", "\u{2026}"),
+            ("teh", "the"),
+        ];
+        let off = [
             ("1/2", "\u{bd}"),
             ("1/3", "\u{2153}"),
             ("2/3", "\u{2154}"),
             ("1/4", "\u{bc}"),
             ("3/4", "\u{be}"),
+            ("1/5", "\u{2155}"),
+            ("2/5", "\u{2156}"),
+            ("3/5", "\u{2157}"),
+            ("4/5", "\u{2158}"),
+            ("1/6", "\u{2159}"),
+            ("5/6", "\u{215a}"),
             ("1/8", "\u{215b}"),
             ("3/8", "\u{215c}"),
             ("5/8", "\u{215d}"),
             ("7/8", "\u{215e}"),
-        ]
-        .into_iter()
-        .map(|(from, to)| Self::new(from, to))
-        .collect()
+        ];
+        on.into_iter()
+            .map(|(from, to)| Self::new(from, to))
+            .chain(off.into_iter().map(|(from, to)| Self {
+                enabled: false,
+                ..Self::new(from, to)
+            }))
+            .collect()
     }
 }
 
 /// Which corrections are made.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AutoCorrect {
-    /// Capitals at the start of sentences, and one capital where a word
-    /// starts with two.
+    /// Capitals at the start of sentences.
     pub capitalization: bool,
     /// Ordinal suffixes raised, as 1st and 2nd.
     pub ordinals: bool,
@@ -71,12 +85,14 @@ pub struct AutoCorrect {
 }
 
 impl Default for AutoCorrect {
+    /// What Pages does on a new install: none of these, though the table
+    /// is ready for when it is turned on.
     fn default() -> Self {
         Self {
-            capitalization: true,
-            ordinals: true,
+            capitalization: false,
+            ordinals: false,
             replacements: Replacement::defaults(),
-            replace: true,
+            replace: false,
         }
     }
 }
@@ -202,24 +218,10 @@ impl AutoCorrect {
         )
     }
 
-    /// A capital for the first letter of a sentence, and one capital
-    /// where a word starts with two, as "THe".
+    /// A capital for the first letter of a sentence. As in Pages, a word
+    /// that starts with two capitals stays as it is, and a dot ends the
+    /// sentence even after an abbreviation such as "i.e.".
     fn capitalize(before: &str, word: &str) -> Option<Correction> {
-        let letters: Vec<char> = word.chars().take(3).collect();
-        if letters.len() == 3
-            && letters[0].is_uppercase()
-            && letters[1].is_uppercase()
-            && letters[2].is_lowercase()
-            && word.chars().skip(2).all(|c| !c.is_uppercase())
-        {
-            let first = letters[0].len_utf8();
-            let second = letters[1].len_utf8();
-            return Some(Correction {
-                range: first..first + second,
-                text: letters[1].to_lowercase().collect(),
-                superscript: None,
-            });
-        }
         let first = word.chars().next()?;
         let sentence_start = before
             .trim_end()
@@ -227,25 +229,15 @@ impl AutoCorrect {
             .next_back()
             .is_none_or(|c| matches!(c, '.' | '!' | '?'));
         // Only words of letters: "iPhone", "e.g." and "x2" stay.
-        if sentence_start
+        (sentence_start
             && first.is_lowercase()
             && word.chars().all(char::is_alphabetic)
-            && word.chars().skip(1).all(char::is_lowercase)
-            // Not after an abbreviation such as "e.g.", whose last word
-            // has a dot inside.
-            && !before
-                .trim_end()
-                .rsplit(char::is_whitespace)
-                .next()
-                .is_some_and(|w| w.trim_end_matches('.').contains('.'))
-        {
-            return Some(Correction {
-                range: 0..first.len_utf8(),
-                text: first.to_uppercase().collect(),
-                superscript: None,
-            });
-        }
-        None
+            && word.chars().skip(1).all(char::is_lowercase))
+        .then(|| Correction {
+            range: 0..first.len_utf8(),
+            text: first.to_uppercase().collect(),
+            superscript: None,
+        })
     }
 }
 
@@ -253,8 +245,18 @@ impl AutoCorrect {
 mod tests {
     use super::*;
 
+    /// Every correction on, as after turning them on in the preferences.
+    fn all() -> AutoCorrect {
+        AutoCorrect {
+            capitalization: true,
+            ordinals: true,
+            replacements: Replacement::defaults(),
+            replace: true,
+        }
+    }
+
     fn apply(before: &str) -> Option<String> {
-        let correction = AutoCorrect::default().correct(before)?;
+        let correction = all().correct(before)?;
         let mut text = before.to_owned();
         text.replace_range(correction.range, &correction.text);
         Some(text)
@@ -275,19 +277,22 @@ mod tests {
         assert_eq!(apply("hello").as_deref(), Some("Hello"));
         assert_eq!(apply("It works. then").as_deref(), Some("It works. Then"));
         assert_eq!(apply("It works then"), None);
-        assert_eq!(apply("as in e.g. this"), None);
+        // Pages takes the dot of "i.e." as the end of a sentence.
+        assert_eq!(apply("as in i.e. not").as_deref(), Some("as in i.e. Not"));
         assert_eq!(apply("iPhone"), None);
-        assert_eq!(apply("THe").as_deref(), Some("The"));
+        assert_eq!(apply("e.g."), None);
+        // Nor does it change two capitals at the start of a word.
+        assert_eq!(apply("THis"), None);
         assert_eq!(apply("USA"), None);
     }
 
     #[test]
     fn ordinals_raise_their_suffix() {
-        let correction = AutoCorrect::default().correct("the 22nd").unwrap();
+        let correction = all().correct("the 22nd").unwrap();
         assert_eq!(correction.range, 4..8);
         assert_eq!(correction.superscript, Some(2..4));
-        assert!(AutoCorrect::default().correct("the 22th").is_none());
-        let correction = AutoCorrect::default().correct("11th").unwrap();
+        assert!(all().correct("the 22th").is_none());
+        let correction = all().correct("11th").unwrap();
         assert_eq!(correction.superscript, Some(2..4));
     }
 
@@ -296,8 +301,20 @@ mod tests {
         assert_eq!(apply("Desk (c)").as_deref(), Some("Desk ©"));
         assert_eq!(apply("Wait...").as_deref(), Some("Wait…"));
         assert_eq!(apply("x(c)"), None);
-        let mut off = AutoCorrect::default();
+        assert_eq!(apply("Desk TM").as_deref(), Some("Desk ™"));
+        assert_eq!(apply("teh").as_deref(), Some("the"));
+        // The fractions are in the table but off, as in Pages.
+        assert_eq!(apply("1/2"), None);
+        let mut off = all();
         off.replacements[0].enabled = false;
         assert!(off.correct("(c)").is_none());
+    }
+
+    #[test]
+    fn txt_07_a_new_install_corrects_nothing_as_pages() {
+        let fresh = AutoCorrect::default();
+        assert!(fresh.correct("hello").is_none());
+        assert!(fresh.correct("1st").is_none());
+        assert!(fresh.correct("(c)").is_none());
     }
 }

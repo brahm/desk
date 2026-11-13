@@ -412,10 +412,12 @@ pub struct Marker {
 /// The kind of list a marker asks for.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MarkerKind {
-    /// Bullets of this text: "•", "-" or "*".
+    /// Bullets of this text: "•", "-", "*" or "+".
     Bullet(char),
-    /// Numbers of this format, starting at this number.
+    /// Numbers of this format and a point, starting at this number.
     Number(NumberFormat, u32),
+    /// Numbers and a parenthesis, as "1)", starting at this number.
+    Parenthesized(u32),
 }
 
 impl MarkerKind {
@@ -424,12 +426,14 @@ impl MarkerKind {
         match self {
             Self::Bullet('\u{2022}') => "Bullet",
             Self::Bullet('-') => "Dash",
+            Self::Bullet('+') => "Plus",
             Self::Bullet(_) => "Asterisk",
             Self::Number(NumberFormat::Decimal, _) => "Numbered List",
             Self::Number(NumberFormat::UpperRoman, _) => "Roman",
             Self::Number(NumberFormat::LowerRoman, _) => "Lower Roman",
             Self::Number(NumberFormat::UpperAlpha, _) => "Upper Lettered",
             Self::Number(NumberFormat::LowerAlpha, _) => "Lettered",
+            Self::Parenthesized(_) => "Numbered Parenthesis",
         }
     }
 
@@ -455,13 +459,20 @@ impl MarkerKind {
                     Length::from_points(18),
                 )
             }),
+            Self::Parenthesized(_) => ListStyle::from_levels(id, name, |level| {
+                ListLevel::new(
+                    ListLabel::number(NumberFormat::Decimal, ")"),
+                    level,
+                    Length::from_points(18),
+                )
+            }),
         }
     }
 }
 
 /// The marker at the start of a paragraph's text, if it starts with
-/// "•", "-" or "*", a number, "a", "A", "i" or "I" and a point, followed
-/// by a space and more text (LST-01).
+/// "•", "-", "*" or "+", a number, "a", "A", "i" or "I" and a point, or a
+/// number and a parenthesis, followed by a space and more text (LST-01).
 pub fn detect_marker(text: &str) -> Option<Marker> {
     let (head, rest) = text.split_once(' ')?;
     if rest.trim().is_empty() {
@@ -470,7 +481,15 @@ pub fn detect_marker(text: &str) -> Option<Marker> {
     let len = head.len() + 1;
     let mut chars = head.chars();
     let kind = match (chars.next()?, chars.as_str()) {
-        (c @ ('\u{2022}' | '-' | '*'), "") => MarkerKind::Bullet(c),
+        (c @ ('\u{2022}' | '-' | '*' | '+'), "") => MarkerKind::Bullet(c),
+        (_, _) if head.ends_with(')') => {
+            let digits = &head[..head.len() - 1];
+            if digits.is_empty() || digits.len() > 6 || !digits.bytes().all(|b| b.is_ascii_digit())
+            {
+                return None;
+            }
+            MarkerKind::Parenthesized(digits.parse().ok()?)
+        }
         (_, _) => {
             let number = head.strip_suffix('.')?;
             match number {
@@ -799,7 +818,7 @@ impl Edit {
         let style = self.list_style_or_add(kind.name(), |id, _| kind.style(id))?;
         let at = Position::new(paragraph, 0);
         self.set_list_style(at, at, Some(style))?;
-        if let MarkerKind::Number(_, n) = marker.kind {
+        if let MarkerKind::Number(_, n) | MarkerKind::Parenthesized(n) = marker.kind {
             self.set_list_start(paragraph, Some(n))?;
         }
         Ok(Some(marker.len))
@@ -831,6 +850,11 @@ mod tests {
             Some((MarkerKind::Bullet('\u{2022}'), 4))
         );
         assert_eq!(kind("* item"), Some((MarkerKind::Bullet('*'), 2)));
+        // Pages also takes "+" and a number with a parenthesis.
+        assert_eq!(kind("+ item"), Some((MarkerKind::Bullet('+'), 2)));
+        assert_eq!(kind("3) item"), Some((MarkerKind::Parenthesized(3), 3)));
+        assert_eq!(kind(") item"), None);
+        assert_eq!(kind("a) item"), None);
         assert_eq!(
             kind("12. item"),
             Some((MarkerKind::Number(NumberFormat::Decimal, 12), 4))

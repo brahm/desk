@@ -113,6 +113,12 @@ def main():
     work = Path(tempfile.mkdtemp(prefix="desk-ui-"))
     letter = work / "Letter.odt"
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    # The table of replacements is off on a new install, as in Pages; the
+    # test turns it on as a user would. The windows open at 100 %, which
+    # the places the test clicks are measured at.
+    config = Path(os.environ["XDG_CONFIG_HOME"]) / "desk"
+    config.mkdir(parents=True, exist_ok=True)
+    (config / "preferences.ini").write_text("[editing]\nreplace-text=true\n[rulers]\nzoom=100\n")
     writer = subprocess.Popen([str(WRITER), str(letter)])
     try:
         app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))

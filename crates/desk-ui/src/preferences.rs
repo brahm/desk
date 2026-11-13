@@ -132,8 +132,8 @@ pub struct Preferences {
     pub center_origin: bool,
     /// Whether the vertical ruler shows with the horizontal one (FMT-17).
     pub vertical_ruler: bool,
-    /// Whether a paragraph that starts with "•", "-", "*", "1.", "a." or
-    /// "I." and a space becomes a list on Return (LST-01).
+    /// Whether a paragraph that starts with "•", "-", "*", "+", "1.",
+    /// "1)", "a." or "I." and a space becomes a list on Return (LST-01).
     pub automatic_lists: bool,
     /// Whether straight quotes become curly ones as they are typed
     /// (TXT-06).
@@ -152,7 +152,7 @@ pub struct Preferences {
     /// (TXT-07, EST-25). As in Pages, it belongs to the computer, not to
     /// the document.
     pub detect_links: bool,
-    /// The zoom of a new window, in percent (INT-07).
+    /// The zoom of a new window, in percent (INT-07): 125, as in Pages.
     pub zoom: u32,
     /// The color of the invisible characters (INT-10).
     pub invisibles_color: Rgba,
@@ -169,8 +169,9 @@ pub struct Preferences {
     pub show_size_and_position: bool,
 }
 
-/// The color of invisible characters until it is changed.
-pub const INVISIBLES_COLOR: Rgba = Rgba::rgb(64, 115, 217);
+/// The color of invisible characters until it is changed: the blue of
+/// Pages, #2E88EB.
+pub const INVISIBLES_COLOR: Rgba = Rgba::rgb(46, 136, 235);
 
 /// The color of the alignment guides until it is changed: the yellow of
 /// Pages.
@@ -201,7 +202,7 @@ impl Default for Preferences {
             proofread: false,
             accept_single_suggestion: false,
             detect_links: true,
-            zoom: 100,
+            zoom: 125,
             invisibles_color: INVISIBLES_COLOR,
             show_counts: true,
             include_preview: true,
@@ -784,7 +785,7 @@ mod tests {
         assert!(Preferences::read(&empty).show_counts);
         assert!(Preferences::read(&empty).detect_links);
         assert!(Preferences::read(&empty).include_preview);
-        assert_eq!(Preferences::read(&empty).zoom, 100);
+        assert_eq!(Preferences::read(&empty).zoom, 125);
         assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
         assert_eq!(Preferences::read(&empty).guide_color, GUIDE_COLOR);
         assert!(Preferences::read(&empty).show_size_and_position);
