@@ -1,2 +1,4 @@
 /target
 __pycache__/
+# The virtual machines of the reference, which hold software of Apple.
+/desk-vm/

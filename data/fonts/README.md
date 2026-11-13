@@ -61,6 +61,7 @@ it, as each license requires.
 | Font | Stands for | License | Source |
 |---|---|---|---|
 | Desk Neue (`desk-neue/`), built from TeX Gyre Heros | Helvetica Neue | GUST Font License (LPPL 1.3c) | This repository, made by `desk-neue/make-desk-neue.py` |
+| Desk Humanist, Flare, Geometric, Transitional, Oldstyle, Didone, Engraver, Typewriter and Marker (`desk-*/`) | Gill Sans, Optima, Futura, Baskerville, Hoefler Text, Didot, Cochin, American Typewriter and Marker Felt | SIL Open Font License 1.1 | This repository, made by `make-substitutes.py` from fonts of <https://github.com/google/fonts> |
 | Liberation Sans, Serif, Mono | Arial and Helvetica, Times New Roman and Times, Courier New and Courier | SIL Open Font License 1.1 | <https://github.com/liberationfonts/liberation-fonts> (Debian: `fonts-liberation`) |
 | TeX Gyre Heros, Termes, Cursor, Pagella, Bonum, Schola, Adventor, Chorus | Helvetica, Times, Courier, Palatino, Bookman, New Century Schoolbook, Avant Garde, Zapf Chancery | GUST Font License (LPPL 1.3c) | <https://www.gust.org.pl/projects/e-foundry/tex-gyre> (Debian: `fonts-texgyre`) |
 | Nimbus Sans, Nimbus Roman, Nimbus Mono PS, P052, URW Bookman, C059, URW Gothic, Z003 | The same 35 PostScript fonts | AGPL 3.0 with the font exception | <https://github.com/ArtifexSoftware/urw-base35-fonts> (Debian: `fonts-urw-base35`) |
@@ -83,9 +84,90 @@ English and Brazilian Portuguese the same way.
 `helvetica-neue/` holds the advance widths, vertical metrics and kerning
 of each Helvetica Neue face, as Pages lays them out on the reference
 machine (macOS 10.14.4 with iWork '09 9.3), one tab-separated file per
-face. `helvetica-neue/measure.py` took them with CoreText; the files
+face. `measure.py` took them with CoreText; the files
 record only numbers, never the fonts, and serve to build
 metric-compatible substitutes from TeX Gyre Heros.
+
+## Metrics of the fonts of the Pages templates
+
+The same script, run as `measure.py "FAMILY" OUTPUT_DIR`, measured every
+face installed on the reference machine of the other families that the
+Pages '09 templates use, into one folder per family in the same format:
+`gill-sans/`, `optima/`, `futura/`, `baskerville/`, `hoefler-text/`,
+`didot/`, `cochin/`, `american-typewriter/` and `marker-felt/`. The fonts
+below are built from them.
+
+## The fonts that stand for those of the Pages templates
+
+No free font has the widths of these families either, so
+`make-substitutes.py` makes one for each from a free font of a similar
+design, under the SIL Open Font License:
+
+| Font | Stands for | Made from |
+|---|---|---|
+| Desk Humanist (`desk-humanist/`) | Gill Sans | Cabin |
+| Desk Flare (`desk-flare/`) | Optima | Lato |
+| Desk Geometric (`desk-geometric/`) | Futura | Jost |
+| Desk Transitional (`desk-transitional/`) | Baskerville | Baskervville |
+| Desk Oldstyle (`desk-oldstyle/`) | Hoefler Text | EB Garamond |
+| Desk Didone (`desk-didone/`) | Didot | Bodoni Moda |
+| Desk Engraver (`desk-engraver/`) | Cochin | Cormorant Garamond |
+| Desk Typewriter (`desk-typewriter/`) | American Typewriter | Zilla Slab |
+| Desk Marker (`desk-marker/`) | Marker Felt | Boogaloo, and Kalam for the letters it lacks |
+
+The sources come from the `ofl` folder of
+<https://github.com/google/fonts>. Each face is given the advance widths,
+the kerning and the vertical metrics measured above, and each glyph is
+scaled so that its capitals are as tall as those of the original and it
+is as wide as its measured advance, or centered in that advance when it
+would have to stretch by more than 15%. The figures are those of the
+source that are like the original's: old style for Hoefler Text, lining
+for the others. fi and fl are joined as in the original, drawn as the two
+letters side by side when the source has no glyph for them. Only the
+characters that were measured are kept, so text in another script falls
+to another font.
+
+The fonts were then checked against two documents that Pages wrote in
+these faces (`corpus/fixtures/pages/doc-05-apple-fonts` and
+`doc-05-apple-fonts-sizes`), whose PDF holds the glyphs that Pages drew
+and their widths. Every width measured was the width drawn, but for four
+things that the measures could not show, which `make-substitutes.py`
+and `originals.tsv` now record:
+
+- Pages joins no letters in Baskerville and in Marker Felt Wide, though
+  they have the glyphs of fi and fl.
+- Hoefler Text joins ff, ffi and ffl too.
+- The figures of Didot are its lining ones, all of one width.
+- A line of Hoefler Text, of Didot and its bold, and of the bold of
+  Futura gets a fifth of its height above the text.
+
+Those documents also showed that Pages keeps on a line the space that a
+font kerns with the character before it, as Gill Sans and Didot do after
+a comma or a period: a line that ends there must have room for the
+space. `desk-text` breaks its lines the same way.
+
+The outlines are not those of the originals: a page looks different, but
+its lines and pages break where they did on the Mac. A weight that the
+source lacks is drawn with the nearest one: the light faces of Gill Sans
+as the regular one, and its ultra bold as the bold. The condensed faces
+that Desk cannot tell from another face of the same weight (Futura
+Condensed Medium and the condensed faces of American Typewriter) and the
+ornaments of Hoefler Text are left out.
+
+The fonts are renamed, as the license asks of modified versions, and none
+uses a reserved font name. Each folder has the license of its source,
+`OFL.txt`, with its copyright notice, and the Flatpak installs it; Desk
+Marker has that of its second source too, `OFL-Kalam.txt`.
+`desk-text` brings the faces inside the program, and `substitutes.tsv`
+puts each first for its family. To make them again:
+
+```sh
+python3 data/fonts/make-substitutes.py SOURCES_DIR
+```
+
+where `SOURCES_DIR` has the folders `cabin`, `lato`, `jost`,
+`baskervville`, `ebgaramond`, `bodonimoda`, `cormorantgaramond`,
+`zillaslab`, `boogaloo` and `kalam` of the `ofl` folder of Google Fonts.
 
 ## Desk Neue
 

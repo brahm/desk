@@ -11,20 +11,63 @@
 
 use std::sync::{Arc, OnceLock};
 
-/// The fonts that Desk brings, which `data/fonts/desk-neue` makes: Desk
-/// Neue, TeX Gyre Heros with the advance widths and kerning of Helvetica
-/// Neue as Pages lays it out, in each of its weights (DOC-05).
-pub(crate) const BUNDLED: [&[u8]; 10] = [
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Regular.otf"),
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Italic.otf"),
+/// The fonts that Desk brings, each with the advance widths and kerning
+/// of a font of the Mac as Pages lays it out, in each of its weights
+/// (DOC-05): Desk Neue, which `data/fonts/desk-neue` makes from TeX Gyre
+/// Heros for Helvetica Neue, and those that `data/fonts/make-substitutes.py`
+/// makes from free fonts for the fonts of the Pages templates.
+pub(crate) const BUNDLED: [&[u8]; 51] = [
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Bold.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-BoldItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Italic.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Light.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-LightItalic.otf"),
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLight.otf"),
-    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLightItalic.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Medium.otf"),
     include_bytes!("../../../data/fonts/desk-neue/DeskNeue-MediumItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-Regular.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLight.otf"),
+    include_bytes!("../../../data/fonts/desk-neue/DeskNeue-UltraLightItalic.otf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Light.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-LightItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-SemiBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-SemiBoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-humanist/DeskHumanist-UltraBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-ExtraBlack.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-flare/DeskFlare-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-CondensedExtraBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-Medium.ttf"),
+    include_bytes!("../../../data/fonts/desk-geometric/DeskGeometric-MediumItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-SemiBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-transitional/DeskTransitional-SemiBoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-Black.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-BlackItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-oldstyle/DeskOldstyle-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-didone/DeskDidone-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-didone/DeskDidone-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-didone/DeskDidone-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-BoldItalic.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-Italic.ttf"),
+    include_bytes!("../../../data/fonts/desk-engraver/DeskEngraver-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-Bold.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-Light.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-Regular.ttf"),
+    include_bytes!("../../../data/fonts/desk-typewriter/DeskTypewriter-SemiBold.ttf"),
+    include_bytes!("../../../data/fonts/desk-marker/DeskMarker-Thin.ttf"),
+    include_bytes!("../../../data/fonts/desk-marker/DeskMarker-Wide.ttf"),
 ];
 
 /// How a font was chosen for a family that a document names.
@@ -74,18 +117,26 @@ pub struct PagesFont {
     /// Whether the leading goes above the text, as with Apple's own fonts,
     /// rather than below it.
     pub leading_above: bool,
+    /// Whether a line whose leading rounds to nothing gets a fifth of its
+    /// height above the text in its place, as in some faces of Didot and
+    /// Futura.
+    pub fifth: bool,
     /// Whether fi and fl are joined into ligatures.
     pub ligatures: bool,
-    /// Whether ff and ffi are joined too. No other letters are.
+    /// Whether ff and ffi are joined too.
     pub ff_ligatures: bool,
+    /// Whether ffl is joined too, as in Hoefler Text. No other letters
+    /// are.
+    pub ffl_ligatures: bool,
     /// The space added between letters, in ems, so that a line of the font
     /// that stands for the family is as wide as in Pages.
     pub spacing: f32,
 }
 
-/// How Pages lays out a family at a weight, when it was measured: the face
-/// of that weight when it lays out otherwise, or else the family.
-pub fn pages_font(family: &str, weight: u16) -> Option<PagesFont> {
+/// How Pages lays out a face of a family, when it was measured: the face
+/// of that weight and slant when it lays out otherwise, or else the
+/// family.
+pub fn pages_font(family: &str, weight: u16, italic: bool) -> Option<PagesFont> {
     static TABLE: OnceLock<Vec<(&'static str, PagesFont)>> = OnceLock::new();
     let table = TABLE.get_or_init(|| {
         include_str!("../../../data/fonts/originals.tsv")
@@ -111,8 +162,10 @@ pub fn pages_font(family: &str, weight: u16) -> Option<PagesFont> {
                         descent: descent.parse().ok()?,
                         leading: leading.parse().ok()?,
                         leading_above: place == "above",
+                        fifth: place == "fifth",
                         ligatures: ligatures.starts_with("fi fl"),
-                        ff_ligatures: ligatures == "fi fl ff ffi",
+                        ff_ligatures: ligatures.starts_with("fi fl ff ffi"),
+                        ffl_ligatures: ligatures == "fi fl ff ffi ffl",
                         spacing: spacing.parse().ok()?,
                     },
                 ))
@@ -126,15 +179,24 @@ pub fn pages_font(family: &str, weight: u16) -> Option<PagesFont> {
             .find(|(name, _)| name.eq_ignore_ascii_case(wanted))
             .map(|&(_, font)| font)
     };
-    let face = match weight {
-        0..=200 => Some("UltraLight"),
-        201..=350 => Some("Light"),
-        351..=450 => None,
-        451..=550 => Some("Medium"),
-        _ => Some("Bold"),
+    let weights: &[&str] = match weight {
+        0..=200 => &["UltraLight"],
+        201..=350 => &["Light"],
+        351..=450 => &[],
+        451..=550 => &["Medium"],
+        751..=850 => &["ExtraBold", "Bold"],
+        _ => &["Bold"],
     };
-    face.and_then(|face| find(&format!("{family} {face}")))
-        .or_else(|| find(family))
+    let faces = || {
+        weights
+            .iter()
+            .map(|face| format!("{family} {face}"))
+            .chain([family.to_owned()])
+    };
+    italic
+        .then(|| faces().find_map(|face| find(&format!("{face} Italic"))))
+        .flatten()
+        .or_else(|| faces().find_map(|face| find(&face)))
 }
 
 /// A row of the table.
@@ -230,8 +292,9 @@ mod tests {
         assert!(table().len() > 40);
         let helvetica: Vec<_> = substitutes("helvetica").collect();
         assert_eq!(helvetica[0], ("Liberation Sans", true));
+        assert_eq!(substitutes("Optima").next(), Some(("Desk Flare", true)));
         assert_eq!(
-            substitutes("Optima").next(),
+            substitutes("Optima").nth(1),
             Some(("TeX Gyre Heros", false))
         );
         assert_eq!(substitutes("Unknown").count(), 0);
@@ -239,17 +302,17 @@ mod tests {
 
     #[test]
     fn the_fonts_of_pages_read() {
-        let helvetica = pages_font("helvetica", 400).unwrap();
+        let helvetica = pages_font("helvetica", 400, false).unwrap();
         assert_eq!(helvetica.ascent, 0.77002);
         assert!(helvetica.leading_above && helvetica.ligatures && !helvetica.ff_ligatures);
-        assert_eq!(pages_font("Helvetica", 700), Some(helvetica));
-        let arial = pages_font("Arial", 400).unwrap();
+        assert_eq!(pages_font("Helvetica", 700, true), Some(helvetica));
+        let arial = pages_font("Arial", 400, false).unwrap();
         assert!(!arial.leading_above && !arial.ligatures);
-        assert_eq!(pages_font("Optima", 400), None);
+        assert_eq!(pages_font("Optima", 400, false), None);
 
         // Each face of Helvetica Neue has its own height, measured on the
         // reference machine, and its leading below the text.
-        let neue = |weight| pages_font("Helvetica Neue", weight).unwrap();
+        let neue = |weight| pages_font("Helvetica Neue", weight, false).unwrap();
         assert_eq!((neue(400).ascent, neue(400).leading), (0.952, 0.028));
         assert!(!neue(400).leading_above && neue(400).ff_ligatures);
         assert_eq!(neue(300).ascent, 0.967);
@@ -261,6 +324,18 @@ mod tests {
         assert_eq!((neue(400).spacing, neue(300).spacing), (0.0, 0.0));
         assert_eq!(helvetica.spacing, 0.0);
         assert!(neue(700).ff_ligatures);
+
+        // The faces of the fonts of the templates that lay out otherwise
+        // than the font that stands for them says.
+        let hoefler = pages_font("Hoefler Text", 900, true).unwrap();
+        assert!(hoefler.leading_above && hoefler.ffl_ligatures && hoefler.ff_ligatures);
+        assert!(pages_font("Didot", 400, false).unwrap().fifth);
+        assert!(pages_font("Didot", 700, false).unwrap().fifth);
+        assert!(!pages_font("Didot", 400, true).unwrap().fifth);
+        assert!(pages_font("Futura", 700, false).unwrap().fifth);
+        assert!(!pages_font("Futura", 800, false).unwrap().fifth);
+        assert_eq!(pages_font("Futura", 500, false), None);
+        assert!(!neue(400).fifth && !neue(400).ffl_ligatures);
     }
 
     #[test]
@@ -271,6 +346,29 @@ mod tests {
             (&*choice.used, choice.kind),
             ("Desk Neue", FontMatch::Metric)
         );
+    }
+
+    #[test]
+    fn doc_05_fonts_of_desk_stand_for_the_fonts_of_the_pages_templates() {
+        let mut system = crate::TextSystem::new();
+        for (family, stands) in [
+            ("Gill Sans", "Desk Humanist"),
+            ("Optima", "Desk Flare"),
+            ("Futura", "Desk Geometric"),
+            ("Baskerville", "Desk Transitional"),
+            ("Hoefler Text", "Desk Oldstyle"),
+            ("Didot", "Desk Didone"),
+            ("Cochin", "Desk Engraver"),
+            ("American Typewriter", "Desk Typewriter"),
+            ("Marker Felt", "Desk Marker"),
+        ] {
+            let choice = system.font_choice(family);
+            assert_eq!(
+                (&*choice.used, choice.kind),
+                (stands, FontMatch::Metric),
+                "{family}"
+            );
+        }
     }
 
     #[test]

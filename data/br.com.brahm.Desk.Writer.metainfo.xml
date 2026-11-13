@@ -23,14 +23,16 @@
       Pages fazia e os salva como texto OpenDocument.
     </p>
     <p>
-      This is a nightly build of an early version: it opens, edits and saves
-      text with pictures, shapes and text boxes, but much of Pages is still
-      to come.
+      Desk Writer is in development. Text, styles, lists, sections, notes,
+      tables of contents, pictures, shapes, text boxes and media are done.
+      Tables, charts, change tracking, templates and printing are still to
+      come.
     </p>
     <p xml:lang="pt-BR">
-      Esta é uma versão noturna de uma fase inicial: ela abre, edita e salva
-      texto com imagens, formas e caixas de texto, mas muito do Pages ainda
-      está por vir.
+      O Desk Writer está em desenvolvimento. Texto, estilos, listas, seções,
+      notas, sumários, imagens, formas, caixas de texto e mídia estão prontos.
+      Tabelas, gráficos, controle de alterações, modelos e impressão ainda
+      estão por vir.
     </p>
   </description>
   <launchable type="desktop-id">br.com.brahm.Desk.Writer.desktop</launchable>
@@ -60,6 +62,28 @@
     <mediatype>application/vnd.apple.pages</mediatype>
   </provides>
   <releases>
+    <release version="0.6.0~beta1" date="2026-11-13" type="development">
+      <description>
+        <p>The second beta, with objects and page layout:</p>
+        <ul>
+          <li>Pictures, shapes, text boxes, movies and sounds, on the page or in the text, with masks, Instant Alpha, fills, strokes, shadows, reflections and picture frames</li>
+          <li>Text that wraps around objects, linked text boxes and page layout documents</li>
+          <li>Formatted text and pictures pasted from other programs</li>
+          <li>Desk Neue, a font with the widths of Helvetica Neue, so that lines break where Pages breaks them</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.5.0~beta1" date="2026-11-03" type="development">
+      <description>
+        <p>The first beta, for long documents of text:</p>
+        <ul>
+          <li>Paragraph, character and list styles</li>
+          <li>Spelling and grammar, hyphenation, and find and replace</li>
+          <li>Sections, columns, headers and footers, footnotes and endnotes, tables of contents, links and bookmarks</li>
+          <li>Page thumbnails and the outline</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-02" type="development">
       <description>
         <p>The first nightly build: open documents of Pages ’09 and OpenDocument text, edit and format their text, and save them as ODT.</p>
