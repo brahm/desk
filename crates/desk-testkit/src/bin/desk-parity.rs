@@ -16,7 +16,9 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use desk_testkit::report::{Report, compared_by_row, differing_by_row, run_case, tests_by_row};
+use desk_testkit::report::{
+    Report, compared_by_row, differing_by_row, parse_review, run_case, tests_by_row,
+};
 use desk_testkit::{Case, matrix};
 
 fn main() -> ExitCode {
@@ -61,7 +63,13 @@ fn run() -> Result<bool, String> {
 
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let results = cases.iter().map(|case| run_case(case, &out)).collect();
-    let report = Report::new(rows, results, &tests, &compared, &differing);
+    let review_path = corpus.join("vm-review.tsv");
+    let review = std::fs::read_to_string(&review_path)
+        .map_err(|e| format!("{}: {e}", review_path.display()))
+        .and_then(|text| {
+            parse_review(&text).map_err(|e| format!("{}: {e}", review_path.display()))
+        })?;
+    let report = Report::new(rows, results, &tests, &compared, &differing).with_review(&review);
     for (name, text) in [
         ("report.md", report.to_markdown(&out)),
         ("report.json", report.to_json()),

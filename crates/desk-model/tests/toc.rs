@@ -164,3 +164,47 @@ fn est_23_entries_get_styles_with_a_tab_for_the_leader() {
         page.width - page.margin_left - page.margin_right
     );
 }
+
+#[test]
+fn sty_05_a_style_that_a_table_lists_can_be_deleted_and_the_table_updates() {
+    // On the reference machine, Pages 4.3 deletes a style that the table
+    // of contents lists: the table stops listing it and updates at once.
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let heading = editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "Chapter one")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Some text")?;
+            let heading = edit.new_paragraph_style("MyHead", start, start, true)?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry: edit.document().styles().default_paragraph(),
+                    page_number: true,
+                }],
+                page_links: false,
+            };
+            edit.set_text_settings(settings)?;
+            edit.insert_table_of_contents(0)?;
+            Ok(heading)
+        })
+        .unwrap();
+    assert!(
+        texts(editor.document())
+            .iter()
+            .any(|t| t.starts_with("Chapter one\t"))
+    );
+    editor
+        .edit("Delete Style", |edit| edit.delete_style(heading, None))
+        .unwrap();
+    let document = editor.document();
+    assert!(document.styles().get(heading).is_none());
+    assert!(!document.text_settings().toc.uses(heading));
+    assert!(
+        !texts(document)
+            .iter()
+            .any(|t| t.starts_with("Chapter one\t"))
+    );
+}

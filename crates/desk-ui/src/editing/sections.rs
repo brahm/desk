@@ -9,7 +9,7 @@ use std::cell::RefCell;
 
 use desk_model::{LayoutPagesClip, ModelError, SectionsClip};
 
-use super::{Selection, Spot, TextEditor};
+use super::{Spot, TextEditor};
 
 /// What was last cut or copied in the thumbnails: sections of a word
 /// processing document, or pages of a page layout one.
@@ -224,8 +224,24 @@ impl TextEditor {
         ))
     }
 
-    /// Deletes what a page holds (Edit ▸ Delete Page, TXT-02): its
-    /// section, when the page is all of it, or else its text.
+    /// The first and the last page of the section of a page, which Delete
+    /// Page deletes in a word processing document; the page alone in a
+    /// page layout one (TXT-02).
+    pub fn deleted_pages(&self, page: usize) -> Option<(usize, usize)> {
+        if self.is_page_layout() {
+            return Some((page, page));
+        }
+        let sections = self.page_sections();
+        let section = *sections.get(page)?;
+        let first = sections.iter().position(|&s| s == section)?;
+        let last = sections.iter().rposition(|&s| s == section)?;
+        Some((first, last))
+    }
+
+    /// Deletes a page (Edit ▸ Delete Page, TXT-02). In a word processing
+    /// document the whole section of the page goes, as the reference
+    /// machine showed Pages 4.3 do: deleting page 2 of a section of 8
+    /// pages deletes the 8, and the last section leaves an empty page.
     pub fn delete_page(&self, page: usize) {
         self.leave_story(None);
         if self.is_page_layout() {
@@ -233,31 +249,9 @@ impl TextEditor {
             self.layout_page_edit("Delete Page", |edit| edit.delete_layout_page(page));
             return;
         }
-        let sections = self.page_sections();
-        let Some(&section) = sections.get(page) else {
-            return;
-        };
-        if sections.iter().filter(|&&s| s == section).count() == 1 {
+        if let Some(&section) = self.page_sections().get(page) {
             self.delete_sections(&[section]);
-            return;
         }
-        let Some((start, mut end)) = self.page_text_range(page) else {
-            return;
-        };
-        // The break at the end of the last paragraph goes too, unless the
-        // next page starts in the same paragraph.
-        let next = self.page_text_range(page + 1);
-        if next.is_none_or(|(n, _)| n.paragraph > end.paragraph) {
-            let count = self.state.borrow().editor.document().body().len();
-            if end.paragraph + 1 < count {
-                end = Spot::new(end.paragraph + 1, 0);
-            }
-        }
-        self.select(Selection {
-            anchor: start,
-            focus: end,
-        });
-        self.replace_selection("Delete Page", "");
     }
 
     /// Whether the document is laid out page by page, with no body text

@@ -2552,6 +2552,21 @@ impl TextEditor {
         styles
     }
 
+    /// The character styles of the document, by name.
+    pub fn character_styles(&self) -> Vec<(StyleId, String)> {
+        let state = self.state.borrow();
+        let mut styles: Vec<_> = state
+            .editor
+            .document()
+            .styles()
+            .iter()
+            .filter(|s| s.family() == StyleFamily::Character)
+            .map(|s| (s.id(), s.name().to_owned()))
+            .collect();
+        styles.sort_by_key(|s| s.1.to_lowercase());
+        styles
+    }
+
     /// Sets character formatting on the selection, as one action of the
     /// history. With nothing selected, the next text typed takes it.
     pub fn set_character_attrs(&self, name: &str, attrs: &CharAttrs) {
@@ -2640,8 +2655,8 @@ impl TextEditor {
     }
 
     /// Gives the paragraphs of the selection a paragraph style and drops
-    /// the formatting set over it, as a style shortcut with Alt does
-    /// (STY-04).
+    /// the formatting and character styles set over it, as a double click
+    /// on the style or a style shortcut with Shift does (STY-04, STY-06).
     pub fn set_paragraph_style_clean(&self, style: StyleId) {
         if self.style_selected_objects(
             "Paragraph Style",
@@ -3171,7 +3186,23 @@ impl TextEditor {
         let collapse = |forward: bool| {
             (!shift && !selection.is_empty()).then_some(if forward { end } else { start })
         };
+        let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
         match key {
+            // In a list, Alt+Shift+Right and Alt+Shift+Left change the
+            // level of the item alone, as Option-Tab does in Pages:
+            // Alt+Tab belongs to GNOME (LST-02).
+            gdk::Key::Right | gdk::Key::KP_Right | gdk::Key::Left | gdk::Key::KP_Left
+                if alt
+                    && shift
+                    && !control
+                    && self.change_list_level(
+                        if matches!(key, gdk::Key::Left | gdk::Key::KP_Left) {
+                            -1
+                        } else {
+                            1
+                        },
+                        false,
+                    ) => {}
             gdk::Key::Left | gdk::Key::KP_Left => {
                 let spot = collapse(false).unwrap_or_else(|| {
                     if control {
@@ -3260,11 +3291,9 @@ impl TextEditor {
             }
             gdk::Key::Tab | gdk::Key::ISO_Left_Tab if !control => {
                 // In a list, Tab and Shift-Tab change the level of the
-                // item and the items under it, and with Alt only of the
-                // item (LST-02).
-                let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
+                // item and the items under it (LST-02).
                 let by = if shift { -1 } else { 1 };
-                if !self.change_list_level(by, !alt) {
+                if !self.change_list_level(by, true) {
                     self.replace_selection("Typing", "\t");
                 }
             }

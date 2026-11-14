@@ -46,7 +46,10 @@ const SECTIONS: &[Section] = &[
             ("<Control>c", n_("Copy")),
             ("<Control>d", n_("Duplicate")),
             ("<Control>v", n_("Paste")),
-            ("<Control><Shift><Alt>v", n_("Paste and match style")),
+            (
+                "<Control><Shift>v <Control><Shift><Alt>v",
+                n_("Paste and match style"),
+            ),
             ("<Control>a", n_("Select all")),
             ("<Control>period", n_("Special characters")),
             ("<Shift>Return", n_("Line break")),
@@ -65,6 +68,10 @@ const SECTIONS: &[Section] = &[
                 n_("Start or end of the document"),
             ),
             ("<Shift>Left <Shift>Right", n_("Select while moving")),
+            (
+                "<Alt><Shift>Right <Alt><Shift>Left",
+                n_("Change the level of a list item alone"),
+            ),
             ("Menu <Shift>F10", n_("Context menu")),
         ],
     ),
@@ -87,9 +94,12 @@ const SECTIONS: &[Section] = &[
             ("<Control><Alt>c", n_("Copy paragraph style")),
             ("<Control><Shift><Alt>c", n_("Copy character style")),
             ("<Control><Alt>v", n_("Paste style")),
-            ("F1 F2 F3 F4 F5 F6 F7 F8", n_("Apply the style of the key")),
             (
-                "<Alt>F1",
+                "<Control>1 <Control>2 <Control>3 <Control>4 <Control>5 <Control>6 <Control>7 <Control>8",
+                n_("Apply the style of the key"),
+            ),
+            (
+                "<Control><Shift>1",
                 n_("Apply a style and drop the formatting over it"),
             ),
             ("<Control>r", n_("Show ruler")),
@@ -101,6 +111,7 @@ const SECTIONS: &[Section] = &[
         n_("Arranging"),
         true,
         &[
+            ("<Control><Alt>p", n_("Choose an image, movie or sound")),
             ("<Control><Shift>bracketright", n_("Bring to front")),
             ("<Control>bracketright", n_("Bring forward")),
             ("<Control>bracketleft", n_("Send backward")),
@@ -118,6 +129,7 @@ const SECTIONS: &[Section] = &[
         true,
         &[
             ("<Control>f", n_("Find & Replace")),
+            ("<Control>h", n_("Replace")),
             ("<Control>g", n_("Find next")),
             ("<Control><Shift>g", n_("Find previous")),
             ("<Control>e", n_("Use selection for Find")),

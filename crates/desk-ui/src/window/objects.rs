@@ -50,7 +50,9 @@ pub(super) const OBJECT_ACTIONS: [&str; 28] = [
 /// The keys of the Arrange menu.
 pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 10] = [
     ("win.duplicate-objects", &["<Control>d"]),
-    ("win.insert-picture", &["<Control><Shift>v"]),
+    // Ctrl+Shift+V is Paste Special in GNOME, so Choose… of Pages moves
+    // to Ctrl+Alt+P, for picture.
+    ("win.insert-picture", &["<Control><Alt>p"]),
     ("win.bring-to-front", &["<Control><Shift>bracketright"]),
     ("win.bring-forward", &["<Control>bracketright"]),
     ("win.send-backward", &["<Control>bracketleft"]),

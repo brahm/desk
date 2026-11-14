@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The rows of matrix.tsv whose interface was compared by eye with Pages
+# 4.3 running on the reference Mac OS X Lion, with the date and the review
+# that did it. desk-parity shows them as "conferido na VM do Lion" when
+# their tests pass and no PDF of Pages checks them. The review of
+# 2026-11-13 is "Interface do Desk comparada ao Pages 4.3"; its
+# differences were fixed in #97 to #100 or are rows of the closing of
+# phase 6 in the roadmap. OBJ-31 is not here: Pages 4.3 keeps the
+# command disabled.
+id	date	source
+DOC-03	2026-11-13	Interface do Desk comparada ao Pages 4.3
+DOC-07	2026-11-13	Interface do Desk comparada ao Pages 4.3
+DOC-09	2026-11-13	Interface do Desk comparada ao Pages 4.3
+DOC-12	2026-11-13	Interface do Desk comparada ao Pages 4.3
+DOC-18	2026-11-13	Interface do Desk comparada ao Pages 4.3
+DOC-21	2026-11-13	Interface do Desk comparada ao Pages 4.3
+EST-01	2026-11-13	Interface do Desk comparada ao Pages 4.3
+EST-17	2026-11-13	Interface do Desk comparada ao Pages 4.3
+EST-21	2026-11-13	Interface do Desk comparada ao Pages 4.3
+FMT-17	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-05	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-07	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-08	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-09	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-10	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-14	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-15	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-16	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-17	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-18	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-19	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-20	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-21	2026-11-13	Interface do Desk comparada ao Pages 4.3
+INT-22	2026-11-13	Interface do Desk comparada ao Pages 4.3
+LST-01	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-21	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-22	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-23	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-26	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-27	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-28	2026-11-13	Interface do Desk comparada ao Pages 4.3
+OBJ-29	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-02	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-03	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-04	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-05	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-06	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-07	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-08	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-09	2026-11-13	Interface do Desk comparada ao Pages 4.3
+STY-10	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-02	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-03	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-05	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-07	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-10	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-11	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-12	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-13	2026-11-13	Interface do Desk comparada ao Pages 4.3
+TXT-14	2026-11-13	Interface do Desk comparada ao Pages 4.3

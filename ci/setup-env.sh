@@ -21,7 +21,7 @@
 set -euo pipefail
 
 # Keep in sync with rust-version in Cargo.toml.
-msrv=1.100
+msrv=1.98
 # The GTK of the GNOME 51 runtime; keep in sync with the features of gtk
 # in Cargo.toml.
 gtk_version=4.24
