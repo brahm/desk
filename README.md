@@ -55,16 +55,10 @@ done (the first six phases of the plan;
   widths and kerning, so that lines break where Pages breaks them.
 - `desk-convert` exports documents to PDF from the command line.
 
-Tables and charts come next, then review and collaboration. Desk Slides
+The new window comes next, then tables and charts, then review and
+collaboration. Desk Slides
 and Desk Tables have their own parity matrices, with 180 rows each, and
 start once the table and chart engine is ready.
-
-The three apps share one window: a navigation sidebar, a header bar with
-the insert buttons, a slim format bar that changes with the selection, an
-Inspector in two levels and a bottom bar.
-[`docs/interface`](docs/interface/README.md) describes it, lists its 208
-components and says where each command of iWork '09 went. Desk Writer
-moves to it before tables and charts.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
 has a nightly branch built from `main` every night:
@@ -82,6 +76,32 @@ Desk is built by one person working with Claude, Anthropic's AI, with
 the same engineering rigor expected of any team: every feature of the
 iWork '09 apps is a row of a parity matrix, and the output is compared
 with PDFs made by iWork 9.3 itself.
+
+## How the apps will look
+
+The three apps will share one window, chosen in November 2026: a sidebar
+to move around the document, a header bar with the insert buttons, a
+slim format bar that changes with the selection, one Inspector on the
+right and a bottom bar with the zoom and the position. Desk Writer moves
+to it before tables and charts. These are mockups drawn with the real
+GTK 4 and Libadwaita widgets, shown in Brazilian Portuguese.
+[`docs/interface`](docs/interface/README.md) describes the window, lists
+its 208 components and says where each command of iWork '09 went.
+
+<p align="center">
+  <img src="docs/interface/janelas/writer-b.png" alt="Desk Writer: page thumbnails in the sidebar, a report with a picture and a table, and the Inspector open on the text format" width="800">
+  <br><em>Desk Writer</em>
+</p>
+
+<p align="center">
+  <img src="docs/interface/janelas/tables-b.png" alt="Desk Tables: sheets in the sidebar, a table of expenses with the formula bar, and instant calculations in the bottom bar" width="800">
+  <br><em>Desk Tables</em>
+</p>
+
+<p align="center">
+  <img src="docs/interface/janelas/slides-b.png" alt="Desk Slides: the slide navigator in the sidebar, a slide with a picture selected, presenter notes below and the Play button in the header bar" width="800">
+  <br><em>Desk Slides</em>
+</p>
 
 ## Building
 

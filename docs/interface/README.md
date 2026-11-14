@@ -191,16 +191,15 @@ virtual.
 | Duplicar, Travar, Agrupar, Desagrupar | ⌘D, ⌘L, ⌥⌘G, ⌥⇧⌘G | Ctrl+D, Ctrl+L, Ctrl+Alt+G, Ctrl+Shift+Alt+G | 2 | |
 | Trazer para a frente, Enviar para trás | ⇧⌘F, ⇧⌘B | Ctrl+Shift+] e Ctrl+Shift+[ | 3 | É o que o Desk Writer já usa. Uma camada por vez: Ctrl+] e Ctrl+[ |
 | Resultados da busca na barra lateral | ⌥⌘F | Ctrl+Alt+F | 2 | |
-| Máscara | ⇧⌘M | Ctrl+Shift+M | 2 | Proposta |
-| Buscar comandos | ⇧⌘? (busca do menu Ajuda) | Ctrl+/ | 3 | Proposta. Nos campos de texto do GTK, Ctrl+/ seleciona tudo. No GTK 4.24.1 o atalho do aplicativo vence, e selecionar tudo continua em Ctrl+A. A alternativa é Ctrl+Shift+P |
-| Reproduzir a apresentação | ⌥⌘P | F5 | 3 | Proposta. Ctrl+Alt+P já é Escolher, e F5 é o costume em apresentações no Linux |
-| Novo slide | ⇧⌘N | Ctrl+M | 3 | Proposta. Ctrl+Shift+N já é Nova janela no Desk |
-| Pular este slide | Sem atalho | Ctrl+Shift+H | 2 | Proposta, igual ao Keynote de hoje |
-| Linha acima ou abaixo, coluna antes ou depois | ⌥ e as setas | Alt e as setas | 2 | Proposta para o Tables |
-| Lista de fórmulas | ⌥⌘F | A definir | 3 | Ctrl+Alt+F já abre os resultados da busca |
+| Máscara | ⇧⌘M | Ctrl+Shift+M | 2 | |
+| Buscar comandos | ⇧⌘? (busca do menu Ajuda) | Ctrl+/ | 3 | Nos campos de texto do GTK, Ctrl+/ seleciona tudo. No GTK 4.24.1 o atalho do aplicativo vence, e selecionar tudo continua em Ctrl+A |
+| Reproduzir a apresentação | ⌥⌘P | F5 | 3 | Ctrl+Alt+P já é Escolher, e F5 é o costume em apresentações no Linux |
+| Novo slide | ⇧⌘N | Ctrl+M | 3 | Ctrl+Shift+N já é Nova janela no Desk |
+| Pular este slide | Sem atalho | Ctrl+Shift+H | 2 | Igual ao Keynote de hoje |
+| Linha acima ou abaixo, coluna antes ou depois | ⌥ e as setas | Alt e as setas | 2 | No Tables |
+| Lista de fórmulas | ⌥⌘F | Ctrl+Shift+F | 3 | Ctrl+Alt+F já abre os resultados da busca. Ctrl+Shift+F guarda o F do Numbers e está livre no Desk e no GNOME |
 
-As linhas marcadas como proposta esperam confirmação antes de entrarem
-no código.
+Os atalhos que eram propostas foram confirmados em 14/11/2026.
 
 ## Práticas da HIG que a interface segue
 
@@ -345,16 +344,16 @@ A fase 1 do Slides só depende do que o Desk Writer já tem e pode andar
 junto com as sete etapas. A fase 2 do Slides e a do Tables esperam as
 etapas 1 a 6, e o Tables inteiro espera a fase 7 do Writer.
 
-## O que espera confirmação
+## Decidido em 14/11/2026
 
-- O nome **Dados** para o que o Numbers chamava de Reorganizar (ordenar,
-  filtrar e categorizar), e **Info** para a aba de informações do
-  documento.
-- Os atalhos marcados como proposta na tabela: Ctrl+/ para a busca de
-  comandos, F5 para reproduzir, Ctrl+M para novo slide, Ctrl+Shift+H para
-  pular o slide, Ctrl+Shift+M para a máscara, Alt e as setas no Tables, e
-  o da lista de fórmulas, que falta escolher.
-- Renomear o documento com um clique no título da janela.
+- A aba **Dados** do Inspetor do Tables reúne o que o Numbers chamava de
+  Reorganizar (ordenar, filtrar e categorizar), e a aba **Info** tem as
+  informações do documento.
+- Os atalhos da tabela acima: Ctrl+/ para a busca de comandos, F5 para
+  reproduzir, Ctrl+M para novo slide, Ctrl+Shift+H para pular o slide,
+  Ctrl+Shift+M para a máscara, Alt e as setas no Tables e Ctrl+Shift+F
+  para a lista de fórmulas.
+- Um clique no título da janela renomeia o documento.
 
 ## Refazer os mockups
 

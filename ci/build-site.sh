@@ -4,7 +4,8 @@
 
 # Assembles the website published on GitHub Pages into one directory
 # (target/site by default): the pages in site/, plus the logo and the app
-# icons copied from data/, so that the images have one source.
+# icons copied from data/ and the interface mockups copied from
+# docs/interface/janelas/, so that the images have one source.
 #
 # The Flatpak repository is published on the same site, under paths that
 # the pages must never use; site/README.md lists them.
@@ -27,6 +28,10 @@ done
 cp data/logo/desk.svg data/logo/desk-logo.svg data/logo/desk-logo-dark.svg \
     data/logo/desk-logo.png "$out/img/"
 cp data/icons/hicolor/scalable/apps/br.com.brahm.Desk.*.svg "$out/img/"
+# The mockups of the interface, from the docs, for the same reason.
+mkdir -p "$out/img/interface"
+cp docs/interface/janelas/writer-b.png docs/interface/janelas/tables-b.png \
+    docs/interface/janelas/slides-b.png "$out/img/interface/"
 
 # The site is plain files: tell GitHub Pages not to run Jekyll on it.
 touch "$out/.nojekyll"

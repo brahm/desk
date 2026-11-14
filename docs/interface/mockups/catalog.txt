@@ -9,7 +9,7 @@
 ## Janela
 janela | Janela do documento | - | Uma janela por documento (AdwApplicationWindow), com pontos de quebra para largura média e estreita | Janela do documento | Janela do documento | existe | Ctrl+N, Ctrl+W
 cab.barra | Barra de cabeçalho | - | Controles da janela inteira: visualização e inserção no início, título no centro, busca, Inspetor e menu principal no fim. Sem personalização | Barra de ferramentas personalizável (51 itens no Pages) | Barra de ferramentas | muda | F10 abre o menu
-cab.titulo | Título da janela | - | Nome do documento e, embaixo, a pasta e o estado (Editado). Clicar renomeia (proposta) | Título com ícone de proxy e versões | Título com menu de renomear e mover | existe | -
+cab.titulo | Título da janela | - | Nome do documento e, embaixo, a pasta e o estado (Editado). Clicar renomeia | Título com ícone de proxy e versões | Título com menu de renomear e mover | existe | -
 cab.abrir | Abrir | Open | Abre o seletor de arquivos. Só na versão A; nas outras fica no menu principal e no seletor de modelos | Arquivo ▸ Abrir | Arquivo ▸ Abrir | existe | Ctrl+O
 cab.visualizar-menu | Visualização (botão de menu) | View | Menu Visualizar do iWork como botão de texto: painéis, régua, layout, invisíveis, zoom | Botão View da barra e menu View | Botão Visualizar | existe | -
 cab.inserir-menu | Inserir (botão de menu) | Insert | Menu Inserir inteiro, com os objetos e o resto (quebras, campos, notas, link) | Menu Insert e botões Text Box, Shapes, Table, Charts, Comment | Botões e menu Inserir | existe | -
@@ -25,10 +25,10 @@ cab.inserir.comentario | Comentário | Comment | Insere um comentário no texto 
 cab.inserir-tudo | Inserir (um botão só) | Insert | Versão C: um popover com abas Tabela, Gráfico, Forma e Mídia e a lista do resto (caixa de texto, comentário, quebras e campos) | Botão Objects da paleta de personalização | Botão Inserir do iPad | novo | -
 cab.funcao | Função | Function | Versão A: menu com soma, média, mínimo, máximo, contagem, produto, mais funções e editor de fórmulas | Botão Function | Botão Inserir fórmula | novo | -
 cab.reorganizar | Reorganizar | Reorganize | Versões A e C: abre o painel de ordenar, filtrar e categorizar | Botão Reorganize (painel flutuante) | Botão Organizar | novo | -
-cab.novo-slide | Novo slide | New | Versão A: acrescenta um slide depois do selecionado | Botão New (+) | Botão Adicionar slide | novo | Novo slide: Ctrl+M (proposta, como no Impress e no PowerPoint; Ctrl+Shift+N já é Nova janela no Desk)
+cab.novo-slide | Novo slide | New | Versão A: acrescenta um slide depois do selecionado | Botão New (+) | Botão Adicionar slide | novo | Novo slide: Ctrl+M, como no Impress e no PowerPoint (Ctrl+Shift+N já é Nova janela no Desk)
 cab.temas | Temas | Themes | Versão A: troca o tema da apresentação | Botão Themes | Documento ▸ Alterar tema | novo | -
 cab.mestres | Mestres | Masters | Versão A: aplica um slide mestre ao slide selecionado | Botão Masters | Formatar ▸ Layout do slide | novo | -
-cab.reproduzir | Reproduzir | Play | Inicia a apresentação. Em B é um AdwSplitButton: a seta abre do início, deste slide, ensaiar, gravar, tela do apresentador, em janela | Botão Play e menu Play | Botão Reproduzir | novo | F5 (proposta); Esc sai
+cab.reproduzir | Reproduzir | Play | Inicia a apresentação. Em B é um AdwSplitButton: a seta abre do início, deste slide, ensaiar, gravar, tela do apresentador, em janela | Botão Play e menu Play | Botão Reproduzir | novo | F5; Esc sai
 cab.localizar | Buscar | Find | Botão de alternância que abre a barra de busca sob a barra de cabeçalho | Editar ▸ Buscar (painel Find & Replace) | Buscar na barra de ferramentas | existe | Ctrl+F; Ctrl+H substituir
 cab.inspetor | Inspetor | Inspector | Botão de alternância do painel à direita | Botão Inspector (janelas flutuantes) | Botões Formatar e Documento | existe | Ctrl+Alt+I
 cab.midia | Mídia | Media | Versão A: abre o navegador de mídia como página do painel | Botão Media | Botão Mídia | existe | -
@@ -40,7 +40,7 @@ cab.menu | Menu principal | Main Menu | Novo documento, Abrir, Abrir recente, Sa
 ## Barra lateral
 lat.barra | Barra lateral de navegação | Sidebar | Painel da altura da janela (versões B e C) com cabeçalho próprio; some em tela cheia e vira sobreposição em janela estreita | Painel de miniaturas à esquerda | Barra lateral de miniaturas | muda | F9
 lat.modo | Conteúdo da barra lateral | - | Botão de menu no cabeçalho da lateral: Páginas, Estilos, Comentários, Resultados da busca (Writer); Planilhas, Estilos de tabela (Tables); Navegador, Tópicos, Slides mestres (Slides) | Pop-up View e gaveta de estilos | Menu Visualizar | novo | Ctrl+Shift+T estilos; Ctrl+Alt+F busca
-lat.adicionar | Adicionar página, planilha ou slide | Add Page / Sheet / Slide | Botão + do cabeçalho da lateral; abre as páginas do modelo, os tipos de planilha ou os slides mestres | Botões Sections, Sheet e New | Adicionar página / folha / slide | novo | Novo slide: Ctrl+M (proposta, como no Impress e no PowerPoint; Ctrl+Shift+N já é Nova janela no Desk)
+lat.adicionar | Adicionar página, planilha ou slide | Add Page / Sheet / Slide | Botão + do cabeçalho da lateral; abre as páginas do modelo, os tipos de planilha ou os slides mestres | Botões Sections, Sheet e New | Adicionar página / folha / slide | novo | Novo slide: Ctrl+M, como no Impress e no PowerPoint (Ctrl+Shift+N já é Nova janela no Desk)
 lat.miniaturas | Miniaturas das páginas | Page Thumbnails | Lista de páginas com número; arrastar reordena seções, menu de contexto duplica e exclui | Painel Page Thumbnails | Miniaturas de página | existe | F9
 lat.planilhas | Planilhas e objetos | Sheets | AdwSidebar com duas seções: as planilhas do documento e as tabelas e os gráficos da planilha atual | Painel Sheets (árvore) | Abas de folha | novo | Ctrl+PageUp/PageDown troca de planilha
 lat.navegador | Navegador de slides | Navigator | Miniaturas numeradas; arrastar reordena, Tab recua (agrupa), menu de contexto pula ou duplica | Slide navigator | Navegador de slides | novo | F9
@@ -99,7 +99,7 @@ fmt.bordas | Bordas da célula | Cell Borders | Menu: todas, externas, internas,
 fmt.mestre | Slide mestre | Slide Master | Versão B (Slides), sem seleção: botão de menu com o mestre do slide; o popover mostra os mestres do tema | Botão Masters da barra | Layout do slide no painel Formatar | novo | -
 fmt.fundo-slide | Fundo do slide | Slide Background | Versão B (Slides), sem seleção: popover Cores para o fundo, com gradiente e imagem no Inspetor | Painel Slide ▸ Appearance ▸ Background | Fundo no painel Formatar | novo | -
 fmt.transicao | Transição | Transition | Versão B (Slides), sem seleção: botão de menu com o efeito atual; o popover lista os efeitos | Painel Slide ▸ Transition | Painel Animar ▸ Transição | novo | -
-fmt.pular | Pular este slide | Skip Slide | Versão B (Slides): botão de alternância; o slide pulado fica recolhido no navegador | Slide ▸ Skip Slide (na tradução da Apple, Ignorar Slide) e botão Skip da paleta | Slide ▸ Pular Slide | novo | Ctrl+Shift+H (proposta, como no Keynote)
+fmt.pular | Pular este slide | Skip Slide | Versão B (Slides): botão de alternância; o slide pulado fica recolhido no navegador | Slide ▸ Skip Slide (na tradução da Apple, Ignorar Slide) e botão Skip da paleta | Slide ▸ Pular Slide | novo | Ctrl+Shift+H, como no Keynote de hoje
 fmt.tipo-grafico | Tipo de gráfico | Chart Type | Botão de menu com o tipo atual; popover com a galeria de tipos | Pop-up Chart Type | Tipo de gráfico no painel | novo | -
 fmt.editar-dados | Editar dados | Edit Data | Mostra as referências de dados (Tables) ou o editor de dados (Writer e Slides) | Botão Edit Data e Chart Data Editor | Editar referências de dados | novo | -
 
@@ -261,7 +261,7 @@ busca.substituir-campo | Substituir por | Replace | Campo do texto novo | Campo 
 busca.substituir | Substituir | Replace | Troca o resultado atual | Botão Replace | Botão Substituir | existe | -
 busca.substituir-tudo | Substituir tudo | Replace All | Troca todos | Botão Replace All | Botão Substituir tudo | existe | -
 aviso.banner | Avisos do documento | Document Warnings | AdwBanner depois de abrir ou exportar com perdas; o botão abre a lista | Janela Document Warnings | Avisos | existe | -
-comandos.dialogo | Buscar comandos | Search Commands | Diálogo com um campo e a lista de todos os comandos, inclusive os que o iWork tinha só na barra de menus | Barra de menus e Ajuda ▸ Buscar | Ajuda ▸ Buscar | novo | Ctrl+/ (proposta; conferir contra o Ctrl+/ dos campos de texto do GTK, alternativa Ctrl+Shift+P)
+comandos.dialogo | Buscar comandos | Search Commands | Diálogo com um campo e a lista de todos os comandos, inclusive os que o iWork tinha só na barra de menus | Barra de menus e Ajuda ▸ Buscar | Ajuda ▸ Buscar | novo | Ctrl+/ (vence o selecionar tudo dos campos de texto do GTK, que continua em Ctrl+A)
 comandos.campo | Campo de comandos | - | Digitar filtra a lista | Ajuda ▸ Buscar | - | novo | -
 comandos.lista | Lista de comandos | - | Nome do comando, o menu de origem e o atalho (AdwShortcutLabel) | - | - | novo | Enter executa
 
