@@ -1289,7 +1289,12 @@ def inspector_node(app, name, accept=None):
         if n.get_role() == Atspi.Role.RADIO_BUTTON and n.get_name() in PANES and showing(n)
     ]
     for toggle in toggles:
-        Atspi.Action.do_action(toggle, 0)
+        try:
+            Atspi.Action.do_action(toggle, 0)
+        except GLib.GError:
+            # The Inspector made its panes again for a new selection; the
+            # next look finds the new toggles.
+            return None
         time.sleep(0.3)
         found = look()
         if found is not None:
