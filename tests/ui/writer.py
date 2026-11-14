@@ -2269,19 +2269,19 @@ def gnome_window(work):
         press("ctrl+alt+i")
         language = wait_for("the Inspector", lambda: inspector_node(app, "Language"))
         check(
-            "at 640 px the Inspector still sits beside the pages (GNM-01)",
+            "at 640 px, half of a 1280 × 720 screen, the Inspector sits beside the pages (GNM-01)",
             right_of(pages) <= extents(language).x,
         )
         subprocess.run(
-            ["xdotool", "search", "--name", name, "windowsize", "380", "600"],
+            ["xdotool", "search", "--name", name, "windowsize", "500", "600"],
             check=True,
         )
-        # Below 400 px the Inspector closes, and comes back over the pages.
-        wait_for("the Inspector to close below 400 px", lambda: inspector_node(app, "Language") is None)
+        # Below 520 px the Inspector closes, and comes back over the pages.
+        wait_for("the Inspector to close below 520 px", lambda: inspector_node(app, "Language") is None)
         press("ctrl+alt+i")
         language = wait_for("the Inspector over the pages", lambda: inspector_node(app, "Language"))
         check(
-            "below 400 px the Inspector covers the pages (GNM-01)",
+            "below 520 px the Inspector covers the pages (GNM-01)",
             right_of(pages) > extents(language).x,
         )
         press("ctrl+alt+i")

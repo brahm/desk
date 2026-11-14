@@ -322,13 +322,12 @@ funcionando.
 
 Oito linhas que já têm testes mudam de forma com a interface B e ficam
 reabertas até a etapa que as refaz: INT-07, INT-11, INT-14, INT-18,
-INT-19, DOC-20, TXT-13 e GNM-01. A etapa 1 refez GNM-01: a janela desce a
-360 px, a barra lateral cobre as páginas abaixo de 720 px e o Inspetor,
-abaixo de 400 px, onde ele fecha e volta por cima das páginas; nessa
-largura a barra de cabeçalho mostra Visualização e Inserir como ícones,
-sem Abrir nem o Navegador de mídia, e o título sem a pasta. O botão
-Adicionar da barra lateral insere, por enquanto, uma página em branco ou
-uma quebra de seção; as páginas do modelo chegam com a fase 9 (INT-06).
+INT-19, DOC-20, TXT-13 e GNM-01. A etapa 1 refez GNM-01 para a tela
+mínima de 1280 × 720: abaixo de 720 px, como em meia tela, a barra
+lateral cobre as páginas; abaixo de 520 px o Inspetor fecha e volta por
+cima delas. O botão Adicionar da barra lateral insere, por enquanto, uma
+página em branco ou uma quebra de seção; as páginas do modelo chegam com
+a fase 9 (INT-06).
 O relatório de paridade continua a
 contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.

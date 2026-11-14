@@ -203,7 +203,7 @@ impl FindWindow {
             .placeholder_text(tr("Find"))
             .primary_icon_name("system-search-symbolic")
             .hexpand(true)
-            // Narrow enough for a window of 360 px (GNM-01); it grows
+            // Narrow enough for a narrow window (GNM-01); it grows
             // with the window.
             .width_chars(6)
             .build();
@@ -274,7 +274,7 @@ impl FindWindow {
         let status = gtk::Label::builder()
             .xalign(0.0)
             .width_chars(10)
-            // It gives way in a window of 360 px (GNM-01).
+            // It gives way in a narrow window (GNM-01).
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .css_classes(["dim-label", "caption"])
             .build();
@@ -309,7 +309,7 @@ impl FindWindow {
         labelled(&window, &tr("Find & Replace"));
         window.connect_entry(&find);
         // A closed bar takes no room, not even the width of its fields,
-        // so that the window goes down to 360 px (GNM-01).
+        // so that the window can be narrow (GNM-01).
         window.set_visible(false);
         window.connect_search_mode_enabled_notify(|bar| {
             bar.set_visible(bar.is_search_mode());

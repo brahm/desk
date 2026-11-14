@@ -8,8 +8,8 @@
 //! The window has the skeleton of interface B (docs/interface): the
 //! navigation sidebar as high as the window at the start, with the page
 //! thumbnails (GNM-12), and the Inspector as a utility pane at the end.
-//! Below 720 px the sidebar covers the pages instead of pushing them, and
-//! below 400 px the Inspector does too (GNM-01).
+//! Below 720 px, as in half of the smallest screen Desk supports, the
+//! sidebar covers the pages instead of pushing them (GNM-01).
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -47,10 +47,11 @@ const INSPECTOR_WIDTH: f64 = 332.0;
 
 /// The widths below which the window changes, in pixels (GNM-01): the
 /// format bar leaves out its secondary controls, the navigation sidebar
-/// covers the pages, and the Inspector covers them too.
+/// covers the pages, and the Inspector covers them too. Desk asks for a
+/// screen of 1280 × 720 at least, and a window can take half of one.
 const COMPACT_FORMAT_BAR: f64 = 1000.0;
 const OVERLAY_SIDEBAR: f64 = 720.0;
-const OVERLAY_INSPECTOR: f64 = 400.0;
+const OVERLAY_INSPECTOR: f64 = 520.0;
 
 /// What an action of the window does.
 type WindowAction = fn(&Rc<DocumentWindow>);
@@ -63,11 +64,6 @@ pub struct DocumentWindow {
     info: AppInfo,
     opener: Option<&'static Opener>,
     title: adw::WindowTitle,
-    /// The folder of the document, which the title shows under the name
-    /// unless the window is narrower than 400 px, as in the mockups.
-    folder: Rc<RefCell<String>>,
-    /// Whether the window is narrower than 400 px.
-    narrow: Rc<Cell<bool>>,
     toolbar_view: adw::ToolbarView,
     header: adw::HeaderBar,
     stack: gtk::Stack,
@@ -226,9 +222,6 @@ impl DocumentWindow {
 
         let title = adw::WindowTitle::new(info.name, "");
         let header = adw::HeaderBar::builder().title_widget(&title).build();
-        // What the header bar shows below 400 px, so that it fits in a
-        // window of 360 (GNM-01): each widget and whether it shows there.
-        let mut narrow_header: Vec<(gtk::Widget, bool)> = Vec::new();
         if opener.is_some() {
             let open = gtk::Button::builder()
                 .label(tr("_Open"))
@@ -237,8 +230,6 @@ impl DocumentWindow {
                 .tooltip_text(tr("Open a Document"))
                 .build();
             header.pack_start(&open);
-            // The main menu has Open too.
-            narrow_header.push((open.upcast(), false));
         }
         formatting::labelled(&menu_button, &tr("Main Menu"));
         header.pack_end(&menu_button);
@@ -270,35 +261,12 @@ impl DocumentWindow {
             .tooltip_text(tr("Inspector"))
             .build();
         formatting::labelled(&inspector_toggle, &tr("Inspector"));
-        // In a narrow window View and Insert show as icons.
-        let view_icon = gtk::MenuButton::builder()
-            .icon_name("view-reveal-symbolic")
-            .menu_model(&view_menu())
-            .tooltip_text(tr("View"))
-            .visible(false)
-            .build();
-        formatting::labelled(&view_icon, &tr("View"));
-        let insert_icon = gtk::MenuButton::builder()
-            .icon_name("insert-object-symbolic")
-            .menu_model(&insert_menu())
-            .tooltip_text(tr("Insert"))
-            .visible(false)
-            .build();
-        formatting::labelled(&insert_icon, &tr("Insert"));
         let start_buttons = gtk::Box::builder().spacing(6).visible(false).build();
-        for button in [&view_button, &view_icon, &insert_button, &insert_icon] {
-            start_buttons.append(button);
-        }
+        start_buttons.append(&view_button);
+        start_buttons.append(&insert_button);
         let end_buttons = gtk::Box::builder().spacing(6).visible(false).build();
         end_buttons.append(&media_toggle);
         end_buttons.append(&inspector_toggle);
-        narrow_header.extend([
-            (view_button.clone().upcast(), false),
-            (insert_button.clone().upcast(), false),
-            (view_icon.upcast(), true),
-            (insert_icon.upcast(), true),
-            (media_toggle.clone().upcast(), false),
-        ]);
         let document_buttons: [gtk::Widget; 2] =
             [start_buttons.clone().upcast(), end_buttons.clone().upcast()];
         header.pack_start(&start_buttons);
@@ -359,8 +327,7 @@ impl DocumentWindow {
             .tooltip_text(tr("Zoom"))
             .css_classes(["flat"])
             .build();
-        // The counts give way in a narrow window, which goes down to
-        // 360 px (GNM-01).
+        // The counts give way in a narrow window (GNM-01).
         let counts_label = gtk::Label::builder()
             .css_classes(["dim-label", "caption", "numeric"])
             .hexpand(true)
@@ -507,26 +474,25 @@ impl DocumentWindow {
             .application(app)
             .title(info.name)
             .default_width(1280)
-            .default_height(800)
+            .default_height(720)
             .content(&nav_split)
             .build();
 
         // Of the breakpoints that match, the window applies the one added
         // last, so each one sets what the wider ones set too. Below about
         // a thousand pixels the format bar leaves out its secondary
-        // controls; below 720 the sidebars cover the pages instead of
-        // pushing them; below 400 the Inspector covers them too (GNM-01).
+        // controls; below 720, as when the window takes half of a screen
+        // of 1280 × 720, the smallest Desk supports, the sidebars cover the
+        // pages instead of pushing them; below 520 the Inspector covers
+        // them too, so that the pages keep some room (GNM-01).
         let sidebars = [&nav_split, &drawer_split, &search_split];
         let mut breakpoints = Vec::new();
-        let narrow_flag = Rc::new(Cell::new(false));
-        let folder = Rc::new(RefCell::new(String::new()));
-        for (width, collapsed, narrow) in [
-            (COMPACT_FORMAT_BAR, &[][..], false),
-            (OVERLAY_SIDEBAR, &sidebars[..], false),
+        for (width, collapsed) in [
+            (COMPACT_FORMAT_BAR, &[][..]),
+            (OVERLAY_SIDEBAR, &sidebars[..]),
             (
                 OVERLAY_INSPECTOR,
                 &[&nav_split, &drawer_split, &search_split, &split][..],
-                true,
             ),
         ] {
             let breakpoint = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
@@ -536,26 +502,6 @@ impl DocumentWindow {
             ));
             for split in collapsed {
                 breakpoint.add_setter(*split, "collapsed", Some(&true.to_value()));
-            }
-            if narrow {
-                for (widget, shown) in &narrow_header {
-                    breakpoint.add_setter(widget, "visible", Some(&shown.to_value()));
-                }
-                let (flag, title_of) = (narrow_flag.clone(), title.downgrade());
-                breakpoint.connect_apply(move |_| {
-                    flag.set(true);
-                    if let Some(title) = title_of.upgrade() {
-                        title.set_subtitle("");
-                    }
-                });
-                let (flag, title_of, folder) =
-                    (narrow_flag.clone(), title.downgrade(), folder.clone());
-                breakpoint.connect_unapply(move |_| {
-                    flag.set(false);
-                    if let Some(title) = title_of.upgrade() {
-                        title.set_subtitle(&folder.borrow());
-                    }
-                });
             }
             let bar = format_bar.clone();
             breakpoint.connect_apply(move |_| bar.set_compact(true));
@@ -588,8 +534,6 @@ impl DocumentWindow {
             info,
             opener,
             title,
-            folder,
-            narrow: narrow_flag,
             toolbar_view,
             header,
             stack,
@@ -999,10 +943,8 @@ impl DocumentWindow {
             }
             let edited = if self.needs_saving() { "• " } else { "" };
             self.title.set_title(&format!("{edited}{name}"));
-            *self.folder.borrow_mut() = path.as_deref().map(folder_of).unwrap_or_default();
-            if !self.narrow.get() {
-                self.title.set_subtitle(&self.folder.borrow());
-            }
+            self.title
+                .set_subtitle(&path.as_deref().map(folder_of).unwrap_or_default());
             self.window.set_title(Some(&format!("{edited}{name}")));
             self.view
                 .access()
