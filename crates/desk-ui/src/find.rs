@@ -203,11 +203,15 @@ impl FindWindow {
             .placeholder_text(tr("Find"))
             .primary_icon_name("system-search-symbolic")
             .hexpand(true)
+            // Narrow enough for a window of 360 px (GNM-01); it grows
+            // with the window.
+            .width_chars(6)
             .build();
         labelled(&find, &tr("Find"));
         let replace = gtk::Entry::builder()
             .placeholder_text(tr("Replace"))
             .hexpand(true)
+            .width_chars(6)
             .build();
         labelled(&replace, &tr("Replace"));
         let match_case = gtk::CheckButton::with_label(&tr("Match Case"));
@@ -270,6 +274,8 @@ impl FindWindow {
         let status = gtk::Label::builder()
             .xalign(0.0)
             .width_chars(10)
+            // It gives way in a window of 360 px (GNM-01).
+            .ellipsize(gtk::pango::EllipsizeMode::End)
             .css_classes(["dim-label", "caption"])
             .build();
         status.set_accessible_role(gtk::AccessibleRole::Status);
@@ -288,7 +294,6 @@ impl FindWindow {
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(6)
-            .width_request(360)
             .build();
         content.append(&find_row);
         content.append(&replace_row);
@@ -303,6 +308,12 @@ impl FindWindow {
             .build();
         labelled(&window, &tr("Find & Replace"));
         window.connect_entry(&find);
+        // A closed bar takes no room, not even the width of its fields,
+        // so that the window goes down to 360 px (GNM-01).
+        window.set_visible(false);
+        window.connect_search_mode_enabled_notify(|bar| {
+            bar.set_visible(bar.is_search_mode());
+        });
         // The fields are plain entries, which the search bar does not close
         // on Escape by itself, so Escape in either of them closes it.
         let escape = gtk::EventControllerKey::new();

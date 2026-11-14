@@ -132,6 +132,11 @@ def main():
     config = Path(os.environ["XDG_CONFIG_HOME"]) / "desk"
     config.mkdir(parents=True, exist_ok=True)
     (config / "preferences.ini").write_text("[editing]\nreplace-text=true\n[rulers]\nzoom=100\n")
+    # The buttons of the window are those of GNOME, Close alone, which the
+    # narrow window is measured with (GNM-01).
+    gtk = Path(os.environ["XDG_CONFIG_HOME"]) / "gtk-4.0"
+    gtk.mkdir(parents=True, exist_ok=True)
+    (gtk / "settings.ini").write_text("[Settings]\ngtk-decoration-layout=appmenu:close\n")
     writer = subprocess.Popen([str(WRITER), str(letter)])
     try:
         app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
@@ -2142,13 +2147,35 @@ def character_styles(app):
     )
 
 
+def extents(node):
+    """Where a node is in its window."""
+    return Atspi.Component.get_extents(node, Atspi.CoordType.WINDOW)
+
+
+def scroll_pane_of(node):
+    """The scrolled pane that shows a node: the part of the window that
+    the pages take."""
+    while node is not None and node.get_role() != Atspi.Role.SCROLL_PANE:
+        node = node.get_parent()
+    return node
+
+
+def right_of(node):
+    """The right edge of a node in its window."""
+    box = extents(node)
+    return box.x + box.width
+
+
 def gnome_window(work):
     """The window as the decisions of 13/11 adapt it to GNOME: a header bar
     without customization and the main menu (INT-11), the shortcuts
     dialog of Libadwaita (GNM-11), Ctrl+H for Replace (TXT-12), the
     character styles in the format bar (STY-02), the language of the text
     in the Inspector (TXT-10), Favorites in the Fonts popover (INT-15),
-    and a narrow window that keeps what matters most (GNM-01)."""
+    and a narrow window that keeps what matters most (GNM-01); and the
+    skeleton of interface B: the navigation sidebar as high as the window
+    (GNM-12), and the sidebar and then the Inspector covering the pages in
+    a narrow window (GNM-01)."""
     name = "Gnome.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -2198,6 +2225,23 @@ def gnome_window(work):
         check("the Fonts popover has Favorites and its star (INT-15)", showing_named(app, "Favorite") is not None)
         press("Escape")
 
+        document = find(app, Atspi.Role.TEXT, name)
+        start = extents(document).x
+        press("F9")
+        add = wait_for("the Add Page button of the sidebar", lambda: showing_named(app, "Add Page"))
+        check(
+            "F9 shows the navigation sidebar with its content button on Pages (GNM-12)",
+            showing_named(app, "Pages") is not None,
+        )
+        check(
+            "the sidebar is as high as the window, beside the header bar (GNM-12)",
+            abs(extents(add).y - extents(showing_named(app, "Main Menu")).y) < 12,
+        )
+        wait_for("the sidebar to push the pages", lambda: extents(document).x >= start + 150)
+        check("the sidebar pushes the pages in a wide window (GNM-12)", True)
+        press("F9")
+        wait_for("the sidebar to hide", lambda: showing_named(app, "Add Page") is None)
+
         subprocess.run(
             ["xdotool", "search", "--name", name, "windowsize", "640", "600"],
             check=True,
@@ -2208,6 +2252,34 @@ def gnome_window(work):
         )
         wait_for("the main menu in the narrow window", lambda: showing_named(app, "Main Menu"))
         check("a narrow window keeps the main controls (GNM-01)", True)
+
+        start = extents(document).x
+        press("F9")
+        wait_for("the sidebar in the narrow window", lambda: showing_named(app, "Add Page"))
+        check("below 720 px the sidebar covers the pages (GNM-01)", extents(document).x == start)
+        press("F9")
+        wait_for("the sidebar to hide", lambda: showing_named(app, "Add Page") is None)
+
+        pages = scroll_pane_of(document)
+        press("ctrl+alt+i")
+        language = wait_for("the Inspector", lambda: inspector_node(app, "Language"))
+        check(
+            "at 640 px the Inspector still sits beside the pages (GNM-01)",
+            right_of(pages) <= extents(language).x,
+        )
+        subprocess.run(
+            ["xdotool", "search", "--name", name, "windowsize", "380", "600"],
+            check=True,
+        )
+        # Below 400 px the Inspector closes, and comes back over the pages.
+        wait_for("the Inspector to close below 400 px", lambda: inspector_node(app, "Language") is None)
+        press("ctrl+alt+i")
+        language = wait_for("the Inspector over the pages", lambda: inspector_node(app, "Language"))
+        check(
+            "below 400 px the Inspector covers the pages (GNM-01)",
+            right_of(pages) > extents(language).x,
+        )
+        press("ctrl+alt+i")
     finally:
         writer.terminate()
         writer.wait(timeout=10)

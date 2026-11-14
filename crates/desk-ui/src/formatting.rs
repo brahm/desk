@@ -962,7 +962,7 @@ impl InspectorPanes {
         bar.append(&toggles);
         let root = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .width_request(300)
+            .width_request(332)
             .build();
         root.append(&bar);
         root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
