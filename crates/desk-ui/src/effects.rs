@@ -14,8 +14,8 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{
-    BorderSides, BorderStyle, CharAttrs, CharFormat, Length, Ligatures, ParaAttrs, ParaBorder,
-    ParaFormat, Rgba, Shadow,
+    BorderSides, BorderStyle, CharAttrs, CharFormat, Language, Length, Ligatures, ParaAttrs,
+    ParaBorder, ParaFormat, Rgba, Shadow,
 };
 
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
@@ -27,6 +27,42 @@ use crate::tab_stops::string_list;
 
 /// The ligatures in the order of their menu.
 pub const LIGATURES: [Ligatures; 3] = [Ligatures::Default, Ligatures::None, Ligatures::All];
+
+/// The name of a language in the menu of languages: its name for the
+/// usual ones, and its tag for the others (TXT-10).
+pub fn language_name(tag: &str) -> String {
+    match tag {
+        "und" => tr("No Language"),
+        "en-US" => tr("English (US)"),
+        "en-GB" => tr("English (UK)"),
+        "en" => tr("English"),
+        "pt-BR" => tr("Portuguese (Brazil)"),
+        "pt-PT" => tr("Portuguese (Portugal)"),
+        "pt" => tr("Portuguese"),
+        "es" | "es-ES" => tr("Spanish"),
+        "fr" | "fr-FR" => tr("French"),
+        "de" | "de-DE" => tr("German"),
+        "it" | "it-IT" => tr("Italian"),
+        _ => tag.to_owned(),
+    }
+}
+
+/// The languages of the menu: none, then those the system has
+/// dictionaries for, then `extra` when it is another.
+fn language_tags(extra: Option<&str>) -> Vec<String> {
+    let mut tags = desk_lang::installed(desk_lang::Kind::Spelling);
+    tags.extend(desk_lang::installed(desk_lang::Kind::Hyphenation));
+    tags.sort();
+    tags.dedup();
+    if let Some(extra) = extra
+        && extra != "und"
+        && !tags.iter().any(|t| t == extra)
+    {
+        tags.push(extra.to_owned());
+    }
+    tags.insert(0, "und".to_owned());
+    tags
+}
 
 /// The sides in the order of their menu.
 const SIDES: [BorderSides; 5] = [
@@ -142,6 +178,9 @@ pub struct Effects {
     tracking: compact::SpinRow,
     ligatures: compact::ComboRow,
     outline: compact::SwitchRow,
+    language: compact::ComboRow,
+    /// The tags of the menu of languages, in its order.
+    languages: RefCell<Vec<String>>,
     text_background: ColorRow,
     paragraph_background: ColorRow,
     sides: compact::ComboRow,
@@ -178,6 +217,14 @@ impl Effects {
         character.add(&ligatures);
         character.add(&outline);
         character.add(&text_background.row);
+        // The language of the text, which chooses its dictionaries, as in
+        // the Text inspector of Pages (TXT-10).
+        let languages = language_tags(None);
+        let language = compact::ComboRow::builder()
+            .title(tr("Language"))
+            .model(&string_list(languages.iter().map(|t| language_name(t))))
+            .build();
+        character.add(&language);
 
         let paragraph_background =
             ColorRow::new(&tr("Paragraph Background"), Rgba::rgb(255, 255, 117));
@@ -233,6 +280,8 @@ impl Effects {
             tracking,
             ligatures,
             outline,
+            language,
+            languages: RefCell::new(languages),
             text_background,
             paragraph_background,
             sides,
@@ -282,6 +331,27 @@ impl Effects {
             }),
         );
         self.tracking.connect_value_notify(move |_| changed());
+        let changed = with(
+            self,
+            Rc::new(|this, editor| {
+                let Some(tag) = this
+                    .languages
+                    .borrow()
+                    .get(this.language.selected() as usize)
+                    .cloned()
+                else {
+                    return;
+                };
+                editor.set_character_attrs(
+                    "Language",
+                    &CharAttrs {
+                        language: Some(Language::new(&tag)),
+                        ..CharAttrs::default()
+                    },
+                );
+            }),
+        );
+        self.language.connect_selected_notify(move |_| changed());
         let shadow_changed = with(
             self,
             Rc::new(|this, editor| {
@@ -454,6 +524,16 @@ impl Effects {
             LIGATURES.iter().position(|l| *l == character.ligatures),
         ));
         self.outline.set_active(character.outline);
+        let tag = character.language.tag();
+        if !self.languages.borrow().iter().any(|t| t == tag) {
+            let tags = language_tags(Some(tag));
+            self.language
+                .set_model(Some(&string_list(tags.iter().map(|t| language_name(t)))));
+            *self.languages.borrow_mut() = tags;
+        }
+        self.language.set_selected(index(
+            self.languages.borrow().iter().position(|t| t == tag),
+        ));
         self.text_background.show(character.background);
         self.shadow.show(character.shadow.map(|s| s.color));
         let shadow = character.shadow.unwrap_or_default();
@@ -487,5 +567,15 @@ mod tests {
         assert_eq!(names.len(), 3);
         assert!(SIDES.map(sides_name).iter().all(|n| !n.is_empty()));
         assert!(STYLES.map(style_name).iter().all(|n| !n.is_empty()));
+    }
+
+    #[test]
+    fn txt_10_the_menu_of_languages_starts_with_none_and_keeps_the_text_language() {
+        let tags = language_tags(Some("tlh"));
+        assert_eq!(tags[0], "und");
+        assert!(tags.iter().any(|t| t == "tlh"));
+        assert_eq!(language_name("pt-BR"), "Portuguese (Brazil)");
+        assert_eq!(language_name("tlh"), "tlh");
+        assert_eq!(language_tags(Some("und")).iter().filter(|t| *t == "und").count(), 1);
     }
 }

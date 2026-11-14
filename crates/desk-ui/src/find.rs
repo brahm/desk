@@ -5,7 +5,8 @@
 //!
 //! The Find & Replace window has a simple mode, with the text to find and
 //! its replacement, and an advanced one, which adds Match Case and Whole
-//! Words. Its buttons replace all, replace, replace and find, and go to
+//! Words, and inserts tabs and line breaks into the fields, which show
+//! them as ⇥ and ↵. Its buttons replace all, replace, replace and find, and go to
 //! the previous and next match. The search of a window is shared: Find
 //! Next and Find Previous use it with the window closed, and Use Selection
 //! for Find sets it from the selection.
@@ -18,12 +19,28 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
-use desk_model::{Found, Query};
+use desk_model::{Found, LINE_BREAK, Query};
 use gtk::glib;
 
 use crate::editing::TextEditor;
 use crate::formatting::{EditorOf, labelled};
 use crate::i18n::{tr, trn};
+
+/// How the fields of Find & Replace show a tab and a line break.
+const TAB_SIGN: char = '⇥';
+const LINE_BREAK_SIGN: char = '↵';
+
+/// The text that a field of Find & Replace stands for: its signs become
+/// the tabs and line breaks they show (TXT-12).
+pub fn from_field(text: &str) -> String {
+    text.replace(TAB_SIGN, "\t").replace(LINE_BREAK_SIGN, &LINE_BREAK.to_string())
+}
+
+/// How a field of Find & Replace shows a text.
+pub fn to_field(text: &str) -> String {
+    text.replace('\t', &TAB_SIGN.to_string())
+        .replace(LINE_BREAK, &LINE_BREAK_SIGN.to_string())
+}
 
 /// How many searches the sidebar keeps.
 pub const RECENT: usize = 10;
@@ -173,6 +190,9 @@ pub struct FindWindow {
     search: Rc<Search>,
     editor: EditorOf,
     updating: Cell<bool>,
+    /// Whether the replacement was the last field with the focus, where
+    /// the tabs and line breaks of the advanced options go.
+    into_replace: Cell<bool>,
 }
 
 impl FindWindow {
@@ -197,6 +217,21 @@ impl FindWindow {
             .build();
         options.append(&match_case);
         options.append(&whole_words);
+        // Tabs and line breaks cannot be typed in a field, so the advanced
+        // options insert them, as the Insert menu of Pages does (TXT-12).
+        let insert_tab = gtk::Button::builder()
+            .label(tr("Insert _Tab"))
+            .use_underline(true)
+            .css_classes(["flat"])
+            .build();
+        let insert_break = gtk::Button::builder()
+            .label(tr("Insert _Line Break"))
+            .use_underline(true)
+            .css_classes(["flat"])
+            .build();
+        options.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        options.append(&insert_tab);
+        options.append(&insert_break);
         let advanced = gtk::MenuButton::builder()
             .icon_name("emblem-system-symbolic")
             .popover(&gtk::Popover::builder().child(&options).build())
@@ -280,7 +315,35 @@ impl FindWindow {
             search,
             editor,
             updating: Cell::new(false),
+            into_replace: Cell::new(false),
         });
+        for (entry, replace) in [(&this.find, false), (&this.replace, true)] {
+            let focus = gtk::EventControllerFocus::new();
+            let weak = Rc::downgrade(&this);
+            focus.connect_enter(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.into_replace.set(replace);
+                }
+            });
+            entry.add_controller(focus);
+        }
+        for (button, sign) in [(&insert_tab, TAB_SIGN), (&insert_break, LINE_BREAK_SIGN)] {
+            let weak = Rc::downgrade(&this);
+            let advanced = advanced.clone();
+            button.connect_clicked(move |_| {
+                let Some(this) = weak.upgrade() else { return };
+                advanced.popdown();
+                let entry = if this.into_replace.get() && this.replace_row.is_visible() {
+                    &this.replace
+                } else {
+                    &this.find
+                };
+                let mut at = entry.position();
+                entry.insert_text(&sign.to_string(), &mut at);
+                entry.grab_focus_without_selecting();
+                entry.set_position(at);
+            });
+        }
 
         let weak = Rc::downgrade(&this);
         this.replace_toggle.connect_toggled(move |button| {
@@ -357,7 +420,7 @@ impl FindWindow {
     /// The query that the fields set.
     fn query(&self) -> Query {
         Query {
-            text: self.find.text().to_string(),
+            text: from_field(&self.find.text()),
             match_case: self.match_case.is_active(),
             whole_words: self.whole_words.is_active(),
         }
@@ -369,7 +432,7 @@ impl FindWindow {
             return;
         }
         *self.search.query.borrow_mut() = self.query();
-        *self.search.replacement.borrow_mut() = self.replace.text().to_string();
+        *self.search.replacement.borrow_mut() = from_field(&self.replace.text());
         self.status.set_label("");
     }
 
@@ -378,10 +441,12 @@ impl FindWindow {
     pub fn present(&self) {
         self.updating.set(true);
         let query = self.search.query.borrow().clone();
-        if self.find.text() != query.text {
-            self.find.set_text(&query.text);
+        let shown = to_field(&query.text);
+        if self.find.text() != shown {
+            self.find.set_text(&shown);
         }
         let replacement = self.search.replacement.borrow().clone();
+        let replacement = to_field(&replacement);
         if self.replace.text() != replacement {
             self.replace.set_text(&replacement);
         }
@@ -390,6 +455,12 @@ impl FindWindow {
         self.updating.set(false);
         self.window.set_search_mode(true);
         self.find.grab_focus();
+    }
+
+    /// Shows the bar with its replacement, as Ctrl+H does in GNOME.
+    pub fn present_replace(&self) {
+        self.present();
+        self.replace_toggle.set_active(true);
     }
 
     /// Goes to the next match, or the previous one.
@@ -413,7 +484,7 @@ impl FindWindow {
         self.store();
         let query = self.search.query.borrow().clone();
         if let Some(found) = selected_match(&editor, &query) {
-            editor.replace_found(&found, &self.replace.text());
+            editor.replace_found(&found, &from_field(&self.replace.text()));
         }
     }
 
@@ -423,7 +494,7 @@ impl FindWindow {
         };
         self.store();
         let query = self.search.query.borrow().clone();
-        let count = editor.replace_all(&query, &self.replace.text());
+        let count = editor.replace_all(&query, &from_field(&self.replace.text()));
         self.status.set_label(&if count == 0 {
             tr("Not found")
         } else {
@@ -731,5 +802,12 @@ mod tests {
         assert_eq!(recent.len(), RECENT);
         assert_eq!(recent[0], "5");
         assert_eq!(recent.iter().filter(|t| *t == "5").count(), 1);
+    }
+
+    #[test]
+    fn txt_12_the_fields_show_tabs_and_line_breaks_as_signs() {
+        let text = format!("a\tb{LINE_BREAK}c");
+        assert_eq!(to_field(&text), "a⇥b↵c");
+        assert_eq!(from_field(&to_field(&text)), text);
     }
 }

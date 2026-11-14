@@ -78,6 +78,10 @@ pub struct FormatBar {
     root: gtk::Box,
     styles: gtk::DropDown,
     style_ids: RefCell<Vec<StyleId>>,
+    /// The character styles, after none, as the format bar of Pages has
+    /// them (STY-02).
+    characters: gtk::DropDown,
+    character_ids: RefCell<Vec<Option<StyleId>>>,
     /// The font family, by name: a font the document names stays named
     /// here even when it is not installed, as in Pages.
     font: gtk::Button,
@@ -85,7 +89,7 @@ pub struct FormatBar {
     color: gtk::ColorDialogButton,
     /// What a narrow window leaves out: the alignments and the columns,
     /// which the Inspector and the Format menu also have.
-    secondary: [gtk::Widget; 2],
+    secondary: [gtk::Widget; 3],
     /// Set while the bar shows the formatting at the selection, so that
     /// showing it does not change it.
     updating: Cell<bool>,
@@ -110,6 +114,13 @@ impl FormatBar {
             .build();
         styles.update_property(&[gtk::accessible::Property::Label(&tr("Paragraph Style"))]);
         root.append(&styles);
+        let characters = gtk::DropDown::builder()
+            .model(&gtk::StringList::new(&[]))
+            .tooltip_text(tr("Character Style"))
+            .enable_search(true)
+            .build();
+        characters.update_property(&[gtk::accessible::Property::Label(&tr("Character Style"))]);
+        root.append(&characters);
 
         let font = gtk::Button::builder()
             .action_name("win.fonts")
@@ -216,10 +227,12 @@ impl FormatBar {
             root,
             styles,
             style_ids: RefCell::new(Vec::new()),
+            characters: characters.clone(),
+            character_ids: RefCell::new(Vec::new()),
             font,
             size,
             color,
-            secondary: [alignments.upcast(), columns.upcast()],
+            secondary: [alignments.upcast(), columns.upcast(), characters.upcast()],
             updating: Cell::new(false),
         });
         this.connect(editor);
@@ -263,6 +276,24 @@ impl FormatBar {
                 .copied();
             if let (Some(id), Some(editor)) = (id, of()) {
                 editor.set_paragraph_style(id);
+                editor.focus();
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        let of = editor.clone();
+        self.characters.connect_selected_notify(move |dropdown| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let id = this
+                .character_ids
+                .borrow()
+                .get(dropdown.selected() as usize)
+                .copied();
+            if let (Some(id), Some(editor)) = (id, of()) {
+                editor.set_character_style(id);
                 editor.focus();
             }
         });
@@ -328,6 +359,45 @@ impl FormatBar {
         *self.style_ids.borrow_mut() = ids;
         self.updating.set(false);
         true
+    }
+
+    /// Shows the character styles of a document, after none. Returns
+    /// whether they changed.
+    pub fn set_character_styles(&self, styles: &[(StyleId, String)]) -> bool {
+        let ids: Vec<Option<StyleId>> = std::iter::once(None)
+            .chain(styles.iter().map(|(id, _)| Some(*id)))
+            .collect();
+        let mut names = vec![tr("No Character Style")];
+        names.extend(styles.iter().map(|(_, n)| n.clone()));
+        let model = self
+            .characters
+            .model()
+            .and_then(|m| m.downcast::<gtk::StringList>().ok());
+        let same_names = model.is_some_and(|m| {
+            m.n_items() as usize == names.len()
+                && names
+                    .iter()
+                    .enumerate()
+                    .all(|(i, n)| m.string(i as u32).as_deref() == Some(n.as_str()))
+        });
+        if same_names && *self.character_ids.borrow() == ids {
+            return false;
+        }
+        self.updating.set(true);
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        self.characters.set_model(Some(&gtk::StringList::new(&names)));
+        *self.character_ids.borrow_mut() = ids;
+        self.updating.set(false);
+        true
+    }
+
+    /// Shows the character style at the selection.
+    pub fn show_character_style(&self, style: Option<StyleId>) {
+        self.updating.set(true);
+        let index = self.character_ids.borrow().iter().position(|id| *id == style);
+        self.characters
+            .set_selected(index.map_or(gtk::INVALID_LIST_POSITION, |i| i as u32));
+        self.updating.set(false);
     }
 
     /// Shows the formatting at the selection.

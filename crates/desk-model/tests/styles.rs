@@ -879,3 +879,57 @@ fn sty_05_a_style_deleted_for_free_form_leaves_the_text_as_it_looked() {
     // The other paragraph is as it was.
     assert!(!look(&editor, 1, 0).weight.is_bold());
 }
+
+#[test]
+fn sty_07_the_following_style_is_set_and_return_starts_it() {
+    let (mut editor, heading) = editor();
+    let body = editor.document().styles().default_paragraph();
+    editor
+        .edit("Following", |edit| edit.set_next_style(heading, Some(body)))
+        .unwrap();
+    let styles = editor.document().styles();
+    assert_eq!(styles.paragraph(heading).unwrap().next, Some(body));
+    editor
+        .edit("Following", |edit| edit.set_next_style(heading, Some(heading)))
+        .unwrap();
+    assert_eq!(editor.document().styles().paragraph(heading).unwrap().next, None);
+}
+
+#[test]
+fn sty_06_reverting_drops_character_styles_in_the_whole_paragraph() {
+    // On the reference machine, Revert to Defined Style and a double
+    // click on the style both drop the italic set on "delta" and the
+    // character style of "beta", even when only "gamma" is selected.
+    let (mut editor, _) = editor();
+    let (b0, b1) = (at(&editor, 0, 0), at(&editor, 0, 4));
+    let (d0, d1) = (at(&editor, 0, 7), at(&editor, 0, 10));
+    let body = editor.document().styles().default_paragraph();
+    for clean in [false, true] {
+        editor
+            .edit("Setup", |edit| {
+                let id = edit.new_character_style(
+                    if clean { "Strong 2" } else { "Strong" },
+                    italic(),
+                    b0,
+                    b1,
+                    true,
+                )?;
+                edit.set_character_style(b0, b1, Some(id))?;
+                edit.set_character_attrs(d0, d1, &italic())
+            })
+            .unwrap();
+        let (g0, g1) = (at(&editor, 0, 5), at(&editor, 0, 6));
+        editor
+            .edit("Revert", |edit| {
+                if clean {
+                    edit.set_paragraph_style_clean(g0, g1, body)
+                } else {
+                    edit.revert_to_style(g0, g1)
+                }
+            })
+            .unwrap();
+        assert!(paragraph(&editor, 0)
+            .runs()
+            .all(|run| run.style.is_none() && run.attrs.is_empty()));
+    }
+}

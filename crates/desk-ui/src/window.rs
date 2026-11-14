@@ -107,7 +107,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 63] = [
+const DOCUMENT_ACTIONS: [&str; 64] = [
     "outline",
     "colors",
     "format-bar",
@@ -154,6 +154,7 @@ const DOCUMENT_ACTIONS: [&str; 63] = [
     "insert-link",
     "insert-bookmark",
     "find",
+    "find-replace",
     "find-next",
     "find-previous",
     "use-selection-for-find",
@@ -704,7 +705,8 @@ impl DocumentWindow {
                 // A banner says when something may not show as it was made;
                 // fonts with the same metrics in place of others are only
                 // in Document Warnings of the main menu.
-                self.warnings_banner.set_revealed(shown.lossy);
+                self.warnings_banner
+                    .set_revealed(shown.lossy && crate::preferences::get().show_warnings);
                 *self.warnings.borrow_mut() = shown.warnings;
                 self.enable_warnings();
                 remember_recent(path);
@@ -815,6 +817,8 @@ impl DocumentWindow {
         let Some(editor) = self.editor() else { return };
         let format = editor.format();
         self.format_bar.show(&format);
+        self.format_bar
+            .show_character_style(editor.character_style());
         self.inspector.show(&format);
         if self.drawer_split.shows_sidebar() {
             self.drawer.show(&editor);
@@ -879,7 +883,11 @@ impl DocumentWindow {
         let path = self.path.borrow().clone();
         let name = self.name.borrow().clone();
         if let Some(editor) = &editor {
-            if self.format_bar.set_styles(&editor.paragraph_styles()) {
+            let paragraphs = self.format_bar.set_styles(&editor.paragraph_styles());
+            let characters = self
+                .format_bar
+                .set_character_styles(&editor.character_styles());
+            if paragraphs || characters {
                 self.show_format();
             }
             let edited = if self.needs_saving() { "• " } else { "" };
@@ -949,11 +957,20 @@ impl DocumentWindow {
             this.enable_warnings();
             true
         };
+        let weak = Rc::downgrade(self);
+        let clear = move || {
+            if let Some(this) = weak.upgrade() {
+                this.warnings.borrow_mut().clear();
+                this.warnings_banner.set_revealed(false);
+                this.enable_warnings();
+            }
+        };
         crate::warnings::show(
             &self.window,
             &self.name.borrow(),
             &self.warnings.borrow(),
             Rc::new(replace),
+            Rc::new(clear),
         );
     }
 
@@ -1426,13 +1443,25 @@ impl DocumentWindow {
         let Some(page) = editor.cursor_page() else {
             return;
         };
-        let dialog = adw::AlertDialog::new(
-            Some(&tr("Delete Page?")),
-            Some(
-                &tr("Everything on page {n} will be deleted.")
-                    .replace("{n}", &(page + 1).to_string()),
-            ),
-        );
+        let Some((first, last)) = editor.deleted_pages(page) else {
+            return;
+        };
+        // Pages deletes the section of the page and names its pages.
+        let (heading, body) = if first == last {
+            (
+                tr("Delete Page?"),
+                tr("Everything on page {n} will be deleted.")
+                    .replace("{n}", &(first + 1).to_string()),
+            )
+        } else {
+            (
+                tr("Delete Pages?"),
+                tr("Pages {first} to {last}, the section of this page, will be deleted.")
+                    .replace("{first}", &(first + 1).to_string())
+                    .replace("{last}", &(last + 1).to_string()),
+            )
+        };
+        let dialog = adw::AlertDialog::new(Some(&heading), Some(&body));
         dialog.add_response("cancel", &tr("_Cancel"));
         dialog.add_response("delete", &tr("_Delete"));
         dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
@@ -2304,9 +2333,12 @@ impl DocumentWindow {
     /// Find & Replace, the Search sidebar and the Writing Tools (TXT-12,
     /// TXT-13, INT-20).
     fn add_find_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 9] = [
+        let simple: [(&str, WindowAction); 10] = [
             ("find", |this| {
                 this.find.present();
+            }),
+            ("find-replace", |this| {
+                this.find.present_replace();
             }),
             ("find-next", |this| {
                 if let Some(editor) = this.editor() {

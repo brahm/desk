@@ -46,7 +46,7 @@ const SECTIONS: &[Section] = &[
             ("<Control>c", n_("Copy")),
             ("<Control>d", n_("Duplicate")),
             ("<Control>v", n_("Paste")),
-            ("<Control><Shift><Alt>v", n_("Paste and match style")),
+            ("<Control><Shift>v <Control><Shift><Alt>v", n_("Paste and match style")),
             ("<Control>a", n_("Select all")),
             ("<Control>period", n_("Special characters")),
             ("<Shift>Return", n_("Line break")),
@@ -125,6 +125,7 @@ const SECTIONS: &[Section] = &[
         true,
         &[
             ("<Control>f", n_("Find & Replace")),
+            ("<Control>h", n_("Replace")),
             ("<Control>g", n_("Find next")),
             ("<Control><Shift>g", n_("Find previous")),
             ("<Control>e", n_("Use selection for Find")),

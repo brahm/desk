@@ -565,8 +565,8 @@ impl Edit {
     }
 
     /// Gives the paragraphs between two positions a paragraph style and
-    /// removes every attribute set over their styles, as a style shortcut
-    /// with Shift does (STY-04). Character styles stay.
+    /// reverts them to it, as a double click on the style and a style
+    /// shortcut with Shift do (STY-04, STY-06).
     pub fn set_paragraph_style_clean(
         &mut self,
         start: Position,
@@ -577,17 +577,22 @@ impl Edit {
         self.revert_to_style(start, end)
     }
 
-    /// Reverts the text between two positions to its styles: Revert to
-    /// Defined Style (STY-06). The paragraphs lose the attributes set on
-    /// them, and their text, all of it for a cursor, loses the attributes
-    /// set on it. Character styles stay.
+    /// Reverts the paragraphs between two positions to their paragraph
+    /// style: Revert to Defined Style (STY-06). As in Pages 4.3, which the
+    /// reference machine showed, each paragraph touched loses, all of its
+    /// text and not only the part selected, the attributes set on it and
+    /// its character styles. Fields, links and bookmarks stay.
     pub fn revert_to_style(&mut self, start: Position, end: Position) -> Result<(), ModelError> {
-        let ranges = self.ranges_or_paragraph(start, end)?;
-        for (id, _) in &ranges {
+        let mut ranges = self.document().paragraph_ranges(start, end)?;
+        for (id, range) in &mut ranges {
+            *range = 0..self.document().paragraph(*id)?.len();
             let kept = self.document().paragraph(*id)?.attrs().structure();
             self.set_own_paragraph_attrs(*id, kept)?;
         }
-        self.map_ranges(&ranges, |run| run.attrs = run.attrs.text_bound())
+        self.map_ranges(&ranges, |run| {
+            run.style = None;
+            run.attrs = run.attrs.text_bound();
+        })
     }
 
     /// Takes the attributes set over a style at a position into the style:
@@ -693,12 +698,23 @@ impl Edit {
         self.put(style.with_shortcut(key))
     }
 
+    /// Sets the paragraph style that Return starts after a paragraph of
+    /// a paragraph style, or none to keep the same style (STY-07).
+    pub fn set_next_style(&mut self, id: StyleId, next: Option<StyleId>) -> Result<(), ModelError> {
+        let Some(Style::Paragraph(mut style)) = self.document().styles().get(id).cloned() else {
+            return Err(ModelError::UnknownStyle(id));
+        };
+        style.next = next.filter(|&next| next != id);
+        self.put(Style::Paragraph(style))
+    }
+
     /// Deletes a style (STY-05). The text that uses it takes the
     /// replacement: for a paragraph style, another paragraph style, or
     /// the default one when there is none; for a character style, another
     /// character style or none. Styles that inherit from it take its
-    /// attributes and its parent, so they look as they did, and styles
-    /// that it was the next style of take the replacement.
+    /// attributes and its parent, so they look as they did, styles that
+    /// it was the next style of take the replacement, and tables of
+    /// contents stop listing it.
     pub fn delete_style(
         &mut self,
         id: StyleId,
@@ -768,6 +784,22 @@ impl Edit {
         }
         // The text that uses it.
         self.replace_style_in_body(id, family, replacement)?;
+        // Tables of contents stop listing it, and their entries that took
+        // it take the default style, as the reference machine showed Pages
+        // 4.3 do: the tables of contents update at once.
+        let mut settings = self.document().text_settings().clone();
+        if settings.toc.uses(id) {
+            let default = self.document().styles().default_paragraph();
+            settings.toc.levels.retain(|level| level.style != id);
+            for level in &mut settings.toc.levels {
+                if level.entry == id {
+                    level.entry = default;
+                }
+            }
+            self.set_text_settings(settings)?;
+            self.apply(Op::RemoveStyle { style: id })?;
+            return self.update_tables_of_contents();
+        }
         self.apply(Op::RemoveStyle { style: id })
     }
 

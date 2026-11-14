@@ -159,6 +159,12 @@ pub struct Preferences {
     /// Whether the words and pages of the document show at the bottom of
     /// the window (DOC-20).
     pub show_counts: bool,
+    /// Whether a banner says so when a document opens with problems, as
+    /// the Warnings window of Pages shows itself (INT-22).
+    pub show_warnings: bool,
+    /// The font families of the Favorites collection of the Fonts
+    /// popover (INT-15).
+    pub font_favorites: Vec<String>,
     /// Whether a saved document holds a picture of its first page, which
     /// file managers show (DOC-09).
     pub include_preview: bool,
@@ -211,6 +217,8 @@ impl Default for Preferences {
             zoom: 125,
             invisibles_color: INVISIBLES_COLOR,
             show_counts: true,
+            show_warnings: true,
+            font_favorites: Vec::new(),
             include_preview: true,
             guide_color: GUIDE_COLOR,
             // As in Pages: at the middles, and not at the edges.
@@ -225,6 +233,7 @@ const RULERS: &str = "rulers";
 const EDITING: &str = "editing";
 const WINDOW: &str = "window";
 const SAVING: &str = "saving";
+const FONTS: &str = "fonts";
 
 /// A color as `#rrggbb`, or `#rrggbbaa` when it is not opaque.
 fn color_key(color: Rgba) -> String {
@@ -287,6 +296,16 @@ impl Preferences {
         out.show_counts = file
             .boolean(WINDOW, "show-counts")
             .unwrap_or(out.show_counts);
+        out.show_warnings = file
+            .boolean(WINDOW, "show-warnings")
+            .unwrap_or(out.show_warnings);
+        if let Ok(favorites) = file.string(FONTS, "favorites") {
+            out.font_favorites = favorites
+                .split(';')
+                .filter(|n| !n.is_empty())
+                .map(str::to_owned)
+                .collect();
+        }
         out.include_preview = file
             .boolean(SAVING, "include-preview")
             .unwrap_or(out.include_preview);
@@ -344,6 +363,14 @@ impl Preferences {
             &color_key(self.invisibles_color),
         );
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
+        file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
+        // As a list of the key file: names, each ended by a semicolon.
+        let favorites: String = self
+            .font_favorites
+            .iter()
+            .map(|n| format!("{};", n.replace(';', "")))
+            .collect();
+        file.set_string(FONTS, "favorites", &favorites);
         file.set_boolean(SAVING, "include-preview", self.include_preview);
         file.set_string(EDITING, "guide-color", &color_key(self.guide_color));
         file.set_boolean(EDITING, "guides-at-center", self.guides_at_center);
@@ -445,7 +472,7 @@ pub fn connect_changed(f: impl Fn(&Preferences) + 'static) {
 }
 
 /// Changes the preferences with `f`.
-fn change(f: impl FnOnce(&mut Preferences)) {
+pub(crate) fn change(f: impl FnOnce(&mut Preferences)) {
     let mut preferences = get();
     f(&mut preferences);
     set(preferences);
@@ -594,6 +621,12 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         &tr("At the bottom of the window"),
         current.show_counts,
         |p, on| p.show_counts = on,
+    ));
+    window.add(&switch(
+        &tr("Show Document Warnings"),
+        &tr("When a document opens with problems"),
+        current.show_warnings,
+        |p, on| p.show_warnings = on,
     ));
     let color = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::new())
@@ -796,6 +829,8 @@ mod tests {
                 a: 128,
             },
             show_counts: false,
+            show_warnings: false,
+            font_favorites: vec!["Liberation Serif".into(), "DejaVu Sans".into()],
             include_preview: false,
             guide_color: Rgba::rgb(10, 200, 30),
             guides_at_center: false,
@@ -810,6 +845,7 @@ mod tests {
         assert!(!Preferences::read(&empty).percent);
         assert!(Preferences::read(&empty).automatic_lists);
         assert!(Preferences::read(&empty).show_counts);
+        assert!(Preferences::read(&empty).show_warnings);
         assert!(Preferences::read(&empty).detect_links);
         assert!(Preferences::read(&empty).include_preview);
         assert_eq!(Preferences::read(&empty).zoom, 125);

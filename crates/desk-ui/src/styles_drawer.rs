@@ -5,7 +5,7 @@
 //! paragraph and character styles of the document, each shown in its
 //! own font, with the style at the selection marked and an arrow where
 //! the formatting there differs from it (STY-06). A click applies a
-//! style, a double click applies it and drops the formatting set over
+//! style, a double click applies it and drops the formatting and character styles set over
 //! it, and the menu of a style redefines, reverts, selects its uses,
 //! renames, deletes it and gives it a shortcut, Ctrl and a digit from 1
 //! to 8 (STY-02 to STY-09).
@@ -442,13 +442,22 @@ impl StylesDrawer {
         {
             action.set_state(&key.to_string().to_variant());
         }
+        let paragraph = (self.editor)()
+            .is_some_and(|e| e.styles().paragraph(id).is_some());
+        if let Some(action) = self
+            .actions
+            .lookup_action("next-style")
+            .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
+        {
+            action.set_enabled(paragraph);
+        }
         popover.set_pointing_to(Some(&gdk::Rectangle::new(x, y, 1, 1)));
         popover.popup();
     }
 
     fn add_actions(self: &Rc<Self>) {
         type StyleAction = fn(&Rc<StylesDrawer>, &TextEditor, StyleId);
-        let on_style: [(&str, StyleAction); 6] = [
+        let on_style: [(&str, StyleAction); 7] = [
             ("redefine", |this, editor, id| {
                 let result = editor.style_edit(&tr("Redefine Style"), |edit, from, to| {
                     edit.redefine_style(id, from, to)
@@ -478,6 +487,7 @@ impl StylesDrawer {
             ("replace-uses", |this, editor, id| {
                 this.replace_uses(editor, id)
             }),
+            ("next-style", |this, editor, id| this.next_style(editor, id)),
             ("rename", |this, editor, id| this.rename(editor, id)),
             ("delete", |this, editor, id| this.delete(editor, id)),
         ];
@@ -779,6 +789,58 @@ impl StylesDrawer {
         );
     }
 
+    /// Asks for the paragraph style that Return starts after a paragraph
+    /// of a style, as the Following Paragraph Style of Pages (STY-07).
+    fn next_style(self: &Rc<Self>, editor: &TextEditor, id: StyleId) {
+        let styles = editor.styles();
+        let Some(style) = styles.paragraph(id).cloned() else {
+            return;
+        };
+        let mut choices: Vec<Option<StyleId>> = vec![None];
+        let mut names: Vec<String> = vec![tr("Same Style")];
+        for other in sorted(&styles, StyleFamily::Paragraph) {
+            if other.id() != id {
+                choices.push(Some(other.id()));
+                names.push(other.name().to_owned());
+            }
+        }
+        let start = choices
+            .iter()
+            .position(|&c| c == style.next.filter(|&n| n != id))
+            .unwrap_or(0);
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Following Paragraph Style")),
+            Some(&tr("Return after a paragraph of “{name}” starts one of this style.")
+                .replace("{name}", &style.name)),
+        );
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let next = gtk::DropDown::builder()
+            .model(&gtk::StringList::new(&names))
+            .selected(start as u32)
+            .build();
+        labelled(&next, &tr("Following Paragraph Style"));
+        dialog.set_extra_child(Some(&next));
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("set", &tr("_Set"));
+        dialog.set_response_appearance("set", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("set"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        let editor = editor.clone();
+        dialog.connect_response(None, move |_, response| {
+            let Some(this) = weak.upgrade() else { return };
+            if response != "set" {
+                return;
+            }
+            let choice = choices.get(next.selected() as usize).copied().flatten();
+            let result = editor.style_edit(&tr("Following Paragraph Style"), |edit, _, _| {
+                edit.set_next_style(id, choice)
+            });
+            this.report(&tr("Cannot Set the Following Style"), result);
+        });
+        self.present(&dialog);
+    }
+
     /// Asks for a style of the family of another to take its place, or
     /// Free Form when `free_form` is true, and then does `then` with it,
     /// or with none for no character style.
@@ -833,12 +895,14 @@ impl StylesDrawer {
         dialog.set_extra_child(Some(&replacement));
         dialog.add_response("cancel", &tr("_Cancel"));
         dialog.add_response("go", &tr(verb));
+        // Return never runs a destructive action (HIG: dialogs).
         if destructive {
             dialog.set_response_appearance("go", adw::ResponseAppearance::Destructive);
+            dialog.set_default_response(Some("cancel"));
         } else {
             dialog.set_response_appearance("go", adw::ResponseAppearance::Suggested);
+            dialog.set_default_response(Some("go"));
         }
-        dialog.set_default_response(Some("go"));
         dialog.set_close_response("cancel");
         let weak = Rc::downgrade(self);
         let editor = editor.clone();
@@ -1050,6 +1114,10 @@ fn style_menu() -> gio::Menu {
         shortcut.append_item(&item);
     }
     let keys = gio::Menu::new();
+    keys.append(
+        Some(&tr("_Following Paragraph Style…")),
+        Some("styles.next-style"),
+    );
     keys.append_submenu(Some(&tr("_Shortcut")), &shortcut);
     menu.append_section(None, &keys);
     let manage = gio::Menu::new();

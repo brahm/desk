@@ -2552,6 +2552,21 @@ impl TextEditor {
         styles
     }
 
+    /// The character styles of the document, by name.
+    pub fn character_styles(&self) -> Vec<(StyleId, String)> {
+        let state = self.state.borrow();
+        let mut styles: Vec<_> = state
+            .editor
+            .document()
+            .styles()
+            .iter()
+            .filter(|s| s.family() == StyleFamily::Character)
+            .map(|s| (s.id(), s.name().to_owned()))
+            .collect();
+        styles.sort_by_key(|s| s.1.to_lowercase());
+        styles
+    }
+
     /// Sets character formatting on the selection, as one action of the
     /// history. With nothing selected, the next text typed takes it.
     pub fn set_character_attrs(&self, name: &str, attrs: &CharAttrs) {
@@ -2640,8 +2655,8 @@ impl TextEditor {
     }
 
     /// Gives the paragraphs of the selection a paragraph style and drops
-    /// the formatting set over it, as a style shortcut with Alt does
-    /// (STY-04).
+    /// the formatting and character styles set over it, as a double click
+    /// on the style or a style shortcut with Shift does (STY-04, STY-06).
     pub fn set_paragraph_style_clean(&self, style: StyleId) {
         if self.style_selected_objects(
             "Paragraph Style",
