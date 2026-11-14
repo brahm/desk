@@ -81,7 +81,7 @@ with PDFs made by iWork 9.3 itself.
 
 Desk is distributed only as a Flatpak, on the GNOME 51 runtime, and
 the code uses what that runtime has: GTK 4.24 and Libadwaita 1.10. To
-build it outside Flatpak you need Rust 1.100 or later and the
+build it outside Flatpak you need Rust 1.98 or later, the Rust of the Flatpak SDK, and the
 development files of those versions or later, which Fedora 45 and
 Ubuntu 26.10 have. Packagers of other systems need to meet these
 requirements too, or keep a fork that adapts the code to older
