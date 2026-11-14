@@ -322,4 +322,8 @@ IOP-08		Equações	skipped	Needs MathType 6, which is not in the VM.
 IOP-09		Modelos e espaços reservados	skipped	Not a row of its own for Pages: see txt-01-mod-08-placeholder and obj-03-mod-09-media-placeholder.
 IOP-10		Exportar e compartilhar	skipped	Export and sharing are not held in a document.
 IOP-11		Senha e versões	skipped	Not made: the password needs a dialog, as DOC-08; versions are not held in a document.
+VMI-01		Desmarcar tudo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+VMI-02		Reaplicar padrões à seleção	skipped	An action; the document holds only the result.
+VMI-03		Linhas de conexão das caixas vinculadas	skipped	Not made: whether a document keeps this view setting was not checked.
+VMI-04		Redefinir texto e alças da forma	skipped	An action; the document holds only the result.
 -	lossy-import.pages	Content Desk does not import, to check the warning log	made	All the items asked for; not tied to one row.

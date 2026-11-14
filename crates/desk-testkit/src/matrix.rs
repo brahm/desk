@@ -181,11 +181,12 @@ mod tests {
     fn the_matrix_of_the_corpus_reads() {
         let text = include_str!("../../../corpus/matrix.tsv");
         let rows = parse(text).unwrap();
-        assert_eq!(rows.len(), 304);
+        assert_eq!(rows.len(), 310);
         let count = |prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         assert_eq!(count("IOP"), 33);
-        assert_eq!(count("GNM"), 11);
-        assert_eq!(rows.len() - count("IOP") - count("GNM"), 260);
+        assert_eq!(count("GNM"), 13);
+        assert_eq!(count("VMI"), 4);
+        assert_eq!(rows.len() - count("IOP") - count("GNM") - count("VMI"), 260);
         assert!(rows.iter().all(|r| r.phase.is_none_or(|p| p <= 11)));
         let gnome = |id: &str| &rows.iter().find(|r| r.id == id).unwrap().gnome;
         // The decisions of 2026-11-13: one Inspector, a header bar
@@ -193,6 +194,11 @@ mod tests {
         assert!(gnome("INT-13").contains("Um Inspetor só"));
         assert!(gnome("INT-11").contains("sem personalização"));
         assert!(gnome("DOC-11").contains("Rascunho de recuperação"));
+        // The interface chosen on 2026-11-14: the navigation sidebar,
+        // the two levels of the Inspector and the slim format bar.
+        assert!(gnome("INT-13").contains("Formato e Documento"));
+        assert!(gnome("INT-12").contains("menu Mais"));
+        assert!(gnome("INT-18").contains("barra lateral de navegação"));
     }
 
     #[test]
@@ -221,8 +227,8 @@ mod tests {
         let writer = parse(include_str!("../../../corpus/matrix.tsv")).unwrap();
         let slides = parse(include_str!("../../../corpus/slides-matrix.tsv")).unwrap();
         let tables = parse(include_str!("../../../corpus/tables-matrix.tsv")).unwrap();
-        assert_eq!(slides.len(), 173);
-        assert_eq!(tables.len(), 175);
+        assert_eq!(slides.len(), 180);
+        assert_eq!(tables.len(), 180);
         let count =
             |rows: &[Row], prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         for (area, n) in [
@@ -239,7 +245,8 @@ mod tests {
             ("KAPR", 13),
             ("KEXP", 11),
             ("KMES", 21),
-            ("KGNM", 12),
+            ("KGNM", 14),
+            ("KVMI", 5),
         ] {
             assert_eq!(count(&slides, area), n, "{area}");
         }
@@ -255,7 +262,8 @@ mod tests {
             ("NCON", 4),
             ("NIMP", 14),
             ("NMOD", 8),
-            ("NGNM", 11),
+            ("NGNM", 13),
+            ("NVMI", 3),
         ] {
             assert_eq!(count(&tables, area), n, "{area}");
         }
