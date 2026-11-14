@@ -56,8 +56,8 @@ done (the first six phases of the plan;
 - `desk-convert` exports documents to PDF from the command line.
 
 Tables and charts come next, then review and collaboration. Desk Slides
-and Desk Tables have their own parity matrices, with 161 rows for
-Keynote and 164 for Numbers, and start once the table and chart engine
+and Desk Tables have their own parity matrices, with 173 rows for
+Keynote and 175 for Numbers, and start once the table and chart engine
 is ready.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also

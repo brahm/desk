@@ -2593,16 +2593,19 @@ impl DocumentWindow {
         let area = self.view.area().downgrade();
         let editor = self.editor.clone();
         let window = self.window.downgrade();
-        keys.connect_key_pressed(move |_, key, _, modifiers| {
-            // The shortcuts of styles: F1 to F8, with Alt to drop the
-            // formatting set over the style (STY-04).
-            let alt = gdk::ModifierType::ALT_MASK;
-            if let Some(n) = function_key(key)
-                && (modifiers.is_empty() || modifiers == alt)
+        keys.connect_key_pressed(move |_, key, keycode, modifiers| {
+            // The shortcuts of styles: Ctrl+1 to Ctrl+8 in place of F1 to
+            // F8 of Pages, with Shift to drop the formatting set over the
+            // style in place of Option, since GNOME keeps F1 for Help and
+            // Alt with the function keys for the windows (STY-04).
+            let control = gdk::ModifierType::CONTROL_MASK;
+            let shift = control | gdk::ModifierType::SHIFT_MASK;
+            if (modifiers == control || modifiers == shift)
+                && let Some(n) = style_key(key, keycode)
                 && let Some(editor) = editor.borrow().clone()
                 && let Some(style) = editor.styles().by_shortcut(n).map(desk_model::Style::id)
             {
-                editor.apply_style(style, modifiers == alt);
+                editor.apply_style(style, modifiers == shift);
                 return glib::Propagation::Stop;
             }
             let menu_key = key == gdk::Key::Menu
@@ -2774,21 +2777,21 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
     }
 }
 
-/// The number of a function key from F1 to F8.
-fn function_key(key: gdk::Key) -> Option<u8> {
-    [
-        gdk::Key::F1,
-        gdk::Key::F2,
-        gdk::Key::F3,
-        gdk::Key::F4,
-        gdk::Key::F5,
-        gdk::Key::F6,
-        gdk::Key::F7,
-        gdk::Key::F8,
-    ]
-    .iter()
-    .position(|k| *k == key)
-    .map(|i| i as u8 + 1)
+/// The number of a style shortcut, from 1 to 8, for the key of a digit
+/// on the row of digits or the keypad. With Shift the key is a symbol on
+/// most layouts, so the key is read again without modifiers (STY-04).
+fn style_key(key: gdk::Key, keycode: u32) -> Option<u8> {
+    let digit = |key: gdk::Key| {
+        key.to_unicode()
+            .and_then(|c| c.to_digit(10))
+            .filter(|d| (1..=8).contains(d))
+            .map(|d| d as u8)
+    };
+    digit(key).or_else(|| {
+        let display = gdk::Display::default()?;
+        let (plain, ..) = display.translate_key(keycode, gdk::ModifierType::empty(), 0)?;
+        digit(plain)
+    })
 }
 
 /// The main menu of the header bar.

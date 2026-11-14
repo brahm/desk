@@ -242,6 +242,14 @@ def main():
         press("ctrl+alt+i")
         wait_for("the list in the Inspector", lambda: showing(find_named(app, "Indent Level")))
         check("the Inspector shows the level of the item", True)
+        # Alt+Shift+Right indents the item alone, as Option-Tab does in
+        # Pages, since Alt+Tab switches windows in GNOME (LST-02).
+        level = spin_of(app, "Indent Level")
+        press("alt+shift+Right")
+        wait_for("the item to go a level in", lambda: Atspi.Value.get_current_value(level) == 2)
+        press("alt+shift+Left")
+        wait_for("the item to come back", lambda: Atspi.Value.get_current_value(level) == 1)
+        check("Alt+Shift+Right and Alt+Shift+Left change the level of the item (LST-02)", True)
         press("Return")
         wait_for("the list to end", lambda: not showing(find_named(app, "Indent Level")))
         check("Return on an empty item ends the list", True)

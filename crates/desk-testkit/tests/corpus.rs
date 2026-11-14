@@ -91,6 +91,7 @@ fn a_case_matches_its_own_pdf_and_not_another() {
             guide_pages: String::new(),
             shared: String::new(),
             odf: String::new(),
+            gnome: String::new(),
         }],
         vec![result],
         &Default::default(),
@@ -172,6 +173,7 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
         guide_pages: String::new(),
         shared: String::new(),
         odf: String::new(),
+        gnome: String::new(),
     };
     let report = Report::new(
         vec![row("EST-07"), row("TXT-03")],
@@ -212,6 +214,7 @@ fn the_report_tells_documents_of_pages_that_still_differ() {
             guide_pages: String::new(),
             shared: String::new(),
             odf: String::new(),
+            gnome: String::new(),
         }],
         Vec::new(),
         &Default::default(),
@@ -221,4 +224,24 @@ fn the_report_tells_documents_of_pages_that_still_differ() {
     assert_eq!(report.rows[0].status, Status::Differs);
     assert!(!report.has_failures());
     assert!(report.to_markdown(Path::new(".")).contains("ainda diferem"));
+}
+
+/// The rows compared by eye on the reference machine exist in the matrix
+/// and only mark rows that tests check.
+#[test]
+fn the_review_on_the_reference_machine_names_rows_of_the_matrix() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let review = desk_testkit::report::parse_review(
+        &std::fs::read_to_string(root.join("corpus/vm-review.tsv")).unwrap(),
+    )
+    .unwrap();
+    let rows = desk_testkit::matrix::parse(
+        &std::fs::read_to_string(root.join("corpus/matrix.tsv")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(review.len(), 50);
+    for id in review.keys() {
+        assert!(rows.iter().any(|r| &r.id == id), "{id}");
+    }
+    assert!(desk_testkit::report::parse_review("id\tdate\tsource\nFMT-1\t2026\tx\n").is_err());
 }

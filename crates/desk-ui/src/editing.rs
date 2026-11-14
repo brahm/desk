@@ -3171,7 +3171,19 @@ impl TextEditor {
         let collapse = |forward: bool| {
             (!shift && !selection.is_empty()).then_some(if forward { end } else { start })
         };
+        let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
         match key {
+            // In a list, Alt+Shift+Right and Alt+Shift+Left change the
+            // level of the item alone, as Option-Tab does in Pages:
+            // Alt+Tab belongs to GNOME (LST-02).
+            gdk::Key::Right | gdk::Key::KP_Right | gdk::Key::Left | gdk::Key::KP_Left
+                if alt
+                    && shift
+                    && !control
+                    && self.change_list_level(
+                        if matches!(key, gdk::Key::Left | gdk::Key::KP_Left) { -1 } else { 1 },
+                        false,
+                    ) => {}
             gdk::Key::Left | gdk::Key::KP_Left => {
                 let spot = collapse(false).unwrap_or_else(|| {
                     if control {
@@ -3260,11 +3272,9 @@ impl TextEditor {
             }
             gdk::Key::Tab | gdk::Key::ISO_Left_Tab if !control => {
                 // In a list, Tab and Shift-Tab change the level of the
-                // item and the items under it, and with Alt only of the
-                // item (LST-02).
-                let alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
+                // item and the items under it (LST-02).
                 let by = if shift { -1 } else { 1 };
-                if !self.change_list_level(by, !alt) {
+                if !self.change_list_level(by, true) {
                     self.replace_selection("Typing", "\t");
                 }
             }

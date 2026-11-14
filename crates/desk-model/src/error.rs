@@ -35,7 +35,7 @@ pub enum ModelError {
     DefaultStyle,
     /// Another style of the family has this name.
     DuplicateStyleName(String),
-    /// A style shortcut is a function key from 1 to 8.
+    /// A style shortcut is Ctrl and a digit from 1 to 8.
     InvalidShortcut(u8),
     /// Another node already has this identifier.
     DuplicateId(NodeId),

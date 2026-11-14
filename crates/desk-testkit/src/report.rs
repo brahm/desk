@@ -237,6 +237,10 @@ pub enum Status {
     Compared,
     /// It has cases, still without a PDF of Pages.
     AwaitsReference,
+    /// Tests check it, and its interface was compared by eye with Pages
+    /// 4.3 on the reference Mac OS X Lion, as `corpus/vm-review.tsv`
+    /// lists.
+    Reviewed,
     /// Only tests check it.
     Tested,
     /// Nothing checks it yet.
@@ -250,16 +254,18 @@ impl Status {
             Self::Differs => "diferente do Pages",
             Self::Compared => "comparado com o PDF do Pages",
             Self::AwaitsReference => "sem referência",
+            Self::Reviewed => "conferido na VM do Lion",
             Self::Tested => "só testes",
             Self::Pending => "pendente",
         }
     }
 
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::Matches,
         Self::Differs,
         Self::Compared,
         Self::AwaitsReference,
+        Self::Reviewed,
         Self::Tested,
         Self::Pending,
     ];
@@ -353,6 +359,18 @@ impl Report {
             rows,
             unknown_rows,
         }
+    }
+
+    /// Marks as reviewed on the reference machine the rows that only tests
+    /// check and that `reviewed` lists, as `corpus/vm-review.tsv` does.
+    #[must_use]
+    pub fn with_review(mut self, reviewed: &BTreeMap<String, String>) -> Self {
+        for row in &mut self.rows {
+            if row.status == Status::Tested && reviewed.contains_key(&row.row.id) {
+                row.status = Status::Reviewed;
+            }
+        }
+        self
     }
 
     /// Whether a case failed, or names a row the matrix does not have.
@@ -564,6 +582,47 @@ pub fn tests_by_row(crates: &Path) -> std::io::Result<BTreeMap<String, Vec<Strin
         tests.dedup();
     }
     Ok(found)
+}
+
+/// Reads `corpus/vm-review.tsv`: the rows whose interface was compared
+/// by eye with Pages 4.3 on the reference machine, each with the date and
+/// the review that did it. Lines that start with `#` are comments, and
+/// the first other line is the header `id\tdate\tsource`.
+pub fn parse_review(text: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut rows = BTreeMap::new();
+    let mut header = false;
+    for (i, line) in text.lines().enumerate() {
+        if line.starts_with('#') || line.trim().is_empty() {
+            continue;
+        }
+        if !header {
+            if line != "id\tdate\tsource" {
+                return Err(format!(
+                    "line {}: the header must be id, date, source",
+                    i + 1
+                ));
+            }
+            header = true;
+            continue;
+        }
+        match line.split('\t').collect::<Vec<_>>()[..] {
+            [id, date, source] if crate::matrix::is_id(id) => {
+                if rows
+                    .insert(id.to_owned(), format!("{date}: {source}"))
+                    .is_some()
+                {
+                    return Err(format!("line {}: {id} is listed twice", i + 1));
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "line {}: expected an ID, a date and a source",
+                    i + 1
+                ));
+            }
+        }
+    }
+    Ok(rows)
 }
 
 /// The tests named after each row that compare with Pages: those of the

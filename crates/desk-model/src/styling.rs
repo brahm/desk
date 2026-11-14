@@ -566,7 +566,7 @@ impl Edit {
 
     /// Gives the paragraphs between two positions a paragraph style and
     /// removes every attribute set over their styles, as a style shortcut
-    /// with Option does (STY-04). Character styles stay.
+    /// with Shift does (STY-04). Character styles stay.
     pub fn set_paragraph_style_clean(
         &mut self,
         start: Position,
@@ -676,8 +676,8 @@ impl Edit {
         self.put(style.with_name(name))
     }
 
-    /// Sets the function key of a style, from 1 for F1 to 8 for F8, or
-    /// removes it. A style that had the key loses it (STY-04).
+    /// Sets the shortcut key of a style, from 1 for Ctrl+1 to 8 for
+    /// Ctrl+8, or removes it. A style that had the key loses it (STY-04).
     pub fn set_style_shortcut(&mut self, id: StyleId, key: Option<u8>) -> Result<(), ModelError> {
         let styles = self.document().styles();
         let style = styles

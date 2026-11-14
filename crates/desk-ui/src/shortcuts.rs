@@ -65,6 +65,10 @@ const SECTIONS: &[Section] = &[
                 n_("Start or end of the document"),
             ),
             ("<Shift>Left <Shift>Right", n_("Select while moving")),
+            (
+                "<Alt><Shift>Right <Alt><Shift>Left",
+                n_("Change the level of a list item alone"),
+            ),
             ("Menu <Shift>F10", n_("Context menu")),
         ],
     ),
@@ -87,9 +91,12 @@ const SECTIONS: &[Section] = &[
             ("<Control><Alt>c", n_("Copy paragraph style")),
             ("<Control><Shift><Alt>c", n_("Copy character style")),
             ("<Control><Alt>v", n_("Paste style")),
-            ("F1 F2 F3 F4 F5 F6 F7 F8", n_("Apply the style of the key")),
             (
-                "<Alt>F1",
+                "<Control>1 <Control>2 <Control>3 <Control>4 <Control>5 <Control>6 <Control>7 <Control>8",
+                n_("Apply the style of the key"),
+            ),
+            (
+                "<Control><Shift>1",
                 n_("Apply a style and drop the formatting over it"),
             ),
             ("<Control>r", n_("Show ruler")),

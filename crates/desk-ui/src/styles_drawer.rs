@@ -7,7 +7,8 @@
 //! the formatting there differs from it (STY-06). A click applies a
 //! style, a double click applies it and drops the formatting set over
 //! it, and the menu of a style redefines, reverts, selects its uses,
-//! renames, deletes it and gives it a function key (STY-02 to STY-09).
+//! renames, deletes it and gives it a shortcut, Ctrl and a digit from 1
+//! to 8 (STY-02 to STY-09).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -56,9 +57,14 @@ pub struct StylesDrawer {
     editor: EditorOf,
 }
 
-/// The name of a function key for a style shortcut.
+/// The name of the shortcut of a style, Ctrl+1 to Ctrl+8 as GTK writes
+/// it in the language of the interface (STY-04).
 pub fn key_name(key: u8) -> String {
-    format!("F{key}")
+    gtk::accelerator_get_label(
+        gdk::Key::from_name(key.to_string()).unwrap_or(gdk::Key::_1),
+        gdk::ModifierType::CONTROL_MASK,
+    )
+    .into()
 }
 
 /// The look of the name of a style: its font, size within bounds, weight,
