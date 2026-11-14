@@ -5,7 +5,9 @@ The project website, published on GitHub Pages at
 build tool and no scripts.
 
 `ci/build-site.sh` assembles it in `target/site`, copying the logo and
-the app icons from [data](../data) so that they have one source. Open
+the app icons from [data](../data), and three windows of the interface
+from [docs/interface/janelas](../docs/interface/janelas), so that they
+have one source. Open
 `target/site/index.html` in a browser to see it. The
 [Website workflow](../.github/workflows/pages.yml) builds it on every
 pull request that touches it and publishes it from `main`.

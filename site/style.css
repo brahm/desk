@@ -574,6 +574,47 @@ code {
   }
 }
 
+/* Mockups of the interface: a row of windows that scrolls sideways,
+   like the screenshots of an app page in GNOME Software. */
+
+.shots {
+  display: flex;
+  gap: 16px;
+  margin: 0 -16px;
+  padding: 4px 16px 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  list-style: none;
+}
+
+.shots li {
+  flex: 0 0 92%;
+  scroll-snap-align: start;
+}
+
+.shots figure {
+  margin: 0;
+}
+
+.shots img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.shots figcaption {
+  margin-top: 10px;
+  color: var(--dim);
+  font-size: 0.9rem;
+}
+
+.shots figcaption strong {
+  color: var(--strong);
+}
+
 /* The symbols of the row icons: kept in the page, but out of the layout. */
 .sprite {
   position: absolute;
