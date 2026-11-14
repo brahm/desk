@@ -531,9 +531,8 @@ impl Effects {
                 .set_model(Some(&string_list(tags.iter().map(|t| language_name(t)))));
             *self.languages.borrow_mut() = tags;
         }
-        self.language.set_selected(index(
-            self.languages.borrow().iter().position(|t| t == tag),
-        ));
+        self.language
+            .set_selected(index(self.languages.borrow().iter().position(|t| t == tag)));
         self.text_background.show(character.background);
         self.shadow.show(character.shadow.map(|s| s.color));
         let shadow = character.shadow.unwrap_or_default();
@@ -576,6 +575,12 @@ mod tests {
         assert!(tags.iter().any(|t| t == "tlh"));
         assert_eq!(language_name("pt-BR"), "Portuguese (Brazil)");
         assert_eq!(language_name("tlh"), "tlh");
-        assert_eq!(language_tags(Some("und")).iter().filter(|t| *t == "und").count(), 1);
+        assert_eq!(
+            language_tags(Some("und"))
+                .iter()
+                .filter(|t| *t == "und")
+                .count(),
+            1
+        );
     }
 }

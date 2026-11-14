@@ -442,8 +442,7 @@ impl StylesDrawer {
         {
             action.set_state(&key.to_string().to_variant());
         }
-        let paragraph = (self.editor)()
-            .is_some_and(|e| e.styles().paragraph(id).is_some());
+        let paragraph = (self.editor)().is_some_and(|e| e.styles().paragraph(id).is_some());
         if let Some(action) = self
             .actions
             .lookup_action("next-style")
@@ -810,8 +809,10 @@ impl StylesDrawer {
             .unwrap_or(0);
         let dialog = adw::AlertDialog::new(
             Some(&tr("Following Paragraph Style")),
-            Some(&tr("Return after a paragraph of “{name}” starts one of this style.")
-                .replace("{name}", &style.name)),
+            Some(
+                &tr("Return after a paragraph of “{name}” starts one of this style.")
+                    .replace("{name}", &style.name),
+            ),
         );
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
         let next = gtk::DropDown::builder()

@@ -46,7 +46,10 @@ const SECTIONS: &[Section] = &[
             ("<Control>c", n_("Copy")),
             ("<Control>d", n_("Duplicate")),
             ("<Control>v", n_("Paste")),
-            ("<Control><Shift>v <Control><Shift><Alt>v", n_("Paste and match style")),
+            (
+                "<Control><Shift>v <Control><Shift><Alt>v",
+                n_("Paste and match style"),
+            ),
             ("<Control>a", n_("Select all")),
             ("<Control>period", n_("Special characters")),
             ("<Shift>Return", n_("Line break")),
@@ -108,6 +111,7 @@ const SECTIONS: &[Section] = &[
         n_("Arranging"),
         true,
         &[
+            ("<Control><Alt>p", n_("Choose an image, movie or sound")),
             ("<Control><Shift>bracketright", n_("Bring to front")),
             ("<Control>bracketright", n_("Bring forward")),
             ("<Control>bracketleft", n_("Send backward")),

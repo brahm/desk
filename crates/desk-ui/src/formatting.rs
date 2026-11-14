@@ -119,6 +119,10 @@ impl FormatBar {
             .tooltip_text(tr("Character Style"))
             .enable_search(true)
             .build();
+        // The button shows the name cut short, so that a long name does
+        // not widen the bar; the list shows names whole.
+        characters.set_factory(Some(&label_factory(Some(12))));
+        characters.set_list_factory(Some(&label_factory(None)));
         characters.update_property(&[gtk::accessible::Property::Label(&tr("Character Style"))]);
         root.append(&characters);
 
@@ -385,7 +389,8 @@ impl FormatBar {
         }
         self.updating.set(true);
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
-        self.characters.set_model(Some(&gtk::StringList::new(&names)));
+        self.characters
+            .set_model(Some(&gtk::StringList::new(&names)));
         *self.character_ids.borrow_mut() = ids;
         self.updating.set(false);
         true
@@ -394,7 +399,11 @@ impl FormatBar {
     /// Shows the character style at the selection.
     pub fn show_character_style(&self, style: Option<StyleId>) {
         self.updating.set(true);
-        let index = self.character_ids.borrow().iter().position(|id| *id == style);
+        let index = self
+            .character_ids
+            .borrow()
+            .iter()
+            .position(|id| *id == style);
         self.characters
             .set_selected(index.map_or(gtk::INVALID_LIST_POSITION, |i| i as u32));
         self.updating.set(false);
@@ -1011,6 +1020,37 @@ impl InspectorPanes {
         self.toggles.set_active_name(Some(&active));
         self.stack.set_visible_child_name(&active);
     }
+}
+
+/// Shows the strings of a list as labels, cut short to `chars`
+/// characters when it is given.
+fn label_factory(chars: Option<i32>) -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(move |_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let label = gtk::Label::builder().xalign(0.0).build();
+        if let Some(chars) = chars {
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            label.set_max_width_chars(chars);
+        }
+        item.set_child(Some(&label));
+    });
+    factory.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let text = item
+            .item()
+            .and_downcast::<gtk::StringObject>()
+            .map(|s| s.string().to_string())
+            .unwrap_or_default();
+        if let Some(label) = item.child().and_downcast::<gtk::Label>() {
+            label.set_label(&text);
+        }
+    });
+    factory
 }
 
 #[cfg(test)]

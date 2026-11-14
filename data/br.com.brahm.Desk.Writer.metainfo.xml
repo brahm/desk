@@ -35,6 +35,24 @@
       estão por vir.
     </p>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A document with its styles in the format bar</caption>
+      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-window.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The Inspector in the sidebar</caption>
+      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-inspector.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The Styles drawer</caption>
+      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-styles.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Find and Replace</caption>
+      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-find.png</image>
+    </screenshot>
+  </screenshots>
   <launchable type="desktop-id">br.com.brahm.Desk.Writer.desktop</launchable>
   <url type="homepage">https://github.com/brahm/desk</url>
   <url type="bugtracker">https://github.com/brahm/desk/issues</url>
@@ -62,6 +80,20 @@
     <mediatype>application/vnd.apple.pages</mediatype>
   </provides>
   <releases>
+    <release version="0.7.0~beta1" date="2026-11-14" type="development">
+      <description>
+        <p>The third beta, with a window made for GNOME 51:</p>
+        <ul>
+          <li>View and Insert menus in the header bar, a format bar with the paragraph and character styles, and the Inspector in a sidebar of compact panes</li>
+          <li>Find and Replace in a search bar, with Ctrl+H, tabs and line breaks</li>
+          <li>Keyboard shortcuts that follow GNOME first, with the shortcuts dialog of Libadwaita</li>
+          <li>A template gallery, recovery of unsaved changes after a crash and a banner for the warnings of a document</li>
+          <li>The language of the text, the next paragraph style and favorite fonts</li>
+          <li>Delete Pages deletes the section of the page, and Revert to Style drops the character styles too, as Pages does</li>
+          <li>Windows as narrow as 640 pixels</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.0~beta1" date="2026-11-13" type="development">
       <description>
         <p>The second beta, with objects and page layout:</p>

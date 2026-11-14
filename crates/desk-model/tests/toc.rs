@@ -191,12 +191,20 @@ fn sty_05_a_style_that_a_table_lists_can_be_deleted_and_the_table_updates() {
             Ok(heading)
         })
         .unwrap();
-    assert!(texts(editor.document()).iter().any(|t| t.starts_with("Chapter one\t")));
+    assert!(
+        texts(editor.document())
+            .iter()
+            .any(|t| t.starts_with("Chapter one\t"))
+    );
     editor
         .edit("Delete Style", |edit| edit.delete_style(heading, None))
         .unwrap();
     let document = editor.document();
     assert!(document.styles().get(heading).is_none());
     assert!(!document.text_settings().toc.uses(heading));
-    assert!(!texts(document).iter().any(|t| t.starts_with("Chapter one\t")));
+    assert!(
+        !texts(document)
+            .iter()
+            .any(|t| t.starts_with("Chapter one\t"))
+    );
 }

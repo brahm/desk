@@ -33,7 +33,8 @@ const LINE_BREAK_SIGN: char = '↵';
 /// The text that a field of Find & Replace stands for: its signs become
 /// the tabs and line breaks they show (TXT-12).
 pub fn from_field(text: &str) -> String {
-    text.replace(TAB_SIGN, "\t").replace(LINE_BREAK_SIGN, &LINE_BREAK.to_string())
+    text.replace(TAB_SIGN, "\t")
+        .replace(LINE_BREAK_SIGN, &LINE_BREAK.to_string())
 }
 
 /// How a field of Find & Replace shows a text.
@@ -302,6 +303,27 @@ impl FindWindow {
             .build();
         labelled(&window, &tr("Find & Replace"));
         window.connect_entry(&find);
+        // The fields are plain entries, which the search bar does not close
+        // on Escape by itself, so Escape in either of them closes it.
+        let escape = gtk::EventControllerKey::new();
+        {
+            let window = window.downgrade();
+            escape.connect_key_pressed(move |_, key, _, state| {
+                if key == gtk::gdk::Key::Escape
+                    && !state.intersects(
+                        gtk::gdk::ModifierType::CONTROL_MASK
+                            | gtk::gdk::ModifierType::SHIFT_MASK
+                            | gtk::gdk::ModifierType::ALT_MASK,
+                    )
+                    && let Some(window) = window.upgrade()
+                {
+                    window.set_search_mode(false);
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            });
+        }
+        clamp.add_controller(escape);
 
         let this = Rc::new(Self {
             window,

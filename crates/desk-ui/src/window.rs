@@ -441,7 +441,7 @@ impl DocumentWindow {
         let window = adw::ApplicationWindow::builder()
             .application(app)
             .title(info.name)
-            .default_width(900)
+            .default_width(1100)
             .default_height(700)
             .content(&toolbar_view)
             .build();
@@ -462,6 +462,22 @@ impl DocumentWindow {
             let bar = format_bar.clone();
             narrow.connect_unapply(move |_| bar.set_compact(false));
         }
+        // Below about a thousand pixels the format bar leaves out its
+        // secondary controls before the sidebars collapse. Of the
+        // breakpoints that match, the window applies the one added last,
+        // so the narrow one comes after and sets the format bar too.
+        let medium = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            1000.0,
+            adw::LengthUnit::Sp,
+        ));
+        {
+            let bar = format_bar.clone();
+            medium.connect_apply(move |_| bar.set_compact(true));
+            let bar = format_bar.clone();
+            medium.connect_unapply(move |_| bar.set_compact(false));
+        }
+        window.add_breakpoint(medium);
         window.add_breakpoint(narrow);
         // One sidebar a side when they cover the pages.
         for (a, b) in [(&thumbnails_split, &drawer_split), (&search_split, &split)] {

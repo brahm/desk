@@ -350,7 +350,10 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.copy-character-style", &["<Control><Shift><Alt>c"]),
             ("win.paste-style", &["<Control><Alt>v"]),
             // Ctrl+Shift+V is Paste Special in GNOME.
-            ("win.paste-match-style", &["<Control><Shift>v", "<Control><Shift><Alt>v"]),
+            (
+                "win.paste-match-style",
+                &["<Control><Shift>v", "<Control><Shift><Alt>v"],
+            ),
             ("win.inspector", &["<Control><Alt>i"]),
             ("win.thumbnails", &["F9"]),
             ("win.fonts", &["<Control>t"]),

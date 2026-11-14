@@ -3196,7 +3196,11 @@ impl TextEditor {
                     && shift
                     && !control
                     && self.change_list_level(
-                        if matches!(key, gdk::Key::Left | gdk::Key::KP_Left) { -1 } else { 1 },
+                        if matches!(key, gdk::Key::Left | gdk::Key::KP_Left) {
+                            -1
+                        } else {
+                            1
+                        },
                         false,
                     ) => {}
             gdk::Key::Left | gdk::Key::KP_Left => {

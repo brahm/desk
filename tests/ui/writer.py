@@ -486,6 +486,7 @@ def main():
     advanced_gradient(work)
     mask_and_frame(work)
     mask_from_the_menu(work)
+    gnome_window(work)
     print("All UI tests passed.")
 
 
@@ -1185,7 +1186,7 @@ CHOOSE = "Choose an Image, Movie or Sound"
 
 def choose_file(app, path):
     """Asks Insert, Choose… for a file and picks it in the dialog."""
-    press("Escape", "ctrl+shift+v")
+    press("Escape", "ctrl+alt+p")
     wait_for(
         "the dialog that chooses an image",
         lambda: next(
@@ -2120,6 +2121,93 @@ def mask_from_the_menu(work):
             and not saved_content(letter, r"desk:mask"),
         )
         check("Unmask takes the mask off the picture (OBJ-04)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+
+def character_styles(app):
+    """The menu of the character styles in the format bar, if it shows: a
+    menu of GTK takes the name of what it has chosen."""
+    return next(
+        (
+            n
+            for n in walk(app)
+            if n.get_role() == Atspi.Role.COMBO_BOX
+            and n.get_name() == "No Character Style"
+            and showing(n)
+        ),
+        None,
+    )
+
+
+def gnome_window(work):
+    """The window as the decisions of 13/11 adapt it to GNOME: a header bar
+    without customization and the main menu (INT-11), the shortcuts
+    dialog of Libadwaita (GNM-11), Ctrl+H for Replace (TXT-12), the
+    character styles in the format bar (STY-02), the language of the text
+    in the Inspector (TXT-10), Favorites in the Fonts popover (INT-15),
+    and a narrow window that keeps what matters most (GNM-01)."""
+    name = "Gnome.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        wait_for("the main menu", lambda: showing_named(app, "Main Menu"))
+        check(
+            "the header bar has the main menu and nothing to customize it (INT-11)",
+            showing_named(app, "Customize Toolbar") is None,
+        )
+
+        press("ctrl+question")
+        wait_for(
+            "the shortcuts dialog",
+            lambda: showing_named(app, "Apply the style of the key"),
+        )
+        check("Ctrl+? shows the shortcuts of Libadwaita (GNM-11)", True)
+        press("Escape")
+
+        press("ctrl+h")
+        wait_for("the replacement field", lambda: showing_named(app, "Show Replace"))
+        wait_for("Replace All", lambda: showing_named(app, "Replace All"))
+        check("Ctrl+H shows Find & Replace with the replacement (TXT-12)", True)
+        press("Escape")
+
+        check(
+            "the format bar has the character styles (STY-02)",
+            wait_for("the character styles", lambda: character_styles(app))
+            is not None,
+        )
+
+        press("ctrl+alt+i")
+        check(
+            "the Inspector sets the language of the text (TXT-10)",
+            wait_for("the language", lambda: inspector_node(app, "Language")) is not None,
+        )
+        press("ctrl+alt+i")
+
+        press("ctrl+t")
+        wait_for("the Fonts popover", lambda: showing_named(app, "Favorites"))
+        check("the Fonts popover has Favorites and its star (INT-15)", showing_named(app, "Favorite") is not None)
+        press("Escape")
+
+        subprocess.run(
+            ["xdotool", "search", "--name", name, "windowsize", "640", "600"],
+            check=True,
+        )
+        wait_for(
+            "the format bar to leave out the character styles",
+            lambda: character_styles(app) is None,
+        )
+        wait_for("the main menu in the narrow window", lambda: showing_named(app, "Main Menu"))
+        check("a narrow window keeps the main controls (GNM-01)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

@@ -890,9 +890,14 @@ fn sty_07_the_following_style_is_set_and_return_starts_it() {
     let styles = editor.document().styles();
     assert_eq!(styles.paragraph(heading).unwrap().next, Some(body));
     editor
-        .edit("Following", |edit| edit.set_next_style(heading, Some(heading)))
+        .edit("Following", |edit| {
+            edit.set_next_style(heading, Some(heading))
+        })
         .unwrap();
-    assert_eq!(editor.document().styles().paragraph(heading).unwrap().next, None);
+    assert_eq!(
+        editor.document().styles().paragraph(heading).unwrap().next,
+        None
+    );
 }
 
 #[test]
@@ -928,8 +933,10 @@ fn sty_06_reverting_drops_character_styles_in_the_whole_paragraph() {
                 }
             })
             .unwrap();
-        assert!(paragraph(&editor, 0)
-            .runs()
-            .all(|run| run.style.is_none() && run.attrs.is_empty()));
+        assert!(
+            paragraph(&editor, 0)
+                .runs()
+                .all(|run| run.style.is_none() && run.attrs.is_empty())
+        );
     }
 }
