@@ -332,11 +332,18 @@ Depois disso:
 - A fase 7 do Writer desenha sobre a interface B as abas Tabela, Célula,
   Gráfico, Eixo e Séries e as barras de formatação de célula e de gráfico.
 - A fase 2 do Tables monta a mesma janela com as planilhas na barra
-  lateral, a barra de fórmulas, a aba Dados e o cálculo instantâneo na
-  barra inferior (NINT-02 a NINT-14, NGNM-12, NGNM-13).
-- A fase 2 do Slides monta a mesma janela com o navegador na barra
-  lateral, o botão Reproduzir, a aba Animação e as notas do apresentador
-  (KINT-05 a KINT-15, KGNM-13, KGNM-14).
+  lateral (NINT-02 a NINT-04, NINT-06 a NINT-09, NINT-14, NGNM-12,
+  NGNM-13). A barra de fórmulas e o cálculo instantâneo já têm lugar nela
+  e ganham função na fase 4 (NINT-10, NINT-13), e a aba Dados e os estilos
+  de tabela, na fase 5 (NTAB-24 a NTAB-30, NINT-12).
+- A fase 2 do Slides monta a mesma janela com o navegador na barra lateral
+  e as notas do apresentador (KINT-05 a KINT-13, KINT-15, KGNM-13,
+  KGNM-14). O botão Reproduzir e a aba Animação já têm lugar nela e
+  ganham função nas fases 4 e 5, e o Inspetor fecha na fase 7 (KINT-14).
+
+A fase 1 do Slides só depende do que o Desk Writer já tem e pode andar
+junto com as sete etapas. A fase 2 do Slides e a do Tables esperam as
+etapas 1 a 6, e o Tables inteiro espera a fase 7 do Writer.
 
 ## O que espera confirmação
 
