@@ -1,0 +1,297 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Catálogo dos componentes dos mockups. Uma linha por id marcado nas cenas:
+# id | nome (pt-BR) | rótulo de origem (inglês) | o que faz e o que contém | onde isso ficava no iWork '09 | referência no iWork atual | estado no Desk hoje | atalho
+# Estado: existe = o Desk Writer já tem assim; muda = já tem, com outra forma ou em outro lugar; novo = a fazer.
+# "-" = não se aplica.
+
+## Janela
+janela | Janela do documento | - | Uma janela por documento (AdwApplicationWindow), com pontos de quebra para largura média e estreita | Janela do documento | Janela do documento | existe | Ctrl+N, Ctrl+W
+cab.barra | Barra de cabeçalho | - | Controles da janela inteira: visualização e inserção no início, título no centro, busca, Inspetor e menu principal no fim. Sem personalização | Barra de ferramentas personalizável (51 itens no Pages) | Barra de ferramentas | muda | F10 abre o menu
+cab.titulo | Título da janela | - | Nome do documento e, embaixo, a pasta e o estado (Editado). Clicar renomeia (proposta) | Título com ícone de proxy e versões | Título com menu de renomear e mover | existe | -
+cab.abrir | Abrir | Open | Abre o seletor de arquivos. Só na versão A; nas outras fica no menu principal e no seletor de modelos | Arquivo ▸ Abrir | Arquivo ▸ Abrir | existe | Ctrl+O
+cab.visualizar-menu | Visualização (botão de menu) | View | Menu Visualizar do iWork como botão de texto: painéis, régua, layout, invisíveis, zoom | Botão View da barra e menu View | Botão Visualizar | existe | -
+cab.inserir-menu | Inserir (botão de menu) | Insert | Menu Inserir inteiro, com os objetos e o resto (quebras, campos, notas, link) | Menu Insert e botões Text Box, Shapes, Table, Charts, Comment | Botões e menu Inserir | existe | -
+cab.visualizar | Barra lateral e Visualização | Sidebar / View | AdwSplitButton: o botão mostra ou esconde a barra lateral; a seta abre o menu Visualização (painel da lateral, régua, barra de formatação, layout, invisíveis, tópicos, tela cheia, zoom) | Botão View (pop-up) e menu View | Botão Visualizar | muda | F9; itens: Ctrl+R, Ctrl+Shift+R, Ctrl+Shift+L, Ctrl+Shift+I, F11
+cab.lateral | Barra lateral | Sidebar | Mostra ou esconde a barra lateral (versão C e janelas estreitas, onde vira sobreposição) | Botão View | Botão Visualizar | muda | F9
+cab.inserir | Inserir | Insert | Botão de menu com ícone e rótulo: quebras, campos, nota de rodapé, sumário, marcador, link, caracteres especiais, Escolher. Em janela estreita recebe também os objetos | Menu Insert | Menu Inserir | muda | Escolher: Ctrl+Alt+P; caracteres especiais: Ctrl+.
+cab.inserir.tabela | Tabela | Table | Popover com os estilos de tabela; clicar insere | Botão Table (Tables ▾ no Numbers) | Botão Tabela com galeria | novo | -
+cab.inserir.grafico | Gráfico | Chart | Popover com os tipos de gráfico em 2D, 3D e interativo | Botão Charts (grade 2D e 3D) | Botão Gráfico com galeria | novo | -
+cab.inserir.texto | Caixa de texto | Text Box | Insere uma caixa de texto no centro da vista | Botão Text Box | Botão Texto | muda | -
+cab.inserir.forma | Forma | Shape | Popover com busca, categorias e a grade de formas; no fim, desenhar com a caneta | Botão Shapes (15 formas e Draw) | Botão Forma com biblioteca e busca | muda | -
+cab.inserir.midia | Mídia | Media | Popover com fotos, músicas e filmes das pastas do usuário e Escolher arquivo | Botão Media (Media Browser, janela à parte) | Botão Mídia | muda | Ctrl+Alt+P escolhe um arquivo
+cab.inserir.comentario | Comentário | Comment | Insere um comentário no texto ou no objeto selecionado | Botão Comment | Botão Comentário | existe | -
+cab.inserir-tudo | Inserir (um botão só) | Insert | Versão C: um popover com abas Tabela, Gráfico, Forma e Mídia e a lista do resto (caixa de texto, comentário, quebras e campos) | Botão Objects da paleta de personalização | Botão Inserir do iPad | novo | -
+cab.funcao | Função | Function | Versão A: menu com soma, média, mínimo, máximo, contagem, produto, mais funções e editor de fórmulas | Botão Function | Botão Inserir fórmula | novo | -
+cab.reorganizar | Reorganizar | Reorganize | Versões A e C: abre o painel de ordenar, filtrar e categorizar | Botão Reorganize (painel flutuante) | Botão Organizar | novo | -
+cab.novo-slide | Novo slide | New | Versão A: acrescenta um slide depois do selecionado | Botão New (+) | Botão Adicionar slide | novo | Novo slide: Ctrl+M (proposta, como no Impress e no PowerPoint; Ctrl+Shift+N já é Nova janela no Desk)
+cab.temas | Temas | Themes | Versão A: troca o tema da apresentação | Botão Themes | Documento ▸ Alterar tema | novo | -
+cab.mestres | Mestres | Masters | Versão A: aplica um slide mestre ao slide selecionado | Botão Masters | Formatar ▸ Layout do slide | novo | -
+cab.reproduzir | Reproduzir | Play | Inicia a apresentação. Em B é um AdwSplitButton: a seta abre do início, deste slide, ensaiar, gravar, tela do apresentador, em janela | Botão Play e menu Play | Botão Reproduzir | novo | F5 (proposta); Esc sai
+cab.localizar | Buscar | Find | Botão de alternância que abre a barra de busca sob a barra de cabeçalho | Editar ▸ Buscar (painel Find & Replace) | Buscar na barra de ferramentas | existe | Ctrl+F; Ctrl+H substituir
+cab.inspetor | Inspetor | Inspector | Botão de alternância do painel à direita | Botão Inspector (janelas flutuantes) | Botões Formatar e Documento | existe | Ctrl+Alt+I
+cab.midia | Mídia | Media | Versão A: abre o navegador de mídia como página do painel | Botão Media | Botão Mídia | existe | -
+cab.formatar | Formatar | Format | Versão C: botão de alternância que abre o painel no formato da seleção | Botão Inspector | Botão Formatar | novo | Ctrl+Alt+I
+cab.animar | Animar | Animate | Versão C: abre o painel nas composições e na transição | Inspetor Build e Slide | Botão Animar | novo | -
+cab.documento | Documento | Document | Versão C: abre o painel nas opções do documento | Inspetor Document | Botão Documento | novo | Alt+Enter
+cab.menu | Menu principal | Main Menu | Novo documento, Abrir, Abrir recente, Salvar, Salvar como, Exportar, Imprimir, Buscar comandos, Preferências, Atalhos de teclado, Ajuda, Sobre. Doze itens no máximo | Menus Pages/Keynote/Numbers, File e Help | Menus Arquivo e Ajuda | muda | F10
+
+## Barra lateral
+lat.barra | Barra lateral de navegação | Sidebar | Painel da altura da janela (versões B e C) com cabeçalho próprio; some em tela cheia e vira sobreposição em janela estreita | Painel de miniaturas à esquerda | Barra lateral de miniaturas | muda | F9
+lat.modo | Conteúdo da barra lateral | - | Botão de menu no cabeçalho da lateral: Páginas, Estilos, Comentários, Resultados da busca (Writer); Planilhas, Estilos de tabela (Tables); Navegador, Tópicos, Slides mestres (Slides) | Pop-up View e gaveta de estilos | Menu Visualizar | novo | Ctrl+Shift+T estilos; Ctrl+Alt+F busca
+lat.adicionar | Adicionar página, planilha ou slide | Add Page / Sheet / Slide | Botão + do cabeçalho da lateral; abre as páginas do modelo, os tipos de planilha ou os slides mestres | Botões Sections, Sheet e New | Adicionar página / folha / slide | novo | Novo slide: Ctrl+M (proposta, como no Impress e no PowerPoint; Ctrl+Shift+N já é Nova janela no Desk)
+lat.miniaturas | Miniaturas das páginas | Page Thumbnails | Lista de páginas com número; arrastar reordena seções, menu de contexto duplica e exclui | Painel Page Thumbnails | Miniaturas de página | existe | F9
+lat.planilhas | Planilhas e objetos | Sheets | AdwSidebar com duas seções: as planilhas do documento e as tabelas e os gráficos da planilha atual | Painel Sheets (árvore) | Abas de folha | novo | Ctrl+PageUp/PageDown troca de planilha
+lat.navegador | Navegador de slides | Navigator | Miniaturas numeradas; arrastar reordena, Tab recua (agrupa), menu de contexto pula ou duplica | Slide navigator | Navegador de slides | novo | F9
+lat.a.planilhas | Painel Planilhas | Sheets pane | Versão A: árvore de planilhas com as tabelas e os gráficos de cada uma e o botão de nova planilha | Painel Sheets | - | novo | -
+lat.a.estilos | Painel Estilos | Styles pane | Versão A: lista dos estilos de tabela do documento | Painel Styles | Estilos de tabela no painel Formatar | novo | -
+lat.a.calculos | Cálculos instantâneos | Instant calculations | Versão A: soma, média, mínimo, máximo e contagem da seleção; cada um pode ser arrastado para uma célula | Painel de cálculos instantâneos | Barra de cálculo rápido | novo | -
+
+## Barra de formatação
+fmt.barra | Barra de formatação | Format Bar | Barra contextual sob a barra de cabeçalho: muda com a seleção (texto, objeto, célula, gráfico). Em B mostra o essencial e termina em Mais | Format Bar (18 modos no Pages) | - (tudo no painel Formatar) | muda | Ctrl+Shift+R
+fmt.gaveta | Gaveta de estilos | Styles Drawer | Versão A: mostra os estilos de parágrafo, caractere e lista | Botão da gaveta de estilos | - | existe | Ctrl+Shift+T
+fmt.estilo-paragrafo | Estilo de parágrafo | Paragraph Style | Botão de menu com o estilo atual; lista os estilos, cria e redefine a partir da seleção | Pop-up de estilos de parágrafo | Estilo de parágrafo no topo do painel | existe | Ctrl+1 a Ctrl+8
+fmt.estilo-caractere | Estilo de caractere | Character Style | Versão A: menu dos estilos de caractere | Pop-up de estilos de caractere | Estilo de caractere no painel | existe | -
+fmt.fonte | Fonte | Font | Botão de menu com a família atual; abre o popover Fontes | Pop-up Font Family | Fonte no painel | existe | Ctrl+T
+fmt.tipo | Tipo | Typeface | Versão A: lista suspensa com regular, itálico, negrito | Pop-up Typeface | Estilo da fonte no painel | novo | -
+fmt.tamanho | Tamanho da fonte | Font Size | GtkSpinButton de 1 a 400 pt | Combo Font Size | Tamanho no painel | existe | Ctrl++ e Ctrl+- (proposta: Ctrl+Shift+> e <)
+fmt.negrito | Negrito | Bold | Botão de alternância | Botão B | Botão B | existe | Ctrl+B
+fmt.italico | Itálico | Italic | Botão de alternância | Botão I | Botão I | existe | Ctrl+I
+fmt.sublinhado | Sublinhado | Underline | Botão de alternância | Botão U | Botão U | existe | Ctrl+U
+fmt.tachado | Tachado | Strikethrough | Versão A: botão de alternância; em B fica em Mais e no Inspetor | Formatar ▸ Fonte ▸ Tachado | Botão S | existe | -
+fmt.cor-texto | Cor do texto | Text Color | Botão de menu que abre o popover Cores | Poço de cor do texto | Poço de cor no painel | existe | Ctrl+Shift+C
+fmt.cor-fundo | Cor de fundo do texto | Text Background Color | Versão A: abre o popover Cores para o fundo dos caracteres | Poço de cor de fundo | Cor de fundo em Avançado | existe | -
+fmt.alinhamento | Alinhamento | Alignment | AdwToggleGroup plano: esquerda, centro, direita, justificado (em células, também automático) | 4 botões de alinhamento (5 em tabelas) | Alinhamento no painel | existe | Ctrl+{, Ctrl+|, Ctrl+}
+fmt.alinhamento-v | Alinhamento vertical | Vertical Alignment | Versão A (Tables): em cima, no meio, embaixo | 3 botões de alinhamento vertical | Alinhamento no painel | novo | -
+fmt.ajustar | Ajustar texto na célula | Wrap Text in Cell | Versão A (Tables): botão de alternância | Caixa Wrap | Ajustar texto na célula | novo | -
+fmt.entrelinha | Espaçamento entre linhas | Line Spacing | Menu com 0,5, 1,0, 1,5, 2,0 e Mostrar mais | Pop-up Line Spacing | Espaçamento no painel | existe | -
+fmt.colunas | Colunas | Columns | Versão A: menu de 1 a 4 colunas | Pop-up Columns | Colunas na aba Layout | existe | -
+fmt.lista | Estilo de lista | List Style | Menu: nenhum, marcador, imagem, numerada, Harvard, legal | Pop-up List Style | Marcadores e listas | existe | -
+fmt.menu-formatar | Formato (menu) | Format | Versão A: o menu Formatar do iWork no fim da barra | Menu Format | Menu Formatar | existe | -
+fmt.mais | Mais opções de formatação | More Formatting Options | Versão B: menu com o que a barra enxuta não mostra e Mostrar no Inspetor | - | - | novo | -
+fmt.estilo-objeto | Estilo (objeto) | Object Style | Popover com os seis estilos prontos do objeto | Gaveta de estilos (só texto) | Miniaturas de estilo no topo do painel | novo | -
+fmt.traco | Traço | Stroke | Em B, um popover com tipo, espessura e cor | Pop-up, combo e poço do traço | Borda no painel | novo | -
+fmt.traco-tipo | Estilo do traço | Stroke Style | Versão A: lista suspensa (nenhum, linha, tracejado, pontilhado, moldura) | Pop-up Stroke | - | novo | -
+fmt.traco-espessura | Espessura do traço | Stroke Thickness | Versão A: GtkSpinButton em pontos | Combo de espessura | - | novo | -
+fmt.traco-cor | Cor do traço | Stroke Color | Versão A: abre o popover Cores | Poço de cor do traço | - | novo | -
+fmt.preenchimento | Preenchimento | Fill | Abre o popover Cores (com gradiente e imagem no Inspetor) | Poço Fill | Preenchimento no painel | novo | -
+fmt.opacidade | Opacidade | Opacity | Em B, popover com controle deslizante; em A, lista suspensa | Combo Opacity | Opacidade no painel | novo | -
+fmt.sombra | Sombra | Shadow | Liga ou desliga a sombra (as opções ficam no Inspetor) | Caixa Shadow | Sombra no painel | novo | -
+fmt.reflexo | Reflexo | Reflection | Liga ou desliga o reflexo | Caixa Reflection | Reflexo no painel | novo | -
+fmt.ajustar-imagem | Ajustar imagem | Adjust Image | Abre os ajustes (exposição, saturação, contraste) na aba Imagem | Janela Adjust Image | Ajustes na aba Imagem | novo | -
+fmt.mascara | Editar máscara | Edit Mask | Entra na edição da máscara da imagem | Botão Mask | Editar máscara | existe | Ctrl+Shift+M
+fmt.alfa | Alfa instantâneo | Instant Alpha | Torna transparente a cor clicada | Botão Alpha | Alfa instantâneo | existe | -
+fmt.posicionamento | Em linha ou flutuante | Inline / Floating | Writer: como o objeto se prende ao texto | Controle Inline e Floating | Mover com o texto / Ficar na página | muda | -
+fmt.ajuste | Ajuste do texto | Text Wrap | Writer: menu dos modos de contorno do texto | Pop-up Wrap | Ajuste de texto na aba Organizar | muda | -
+fmt.frente | Trazer para a frente | Bring to Front | Sobe o objeto para a frente de todos | Botão Front (paleta) e menu Arrange | Frente na aba Organizar | muda | Ctrl+Shift+]
+fmt.fundo | Enviar para trás | Send to Back | Leva o objeto para trás de todos | Botão Back (paleta) e menu Arrange | Fundo na aba Organizar | muda | Ctrl+Shift+[
+fmt.organizar | Organizar | Arrange | Menu: ordem, alinhar, distribuir, espelhar, agrupar, travar | Menu Arrange | Menu Organizar | muda | Ctrl+Alt+G, Ctrl+L
+fmt.formato | Formato de dados | Data Format | Versão B (Tables): menu com automático, número, moeda, porcentagem, caixa de seleção, mais formatos e personalizado | Botões 1.0, $, %, caixa e pop-up | Formato de dados na aba Célula | novo | -
+fmt.numero | Formato número | Number | Versão A: aplica o formato numérico | Botão 1.0 | - | novo | -
+fmt.moeda | Formato moeda | Currency | Versão A | Botão $ | - | novo | -
+fmt.porcento | Formato porcentagem | Percentage | Versão A | Botão % | - | novo | -
+fmt.caixa | Caixa de seleção | Checkbox | Versão A: transforma a célula em caixa de seleção | Botão de caixa | - | novo | -
+fmt.mais-formatos | Mais formatos | More Formats | Versão A: data e hora, duração, fração, sistema numérico, científico, texto, controle deslizante, passo a passo, menu pop-up, personalizado | Pop-up de formatos | - | novo | -
+fmt.menos-casas | Menos casas decimais | Decrease Decimal Places | Tira uma casa decimal da seleção | Botão de menos casas | Casas decimais no painel | novo | -
+fmt.mais-casas | Mais casas decimais | Increase Decimal Places | Acrescenta uma casa decimal | Botão de mais casas | Casas decimais no painel | novo | -
+fmt.bordas | Bordas da célula | Cell Borders | Menu: todas, externas, internas, nenhuma; estilo, espessura e cor | Pop-up de bordas, estilo, espessura e cor | Borda na aba Célula | novo | -
+fmt.mestre | Slide mestre | Slide Master | Versão B (Slides), sem seleção: botão de menu com o mestre do slide; o popover mostra os mestres do tema | Botão Masters da barra | Layout do slide no painel Formatar | novo | -
+fmt.fundo-slide | Fundo do slide | Slide Background | Versão B (Slides), sem seleção: popover Cores para o fundo, com gradiente e imagem no Inspetor | Painel Slide ▸ Appearance ▸ Background | Fundo no painel Formatar | novo | -
+fmt.transicao | Transição | Transition | Versão B (Slides), sem seleção: botão de menu com o efeito atual; o popover lista os efeitos | Painel Slide ▸ Transition | Painel Animar ▸ Transição | novo | -
+fmt.pular | Pular este slide | Skip Slide | Versão B (Slides): botão de alternância; o slide pulado fica recolhido no navegador | Slide ▸ Skip Slide (na tradução da Apple, Ignorar Slide) e botão Skip da paleta | Slide ▸ Pular Slide | novo | Ctrl+Shift+H (proposta, como no Keynote)
+fmt.tipo-grafico | Tipo de gráfico | Chart Type | Botão de menu com o tipo atual; popover com a galeria de tipos | Pop-up Chart Type | Tipo de gráfico no painel | novo | -
+fmt.editar-dados | Editar dados | Edit Data | Mostra as referências de dados (Tables) ou o editor de dados (Writer e Slides) | Botão Edit Data e Chart Data Editor | Editar referências de dados | novo | -
+
+## Barra de fórmulas (Tables)
+formula.barra | Barra de fórmulas | Formula Bar | Linha sob a barra de formatação com a célula ativa, o botão de função e o conteúdo | Barra de fórmula | Editor de fórmulas junto da célula | novo | -
+formula.celula | Célula ativa | Active Cell | Mostra a referência; o menu vai para uma célula ou para uma tabela | Abas de referência | - | novo | Ctrl+L vai para a célula (proposta)
+formula.funcao | Função | Function | Menu das funções rápidas, Mais funções e Editor de fórmulas | Botão Function e botão fx | Inserir fórmula | novo | = começa uma fórmula
+formula.campo | Conteúdo da célula | Cell Content | Campo de texto em fonte monoespaçada; as referências ganham cor ao editar | Campo da barra de fórmula | Editor de fórmulas | novo | F2 edita (proposta)
+formula.cancelar | Cancelar | Cancel | Descarta a edição da fórmula | Botão Cancel do editor | Botão X | novo | Esc
+formula.aceitar | Aceitar | Accept | Confirma a fórmula | Botão Accept do editor | Botão de confirmar | novo | Enter
+calc.resultados | Cálculos instantâneos | Instant calculations | Fichas com soma, média, mínimo, máximo e contagem da seleção; arrastar uma ficha para uma célula cria a fórmula | Painel de cálculos da lateral | Barra de cálculo rápido na base da janela | novo | -
+
+## Documento
+doc.pagina | Página do documento | - | Vista do documento com seleção, guias e alças; zoom com Ctrl e rolagem | Área do documento | Área do documento | existe | Ctrl++, Ctrl+-, Ctrl+0
+doc.regua | Régua | Ruler | Régua horizontal com recuos, margens e tabulações | Régua horizontal e vertical | Régua | existe | Ctrl+R
+doc.planilha | Tela da planilha | Sheet canvas | Tela livre com tabelas, gráficos e outros objetos; a tabela selecionada mostra as abas de referência e as alças | Canvas | Canvas | novo | -
+doc.slide | Slide | Slide canvas | O slide em edição, centrado, com guias de alinhamento | Slide canvas | Tela do slide | novo | -
+doc.notas | Notas do apresentador | Presenter Notes | Campo de texto sob o slide, com altura ajustável | Campo Presenter Notes | Notas do apresentador | novo | -
+doc.mesa-de-luz | Mesa de luz | Light Table | Grade de miniaturas no lugar do slide, para reordenar muitos slides | Modo Light Table | Mesa de luz | novo | -
+
+## Inspetor
+insp.painel | Inspetor | Inspector | Painel utilitário à direita, sob a barra de cabeçalho (AdwOverlaySplitView); um só, contextual; vira folha inferior em janela estreita | Janelas do Inspetor (várias ao mesmo tempo) | Barra lateral Formatar / Documento | muda | Ctrl+Alt+I
+insp.nivel1 | Formato, Animação ou Dados, Documento | Format, Animation, Data, Document | Primeiro nível do painel em B: AdwToggleGroup arredondado. Writer tem Formato e Documento; Slides ganha Animação; Tables ganha Dados | Ícones dos 7 a 10 painéis | Botões Formatar, Animar, Organizar e Documento da barra | novo | Alt+Enter abre Documento
+insp.contexto | Título do contexto | - | Diz o que está selecionado: Texto, Imagem, Forma, Tabela, Gráfico, Slide | Título da janela do Inspetor | - | novo | -
+insp.estilo-atual | Estilo de parágrafo atual | Paragraph Style | Linha com o nome do estilo, o asterisco de alterado, Atualizar e a seta para a lista de estilos | Gaveta de estilos | Estilo de parágrafo no topo da aba Estilo | novo | Ctrl+Shift+T
+insp.abas | Abas do contexto | - | Segundo nível: AdwInlineViewSwitcher com rótulos de texto que mudam com a seleção (texto: Estilo, Layout, Mais; imagem: Estilo, Imagem, Organizar; forma: Estilo, Texto, Organizar; tabela: Tabela, Célula, Texto, Organizar; gráfico: Gráfico, Eixo, Séries, Organizar; Dados: Ordem, Filtro, Categorias; Animação: Entrada, Ação, Saída; Documento: Documento, Seção, Info no Writer, Planilha, Info no Tables, Documento, Áudio, Info no Slides). Rótulos curtos, até 3 abas de mesma largura; com uma página só, o seletor some | Abas internas de cada painel | Abas da barra lateral Formatar | novo | -
+insp.icones | Ícones dos painéis | - | Versão A: um ícone por painel do Inspetor do iWork '09, na ordem dele | Ícones do Inspetor | - | existe | -
+insp.subabas | Abas do painel | - | Versão A: abas do painel escolhido (Texto, Lista, Tabulações, Mais) | Abas do painel Text | - | existe | -
+insp.folha | Inspetor em folha inferior | - | Janela estreita: AdwBottomSheet com o mesmo conteúdo do painel | - | Painel de formato do iPhone | novo | -
+insp.folha.barra | Barra da folha | - | Barra inferior que mostra o contexto e puxa a folha para cima | - | - | novo | -
+insp.texto.fonte | Fonte | Font | Família (abre Fontes), tipo, tamanho, estilo B I U S, cor do texto e opções avançadas (espaçamento entre caracteres, linha de base, maiúsculas, ligaduras, cor de fundo) | Painel Text e janela Fonts | Aba Estilo ▸ Fonte | muda | Ctrl+T
+insp.texto.f.negrito | Negrito (Inspetor) | Bold | Botão de alternância na linha Estilo | Janela Fonts | Botão B | muda | Ctrl+B
+insp.texto.f.italico | Itálico (Inspetor) | Italic | Botão de alternância na linha Estilo | Janela Fonts | Botão I | muda | Ctrl+I
+insp.texto.f.sublinhado | Sublinhado (Inspetor) | Underline | Botão de alternância na linha Estilo | Janela Fonts | Botão U | muda | Ctrl+U
+insp.texto.f.tachado | Tachado (Inspetor) | Strikethrough | Botão de alternância na linha Estilo | Formatar ▸ Fonte | Botão S | muda | -
+insp.texto.alinhamento | Alinhamento | Alignment | Alinhamento horizontal e recuo (diminuir, aumentar) | Painel Text ▸ Text | Aba Estilo ▸ Alinhamento | muda | -
+insp.texto.espacamento | Espaçamento | Spacing | Entre linhas, antes e depois do parágrafo | Painel Text ▸ Text | Aba Estilo ▸ Espaçamento | muda | -
+insp.texto.listas | Marcadores e listas | Bullets & Lists | Estilo de lista; ao escolher um, aparecem marcador, numeração, recuo e tamanho | Painel Text ▸ List | Aba Estilo ▸ Marcadores e listas | muda | -
+insp.layout.colunas | Colunas | Columns | Número de colunas e largura igual | Painel Layout ▸ Layout | Aba Layout ▸ Colunas | muda | -
+insp.layout.recuos | Recuos | Indents | Primeira linha, esquerda e direita | Painel Text ▸ Tabs | Aba Layout ▸ Recuos | muda | -
+insp.layout.tabulacoes | Tabulações | Tabs | Tabulação padrão e lista editável de paradas (posição, alinhamento, preenchimento) | Painel Text ▸ Tabs | Aba Layout ▸ Tabulações | muda | -
+insp.layout.bordas | Bordas e fundo do parágrafo | Borders & Rules | Borda e cor de fundo do parágrafo | Painel Text ▸ More | Aba Layout ▸ Bordas e réguas | muda | -
+insp.mais.paginacao | Paginação e quebras | Pagination & Breaks | Manter linhas juntas, manter com o seguinte, começar em nova página, evitar viúvas e órfãs | Painel Text ▸ More | Aba Mais | muda | -
+insp.mais.idioma | Hifenização e idioma | Hyphenation & Language | Remover hifenização do parágrafo e idioma do texto | Painel Text ▸ More | Aba Mais | muda | -
+insp.mais.seguinte | Estilo seguinte | Following Paragraph Style | Estilo aplicado ao parágrafo seguinte | Painel Text ▸ More | Aba Mais | muda | -
+insp.estilos-objeto | Estilos de objeto | Object Styles | Seis estilos prontos para o objeto selecionado | - | Miniaturas de estilo | novo | -
+insp.estilo.preenchimento | Preenchimento | Fill | Tipo (nenhum, cor, gradiente, gradiente avançado, imagem, imagem tingida) e cor | Painel Graphic ▸ Fill | Aba Estilo ▸ Preenchimento | muda | -
+insp.estilo.traco | Traço | Stroke | Tipo (nenhum, linha, moldura), estilo, cor e espessura | Painel Graphic ▸ Stroke | Aba Estilo ▸ Borda | muda | -
+insp.estilo.sombra | Sombra e reflexo | Shadow | Sombra com deslocamento, desfoque, ângulo e cor; reflexo | Painel Graphic ▸ Shadow, Reflection | Aba Estilo ▸ Sombra, Reflexo | muda | -
+insp.estilo.opacidade | Opacidade | Opacity | Controle deslizante de 0 a 100 % | Painel Graphic ▸ Opacity | Aba Estilo ▸ Opacidade | muda | -
+insp.imagem.arquivo | Arquivo da imagem | File Info | Nome, tamanho e Substituir | Painel Metrics ▸ File Info | Aba Imagem ▸ Informações | muda | -
+insp.imagem.mascara | Máscara e transparência | Mask | Editar máscara e alfa instantâneo | Formatar ▸ Mask e botão Alpha | Aba Imagem | muda | Ctrl+Shift+M
+insp.imagem.ajustar | Ajustar imagem | Adjust Image | Exposição, saturação, contraste, mais ajustes, Melhorar e Redefinir | Janela Adjust Image | Aba Imagem ▸ Ajustes | novo | -
+insp.imagem.descricao | Descrição da imagem | Description | Texto alternativo para leitores de tela | - | Aba Imagem ▸ Descrição | novo | -
+insp.organizar.posicionamento | Posicionamento | Object Placement | Writer: em linha ou flutuante | Painel Wrap | Aba Organizar ▸ Posição do objeto | muda | -
+insp.organizar.ajuste | Ajuste do texto | Text Wrap | Modo de ajuste, contorno pelo retângulo ou pela forma, espaço extra | Painel Wrap | Aba Organizar ▸ Ajuste de texto | muda | -
+insp.organizar.tamanho | Tamanho | Size | Largura, altura e manter proporções | Painel Metrics ▸ Size | Aba Organizar ▸ Tamanho | muda | -
+insp.organizar.metricas | Posição e giro | Position & Rotate | X, Y, ângulo e espelhar | Painel Metrics ▸ Position, Rotate, Flip | Aba Organizar ▸ Posição, Girar | muda | -
+insp.organizar.ordem | Ordem e alinhamento | Order & Align | Frente, uma camada, trás; alinhar e distribuir | Menu Arrange | Aba Organizar | novo | Ctrl+Shift+], Ctrl+], Ctrl+[, Ctrl+Shift+[
+insp.organizar.grupo | Grupo e trava | Group & Lock | Agrupar, desagrupar e travar | Menu Arrange | Aba Organizar | novo | Ctrl+Alt+G, Ctrl+L
+insp.doc.papel | Papel | Page Setup | Tamanho e orientação | Painel Document ▸ Page Setup | Documento ▸ Impressora e tamanho do papel | muda | -
+insp.doc.margens | Margens | Document Margins | Superior, inferior, esquerda, direita e páginas opostas | Painel Document | Documento ▸ Margens | muda | -
+insp.doc.cabecalho | Cabeçalho e rodapé | Headers & Footers | Liga cada um | Painel Document | Documento ▸ Cabeçalho, Rodapé | muda | -
+insp.doc.notas | Notas | Footnotes & Endnotes | Tipo (rodapé, fim do documento, fim da seção) e formato da numeração | Painel Document | Documento | muda | -
+insp.doc.texto | Texto do documento | Document Body | Hifenizar e usar ligaduras | Painel Document | Documento ▸ Hifenização, Ligaduras | muda | -
+insp.doc.senha | Segurança | Password | Exigir senha para abrir | Painel Document | Arquivo ▸ Definir senha | muda | -
+insp.secao.numeracao | Numeração de páginas | Page Numbers | Continuar ou iniciar em; formato | Painel Layout ▸ Section | Aba Seção | muda | -
+insp.secao.config | Cabeçalhos e rodapés da seção | Configuration | Primeira página diferente, esquerda e direita diferentes, usar os da seção anterior | Painel Layout ▸ Section | Aba Seção | muda | -
+insp.secao.inicio | Início da seção | Section starts on | Qualquer página, esquerda ou direita | Painel Layout ▸ Section | Aba Seção | muda | -
+insp.info.campos | Informações | Info | Autor, título, palavras-chave e comentários | Painel Document ▸ Info | Arquivo ▸ Propriedades avançadas | muda | Alt+Enter
+insp.info.estatisticas | Estatísticas | Statistics | Palavras, páginas, parágrafos, caracteres; do documento ou da seleção | Painel Document ▸ Info | Contagem de palavras | muda | -
+insp.a.cor | Cor e alinhamento | Color & Alignment | Versão A: poço de cor e alinhamento, em linha compacta | Painel Text ▸ Text | - | existe | -
+insp.a.espacamento | Espaçamento | Spacing | Versão A: caractere, linha, antes e depois do parágrafo | Painel Text ▸ Text | - | existe | -
+insp.a.margem | Margem interna | Inset Margin | Versão A | Painel Text ▸ Text | - | existe | -
+insp.a.recuos | Recuos | Indents | Versão A: primeira linha, esquerda, direita | Painel Text ▸ Tabs | - | existe | -
+insp.a.hifenizacao | Hifenização | Hyphenation | Versão A | Painel Text ▸ More | - | existe | -
+insp.a.nome | Nome da tabela | Table Name | Versão A (Tables) | Painel Table | - | novo | -
+insp.a.cabecalhos | Cabeçalhos e rodapé | Headers & Footer | Versão A: linhas e colunas de cabeçalho e linhas de rodapé | Painel Table | - | novo | -
+insp.a.tamanho | Linhas e colunas | Row & Column Size | Versão A: altura da linha, largura da coluna, ajustar ao conteúdo | Painel Table | - | novo | -
+insp.a.bordas | Bordas da célula | Cell Borders | Versão A: estilo, cor e espessura | Painel Table | - | novo | -
+insp.a.fundo | Fundo | Cell Background | Versão A: fundo da célula e cor alternada | Painel Table | - | novo | -
+insp.a.previa | Prévia do slide | - | Versão A (Slides): miniatura que mostra a transição | Painel Slide | - | novo | -
+insp.a.transicao | Transição | Transition | Versão A: efeito, duração, direção | Painel Slide ▸ Transition | - | novo | -
+insp.a.inicio | Iniciar transição | Start Transition | Versão A: ao clicar ou automaticamente, com atraso | Painel Slide ▸ Transition | - | novo | -
+
+## Inspetor do Tables
+insp.tabela.estilos | Estilos de tabela | Table Styles | Seis estilos prontos | Painel Styles da lateral | Miniaturas de estilo | novo | -
+insp.tabela.cabecalhos | Cabeçalhos e rodapé | Headers & Footer | Linhas e colunas de cabeçalho, linhas de rodapé, congelar os cabeçalhos | Painel Table e pop-ups da barra | Aba Tabela | novo | -
+insp.tabela.tamanho | Linhas e colunas | Rows & Columns | Quantidade, altura, largura e ajustar ao conteúdo | Painel Table | Aba Tabela | novo | -
+insp.tabela.grade | Grade e fundo | Gridlines | Linhas de grade e cor alternada nas linhas | Painel Table | Aba Tabela | novo | -
+insp.tabela.nome | Nome da tabela | Table Name | Mostrar o nome | Painel Table e caixa Name da barra | Aba Tabela | novo | -
+insp.celula.formato | Formato de dados | Data Format | Formato, casas decimais, separador de milhar, negativos | Painel Cells | Aba Célula | novo | -
+insp.celula.borda | Preenchimento e borda | Fill & Border | Cor de fundo, estilo e cor da borda | Painel Table | Aba Célula | novo | -
+insp.celula.ajuste | Texto na célula | Wrap | Ajustar texto na célula | Caixa Wrap | Aba Célula | novo | -
+insp.celula.condicional | Formato condicional | Conditional Format | Abre a lista de regras | Painel Cells ▸ Conditional Format | Realce condicional | novo | -
+insp.reorg.ordenar | Ordem | Sort | Ordenar a tabela inteira ou as linhas selecionadas; lista editável de colunas com crescente ou decrescente; Ordenar agora | Painel Reorganize ▸ Sort | Organizar ▸ Ordenar | novo | -
+insp.reorg.filtrar | Filtro | Filter | Mostrar as linhas que correspondem a todas ou a qualquer regra; lista editável de regras | Painel Reorganize ▸ Show rows | Organizar ▸ Filtrar | novo | -
+insp.reorg.categorias | Categorias | Categories | Agrupar as linhas pelo valor de uma coluna | Painel Reorganize ▸ Categories | Organizar ▸ Categorias | novo | -
+insp.planilha.nome | Planilha | Sheet | Nome da planilha | Painel Sheet | Aba Folha | novo | -
+insp.planilha.impressao | Impressão | Print | Orientação, papel, escala do conteúdo, numeração | Painel Sheet e Print View | Visualização de impressão | novo | Ctrl+P
+insp.planilha.margens | Margens | Margins | Superior e inferior (as outras ao rolar) | Painel Sheet | Visualização de impressão | novo | -
+insp.grafico.estilos | Estilos de gráfico | Chart Styles | Seis conjuntos de cores | Chart Colors | Miniaturas de estilo | novo | -
+insp.grafico.opcoes | Gráfico | Chart | Tipo, título, legenda, texto oculto de tabelas | Painel Chart | Aba Gráfico | novo | -
+insp.grafico.espacos | Colunas | Bar Format | Espaço entre colunas e entre grupos | Painel Chart ▸ Chart | Aba Gráfico | novo | -
+insp.grafico.3d | Cena 3D | 3D Scene | Liga o 3D; com ele aparecem estilo de iluminação e profundidade | Painel Chart ▸ 3D Scene | Aba Gráfico | novo | -
+insp.eixo.qual | Qual eixo | Value / Category | Alterna entre o eixo de valor e o de categoria | Painel Chart ▸ Axis | Aba Eixo | novo | -
+insp.eixo.escala | Escala | Scale | Linear ou logarítmica, mínimo, máximo, passos | Painel Chart ▸ Axis | Aba Eixo | novo | -
+insp.eixo.rotulos | Rótulos e linhas | Labels & Gridlines | Rótulos de valor, linhas de grade, marcas e formato | Painel Chart ▸ Axis | Aba Eixo | novo | -
+insp.series.dados | Dados da série | Series Data | Valores, rótulos e posição dos rótulos de valor | Painel Chart ▸ Series | Aba Séries | novo | -
+insp.series.tendencia | Linha de tendência | Trendline | Nenhuma, linear, logarítmica, polinomial, potência, exponencial, média móvel | Painel Chart ▸ Series ▸ Advanced | Aba Séries | novo | -
+insp.series.erro | Barras de erro | Error Bars | Nenhuma, positiva e negativa, só positiva, só negativa | Painel Chart ▸ Series ▸ Advanced | Aba Séries | novo | -
+
+## Inspetor do Slides
+insp.slide.mestre | Layout | Slide Layout | Slide mestre aplicado, com miniatura; abre a lista de mestres | Painel Slide ▸ Appearance ▸ Master | Formatar ▸ Layout do slide | novo | -
+insp.slide.aparencia | Aparência | Appearance | Mostrar título, corpo e número do slide | Painel Slide ▸ Appearance | Formatar ▸ Aparência | novo | -
+insp.slide.fundo | Fundo | Background | Do mestre, cor, gradiente ou imagem | Painel Slide ▸ Appearance | Formatar ▸ Fundo | novo | -
+insp.slide.editar-mestre | Editar o slide mestre | Edit Master Slide | Entra na edição dos mestres | Visualizar ▸ Show Master Slides | Editar layout do slide | novo | -
+insp.entrada.efeito | Efeito de entrada | Build In effect | Efeito escolhido (abre a lista) e Pré-visualizar | Painel Build ▸ Build In | Animar ▸ Entrada | novo | -
+insp.entrada.opcoes | Opções da composição | Build options | Duração, direção e entrega (tudo de uma vez, por marcador) | Painel Build ▸ Build In | Animar ▸ Entrada | novo | -
+insp.entrada.ordem | Ordem | Order | Posição na ordem, quando iniciar, atraso e Ordem das composições | Painel Build e gaveta Build Order | Animar ▸ Ordem da composição | novo | -
+insp.acao.efeito | Ação | Action | Mover, opacidade, girar ou escala no próprio slide | Painel Build ▸ Action | Animar ▸ Ação | novo | -
+insp.saida.efeito | Efeito de saída | Build Out effect | Como a entrada | Painel Build ▸ Build Out | Animar ▸ Saída | novo | -
+insp.saida.opcoes | Opções da saída | Build Out options | Como a entrada | Painel Build ▸ Build Out | Animar ▸ Saída | novo | -
+insp.saida.ordem | Ordem da saída | Build Out order | Como a entrada | Painel Build ▸ Build Out | Animar ▸ Saída | novo | -
+insp.transicao.efeito | Transição | Transition | Efeito, duração, direção e Pré-visualizar; aparece em Animação sem objeto selecionado | Painel Slide ▸ Transition | Animar ▸ Transição | novo | -
+insp.transicao.inicio | Iniciar transição | Start Transition | Ao clicar ou automaticamente, com atraso | Painel Slide ▸ Transition | Animar ▸ Transição | novo | -
+insp.apres.opcoes | Apresentação | Slideshow Settings | Tipo (normal, só links, gravada, automática), reproduzir ao abrir, repetir, reiniciar se parada, senha para sair | Painel Document ▸ Document | Documento ▸ Ajustes da apresentação | novo | -
+insp.apres.tamanho | Tamanho do slide | Slide Size | 16:9, 4:3 ou personalizado | Painel Document ▸ Slide Size | Documento ▸ Tamanho do slide | novo | -
+insp.apres.tema | Tema | Theme | Tema atual e Trocar de tema | Botão Themes | Documento ▸ Alterar tema | novo | -
+insp.audio.trilha | Trilha sonora | Soundtrack | Reprodução, arquivo, volume, Escolher áudio | Painel Document ▸ Audio | Documento ▸ Áudio | novo | -
+insp.audio.gravacao | Gravação | Slideshow Recording | Narração gravada e Gravar | Painel Document ▸ Audio e Play ▸ Record | Documento ▸ Áudio | novo | -
+
+## Barra inferior e controles sobre a vista
+inf.barra | Barra inferior | Bottom Bar | Barra fina com zoom no início, posição no centro e contagem ou seleção no fim | Borda inferior da janela | - | muda | -
+inf.zoom | Zoom | Zoom | Botão de menu: ajustar à largura, à página, porcentagens, uma ou duas páginas | Pop-up de zoom | Botão Zoom da barra | existe | Ctrl++, Ctrl+-, Ctrl+0
+inf.anterior | Anterior | Previous | Página ou item anterior, conforme Navegar por | Seta ▲ | - | existe | Page Up
+inf.seguinte | Seguinte | Next | Página ou item seguinte | Seta ▼ | - | existe | Page Down
+inf.navegar-por | Navegar por | Scroll to | Versão A: escolhe o que as setas percorrem (página, seção, comentário, nota, link, estilo) | Menu de engrenagem | - | existe | -
+inf.ir-para | Ir para a página | Go to Page | Versão A: campo com o número da página | Campo Go to Page | - | existe | -
+inf.pagina | Página 6 de 41 / Slide 3 de 12 | Page 6 of 41 | Versão B: mostra a posição; o menu tem Ir para e Navegar por | Indicador de página | - | muda | -
+inf.contagem | Contagem | Word Count | Palavras do documento ou da seleção; em B, o menu troca a unidade e abre as estatísticas | Contagem de palavras | Contagem de palavras sobre a página | existe | -
+inf.selecao | Seleção | Selection | Tables: quantas células estão selecionadas; o menu escolhe os cálculos mostrados | - | - | novo | -
+inf.notas | Notas do apresentador | Presenter Notes | Slides: mostra ou esconde o campo de notas | Visualizar ▸ Show Presenter Notes | Visualizar ▸ Mostrar notas | novo | -
+inf.tamanho-miniaturas | Tamanho das miniaturas | Thumbnail Size | Mesa de luz: controle deslizante | Pop-up de tamanho da mesa de luz | Controle de zoom da mesa de luz | novo | -
+inf.celula | Barra da célula | Cell Bar | Versão C: função, referência, conteúdo e cálculos numa barra só, embaixo | - | Editor de fórmulas e barra de cálculo rápido | novo | -
+osd.zoom | Zoom sobre a vista | - | Versão C: pílula .osd com reduzir, porcentagem e ampliar; pode cobrir conteúdo | - | Botão Zoom | novo | Ctrl++, Ctrl+-
+osd.contagem | Contagem sobre a vista | - | Versão C: pílula .osd com a contagem de palavras | - | Contagem de palavras sobre a página | novo | -
+abas.planilhas | Abas das planilhas | Sheet Tabs | Versão C: AdwTabBar com uma aba por planilha | - | Abas de folha | novo | Ctrl+PageUp/PageDown
+abas.adicionar | Adicionar planilha | Add Sheet | Versão C: botão no fim das abas | Botão Sheet | Botão + das abas | novo | -
+
+## Busca, avisos e comandos
+busca.barra | Barra de busca | Find Bar | Barra sob a barra de cabeçalho com busca e substituição; Esc fecha | Painel Find & Replace (Simple, Advanced) | Buscar e substituir | existe | Ctrl+F, Ctrl+H
+busca.campo | Campo de busca | Find | GtkSearchEntry; digitar busca | Campo Find | Campo de busca | existe | Ctrl+E usa a seleção
+busca.contador | Contador | - | Posição do resultado atual (2 de 7) | - | Contador | existe | -
+busca.anterior | Anterior | Previous | Resultado anterior | Botão Previous | Seta | existe | Ctrl+Shift+G
+busca.seguinte | Seguinte | Next | Resultado seguinte | Botão Next | Seta | existe | Ctrl+G
+busca.opcoes | Opções da busca | Find Options | Diferenciar maiúsculas, palavras inteiras, estilo de parágrafo, só na seleção, inserir tabulação ou quebra, mostrar todos na lateral | Aba Advanced | Menu de opções | muda | Ctrl+Alt+F
+busca.substituir-campo | Substituir por | Replace | Campo do texto novo | Campo Replace | Campo Substituir | existe | Ctrl+H
+busca.substituir | Substituir | Replace | Troca o resultado atual | Botão Replace | Botão Substituir | existe | -
+busca.substituir-tudo | Substituir tudo | Replace All | Troca todos | Botão Replace All | Botão Substituir tudo | existe | -
+aviso.banner | Avisos do documento | Document Warnings | AdwBanner depois de abrir ou exportar com perdas; o botão abre a lista | Janela Document Warnings | Avisos | existe | -
+comandos.dialogo | Buscar comandos | Search Commands | Diálogo com um campo e a lista de todos os comandos, inclusive os que o iWork tinha só na barra de menus | Barra de menus e Ajuda ▸ Buscar | Ajuda ▸ Buscar | novo | Ctrl+/ (proposta; conferir contra o Ctrl+/ dos campos de texto do GTK, alternativa Ctrl+Shift+P)
+comandos.campo | Campo de comandos | - | Digitar filtra a lista | Ajuda ▸ Buscar | - | novo | -
+comandos.lista | Lista de comandos | - | Nome do comando, o menu de origem e o atalho (AdwShortcutLabel) | - | - | novo | Enter executa
+
+## Popovers
+cores.popover | Cores | Colors | Popover no lugar da janela Colors | Janela Colors | Poço de cor com paleta | existe | Ctrl+Shift+C
+cores.paleta | Paleta | Palette | A paleta do GNOME, cinco tons de nove cores | Abas da janela Colors | Paleta do tema | muda | -
+cores.documento | Cores do documento | Document Colors | As cores já usadas | Poços de cores guardadas | - | novo | -
+cores.conta-gotas | Conta-gotas | Eyedropper | Pega uma cor da tela pelo portal | Lupa da janela Colors | Conta-gotas | existe | -
+cores.personalizada | Personalizada | Custom | Abre o seletor de cor completo | Janela Colors | Roda de cores | existe | -
+cores.nenhuma | Nenhuma | None | Remove a cor | - | Sem preenchimento | novo | -
+fontes.popover | Fontes | Fonts | Popover no lugar da janela Fonts | Janela Fonts | Lista de fontes | existe | Ctrl+T
+fontes.busca | Buscar fontes | Search Fonts | Filtra a lista | Busca da janela Fonts | Busca | existe | -
+fontes.lista | Lista de fontes | - | As do documento e as recentes primeiro, cada uma escrita nela mesma | Coleções e famílias | Lista de fontes | existe | -
+fontes.mais | Mais no Inspetor | - | Leva ao grupo Fonte do Inspetor (tipo, espaçamento, ligaduras) | Menu de ação da janela Fonts | - | novo | -
+ins.popover | Popover Inserir | - | Versão C: tudo o que se insere num popover | - | Popover Inserir do iPad | novo | -
+ins.abas | Abas de Inserir | - | AdwInlineViewSwitcher com ícones: Tabela, Gráfico, Forma, Mídia | - | Abas do popover | novo | -
+ins.lista | Outros itens de Inserir | - | Caixa de texto, comentário, quebras, campos e notas | Menu Insert | - | novo | -
+
+## Seletor de modelos e diálogos
+modelos.janela | Seletor de modelos | Template Chooser | O que a janela nova mostra antes de haver documento; não é um diálogo à parte | Janela Template Chooser | Seletor de modelos | muda | Ctrl+N
+modelos.categorias | Categorias | Categories | AdwSidebar: Todos, Recentes, Meus modelos e as categorias do iWork | Lista de categorias | Lista de categorias | muda | -
+modelos.grade | Modelos | Templates | Grade de miniaturas; duplo clique ou Criar abre | Grade de modelos | Grade | muda | Enter cria
+modelos.abrir | Abrir | Open | Abre um arquivo existente | Botão Open an Existing File | Botão | existe | Ctrl+O
+modelos.buscar | Buscar modelos | Search | Barra de busca dos modelos | - | - | novo | Ctrl+F
+modelos.criar | Criar | Create | Ação sugerida | Botão Choose | Botão Criar | muda | Enter
+modelos.mostrar-ao-abrir | Mostrar ao abrir | Show when opening | Liga ou desliga o seletor para documentos novos | Preferência For New Documents | Preferência | muda | -
+dialogo.fechar | Salvar as alterações? | Save Changes? | AdwAlertDialog ao fechar com alterações: Cancelar, Descartar (destrutivo), Salvar (sugerido); Esc cancela | Folha Save | Salvamento automático | existe | -
+dialogo.preferencias | Preferências | Preferences | AdwPreferencesDialog com Geral, Réguas e Autocorreção | Janela Preferences (General, Rulers, Auto-Correction) | Ajustes | existe | Ctrl+,
+pref.novos | Novos documentos | For New Documents | Mostrar o seletor de modelos ou usar um modelo | General | Geral | existe | -
+pref.edicao | Edição | Editing | Tamanho e posição ao mover, contagem de palavras, listas automáticas | General | Geral | existe | -
+pref.salvamento | Salvamento | Saving | Rascunho de recuperação e visualização no documento | General ▸ Saving (back up, preview) | Salvamento automático | muda | -
+pref.autor | Autor | Author | Nome usado nos comentários e nas alterações | General ▸ Change Tracking | Autor | existe | -
+dialogo.atalhos | Atalhos de teclado | Keyboard Shortcuts | AdwShortcutsDialog com busca e seções | Ajuda ▸ Keyboard Shortcuts (página de ajuda) | Ajuda | existe | Ctrl+?

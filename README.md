@@ -32,7 +32,7 @@ extensions for what standard ODF cannot hold.
 The project is in development, starting with Desk Writer. Its text
 engine, its document structure, its writing tools and its objects are
 done (the first six phases of the plan;
-<!-- parity -->159 of the 304 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
+<!-- parity -->159 of the 310 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
 
 - It opens ODT documents and Pages '09 documents, listing what they
   hold that Desk cannot keep yet, and saves as ODT.
@@ -56,9 +56,15 @@ done (the first six phases of the plan;
 - `desk-convert` exports documents to PDF from the command line.
 
 Tables and charts come next, then review and collaboration. Desk Slides
-and Desk Tables have their own parity matrices, with 173 rows for
-Keynote and 175 for Numbers, and start once the table and chart engine
-is ready.
+and Desk Tables have their own parity matrices, with 180 rows each, and
+start once the table and chart engine is ready.
+
+The three apps share one window: a navigation sidebar, a header bar with
+the insert buttons, a slim format bar that changes with the selection, an
+Inspector in two levels and a bottom bar.
+[`docs/interface`](docs/interface/README.md) describes it, lists its 208
+components and says where each command of iWork '09 went. Desk Writer
+moves to it before tables and charts.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
 has a nightly branch built from `main` every night:
