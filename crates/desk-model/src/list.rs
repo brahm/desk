@@ -207,7 +207,7 @@ pub struct ListStyle {
     pub id: StyleId,
     /// The name shown to the user.
     pub name: Arc<str>,
-    /// The function key that applies the style, from 1 for F1 to 8 for F8
+    /// The shortcut that applies the style, from 1 for Ctrl+1 to 8 for Ctrl+8
     /// (STY-04).
     pub shortcut: Option<u8>,
     /// The levels, from the first.
@@ -592,7 +592,7 @@ impl Edit {
     /// when negative, between the first level and the ninth (LST-02).
     /// With `children`, the items after them that are deeper than the
     /// first move too, as Tab does; without, only the items themselves
-    /// move, as Option-Tab does. Paragraphs outside a list stay.
+    /// move, as Option-Tab does in Pages and Alt+Shift+Right in Desk. Paragraphs outside a list stay.
     pub fn change_list_level(
         &mut self,
         start: Position,

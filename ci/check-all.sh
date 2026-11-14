@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Keep in sync with rust-version in Cargo.toml.
-msrv=1.100
+msrv=1.98
 
 step() {
     printf '\n==> %s\n' "$1"

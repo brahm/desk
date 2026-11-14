@@ -32,7 +32,7 @@ extensions for what standard ODF cannot hold.
 The project is in development, starting with Desk Writer. Its text
 engine, its document structure, its writing tools and its objects are
 done (the first six phases of the plan;
-<!-- parity -->155 of the 304 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
+<!-- parity -->159 of the 304 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
 
 - It opens ODT documents and Pages '09 documents, listing what they
   hold that Desk cannot keep yet, and saves as ODT.
@@ -56,8 +56,8 @@ done (the first six phases of the plan;
 - `desk-convert` exports documents to PDF from the command line.
 
 Tables and charts come next, then review and collaboration. Desk Slides
-and Desk Tables have their own parity matrices, with 161 rows for
-Keynote and 164 for Numbers, and start once the table and chart engine
+and Desk Tables have their own parity matrices, with 173 rows for
+Keynote and 175 for Numbers, and start once the table and chart engine
 is ready.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
@@ -81,7 +81,7 @@ with PDFs made by iWork 9.3 itself.
 
 Desk is distributed only as a Flatpak, on the GNOME 51 runtime, and
 the code uses what that runtime has: GTK 4.24 and Libadwaita 1.10. To
-build it outside Flatpak you need Rust 1.100 or later and the
+build it outside Flatpak you need Rust 1.98 or later, the Rust of the Flatpak SDK, and the
 development files of those versions or later, which Fedora 45 and
 Ubuntu 26.10 have. Packagers of other systems need to meet these
 requirements too, or keep a fork that adapts the code to older

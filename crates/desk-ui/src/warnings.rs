@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The Warnings window (INT-22): what an import left out and the fonts
-//! that were replaced, which can be copied as text, and a missing font
-//! replaced by another one.
+//! that were replaced, which can be copied as text or cleared, and a
+//! missing font replaced by another one.
 
 use std::rc::Rc;
 
@@ -17,12 +17,13 @@ pub(crate) type ReplaceFont = Rc<dyn Fn(&str, &str) -> bool>;
 
 /// Shows the warnings of a document over `parent`. `replace` replaces a
 /// missing font family with another one chosen here, and says whether it
-/// did.
+/// did; `clear` forgets the warnings, as Clear All in Pages.
 pub(crate) fn show(
     parent: &impl IsA<gtk::Widget>,
     document: &str,
     warnings: &[Warning],
     replace: ReplaceFont,
+    clear: Rc<dyn Fn()>,
 ) {
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::None)
@@ -86,8 +87,15 @@ pub(crate) fn show(
         button.clipboard().set_text(&text);
     });
 
+    let clear_all = gtk::Button::builder()
+        .label(tr("C_lear All"))
+        .use_underline(true)
+        .tooltip_text(tr("Forget the warnings of the document"))
+        .build();
+
     let header = adw::HeaderBar::new();
     header.pack_start(&copy);
+    header.pack_end(&clear_all);
 
     let description = gtk::Label::builder()
         .label(
@@ -125,6 +133,13 @@ pub(crate) fn show(
         .content_height(400)
         .child(&view)
         .build();
+    let closing = dialog.downgrade();
+    clear_all.connect_clicked(move |_| {
+        clear();
+        if let Some(dialog) = closing.upgrade() {
+            dialog.close();
+        }
+    });
     dialog.present(Some(parent));
 }
 

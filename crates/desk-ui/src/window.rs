@@ -107,7 +107,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 63] = [
+const DOCUMENT_ACTIONS: [&str; 64] = [
     "outline",
     "colors",
     "format-bar",
@@ -154,6 +154,7 @@ const DOCUMENT_ACTIONS: [&str; 63] = [
     "insert-link",
     "insert-bookmark",
     "find",
+    "find-replace",
     "find-next",
     "find-previous",
     "use-selection-for-find",
@@ -440,7 +441,7 @@ impl DocumentWindow {
         let window = adw::ApplicationWindow::builder()
             .application(app)
             .title(info.name)
-            .default_width(900)
+            .default_width(1100)
             .default_height(700)
             .content(&toolbar_view)
             .build();
@@ -461,6 +462,22 @@ impl DocumentWindow {
             let bar = format_bar.clone();
             narrow.connect_unapply(move |_| bar.set_compact(false));
         }
+        // Below about a thousand pixels the format bar leaves out its
+        // secondary controls before the sidebars collapse. Of the
+        // breakpoints that match, the window applies the one added last,
+        // so the narrow one comes after and sets the format bar too.
+        let medium = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            1000.0,
+            adw::LengthUnit::Sp,
+        ));
+        {
+            let bar = format_bar.clone();
+            medium.connect_apply(move |_| bar.set_compact(true));
+            let bar = format_bar.clone();
+            medium.connect_unapply(move |_| bar.set_compact(false));
+        }
+        window.add_breakpoint(medium);
         window.add_breakpoint(narrow);
         // One sidebar a side when they cover the pages.
         for (a, b) in [(&thumbnails_split, &drawer_split), (&search_split, &split)] {
@@ -704,7 +721,8 @@ impl DocumentWindow {
                 // A banner says when something may not show as it was made;
                 // fonts with the same metrics in place of others are only
                 // in Document Warnings of the main menu.
-                self.warnings_banner.set_revealed(shown.lossy);
+                self.warnings_banner
+                    .set_revealed(shown.lossy && crate::preferences::get().show_warnings);
                 *self.warnings.borrow_mut() = shown.warnings;
                 self.enable_warnings();
                 remember_recent(path);
@@ -815,6 +833,8 @@ impl DocumentWindow {
         let Some(editor) = self.editor() else { return };
         let format = editor.format();
         self.format_bar.show(&format);
+        self.format_bar
+            .show_character_style(editor.character_style());
         self.inspector.show(&format);
         if self.drawer_split.shows_sidebar() {
             self.drawer.show(&editor);
@@ -879,7 +899,11 @@ impl DocumentWindow {
         let path = self.path.borrow().clone();
         let name = self.name.borrow().clone();
         if let Some(editor) = &editor {
-            if self.format_bar.set_styles(&editor.paragraph_styles()) {
+            let paragraphs = self.format_bar.set_styles(&editor.paragraph_styles());
+            let characters = self
+                .format_bar
+                .set_character_styles(&editor.character_styles());
+            if paragraphs || characters {
                 self.show_format();
             }
             let edited = if self.needs_saving() { "• " } else { "" };
@@ -949,11 +973,20 @@ impl DocumentWindow {
             this.enable_warnings();
             true
         };
+        let weak = Rc::downgrade(self);
+        let clear = move || {
+            if let Some(this) = weak.upgrade() {
+                this.warnings.borrow_mut().clear();
+                this.warnings_banner.set_revealed(false);
+                this.enable_warnings();
+            }
+        };
         crate::warnings::show(
             &self.window,
             &self.name.borrow(),
             &self.warnings.borrow(),
             Rc::new(replace),
+            Rc::new(clear),
         );
     }
 
@@ -1426,13 +1459,25 @@ impl DocumentWindow {
         let Some(page) = editor.cursor_page() else {
             return;
         };
-        let dialog = adw::AlertDialog::new(
-            Some(&tr("Delete Page?")),
-            Some(
-                &tr("Everything on page {n} will be deleted.")
-                    .replace("{n}", &(page + 1).to_string()),
-            ),
-        );
+        let Some((first, last)) = editor.deleted_pages(page) else {
+            return;
+        };
+        // Pages deletes the section of the page and names its pages.
+        let (heading, body) = if first == last {
+            (
+                tr("Delete Page?"),
+                tr("Everything on page {n} will be deleted.")
+                    .replace("{n}", &(first + 1).to_string()),
+            )
+        } else {
+            (
+                tr("Delete Pages?"),
+                tr("Pages {first} to {last}, the section of this page, will be deleted.")
+                    .replace("{first}", &(first + 1).to_string())
+                    .replace("{last}", &(last + 1).to_string()),
+            )
+        };
+        let dialog = adw::AlertDialog::new(Some(&heading), Some(&body));
         dialog.add_response("cancel", &tr("_Cancel"));
         dialog.add_response("delete", &tr("_Delete"));
         dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
@@ -2304,9 +2349,12 @@ impl DocumentWindow {
     /// Find & Replace, the Search sidebar and the Writing Tools (TXT-12,
     /// TXT-13, INT-20).
     fn add_find_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 9] = [
+        let simple: [(&str, WindowAction); 10] = [
             ("find", |this| {
                 this.find.present();
+            }),
+            ("find-replace", |this| {
+                this.find.present_replace();
             }),
             ("find-next", |this| {
                 if let Some(editor) = this.editor() {
@@ -2593,16 +2641,19 @@ impl DocumentWindow {
         let area = self.view.area().downgrade();
         let editor = self.editor.clone();
         let window = self.window.downgrade();
-        keys.connect_key_pressed(move |_, key, _, modifiers| {
-            // The shortcuts of styles: F1 to F8, with Alt to drop the
-            // formatting set over the style (STY-04).
-            let alt = gdk::ModifierType::ALT_MASK;
-            if let Some(n) = function_key(key)
-                && (modifiers.is_empty() || modifiers == alt)
+        keys.connect_key_pressed(move |_, key, keycode, modifiers| {
+            // The shortcuts of styles: Ctrl+1 to Ctrl+8 in place of F1 to
+            // F8 of Pages, with Shift to drop the formatting set over the
+            // style in place of Option, since GNOME keeps F1 for Help and
+            // Alt with the function keys for the windows (STY-04).
+            let control = gdk::ModifierType::CONTROL_MASK;
+            let shift = control | gdk::ModifierType::SHIFT_MASK;
+            if (modifiers == control || modifiers == shift)
+                && let Some(n) = style_key(key, keycode)
                 && let Some(editor) = editor.borrow().clone()
                 && let Some(style) = editor.styles().by_shortcut(n).map(desk_model::Style::id)
             {
-                editor.apply_style(style, modifiers == alt);
+                editor.apply_style(style, modifiers == shift);
                 return glib::Propagation::Stop;
             }
             let menu_key = key == gdk::Key::Menu
@@ -2774,21 +2825,21 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
     }
 }
 
-/// The number of a function key from F1 to F8.
-fn function_key(key: gdk::Key) -> Option<u8> {
-    [
-        gdk::Key::F1,
-        gdk::Key::F2,
-        gdk::Key::F3,
-        gdk::Key::F4,
-        gdk::Key::F5,
-        gdk::Key::F6,
-        gdk::Key::F7,
-        gdk::Key::F8,
-    ]
-    .iter()
-    .position(|k| *k == key)
-    .map(|i| i as u8 + 1)
+/// The number of a style shortcut, from 1 to 8, for the key of a digit
+/// on the row of digits or the keypad. With Shift the key is a symbol on
+/// most layouts, so the key is read again without modifiers (STY-04).
+fn style_key(key: gdk::Key, keycode: u32) -> Option<u8> {
+    let digit = |key: gdk::Key| {
+        key.to_unicode()
+            .and_then(|c| c.to_digit(10))
+            .filter(|d| (1..=8).contains(d))
+            .map(|d| d as u8)
+    };
+    digit(key).or_else(|| {
+        let display = gdk::Display::default()?;
+        let (plain, ..) = display.translate_key(keycode, gdk::ModifierType::empty(), 0)?;
+        digit(plain)
+    })
 }
 
 /// The main menu of the header bar.

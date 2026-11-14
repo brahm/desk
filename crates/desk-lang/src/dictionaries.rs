@@ -189,6 +189,26 @@ pub fn find(kind: Kind, tag: &str) -> Option<PathBuf> {
     best_in(kind, tag, &search_folders(kind))
 }
 
+/// The languages that the system has dictionaries of a kind for, as BCP
+/// 47 tags such as `pt-BR`, sorted and each once (TXT-10).
+pub fn installed(kind: Kind) -> Vec<String> {
+    let mut tags: Vec<String> = search_folders(kind)
+        .iter()
+        .filter_map(|folder| std::fs::read_dir(folder).ok())
+        .flatten()
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let locale = kind.locale_of(&name)?;
+            parts(locale)?;
+            Some(locale.replace('_', "-"))
+        })
+        .collect();
+    tags.sort();
+    tags.dedup();
+    tags
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

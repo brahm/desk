@@ -6,7 +6,19 @@ The reference corpus of Desk: what Desk must do the same as iWork '09.
   the phase of the roadmap that completes it: the 260 rows of the survey
   of Pages '09, the 33 cases of integration among the three apps of the
   surveys of Pages, Numbers and Keynote (`IOP`), and 11 rows for what the
-  GNOME HIG and the desktop ask of the apps (`GNM`).
+  GNOME HIG and the desktop ask of the apps (`GNM`). Its last column,
+  `gnome`, says how Desk adapts a row to GNOME where the decisions of
+  2026-11-13 and 2026-11-14 changed its form (one Inspector, a header bar
+  without customization, popovers for Fonts and Colors, a recovery draft
+  in place of versions, shortcuts that leave GNOME's own alone); the row
+  passes when Desk does it that way.
+- `slides-matrix.tsv` (173 rows) and `tables-matrix.tsv` (175 rows) are
+  the matrices of Desk Slides and Desk Tables, with a `shared` column that
+  names the rows of the other surveys that describe the same feature, the
+  same `gnome` column, and their own GNOME rows (`KGNM`, `NGNM`).
+- `vm-review.tsv` lists the rows whose interface was compared by eye with
+  Pages 4.3 on the reference Mac OS X Lion; the parity report shows them
+  as "conferido na VM do Lion" when only tests check them otherwise.
 - Each folder under `writer/` is a case: `case.toml` describes a short
   document, and the reference virtual machine adds the `.pages` file that
   Pages builds from the same description and `reference.pdf`, the PDF that

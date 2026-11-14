@@ -45,7 +45,7 @@ pub struct ParagraphStyle {
     /// The style of the paragraph that Return starts at the end of a
     /// paragraph with this style. `None` keeps the same style.
     pub next: Option<StyleId>,
-    /// The function key that applies the style, from 1 for F1 to 8 for F8
+    /// The shortcut that applies the style, from 1 for Ctrl+1 to 8 for Ctrl+8
     /// (STY-04).
     pub shortcut: Option<u8>,
     /// The paragraph attributes.
@@ -78,7 +78,7 @@ pub struct CharacterStyle {
     pub name: Arc<str>,
     /// The style it inherits from.
     pub parent: Option<StyleId>,
-    /// The function key that applies the style, from 1 for F1 to 8 for F8
+    /// The shortcut that applies the style, from 1 for Ctrl+1 to 8 for Ctrl+8
     /// (STY-04).
     pub shortcut: Option<u8>,
     /// The character attributes.
@@ -137,7 +137,7 @@ impl Style {
         }
     }
 
-    /// The function key that applies the style, from 1 to 8.
+    /// The shortcut that applies the style, Ctrl and a digit from 1 to 8.
     pub fn shortcut(&self) -> Option<u8> {
         match self {
             Self::Paragraph(style) => style.shortcut,
@@ -253,7 +253,7 @@ impl Styles {
             .find(|style| style.family() == family && style.name() == name)
     }
 
-    /// The style that a function key applies, from 1 for F1 to 8 for F8.
+    /// The style that a shortcut applies, from 1 for Ctrl+1 to 8 for Ctrl+8.
     pub fn by_shortcut(&self, key: u8) -> Option<&Style> {
         self.iter().find(|style| style.shortcut() == Some(key))
     }

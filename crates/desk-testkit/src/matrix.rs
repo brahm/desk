@@ -31,6 +31,10 @@ pub struct Row {
     pub shared: String,
     /// How it is kept in ODF.
     pub odf: String,
+    /// How Desk adapts the feature to GNOME, where the decisions of
+    /// 2026-11-13 and 2026-11-14 changed its form, or empty when Desk does
+    /// it as the iWork app does.
+    pub gnome: String,
 }
 
 /// Why the matrix could not be read.
@@ -50,11 +54,11 @@ impl fmt::Display for MatrixError {
 
 impl std::error::Error for MatrixError {}
 
-const HEADER: &str = "id\tphase\tfeature\texpected\tpages\todf";
+const HEADER: &str = "id\tphase\tfeature\texpected\tpages\todf\tgnome";
 
 /// The header of the matrices of Desk Slides and Desk Tables, which also
 /// say what the other surveys share.
-const SHARED_HEADER: &str = "id\tphase\tfeature\texpected\tpages\tshared\todf";
+const SHARED_HEADER: &str = "id\tphase\tfeature\texpected\tpages\tshared\todf\tgnome";
 
 /// Reads a matrix. Lines that start with `#` are comments, and the first
 /// other line is the header.
@@ -81,15 +85,15 @@ pub fn parse(text: &str) -> Result<Vec<Row>, MatrixError> {
             continue;
         }
         let fields: Vec<&str> = line.split('\t').collect();
-        let (id, phase, feature, expected, pages, shared, odf) = match fields[..] {
-            [id, phase, feature, expected, pages, odf] if !shared_column => {
-                (id, phase, feature, expected, pages, "", odf)
+        let (id, phase, feature, expected, pages, shared, odf, gnome) = match fields[..] {
+            [id, phase, feature, expected, pages, odf, gnome] if !shared_column => {
+                (id, phase, feature, expected, pages, "", odf, gnome)
             }
-            [id, phase, feature, expected, pages, shared, odf] if shared_column => {
-                (id, phase, feature, expected, pages, shared, odf)
+            [id, phase, feature, expected, pages, shared, odf, gnome] if shared_column => {
+                (id, phase, feature, expected, pages, shared, odf, gnome)
             }
             _ => {
-                let want = if shared_column { 7 } else { 6 };
+                let want = if shared_column { 8 } else { 7 };
                 return Err(error(format!("{} fields instead of {want}", fields.len())));
             }
         };
@@ -114,6 +118,7 @@ pub fn parse(text: &str) -> Result<Vec<Row>, MatrixError> {
             guide_pages: pages.into(),
             shared: shared.into(),
             odf: odf.into(),
+            gnome: gnome.into(),
         });
     }
     Ok(rows)
@@ -148,23 +153,25 @@ mod tests {
 
     #[test]
     fn reads_rows_and_phases() {
-        let text = "# comment\nid\tphase\tfeature\texpected\tpages\todf\n\
-                    FMT-15\t1\tEspaço\tO maior vale\t72\tNativo\n\
-                    EXP-11\t-\tiWork.com\tFechado\t200\t-\n";
+        let text = "# comment\nid\tphase\tfeature\texpected\tpages\todf\tgnome\n\
+                    FMT-15\t1\tEspaço\tO maior vale\t72\tNativo\t\n\
+                    EXP-11\t-\tiWork.com\tFechado\t200\t-\tFora\n";
         let rows = parse(text).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].id, "FMT-15");
         assert_eq!(rows[0].phase, Some(1));
         assert_eq!(rows[1].phase, None);
+        assert_eq!(rows[0].gnome, "");
+        assert_eq!(rows[1].gnome, "Fora");
     }
 
     #[test]
     fn refuses_bad_lines() {
-        let header = "id\tphase\tfeature\texpected\tpages\todf\n";
+        let header = "id\tphase\tfeature\texpected\tpages\todf\tgnome\n";
         assert_eq!(parse("id\tphase\n").unwrap_err().line, 1);
         let short = format!("{header}FMT-15\t1\n");
         assert_eq!(parse(&short).unwrap_err().line, 2);
-        let twice = format!("{header}FMT-15\t1\ta\tb\tc\td\nFMT-15\t1\ta\tb\tc\td\n");
+        let twice = format!("{header}FMT-15\t1\ta\tb\tc\td\t\nFMT-15\t1\ta\tb\tc\td\t\n");
         assert_eq!(parse(&twice).unwrap_err().line, 3);
         assert!(!is_id("FMT-1"));
         assert!(!is_id("fmt-15"));
@@ -180,20 +187,26 @@ mod tests {
         assert_eq!(count("GNM"), 11);
         assert_eq!(rows.len() - count("IOP") - count("GNM"), 260);
         assert!(rows.iter().all(|r| r.phase.is_none_or(|p| p <= 11)));
+        let gnome = |id: &str| &rows.iter().find(|r| r.id == id).unwrap().gnome;
+        // The decisions of 2026-11-13: one Inspector, a header bar
+        // without customization, no browser of versions.
+        assert!(gnome("INT-13").contains("Um Inspetor só"));
+        assert!(gnome("INT-11").contains("sem personalização"));
+        assert!(gnome("DOC-11").contains("Rascunho de recuperação"));
     }
 
     #[test]
     fn reads_the_shared_column() {
-        let text = "id\tphase\tfeature\texpected\tpages\tshared\todf\n\
-                    KSLD-04\t2\tGrupos\tRecolhe\t50\tSó Keynote\tExtensão\n";
+        let text = "id\tphase\tfeature\texpected\tpages\tshared\todf\tgnome\n\
+                    KSLD-04\t2\tGrupos\tRecolhe\t50\tSó Keynote\tExtensão\t\n";
         let rows = parse(text).unwrap();
         assert_eq!(rows[0].id, "KSLD-04");
         assert_eq!(rows[0].shared, "Só Keynote");
         assert_eq!(rows[0].odf, "Extensão");
-        let six = "id\tphase\tfeature\texpected\tpages\tshared\todf\n\
-                   KSLD-04\t2\ta\tb\tc\td\n";
+        let six = "id\tphase\tfeature\texpected\tpages\tshared\todf\tgnome\n\
+                   KSLD-04\t2\ta\tb\tc\td\te\n";
         assert_eq!(parse(six).unwrap_err().line, 2);
-        let writer = "id\tphase\tfeature\texpected\tpages\todf\nKSLD-04\t2\ta\tb\tc\td\n";
+        let writer = "id\tphase\tfeature\texpected\tpages\todf\tgnome\nKSLD-04\t2\ta\tb\tc\td\t\n";
         assert_eq!(parse(writer).unwrap_err().line, 2);
         assert!(is_app_id("NCEL-12"));
         assert!(!is_app_id("XCEL-12"));
@@ -208,8 +221,8 @@ mod tests {
         let writer = parse(include_str!("../../../corpus/matrix.tsv")).unwrap();
         let slides = parse(include_str!("../../../corpus/slides-matrix.tsv")).unwrap();
         let tables = parse(include_str!("../../../corpus/tables-matrix.tsv")).unwrap();
-        assert_eq!(slides.len(), 161);
-        assert_eq!(tables.len(), 164);
+        assert_eq!(slides.len(), 173);
+        assert_eq!(tables.len(), 175);
         let count =
             |rows: &[Row], prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         for (area, n) in [
@@ -226,6 +239,7 @@ mod tests {
             ("KAPR", 13),
             ("KEXP", 11),
             ("KMES", 21),
+            ("KGNM", 12),
         ] {
             assert_eq!(count(&slides, area), n, "{area}");
         }
@@ -241,6 +255,7 @@ mod tests {
             ("NCON", 4),
             ("NIMP", 14),
             ("NMOD", 8),
+            ("NGNM", 11),
         ] {
             assert_eq!(count(&tables, area), n, "{area}");
         }

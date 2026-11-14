@@ -428,6 +428,14 @@ impl Thumbnails {
                 editor.paste_sections(before);
             }
         });
+        // Every section, or every page of a page layout document (EST-17).
+        add("select-all", |this| {
+            let count = (this.editor)()
+                .map(|e| e.page_sections().last().map_or(0, |s| s + 1))
+                .unwrap_or(0);
+            *this.selected.borrow_mut() = (0..count).collect();
+            this.show_selection();
+        });
         add("duplicate", |this| {
             let selected = this.selection();
             this.with_editor(|editor, selected| editor.duplicate_sections(&selected));
@@ -454,6 +462,7 @@ impl Thumbnails {
                 gdk::Key::c if control => "copy",
                 gdk::Key::v if control => "paste",
                 gdk::Key::d if control => "duplicate",
+                gdk::Key::a if control => "select-all",
                 _ => return glib::Propagation::Proceed,
             };
             let _ = this.root.activate_action(&format!("thumbs.{action}"), None);
@@ -469,6 +478,9 @@ impl Thumbnails {
         menu.append(Some(&tr("_Paste")), Some("thumbs.paste"));
         menu.append(Some(&tr("D_uplicate")), Some("thumbs.duplicate"));
         menu.append(Some(&tr("_Delete")), Some("thumbs.delete"));
+        let all = gio::Menu::new();
+        all.append(Some(&tr("Select _All")), Some("thumbs.select-all"));
+        menu.append_section(None, &all);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(&self.list);
         popover.set_has_arrow(false);

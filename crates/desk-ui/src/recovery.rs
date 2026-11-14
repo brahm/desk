@@ -115,7 +115,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn leftovers_leave_out_the_drafts_of_this_run_and_the_names() {
+    fn doc_11_leftovers_leave_out_the_drafts_of_this_run_and_the_names() {
         let folder = std::env::temp_dir().join(format!("desk-recovery-{}", std::process::id()));
         std::fs::create_dir_all(&folder).unwrap();
         for file in [

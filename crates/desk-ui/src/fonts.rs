@@ -137,15 +137,23 @@ fn features() -> [(&'static str, String); 12] {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Collection {
     All,
+    /// The families marked with the star, kept in the preferences.
+    Favorites,
     FixedWidth,
     Recent,
 }
 
-const COLLECTIONS: [Collection; 3] = [Collection::All, Collection::FixedWidth, Collection::Recent];
+const COLLECTIONS: [Collection; 4] = [
+    Collection::All,
+    Collection::Favorites,
+    Collection::FixedWidth,
+    Collection::Recent,
+];
 
 fn collection_name(collection: Collection) -> String {
     match collection {
         Collection::All => tr("All Fonts"),
+        Collection::Favorites => tr("Favorites"),
         Collection::FixedWidth => tr("Fixed Width"),
         Collection::Recent => tr("Recently Used"),
     }
@@ -245,6 +253,8 @@ pub struct FontsWindow {
     sizes: gtk::ListBox,
     size: gtk::SpinButton,
     search: gtk::SearchEntry,
+    /// Adds the family chosen to Favorites, or takes it out.
+    favorite: gtk::ToggleButton,
     underline: gtk::DropDown,
     strikethrough: gtk::DropDown,
     color: gtk::ColorDialogButton,
@@ -296,7 +306,16 @@ impl FontsWindow {
         labelled(&size, &tr("Font Size"));
         let search = gtk::SearchEntry::builder()
             .placeholder_text(tr("Search Fonts"))
+            .hexpand(true)
             .build();
+        let favorite = gtk::ToggleButton::builder()
+            .icon_name("starred-symbolic")
+            .tooltip_text(tr("Add to Favorites"))
+            .build();
+        labelled(&favorite, &tr("Favorite"));
+        let family_top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        family_top.append(&search);
+        family_top.append(&favorite);
 
         let column = |title: &str, top: Option<&gtk::Widget>, view: &gtk::ScrolledWindow| {
             let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
@@ -317,7 +336,7 @@ impl FontsWindow {
         lists.append(&column(&tr("Collection"), None, &collections_view));
         lists.append(&column(
             &tr("Family"),
-            Some(search.upcast_ref()),
+            Some(family_top.upcast_ref()),
             &families_view,
         ));
         lists.append(&column(&tr("Typeface"), None, &faces_view));
@@ -457,6 +476,7 @@ impl FontsWindow {
             sizes,
             size,
             search,
+            favorite,
             underline,
             strikethrough,
             color,
@@ -481,6 +501,23 @@ impl FontsWindow {
         this
     }
 
+    /// Shows whether the family chosen is a favorite.
+    fn show_star(&self) {
+        let name = self.families.selected_row().and_then(|r| row_name(&r));
+        let on = name
+            .as_ref()
+            .is_some_and(|n| crate::preferences::get().font_favorites.contains(n));
+        let was = self.updating.replace(true);
+        self.favorite.set_sensitive(name.is_some());
+        self.favorite.set_active(on);
+        self.favorite.set_tooltip_text(Some(&if on {
+            tr("Remove from Favorites")
+        } else {
+            tr("Add to Favorites")
+        }));
+        self.updating.set(was);
+    }
+
     /// The families of the collection chosen that match the search.
     fn show_families(&self) {
         let collection = self
@@ -492,6 +529,7 @@ impl FontsWindow {
         let query = self.search.text().to_lowercase();
         let names: Vec<String> = match collection {
             Collection::Recent => RECENT.with(|r| r.borrow().clone()),
+            Collection::Favorites => crate::preferences::get().font_favorites,
             _ => self
                 .installed
                 .iter()
@@ -545,6 +583,32 @@ impl FontsWindow {
         };
         let again = changed.clone();
         self.collections.connect_row_selected(move |_, _| again());
+        // The star adds the family chosen to Favorites or takes it out.
+        let weak = Rc::downgrade(self);
+        self.favorite.connect_toggled(move |button| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let Some(name) = this.families.selected_row().and_then(|r| row_name(&r)) else {
+                return;
+            };
+            let on = button.is_active();
+            crate::preferences::change(|p| {
+                p.font_favorites.retain(|n| n != &name);
+                if on {
+                    p.font_favorites.push(name.clone());
+                    p.font_favorites.sort_by_key(|n| n.to_lowercase());
+                }
+            });
+            this.show_star();
+        });
+        let weak = Rc::downgrade(self);
+        self.families.connect_row_selected(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.show_star();
+            }
+        });
         self.search.connect_search_changed(move |_| changed());
 
         let family = character("Font", |this| {
