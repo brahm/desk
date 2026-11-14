@@ -181,10 +181,10 @@ mod tests {
     fn the_matrix_of_the_corpus_reads() {
         let text = include_str!("../../../corpus/matrix.tsv");
         let rows = parse(text).unwrap();
-        assert_eq!(rows.len(), 310);
+        assert_eq!(rows.len(), 311);
         let count = |prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         assert_eq!(count("IOP"), 33);
-        assert_eq!(count("GNM"), 13);
+        assert_eq!(count("GNM"), 14);
         assert_eq!(count("VMI"), 4);
         assert_eq!(rows.len() - count("IOP") - count("GNM") - count("VMI"), 260);
         assert!(rows.iter().all(|r| r.phase.is_none_or(|p| p <= 11)));
@@ -227,8 +227,8 @@ mod tests {
         let writer = parse(include_str!("../../../corpus/matrix.tsv")).unwrap();
         let slides = parse(include_str!("../../../corpus/slides-matrix.tsv")).unwrap();
         let tables = parse(include_str!("../../../corpus/tables-matrix.tsv")).unwrap();
-        assert_eq!(slides.len(), 180);
-        assert_eq!(tables.len(), 180);
+        assert_eq!(slides.len(), 181);
+        assert_eq!(tables.len(), 181);
         let count =
             |rows: &[Row], prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         for (area, n) in [
@@ -245,7 +245,7 @@ mod tests {
             ("KAPR", 13),
             ("KEXP", 11),
             ("KMES", 21),
-            ("KGNM", 14),
+            ("KGNM", 15),
             ("KVMI", 5),
         ] {
             assert_eq!(count(&slides, area), n, "{area}");
@@ -262,7 +262,7 @@ mod tests {
             ("NCON", 4),
             ("NIMP", 14),
             ("NMOD", 8),
-            ("NGNM", 13),
+            ("NGNM", 14),
             ("NVMI", 3),
         ] {
             assert_eq!(count(&tables, area), n, "{area}");

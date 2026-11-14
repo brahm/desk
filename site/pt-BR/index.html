@@ -74,11 +74,11 @@
 
     <section id="looks" aria-labelledby="looks-title">
       <h2 id="looks-title">Como os aplicativos vão ficar</h2>
-      <p class="section-intro">Os três aplicativos terão a mesma janela, escolhida em novembro de 2026: uma barra lateral para andar pelo documento, uma barra de formatação enxuta que muda com a seleção e um Inspetor só, à direita. São mockups desenhados com os widgets de verdade do GTK 4 e da Libadwaita. O Desk Writer muda para esta janela na próxima etapa.</p>
+      <p class="section-intro">Os três aplicativos terão a mesma janela, escolhida em novembro de 2026: uma barra lateral para andar pelo documento, uma barra de formatação enxuta que muda com a seleção e um Inspetor só, à direita. São mockups desenhados com os widgets de verdade do GTK 4 e da Libadwaita, em 1280 × 720, a menor tela para a qual o Desk é feito. O Desk Writer muda para esta janela na próxima etapa.</p>
       <ul class="shots">
-        <li><figure><img src="../img/interface/writer-b.png" alt="Janela do Desk Writer: miniaturas das páginas na barra lateral, um relatório com imagem e tabela, e o Inspetor aberto no formato do texto" width="1280" height="800" loading="lazy"><figcaption><strong>Desk Writer.</strong> Miniaturas das páginas na barra lateral, o formato do texto no Inspetor, e o zoom, a página e a contagem de palavras na barra inferior.</figcaption></figure></li>
-        <li><figure><img src="../img/interface/tables-b.png" alt="Janela do Desk Tables: planilhas na barra lateral, uma tabela de despesas com a barra de fórmulas, e o cálculo instantâneo na barra inferior" width="1280" height="800" loading="lazy"><figcaption><strong>Desk Tables.</strong> Planilhas na barra lateral, várias tabelas numa planilha, a barra de fórmulas, e soma, média e contagem da seleção na barra inferior.</figcaption></figure></li>
-        <li><figure><img src="../img/interface/slides-b.png" alt="Janela do Desk Slides: navegador de slides na barra lateral, um slide com uma imagem selecionada, notas do apresentador embaixo e o botão Reproduzir na barra de cabeçalho" width="1280" height="800" loading="lazy"><figcaption><strong>Desk Slides.</strong> O navegador de slides na barra lateral, o botão Reproduzir na barra de cabeçalho, as notas do apresentador sob o slide e a aba Animação no Inspetor.</figcaption></figure></li>
+        <li><figure><img src="../img/interface/writer-b.png" alt="Janela do Desk Writer: miniaturas das páginas na barra lateral, um relatório com imagem e tabela, e o Inspetor aberto no formato do texto" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Writer.</strong> Miniaturas das páginas na barra lateral, o formato do texto no Inspetor, e o zoom, a página e a contagem de palavras na barra inferior.</figcaption></figure></li>
+        <li><figure><img src="../img/interface/tables-b.png" alt="Janela do Desk Tables: planilhas na barra lateral, uma tabela de despesas com a barra de fórmulas, e o cálculo instantâneo na barra inferior" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Tables.</strong> Planilhas na barra lateral, várias tabelas numa planilha, a barra de fórmulas, e soma, média e contagem da seleção na barra inferior.</figcaption></figure></li>
+        <li><figure><img src="../img/interface/slides-b.png" alt="Janela do Desk Slides: navegador de slides na barra lateral, um slide com uma imagem selecionada, notas do apresentador embaixo e o botão Reproduzir na barra de cabeçalho" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Slides.</strong> O navegador de slides na barra lateral, o botão Reproduzir na barra de cabeçalho, as notas do apresentador sob o slide e a aba Animação no Inspetor.</figcaption></figure></li>
       </ul>
     </section>
 
@@ -181,6 +181,7 @@
         <pre><code>flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
 flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
         <p class="card-note">Ou abra o <a href="../desk-writer-beta.flatpakref">desk-writer-beta.flatpakref</a> para instalar pelo GNOME Software. É uma versão de testes: guarde uma cópia dos documentos que abrir com ela. Para a versão gerada toda noite a partir do código mais recente, use <code>//nightly</code> ou o <a href="../desk-writer-nightly.flatpakref">desk-writer-nightly.flatpakref</a>. Também dá para compilar o Desk a partir do <a href="https://github.com/brahm/desk#building">código-fonte</a>.</p>
+        <p class="card-note">O Desk precisa de uma tela de pelo menos 1280 × 720 pixels, depois da escala da tela: um computador de mesa, um notebook ou um tablet deitado. Celulares e telas menores não têm suporte. Os aplicativos abrem neles mesmo assim, com um aviso de que partes da janela podem não caber.</p>
       </div>
     </section>
 
@@ -244,6 +245,10 @@ flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-desktop"/></svg></span>
           <span class="row-text"><strong>Plataforma</strong><span>GNOME 51, distribuído como Flatpak</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-desktop"/></svg></span>
+          <span class="row-text"><strong>Tela</strong><span>1280 × 720 ou maior, em computadores, notebooks e tablets; celulares não têm suporte</span></span>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>
