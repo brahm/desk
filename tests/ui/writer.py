@@ -496,6 +496,7 @@ def main():
     gnome_window(work)
     two_level_inspector(work)
     sidebar_pages(work)
+    bottom_bar(work)
     header_and_menus(work)
     slim_format_bar(work)
     small_screen(work)
@@ -1553,7 +1554,12 @@ def activate(action, value=None):
     item does, through the actions that GTK puts on the session bus: the
     items of GTK's menus have no names for the accessibility tree. A value
     is the string that the item gives the action."""
-    parameter = "[]" if value is None else f"[<'{value}'>]"
+    if value is None:
+        parameter = "[]"
+    elif isinstance(value, bool):
+        parameter = f"[<{str(value).lower()}>]"
+    else:
+        parameter = f"[<'{value}'>]"
     subprocess.run(
         [
             "gdbus", "call", "--session", "--dest", "br.com.brahm.Desk.Writer",
@@ -2423,7 +2429,7 @@ def header_and_menus(work):
         wait_for("the command search to close", lambda: showing_named(app, "Search Commands") is None)
         wait_for(
             "the page break",
-            lambda: next((n for n in walk(app) if (n.get_name() or "").endswith("2 pages")), None),
+            lambda: next((n for n in walk(app) if (n.get_name() or "").endswith(" of 2")), None),
         )
         check("a command found runs with Enter (GNM-10)", True)
 
@@ -2526,6 +2532,120 @@ def sidebar_pages(work):
             lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
         )
         check("Page Thumbnails turns the sidebar back to the pages (INT-19)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+LONG_DOCUMENT = ROOT / "corpus" / "fixtures" / "pages" / "long-document.pages"
+
+
+def named_like(app, pattern):
+    """The first node that shows with a name matching a pattern, and the
+    match."""
+    try:
+        for node in walk(app):
+            found = re.fullmatch(pattern, node.get_name() or "")
+            if found and showing(node):
+                return node, found
+    except GLib.GError:
+        pass
+    return None
+
+
+def open_menu_button(node):
+    """Opens a menu button: the toggle that it holds takes the action."""
+    for part in walk(node):
+        try:
+            if Atspi.Action.get_n_actions(part) > 0:
+                part.do_action(0)
+                return
+        except (GLib.GError, NotImplementedError, TypeError):
+            continue
+    fail(f"{node.get_name()} has nothing to press")
+
+
+def bottom_bar(work):
+    """The bottom bar of interface B: the zoom at the start, the position
+    in the middle between the arrows, whose menu has Go to Page and
+    Navigate By, and at the end the count of the document, or of the
+    selection when text is selected, whose menu chooses what it counts and
+    shows the statistics (GNM-13, INT-07, INT-19, DOC-20)."""
+    name = "Long.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(LONG_DOCUMENT), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        zoom, _ = wait_for("the zoom", lambda: named_like(app, r"\d+%"))
+        position, found = wait_for(
+            "the position", lambda: named_like(app, r"Page 1 of (\d+)")
+        )
+        pages = int(found.group(1))
+        count, found = wait_for("the count", lambda: named_like(app, r"([\d,]+) words"))
+        words = int(found.group(1).replace(",", ""))
+        check(
+            "the bottom bar has the zoom, the position in the middle and the count (GNM-13)",
+            pages > 1
+            and words > 1000
+            and right_of(zoom) < extents(position).x
+            and right_of(position) < extents(count).x,
+        )
+        activate("zoom", "1.5")
+        wait_for("the zoom to change", lambda: showing_named(app, "150%"))
+        check("the zoom of the bottom bar shows the zoom chosen (INT-07)", True)
+
+        open_menu_button(position)
+        wait_for(
+            "Go to Page",
+            lambda: any(
+                n.get_role() == Atspi.Role.TEXT and n.get_name() == "Go to Page" and showing(n)
+                for n in walk(app)
+            ),
+        )
+        check(
+            "the menu of the position has Go to Page and Navigate By (INT-19)",
+            showing_named(app, "Navigate By") is not None,
+        )
+        press("ctrl+a")
+        type_text("6")
+        press("Return")
+        wait_for("page 6", lambda: named_like(app, rf"Page 6 of {pages}"))
+        check("Go to Page shows the page typed (INT-19)", True)
+        activate("navigate", True)
+        wait_for("page 7", lambda: named_like(app, rf"Page 7 of {pages}"))
+        check("the arrow goes to the next page and the position follows (INT-19)", True)
+        activate("navigate-by", "section")
+        wait_for("the arrows to sections", lambda: showing_named(app, "Next Section"))
+        check("Navigate By turns the arrows to another kind of place (INT-19)", True)
+        activate("navigate-by", "page")
+
+        press("ctrl+a")
+        wait_for(
+            "the count of the selection",
+            lambda: named_like(app, rf"{words:,} of {words:,} words"),
+        )
+        check("with text selected the count is that of the selection (DOC-20)", True)
+        press("ctrl+Home")
+        wait_for("the count of the document", lambda: named_like(app, rf"{words:,} words"))
+        activate("count", "characters")
+        wait_for("the characters", lambda: named_like(app, r"[\d,]+ characters"))
+        check("the menu of the count chooses what it counts (DOC-20)", True)
+        count, _ = named_like(app, r"[\d,]+ characters")
+        # The items of GTK's menus have no names: Show Statistics is the
+        # action that the item gives.
+        open_menu_button(count)
+        press("Escape")
+        activate("statistics")
+        wait_for("the statistics", lambda: showing_named(app, "Statistics"))
+        check("Show Statistics of the count opens the statistics (DOC-20)", True)
+        press("Escape")
+        activate("count", "words")
     finally:
         writer.terminate()
         writer.wait(timeout=10)

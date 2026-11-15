@@ -242,7 +242,7 @@ pub(super) fn view_menu() -> gio::Menu {
     let window = gio::Menu::new();
     window.append(Some(&tr("As _Outline")), Some("win.outline"));
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
-    window.append_submenu(Some(&tr("_Zoom")), &super::zoom_menu());
+    window.append_submenu(Some(&tr("_Zoom")), &crate::bottom_bar::zoom_menu());
     let menu = gio::Menu::new();
     menu.append_section(Some(&tr("Sidebar")), &panes);
     menu.append_section(None, &document);

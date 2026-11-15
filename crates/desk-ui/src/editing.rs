@@ -597,9 +597,10 @@ impl TextEditor {
         DisplayList::pages(Self::main_layout(&state))
     }
 
-    /// The number of words of the document.
-    pub fn word_count(&self) -> usize {
-        Self::main_document(&self.state.borrow()).statistics().words
+    /// The counts of the document, without the header or note being
+    /// edited, for the bottom of the window (DOC-20).
+    pub fn main_statistics(&self) -> desk_model::Statistics {
+        Self::main_document(&self.state.borrow()).statistics()
     }
 
     /// Whether the document has changed since it was saved or opened.
@@ -2776,18 +2777,22 @@ impl TextEditor {
     /// The counts of the document, and of the selection when there is
     /// one (INT-20).
     pub fn statistics(&self) -> (desk_model::Statistics, Option<desk_model::Statistics>) {
+        let all = self.state.borrow().editor.document().statistics();
+        (all, self.selection_statistics())
+    }
+
+    /// The counts of the text selected, when there is some (DOC-20).
+    pub fn selection_statistics(&self) -> Option<desk_model::Statistics> {
         let state = self.state.borrow();
         let document = state.editor.document();
-        let all = document.statistics();
         let (start, end) = state.selection.ordered();
-        let selected = (start != end)
+        (start != end)
             .then(|| {
                 document
                     .statistics_between(start.position(document)?, end.position(document)?)
                     .ok()
             })
-            .flatten();
-        (all, selected)
+            .flatten()
     }
 
     /// The lines of the document, and of the selection when there is one

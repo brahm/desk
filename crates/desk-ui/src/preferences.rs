@@ -159,6 +159,10 @@ pub struct Preferences {
     /// Whether the words and pages of the document show at the bottom of
     /// the window (DOC-20).
     pub show_counts: bool,
+    /// What the count at the bottom of the window counts: words,
+    /// characters, characters-without-spaces, paragraphs or pages
+    /// (DOC-20).
+    pub count: String,
     /// Whether a banner says so when a document opens with problems, as
     /// the Warnings window of Pages shows itself (INT-22).
     pub show_warnings: bool,
@@ -217,6 +221,7 @@ impl Default for Preferences {
             zoom: 125,
             invisibles_color: INVISIBLES_COLOR,
             show_counts: true,
+            count: "words".into(),
             show_warnings: true,
             font_favorites: Vec::new(),
             include_preview: true,
@@ -296,6 +301,9 @@ impl Preferences {
         out.show_counts = file
             .boolean(WINDOW, "show-counts")
             .unwrap_or(out.show_counts);
+        if let Ok(count) = file.string(WINDOW, "count") {
+            out.count = count.to_string();
+        }
         out.show_warnings = file
             .boolean(WINDOW, "show-warnings")
             .unwrap_or(out.show_warnings);
@@ -363,6 +371,7 @@ impl Preferences {
             &color_key(self.invisibles_color),
         );
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
+        file.set_string(WINDOW, "count", &self.count);
         file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
         // As a list of the key file: names, each ended by a semicolon.
         let favorites: String = self
@@ -829,6 +838,7 @@ mod tests {
                 a: 128,
             },
             show_counts: false,
+            count: "paragraphs".into(),
             show_warnings: false,
             font_favorites: vec!["Liberation Serif".into(), "DejaVu Sans".into()],
             include_preview: false,
