@@ -409,7 +409,7 @@ funcionando.
 | 4. Inspetor em dois níveis (feita) | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
 | 5. Páginas da barra lateral (feita) | Estilos no lugar da gaveta, Comentários e Resultados da busca | INT-18, TXT-13 |
 | 6. Barra inferior (feita) | Zoom, posição com Ir para e Navegar por, contagem e seleção | GNM-13, INT-07, INT-19, DOC-20 |
-| 7. Comandos e atalhos | Os quatro comandos do inventário, os atalhos confirmados, o diálogo de atalhos, as traduções e os testes pela árvore de acessibilidade | VMI-01 a VMI-04 |
+| 7. Comandos e atalhos (feita) | Os quatro comandos do inventário, os atalhos confirmados, o diálogo de atalhos, as traduções e os testes pela árvore de acessibilidade | VMI-01 a VMI-04 |
 
 Oito linhas que já têm testes mudam de forma com a interface B e ficam
 reabertas até a etapa que as refaz: INT-07, INT-11, INT-14, INT-18,
@@ -462,7 +462,17 @@ contagem troca o que ela conta (palavras, caracteres, caracteres sem
 espaços, parágrafos ou páginas), escolha que fica nas Preferências, e
 abre as estatísticas (DOC-20). As setas dizem para onde vão, e Navegar
 por ganhou as notas de rodapé e de fim; Comentário entra com os
-comentários, na fase 8. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
+comentários, na fase 8. A etapa 7 trouxe os quatro comandos que o
+inventário achou no Pages: Desmarcar tudo, em Ctrl+Shift+A e no menu de
+contexto (VMI-01); Reaplicar padrões à seleção, que devolve a um objeto o
+visual de um objeto novo do mesmo tipo (VMI-02), até os estilos padrão do
+modelo chegarem na fase 9; Mostrar linhas de conexão, que liga o fim de
+uma caixa de texto vinculada ao começo da seguinte quando ela está
+selecionada (VMI-03), os dois no menu Mais da barra de um objeto; e
+Redefinir texto e alças do objeto, no menu Organizar, que tira o giro de
+uma forma sem mudar o desenho, com o texto de novo na horizontal (VMI-04).
+A máscara ganhou Ctrl+Shift+M, e o diálogo de atalhos passou a falar da
+barra lateral no lugar das miniaturas e da gaveta de estilos. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:

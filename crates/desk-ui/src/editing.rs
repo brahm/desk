@@ -390,6 +390,8 @@ struct State {
     on_select: Vec<Rc<dyn Fn()>>,
     /// Whether the invisible characters show (INT-10).
     invisibles: bool,
+    /// Whether the lines between linked text boxes show (VMI-03).
+    connection_lines: bool,
     /// The text as screen readers read it.
     access: AccessText,
     on_change: Vec<Rc<dyn Fn()>>,
@@ -555,6 +557,7 @@ impl TextEditor {
                 pending: None,
                 on_select: Vec::new(),
                 invisibles: false,
+                connection_lines: true,
                 access: AccessText::default(),
                 spelling_scope: None,
                 others: Vec::new(),
@@ -691,6 +694,17 @@ impl TextEditor {
             anchor: Spot::default(),
             focus: text_nav::document_edge(&document, true),
         });
+    }
+
+    /// Takes away the selection of text and of objects, the reverse of
+    /// Select All: the cursor stays where the selection ended (VMI-01).
+    pub fn deselect_all(&self) {
+        if self.has_selected_objects() {
+            self.select_objects(Vec::new());
+            return;
+        }
+        let focus = self.selection().focus;
+        self.select(Selection::cursor(focus));
     }
 
     /// Shows the emoji and symbols of GTK at the cursor, and types the one
@@ -2445,6 +2459,12 @@ impl TextEditor {
     pub fn set_show_invisibles(&self, show: bool) {
         self.state.borrow_mut().invisibles = show;
         self.show_pages();
+    }
+
+    /// Shows or hides the lines between linked text boxes (VMI-03).
+    pub fn set_show_connection_lines(&self, show: bool) {
+        self.state.borrow_mut().connection_lines = show;
+        self.show_objects();
     }
 
     /// Calls `f` whenever the selection moves, or the formatting that text
