@@ -95,6 +95,13 @@ pub struct GraphicProperties {
     /// `desk:reflection`: how opaque the reflection below the object is
     /// where it starts, in percent (OBJ-38).
     pub reflection: Option<f64>,
+    /// `desk:object-style`, of a named graphic style: the kind of object
+    /// that it is an object style of, `shape`, `line`, `text-box` or
+    /// `image` (MOD-04).
+    pub object_style: Option<String>,
+    /// `desk:default-object-style`, of an object style: whether new
+    /// objects of its kind take it.
+    pub default_object_style: Option<bool>,
     /// `desk:picture-frame`: the picture frame of the library of Desk
     /// around the object, by its name.
     pub picture_frame: Option<String>,
@@ -589,6 +596,8 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         opacity: e.attr(DRAW, "opacity").and_then(parse_percent),
         reflection: e.attr(DESK, "reflection").and_then(parse_percent),
         picture_frame: text(DESK, "picture-frame"),
+        object_style: text(DESK, "object-style"),
+        default_object_style: e.attr(DESK, "default-object-style").map(|v| v == "true"),
         master_pages: text(DESK, "master-pages"),
         picture_frame_scale: e.attr(DESK, "picture-frame-scale").and_then(parse_percent),
         fill_tint: e.attr(DESK, "fill-tint").and_then(Color::parse),
@@ -692,6 +701,13 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     }
     if let Some(reflection) = g.reflection {
         w.attr("desk:reflection", &format!("{}%", decimal(reflection)));
+    }
+    w.attr_opt("desk:object-style", g.object_style.as_deref());
+    if let Some(default) = g.default_object_style {
+        w.attr(
+            "desk:default-object-style",
+            if default { "true" } else { "false" },
+        );
     }
     if let Some(opacity) = g.opacity {
         w.attr("draw:opacity", &format!("{}%", decimal(opacity)));

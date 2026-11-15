@@ -21,8 +21,8 @@ use std::sync::Arc;
 use desk_layout::{DocumentLayout, PlacedObject, object_at};
 use desk_model::{
     Anchor, Distribution, Document, Edit, Fill, Frame, GraphicStyle, Layer, Length, ModelError,
-    NodeId, Object, ObjectAlignment, ObjectKind, ParaAttrs, Paragraph, Rgba, Run, Shape, Story,
-    Stroke, TextBox, Wrap,
+    NodeId, Object, ObjectAlignment, ObjectKind, ObjectStyleKind, ParaAttrs, Paragraph, Rgba, Run,
+    Shape, Story, Stroke, TextBox, Wrap,
 };
 use gtk::gdk;
 
@@ -801,6 +801,41 @@ pub struct ObjectInfo {
     /// Whether every selected object moves with a page, so that they can
     /// be grouped.
     pub same_anchor: bool,
+    /// The object styles that the selected objects take.
+    pub styles: ObjectStylesInfo,
+}
+
+/// The object styles of the kind of the first selected object that has
+/// any, as the format bar and the Inspector show them (MOD-04).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ObjectStylesInfo {
+    /// The styles of the kind, in order.
+    pub styles: Vec<desk_model::ObjectStyle>,
+    /// The default of the kind.
+    pub default: Option<desk_model::StyleId>,
+    /// The style that the object took, if it took one.
+    pub current: Option<desk_model::StyleId>,
+    /// Whether the object no longer looks as its style.
+    pub modified: bool,
+}
+
+impl ObjectStylesInfo {
+    fn of(document: &Document, ids: &[NodeId]) -> Self {
+        let Some((object, kind)) = ids.iter().find_map(|id| {
+            let object = document.objects().get(*id)?;
+            Some((object, ObjectStyleKind::of(&object.kind)?))
+        }) else {
+            return Self::default();
+        };
+        let styles = document.object_styles();
+        let current = document.object_style_of(object);
+        Self {
+            styles: styles.of_kind(kind).cloned().collect(),
+            default: styles.default_for(kind).map(|s| s.id),
+            current: current.map(|(s, _)| s.id),
+            modified: current.is_some_and(|(_, same)| !same),
+        }
+    }
 }
 
 impl TextEditor {
@@ -890,11 +925,13 @@ impl TextEditor {
             .iter()
             .filter_map(|id| document.objects().get(*id).map(|o| o.anchor))
             .collect();
+        let styles = ObjectStylesInfo::of(document, &state.objects);
         Some(ObjectInfo {
             object,
             frame,
             count: state.objects.len(),
             same_anchor: anchors.windows(2).all(|w| w[0] == w[1]),
+            styles,
         })
     }
 
@@ -1514,12 +1551,121 @@ impl TextEditor {
     }
 
     /// Gives the selected objects back the look that a new object of their
-    /// kind takes (VMI-02). A group keeps its own.
+    /// kind takes: the default style of the kind (VMI-02, MOD-04). A
+    /// group keeps its own.
     pub fn reapply_defaults(&self) {
+        let document = self.document();
         self.set_each_object("Reapply Defaults", |object, _| {
-            if !matches!(object.kind, ObjectKind::Group(_)) {
-                object.style = default_style(&object.kind);
+            if matches!(object.kind, ObjectKind::Group(_)) {
+                return;
             }
+            if !document.give_default_style(object) {
+                object.style = default_style(&object.kind);
+                object.object_style = None;
+            }
+        });
+    }
+
+    /// Gives the selected objects of its kind the look of an object style,
+    /// which they remember (MOD-04).
+    pub fn apply_object_style(&self, style: desk_model::StyleId) {
+        self.arrange_objects("Object Style", |edit, ids| {
+            edit.apply_object_style(ids, style)?;
+            Ok(None)
+        });
+    }
+
+    /// The first selected object that object styles apply to, with its
+    /// kind of styles.
+    fn styled_object(&self) -> Option<(Object, ObjectStyleKind)> {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        state.objects.iter().find_map(|id| {
+            let object = document.objects().get(*id)?;
+            Some((object.clone(), ObjectStyleKind::of(&object.kind)?))
+        })
+    }
+
+    /// Gives the style of the selected object its look, and so the look
+    /// of the other objects that still look as the style did: Update
+    /// Style (MOD-04).
+    pub fn update_object_style(&self) {
+        let Some((object, _)) = self.styled_object() else {
+            return;
+        };
+        let Some(style) = object.object_style else {
+            return;
+        };
+        self.arrange_objects("Update Style", |edit, _| {
+            edit.redefine_object_style(style, object.style.clone())?;
+            Ok(None)
+        });
+    }
+
+    /// Makes a style of the look of the selected object, which the
+    /// selected objects of its kind take (MOD-04).
+    pub fn new_object_style(&self) {
+        let Some((object, kind)) = self.styled_object() else {
+            return;
+        };
+        let name = crate::i18n::tr("Style");
+        self.arrange_objects("New Style", |edit, ids| {
+            let style = edit.add_object_style(kind, &name, object.style.clone())?;
+            edit.apply_object_style(ids, style)?;
+            Ok(None)
+        });
+    }
+
+    /// Makes the look of the selected object the one that new objects of
+    /// its kind take, as Define Default Style of Pages (MOD-04, MOD-07):
+    /// its style, when it still looks as it, or a new style of its look.
+    pub fn set_default_object_style(&self) {
+        let Some((object, kind)) = self.styled_object() else {
+            return;
+        };
+        let name = crate::i18n::tr("Default");
+        self.arrange_objects("Define Default Style", |edit, ids| {
+            let current = edit
+                .document()
+                .object_style_of(&object)
+                .filter(|(_, same)| *same)
+                .map(|(style, _)| style.id);
+            let style = match current {
+                Some(style) => style,
+                None => {
+                    let style = edit.add_object_style(kind, &name, object.style.clone())?;
+                    edit.apply_object_style(&ids[..1], style)?;
+                    style
+                }
+            };
+            edit.set_default_object_style(style)?;
+            Ok(None)
+        });
+    }
+
+    /// Renames the style of the selected object. A name that another
+    /// style of its kind has is refused, with the error.
+    pub fn rename_object_style(&self, name: &str) -> Result<(), ModelError> {
+        let Some(style) = self.styled_object().and_then(|(o, _)| o.object_style) else {
+            return Ok(());
+        };
+        let mut result = Ok(());
+        self.arrange_objects("Rename Style", |edit, _| {
+            result = edit.rename_object_style(style, name);
+            result.clone().map(|()| None)
+        });
+        result
+    }
+
+    /// Deletes the style of the selected object; the objects that took it
+    /// keep their look. The last style of a kind stays.
+    pub fn delete_object_style(&self) {
+        let Some(style) = self.styled_object().and_then(|(o, _)| o.object_style) else {
+            return;
+        };
+        self.arrange_objects("Delete Style", |edit, _| {
+            edit.remove_object_style(style)?;
+            Ok(None)
         });
     }
 
@@ -1567,7 +1713,10 @@ impl TextEditor {
             };
             let mut object = Object::new(id, kind, frame);
             object.anchor = Anchor::Page(page as u32);
-            object.style = default_style(&object.kind);
+            // The default style of its kind (MOD-04).
+            if !edit.document().give_default_style(&mut object) {
+                object.style = default_style(&object.kind);
+            }
             if shape == NewShape::TextBox {
                 object.wrap = Wrap::Through;
             }
@@ -1652,6 +1801,8 @@ impl TextEditor {
             let id = edit.new_id();
             let mut object = Object::new(id, ObjectKind::Image(picture), frame);
             object.anchor = Anchor::Page(page as u32);
+            // The default image style (MOD-07).
+            edit.document().give_default_style(&mut object);
             edit.add_object(object)?;
             Ok(id)
         });
@@ -1689,11 +1840,12 @@ impl TextEditor {
             } else {
                 edit.delete(from, to)?
             };
-            let object = Object::new(
+            let mut object = Object::new(
                 edit.new_id(),
                 ObjectKind::Image(picture),
                 Frame::from_pt(0.0, 0.0, w, h),
             );
+            edit.document().give_default_style(&mut object);
             let after = edit.insert_object_in_text(at, object)?;
             Ok(crate::text_nav::Spot::of(edit.document(), after))
         });

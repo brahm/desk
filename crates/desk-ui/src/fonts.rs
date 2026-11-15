@@ -887,6 +887,13 @@ impl FontsSlot {
             .borrow_mut()
             .get_or_insert_with(|| FontsWindow::new(parent, editor))
             .clone();
+        // On the button it was asked from: that of the format bar, or the
+        // family of the Text tab of a shape (OBJ-13).
+        let parent = parent.upcast_ref::<gtk::Widget>();
+        if fonts.window.parent().as_ref() != Some(parent) {
+            fonts.window.unparent();
+            fonts.window.set_parent(parent);
+        }
         fonts.present();
         fonts
     }

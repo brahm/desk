@@ -108,6 +108,11 @@ pub struct Inspector {
     effects: Rc<Effects>,
     /// The Metrics and Wrap inspectors of the selected objects.
     objects: Rc<crate::objects_pane::ObjectGroups>,
+    /// The font and alignment of the text of a selected shape or text
+    /// box (OBJ-13).
+    object_text: Rc<crate::object_text_pane::ObjectTextGroups>,
+    /// The object styles of the selected object (MOD-04).
+    object_styles: Rc<crate::object_styles_pane::StylesGroup>,
     /// The units of the indents, those of the rulers.
     units: Cell<Units>,
     /// The paragraph format shown, to show again in other units.
@@ -192,6 +197,8 @@ impl Inspector {
         let links = crate::links_pane::LinksGroup::new(editor.clone());
         let toc = crate::links_pane::TocGroup::new(editor.clone());
         let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
+        let object_text = crate::object_text_pane::ObjectTextGroups::new(editor.clone());
+        let object_styles = crate::object_styles_pane::StylesGroup::new();
 
         let spacing = compact::Group::builder().title(tr("Spacing")).build();
         spacing.add(&line_spacing);
@@ -226,11 +233,13 @@ impl Inspector {
         // The tabs of Format for each kind of selection, and those of
         // Document (INT-13, the Inspector of interface B).
         let [metrics, shape, picture, media, graphic, wrap, text_box] = objects.groups();
+        let [font, alignment] = object_text.groups();
         let [character, text_shadow, borders] = effects.groups();
         let [page, layout, section] = layouts.groups();
         let [link, bookmarks] = links.groups();
         let arrange = || Tab::new("arrange", n_("Arrange"), &[metrics, wrap]);
-        let style = || Tab::new("style", n_("Style"), &[graphic, shape]);
+        let styles = object_styles.group();
+        let style = || Tab::new("style", n_("Style"), &[styles, graphic, shape]);
         let mut contexts = HashMap::new();
         contexts.insert(
             Context::Text,
@@ -251,7 +260,7 @@ impl Inspector {
         contexts.insert(
             Context::Image,
             vec![
-                Tab::new("style", n_("Style"), &[graphic]),
+                Tab::new("style", n_("Style"), &[styles, graphic]),
                 Tab::new("image", n_("Image"), &[picture]),
                 arrange(),
             ],
@@ -261,7 +270,7 @@ impl Inspector {
                 context,
                 vec![
                     style(),
-                    Tab::new("text", n_("Text"), &[text_box]),
+                    Tab::new("text", n_("Text"), &[font, alignment, &spacing, text_box]),
                     arrange(),
                 ],
             );
@@ -322,6 +331,8 @@ impl Inspector {
             lists,
             effects,
             objects,
+            object_text,
+            object_styles,
             units: Cell::new(units),
             shown: RefCell::new(None),
             updating: Cell::new(false),
@@ -426,6 +437,13 @@ impl Inspector {
         &self.link_popover
     }
 
+    /// The button of the font family in the Text tab of a selected shape,
+    /// which the Fonts popover opens on while it shows.
+    pub fn object_font_button(&self) -> Option<&gtk::Button> {
+        let button = self.object_text.family_button();
+        button.is_mapped().then_some(button)
+    }
+
     /// Shows a tab, by its name: "style", "image", "arrange", "document"…
     pub fn show_tab(&self, name: &str) -> bool {
         self.levels.show_tab(name)
@@ -471,6 +489,8 @@ impl Inspector {
     pub fn show(&self, format: &Format) {
         *self.shown.borrow_mut() = Some(format.clone());
         self.objects.show_format(format);
+        self.object_text.show(format, format.object_text);
+        self.object_styles.show(format.object.as_ref());
         self.levels.show(Context::of(format.object.as_ref()));
         self.show_statistics();
         self.updating.set(true);

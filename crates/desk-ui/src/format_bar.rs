@@ -78,6 +78,10 @@ pub struct FormatBar {
     text_more: gtk::MenuButton,
     /// The hyperlink at the selection, in a popover from the Inspector.
     link: gtk::MenuButton,
+    /// The Style button of an object, and the previews of its popover
+    /// (MOD-04).
+    object_style: gtk::MenuButton,
+    object_styles: Rc<crate::object_styles_pane::StylePicker>,
     /// The tools of a picture, which only a picture shows.
     picture_tools: gtk::Box,
     stroke: gtk::DropDown,
@@ -125,6 +129,8 @@ impl FormatBar {
             secondary: text_parts.secondary,
             text_more: text_parts.more,
             link: text_parts.link,
+            object_style: object_parts.style,
+            object_styles: object_parts.styles,
             picture_tools: object_parts.picture_tools,
             stroke: object_parts.stroke,
             stroke_width: object_parts.stroke_width,
@@ -410,6 +416,9 @@ impl FormatBar {
         self.opacity.set_value(f64::from(style.opacity));
         self.picture_tools
             .set_visible(info.count == 1 && matches!(info.object.kind, ObjectKind::Image(_)));
+        self.object_style
+            .set_visible(!info.styles.styles.is_empty());
+        self.object_styles.show(&info.styles);
         self.updating.set(false);
         self.stack.set_visible_child_name("object");
     }
@@ -654,6 +663,8 @@ fn text_more_menu(character_menu: &gio::Menu, compact: bool) -> gio::Menu {
 
 /// The controls of the object variant that the bar changes.
 struct ObjectParts {
+    style: gtk::MenuButton,
+    styles: Rc<crate::object_styles_pane::StylePicker>,
     picture_tools: gtk::Box,
     stroke: gtk::DropDown,
     stroke_width: gtk::SpinButton,
@@ -661,11 +672,15 @@ struct ObjectParts {
     opacity: gtk::Scale,
 }
 
-/// The object variant: the line, shadow, reflection and opacity; Instant
+/// The object variant: the object style, the line, shadow, reflection and opacity; Instant
 /// Alpha, Mask and Adjust Image for a picture; inline or floating and the
 /// wrap; front, back and Arrange; and More.
 fn object_variant() -> (gtk::Box, ObjectParts) {
     let bar = gtk::Box::builder().spacing(6).build();
+
+    // The object styles of its kind (MOD-04).
+    let (style, styles) = crate::object_styles_pane::format_bar_button();
+    bar.append(&style);
 
     // The line: none, solid, dashed or dotted, its width and its color.
     let stroke =
@@ -801,6 +816,8 @@ fn object_variant() -> (gtk::Box, ObjectParts) {
     more.set_tooltip_text(Some(&tr("More Formatting")));
     bar.append(&more);
     let parts = ObjectParts {
+        style,
+        styles,
         picture_tools,
         stroke,
         stroke_width,

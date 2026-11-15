@@ -3347,3 +3347,96 @@ fn int_22_what_a_file_of_another_program_loses_is_listed() {
         .collect();
     assert!(text.iter().any(|t| t == "Cell"), "{text:?}");
 }
+
+#[test]
+fn mod_04_mod_07_object_styles_and_the_objects_that_took_them_are_kept() {
+    use desk_model::{Fill, Frame, GraphicStyle, Object, ObjectKind, ObjectStyleKind, Shape};
+    let mut document = Document::new_word_processing();
+    let blue = document
+        .object_styles()
+        .by_name(ObjectStyleKind::Shape, "Blue")
+        .unwrap()
+        .id;
+    let (follows, changed) = document
+        .transact("Styles", |edit| {
+            let mine = edit.add_object_style(
+                ObjectStyleKind::Shape,
+                "Mine",
+                GraphicStyle {
+                    fill: Some(Fill::Color(Rgba::rgb(1, 2, 3))),
+                    opacity: 70,
+                    ..GraphicStyle::default()
+                },
+            )?;
+            edit.set_default_object_style(mine)?;
+            edit.rename_object_style(blue, "Sky")?;
+            let mut ids = Vec::new();
+            for x in [0.0, 120.0] {
+                let id = edit.new_id();
+                let object = Object::new(
+                    id,
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(x, 0.0, 100.0, 100.0),
+                );
+                edit.add_object(object)?;
+                ids.push(id);
+            }
+            edit.apply_object_style(&ids, blue)?;
+            // The second no longer looks as its style: no shadow.
+            let mut changed = edit.document().objects().get(ids[1]).unwrap().clone();
+            changed.style.shadow = None;
+            edit.replace_object(changed)?;
+            Ok((ids[0], ids[1]))
+        })
+        .unwrap()
+        .0;
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-object-styles.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let styles = read.object_styles();
+    assert_eq!(
+        styles.iter().count(),
+        document.object_styles().iter().count()
+    );
+    for style in document.object_styles().iter() {
+        let again = styles.by_name(style.kind, &style.name).unwrap();
+        assert_eq!(again.graphic, style.graphic, "{}", style.name);
+    }
+    assert_eq!(
+        styles
+            .default_for(ObjectStyleKind::Shape)
+            .unwrap()
+            .name
+            .as_ref(),
+        "Mine"
+    );
+    let objects: Vec<&Object> = read.objects().iter().collect();
+    assert_eq!(objects.len(), 2);
+    let (style, same) = read.object_style_of(objects[0]).unwrap();
+    assert_eq!(style.name.as_ref(), "Sky");
+    assert!(same);
+    assert_eq!(
+        objects[0].style,
+        document.objects().get(follows).unwrap().style
+    );
+    // The changed one keeps its style and its own look, without the
+    // shadow of the style showing through.
+    let (style, same) = read.object_style_of(objects[1]).unwrap();
+    assert_eq!(style.name.as_ref(), "Sky");
+    assert!(!same);
+    assert_eq!(objects[1].style.shadow, None);
+    assert_eq!(
+        objects[1].style,
+        document.objects().get(changed).unwrap().style
+    );
+}
+
+#[test]
+fn mod_04_the_styles_of_the_library_come_back_as_they_were() {
+    let read = read_odt(&write_odt(&sample()).unwrap()).unwrap();
+    let new = Document::new_word_processing();
+    assert_eq!(read.object_styles(), new.object_styles());
+    // A file of another program, without object styles, gets them too.
+    let foreign = import(&foreign()).unwrap();
+    assert_eq!(foreign.object_styles().iter().count(), 24);
+}

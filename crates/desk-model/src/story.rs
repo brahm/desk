@@ -129,6 +129,72 @@ impl Document {
 }
 
 impl Edit {
+    /// Changes the whole text of a story with the tools of the body,
+    /// given the start and the end of the text, as the Text tab of the
+    /// Inspector formats all the text of a selected shape or text box.
+    /// A shape with no text yet keeps an empty paragraph, centered as its
+    /// first text is, with the paragraph formatting, which the first
+    /// text typed in it takes; an empty paragraph has no characters for
+    /// character formatting.
+    pub fn format_whole_story(
+        &mut self,
+        story: Story,
+        change: impl FnOnce(&mut Edit, crate::Position, crate::Position) -> Result<(), ModelError>,
+    ) -> Result<(), ModelError> {
+        let mut paragraphs = self.document().story_paragraphs(story);
+        let first_text = paragraphs.is_empty();
+        if first_text {
+            let Story::TextBox(id) = story else {
+                return Ok(());
+            };
+            if !self
+                .document()
+                .objects()
+                .get(id)
+                .is_some_and(Object::holds_text)
+            {
+                return Err(ModelError::UnknownObject(id));
+            }
+            let style = self.document().styles().default_paragraph();
+            let attrs = crate::ParaAttrs {
+                alignment: Some(crate::Alignment::Center),
+                ..crate::ParaAttrs::default()
+            };
+            let id = self.new_id();
+            paragraphs.push(Paragraph::from_runs(id, style, attrs, [])?);
+        }
+        let mut copy = self.document().with_body(paragraphs);
+        copy.transact("Format", |edit| {
+            let body = edit.document().body();
+            let last = body.len().saturating_sub(1);
+            let (Some(first), Some(end)) = (body.get(0), body.get(last)) else {
+                return Ok(());
+            };
+            let from = crate::Position::new(first.id(), 0);
+            let to = crate::Position::new(end.id(), end.len());
+            change(edit, from, to)
+        })?;
+        self.adopt_document_settings(&copy)?;
+        let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+        match story {
+            Story::TextBox(id) if first_text => {
+                let id = self.document().text_box_head(id);
+                let mut object = self
+                    .document()
+                    .objects()
+                    .get(id)
+                    .cloned()
+                    .ok_or(ModelError::UnknownObject(id))?;
+                match object.text.as_mut() {
+                    Some(text) => text.paragraphs = paragraphs.into(),
+                    None => object.text = Some(TextBox::in_shape(paragraphs.into())),
+                }
+                self.replace_object(object)
+            }
+            _ => self.set_story(story, paragraphs),
+        }
+    }
+
     /// Sets the paragraphs of a story. A note keeps its mark of its own,
     /// and a header or footer whose paragraphs are all empty becomes
     /// empty.
@@ -226,6 +292,74 @@ mod tests {
     use crate::find::Query;
     use crate::header::{MarginKind, MarginPages};
     use crate::text::Position;
+
+    #[test]
+    fn obj_13_the_text_tab_formats_all_the_text_of_a_shape() {
+        use crate::{Alignment, CharAttrs, Frame, ParaAttrs, Run, Shape};
+        let mut document = Document::new_word_processing();
+        let (with_text, empty) = document
+            .transact("Shapes", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let paragraphs: Vec<Paragraph> = ["One", "Two"]
+                    .iter()
+                    .map(|t| {
+                        Paragraph::from_runs(
+                            edit.new_id(),
+                            style,
+                            ParaAttrs::default(),
+                            [Run::new(t)],
+                        )
+                    })
+                    .collect::<Result<_, _>>()?;
+                let a = edit.new_id();
+                let mut shape = Object::new(
+                    a,
+                    Shape::Rectangle.into(),
+                    Frame::from_pt(0.0, 0.0, 9.0, 9.0),
+                );
+                shape.text = Some(TextBox::in_shape(paragraphs.into()));
+                edit.add_object(shape)?;
+                let b = edit.new_id();
+                edit.add_object(Object::new(
+                    b,
+                    Shape::Ellipse.into(),
+                    Frame::from_pt(0.0, 0.0, 9.0, 9.0),
+                ))?;
+                Ok((a, b))
+            })
+            .unwrap()
+            .0;
+        let red = CharAttrs {
+            color: Some(crate::Rgba::rgb(255, 0, 0)),
+            ..CharAttrs::default()
+        };
+        let right = ParaAttrs {
+            alignment: Some(Alignment::Right),
+            ..ParaAttrs::default()
+        };
+        for id in [with_text, empty] {
+            document
+                .transact("Format", |edit| {
+                    edit.format_whole_story(Story::TextBox(id), |edit, from, to| {
+                        edit.set_character_attrs(from, to, &red)?;
+                        edit.set_paragraph_attrs(from, to, &right)
+                    })
+                })
+                .unwrap();
+        }
+        let paragraphs = document.story_paragraphs(Story::TextBox(with_text));
+        assert_eq!(paragraphs.len(), 2);
+        for paragraph in &paragraphs {
+            assert_eq!(paragraph.attrs().alignment, Some(Alignment::Right));
+            assert!(paragraph.runs().all(|r| r.attrs.color == red.color));
+        }
+        // The shape with no text keeps how its first paragraph is set;
+        // an empty paragraph has no characters to color.
+        let paragraphs = document.story_paragraphs(Story::TextBox(empty));
+        assert_eq!(paragraphs.len(), 1);
+        assert!(paragraphs[0].is_empty());
+        assert_eq!(paragraphs[0].attrs().alignment, Some(Alignment::Right));
+    }
 
     #[test]
     fn txt_12_searches_go_through_the_headers_too() {

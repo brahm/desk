@@ -43,6 +43,10 @@ pub struct Object {
     pub flip_vertical: bool,
     /// How it is filled and outlined.
     pub style: GraphicStyle,
+    /// The object style it took, which redefining the style changes it
+    /// with while it still looks as the style did (MOD-04); none when it
+    /// took none.
+    pub object_style: Option<crate::StyleId>,
     /// How the text of the body goes around it (OBJ-17).
     pub wrap: Wrap,
     /// The room left between the object and the text around it.
@@ -214,6 +218,7 @@ impl Object {
             flip_horizontal: false,
             flip_vertical: false,
             style: GraphicStyle::default(),
+            object_style: None,
             wrap: Wrap::Both,
             wrap_margin: Length::from_points(12),
             wrap_threshold: Self::WRAP_THRESHOLD,

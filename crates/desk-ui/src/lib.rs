@@ -43,6 +43,8 @@ mod media_browser;
 mod media_pane;
 mod nav_sidebar;
 mod notes_pane;
+mod object_styles_pane;
+mod object_text_pane;
 mod objects_pane;
 mod outline_view;
 mod picture_pane;

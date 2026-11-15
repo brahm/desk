@@ -1317,6 +1317,31 @@ impl Edit {
             .collect()
     }
 
+    /// The object style of this document that a copied object took
+    /// there: the one of its kind and name, or the style brought in
+    /// (MOD-04).
+    fn adopt_object_style(
+        &mut self,
+        from: &Document,
+        object: &crate::Object,
+    ) -> Result<Option<StyleId>, ModelError> {
+        let Some(style) = object
+            .object_style
+            .and_then(|id| from.object_styles().get(id))
+        else {
+            return Ok(None);
+        };
+        if let Some(own) = self
+            .document()
+            .object_styles()
+            .by_name(style.kind, &style.name)
+        {
+            return Ok(Some(own.id));
+        }
+        self.add_object_style(style.kind, &style.name, style.graphic.clone())
+            .map(Some)
+    }
+
     fn adopt_styles_of(
         &mut self,
         from: &Document,
@@ -1324,6 +1349,7 @@ impl Edit {
         styles: &mut HashMap<StyleId, StyleId>,
     ) -> Result<crate::Object, ModelError> {
         let mut object = object.clone();
+        object.object_style = self.adopt_object_style(from, &object)?;
         if let crate::ObjectKind::Group(members) = &object.kind {
             let members = members
                 .iter()
