@@ -370,6 +370,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.check-spelling", &["<Control>semicolon"]),
             ("win.spelling", &["<Control>colon"]),
             ("win.shortcuts", &["<Control>question"]),
+            ("win.command-search", &["<Control>slash"]),
         ] {
             app.set_accels_for_action(action, keys);
         }
@@ -529,7 +530,19 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
         let open = gio::ActionEntry::builder("open")
             .activate(move |app: &adw::Application, _, _| show_open_dialog(app, info, opener))
             .build();
-        app.add_action_entries([open]);
+        // Open Recent in the main menu names a document by its URI.
+        let open_recent = gio::ActionEntry::builder("open-recent")
+            .parameter_type(Some(gtk::glib::VariantTy::STRING))
+            .activate(move |app: &adw::Application, _, uri| {
+                if let Some(path) = uri
+                    .and_then(|u| u.get::<String>())
+                    .and_then(|u| gio::File::for_uri(&u).path())
+                {
+                    open_in_window(app, info, opener, &path);
+                }
+            })
+            .build();
+        app.add_action_entries([open, open_recent]);
     }
 }
 

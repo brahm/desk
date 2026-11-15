@@ -492,6 +492,8 @@ def main():
     mask_and_frame(work)
     mask_from_the_menu(work)
     gnome_window(work)
+    header_and_menus(work)
+    small_screen(work)
     print("All UI tests passed.")
 
 
@@ -1412,8 +1414,8 @@ def reduced_movie(work):
 
 
 def media_browser(work):
-    """The Media Browser shows the photographs of the Pictures folder, and
-    one activated there goes on the page (INT-14)."""
+    """The Media Browser, in the popover of Media, shows the photographs of
+    the Pictures folder, and one activated there goes on the page (INT-14)."""
     pictures = work / "Pictures"
     pictures.mkdir(exist_ok=True)
     photo = pictures / "browsed.jpg"
@@ -1437,8 +1439,9 @@ def media_browser(work):
         box = Atspi.Component.get_extents(cell, Atspi.CoordType.WINDOW)
         # A double click activates it, as in the browser of Pages.
         click(int(window["X"]) + box.x + box.width / 2, int(window["Y"]) + box.y + box.height / 2, 2)
-        # The Inspector takes the place of the browser at the side.
-        activate("inspector")
+        wait_for("the popover of Media to close", lambda: showing_named(app, "Choose File…") is None)
+        check("the popover of Media closes as the photograph goes on the page (INT-14)", True)
+        # The Inspector stays at the side, and shows the photograph.
         wait_for("the Image group of the Inspector", lambda: inspector_node(app, "Take Out a Color"))
         check("an activated photograph goes on the page (INT-14)", True)
     finally:
@@ -2288,6 +2291,181 @@ def gnome_window(work):
     finally:
         writer.terminate()
         writer.wait(timeout=10)
+
+
+# The buttons of the header bar of interface B, by their names, and the
+# ones a window narrower than 720 px puts in the Insert menu (INT-11).
+HEADER = ("Sidebar", "Insert", "Find", "Inspector", "Main Menu")
+OBJECTS = ("Table", "Chart", "Text Box", "Shape", "Media", "Comment")
+
+
+def header_and_menus(work):
+    """The header bar of interface B: the Sidebar button, Insert and the
+    six objects at the start, Find, the Inspector and the main menu at the
+    end (INT-11); the popover of Media with the Media Browser (INT-14);
+    Search Commands, which finds every command by name (GNM-10); and no
+    warning on a screen of 1280 × 720 or more (GNM-14)."""
+    name = "Header.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        wait_for("the Sidebar button", lambda: showing_named(app, "Sidebar"))
+        missing = [b for b in HEADER + OBJECTS if showing_named(app, b) is None]
+        check(
+            "the header bar has Sidebar, Insert, the six objects, Find, the Inspector and the menu (INT-11)",
+            not missing,
+        )
+        sidebar = showing_named(app, "Sidebar")
+        objects = [extents(showing_named(app, b)).x for b in ("Insert",) + OBJECTS]
+        check(
+            "the objects follow Insert at the start of the header bar (INT-11)",
+            extents(sidebar).x < objects[0] and objects == sorted(objects),
+        )
+        check(
+            "a screen of 1280 × 720 or more has no warning (GNM-14)",
+            warning_of_small_screen(app) is None,
+        )
+
+        # Find shows the find bar, and is down while it shows.
+        Atspi.Action.do_action(showing_named(app, "Find"), 0)
+        wait_for("the find bar", lambda: showing_named(app, "Show Replace"))
+        check("Find in the header bar shows the find bar (INT-11)", True)
+        press("Escape")
+        wait_for("the find bar to hide", lambda: showing_named(app, "Show Replace") is None)
+
+        # The button inside the menu button of Media has the action.
+        media = next(
+            n
+            for n in walk(app)
+            if n.get_name() == "Media" and n.get_role() == Atspi.Role.TOGGLE_BUTTON and showing(n)
+        )
+        Atspi.Action.do_action(media, 0)
+        wait_for("the popover of Media", lambda: showing_named(app, "Choose File…"))
+        check(
+            "Media opens a popover with the Media Browser and Choose File (INT-14)",
+            showing_named(app, "Media Browser") is not None,
+        )
+        press("Escape")
+        wait_for("the popover to close", lambda: showing_named(app, "Choose File…") is None)
+
+        # Ctrl+/ searches the commands; Enter runs the first found.
+        press("ctrl+slash")
+        wait_for("the command search", lambda: showing_named(app, "Search Commands"))
+        type_text("save as")
+        wait_for("Save As in the search", lambda: showing_named(app, "Save As…"))
+        check("Search Commands finds the commands of the main menu (GNM-10)", True)
+        press("ctrl+a")
+        type_text("page break")
+        wait_for("Page Break in the search", lambda: showing_named(app, "Page Break"))
+        check(
+            "Search Commands finds what is in submenus, and says where (GNM-10)",
+            showing_named(app, "Save As…") is None,
+        )
+        press("Return")
+        wait_for("the command search to close", lambda: showing_named(app, "Search Commands") is None)
+        wait_for(
+            "the page break",
+            lambda: next((n for n in walk(app) if (n.get_name() or "").endswith("2 pages")), None),
+        )
+        check("a command found runs with Enter (GNM-10)", True)
+
+        subprocess.run(
+            ["xdotool", "search", "--name", name, "windowsize", "700", "600"],
+            check=True,
+        )
+        wait_for("the objects to leave the header bar", lambda: showing_named(app, "Table") is None)
+        time.sleep(1)
+        missing = [b for b in HEADER if showing_named(app, b) is None]
+        check(
+            "below 720 px the header bar keeps Insert and leaves out the objects (INT-11)",
+            not missing,
+        )
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+# The warning of a screen smaller than Desk asks for (GNM-14).
+SMALL_SCREEN = "The screen is smaller than 1280 × 720, so parts of the window might not fit"
+
+
+def warning_of_small_screen(app):
+    """The title of the warning of a small screen, if it shows: a banner
+    that is not revealed still says it shows, with no height."""
+    title = showing_named(app, SMALL_SCREEN)
+    try:
+        return title if title is not None and extents(title).height > 0 else None
+    except GLib.GError:
+        return None
+
+
+def small_screen(work):
+    """On a screen of 1024 × 600 the first window says that the screen is
+    smaller than Desk asks for, Close takes the warning away, and a new
+    window does not show it again (GNM-14)."""
+    display = ":97"
+    screen = subprocess.Popen(
+        ["Xvfb", display, "-screen", "0", "1024x600x24"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    name = "Small.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    env = dict(os.environ, DISPLAY=display)
+    time.sleep(1)
+    writer = subprocess.Popen([str(WRITER), str(letter)], env=env)
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        title = wait_for("the warning of a small screen", lambda: warning_of_small_screen(app))
+        check("a screen of 1024 × 600 shows the warning over the first window (GNM-14)", True)
+        # Close of the banner is on the line of its title; the window has
+        # a Close of its own in the header bar.
+        line = extents(title)
+        close = next(
+            (
+                n
+                for n in walk(app)
+                if n.get_role() == Atspi.Role.PUSH_BUTTON
+                and n.get_name() == "Close"
+                and showing(n)
+                and extents(n).y <= line.y + line.height / 2 <= extents(n).y + extents(n).height
+            ),
+            None,
+        )
+        check("the warning has a Close button (GNM-14)", close is not None)
+        Atspi.Action.do_action(close, 0)
+        wait_for("the warning to go", lambda: warning_of_small_screen(app) is None)
+        check("Close takes the warning away (GNM-14)", True)
+        # New Window opens a second window of the same app.
+        made = subprocess.run(
+            [
+                "gdbus", "call", "--session", "--dest", "br.com.brahm.Desk.Writer",
+                "--object-path", "/br/com/brahm/Desk/Writer",
+                "--method", "org.gtk.Actions.Activate", "new-window", "[]", "{}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        check("New Window opens a second window", made.returncode == 0)
+        wait_for("the second window", lambda: app.get_child_count() >= 2)
+        time.sleep(1)
+        check(
+            "the warning does not come back in a new window (GNM-14)",
+            warning_of_small_screen(app) is None,
+        )
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+        screen.terminate()
+        screen.wait(timeout=10)
 
 
 if __name__ == "__main__":

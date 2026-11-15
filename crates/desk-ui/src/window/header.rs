@@ -1,0 +1,398 @@
+// SPDX-FileCopyrightText: 2026 Desk contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! The header bar of interface B (INT-11, INT-14, GNM-10): at the start,
+//! the Sidebar button with the View menu, the Insert menu and the buttons
+//! of the objects; at the end, Find, the Inspector and the main menu.
+
+use adw::prelude::*;
+use gtk::gio;
+
+use crate::AppInfo;
+use crate::formatting;
+use crate::i18n::tr;
+
+/// The parts of the header bar that the window changes later.
+pub(super) struct Header {
+    pub header: adw::HeaderBar,
+    pub title: adw::WindowTitle,
+    /// What shows only with a document: the start and the end buttons.
+    pub document_buttons: [gtk::Widget; 2],
+    /// Insert, whose menu takes the objects in a narrow window.
+    pub insert_button: gtk::MenuButton,
+    /// The buttons of the objects, which a narrow window leaves out.
+    pub objects: gtk::Box,
+    /// Media, whose popover holds the Media Browser (INT-14).
+    pub media_button: gtk::MenuButton,
+    /// Find, in step with the find bar.
+    pub find_toggle: gtk::ToggleButton,
+}
+
+impl Header {
+    pub fn new(info: AppInfo, opens: bool) -> Self {
+        let title = adw::WindowTitle::new(info.name, "");
+        let header = adw::HeaderBar::builder().title_widget(&title).build();
+
+        // The Sidebar button shows the navigation sidebar (F9), and its
+        // arrow opens the View menu.
+        let sidebar_button = adw::SplitButton::builder()
+            .icon_name("sidebar-show-symbolic")
+            .action_name("win.thumbnails")
+            .menu_model(&view_menu())
+            .tooltip_text(tr("Sidebar"))
+            .dropdown_tooltip(tr("View"))
+            .build();
+        formatting::labelled(sidebar_button.upcast_ref::<gtk::Widget>(), &tr("Sidebar"));
+        let insert_label = adw::ButtonContent::builder()
+            .icon_name("desk-insert-symbolic")
+            .label(tr("_Insert"))
+            .use_underline(true)
+            .build();
+        let insert_button = gtk::MenuButton::builder()
+            .child(&insert_label)
+            .menu_model(&insert_menu(false))
+            .tooltip_text(tr("Insert"))
+            .build();
+        let objects = gtk::Box::builder().spacing(6).build();
+        let media_button = gtk::MenuButton::builder()
+            .icon_name("desk-media-symbolic")
+            .tooltip_text(tr("Media"))
+            .build();
+        formatting::labelled(&media_button, &tr("Media"));
+        for (icon, label, action) in [
+            ("desk-table-symbolic", tr("Table"), "win.insert-table"),
+            ("desk-chart-symbolic", tr("Chart"), "win.insert-chart"),
+            (
+                "desk-textbox-symbolic",
+                tr("Text Box"),
+                "win.insert-text-box",
+            ),
+        ] {
+            objects.append(&object_button(icon, &label, action));
+        }
+        let shape_button = gtk::MenuButton::builder()
+            .icon_name("desk-shape-symbolic")
+            .menu_model(&shape_menu())
+            .tooltip_text(tr("Shape"))
+            .build();
+        formatting::labelled(&shape_button, &tr("Shape"));
+        objects.append(&shape_button);
+        objects.append(&media_button);
+        objects.append(&object_button(
+            "desk-comment-symbolic",
+            &tr("Comment"),
+            "win.insert-comment",
+        ));
+        let start = gtk::Box::builder().spacing(6).visible(false).build();
+        start.append(&sidebar_button);
+        start.append(&insert_button);
+        start.append(&objects);
+        header.pack_start(&start);
+
+        let menu_button = gtk::MenuButton::builder()
+            .icon_name("open-menu-symbolic")
+            .menu_model(&main_menu(info, opens))
+            .primary(true)
+            .tooltip_text(tr("Main Menu"))
+            .build();
+        formatting::labelled(&menu_button, &tr("Main Menu"));
+        header.pack_end(&menu_button);
+        let inspector_toggle = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-right-symbolic")
+            .action_name("win.inspector")
+            .tooltip_text(tr("Inspector"))
+            .build();
+        formatting::labelled(&inspector_toggle, &tr("Inspector"));
+        let find_toggle = gtk::ToggleButton::builder()
+            .icon_name("edit-find-symbolic")
+            .tooltip_text(tr("Find"))
+            .build();
+        formatting::labelled(&find_toggle, &tr("Find"));
+        let end = gtk::Box::builder().spacing(6).visible(false).build();
+        end.append(&find_toggle);
+        end.append(&inspector_toggle);
+        header.pack_end(&end);
+
+        Self {
+            header,
+            title,
+            document_buttons: [start.upcast(), end.upcast()],
+            insert_button,
+            objects,
+            media_button,
+            find_toggle,
+        }
+    }
+}
+
+/// A button that inserts an object.
+fn object_button(icon: &str, label: &str, action: &str) -> gtk::Button {
+    let button = gtk::Button::builder()
+        .icon_name(icon)
+        .action_name(action)
+        .tooltip_text(label)
+        .build();
+    formatting::labelled(&button, label);
+    button
+}
+
+/// The main menu: what belongs to the file and to the app (GNM-10). What
+/// the menu bar of iWork had and is not here, the command search finds.
+pub(super) fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
+    let menu = gio::Menu::new();
+    let file = gio::Menu::new();
+    if opens {
+        file.append(Some(&tr("_New Document")), Some("app.new-document"));
+        file.append(Some(&tr("_Open…")), Some("app.open"));
+        file.append_submenu(Some(&tr("Open _Recent")), &recent_menu());
+    } else {
+        file.append(Some(&tr("_New Window")), Some("app.new-window"));
+    }
+    menu.append_section(None, &file);
+    if opens {
+        let save = gio::Menu::new();
+        save.append(Some(&tr("_Save")), Some("win.save"));
+        save.append(Some(&tr("Save _As…")), Some("win.save-as"));
+        menu.append_section(None, &save);
+    }
+    let commands = gio::Menu::new();
+    commands.append(Some(&tr("Search _Commands…")), Some("win.command-search"));
+    menu.append_section(None, &commands);
+    let help = gio::Menu::new();
+    help.append(Some(&tr("_Preferences")), Some("app.preferences"));
+    help.append(Some(&tr("_Keyboard Shortcuts")), Some("win.shortcuts"));
+    help.append(
+        Some(&tr("_About {app}").replace("{app}", info.name)),
+        Some("app.about"),
+    );
+    menu.append_section(None, &help);
+    menu
+}
+
+/// The commands that left the main menu, which the command search still
+/// finds by name: they have shortcuts, or belonged to the File menu of
+/// iWork.
+pub(super) fn more_commands(opens: bool) -> gio::Menu {
+    let menu = gio::Menu::new();
+    if opens {
+        menu.append(Some(&tr("_New Window")), Some("app.new-window"));
+        menu.append(Some(&tr("Save a _Copy…")), Some("win.save-copy"));
+        menu.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
+        menu.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
+        menu.append(Some(&tr("Document _Info")), Some("win.properties"));
+        menu.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
+        menu.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
+    }
+    menu.append(Some(&tr("C_lose")), Some("win.close"));
+    menu.append(Some(&tr("Close _All Windows")), Some("app.close-all"));
+    menu
+}
+
+/// The documents opened last, newest first, for Open Recent. The menu is
+/// made again each time the main menu opens.
+pub(super) fn recent_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    fill_recent(&menu);
+    menu
+}
+
+/// The number of documents that Open Recent lists.
+const RECENT: usize = 10;
+
+/// Puts the recent documents of Desk in `menu`.
+pub(super) fn fill_recent(menu: &gio::Menu) {
+    menu.remove_all();
+    let mut items: Vec<_> = gtk::RecentManager::default()
+        .items()
+        .into_iter()
+        .filter(|item| {
+            item.exists()
+                && item
+                    .mime_type()
+                    .as_str()
+                    .starts_with("application/vnd.oasis.opendocument.text")
+                    | item.uri().ends_with(".pages")
+        })
+        .collect();
+    items.sort_by_key(|item| std::cmp::Reverse(item.modified().to_unix()));
+    for item in items.into_iter().take(RECENT) {
+        let entry = gio::MenuItem::new(Some(&item.display_name()), None);
+        entry.set_action_and_target_value(
+            Some("app.open-recent"),
+            Some(&item.uri().as_str().to_variant()),
+        );
+        menu.append_item(&entry);
+    }
+}
+
+/// The View menu, under the arrow of the Sidebar button (GNM-10): the
+/// pages of the sidebar, what the window shows, and the zoom.
+pub(super) fn view_menu() -> gio::Menu {
+    let panes = gio::Menu::new();
+    panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
+    panes.append(Some(&tr("_Styles Drawer")), Some("win.styles-drawer"));
+    panes.append(Some(&tr("Se_arch Sidebar")), Some("win.search"));
+    panes.append(Some(&tr("Spe_lling and Grammar")), Some("win.spelling"));
+    let document = gio::Menu::new();
+    document.append(Some(&tr("_Ruler")), Some("win.ruler"));
+    document.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
+    document.append(Some(&tr("_Layout")), Some("win.show-layout"));
+    document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
+    let window = gio::Menu::new();
+    window.append(Some(&tr("As _Outline")), Some("win.outline"));
+    window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
+    window.append_submenu(Some(&tr("_Zoom")), &super::zoom_menu());
+    let menu = gio::Menu::new();
+    menu.append_section(Some(&tr("Sidebar")), &panes);
+    menu.append_section(None, &document);
+    menu.append_section(None, &window);
+    menu
+}
+
+/// The Insert menu (GNM-10): what the Insert menu of Pages had besides the
+/// objects, which have buttons of their own: breaks, fields, notes,
+/// tables of contents, links and bookmarks (EST-04, EST-08, EST-09,
+/// EST-13, EST-15, EST-16, EST-22, EST-25, EST-26, EST-27); with `objects`, the objects
+/// too, as a window narrower than 720 px shows them.
+pub(super) fn insert_menu(objects: bool) -> gio::Menu {
+    let menu = gio::Menu::new();
+    if objects {
+        let items = gio::Menu::new();
+        items.append(Some(&tr("_Table")), Some("win.insert-table"));
+        items.append(Some(&tr("C_hart")), Some("win.insert-chart"));
+        items.append(Some(&tr("Te_xt Box")), Some("win.insert-text-box"));
+        items.append_submenu(Some(&tr("S_hape")), &shape_menu());
+        items.append(
+            Some(&tr("_Image, Movie or Sound…")),
+            Some("win.insert-picture"),
+        );
+        items.append(Some(&tr("Co_mment")), Some("win.insert-comment"));
+        menu.append_section(None, &items);
+    }
+    let breaks = gio::Menu::new();
+    breaks.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
+    breaks.append(Some(&tr("_Column Break")), Some("win.insert-column-break"));
+    breaks.append(Some(&tr("_Layout Break")), Some("win.insert-layout-break"));
+    breaks.append(
+        Some(&tr("_Section Break")),
+        Some("win.insert-section-break"),
+    );
+    let fields = gio::Menu::new();
+    fields.append(
+        Some(&tr("_Auto Page Numbers…")),
+        Some("win.insert-auto-page-numbers"),
+    );
+    fields.append(Some(&tr("Page _Number")), Some("win.insert-page-number"));
+    fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
+    fields.append(Some(&tr("_Date")), Some("win.insert-date"));
+    fields.append(Some(&tr("_File Name")), Some("win.insert-file-name"));
+    let inserts = gio::Menu::new();
+    inserts.append_submenu(Some(&tr("_Break")), &breaks);
+    inserts.append_submenu(Some(&tr("_Field")), &fields);
+    menu.append_section(None, &inserts);
+    let notes = gio::Menu::new();
+    notes.append(Some(&tr("Foot_note")), Some("win.insert-note"));
+    notes.append(Some(&tr("Ne_xt Note")), Some("win.next-note"));
+    notes.append(Some(&tr("Pre_vious Note")), Some("win.previous-note"));
+    menu.append_section(None, &notes);
+    let structure = gio::Menu::new();
+    structure.append(Some(&tr("_Table of Contents")), Some("win.insert-toc"));
+    structure.append(
+        Some(&tr("Update Table of C_ontents")),
+        Some("win.update-toc"),
+    );
+    structure.append(Some(&tr("_Bookmark")), Some("win.insert-bookmark"));
+    structure.append(Some(&tr("_Hyperlink")), Some("win.insert-link"));
+    menu.append_section(None, &structure);
+    let other = gio::Menu::new();
+    other.append(
+        Some(&tr("Special _Characters…")),
+        Some("win.special-characters"),
+    );
+    other.append(
+        Some(&tr("Add _Linked Text Box")),
+        Some("win.add-linked-text-box"),
+    );
+    other.append(Some(&tr("C_hoose…")), Some("win.insert-picture"));
+    menu.append_section(None, &other);
+    menu
+}
+
+/// The menu of the Shape button: the shapes, the pen and the connection
+/// line (OBJ-08).
+pub(super) fn shape_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    let shapes = gio::Menu::new();
+    for (label, value) in super::objects::shape_names()
+        .into_iter()
+        .chain([(tr("_Line"), "line")])
+    {
+        shapes.append(Some(&label), Some(&format!("win.insert-shape('{value}')")));
+    }
+    menu.append_section(None, &shapes);
+    let drawn = gio::Menu::new();
+    drawn.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
+    drawn.append(Some(&tr("Connection L_ine")), Some("win.insert-connection"));
+    menu.append_section(None, &drawn);
+    menu
+}
+
+/// The popover of the Media button: the Media Browser, and Choose File
+/// for what is elsewhere (INT-14). The browser goes in when the popover
+/// first opens.
+pub(super) fn media_popover() -> (gtk::Popover, gtk::Box) {
+    let holder = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .width_request(360)
+        .height_request(420)
+        .build();
+    let choose = gtk::Button::builder()
+        .label(tr("Choose _File…"))
+        .use_underline(true)
+        .action_name("win.insert-picture")
+        .margin_start(12)
+        .margin_end(12)
+        .margin_bottom(12)
+        .build();
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .build();
+    content.append(&holder);
+    content.append(&choose);
+    let popover = gtk::Popover::builder().child(&content).build();
+    // Choosing a file closes the popover, as the file dialog takes over.
+    let weak = popover.downgrade();
+    choose.connect_clicked(move |_| {
+        if let Some(popover) = weak.upgrade() {
+            popover.popdown();
+        }
+    });
+    (popover, holder)
+}
+
+/// Whether a monitor of this size, in logical pixels, is smaller than the
+/// 1280 × 720 that Desk asks for (GNM-14).
+pub(super) fn is_small_screen(width: i32, height: i32) -> bool {
+    width < MIN_SCREEN.0 || height < MIN_SCREEN.1
+}
+
+/// The smallest screen Desk supports, in logical pixels.
+const MIN_SCREEN: (i32, i32) = (1280, 720);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gnm_14_a_screen_below_720p_is_small() {
+        assert!(!is_small_screen(1280, 720));
+        assert!(!is_small_screen(2560, 1440));
+        assert!(is_small_screen(1024, 600));
+        assert!(is_small_screen(1279, 800));
+        // A tablet standing up.
+        assert!(is_small_screen(800, 1280));
+        // 1920 × 1080 at 200 %.
+        assert!(is_small_screen(960, 540));
+    }
+}
