@@ -1331,6 +1331,14 @@ def inspector_node(app, name, accept=None):
     return None
 
 
+def tab_shown(app, tab, name):
+    """Opens a tab of the Inspector by its name, as Show in Inspector
+    does, and returns the showing node named `name` in it (INT-13)."""
+    activate("inspector-tab", tab)
+    time.sleep(0.3)
+    return showing_named(app, name)
+
+
 def link_node(app, name):
     """The showing node of a name in the Link popover of the format bar,
     which the Link button opens (INT-13)."""
@@ -1393,7 +1401,7 @@ def chosen_movie(work):
     writer, app, letter = opened_without_portals(work, "Movie.odt")
     try:
         choose_file(app, movie)
-        wait_for("the Movie and Sound group of the Inspector", lambda: inspector_node(app, "Poster Frame"))
+        wait_for("the Media tab of the Inspector", lambda: tab_shown(app, "media", "Poster Frame"))
         check("the chosen movie is on the page and selected (OBJ-18)", True)
         press("ctrl+s")
         wait_for(
@@ -1407,9 +1415,16 @@ def chosen_movie(work):
             "its first frame is saved as its poster (OBJ-19)",
             saved_content(letter, r'</draw:plugin><draw:image xlink:href="Pictures/object\d+\.png"'),
         )
-        play = wait_for("the Play button of the Inspector", lambda: inspector_node(app, "Play"))
+        play = wait_for("the Play button of the Inspector", lambda: tab_shown(app, "media", "Play"))
         play.do_action(0)
-        wait_for("the window that plays the movie", lambda: showing_named(app, "Movie"))
+        # The Inspector is titled Movie too; the window is a frame.
+        wait_for(
+            "the window that plays the movie",
+            lambda: next(
+                (n for n in toggles_named(app, ("Movie",), Atspi.Role.FRAME)),
+                None,
+            ),
+        )
         check("the Inspector plays the movie (OBJ-19)", True)
     finally:
         writer.terminate()
@@ -1424,7 +1439,7 @@ def reduced_movie(work):
     writer, app, letter = opened_without_portals(work, "Reduced.odt")
     try:
         choose_file(app, movie)
-        row = wait_for("the Stop row of the Inspector", lambda: inspector_node(app, "Stop"))
+        row = wait_for("the Stop row of the Inspector", lambda: tab_shown(app, "media", "Stop"))
         spin = next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
         Atspi.Value.set_current_value(spin, 0.5)
         time.sleep(1)
