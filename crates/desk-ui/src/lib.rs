@@ -358,7 +358,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
                 &["<Control><Shift>v", "<Control><Shift><Alt>v"],
             ),
             ("win.inspector", &["<Control><Alt>i"]),
-            ("win.thumbnails", &["F9"]),
+            ("win.sidebar", &["F9"]),
             ("win.fonts", &["<Control>t"]),
             ("win.find", &["<Control>f"]),
             ("win.find-replace", &["<Control>h"]),

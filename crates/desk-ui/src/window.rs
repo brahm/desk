@@ -49,6 +49,18 @@ const REVEAL_EDGE: f64 = 4.0;
 
 /// The width of the Inspector, in pixels, as in the mockups of interface B.
 const INSPECTOR_WIDTH: f64 = 332.0;
+/// The width of the sidebar while it shows the styles, as the Styles
+/// drawer had (INT-18).
+const STYLES_WIDTH: f64 = 220.0;
+/// The width of the sidebar while it shows the search results (TXT-13).
+const SEARCH_WIDTH: f64 = 260.0;
+/// The pages of the navigation sidebar, and the actions that show them.
+const NAV_PAGES: [(&str, &str); 4] = [
+    ("pages", "thumbnails"),
+    ("styles", "styles-drawer"),
+    ("comments", "comments"),
+    ("search", "search"),
+];
 
 /// The widths below which the window changes, in pixels (GNM-01): the
 /// format bar leaves out its secondary controls, the navigation sidebar
@@ -85,9 +97,8 @@ pub struct DocumentWindow {
     editor: Rc<RefCell<Option<TextEditor>>>,
     format_bar: Rc<FormatBar>,
     inspector: Rc<Inspector>,
-    /// The Styles drawer (INT-18).
+    /// The styles, a page of the navigation sidebar (INT-18).
     drawer: Rc<StylesDrawer>,
-    drawer_split: adw::OverlaySplitView,
     /// The Fonts window (INT-15), made when first shown.
     fonts: FontsSlot,
     split: adw::OverlaySplitView,
@@ -95,8 +106,8 @@ pub struct DocumentWindow {
     search: Rc<Search>,
     /// The Find & Replace window, made when first shown.
     find: Rc<FindWindow>,
+    /// The search results, a page of the navigation sidebar (TXT-13).
     search_sidebar: Rc<SearchSidebar>,
-    search_split: adw::OverlaySplitView,
     navigate_by: gtk::MenuButton,
     page_entry: gtk::Entry,
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
@@ -137,8 +148,10 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 64] = [
+const DOCUMENT_ACTIONS: [&str; 66] = [
     "outline",
+    "sidebar",
+    "comments",
     "colors",
     "format-bar",
     "navigate",
@@ -392,33 +405,41 @@ impl DocumentWindow {
         // GNM-12).
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
         let nav = NavSidebar::new(&tr("Add Page"), add_page_menu().upcast_ref());
-        nav.add_page("pages", &tr("Pages"), thumbnails.widget());
-        let search_split = adw::OverlaySplitView::builder()
-            .content(&stack)
-            .sidebar(search_sidebar.widget())
-            .sidebar_position(gtk::PackType::End)
-            .show_sidebar(false)
-            .build();
+        nav.add_page(
+            "pages",
+            &tr("Pages"),
+            nav_sidebar::WIDTH,
+            thumbnails.widget(),
+        );
+        // The styles that were the Styles drawer of Pages (INT-18), the
+        // comments, and the search results that were its search sidebar
+        // (TXT-13), as pages of the sidebar of interface B.
+        nav.add_page("styles", &tr("Styles"), STYLES_WIDTH, drawer.widget());
+        nav.add_page(
+            "comments",
+            &tr("Comments"),
+            nav_sidebar::WIDTH,
+            &comments_page(),
+        );
+        nav.add_page(
+            "search",
+            &tr("Search Results"),
+            SEARCH_WIDTH,
+            search_sidebar.widget(),
+        );
         let side = gtk::Stack::builder()
             .transition_type(gtk::StackTransitionType::Crossfade)
             .build();
         side.add_named(inspector.widget(), Some("inspector"));
         // The Inspector is a utility pane of a fixed width at the end.
         let split = adw::OverlaySplitView::builder()
-            .content(&search_split)
+            .content(&stack)
             .sidebar(&side)
             .min_sidebar_width(INSPECTOR_WIDTH)
             .max_sidebar_width(INSPECTOR_WIDTH)
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
-        let drawer_split = adw::OverlaySplitView::builder()
-            .content(&split)
-            .sidebar(drawer.widget())
-            .sidebar_position(gtk::PackType::Start)
-            .show_sidebar(false)
-            .build();
-
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
         toolbar_view.add_top_bar(&screen_banner);
@@ -426,7 +447,7 @@ impl DocumentWindow {
         toolbar_view.add_top_bar(&format_revealer);
         let find = FindWindow::new(editor_of(), search.clone());
         toolbar_view.add_top_bar(find.widget());
-        toolbar_view.set_content(Some(&drawer_split));
+        toolbar_view.set_content(Some(&split));
         toolbar_view.add_bottom_bar(&bottom_bar);
 
         // The navigation sidebar is as high as the window, beside the
@@ -455,15 +476,11 @@ impl DocumentWindow {
         // of 1280 × 720, the smallest Desk supports, the sidebars cover the
         // pages instead of pushing them; below 520 the Inspector covers
         // them too, so that the pages keep some room (GNM-01).
-        let sidebars = [&nav_split, &drawer_split, &search_split];
         let mut breakpoints = Vec::new();
         for (width, collapsed) in [
             (COMPACT_FORMAT_BAR, &[][..]),
-            (OVERLAY_SIDEBAR, &sidebars[..]),
-            (
-                OVERLAY_INSPECTOR,
-                &[&nav_split, &drawer_split, &search_split, &split][..],
-            ),
+            (OVERLAY_SIDEBAR, &[&nav_split][..]),
+            (OVERLAY_INSPECTOR, &[&nav_split, &split][..]),
         ] {
             let breakpoint = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
                 adw::BreakpointConditionLengthType::MaxWidth,
@@ -492,20 +509,6 @@ impl DocumentWindow {
         for breakpoint in breakpoints {
             window.add_breakpoint(breakpoint);
         }
-        // One sidebar a side when they cover the pages.
-        for (a, b) in [(&nav_split, &drawer_split), (&search_split, &split)] {
-            for (one, other) in [(a, b), (b, a)] {
-                let other = other.downgrade();
-                one.connect_show_sidebar_notify(move |one| {
-                    if let Some(other) = other.upgrade()
-                        && one.is_collapsed()
-                        && one.shows_sidebar()
-                    {
-                        other.set_show_sidebar(false);
-                    }
-                });
-            }
-        }
         window.set_width_request(360);
         window.set_height_request(294);
 
@@ -528,13 +531,11 @@ impl DocumentWindow {
             format_bar,
             inspector,
             drawer,
-            drawer_split,
             fonts: FontsSlot::default(),
             split,
             search,
             find,
             search_sidebar,
-            search_split,
             navigate_by,
             page_entry,
             thumbnails,
@@ -855,7 +856,7 @@ impl DocumentWindow {
         let format = editor.format();
         self.show_format_bar(&editor, &format);
         self.inspector.show(&format);
-        if self.drawer_split.shows_sidebar() {
+        if self.nav_shows("styles") {
             self.drawer.show(&editor);
         }
         if let Some(fonts) = self.fonts.visible() {
@@ -902,6 +903,41 @@ impl DocumentWindow {
         self.ruler.widget().set_visible(on);
         self.vertical_ruler.widget().set_visible(vertical);
         self.ruler_corner.set_visible(vertical);
+    }
+
+    /// Whether the navigation sidebar shows the page called `page`.
+    fn nav_shows(&self, page: &str) -> bool {
+        self.nav_split.shows_sidebar() && self.nav.page() == page
+    }
+
+    /// Puts the actions of the pages of the navigation sidebar, its width
+    /// and what its pages show in step with what it shows.
+    fn sync_nav(&self) {
+        let shown = self.nav_split.shows_sidebar();
+        formatting::set_state(&self.window, "sidebar", shown.to_variant());
+        let page = self.nav.page();
+        let width = self.nav.width(&page);
+        self.nav_split.set_min_sidebar_width(width);
+        self.nav_split.set_max_sidebar_width(width);
+        for (name, action) in NAV_PAGES {
+            let on = shown && page == name;
+            let was = self.action_state(action);
+            formatting::set_state(&self.window, action, on.to_variant());
+            if on == was {
+                continue;
+            }
+            match name {
+                "pages" => self.thumbnails.set_shown(on, self.window.upcast_ref()),
+                "search" => {
+                    self.search_sidebar.set_shown(on);
+                    if !on && let Some(editor) = self.editor() {
+                        editor.focus();
+                    }
+                }
+                "styles" => self.show_format(),
+                _ => {}
+            }
+        }
     }
 
     fn action_state(&self, name: &str) -> bool {
@@ -2000,31 +2036,45 @@ impl DocumentWindow {
         });
         self.window.add_action(&navigate);
 
-        // The page thumbnails (INT-19).
-        let thumbnails = gio::SimpleAction::new_stateful("thumbnails", None, &false.to_variant());
+        // The sidebar, with the page it shows (GNM-12), and its pages:
+        // the page thumbnails (INT-19), the styles (INT-18), the comments
+        // and the search results (TXT-13).
+        let sidebar = gio::SimpleAction::new_stateful("sidebar", None, &false.to_variant());
         let weak = Rc::downgrade(self);
-        thumbnails.connect_change_state(move |action, value| {
-            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
-            else {
-                return;
-            };
-            action.set_state(&on.to_variant());
-            if on {
-                this.nav.set_page("pages");
+        sidebar.connect_change_state(move |_, value| {
+            if let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>())) {
+                this.nav_split.set_show_sidebar(on);
             }
-            this.nav_split.set_show_sidebar(on);
-            this.thumbnails.set_shown(on, this.window.upcast_ref());
         });
-        self.window.add_action(&thumbnails);
-        // The sidebar also closes by itself when it covers the pages.
+        self.window.add_action(&sidebar);
+        for (page, name) in NAV_PAGES {
+            let action = gio::SimpleAction::new_stateful(name, None, &false.to_variant());
+            let weak = Rc::downgrade(self);
+            action.connect_change_state(move |_, value| {
+                let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+                else {
+                    return;
+                };
+                if on {
+                    this.nav.set_page(page);
+                    this.nav_split.set_show_sidebar(true);
+                } else if this.nav.page() == page {
+                    this.nav_split.set_show_sidebar(false);
+                }
+                this.sync_nav();
+            });
+            self.window.add_action(&action);
+        }
         let weak = Rc::downgrade(self);
-        self.nav_split.connect_show_sidebar_notify(move |split| {
-            if let Some(this) = weak.upgrade()
-                && this.action_state("thumbnails") != split.shows_sidebar()
-                && !this.window.is_fullscreen()
-            {
-                this.window
-                    .change_action_state("thumbnails", &split.shows_sidebar().to_variant());
+        self.nav.connect_page_changed(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.sync_nav();
+            }
+        });
+        let weak = Rc::downgrade(self);
+        self.nav_split.connect_show_sidebar_notify(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.sync_nav();
             }
         });
 
@@ -2101,25 +2151,6 @@ impl DocumentWindow {
             revealer.set_reveal_child(on && stack.visible_child_name().as_deref() != Some("empty"));
         });
         self.window.add_action(&format_bar);
-
-        let drawer = gio::SimpleAction::new_stateful("styles-drawer", None, &false.to_variant());
-        let weak = Rc::downgrade(self);
-        drawer.connect_change_state(move |action, value| {
-            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
-            else {
-                return;
-            };
-            action.set_state(&on.to_variant());
-            this.drawer_split.set_show_sidebar(on);
-            this.show_format();
-        });
-        self.window.add_action(&drawer);
-        let window = self.window.downgrade();
-        self.drawer_split.connect_show_sidebar_notify(move |split| {
-            if let Some(window) = window.upgrade() {
-                formatting::set_state(&window, "styles-drawer", split.shows_sidebar().to_variant());
-            }
-        });
 
         // Pages copies the style of the paragraph and that of the
         // characters apart, and pastes only what was copied (STY-08).
@@ -2499,29 +2530,6 @@ impl DocumentWindow {
             self.window.add_action(&action);
         }
 
-        let search = gio::SimpleAction::new_stateful("search", None, &false.to_variant());
-        let weak = Rc::downgrade(self);
-        search.connect_change_state(move |action, value| {
-            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
-            else {
-                return;
-            };
-            action.set_state(&on.to_variant());
-            this.search_split.set_show_sidebar(on);
-            this.search_sidebar.set_shown(on);
-            if !on && let Some(editor) = this.editor() {
-                editor.focus();
-            }
-        });
-        self.window.add_action(&search);
-        let weak = Rc::downgrade(self);
-        self.search_split.connect_show_sidebar_notify(move |split| {
-            if let Some(this) = weak.upgrade() {
-                let on = split.shows_sidebar();
-                formatting::set_state(&this.window, "search", on.to_variant());
-                this.search_sidebar.set_shown(on);
-            }
-        });
         let recent = gio::SimpleAction::new("recent-search", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
         recent.connect_activate(move |_, parameter| {
@@ -3003,6 +3011,17 @@ fn from_template(target: &str) -> Document {
 /// page, which in a page layout document is a page of its own, and a
 /// section break. The pages of the template join them with the templates
 /// of the gallery (INT-06).
+/// The Comments page of the sidebar. Desk has no comments yet (REV-08,
+/// phase 8 of the plan), so it says so.
+fn comments_page() -> adw::StatusPage {
+    adw::StatusPage::builder()
+        .icon_name("desk-comment-symbolic")
+        .title(tr("No Comments"))
+        .description(tr("The comments of the document show here."))
+        .css_classes(["compact"])
+        .build()
+}
+
 fn add_page_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("_Blank Page")), Some("win.insert-page-break"));

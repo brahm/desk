@@ -37,7 +37,7 @@ impl Header {
         // arrow opens the View menu.
         let sidebar_button = adw::SplitButton::builder()
             .icon_name("sidebar-show-symbolic")
-            .action_name("win.thumbnails")
+            .action_name("win.sidebar")
             .menu_model(&view_menu())
             .tooltip_text(tr("Sidebar"))
             .dropdown_tooltip(tr("View"))
@@ -230,8 +230,9 @@ pub(super) fn fill_recent(menu: &gio::Menu) {
 pub(super) fn view_menu() -> gio::Menu {
     let panes = gio::Menu::new();
     panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
-    panes.append(Some(&tr("_Styles Drawer")), Some("win.styles-drawer"));
-    panes.append(Some(&tr("Se_arch Sidebar")), Some("win.search"));
+    panes.append(Some(&tr("_Styles")), Some("win.styles-drawer"));
+    panes.append(Some(&tr("_Comments")), Some("win.comments"));
+    panes.append(Some(&tr("Search _Results")), Some("win.search"));
     panes.append(Some(&tr("Spe_lling and Grammar")), Some("win.spelling"));
     let document = gio::Menu::new();
     document.append(Some(&tr("_Ruler")), Some("win.ruler"));
