@@ -40,6 +40,7 @@ mod command_search;
 mod format_actions;
 mod header;
 mod objects;
+mod rename;
 
 pub(crate) use objects::arrange_menu;
 
@@ -149,7 +150,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 68] = [
+const DOCUMENT_ACTIONS: [&str; 69] = [
     "outline",
     "sidebar",
     "comments",
@@ -166,6 +167,7 @@ const DOCUMENT_ACTIONS: [&str; 68] = [
     "fullscreen",
     "select-all",
     "deselect-all",
+    "rename",
     "connection-lines",
     "cut",
     "copy",
@@ -500,6 +502,7 @@ impl DocumentWindow {
         this.add_actions();
         this.add_format_bar_actions();
         this.connect_header(&find_toggle);
+        this.add_rename();
         warn_small_screen(&this.window, &screen_banner);
         this.show_rulers();
         {
