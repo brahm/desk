@@ -62,9 +62,13 @@
     <control>keyboard</control>
     <control>pointing</control>
   </supports>
-  <requires>
-    <display_length compare="ge">360</display_length>
-  </requires>
+  <!-- The minimum screen is 1280 × 720 (docs/interface/README.md). Smaller
+       screens and phones are not supported, but the app opens there with
+       a warning, so this is a recommendation and not a requirement. -->
+  <recommends>
+    <display_length compare="ge" side="longest">1280</display_length>
+    <display_length compare="ge" side="shortest">720</display_length>
+  </recommends>
   <categories>
     <category>Office</category>
     <category>WordProcessor</category>

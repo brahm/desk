@@ -290,12 +290,11 @@ def format_bar_text(prefix, slim=False, full=False, compact=False):
                                menu=menu_model(['Nenhum', 'Ênfase', 'Forte', 'Sublinhado'])))
     bar.append(spacer())
     bar.append(menu_button(text='TeX Gyre Termes', tip='Fonte', cid=f'{prefix}.fonte', popover=fonts_popover(),
-                           max_chars=13 if full else 9 if compact else 16, visible=compact != 'phone'))
+                           max_chars=13 if full else 9 if compact else 16))
     if full:
         bar.append(dropdown(['Regular', 'Itálico', 'Negrito', 'Negrito itálico'], 0, f'{prefix}.tipo',
                             tooltip_text='Tipo'))
-    if compact != 'phone':
-        bar.append(size_spin(11, f'{prefix}.tamanho'))
+    bar.append(size_spin(11, f'{prefix}.tamanho'))
     color = menu_button(icon='desk-text-color', tip='Cor do texto', cid=f'{prefix}.cor-texto',
                         popover=colors_popover())
     if full:

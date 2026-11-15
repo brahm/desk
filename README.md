@@ -32,7 +32,7 @@ extensions for what standard ODF cannot hold.
 The project is in development, starting with Desk Writer. Its text
 engine, its document structure, its writing tools and its objects are
 done (the first six phases of the plan;
-<!-- parity -->160 of the 310 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
+<!-- parity -->160 of the 311 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
 
 - It opens ODT documents and Pages '09 documents, listing what they
   hold that Desk cannot keep yet, and saves as ODT.
@@ -57,7 +57,7 @@ done (the first six phases of the plan;
 
 The new window comes next, then tables and charts, then review and
 collaboration. Desk Slides
-and Desk Tables have their own parity matrices, with 180 rows each, and
+and Desk Tables have their own parity matrices, with 181 rows each, and
 start once the table and chart engine is ready.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
@@ -72,6 +72,12 @@ flatpak run br.com.brahm.Desk.Writer//beta
 Use `//nightly` in place of `//beta` for the nightly builds, which are
 also a bundle in the [nightly release](https://github.com/brahm/desk/releases/tag/nightly).
 
+Desk is made for desktops, laptops and tablets with a screen of at
+least **1280 × 720 pixels** (720p), counted after display scaling, so a
+2560 × 1440 screen at 200 % qualifies and a 1920 × 1080 one at 200 %
+does not. Phones and smaller screens are not supported: the apps still
+open there, with a warning that parts of the window may not fit.
+
 Desk is built by one person working with Claude, Anthropic's AI, with
 the same engineering rigor expected of any team: every feature of the
 iWork '09 apps is a row of a parity matrix, and the output is compared
@@ -84,7 +90,8 @@ to move around the document, a header bar with the insert buttons, a
 slim format bar that changes with the selection, one Inspector on the
 right and a bottom bar with the zoom and the position. Desk Writer moves
 to it before tables and charts. These are mockups drawn with the real
-GTK 4 and Libadwaita widgets, shown in Brazilian Portuguese.
+GTK 4 and Libadwaita widgets at 1280 × 720, the smallest screen Desk is
+made for, shown in Brazilian Portuguese.
 [`docs/interface`](docs/interface/README.md) describes the window, lists
 its 208 components and says where each command of iWork '09 went.
 

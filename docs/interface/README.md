@@ -13,7 +13,7 @@ em casa quem vem dele, isto é, os nomes, a ordem das coisas e o Inspetor.
 
 | Arquivo | O que é |
 | --- | --- |
-| [`componentes.tsv`](componentes.tsv) | Os 208 componentes da interface, um por linha: o widget que o desenha, o que faz, o que era no iWork '09, o que é no iWork de hoje, o atalho e o estado no Desk Writer. É o inventário do que implementar. |
+| [`componentes.tsv`](componentes.tsv) | Os 207 componentes da interface, um por linha: o widget que o desenha, o que faz, o que era no iWork '09, o que é no iWork de hoje, o atalho e o estado no Desk Writer. É o inventário do que implementar. |
 | [`iwork-para-desk.tsv`](iwork-para-desk.tsv) | Os 933 comandos, botões, painéis e janelas do Pages 4.3, do Numbers 2.3 e do Keynote 5.3, lidos na máquina virtual de referência, cada um com o lugar dele no Desk. |
 | [`janelas/`](janelas) | Oito janelas dos mockups, em PNG. |
 | [`mockups/`](mockups) | O código que desenha os mockups com o GTK e a Libadwaita de verdade, e o catálogo de onde sai o inventário. |
@@ -33,7 +33,7 @@ do GNOME, sem barra de formatação. Em 14/11/2026 foi escolhida a versão
 B, a equilibrada, que é a única descrita daqui em diante. O código das
 outras duas continua em `mockups/`, como registro.
 
-O que pesou na escolha, com a janela em 1280 × 800:
+O que pesou na escolha, com a janela em 1280 × 720:
 
 | | A | B | C |
 | --- | --- | --- | --- |
@@ -45,6 +45,62 @@ O que pesou na escolha, com a janela em 1280 × 800:
 
 A versão B mantém à vista o que o iWork mantinha (inserir objetos e
 formatar texto com um clique) e arruma o resto como a HIG pede.
+
+## A tela mínima
+
+O Desk é feito para computadores de mesa, notebooks e tablets. A tela
+mínima é de **1280 × 720 pixels** (720p), em pixels lógicos, isto é,
+depois da escala da tela: uma tela de 2560 × 1440 em 200 % conta como
+1280 × 720, e uma de 1920 × 1080 em 200 % conta como 960 × 540. Num
+tablet, vale a tela deitada. Celulares e telas menores que a mínima não
+têm suporte: o Desk abre nelas e continua funcionando, mas avisa na
+abertura que a experiência pode ser prejudicada (GNM-14, NGNM-14,
+KGNM-15). A janela abre com 1280 × 720.
+
+A HIG pede que todo aplicativo funcione numa tela de 1024 × 600. O Desk
+pede mais, porque uma página, uma barra lateral e o Inspetor lado a lado
+precisam de 1280 px. Em 1024 × 600 a janela ainda abre inteira, com o
+aviso (veja abaixo), mas não é nessa tela que as decisões de desenho são
+tomadas nem conferidas.
+
+### A conferência das telas
+
+Todas as 37 cenas dos mockups, das três versões, foram refeitas em
+1280 × 720, e o tamanho mínimo de cada janela foi medido com o GTK
+(`gtk_widget_measure`), sem pontos de quebra. Nenhuma passa de
+1280 px de largura nem de 490 px de altura, de modo que todas cabem na
+tela mínima, mesmo maximizadas sob a barra superior do GNOME.
+
+| Cenas da versão B | Largura mínima | Altura mínima |
+| --- | --- | --- |
+| Writer (texto, imagem, forma, Documento, popovers e menus) | 921 a 953 px | 258 a 352 px |
+| Writer com a busca e a substituição abertas | 953 px | 490 px |
+| Tables (Formato, Dados, gráfico, fórmula, Documento) | 921 a 1046 px | 298 a 330 px |
+| Slides (objeto, slide, transição, Animação, Documento) | 991 px | 248 a 290 px |
+| Mesa de luz do Slides | 1018 px | 216 px |
+| Seletor de modelos | 622 px | 160 px |
+| Diálogos (Preferências, atalhos, busca de comandos, fechar) | 953 px | 352 px |
+
+A conferência achou quatro coisas que o plano passa a pedir:
+
+- **O zoom ao abrir.** Com a barra lateral (196 px) e o Inspetor
+  (332 px) abertos, sobram 752 px para o documento em 1280 px. Uma página
+  A4 em 100 % tem 794 px, e uma Carta, 816 px, então a página não cabe
+  inteira. O Writer abre o documento com o zoom que faz a página caber na
+  largura, até 100 %, como o Ajustar à largura do Pages. Os mockups
+  desenham a página menor do que ela é, e o rótulo de zoom deles não é
+  uma medida.
+- **Abas do Inspetor com quatro nomes.** Em 332 px, as abas Tabela,
+  Célula, Texto e Organizar, e Gráfico, Eixo, Séries e Organizar, saem
+  cortadas (Ta…, Cél…). A fase 7 do Writer resolve isso antes de desenhar
+  essas abas, com nomes que caibam ou com o Inspetor um pouco mais largo
+  quando há quatro abas.
+- **A barra de formatação do Tables** precisa de 1046 px, mais que os
+  1000 px em que a do Writer se recolhe. O ponto de quebra da barra de
+  formatação é medido por aplicativo: no Tables, cerca de 1060 px.
+- **Meia tela.** Com duas janelas lado a lado na tela mínima, cada uma tem
+  640 px. O Inspetor fica ao lado da página até 520 px e deixa uns 300 px
+  para ela, que abre com o zoom que caber.
 
 ## A janela
 
@@ -64,7 +120,7 @@ A janela tem as mesmas sete regiões nos três aplicativos.
 
 Avisos de importação aparecem numa faixa (`AdwBanner`) sobre o documento,
 e a busca é uma barra sob a barra de cabeçalho, as duas como o Desk Writer
-já faz.
+já faz. O aviso de tela pequena usa uma faixa igual.
 
 ![Desk Tables](janelas/tables-b.png)
 
@@ -147,18 +203,51 @@ slides e o menu do botão Reproduzir. Janela e os comandos Ocultar são do
 GNOME. Compartilhar some: o iWork.com foi encerrado, e exportar e enviar
 por e-mail ficam em Exportar.
 
-### A janela estreita
+### Janelas menores que a tela
 
-| Largura | O que muda |
+A tela mínima é de 1280 × 720, mas a janela pode ser menor que a tela,
+como quando fica lado a lado com outra. Os pontos de quebra cuidam disso,
+e não de celulares:
+
+| Largura da janela | O que muda |
 | --- | --- |
+| Abaixo de 1000 px (Writer), de cerca de 1060 px (Tables) | A barra de formatação se recolhe, e o resto vai para o menu Mais |
 | Abaixo de 720 px | A barra lateral de navegação vira sobreposição, e os botões de objeto entram no menu Inserir |
-| Abaixo de 400 px | O Inspetor vira uma folha inferior (`AdwBottomSheet`) |
+| Abaixo de 520 px | O Inspetor também vira sobreposição: fecha e volta por cima do documento |
 
-São dois `AdwBreakpoint` da janela. O estilo escuro e o de alto contraste
-vêm prontos da Libadwaita.
+São `AdwBreakpoint` da janela. Não há leiaute de celular nem folha
+inferior: abaixo de 520 px a janela continua usável, sem conferência. O
+estilo escuro e o de alto contraste vêm prontos da Libadwaita.
 
-![Janela de 720 px](janelas/comum-media.png)
-![Janela de 400 px](janelas/comum-estreita.png)
+![Janela em meia tela, 640 × 720](janelas/comum-media.png)
+
+### O aviso de tela pequena
+
+Quando uma janela abre num monitor menor que 1280 × 720, uma faixa
+(`AdwBanner`) sob as barras do alto diz:
+
+> Tela menor que 1280 × 720 ‒ partes da janela podem não caber
+
+O botão **Fechar** esconde a faixa. Nada é bloqueado e não há diálogo: a
+HIG põe numa faixa um estado que dura, como esse, e um toast sumiria
+antes de ser lido.
+
+- **Quando.** Ao abrir a primeira janela de cada aplicativo, depois que
+  ela aparece, com o monitor em que ela está
+  (`gdk_display_get_monitor_at_surface`). A medida é a geometria do
+  monitor, que o GTK já dá em pixels lógicos; vale largura menor que
+  1280 ou altura menor que 720, então um tablet em pé também recebe o
+  aviso.
+- **Até quando.** Fechada, a faixa não volta até o aplicativo abrir de
+  novo. Não há preferência para calar o aviso, e mover a janela para
+  outro monitor não o mostra outra vez.
+- **Com outras faixas.** Fica acima da faixa de avisos de importação; as
+  duas podem aparecer juntas.
+- **Testes.** A regra é uma função da geometria (largura e altura) e é
+  testada sozinha; o teste da interface abre a janela numa tela virtual
+  de 1024 × 600 e confere a faixa pela árvore de acessibilidade.
+
+![Tela de 1024 × 600, com o aviso](janelas/comum-aviso.png)
 
 ## Atalhos
 
@@ -222,8 +311,9 @@ Os atalhos que eram propostas foram confirmados em 14/11/2026.
 - **Avisos na medida certa.** Faixa para o que afeta o documento, toast
   para o que não pede resposta, e o diálogo de alerta do GNOME para fechar
   com alterações (Descartar, Cancelar, Salvar).
-- **Janela que se adapta.** Pontos de quebra em 720 e 400 px, estilo
-  escuro e alto contraste.
+- **Janela que se adapta.** Tela mínima de 1280 × 720, com um aviso
+  abaixo dela; pontos de quebra para meia tela e janelas menores (720 e
+  520 px), estilo escuro e alto contraste.
 - **Teclado.** Os atalhos padrão do GNOME têm prioridade, e todo comando
   aparece no diálogo de atalhos e na busca de comandos.
 - **Texto da interface.** Em português, só a primeira letra maiúscula e os
@@ -273,7 +363,7 @@ animações obsoletas, a geometria do gráfico nos slides mestres e Ajustar
 
 ## Os componentes
 
-[`componentes.tsv`](componentes.tsv) tem 208 linhas. Cada uma é uma peça
+[`componentes.tsv`](componentes.tsv) tem 207 linhas. Cada uma é uma peça
 que aparece nos mockups, com o tipo do widget lido do próprio mockup.
 
 | Seção | Já existe | Muda | Novo |
@@ -283,22 +373,23 @@ que aparece nos mockups, com o tipo do widget lido do próprio mockup.
 | Barra de formatação | 12 | 6 | 18 |
 | Barra de fórmulas (Tables) | | | 7 |
 | Documento | 2 | | 4 |
-| Inspetor | | 37 | 11 |
+| Inspetor | | 37 | 9 |
 | Inspetor do Tables | | | 25 |
 | Inspetor do Slides | | | 18 |
 | Barra inferior | 4 | 2 | 3 |
-| Busca, avisos e comandos | 9 | 1 | 3 |
+| Busca, avisos e comandos | 9 | 1 | 4 |
 | Popovers | 6 | 1 | 3 |
 | Seletor de modelos e diálogos | 7 | 6 | 1 |
-| **Total** | **46** | **62** | **100** |
+| **Total** | **46** | **62** | **99** |
 
 O estado é medido contra o Desk Writer de hoje: `existe` já está lá,
-`muda` está lá de outra forma e `novo` falta escrever. O Writer usa 138
-dos 208 componentes (46 existem, 62 mudam e 30 são novos), o Tables usa
-123 e o Slides, 113. Tudo o que é comum aos três fica em `desk-ui`.
+`muda` está lá de outra forma e `novo` falta escrever. O Writer usa 137
+dos 207 componentes (46 existem, 62 mudam e 29 são novos), o Tables usa
+122 e o Slides, 112. Tudo o que é comum aos três fica em `desk-ui`.
 
 Dos componentes da Libadwaita que a interface pede, o Desk Writer ainda
-não usa dois: `AdwBottomSheet` (1.6) e `AdwSplitButton`. Os mais novos da
+não usa um: `AdwSplitButton`. A folha inferior (`AdwBottomSheet`), que
+servia a celulares, saiu com a tela mínima de 1280 × 720. Os mais novos da
 lista, `AdwSidebar` (1.9), `AdwToggleGroup` e `AdwInlineViewSwitcher`
 (1.7), já estão em `desk-ui` e passam a ter um papel maior.
 
@@ -313,9 +404,9 @@ funcionando.
 | Etapa | O que faz | Linhas das matrizes |
 | --- | --- | --- |
 | 1. Esqueleto da janela (feita) | Barra lateral de navegação da altura da janela, com o botão de conteúdo e o botão Adicionar; Inspetor como painel utilitário; os dois pontos de quebra | GNM-12, GNM-01 |
-| 2. Barra de cabeçalho e menus | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens e a busca de comandos | INT-11, INT-14, GNM-10 |
+| 2. Barra de cabeçalho e menus | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens, a busca de comandos e o aviso de tela pequena | INT-11, INT-14, GNM-10, GNM-14 |
 | 3. Barra de formatação enxuta | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
-| 4. Inspetor em dois níveis | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e a folha inferior na janela estreita | INT-13 |
+| 4. Inspetor em dois níveis | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
 | 5. Páginas da barra lateral | Estilos no lugar da gaveta, Comentários e Resultados da busca | INT-18, TXT-13 |
 | 6. Barra inferior | Zoom, posição com Ir para e Navegar por, contagem e seleção | GNM-13, INT-07, INT-19, DOC-20 |
 | 7. Comandos e atalhos | Os quatro comandos do inventário, os atalhos confirmados, o diálogo de atalhos, as traduções e os testes pela árvore de acessibilidade | VMI-01 a VMI-04 |
@@ -327,9 +418,7 @@ mínima de 1280 × 720: abaixo de 720 px, como em meia tela, a barra
 lateral cobre as páginas; abaixo de 520 px o Inspetor fecha e volta por
 cima delas. O botão Adicionar da barra lateral insere, por enquanto, uma
 página em branco ou uma quebra de seção; as páginas do modelo chegam com
-a fase 9 (INT-06).
-O relatório de paridade continua a
-contá-las como testadas enquanto os testes verificarem a forma antiga, e
+a fase 9 (INT-06). O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:
@@ -337,13 +426,13 @@ Depois disso:
 - A fase 7 do Writer desenha sobre a interface B as abas Tabela, Célula,
   Gráfico, Eixo e Séries e as barras de formatação de célula e de gráfico.
 - A fase 2 do Tables monta a mesma janela com as planilhas na barra
-  lateral (NINT-02 a NINT-04, NINT-06 a NINT-09, NINT-14, NGNM-12,
-  NGNM-13). A barra de fórmulas e o cálculo instantâneo já têm lugar nela
+  lateral (NINT-02 a NINT-04, NINT-06 a NINT-09, NINT-14, NGNM-01,
+  NGNM-12 a NGNM-14). A barra de fórmulas e o cálculo instantâneo já têm lugar nela
   e ganham função na fase 4 (NINT-10, NINT-13), e a aba Dados e os estilos
   de tabela, na fase 5 (NTAB-24 a NTAB-30, NINT-12).
 - A fase 2 do Slides monta a mesma janela com o navegador na barra lateral
-  e as notas do apresentador (KINT-05 a KINT-13, KINT-15, KGNM-13,
-  KGNM-14). O botão Reproduzir e a aba Animação já têm lugar nela e
+  e as notas do apresentador (KINT-05 a KINT-13, KINT-15, KGNM-01,
+  KGNM-13 a KGNM-15). O botão Reproduzir e a aba Animação já têm lugar nela e
   ganham função nas fases 4 e 5, e o Inspetor fecha na fase 7 (KINT-14).
 
 A fase 1 do Slides só depende do que o Desk Writer já tem e pode andar
@@ -360,6 +449,10 @@ etapas 1 a 6, e o Tables inteiro espera a fase 7 do Writer.
   Ctrl+Shift+M para a máscara, Alt e as setas no Tables e Ctrl+Shift+F
   para a lista de fórmulas.
 - Um clique no título da janela renomeia o documento.
+- A tela mínima do Desk é de 1280 × 720 pixels lógicos, para computadores
+  e tablets. Celulares e telas menores não têm suporte, e o aplicativo
+  avisa na abertura, sem impedir o uso. Os pontos de quebra ficam em 720
+  e 520 px, e a folha inferior e o mockup de 400 px saíram.
 
 ## Refazer os mockups
 

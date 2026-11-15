@@ -189,7 +189,7 @@ def capture(win, path):
 class Scene:
     """One picture: a window, and what to do with it before the shot."""
 
-    def __init__(self, sid, title, build, app='', version='', size=(1280, 800), after=None,
+    def __init__(self, sid, title, build, app='', version='', size=(1280, 720), after=None,
                  dark=False, note=''):
         self.sid, self.title, self.build = sid, title, build
         self.app, self.version, self.size = app, version, size

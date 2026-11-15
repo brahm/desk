@@ -74,11 +74,11 @@
 
     <section id="looks" aria-labelledby="looks-title">
       <h2 id="looks-title">How the apps will look</h2>
-      <p class="section-intro">The three apps will share one window, chosen in November 2026: a sidebar to move around the document, a slim format bar that changes with the selection, and one Inspector on the right. These are mockups drawn with the real GTK 4 and Libadwaita widgets, shown in Brazilian Portuguese. Desk Writer moves to this window in the next stage.</p>
+      <p class="section-intro">The three apps will share one window, chosen in November 2026: a sidebar to move around the document, a slim format bar that changes with the selection, and one Inspector on the right. These are mockups drawn with the real GTK 4 and Libadwaita widgets, at 1280 × 720, the smallest screen Desk is made for, and shown in Brazilian Portuguese. Desk Writer moves to this window in the next stage.</p>
       <ul class="shots">
-        <li><figure><img src="img/interface/writer-b.png" alt="Desk Writer window: page thumbnails in the sidebar, a report with a picture and a table, and the Inspector open on the text format" width="1280" height="800" loading="lazy"><figcaption><strong>Desk Writer.</strong> Page thumbnails in the sidebar, the text format in the Inspector, and the zoom, page and word count in the bottom bar.</figcaption></figure></li>
-        <li><figure><img src="img/interface/tables-b.png" alt="Desk Tables window: sheets in the sidebar, a table of expenses with a formula bar, and instant calculations in the bottom bar" width="1280" height="800" loading="lazy"><figcaption><strong>Desk Tables.</strong> Sheets in the sidebar, several tables on one sheet, the formula bar, and sum, average and count of the selection in the bottom bar.</figcaption></figure></li>
-        <li><figure><img src="img/interface/slides-b.png" alt="Desk Slides window: slide navigator in the sidebar, a slide with a picture selected, presenter notes below and the Play button in the header bar" width="1280" height="800" loading="lazy"><figcaption><strong>Desk Slides.</strong> The slide navigator in the sidebar, the Play button in the header bar, presenter notes below the slide, and the Animation tab in the Inspector.</figcaption></figure></li>
+        <li><figure><img src="img/interface/writer-b.png" alt="Desk Writer window: page thumbnails in the sidebar, a report with a picture and a table, and the Inspector open on the text format" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Writer.</strong> Page thumbnails in the sidebar, the text format in the Inspector, and the zoom, page and word count in the bottom bar.</figcaption></figure></li>
+        <li><figure><img src="img/interface/tables-b.png" alt="Desk Tables window: sheets in the sidebar, a table of expenses with a formula bar, and instant calculations in the bottom bar" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Tables.</strong> Sheets in the sidebar, several tables on one sheet, the formula bar, and sum, average and count of the selection in the bottom bar.</figcaption></figure></li>
+        <li><figure><img src="img/interface/slides-b.png" alt="Desk Slides window: slide navigator in the sidebar, a slide with a picture selected, presenter notes below and the Play button in the header bar" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Slides.</strong> The slide navigator in the sidebar, the Play button in the header bar, presenter notes below the slide, and the Animation tab in the Inspector.</figcaption></figure></li>
       </ul>
     </section>
 
@@ -181,6 +181,7 @@
         <pre><code>flatpak remote-add --if-not-exists desk https://brahm.github.io/desk/desk.flatpakrepo
 flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
         <p class="card-note">Or open <a href="desk-writer-beta.flatpakref">desk-writer-beta.flatpakref</a> to install it with GNOME Software. It is a test version: keep a copy of the documents you open with it. For the version built every night from the latest code, use <code>//nightly</code> or <a href="desk-writer-nightly.flatpakref">desk-writer-nightly.flatpakref</a>. You can also build Desk from the <a href="https://github.com/brahm/desk#building">source code</a>.</p>
+        <p class="card-note">Desk needs a screen of at least 1280 × 720 pixels, after display scaling: a desktop, a laptop or a tablet held sideways. Phones and smaller screens are not supported. The apps still open on them, with a warning that parts of the window may not fit.</p>
       </div>
     </section>
 
@@ -244,6 +245,10 @@ flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-desktop"/></svg></span>
           <span class="row-text"><strong>Platform</strong><span>GNOME 51, shipped as a Flatpak</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-desktop"/></svg></span>
+          <span class="row-text"><strong>Screen</strong><span>1280 × 720 or larger, on desktops, laptops and tablets; phones are not supported</span></span>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>

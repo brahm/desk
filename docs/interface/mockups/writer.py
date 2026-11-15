@@ -128,7 +128,7 @@ def version_a(win, context='text'):
     win.set_content(shell.toolbar_view(body, top=[hb, fbar], bottom=[bottom]))
 
 
-def version_b(win, context='text', level=shell.FORMAT, find=False, banner=False):
+def version_b(win, context='text', level=shell.FORMAT, find=False, banner=False, low_res=False):
     side = shell.nav_sidebar(APP, parts.thumbs_list('page', 5, 2), SIDE_MODES, 'Adicionar página', ADD_PAGE)
     start = [split_button(icon='sidebar-show', tip='Barra lateral', drop_tip='Visualização',
                           cid='cab.visualizar', menu=parts.view_menu(APP)),
@@ -146,6 +146,9 @@ def version_b(win, context='text', level=shell.FORMAT, find=False, banner=False)
     tops = [hb, fbar]
     if find:
         tops.append(find_bar())
+    if low_res:
+        tops.append(tag(Adw.Banner(title='Tela menor que 1280 × 720 ‒ partes da janela podem não caber',
+                                   button_label='Fechar', revealed=True), 'aviso.resolucao'))
     if banner:
         tops.append(tag(Adw.Banner(title='Este documento foi aberto com 3 avisos', button_label='Ver avisos',
                                    revealed=True), 'aviso.banner'))

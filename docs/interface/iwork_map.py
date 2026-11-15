@@ -147,7 +147,7 @@ TOOLBAR = [
     (r'^Tables?$', 'Botão Tabela da barra de cabeçalho', 'cab.inserir.tabela', SAME),
     (r'^Charts$', 'Botão Gráfico da barra de cabeçalho', 'cab.inserir.grafico', SAME),
     (r'^Comment$', 'Botão Comentário da barra de cabeçalho', 'cab.inserir.comentario', SAME),
-    (r'^Objects$', 'Os botões de inserir; em janela estreita, o menu Inserir', 'cab.inserir', ADAPT),
+    (r'^Objects$', 'Os botões de inserir; abaixo de 720 px, o menu Inserir', 'cab.inserir', ADAPT),
     (r'^Inspector$', 'Botão Inspetor da barra de cabeçalho', 'cab.inspetor', SAME),
     (r'^Media$', 'Botão Mídia da barra de cabeçalho', 'cab.inserir.midia', ADAPT),
     (r'^Adjust$', 'Botão Ajustar imagem da barra de formatação', 'fmt.ajustar-imagem', ADAPT),
