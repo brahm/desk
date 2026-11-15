@@ -38,6 +38,7 @@ mod lists_pane;
 mod media;
 mod media_browser;
 mod media_pane;
+mod nav_sidebar;
 mod notes_pane;
 mod objects_pane;
 mod outline_view;

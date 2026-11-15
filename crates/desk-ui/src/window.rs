@@ -4,6 +4,12 @@
 //! A document window: the header bar, the document area, and the zoom
 //! menu and counts at the bottom, as in Pages. It saves the document, asks
 //! to save it before it closes, and shows it full screen.
+//!
+//! The window has the skeleton of interface B (docs/interface): the
+//! navigation sidebar as high as the window at the start, with the page
+//! thumbnails (GNM-12), and the Inspector as a utility pane at the end.
+//! Below 720 px, as in half of the smallest screen Desk supports, the
+//! sidebar covers the pages instead of pushing them (GNM-01).
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -19,6 +25,7 @@ use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
 use crate::i18n::{n_, tr, trn};
+use crate::nav_sidebar::{self, NavSidebar};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
 use crate::spelling::MistakeKind;
@@ -34,6 +41,17 @@ mod objects;
 /// How far from the top of the screen the pointer brings the header bar
 /// back in full screen, in pixels.
 const REVEAL_EDGE: f64 = 4.0;
+
+/// The width of the Inspector, in pixels, as in the mockups of interface B.
+const INSPECTOR_WIDTH: f64 = 332.0;
+
+/// The widths below which the window changes, in pixels (GNM-01): the
+/// format bar leaves out its secondary controls, the navigation sidebar
+/// covers the pages, and the Inspector covers them too. Desk asks for a
+/// screen of 1280 × 720 at least, and a window can take half of one.
+const COMPACT_FORMAT_BAR: f64 = 1000.0;
+const OVERLAY_SIDEBAR: f64 = 720.0;
+const OVERLAY_INSPECTOR: f64 = 520.0;
 
 /// What an action of the window does.
 type WindowAction = fn(&Rc<DocumentWindow>);
@@ -78,7 +96,11 @@ pub struct DocumentWindow {
     page_entry: gtk::Entry,
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
     outline: Rc<crate::outline_view::OutlineView>,
-    thumbnails_split: adw::OverlaySplitView,
+    /// The navigation sidebar, with the page thumbnails (GNM-12).
+    nav: Rc<NavSidebar>,
+    nav_split: adw::OverlaySplitView,
+    /// Whether the navigation sidebar showed before full screen hid it.
+    nav_before_fullscreen: Cell<bool>,
     /// The pages of the right sidebar: the Inspector, the Media Browser
     /// and Spelling and Grammar, one at a time.
     side: gtk::Stack,
@@ -218,7 +240,6 @@ impl DocumentWindow {
             .use_underline(true)
             .menu_model(&view_menu())
             .tooltip_text(tr("View"))
-            .visible(false)
             .build();
         view_button.set_always_show_arrow(true);
         let insert_button = gtk::MenuButton::builder()
@@ -226,33 +247,30 @@ impl DocumentWindow {
             .use_underline(true)
             .menu_model(&insert_menu())
             .tooltip_text(tr("Insert"))
-            .visible(false)
             .build();
         insert_button.set_always_show_arrow(true);
         let media_toggle = gtk::ToggleButton::builder()
             .icon_name("folder-pictures-symbolic")
             .action_name("win.media-browser")
             .tooltip_text(tr("Media Browser"))
-            .visible(false)
             .build();
         formatting::labelled(&media_toggle, &tr("Media Browser"));
         let inspector_toggle = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-right-symbolic")
             .action_name("win.inspector")
             .tooltip_text(tr("Inspector"))
-            .visible(false)
             .build();
         formatting::labelled(&inspector_toggle, &tr("Inspector"));
-        let document_buttons: [gtk::Widget; 4] = [
-            view_button.clone().upcast(),
-            insert_button.clone().upcast(),
-            media_toggle.clone().upcast(),
-            inspector_toggle.clone().upcast(),
-        ];
-        header.pack_start(&view_button);
-        header.pack_start(&insert_button);
-        header.pack_end(&inspector_toggle);
-        header.pack_end(&media_toggle);
+        let start_buttons = gtk::Box::builder().spacing(6).visible(false).build();
+        start_buttons.append(&view_button);
+        start_buttons.append(&insert_button);
+        let end_buttons = gtk::Box::builder().spacing(6).visible(false).build();
+        end_buttons.append(&media_toggle);
+        end_buttons.append(&inspector_toggle);
+        let document_buttons: [gtk::Widget; 2] =
+            [start_buttons.clone().upcast(), end_buttons.clone().upcast()];
+        header.pack_start(&start_buttons);
+        header.pack_end(&end_buttons);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -297,7 +315,9 @@ impl DocumentWindow {
         }
 
         let view = DocumentView::new();
-        let stack = gtk::Stack::new();
+        // The template gallery is wider than the pages need to be, and
+        // must not keep the Inspector from fitting beside them (GNM-01).
+        let stack = gtk::Stack::builder().hhomogeneous(false).build();
         stack.add_named(&status, Some("empty"));
 
         let zoom_button = gtk::MenuButton::builder()
@@ -307,10 +327,12 @@ impl DocumentWindow {
             .tooltip_text(tr("Zoom"))
             .css_classes(["flat"])
             .build();
+        // The counts give way in a narrow window (GNM-01).
         let counts_label = gtk::Label::builder()
             .css_classes(["dim-label", "caption", "numeric"])
             .hexpand(true)
             .xalign(1.0)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
             .build();
         let bottom = gtk::Box::builder()
             .spacing(6)
@@ -397,16 +419,13 @@ impl DocumentWindow {
             .child(&format_scroller)
             .reveal_child(false)
             .build();
-        // The page thumbnails, beside the pages (INT-19, EST-17).
+        // The page thumbnails, in the navigation sidebar (INT-19, EST-17,
+        // GNM-12).
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
-        let thumbnails_split = adw::OverlaySplitView::builder()
-            .content(&stack)
-            .sidebar(thumbnails.widget())
-            .sidebar_position(gtk::PackType::Start)
-            .show_sidebar(false)
-            .build();
+        let nav = NavSidebar::new(&tr("Add Page"), add_page_menu().upcast_ref());
+        nav.add_page("pages", &tr("Pages"), thumbnails.widget());
         let search_split = adw::OverlaySplitView::builder()
-            .content(&thumbnails_split)
+            .content(&stack)
             .sidebar(search_sidebar.widget())
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
@@ -415,10 +434,12 @@ impl DocumentWindow {
             .transition_type(gtk::StackTransitionType::Crossfade)
             .build();
         side.add_named(inspector.widget(), Some("inspector"));
+        // The Inspector is a utility pane of a fixed width at the end.
         let split = adw::OverlaySplitView::builder()
             .content(&search_split)
             .sidebar(&side)
-            .min_sidebar_width(300.0)
+            .min_sidebar_width(INSPECTOR_WIDTH)
+            .max_sidebar_width(INSPECTOR_WIDTH)
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
             .build();
@@ -438,49 +459,61 @@ impl DocumentWindow {
         toolbar_view.set_content(Some(&drawer_split));
         toolbar_view.add_bottom_bar(&bottom_bar);
 
+        // The navigation sidebar is as high as the window, beside the
+        // header bar and not under it.
+        let nav_split = adw::OverlaySplitView::builder()
+            .content(&toolbar_view)
+            .sidebar(nav.widget())
+            .sidebar_position(gtk::PackType::Start)
+            .min_sidebar_width(nav_sidebar::WIDTH)
+            .max_sidebar_width(nav_sidebar::WIDTH)
+            .show_sidebar(false)
+            .build();
+
         let window = adw::ApplicationWindow::builder()
             .application(app)
             .title(info.name)
-            .default_width(1100)
-            .default_height(700)
-            .content(&toolbar_view)
+            .default_width(1280)
+            .default_height(720)
+            .content(&nav_split)
             .build();
 
-        // On a narrow window the sidebars cover the pages instead of
-        // pushing them, and the format bar keeps what matters most.
-        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            860.0,
-            adw::LengthUnit::Sp,
-        ));
-        for split in [&thumbnails_split, &search_split, &split, &drawer_split] {
-            narrow.add_setter(split, "collapsed", Some(&true.to_value()));
+        // Of the breakpoints that match, the window applies the one added
+        // last, so each one sets what the wider ones set too. Below about
+        // a thousand pixels the format bar leaves out its secondary
+        // controls; below 720, as when the window takes half of a screen
+        // of 1280 × 720, the smallest Desk supports, the sidebars cover the
+        // pages instead of pushing them; below 520 the Inspector covers
+        // them too, so that the pages keep some room (GNM-01).
+        let sidebars = [&nav_split, &drawer_split, &search_split];
+        let mut breakpoints = Vec::new();
+        for (width, collapsed) in [
+            (COMPACT_FORMAT_BAR, &[][..]),
+            (OVERLAY_SIDEBAR, &sidebars[..]),
+            (
+                OVERLAY_INSPECTOR,
+                &[&nav_split, &drawer_split, &search_split, &split][..],
+            ),
+        ] {
+            let breakpoint = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+                adw::BreakpointConditionLengthType::MaxWidth,
+                width,
+                adw::LengthUnit::Sp,
+            ));
+            for split in collapsed {
+                breakpoint.add_setter(*split, "collapsed", Some(&true.to_value()));
+            }
+            let bar = format_bar.clone();
+            breakpoint.connect_apply(move |_| bar.set_compact(true));
+            let bar = format_bar.clone();
+            breakpoint.connect_unapply(move |_| bar.set_compact(false));
+            breakpoints.push(breakpoint);
         }
-        {
-            let bar = format_bar.clone();
-            narrow.connect_apply(move |_| bar.set_compact(true));
-            let bar = format_bar.clone();
-            narrow.connect_unapply(move |_| bar.set_compact(false));
+        for breakpoint in breakpoints {
+            window.add_breakpoint(breakpoint);
         }
-        // Below about a thousand pixels the format bar leaves out its
-        // secondary controls before the sidebars collapse. Of the
-        // breakpoints that match, the window applies the one added last,
-        // so the narrow one comes after and sets the format bar too.
-        let medium = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            1000.0,
-            adw::LengthUnit::Sp,
-        ));
-        {
-            let bar = format_bar.clone();
-            medium.connect_apply(move |_| bar.set_compact(true));
-            let bar = format_bar.clone();
-            medium.connect_unapply(move |_| bar.set_compact(false));
-        }
-        window.add_breakpoint(medium);
-        window.add_breakpoint(narrow);
         // One sidebar a side when they cover the pages.
-        for (a, b) in [(&thumbnails_split, &drawer_split), (&search_split, &split)] {
+        for (a, b) in [(&nav_split, &drawer_split), (&search_split, &split)] {
             for (one, other) in [(a, b), (b, a)] {
                 let other = other.downgrade();
                 one.connect_show_sidebar_notify(move |one| {
@@ -525,8 +558,10 @@ impl DocumentWindow {
             navigate_by,
             page_entry,
             thumbnails,
-            thumbnails_split,
             outline,
+            nav,
+            nav_split,
+            nav_before_fullscreen: Cell::new(false),
             side,
             spelling: std::cell::OnceCell::new(),
             media_browser: std::cell::OnceCell::new(),
@@ -1586,6 +1621,15 @@ impl DocumentWindow {
             let Some(this) = weak.upgrade() else { return };
             let fullscreen = window.is_fullscreen();
             this.toolbar_view.set_reveal_top_bars(!fullscreen);
+            // The navigation sidebar leaves room for the pages in full
+            // screen and comes back after (GNM-12).
+            if fullscreen {
+                this.nav_before_fullscreen
+                    .set(this.nav_split.shows_sidebar());
+                this.nav_split.set_show_sidebar(false);
+            } else if this.nav_before_fullscreen.replace(false) {
+                this.nav_split.set_show_sidebar(true);
+            }
             if let Some(leave) = leave.upgrade() {
                 leave.set_visible(fullscreen);
             }
@@ -1921,10 +1965,24 @@ impl DocumentWindow {
                 return;
             };
             action.set_state(&on.to_variant());
-            this.thumbnails_split.set_show_sidebar(on);
+            if on {
+                this.nav.set_page("pages");
+            }
+            this.nav_split.set_show_sidebar(on);
             this.thumbnails.set_shown(on, this.window.upcast_ref());
         });
         self.window.add_action(&thumbnails);
+        // The sidebar also closes by itself when it covers the pages.
+        let weak = Rc::downgrade(self);
+        self.nav_split.connect_show_sidebar_notify(move |split| {
+            if let Some(this) = weak.upgrade()
+                && this.action_state("thumbnails") != split.shows_sidebar()
+                && !this.window.is_fullscreen()
+            {
+                this.window
+                    .change_action_state("thumbnails", &split.shows_sidebar().to_variant());
+            }
+        });
 
         // The document as an outline, or as pages (TXT-14).
         let outline = gio::SimpleAction::new_stateful("outline", None, &false.to_variant());
@@ -2947,6 +3005,20 @@ fn from_template(target: &str) -> Document {
         "layout" => Document::new_page_layout(),
         _ => Document::new_word_processing(),
     }
+}
+
+/// The menu of the Add button of the navigation sidebar (GNM-12): a blank
+/// page, which in a page layout document is a page of its own, and a
+/// section break. The pages of the template join them with the templates
+/// of the gallery (INT-06).
+fn add_page_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&tr("_Blank Page")), Some("win.insert-page-break"));
+    menu.append(
+        Some(&tr("_Section Break")),
+        Some("win.insert-section-break"),
+    );
+    menu
 }
 
 /// The View menu of the header bar: what the window shows.

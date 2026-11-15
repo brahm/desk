@@ -403,7 +403,7 @@ funcionando.
 
 | Etapa | O que faz | Linhas das matrizes |
 | --- | --- | --- |
-| 1. Esqueleto da janela | Barra lateral de navegação da altura da janela, com o botão de conteúdo e o botão Adicionar; Inspetor como painel utilitário; os dois pontos de quebra | GNM-12, GNM-01 |
+| 1. Esqueleto da janela (feita) | Barra lateral de navegação da altura da janela, com o botão de conteúdo e o botão Adicionar; Inspetor como painel utilitário; os dois pontos de quebra | GNM-12, GNM-01 |
 | 2. Barra de cabeçalho e menus | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens, a busca de comandos e o aviso de tela pequena | INT-11, INT-14, GNM-10, GNM-14 |
 | 3. Barra de formatação enxuta | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
 | 4. Inspetor em dois níveis | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
@@ -413,8 +413,12 @@ funcionando.
 
 Oito linhas que já têm testes mudam de forma com a interface B e ficam
 reabertas até a etapa que as refaz: INT-07, INT-11, INT-14, INT-18,
-INT-19, DOC-20, TXT-13 e GNM-01. O relatório de paridade continua a
-contá-las como testadas enquanto os testes verificarem a forma antiga, e
+INT-19, DOC-20, TXT-13 e GNM-01. A etapa 1 refez GNM-01 para a tela
+mínima de 1280 × 720: abaixo de 720 px, como em meia tela, a barra
+lateral cobre as páginas; abaixo de 520 px o Inspetor fecha e volta por
+cima delas. O botão Adicionar da barra lateral insere, por enquanto, uma
+página em branco ou uma quebra de seção; as páginas do modelo chegam com
+a fase 9 (INT-06). O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:
