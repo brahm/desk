@@ -144,8 +144,11 @@ impl PictureGroup {
                 "Click a color in the picture, and drag to take out more or less",
             ))
             .build();
-        alpha_row.add_suffix(&restore);
         alpha_row.add_suffix(&alpha);
+        // The buttons go one to a row, so that the group keeps to the
+        // width of the Inspector in every language.
+        let restore_row = compact::ActionRow::new();
+        restore_row.add_suffix(&restore);
         let adjust = [
             tr("Brightness"),
             tr("Contrast"),
@@ -166,9 +169,10 @@ impl PictureGroup {
                 "Keeps only the part of the picture that shows, at the size it is shown",
             ))
             .build();
-        let buttons = compact::ActionRow::new();
-        buttons.add_suffix(&reduce);
-        buttons.add_suffix(&reset);
+        let reduce_row = compact::ActionRow::new();
+        reduce_row.add_suffix(&reduce);
+        let reset_row = compact::ActionRow::new();
+        reset_row.add_suffix(&reset);
         let group = compact::Group::builder().title(tr("Image")).build();
         group.add(&mask);
         group.add(&mask_shape);
@@ -176,10 +180,12 @@ impl PictureGroup {
         group.add(&left);
         group.add(&top);
         group.add(&alpha_row);
+        group.add(&restore_row);
         for row in &adjust {
             group.add(row);
         }
-        group.add(&buttons);
+        group.add(&reduce_row);
+        group.add(&reset_row);
         let this = Rc::new(Self {
             group,
             mask,

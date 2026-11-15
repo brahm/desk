@@ -23,6 +23,7 @@ by name once their prefix is added to the icon theme.
     <file>scalable/actions/desk-media-symbolic.svg</file>
     <file>scalable/actions/desk-comment-symbolic.svg</file>
     <file>scalable/actions/desk-line-spacing-symbolic.svg</file>
+    <file>scalable/actions/desk-link-symbolic.svg</file>
     <file>scalable/actions/desk-stroke-symbolic.svg</file>
     <file>scalable/actions/desk-shadow-symbolic.svg</file>
     <file>scalable/actions/desk-reflection-symbolic.svg</file>

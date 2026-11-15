@@ -406,7 +406,7 @@ funcionando.
 | 1. Esqueleto da janela (feita) | Barra lateral de navegação da altura da janela, com o botão de conteúdo e o botão Adicionar; Inspetor como painel utilitário; os dois pontos de quebra | GNM-12, GNM-01 |
 | 2. Barra de cabeçalho e menus (feita) | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens, a busca de comandos e o aviso de tela pequena | INT-11, INT-14, GNM-10, GNM-14 |
 | 3. Barra de formatação enxuta (feita) | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
-| 4. Inspetor em dois níveis | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
+| 4. Inspetor em dois níveis (feita) | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
 | 5. Páginas da barra lateral | Estilos no lugar da gaveta, Comentários e Resultados da busca | INT-18, TXT-13 |
 | 6. Barra inferior | Zoom, posição com Ir para e Navegar por, contagem e seleção | GNM-13, INT-07, INT-19, DOC-20 |
 | 7. Comandos e atalhos | Os quatro comandos do inventário, os atalhos confirmados, o diálogo de atalhos, as traduções e os testes pela árvore de acessibilidade | VMI-01 a VMI-04 |
@@ -434,7 +434,17 @@ reflexo, opacidade, Alfa instantâneo, Máscara e Ajustar imagem (numa
 imagem), Em linha ou Flutuante, ajuste do texto, Frente, Trás e
 Organizar. Os estilos de objeto ainda não existem no Desk e ficam fora
 da barra, e Ajustar imagem abre o Inspetor até a etapa 4 dar a ele a aba
-Imagem. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
+Imagem. A etapa 4 deu ao Inspetor os dois níveis (INT-13): Formato e
+Documento no alto; sob Formato, o título do que está selecionado (Texto,
+Imagem, Forma, Caixa de texto, Filme, Som ou Grupo) e as suas abas. Texto
+tem Estilo, Layout e Mais; imagem tem Estilo, Imagem e Organizar; forma e
+caixa de texto têm Estilo, Texto e Organizar; filme e som têm Estilo,
+Mídia e Organizar, no lugar do antigo painel QuickTime. Documento tem as
+abas Documento, Seção e Info, com as contagens do documento. O Link virou
+o botão Link da barra de formatação, com um popover. Ajustar imagem abre a
+aba Imagem, e Mostrar no Inspetor do menu de espaçamento abre a aba
+Estilo. A aba Texto de uma forma tem, por enquanto, só a caixa de texto (margem
+interna, alinhamento vertical e colunas). O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:

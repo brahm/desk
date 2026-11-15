@@ -357,6 +357,7 @@ impl DocumentWindow {
         };
         let format_bar = FormatBar::new(editor_of());
         let inspector = Inspector::new(editor_of());
+        format_bar.set_link_popover(inspector.link_popover());
         let drawer = StylesDrawer::new(editor_of());
         let search = Rc::new(Search::default());
         let search_sidebar = SearchSidebar::new(editor_of(), search.clone());

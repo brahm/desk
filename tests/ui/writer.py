@@ -266,9 +266,10 @@ def main():
             "Header Margin",
             "Space Between Notes",
             "Styles to Include",
-            "Make Links Inactive",
         ):
             wait_for(f"{name} in the Inspector", lambda: inspector_node(app, name))
+        wait_for("the Link popover of the format bar", lambda: link_node(app, "Make Links Inactive"))
+        press("Escape")
         check("the Inspector shows spacing, hyphenation, borders and rules", True)
         check("the Inspector shows the headers and footers (EST-01)", True)
         check("the Inspector shows how notes show (EST-13)", True)
@@ -492,6 +493,7 @@ def main():
     mask_and_frame(work)
     mask_from_the_menu(work)
     gnome_window(work)
+    two_level_inspector(work)
     header_and_menus(work)
     slim_format_bar(work)
     small_screen(work)
@@ -1263,13 +1265,35 @@ def showing_named(app, name):
 # The roles of switches: AT-SPI 2.52 has its own.
 SWITCHES = {Atspi.Role.CHECK_BOX, getattr(Atspi.Role, "SWITCH", Atspi.Role.CHECK_BOX)}
 
-# The panes of the Inspector, by the names of their toggles.
-PANES = ("Document", "Layout", "Wrap", "Text", "Graphic", "Metrics", "Link", "QuickTime")
+# The levels of the Inspector, and the tabs under them, by the names of
+# their toggles (INT-13).
+LEVELS = ("Format", "Document")
+TABS = ("Style", "Layout", "More", "Image", "Text", "Media", "Arrange", "Document",
+        "Section", "Info")
+
+
+def toggles_named(app, names, role=Atspi.Role.RADIO_BUTTON):
+    """The showing toggles of the Inspector named one of `names`: the
+    levels are radio buttons, and the tabs page tabs."""
+    try:
+        return [
+            n
+            for n in walk(app)
+            if n.get_role() == role and n.get_name() in names and showing(n)
+        ]
+    except GLib.GError:
+        return []
+
+
+def tab_toggles(app):
+    """The showing toggles of the tabs of the Inspector."""
+    return toggles_named(app, TABS, Atspi.Role.PAGE_TAB)
 
 
 def inspector_node(app, name, accept=None):
     """The showing node of a name in the Inspector, going through its
-    panes until one shows it. `accept` narrows the nodes."""
+    levels and their tabs until one shows it. `accept` narrows the
+    nodes."""
     def look():
         try:
             return next(
@@ -1286,23 +1310,53 @@ def inspector_node(app, name, accept=None):
     found = look()
     if found is not None:
         return found
-    toggles = [
-        n
-        for n in walk(app)
-        if n.get_role() == Atspi.Role.RADIO_BUTTON and n.get_name() in PANES and showing(n)
-    ]
-    for toggle in toggles:
+    for level in LEVELS:
         try:
-            Atspi.Action.do_action(toggle, 0)
+            for toggle in toggles_named(app, (level,))[:1]:
+                Atspi.Action.do_action(toggle, 0)
+            time.sleep(0.3)
+            found = look()
+            if found is not None:
+                return found
+            for toggle in tab_toggles(app):
+                Atspi.Action.do_action(toggle, 0)
+                time.sleep(0.3)
+                found = look()
+                if found is not None:
+                    return found
         except GLib.GError:
-            # The Inspector made its panes again for a new selection; the
+            # The Inspector made its tabs again for a new selection; the
             # next look finds the new toggles.
             return None
-        time.sleep(0.3)
-        found = look()
-        if found is not None:
-            return found
     return None
+
+
+def tab_shown(app, tab, name):
+    """Opens a tab of the Inspector by its name, as Show in Inspector
+    does, and returns the showing node named `name` in it (INT-13)."""
+    activate("inspector-tab", tab)
+    time.sleep(0.3)
+    return showing_named(app, name)
+
+
+def link_node(app, name):
+    """The showing node of a name in the Link popover of the format bar,
+    which the Link button opens (INT-13)."""
+    found = showing_named(app, name)
+    if found is not None:
+        return found
+    button = next(
+        (
+            n
+            for n in walk(app)
+            if n.get_name() == "Link" and n.get_role() == Atspi.Role.TOGGLE_BUTTON and showing(n)
+        ),
+        None,
+    )
+    if button is not None:
+        Atspi.Action.do_action(button, 0)
+        time.sleep(0.5)
+    return showing_named(app, name)
 
 
 def opened_without_portals(work, name):
@@ -1347,7 +1401,7 @@ def chosen_movie(work):
     writer, app, letter = opened_without_portals(work, "Movie.odt")
     try:
         choose_file(app, movie)
-        wait_for("the Movie and Sound group of the Inspector", lambda: inspector_node(app, "Poster Frame"))
+        wait_for("the Media tab of the Inspector", lambda: tab_shown(app, "media", "Poster Frame"))
         check("the chosen movie is on the page and selected (OBJ-18)", True)
         press("ctrl+s")
         wait_for(
@@ -1361,9 +1415,16 @@ def chosen_movie(work):
             "its first frame is saved as its poster (OBJ-19)",
             saved_content(letter, r'</draw:plugin><draw:image xlink:href="Pictures/object\d+\.png"'),
         )
-        play = wait_for("the Play button of the Inspector", lambda: inspector_node(app, "Play"))
+        play = wait_for("the Play button of the Inspector", lambda: tab_shown(app, "media", "Play"))
         play.do_action(0)
-        wait_for("the window that plays the movie", lambda: showing_named(app, "Movie"))
+        # The Inspector is titled Movie too; the window is a frame.
+        wait_for(
+            "the window that plays the movie",
+            lambda: next(
+                (n for n in toggles_named(app, ("Movie",), Atspi.Role.FRAME)),
+                None,
+            ),
+        )
         check("the Inspector plays the movie (OBJ-19)", True)
     finally:
         writer.terminate()
@@ -1378,7 +1439,7 @@ def reduced_movie(work):
     writer, app, letter = opened_without_portals(work, "Reduced.odt")
     try:
         choose_file(app, movie)
-        row = wait_for("the Stop row of the Inspector", lambda: inspector_node(app, "Stop"))
+        row = wait_for("the Stop row of the Inspector", lambda: tab_shown(app, "media", "Stop"))
         spin = next(node for node in walk(row) if node.get_role() == Atspi.Role.SPIN_BUTTON)
         Atspi.Value.set_current_value(spin, 0.5)
         time.sleep(1)
@@ -2383,7 +2444,7 @@ def header_and_menus(work):
 # What the text variant of the format bar shows, and what it leaves for
 # More (INT-12).
 TEXT_BAR = ("Font Size", "Bold", "Italic", "Underline", "Text Color",
-            "Align Left", "Line Spacing", "List", "More")
+            "Align Left", "Line Spacing", "List", "Link", "More")
 OBJECT_BAR = ("Line", "Shadow", "Reflection", "Opacity", "Wrap", "Bring to Front",
               "Send to Back", "Arrange", "More")
 
@@ -2416,7 +2477,7 @@ def slim_format_bar(work):
         wait_for("the text variant of the format bar", lambda: showing_named(app, "Line Spacing"))
         missing = [b for b in TEXT_BAR if showing_named(app, b) is None]
         check(
-            "the format bar of text has the style, font, size, B I U, color, alignment, spacing, list and More (INT-12)",
+            "the format bar of text has the style, font, size, B I U, color, alignment, spacing, list, Link and More (INT-12)",
             not missing,
         )
         check(
@@ -2460,6 +2521,83 @@ def slim_format_bar(work):
         press("ctrl+s")
         wait_for("the saved reflection", lambda: saved_content(letter, r'desk:reflection="50%"'))
         check("Reflection in the bar reflects the shape (INT-12)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def context_title(app, title):
+    """The title of the Inspector over the tabs of Format, if it shows."""
+    try:
+        return next(
+            (
+                n
+                for n in walk(app)
+                if n.get_role() == Atspi.Role.LABEL and n.get_name() == title and showing(n)
+            ),
+            None,
+        )
+    except GLib.GError:
+        return None
+
+
+def tab_names(app):
+    """The names of the tabs of the Inspector that show."""
+    return sorted(n.get_name() for n in tab_toggles(app))
+
+
+def two_level_inspector(work):
+    """The Inspector of interface B: Format and Document at the top; under
+    Format a title that says what is selected and its tabs, Style, Layout
+    and More for text, Style, Text and Arrange for a shape; under Document
+    the tabs Document, Section and Info; and a tab by its name from Show
+    in Inspector (INT-13)."""
+    name = "Levels.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        activate("show-inspector")
+        wait_for("the levels of the Inspector", lambda: len(toggles_named(app, LEVELS)) == 2)
+        check("the Inspector starts with Format and Document (INT-13)", True)
+        wait_for("the title of text", lambda: context_title(app, "Text"))
+        check(
+            "Format has a title for text and the tabs Style, Layout and More (INT-13)",
+            tab_names(app) == ["Layout", "More", "Style"],
+        )
+        activate("inspector-tab", "layout")
+        wait_for("the Layout tab", lambda: showing_named(app, "Default Tabs"))
+        check("Show in Inspector opens a tab by its name (INT-13)", True)
+        activate("inspector-tab", "info")
+        wait_for("the Info tab", lambda: showing_named(app, "Words"))
+        check(
+            "Document has the tabs Document, Section and Info, with the counts (INT-13)",
+            tab_names(app) == ["Document", "Info", "Section"]
+            and context_title(app, "Text") is None,
+        )
+        activate("show-inspector")
+        wait_for("Format again", lambda: context_title(app, "Text"))
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+    writer, app, letter = open_with_a_shape(work, "LevelsShape.odt")
+    try:
+        activate("show-inspector")
+        wait_for("the title of a shape", lambda: context_title(app, "Shape"))
+        check(
+            "a selected shape has the title Shape and the tabs Style, Text and Arrange (INT-13)",
+            tab_names(app) == ["Arrange", "Style", "Text"],
+        )
+        activate("inspector-tab", "arrange")
+        wait_for("the Arrange tab", lambda: showing_named(app, "Width"))
+        check("Arrange has the size and the wrap of the object (INT-13)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

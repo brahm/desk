@@ -4,7 +4,8 @@
 //! The actions of the slim format bar and its More menus (INT-12): the
 //! character style, the line spacing and the list of text; the shadow,
 //! reflection, placement and wrap of objects; Instant Alpha; and Show in
-//! Inspector.
+//! Inspector, which opens the Format level of the Inspector or one of its
+//! tabs (INT-13).
 
 use std::rc::Rc;
 
@@ -17,11 +18,12 @@ use crate::editing::{Format, ObjectInfo, TextEditor};
 use crate::formatting;
 
 /// The actions of the format bar, which need a document.
-pub(super) const FORMAT_BAR_ACTIONS: [&str; 9] = [
+pub(super) const FORMAT_BAR_ACTIONS: [&str; 10] = [
     "character-style",
     "line-spacing",
     "list-style",
     "show-inspector",
+    "inspector-tab",
     "object-shadow",
     "object-reflection",
     "object-placement",
@@ -182,11 +184,29 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         inspector.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
+                this.inspector.show_level(crate::inspector::FORMAT);
                 this.window
                     .change_action_state("inspector", &true.to_variant());
             }
         });
         self.window.add_action(&inspector);
+
+        // A tab of the Inspector by its name, as Adjust Image opens the
+        // Image tab.
+        let tab = gio::SimpleAction::new("inspector-tab", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        tab.connect_activate(move |_, value| {
+            if let (Some(this), Some(name)) =
+                (weak.upgrade(), value.and_then(|v| v.get::<String>()))
+            {
+                if !this.inspector.show_tab(&name) {
+                    this.inspector.show_level(crate::inspector::FORMAT);
+                }
+                this.window
+                    .change_action_state("inspector", &true.to_variant());
+            }
+        });
+        self.window.add_action(&tab);
 
         let alpha = gio::SimpleAction::new("instant-alpha", None);
         let weak = Rc::downgrade(self);
