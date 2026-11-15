@@ -365,6 +365,7 @@ pub struct Document {
     text_settings: TextSettings,
     view: Option<ViewSettings>,
     styles: Styles,
+    pub(crate) object_styles: crate::ObjectStyles,
     container: Container,
 }
 
@@ -375,6 +376,7 @@ impl PartialEq for Document {
         self.metadata == other.metadata
             && self.text_settings == other.text_settings
             && self.styles == other.styles
+            && self.object_styles == other.object_styles
             && self.container == other.container
     }
 }
@@ -388,6 +390,7 @@ impl Document {
         let mut ids = IdAllocator::default();
         let body_style = ids.allocate();
         let first = ids.allocate();
+        let object_styles = crate::ObjectStyles::library(|| ids.allocate());
         Self {
             ids,
             metadata: Metadata::default(),
@@ -399,6 +402,7 @@ impl Document {
             },
             view: None,
             styles: Styles::new(ParagraphStyle::new(body_style, "Body")),
+            object_styles,
             container: Container::Pages(PagedFlow {
                 // The footer of the Blank template is 0.6 inch from the
                 // bottom of the paper, the header half an inch from the top.
@@ -765,6 +769,13 @@ impl Document {
                     Some(old) => Op::PutStyle { style: old },
                     None => Op::RemoveStyle { style: id },
                 })
+            }
+            Op::SetObjectStyles { styles } => {
+                for style in styles.iter() {
+                    self.ids.observe(style.id);
+                }
+                let old = std::mem::replace(&mut self.object_styles, styles);
+                Ok(Op::SetObjectStyles { styles: old })
             }
             Op::RemoveStyle { style } => {
                 if style == self.styles.default_paragraph() {

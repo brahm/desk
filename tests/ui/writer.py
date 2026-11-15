@@ -500,6 +500,8 @@ def main():
     inventory_commands(work)
     header_and_menus(work)
     slim_format_bar(work)
+    object_styles(work)
+    text_of_a_shape(work)
     small_screen(work)
     print("All UI tests passed.")
 
@@ -2855,6 +2857,61 @@ def two_level_inspector(work):
         activate("inspector-tab", "arrange")
         wait_for("the Arrange tab", lambda: showing_named(app, "Width"))
         check("Arrange has the size and the wrap of the object (INT-13)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+# A shape with a word in it, for the Text tab of a shape (OBJ-13).
+SHAPE_WITH_TEXT = (
+    b'<draw:rect draw:style-name="Filled" text:anchor-type="page" text:anchor-page-number="1" '
+    b'svg:x="96pt" svg:y="200pt" svg:width="300pt" svg:height="200pt">'
+    b"<text:p>Shape</text:p></draw:rect>"
+)
+
+
+def object_styles(work):
+    """The object styles of iWork '09: the Style tab of a shape starts with
+    its styles, and choosing one gives the shape its look and keeps it
+    linked to the style in the file (MOD-04)."""
+    writer, app, letter = open_with_a_shape(work, "ObjectStyles.odt")
+    try:
+        group = wait_for("the object styles", lambda: inspector_node(app, "Object Styles"))
+        check("the Style tab of a shape has the object styles (MOD-04)", group is not None)
+        blue = wait_for(
+            "the Blue style",
+            lambda: inspector_node(app, "Blue", lambda n: n.get_role() == Atspi.Role.TOGGLE_BUTTON),
+        )
+        Atspi.Action.do_action(blue, 0)
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for(
+            "the saved style of the shape",
+            lambda: saved_content(letter, r'style:parent-style-name="[^"]*Blue"'),
+        )
+        check("a chosen style is the parent of the look of the shape (MOD-04)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def text_of_a_shape(work):
+    """The Text tab of a selected shape formats all its text, as the Text
+    inspector of Pages does: the font, its style and the alignment
+    (OBJ-13)."""
+    writer, app, letter = open_with_a_shape(work, "ShapeText.odt", SHAPE_WITH_TEXT)
+    try:
+        activate("inspector-tab", "text")
+        wait_for("the font of the shape", lambda: inspector_node(app, "Font Family"))
+        check("the Text tab of a shape has its font (OBJ-13)", True)
+        activate("bold")
+        activate("align", "right")
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for("the saved bold text", lambda: saved_content(letter, r'fo:font-weight="bold"'))
+        check("Bold with a shape selected makes its text bold (OBJ-13)", True)
+        wait_for("the saved alignment", lambda: saved_content(letter, r'fo:text-align="end"'))
+        check("the alignment with a shape selected aligns its text (OBJ-13)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

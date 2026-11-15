@@ -18,7 +18,7 @@ use crate::editing::{Format, ObjectInfo, TextEditor};
 use crate::formatting;
 
 /// The actions of the format bar, which need a document.
-pub(super) const FORMAT_BAR_ACTIONS: [&str; 10] = [
+pub(super) const FORMAT_BAR_ACTIONS: [&str; 16] = [
     "character-style",
     "line-spacing",
     "list-style",
@@ -29,6 +29,12 @@ pub(super) const FORMAT_BAR_ACTIONS: [&str; 10] = [
     "object-placement",
     "object-wrap",
     "instant-alpha",
+    "object-style",
+    "update-object-style",
+    "new-object-style",
+    "default-object-style",
+    "rename-object-style",
+    "delete-object-style",
 ];
 
 /// How opaque a reflection starts, in percent, as Pages makes it.
@@ -208,6 +214,49 @@ impl DocumentWindow {
         });
         self.window.add_action(&tab);
 
+        // The object styles (MOD-04, MOD-07): the style of the selected
+        // object is the state, and choosing another applies it.
+        stateful(
+            self,
+            "object-style",
+            String::new().to_variant(),
+            |_, editor, value| {
+                if let Some(style) = value
+                    .get::<String>()
+                    .as_deref()
+                    .and_then(crate::object_styles_pane::style_of_target)
+                {
+                    editor.apply_object_style(style);
+                }
+            },
+        );
+        /// A command on the style of the selected objects.
+        type StyleCommand = fn(&TextEditor);
+        let style_commands: [(&str, StyleCommand); 4] = [
+            ("update-object-style", TextEditor::update_object_style),
+            ("new-object-style", TextEditor::new_object_style),
+            ("default-object-style", TextEditor::set_default_object_style),
+            ("delete-object-style", TextEditor::delete_object_style),
+        ];
+        for (name, run) in style_commands {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                    run(&editor);
+                }
+            });
+            self.window.add_action(&action);
+        }
+        let rename = gio::SimpleAction::new("rename-object-style", None);
+        let weak = Rc::downgrade(self);
+        rename.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.rename_object_style();
+            }
+        });
+        self.window.add_action(&rename);
+
         let alpha = gio::SimpleAction::new("instant-alpha", None);
         let weak = Rc::downgrade(self);
         alpha.connect_activate(move |_, _| {
@@ -239,7 +288,7 @@ impl DocumentWindow {
             "line-spacing",
             spacing_name(format.paragraph.line_spacing).to_variant(),
         );
-        if let Some(info) = info {
+        if let Some(info) = &info {
             let style = &info.object.style;
             set("object-shadow", style.shadow.is_some().to_variant());
             set("object-reflection", style.reflection.is_some().to_variant());
@@ -250,6 +299,98 @@ impl DocumentWindow {
             );
             set("object-wrap", wrap_name(info.object.wrap).to_variant());
         }
+        // The commands on the style of the object: updating a style asks
+        // for an object changed since it took it.
+        let styles = info.as_ref().map(|i| &i.styles);
+        let current = styles.and_then(|s| s.current);
+        set(
+            "object-style",
+            current
+                .map(crate::object_styles_pane::style_target)
+                .unwrap_or_default()
+                .to_variant(),
+        );
+        let has_styles = styles.is_some_and(|s| !s.styles.is_empty());
+        let locked = info.as_ref().is_some_and(|i| i.object.locked);
+        for (name, on) in [
+            ("object-style", has_styles && !locked),
+            (
+                "update-object-style",
+                styles.is_some_and(|s| s.modified) && !locked,
+            ),
+            ("new-object-style", has_styles && !locked),
+            ("default-object-style", has_styles),
+            ("rename-object-style", current.is_some()),
+            (
+                "delete-object-style",
+                current.is_some() && styles.is_some_and(|s| s.styles.len() > 1),
+            ),
+        ] {
+            if let Some(action) = self
+                .window
+                .lookup_action(name)
+                .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
+            {
+                action.set_enabled(on);
+            }
+        }
+    }
+
+    /// Asks for a new name of the style of the selected object, and
+    /// renames it; a name that another style of its kind has is refused,
+    /// and an alert says so.
+    fn rename_object_style(self: &Rc<Self>) {
+        use adw::prelude::*;
+        let Some(editor) = self.editor() else { return };
+        let Some(info) = editor.object_info() else {
+            return;
+        };
+        let Some(style) = info
+            .styles
+            .current
+            .and_then(|id| info.styles.styles.iter().find(|s| s.id == id))
+        else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(Some(&crate::i18n::tr("Rename Style")), None);
+        let list = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .css_classes(["boxed-list"])
+            .build();
+        let entry = adw::EntryRow::builder()
+            .title(crate::i18n::tr("Name"))
+            .activates_default(true)
+            .build();
+        entry.set_text(&crate::object_styles_pane::style_name(&style.name));
+        list.append(&entry);
+        dialog.set_extra_child(Some(&list));
+        dialog.add_response("cancel", &crate::i18n::tr("_Cancel"));
+        dialog.add_response("rename", &crate::i18n::tr("_Rename"));
+        dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("rename"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(None, move |_, response| {
+            let Some(this) = weak.upgrade() else { return };
+            if response != "rename" {
+                return;
+            }
+            if let Err(desk_model::ModelError::DuplicateStyleName(name)) =
+                editor.rename_object_style(&entry.text())
+            {
+                let body = if name.is_empty() {
+                    crate::i18n::tr("A style needs a name.")
+                } else {
+                    crate::i18n::tr("Another style is already named “{name}”.")
+                        .replace("{name}", &name)
+                };
+                let error =
+                    adw::AlertDialog::new(Some(&crate::i18n::tr("Rename Style")), Some(&body));
+                error.add_response("close", &crate::i18n::tr("_Close"));
+                error.present(Some(&this.window));
+            }
+        });
+        dialog.present(Some(&self.window));
     }
 }
 

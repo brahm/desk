@@ -66,6 +66,11 @@ pub enum Op {
         /// The style.
         style: Style,
     },
+    /// Sets the object styles and their defaults (MOD-04, MOD-07).
+    SetObjectStyles {
+        /// The styles.
+        styles: crate::ObjectStyles,
+    },
     /// Removes a style that nothing uses.
     RemoveStyle {
         /// The style.

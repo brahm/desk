@@ -432,8 +432,9 @@ ficam no menu Mais, e abaixo de 1000 px o alinhamento, o espaçamento e a
 lista também vão para lá. Para um objeto, a barra tem linha, sombra,
 reflexo, opacidade, Alfa instantâneo, Máscara e Ajustar imagem (numa
 imagem), Em linha ou Flutuante, ajuste do texto, Frente, Trás e
-Organizar. Os estilos de objeto ainda não existem no Desk e ficam fora
-da barra, e Ajustar imagem abre o Inspetor até a etapa 4 dar a ele a aba
+Organizar, e começa pelo botão Estilo, com os seis estilos prontos do
+objeto (MOD-04, MOD-07) e os comandos que atualizam, criam, renomeiam e
+apagam estilos e definem o estilo padrão do tipo. Ajustar imagem abre o Inspetor até a etapa 4 dar a ele a aba
 Imagem. A etapa 4 deu ao Inspetor os dois níveis (INT-13): Formato e
 Documento no alto; sob Formato, o título do que está selecionado (Texto,
 Imagem, Forma, Caixa de texto, Filme, Som ou Grupo) e as suas abas. Texto
@@ -443,8 +444,12 @@ Mídia e Organizar, no lugar do antigo painel QuickTime. Documento tem as
 abas Documento, Seção e Info, com as contagens do documento. O Link virou
 o botão Link da barra de formatação, com um popover. Ajustar imagem abre a
 aba Imagem, e Mostrar no Inspetor do menu de espaçamento abre a aba
-Estilo. A aba Texto de uma forma tem, por enquanto, só a caixa de texto (margem
-interna, alinhamento vertical e colunas). A etapa 5 pôs na barra lateral as
+Estilo. A aba Estilo de uma forma, caixa de texto ou imagem começa pelos
+estilos de objeto. A aba Texto de uma forma ou caixa de texto formata
+todo o texto dela, como o inspetor Texto do Pages (OBJ-13): fonte,
+tamanho, negrito, itálico, sublinhado, tachado, cor, alinhamento, lista
+e espaçamento, além da caixa de texto (margem interna, alinhamento
+vertical e colunas). A etapa 5 pôs na barra lateral as
 páginas Estilos (INT-18), Comentários e Resultados da busca (TXT-13), ao
 lado das miniaturas, no lugar da gaveta de estilos e da barra lateral de
 busca. O botão de conteúdo, o menu Visualização, Ctrl+Shift+T e

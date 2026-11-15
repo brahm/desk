@@ -2158,11 +2158,17 @@ impl DocumentWindow {
             let Some(this) = weak.upgrade() else { return };
             let Some(editor) = this.editor() else { return };
             let cell = this.editor.clone();
-            this.format_revealer.set_reveal_child(true);
-            let window = this.fonts.present(
-                this.format_bar.font_button(),
-                Rc::new(move || cell.borrow().clone()),
-            );
+            let editor_of: crate::formatting::EditorOf = Rc::new(move || cell.borrow().clone());
+            let window = match this.inspector.object_font_button() {
+                // The family of a selected shape's text (OBJ-13).
+                Some(button) if editor.has_selected_objects() => {
+                    this.fonts.present(button, editor_of)
+                }
+                _ => {
+                    this.format_revealer.set_reveal_child(true);
+                    this.fonts.present(this.format_bar.font_button(), editor_of)
+                }
+            };
             let format = editor.format();
             window.show(&format.character, &format.paragraph);
         });

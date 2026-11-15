@@ -41,7 +41,7 @@ mod sections;
 mod stories;
 
 pub use navigate::Navigate;
-pub use objects::{NewShape, ObjectInfo};
+pub use objects::{NewShape, ObjectInfo, ObjectStylesInfo};
 pub use outline::OutlineRow;
 pub use sections::has_sections_clip;
 
@@ -491,6 +491,9 @@ pub struct Format {
     pub bookmarks: Vec<Arc<str>>,
     /// The selected objects, when objects are selected (OBJ-21).
     pub object: Option<ObjectInfo>,
+    /// Whether the selected objects hold text, which the Text tab of the
+    /// Inspector formats (OBJ-13).
+    pub object_text: bool,
 }
 
 /// Edits the document of a window.
@@ -2487,10 +2490,16 @@ impl TextEditor {
         let document = state.editor.document();
         let (start, end) = state.selection.ordered();
         let styles = document.styles();
-        let Some(paragraph) = document.body().get(start.paragraph) else {
+        let Some(body_paragraph) = document.body().get(start.paragraph) else {
             return Format::default();
         };
-        let at = if start == end || start.offset >= paragraph.len() {
+        // With a shape or a text box selected, the formatting of its text,
+        // which the Text tab of the Inspector shows (OBJ-13).
+        let object_text = Self::object_text_paragraph(&state);
+        let paragraph = object_text.as_ref().unwrap_or(body_paragraph);
+        let at = if object_text.is_some() {
+            usize::from(!paragraph.is_empty())
+        } else if start == end || start.offset >= paragraph.len() {
             start.offset
         } else {
             // The character after the start of the selection.
@@ -2498,6 +2507,7 @@ impl TextEditor {
         };
         let (style, mut attrs) = paragraph.format_at(at);
         if start == end
+            && object_text.is_none()
             && let Some(pending) = &state.pending
         {
             attrs.merge(pending);
@@ -2524,7 +2534,90 @@ impl TextEditor {
                 .map(|(name, _, _)| name)
                 .collect(),
             object: self.object_info(),
+            object_text: self.selected_objects_have_text(),
         }
+    }
+
+    /// The first paragraph of the text of the first selected object that
+    /// holds text, when objects are selected and no text is being edited.
+    fn object_text_paragraph(state: &State) -> Option<desk_model::Paragraph> {
+        if state.story.is_some() {
+            return None;
+        }
+        let document = state.editor.document();
+        state.objects.iter().find_map(|id| {
+            let object = document.objects().get(*id)?;
+            if !object.holds_text() {
+                return None;
+            }
+            let paragraphs = document.story_paragraphs(Story::TextBox(*id));
+            Some(paragraphs.into_iter().next().unwrap_or_else(|| {
+                // A shape with no text: how its first text is set.
+                let style = document.styles().default_paragraph();
+                let attrs = ParaAttrs {
+                    alignment: Some(desk_model::Alignment::Center),
+                    ..ParaAttrs::default()
+                };
+                desk_model::Paragraph::from_runs(object.id, style, attrs, [])
+                    .unwrap_or_else(|_| desk_model::Paragraph::new(object.id, style))
+            }))
+        })
+    }
+
+    /// Whether the selected objects hold text that the Text tab of the
+    /// Inspector formats: a text box, or a shape with text in it.
+    pub fn selected_objects_have_text(&self) -> bool {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        state.story.is_none()
+            && state
+                .objects
+                .iter()
+                .any(|id| !document.story_paragraphs(Story::TextBox(*id)).is_empty())
+    }
+
+    /// Formats the whole text of each selected shape and text box, as the
+    /// Text tab of the Inspector and the keys do with objects selected
+    /// (OBJ-13). False when no object is selected, and the change is for
+    /// the text.
+    pub(crate) fn format_object_texts(
+        &self,
+        name: &str,
+        change: impl Fn(
+            &mut desk_model::Edit,
+            desk_model::Position,
+            desk_model::Position,
+        ) -> Result<(), ModelError>,
+    ) -> bool {
+        let heads = {
+            let state = self.state.borrow();
+            if state.story.is_some() || state.objects.is_empty() {
+                return false;
+            }
+            let document = state.editor.document();
+            let mut heads: Vec<desk_model::NodeId> = state
+                .objects
+                .iter()
+                .filter(|id| {
+                    document
+                        .objects()
+                        .get(**id)
+                        .is_some_and(|o| o.holds_text() && !o.locked)
+                })
+                .map(|id| document.text_box_head(*id))
+                .collect();
+            heads.dedup();
+            heads
+        };
+        if !heads.is_empty() {
+            self.format_edit(name, |edit| {
+                for head in heads {
+                    edit.format_whole_story(Story::TextBox(head), &change)?;
+                }
+                Ok(())
+            });
+        }
+        true
     }
 
     /// Changes the settings of the text of the whole document, as one
@@ -2591,6 +2684,11 @@ impl TextEditor {
     /// Sets character formatting on the selection, as one action of the
     /// history. With nothing selected, the next text typed takes it.
     pub fn set_character_attrs(&self, name: &str, attrs: &CharAttrs) {
+        if self.format_object_texts(name, |edit, from, to| {
+            edit.set_character_attrs(from, to, attrs)
+        }) {
+            return;
+        }
         let selection = self.selection();
         if selection.is_empty() {
             {
@@ -2964,6 +3062,9 @@ impl TextEditor {
             desk_model::Position,
         ) -> Result<(), ModelError>,
     ) {
+        if self.format_object_texts(name, &change) {
+            return;
+        }
         let ranges = self.ranges();
         self.format_edit(name, move |edit| {
             for (start, end) in ranges {

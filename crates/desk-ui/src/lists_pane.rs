@@ -95,6 +95,21 @@ impl Kind {
 /// Makes the selection a list of the kind that the List menu of the
 /// format bar names (`none`, `bullets`, `numbers` or `tiered`), with the
 /// list style of Pages for it (INT-12).
+/// The target of the List menu (`none`, `bullets`, `numbers` or
+/// `tiered`) that a list style's first level is.
+pub(crate) fn list_target(list: Option<&ListStyle>) -> &'static str {
+    let Some(list) = list else { return "none" };
+    let Some(first) = list.levels.first() else {
+        return "none";
+    };
+    match Kind::of(list, first) {
+        Kind::None => "none",
+        Kind::Bullets | Kind::Images => "bullets",
+        Kind::Numbers => "numbers",
+        Kind::Tiered => "tiered",
+    }
+}
+
 pub(crate) fn set_list(editor: &crate::editing::TextEditor, kind: &str) {
     let kind = match kind {
         "bullets" => Kind::Bullets,
@@ -105,6 +120,13 @@ pub(crate) fn set_list(editor: &crate::editing::TextEditor, kind: &str) {
     match kind.style() {
         None => editor.set_list_style(None),
         Some((name, make)) => {
+            // The whole text of selected shapes and text boxes (OBJ-13).
+            if editor.format_object_texts("List Style", |edit, from, to| {
+                let style = edit.list_style_or_add(name, make)?;
+                edit.set_list_style(from, to, Some(style))
+            }) {
+                return;
+            }
             let result = editor.style_edit("List Style", |edit, from, to| {
                 let style = edit.list_style_or_add(name, make)?;
                 edit.set_list_style(from, to, Some(style))?;

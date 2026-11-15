@@ -45,6 +45,11 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
         else {
             break;
         };
+        if !chain.is_empty() && style.properties.graphic.object_style.is_some() {
+            // An object style of Desk is only a name for the object: its
+            // own style says the whole look.
+            break;
+        }
         chain.push(style.properties.graphic.clone());
         next.clone_from(&style.parent);
     }
@@ -997,6 +1002,179 @@ fn placement(object: &odf::DrawObject) -> (f64, f64, f64, f64, i32) {
     (x, y, w, h, rotation)
 }
 
+/// The object styles of a file of Desk, as graphic styles that name the
+/// kind of object they are for (MOD-04). They take the place of those of
+/// the document; a style of the library keeps its identifier. A file with
+/// none leaves the document with its own.
+fn import_object_styles(
+    source: &odf::TextDocument,
+    document: &mut Document,
+) -> Result<(), FilterError> {
+    let mut styles = desk_model::ObjectStyles::default();
+    let mut defaults = Vec::new();
+    for style in source
+        .styles
+        .iter()
+        .filter(|s| s.family == odf::Family::Graphic)
+    {
+        let g = &style.properties.graphic;
+        let Some(kind) = g
+            .object_style
+            .as_deref()
+            .and_then(desk_model::ObjectStyleKind::from_name)
+        else {
+            continue;
+        };
+        let name = style.shown_name();
+        if styles.by_name(kind, name).is_some() {
+            continue;
+        }
+        let id = match document.object_styles().by_name(kind, name) {
+            Some(own) if styles.get(own.id).is_none() => own.id,
+            _ => document.new_id(),
+        };
+        styles.insert(desk_model::ObjectStyle {
+            id,
+            name: name.into(),
+            kind,
+            graphic: model_look(source, g),
+        });
+        if g.default_object_style == Some(true) {
+            defaults.push(id);
+        }
+    }
+    if styles.is_empty() {
+        return Ok(());
+    }
+    for id in defaults {
+        styles.set_default(id);
+    }
+    document.apply(desk_model::Op::SetObjectStyles { styles })?;
+    Ok(())
+}
+
+/// The object style that an object of a file of Desk took: the parent of
+/// its graphic style, by its kind and name.
+fn object_style_of(
+    source: &odf::TextDocument,
+    document: &Document,
+    name: Option<&str>,
+) -> Option<desk_model::StyleId> {
+    let find = |name: &str| {
+        source
+            .automatic_styles
+            .iter()
+            .chain(&source.styles)
+            .find(|s| s.family == odf::Family::Graphic && s.name == name)
+    };
+    let own = find(name?)?;
+    let style = match own.properties.graphic.object_style {
+        Some(_) => own,
+        None => find(own.parent.as_deref()?)?,
+    };
+    let kind =
+        desk_model::ObjectStyleKind::from_name(style.properties.graphic.object_style.as_deref()?)?;
+    document
+        .object_styles()
+        .by_name(kind, style.shown_name())
+        .map(|s| s.id)
+}
+
+/// The look of an object or an object style from its graphic
+/// properties: its fill, line, reflection, picture frame, shadow and
+/// opacity.
+fn model_look(source: &odf::TextDocument, g: &odf::GraphicProperties) -> desk_model::GraphicStyle {
+    let mut look = desk_model::GraphicStyle::default();
+    let style = &mut look;
+    let filled = match g.fill.as_deref() {
+        Some("none") => false,
+        Some(_) => true,
+        None => g.fill_color.is_some(),
+    };
+    let gradient = g
+        .fill_gradient_name
+        .as_deref()
+        .filter(|_| g.fill.as_deref() == Some("gradient"))
+        .and_then(|name| source.gradients.iter().find(|d| d.name == name));
+    let image = g
+        .fill_image_name
+        .as_deref()
+        .filter(|_| g.fill.as_deref() == Some("bitmap"))
+        .and_then(|name| source.fill_images.iter().find(|i| i.name == name))
+        .and_then(|image| {
+            let path = image.href.strip_prefix("./").unwrap_or(&image.href);
+            source
+                .pictures
+                .iter()
+                .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
+                .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
+        });
+    if let Some(picture) = image {
+        let mode = match (g.fill_image_mode.as_deref(), g.repeat.as_deref()) {
+            (Some("scale-to-fill"), _) => ImageFill::ScaleToFill,
+            (Some("scale-to-fit"), _) => ImageFill::ScaleToFit,
+            (_, Some("no-repeat")) => ImageFill::OriginalSize,
+            (_, Some("stretch")) => ImageFill::Stretch,
+            // ODF repeats a picture unless it says otherwise.
+            _ => ImageFill::Tile,
+        };
+        let tint = g.fill_tint.map(|color| {
+            let mut tint = rgba(color);
+            tint.a = (g.fill_tint_opacity.unwrap_or(100.0).clamp(0.0, 100.0) * 2.55).round() as u8;
+            tint
+        });
+        style.fill = Some(Fill::Image {
+            picture,
+            mode,
+            tint,
+        });
+    } else if let Some(gradient) = gradient {
+        style.fill = Some(model_gradient(gradient));
+    } else if filled && let Some(color) = g.fill_color {
+        style.fill = Some(Fill::Color(rgba(color)));
+    }
+    let stroked = match g.stroke.as_deref() {
+        Some("none") => false,
+        Some(_) => true,
+        None => g.stroke_color.is_some() || g.stroke_width.is_some(),
+    };
+    if stroked {
+        style.stroke = Some(Stroke {
+            color: g.stroke_color.map_or(desk_model::Rgba::BLACK, rgba),
+            // A width of zero is the thinnest line, a hair.
+            width: g
+                .stroke_width
+                .map_or(Length::from_pt(1.0), length)
+                .max(Length::from_pt(0.5)),
+            style: match (g.stroke.as_deref(), g.stroke_style.as_deref()) {
+                (_, Some("dotted")) => desk_model::BorderStyle::Dotted,
+                (Some("dash"), _) => desk_model::BorderStyle::Dashed,
+                _ => desk_model::BorderStyle::Solid,
+            },
+            start: line_end(g.marker_start.as_deref()),
+            end: line_end(g.marker_end.as_deref()),
+        });
+    }
+    style.reflection = g.reflection.map(|r| r.round().clamp(0.0, 100.0) as u8);
+    style.frame = g
+        .picture_frame
+        .as_deref()
+        .and_then(desk_model::FrameStyle::from_name)
+        .map(|frame_style| desk_model::PictureFrame {
+            style: frame_style,
+            scale: g
+                .picture_frame_scale
+                .map_or(100, |s| s.round().clamp(10.0, 400.0) as u16),
+        });
+    if g.shadow.as_deref() == Some("visible") {
+        style.shadow = Some(model_shadow(g));
+    }
+    if let Some(opacity) = g.opacity {
+        style.opacity = opacity.round().clamp(0.0, 100.0) as u8;
+    }
+    look
+}
+
 /// An object of ODF, anchored to a paragraph of the body when it is in
 /// one, or none when Desk cannot hold it. `setup` is the page setup that
 /// positions measured from the margins need.
@@ -1084,95 +1262,13 @@ fn import_one(
         built.anchor = Anchor::Master(None, pages);
     }
     built.rotation = rotation;
-    let style = &mut built.style;
-    let filled = match g.fill.as_deref() {
-        Some("none") => false,
-        Some(_) => true,
-        None => g.fill_color.is_some(),
-    };
-    let gradient = g
-        .fill_gradient_name
-        .as_deref()
-        .filter(|_| g.fill.as_deref() == Some("gradient"))
-        .and_then(|name| source.gradients.iter().find(|d| d.name == name));
-    let image = g
-        .fill_image_name
-        .as_deref()
-        .filter(|_| g.fill.as_deref() == Some("bitmap"))
-        .and_then(|name| source.fill_images.iter().find(|i| i.name == name))
-        .and_then(|image| {
-            let path = image.href.strip_prefix("./").unwrap_or(&image.href);
-            source
-                .pictures
-                .iter()
-                .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
-                .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
-        });
-    if let Some(picture) = image {
-        let mode = match (g.fill_image_mode.as_deref(), g.repeat.as_deref()) {
-            (Some("scale-to-fill"), _) => ImageFill::ScaleToFill,
-            (Some("scale-to-fit"), _) => ImageFill::ScaleToFit,
-            (_, Some("no-repeat")) => ImageFill::OriginalSize,
-            (_, Some("stretch")) => ImageFill::Stretch,
-            // ODF repeats a picture unless it says otherwise.
-            _ => ImageFill::Tile,
-        };
-        let tint = g.fill_tint.map(|color| {
-            let mut tint = rgba(color);
-            tint.a = (g.fill_tint_opacity.unwrap_or(100.0).clamp(0.0, 100.0) * 2.55).round() as u8;
-            tint
-        });
-        style.fill = Some(Fill::Image {
-            picture,
-            mode,
-            tint,
-        });
-    } else if let Some(gradient) = gradient {
-        style.fill = Some(model_gradient(gradient));
-    } else if filled && let Some(color) = g.fill_color {
-        style.fill = Some(Fill::Color(rgba(color)));
-    }
-    let stroked = match g.stroke.as_deref() {
-        Some("none") => false,
-        Some(_) => true,
-        None => g.stroke_color.is_some() || g.stroke_width.is_some(),
-    };
-    if stroked {
-        style.stroke = Some(Stroke {
-            color: g.stroke_color.map_or(desk_model::Rgba::BLACK, rgba),
-            // A width of zero is the thinnest line, a hair.
-            width: g
-                .stroke_width
-                .map_or(Length::from_pt(1.0), length)
-                .max(Length::from_pt(0.5)),
-            style: match (g.stroke.as_deref(), g.stroke_style.as_deref()) {
-                (_, Some("dotted")) => desk_model::BorderStyle::Dotted,
-                (Some("dash"), _) => desk_model::BorderStyle::Dashed,
-                _ => desk_model::BorderStyle::Solid,
-            },
-            start: line_end(g.marker_start.as_deref()),
-            end: line_end(g.marker_end.as_deref()),
-        });
-    }
+    built.style = model_look(source, &g);
+    built.object_style = object_style_of(source, document, object.style.as_deref()).filter(|id| {
+        document.object_styles().get(*id).map(|s| s.kind)
+            == desk_model::ObjectStyleKind::of(&built.kind)
+    });
     if let ObjectKind::Image(picture) = &built.kind {
         built.picture = model_picture_settings(&g, picture, frame);
-    }
-    style.reflection = g.reflection.map(|r| r.round().clamp(0.0, 100.0) as u8);
-    style.frame = g
-        .picture_frame
-        .as_deref()
-        .and_then(desk_model::FrameStyle::from_name)
-        .map(|frame_style| desk_model::PictureFrame {
-            style: frame_style,
-            scale: g
-                .picture_frame_scale
-                .map_or(100, |s| s.round().clamp(10.0, 400.0) as u16),
-        });
-    if g.shadow.as_deref() == Some("visible") {
-        style.shadow = Some(model_shadow(&g));
-    }
-    if let Some(opacity) = g.opacity {
-        style.opacity = opacity.round().clamp(0.0, 100.0) as u8;
     }
     built.wrap = match (g.wrap.as_deref(), g.run_through.as_deref()) {
         (Some("none"), _) => Wrap::AboveAndBelow,
@@ -1391,6 +1487,7 @@ pub(super) fn import_objects(
     document: &mut Document,
     paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
 ) -> Result<(), FilterError> {
+    import_object_styles(source, document)?;
     let setup = *document.page_setup();
     let ids: Vec<NodeId> = document.body().iter().map(Paragraph::id).collect();
     let mut found: Vec<(&odf::DrawObject, Option<NodeId>)> =
@@ -1647,21 +1744,11 @@ impl Exporter<'_> {
         href
     }
 
-    /// An object as an ODF drawing object, its frame moved by `dx`, as
-    /// the margin of the text that a paragraph's objects are measured
-    /// from.
-    pub fn object(
-        &mut self,
-        object: &Object,
-        anchor: &str,
-        page: Option<u32>,
-        dx: f64,
-    ) -> odf::DrawObject {
-        let frame = object.frame;
-        let (x, y) = (frame.x.to_pt() - dx, frame.y.to_pt());
-        let (w, h) = (frame.width.to_pt(), frame.height.to_pt());
+    /// The graphic properties of a look: its fill, line, opacity,
+    /// reflection, picture frame and shadow, as an object or an object
+    /// style has it.
+    pub fn look(&mut self, style: &desk_model::GraphicStyle) -> odf::GraphicProperties {
         let mut g = odf::GraphicProperties::default();
-        let style = &object.style;
         match &style.fill {
             Some(Fill::Image {
                 picture,
@@ -1737,13 +1824,6 @@ impl Exporter<'_> {
             g.opacity = Some(f64::from(style.opacity));
         }
         g.reflection = style.reflection.map(f64::from);
-        if let Anchor::Master(_, pages) = object.anchor {
-            g.master_pages = match pages {
-                desk_model::MarginPages::Default => None,
-                desk_model::MarginPages::First => Some("first".into()),
-                desk_model::MarginPages::Left => Some("left".into()),
-            };
-        }
         if let Some(frame) = style.frame {
             g.picture_frame = Some(frame.style.name().into());
             g.picture_frame_scale = (frame.scale != 100).then_some(f64::from(frame.scale));
@@ -1756,6 +1836,30 @@ impl Exporter<'_> {
             g.shadow_color = Some(odf_color(shadow.color));
             g.shadow_opacity = Some(f64::from(shadow.opacity));
             g.shadow_blur = Some(odf_length(shadow.blur));
+        }
+        g
+    }
+
+    /// An object as an ODF drawing object, its frame moved by `dx`, as
+    /// the margin of the text that a paragraph's objects are measured
+    /// from.
+    pub fn object(
+        &mut self,
+        object: &Object,
+        anchor: &str,
+        page: Option<u32>,
+        dx: f64,
+    ) -> odf::DrawObject {
+        let frame = object.frame;
+        let (x, y) = (frame.x.to_pt() - dx, frame.y.to_pt());
+        let (w, h) = (frame.width.to_pt(), frame.height.to_pt());
+        let mut g = self.look(&object.style);
+        if let Anchor::Master(_, pages) = object.anchor {
+            g.master_pages = match pages {
+                desk_model::MarginPages::Default => None,
+                desk_model::MarginPages::First => Some("first".into()),
+                desk_model::MarginPages::Left => Some("left".into()),
+            };
         }
         let (wrap, through) = match object.wrap {
             Wrap::Both => ("parallel", None),
@@ -1958,10 +2062,21 @@ impl Exporter<'_> {
                 .map(|p| self.paragraph(p))
                 .collect();
         }
+        // The object style it took is the parent of its own, which says
+        // all of its look, so that nothing of the parent shows through
+        // where the object differs from it.
+        let parent = object
+            .object_style
+            .and_then(|id| self.names.get(&id))
+            .cloned();
+        if parent.is_some() {
+            g.shadow.get_or_insert_with(|| "hidden".into());
+            g.opacity.get_or_insert(100.0);
+        }
         let style = self.style(
             "gr",
             odf::Family::Graphic,
-            None,
+            parent,
             odf::Properties {
                 graphic: g,
                 ..Default::default()
@@ -2094,6 +2209,25 @@ fn master_paragraphs(page: &mut odf::MasterPage) -> impl Iterator<Item = &mut od
 /// first paragraph, and those that move with a paragraph in it.
 pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDocument) {
     let document = exporter.document;
+    // The object styles, among the named styles, with the kind of object
+    // each is for and the default of each kind (MOD-04, MOD-07).
+    let object_styles = document.object_styles();
+    for style in object_styles.iter() {
+        let name = exporter.names[&style.id].clone();
+        let mut graphic = exporter.look(&style.graphic);
+        graphic.object_style = Some(style.kind.name().to_owned());
+        graphic.default_object_style = object_styles.is_default(style.id).then_some(true);
+        out.styles.push(odf::Style {
+            display_name: (name != *style.name).then(|| style.name.to_string()),
+            name,
+            family: odf::Family::Graphic,
+            properties: odf::Properties {
+                graphic,
+                ..Default::default()
+            },
+            ..odf::Style::default()
+        });
+    }
     let indexes: HashMap<NodeId, usize> = document
         .body()
         .iter()

@@ -2496,6 +2496,19 @@ pub fn export(document: &Document) -> odf::TextDocument {
         taken.insert(name.clone());
         names.insert(style.id(), name);
     }
+    // The object styles, as graphic styles named for their kind and
+    // name, as two kinds may have styles of one name (MOD-04).
+    for style in document.object_styles().iter() {
+        let base = odf_name(&format!("{} {}", style.kind.name(), style.name));
+        let mut name = base.clone();
+        let mut n = 2;
+        while taken.contains(&name) {
+            name = format!("{base}_{n}");
+            n += 1;
+        }
+        taken.insert(name.clone());
+        names.insert(style.id, name);
+    }
 
     let mut pictures: Vec<(String, Vec<u8>)> = Vec::new();
     let mut out = odf::TextDocument {
