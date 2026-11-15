@@ -221,18 +221,15 @@ impl DocumentWindow {
         }
     }
 
-    /// Shows or hides the Media Browser, whose items go on the page shown
-    /// (INT-14).
+    /// Opens the popover of Media, with the Media Browser, whose items go
+    /// on the page shown (INT-14).
     fn add_media_browser_action(self: &Rc<Self>) {
-        let action = gio::SimpleAction::new_stateful("media-browser", None, &false.to_variant());
+        let action = gio::SimpleAction::new("media-browser", None);
         let weak = Rc::downgrade(self);
-        action.connect_change_state(move |action, value| {
-            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
-            else {
-                return;
-            };
-            action.set_state(&on.to_variant());
-            this.show_side("media", on);
+        action.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.media_button.popup();
+            }
         });
         self.window.add_action(&action);
     }
@@ -244,6 +241,7 @@ impl DocumentWindow {
                 let weak = Rc::downgrade(self);
                 crate::media_browser::MediaBrowser::new(move |file| {
                     let Some(this) = weak.upgrade() else { return };
+                    this.media_button.popdown();
                     if let Some(editor) = this.editor() {
                         editor.insert_file(file, None);
                     }
@@ -253,28 +251,8 @@ impl DocumentWindow {
     }
 }
 
-/// The shapes and the text box of the Insert menu (OBJ-08, OBJ-13).
-pub(super) fn shapes_menu() -> gio::Menu {
-    let menu = gio::Menu::new();
-    menu.append(Some(&tr("C_hoose…")), Some("win.insert-picture"));
-    menu.append(Some(&tr("_Text Box")), Some("win.insert-text-box"));
-    menu.append(
-        Some(&tr("Lin_ked Text Box")),
-        Some("win.add-linked-text-box"),
-    );
-    let shapes = gio::Menu::new();
-    for (label, value) in shape_names().into_iter().chain([(tr("_Line"), "line")]) {
-        shapes.append(Some(&label), Some(&format!("win.insert-shape('{value}')")));
-    }
-    shapes.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
-    menu.append_submenu(Some(&tr("_Shape")), &shapes);
-    // Joins the two selected objects (OBJ-31).
-    menu.append(Some(&tr("Connection L_ine")), Some("win.insert-connection"));
-    menu
-}
-
 /// The shapes of Insert Shape and Mask with Shape, with their values.
-fn shape_names() -> [(String, &'static str); 12] {
+pub(super) fn shape_names() -> [(String, &'static str); 12] {
     [
         (tr("_Rectangle"), "rectangle"),
         (tr("Rounded Re_ctangle"), "rounded"),

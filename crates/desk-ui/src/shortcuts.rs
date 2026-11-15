@@ -34,6 +34,8 @@ const SECTIONS: &[Section] = &[
             ("F11", n_("Fullscreen")),
             ("<Control>comma", n_("Preferences")),
             ("<Control>question", n_("Keyboard shortcuts")),
+            ("F10", n_("Main menu")),
+            ("<Control>slash", n_("Search commands")),
         ],
     ),
     (

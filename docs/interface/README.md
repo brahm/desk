@@ -404,7 +404,7 @@ funcionando.
 | Etapa | O que faz | Linhas das matrizes |
 | --- | --- | --- |
 | 1. Esqueleto da janela (feita) | Barra lateral de navegação da altura da janela, com o botão de conteúdo e o botão Adicionar; Inspetor como painel utilitário; os dois pontos de quebra | GNM-12, GNM-01 |
-| 2. Barra de cabeçalho e menus | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens, a busca de comandos e o aviso de tela pequena | INT-11, INT-14, GNM-10, GNM-14 |
+| 2. Barra de cabeçalho e menus (feita) | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens, a busca de comandos e o aviso de tela pequena | INT-11, INT-14, GNM-10, GNM-14 |
 | 3. Barra de formatação enxuta | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
 | 4. Inspetor em dois níveis | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
 | 5. Páginas da barra lateral | Estilos no lugar da gaveta, Comentários e Resultados da busca | INT-18, TXT-13 |
@@ -418,7 +418,13 @@ mínima de 1280 × 720: abaixo de 720 px, como em meia tela, a barra
 lateral cobre as páginas; abaixo de 520 px o Inspetor fecha e volta por
 cima delas. O botão Adicionar da barra lateral insere, por enquanto, uma
 página em branco ou uma quebra de seção; as páginas do modelo chegam com
-a fase 9 (INT-06). O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
+a fase 9 (INT-06). A etapa 2 refez INT-11 e INT-14: a barra de
+cabeçalho tem o botão Barra lateral, Inserir e os seis objetos, e o
+Navegador de mídia mora no popover do botão Mídia. Tabela e Gráfico ficam
+desativados até a fase 7 do Writer, e Comentário até a etapa 5. O menu
+principal tem nove dos doze itens: Exportar, Imprimir e Ajuda entram
+quando essas funções existirem. Abaixo de 720 px os objetos saem da barra
+e entram no menu Inserir. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:

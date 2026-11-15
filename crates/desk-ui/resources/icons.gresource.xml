@@ -3,7 +3,8 @@
 SPDX-FileCopyrightText: 2026 Desk contributors
 SPDX-License-Identifier: GPL-3.0-or-later
 
-The app icons, laid out as in the hicolor icon theme so that GTK finds them
+The app icons and the symbolic icons of the actions that Adwaita does not
+ship (made by docs/interface/mockups/make_icons.py), laid out as in the hicolor icon theme so that GTK finds them
 by name once their prefix is added to the icon theme.
 -->
 <gresources>
@@ -14,5 +15,12 @@ by name once their prefix is added to the icon theme.
     <file>symbolic/apps/br.com.brahm.Desk.Writer-symbolic.svg</file>
     <file>symbolic/apps/br.com.brahm.Desk.Tables-symbolic.svg</file>
     <file>symbolic/apps/br.com.brahm.Desk.Slides-symbolic.svg</file>
+    <file>scalable/actions/desk-insert-symbolic.svg</file>
+    <file>scalable/actions/desk-table-symbolic.svg</file>
+    <file>scalable/actions/desk-chart-symbolic.svg</file>
+    <file>scalable/actions/desk-textbox-symbolic.svg</file>
+    <file>scalable/actions/desk-shape-symbolic.svg</file>
+    <file>scalable/actions/desk-media-symbolic.svg</file>
+    <file>scalable/actions/desk-comment-symbolic.svg</file>
   </gresource>
 </gresources>

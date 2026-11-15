@@ -36,6 +36,8 @@ use crate::{AppInfo, Opener};
 
 pub(crate) use objects::OBJECT_ACCELS;
 
+mod command_search;
+mod header;
 mod objects;
 
 /// How far from the top of the screen the pointer brings the header bar
@@ -101,11 +103,14 @@ pub struct DocumentWindow {
     nav_split: adw::OverlaySplitView,
     /// Whether the navigation sidebar showed before full screen hid it.
     nav_before_fullscreen: Cell<bool>,
-    /// The pages of the right sidebar: the Inspector, the Media Browser
-    /// and Spelling and Grammar, one at a time.
+    /// The pages of the right sidebar: the Inspector and Spelling and
+    /// Grammar, one at a time.
     side: gtk::Stack,
     /// Spelling and Grammar, made when first shown.
     spelling: std::cell::OnceCell<Rc<crate::spelling_window::SpellingWindow>>,
+    /// Media in the header bar, whose popover holds the Media Browser
+    /// (INT-14).
+    media_button: gtk::MenuButton,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     format_revealer: gtk::Revealer,
@@ -213,64 +218,15 @@ const TOGGLES: [(&str, &str); 4] = [
 impl DocumentWindow {
     /// A new, empty window.
     pub fn new(app: &adw::Application, info: AppInfo, opener: Option<&'static Opener>) -> Rc<Self> {
-        let menu_button = gtk::MenuButton::builder()
-            .icon_name("open-menu-symbolic")
-            .menu_model(&main_menu(info, opener.is_some()))
-            .primary(true)
-            .tooltip_text(tr("Main Menu"))
-            .build();
-
-        let title = adw::WindowTitle::new(info.name, "");
-        let header = adw::HeaderBar::builder().title_widget(&title).build();
-        if opener.is_some() {
-            let open = gtk::Button::builder()
-                .label(tr("_Open"))
-                .use_underline(true)
-                .action_name("app.open")
-                .tooltip_text(tr("Open a Document"))
-                .build();
-            header.pack_start(&open);
-        }
-        formatting::labelled(&menu_button, &tr("Main Menu"));
-        header.pack_end(&menu_button);
-        // The View and Insert menus at the start, and the toggles of the
-        // right sidebar at the end, for a document only.
-        let view_button = gtk::MenuButton::builder()
-            .label(tr("_View"))
-            .use_underline(true)
-            .menu_model(&view_menu())
-            .tooltip_text(tr("View"))
-            .build();
-        view_button.set_always_show_arrow(true);
-        let insert_button = gtk::MenuButton::builder()
-            .label(tr("_Insert"))
-            .use_underline(true)
-            .menu_model(&insert_menu())
-            .tooltip_text(tr("Insert"))
-            .build();
-        insert_button.set_always_show_arrow(true);
-        let media_toggle = gtk::ToggleButton::builder()
-            .icon_name("folder-pictures-symbolic")
-            .action_name("win.media-browser")
-            .tooltip_text(tr("Media Browser"))
-            .build();
-        formatting::labelled(&media_toggle, &tr("Media Browser"));
-        let inspector_toggle = gtk::ToggleButton::builder()
-            .icon_name("sidebar-show-right-symbolic")
-            .action_name("win.inspector")
-            .tooltip_text(tr("Inspector"))
-            .build();
-        formatting::labelled(&inspector_toggle, &tr("Inspector"));
-        let start_buttons = gtk::Box::builder().spacing(6).visible(false).build();
-        start_buttons.append(&view_button);
-        start_buttons.append(&insert_button);
-        let end_buttons = gtk::Box::builder().spacing(6).visible(false).build();
-        end_buttons.append(&media_toggle);
-        end_buttons.append(&inspector_toggle);
-        let document_buttons: [gtk::Widget; 2] =
-            [start_buttons.clone().upcast(), end_buttons.clone().upcast()];
-        header.pack_start(&start_buttons);
-        header.pack_end(&end_buttons);
+        let header::Header {
+            header,
+            title,
+            document_buttons,
+            insert_button,
+            objects: object_buttons,
+            media_button,
+            find_toggle,
+        } = header::Header::new(info, opener.is_some());
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -289,6 +245,15 @@ impl DocumentWindow {
             .build();
         formatting::labelled(&backdrop, &tr("Background"));
         header.pack_end(&backdrop);
+        // Says once, over the first window, that the screen is smaller
+        // than Desk asks for (GNM-14).
+        let screen_banner = adw::Banner::builder()
+            .title(tr(
+                "The screen is smaller than 1280 × 720, so parts of the window might not fit",
+            ))
+            .button_label(tr("_Close"))
+            .build();
+        screen_banner.connect_button_clicked(|banner| banner.set_revealed(false));
         let warnings_banner = adw::Banner::builder()
             .title(tr("Some of the document might not show as it was made"))
             .button_label(tr("_See Warnings"))
@@ -452,6 +417,7 @@ impl DocumentWindow {
 
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
+        toolbar_view.add_top_bar(&screen_banner);
         toolbar_view.add_top_bar(&warnings_banner);
         toolbar_view.add_top_bar(&format_revealer);
         let find = FindWindow::new(editor_of(), search.clone());
@@ -502,6 +468,16 @@ impl DocumentWindow {
             ));
             for split in collapsed {
                 breakpoint.add_setter(*split, "collapsed", Some(&true.to_value()));
+            }
+            if width == OVERLAY_SIDEBAR {
+                // The buttons of the objects go into the Insert menu
+                // (INT-11).
+                breakpoint.add_setter(&object_buttons, "visible", Some(&false.to_value()));
+                breakpoint.add_setter(
+                    &insert_button,
+                    "menu-model",
+                    Some(&header::insert_menu(true).to_value()),
+                );
             }
             let bar = format_bar.clone();
             breakpoint.connect_apply(move |_| bar.set_compact(true));
@@ -564,6 +540,7 @@ impl DocumentWindow {
             nav_before_fullscreen: Cell::new(false),
             side,
             spelling: std::cell::OnceCell::new(),
+            media_button,
             media_browser: std::cell::OnceCell::new(),
             format_revealer,
             ruler,
@@ -574,6 +551,8 @@ impl DocumentWindow {
             draft_due: Cell::new(false),
         });
         this.add_actions();
+        this.connect_header(&find_toggle);
+        warn_small_screen(&this.window, &screen_banner);
         this.show_rulers();
         {
             let current = preferences::get();
@@ -698,9 +677,11 @@ impl DocumentWindow {
         WINDOWS.with(|w| w.borrow_mut().push(this.clone()));
         let weak = Rc::downgrade(&this);
         this.window.connect_destroy(move |_| {
-            WINDOWS.with(|w| {
-                w.borrow_mut()
-                    .retain(|o| weak.upgrade().is_none_or(|me| !Rc::ptr_eq(o, &me)));
+            // The list is gone when the app ends with windows in it.
+            let _ = WINDOWS.try_with(|w| {
+                if let Ok(mut w) = w.try_borrow_mut() {
+                    w.retain(|o| weak.upgrade().is_none_or(|me| !Rc::ptr_eq(o, &me)));
+                }
             });
         });
         this
@@ -1684,6 +1665,61 @@ impl DocumentWindow {
         self.window.add_controller(keys);
     }
 
+    /// Puts Find and Media in the header bar to work, and adds Search
+    /// Commands (INT-14, GNM-10).
+    fn connect_header(self: &Rc<Self>, find_toggle: &gtk::ToggleButton) {
+        // Find is down while the find bar shows.
+        self.find
+            .widget()
+            .bind_property("search-mode-enabled", find_toggle, "active")
+            .sync_create()
+            .build();
+        let weak = Rc::downgrade(self);
+        find_toggle.connect_clicked(move |toggle| {
+            if let Some(this) = weak.upgrade() {
+                if toggle.is_active() {
+                    this.find.present();
+                } else {
+                    this.find.widget().set_search_mode(false);
+                }
+            }
+        });
+
+        // The Media Browser goes in the popover when it first opens.
+        let (popover, holder) = header::media_popover();
+        self.media_button.set_popover(Some(&popover));
+        let weak = Rc::downgrade(self);
+        popover.connect_show(move |_| {
+            if let Some(this) = weak.upgrade()
+                && holder.first_child().is_none()
+            {
+                let browser = this.media_browser();
+                browser.widget().set_vexpand(true);
+                holder.append(browser.widget());
+            }
+        });
+
+        let search = gio::SimpleAction::new("command-search", None);
+        let weak = Rc::downgrade(self);
+        search.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let opens = this.opener.is_some();
+            let menus: Vec<(String, gio::MenuModel)> = [
+                (tr("Main Menu"), header::main_menu(this.info, opens)),
+                (tr("Main Menu"), header::more_commands(opens)),
+                (tr("View"), header::view_menu()),
+                (tr("Insert"), header::insert_menu(true)),
+                (tr("Format"), format_menu()),
+                (tr("Arrange"), objects::arrange_menu()),
+            ]
+            .into_iter()
+            .map(|(name, menu)| (name, menu.upcast()))
+            .collect();
+            command_search::present(&this.window, &menus);
+        });
+        self.window.add_action(&search);
+    }
+
     fn add_actions(self: &Rc<Self>) {
         let simple: [(&str, WindowAction); 9] = [
             ("warnings", |this| this.show_warnings()),
@@ -2254,29 +2290,20 @@ impl DocumentWindow {
     }
 
     /// Shows `page` in the right sidebar, or hides the sidebar if it shows
-    /// that page and `on` is false. Media and spelling are made the first
-    /// time they are asked for.
+    /// that page and `on` is false. Spelling is made the first time it is
+    /// asked for.
     fn show_side(self: &Rc<Self>, page: &str, on: bool) {
-        if self.side.child_by_name(page).is_none() {
-            match page {
-                "media" => {
-                    let browser = self.media_browser();
-                    self.side.add_named(browser.widget(), Some("media"));
-                }
-                "spelling" => {
-                    let cell = self.editor.clone();
-                    let spelling = self
-                        .spelling
-                        .get_or_init(|| {
-                            crate::spelling_window::SpellingWindow::new(Rc::new(move || {
-                                cell.borrow().clone()
-                            }))
-                        })
-                        .clone();
-                    self.side.add_named(spelling.widget(), Some("spelling"));
-                }
-                _ => {}
-            }
+        if page == "spelling" && self.side.child_by_name(page).is_none() {
+            let cell = self.editor.clone();
+            let spelling = self
+                .spelling
+                .get_or_init(|| {
+                    crate::spelling_window::SpellingWindow::new(Rc::new(move || {
+                        cell.borrow().clone()
+                    }))
+                })
+                .clone();
+            self.side.add_named(spelling.widget(), Some("spelling"));
         }
         if on {
             self.side.set_visible_child_name(page);
@@ -2292,10 +2319,8 @@ impl DocumentWindow {
     fn sync_side(&self) {
         let shown = self.split.shows_sidebar();
         let page = self.side.visible_child_name();
-        for (action, name) in [("inspector", "inspector"), ("media-browser", "media")] {
-            let on = shown && page.as_deref() == Some(name);
-            formatting::set_state(&self.window, action, on.to_variant());
-        }
+        let on = shown && page.as_deref() == Some("inspector");
+        formatting::set_state(&self.window, "inspector", on.to_variant());
     }
 
     /// The formats of the field at the cursor, from its context menu
@@ -2900,47 +2925,6 @@ fn style_key(key: gdk::Key, keycode: u32) -> Option<u8> {
     })
 }
 
-/// The main menu of the header bar.
-fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
-    let menu = gio::Menu::new();
-    let file = gio::Menu::new();
-    if opens {
-        file.append(Some(&tr("_New Document")), Some("app.new-document"));
-    }
-    file.append(Some(&tr("_New Window")), Some("app.new-window"));
-    if opens {
-        file.append(Some(&tr("_Open…")), Some("app.open"));
-    }
-    menu.append_section(None, &file);
-    if opens {
-        let save = gio::Menu::new();
-        save.append(Some(&tr("_Save")), Some("win.save"));
-        save.append(Some(&tr("Save _As…")), Some("win.save-as"));
-        save.append(Some(&tr("Save a _Copy…")), Some("win.save-copy"));
-        save.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
-        save.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
-        menu.append_section(None, &save);
-        let document = gio::Menu::new();
-        document.append(Some(&tr("Document _Info")), Some("win.properties"));
-        document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
-        document.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
-        menu.append_section(None, &document);
-    }
-    let close = gio::Menu::new();
-    close.append(Some(&tr("C_lose")), Some("win.close"));
-    close.append(Some(&tr("Close _All Windows")), Some("app.close-all"));
-    menu.append_section(None, &close);
-    let help = gio::Menu::new();
-    help.append(Some(&tr("_Preferences")), Some("app.preferences"));
-    help.append(Some(&tr("_Keyboard Shortcuts")), Some("win.shortcuts"));
-    help.append(
-        Some(&tr("_About {app}").replace("{app}", info.name)),
-        Some("app.about"),
-    );
-    menu.append_section(None, &help);
-    menu
-}
-
 /// The name of an untitled copy of a document, as Duplicate gives it
 /// (DOC-14).
 fn copy_name(name: &str) -> String {
@@ -3021,29 +3005,6 @@ fn add_page_menu() -> gio::Menu {
     menu
 }
 
-/// The View menu of the header bar: what the window shows.
-fn view_menu() -> gio::Menu {
-    let panes = gio::Menu::new();
-    panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
-    panes.append(Some(&tr("_Styles Drawer")), Some("win.styles-drawer"));
-    panes.append(Some(&tr("Se_arch Sidebar")), Some("win.search"));
-    panes.append(Some(&tr("Spe_lling and Grammar")), Some("win.spelling"));
-    let document = gio::Menu::new();
-    document.append(Some(&tr("As _Outline")), Some("win.outline"));
-    document.append(Some(&tr("_Ruler")), Some("win.ruler"));
-    document.append(Some(&tr("_Layout")), Some("win.show-layout"));
-    document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
-    document.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
-    let window = gio::Menu::new();
-    window.append_submenu(Some(&tr("_Zoom")), &zoom_menu());
-    window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
-    let menu = gio::Menu::new();
-    menu.append_section(None, &panes);
-    menu.append_section(None, &document);
-    menu.append_section(None, &window);
-    menu
-}
-
 /// The Format menu at the end of the format bar: fonts, colors and
 /// styles.
 pub(crate) fn format_menu() -> gio::Menu {
@@ -3071,48 +3032,6 @@ pub(crate) fn format_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append_section(None, &fonts);
     menu.append_section(None, &styles);
-    menu
-}
-
-/// The breaks, fields, notes, tables of contents, links and bookmarks of
-/// the Insert menu (EST-04, EST-08, EST-09, EST-13, EST-15, EST-16,
-/// EST-22, EST-25, EST-26, EST-27).
-fn insert_menu() -> gio::Menu {
-    let breaks = gio::Menu::new();
-    breaks.append(Some(&tr("_Page Break")), Some("win.insert-page-break"));
-    breaks.append(Some(&tr("_Column Break")), Some("win.insert-column-break"));
-    breaks.append(Some(&tr("_Layout Break")), Some("win.insert-layout-break"));
-    breaks.append(
-        Some(&tr("_Section Break")),
-        Some("win.insert-section-break"),
-    );
-    let fields = gio::Menu::new();
-    fields.append(
-        Some(&tr("_Auto Page Numbers…")),
-        Some("win.insert-auto-page-numbers"),
-    );
-    fields.append(Some(&tr("Page _Number")), Some("win.insert-page-number"));
-    fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
-    fields.append(Some(&tr("_Date")), Some("win.insert-date"));
-    fields.append(Some(&tr("_File Name")), Some("win.insert-file-name"));
-    let notes = gio::Menu::new();
-    notes.append(Some(&tr("Foot_note")), Some("win.insert-note"));
-    notes.append(Some(&tr("Ne_xt Note")), Some("win.next-note"));
-    notes.append(Some(&tr("Pre_vious Note")), Some("win.previous-note"));
-    let structure = gio::Menu::new();
-    structure.append(Some(&tr("_Table of Contents")), Some("win.insert-toc"));
-    structure.append(
-        Some(&tr("Update Table of C_ontents")),
-        Some("win.update-toc"),
-    );
-    structure.append(Some(&tr("_Hyperlink")), Some("win.insert-link"));
-    structure.append(Some(&tr("_Bookmark")), Some("win.insert-bookmark"));
-    let menu = gio::Menu::new();
-    menu.append_section(None, &breaks);
-    menu.append_section(None, &fields);
-    menu.append_section(None, &notes);
-    menu.append_section(None, &structure);
-    menu.append_section(None, &objects::shapes_menu());
     menu
 }
 
@@ -3227,6 +3146,33 @@ fn zoom_menu() -> gio::Menu {
     }
     menu.append_section(None, &layout);
     menu
+}
+
+thread_local! {
+    /// Whether a window of the app looked at the size of the screen.
+    static SCREEN_CHECKED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Shows `banner` when the first window of the app appears on a screen
+/// smaller than 1280 × 720 (GNM-14). Desk works there, but parts of a
+/// window might not fit; the banner does not return until the app opens
+/// again.
+fn warn_small_screen(window: &adw::ApplicationWindow, banner: &adw::Banner) {
+    let banner = banner.downgrade();
+    window.connect_map(move |window| {
+        if SCREEN_CHECKED.with(|c| c.replace(true)) {
+            return;
+        }
+        let monitor = window
+            .surface()
+            .and_then(|surface| WidgetExt::display(window).monitor_at_surface(&surface));
+        if let (Some(monitor), Some(banner)) = (monitor, banner.upgrade()) {
+            let area = monitor.geometry();
+            if header::is_small_screen(area.width(), area.height()) {
+                banner.set_revealed(true);
+            }
+        }
+    });
 }
 
 /// The name of a document as the title of its window. A package of Pages
