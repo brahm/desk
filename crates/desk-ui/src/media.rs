@@ -17,7 +17,7 @@ use gtk::{gdk, gio, glib};
 
 /// How long finding the poster frame of a movie may take before it is
 /// left without one.
-const PROBE_TIME: Duration = Duration::from_secs(5);
+const PROBE_TIME: Duration = Duration::from_secs(10);
 
 /// The widest or highest a poster frame is kept, in pixels.
 const POSTER_SIDE: f64 = 1280.0;
@@ -139,17 +139,40 @@ pub fn probe(media: &Media, at: u32, done: impl FnOnce(Option<Picture>, Option<u
     }
     {
         let finish = finish.clone();
+        let seeked = seeked.clone();
         stream.connect_invalidate_contents(move |stream| {
-            if seeked.get() && !stream.is_seeking() {
-                finish(picture_of(stream.upcast_ref()));
+            // The first frames after the seek can come before the video
+            // has a size; the probe waits for one that has.
+            if seeked.get()
+                && !stream.is_seeking()
+                && let Some(poster) = picture_of(stream.upcast_ref())
+            {
+                finish(Some(poster));
             }
         });
     }
     {
         let finish = finish.clone();
-        stream.connect_error_notify(move |_| finish(None));
+        stream.connect_error_notify(move |stream| {
+            if let Some(error) = stream.error() {
+                glib::g_debug!("desk", "no poster frame: {error}");
+            }
+            finish(None);
+        });
     }
-    glib::timeout_add_local_once(PROBE_TIME, move || finish(None));
+    // A slow machine may not have drawn the frame by then; whatever frame
+    // it has is better than none.
+    let stream = stream.downgrade();
+    glib::timeout_add_local_once(PROBE_TIME, move || {
+        let poster = stream
+            .upgrade()
+            .filter(|_| seeked.get())
+            .and_then(|stream| picture_of(stream.upcast_ref()));
+        if poster.is_none() {
+            glib::g_debug!("desk", "no poster frame after {PROBE_TIME:?}");
+        }
+        finish(poster);
+    });
 }
 
 /// Plays a movie or a sound in a window over `parent`, `size` pixels
