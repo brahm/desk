@@ -1253,8 +1253,23 @@ def choose_file(app, path):
             pass
         return None
 
-    wait_for("the Open button of the dialog", open_button).do_action(0)
-    time.sleep(1)
+    def opened():
+        # On a slow machine the dialog can still be checking the path it
+        # was given, and then it lets a click on Open go; a person would
+        # click again, and so does the test until the dialog closes.
+        try:
+            if not any(n.get_name() == CHOOSE and showing(n) for n in walk(app)):
+                return True
+        except GLib.GError:
+            return False
+        button = open_button()
+        if button is not None:
+            button.do_action(0)
+        time.sleep(1)
+        return False
+
+    wait_for("the Open button of the dialog", open_button)
+    wait_for("the dialog to open the file", opened)
 
 
 def showing_named(app, name):
