@@ -405,7 +405,7 @@ funcionando.
 | --- | --- | --- |
 | 1. Esqueleto da janela (feita) | Barra lateral de navegação da altura da janela, com o botão de conteúdo e o botão Adicionar; Inspetor como painel utilitário; os dois pontos de quebra | GNM-12, GNM-01 |
 | 2. Barra de cabeçalho e menus (feita) | Botão Barra lateral com o menu Visualização, Inserir e os seis botões de objeto, o popover de mídia, o menu principal de doze itens, a busca de comandos e o aviso de tela pequena | INT-11, INT-14, GNM-10, GNM-14 |
-| 3. Barra de formatação enxuta | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
+| 3. Barra de formatação enxuta (feita) | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
 | 4. Inspetor em dois níveis | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
 | 5. Páginas da barra lateral | Estilos no lugar da gaveta, Comentários e Resultados da busca | INT-18, TXT-13 |
 | 6. Barra inferior | Zoom, posição com Ir para e Navegar por, contagem e seleção | GNM-13, INT-07, INT-19, DOC-20 |
@@ -424,7 +424,17 @@ Navegador de mídia mora no popover do botão Mídia. Tabela e Gráfico ficam
 desativados até a fase 7 do Writer, e Comentário até a etapa 5. O menu
 principal tem nove dos doze itens: Exportar, Imprimir e Ajuda entram
 quando essas funções existirem. Abaixo de 720 px os objetos saem da barra
-e entram no menu Inserir. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
+e entram no menu Inserir. A etapa 3 deixou a barra de formatação enxuta (INT-12). Para
+texto, ela tem estilo de parágrafo, fonte, tamanho, negrito, itálico,
+sublinhado, cor, alinhamento, espaçamento entre linhas e lista. Estilo de
+caractere, tachado, colunas, Copiar e Colar estilo e Mostrar no Inspetor
+ficam no menu Mais, e abaixo de 1000 px o alinhamento, o espaçamento e a
+lista também vão para lá. Para um objeto, a barra tem linha, sombra,
+reflexo, opacidade, Alfa instantâneo, Máscara e Ajustar imagem (numa
+imagem), Em linha ou Flutuante, ajuste do texto, Frente, Trás e
+Organizar. Os estilos de objeto ainda não existem no Desk e ficam fora
+da barra, e Ajustar imagem abre o Inspetor até a etapa 4 dar a ele a aba
+Imagem. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:

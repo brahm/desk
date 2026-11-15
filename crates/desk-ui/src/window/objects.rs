@@ -290,7 +290,7 @@ fn named_shape(value: &str) -> NewShape {
 
 /// The Arrange menu of Pages (OBJ-04, OBJ-24, OBJ-26, OBJ-30, OBJ-32,
 /// OBJ-34).
-pub(super) fn arrange_menu() -> gio::Menu {
+pub(crate) fn arrange_menu() -> gio::Menu {
     let layers = gio::Menu::new();
     layers.append(Some(&tr("Bring to _Front")), Some("win.bring-to-front"));
     layers.append(Some(&tr("Bring _Forward")), Some("win.bring-forward"));

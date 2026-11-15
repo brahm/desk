@@ -25,6 +25,7 @@ mod eyedropper;
 mod fields;
 mod find;
 mod fonts;
+mod format_bar;
 mod formatting;
 pub mod geometry;
 mod gradient_bar;

@@ -92,6 +92,31 @@ impl Kind {
     }
 }
 
+/// Makes the selection a list of the kind that the List menu of the
+/// format bar names (`none`, `bullets`, `numbers` or `tiered`), with the
+/// list style of Pages for it (INT-12).
+pub(crate) fn set_list(editor: &crate::editing::TextEditor, kind: &str) {
+    let kind = match kind {
+        "bullets" => Kind::Bullets,
+        "numbers" => Kind::Numbers,
+        "tiered" => Kind::Tiered,
+        _ => Kind::None,
+    };
+    match kind.style() {
+        None => editor.set_list_style(None),
+        Some((name, make)) => {
+            let result = editor.style_edit("List Style", |edit, from, to| {
+                let style = edit.list_style_or_add(name, make)?;
+                edit.set_list_style(from, to, Some(style))?;
+                Ok(())
+            });
+            if let Err(error) = result {
+                glib::g_warning!("desk", "cannot make a list: {error}");
+            }
+        }
+    }
+}
+
 /// The number formats of the menu: how the number is written, and the
 /// text before and after it.
 const NUMBERS: [(NumberFormat, &str, &str); 15] = {
