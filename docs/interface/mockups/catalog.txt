@@ -7,15 +7,15 @@
 # "-" = não se aplica.
 
 ## Janela
-janela | Janela do documento | - | Uma janela por documento (AdwApplicationWindow), com pontos de quebra para largura média e estreita | Janela do documento | Janela do documento | existe | Ctrl+N, Ctrl+W
+janela | Janela do documento | - | Uma janela por documento (AdwApplicationWindow), que abre com 1280 × 720 e tem pontos de quebra para meia tela (720 px) e para janelas menores (520 px) | Janela do documento | Janela do documento | existe | Ctrl+N, Ctrl+W
 cab.barra | Barra de cabeçalho | - | Controles da janela inteira: visualização e inserção no início, título no centro, busca, Inspetor e menu principal no fim. Sem personalização | Barra de ferramentas personalizável (51 itens no Pages) | Barra de ferramentas | muda | F10 abre o menu
 cab.titulo | Título da janela | - | Nome do documento e, embaixo, a pasta e o estado (Editado). Clicar renomeia | Título com ícone de proxy e versões | Título com menu de renomear e mover | existe | -
 cab.abrir | Abrir | Open | Abre o seletor de arquivos. Só na versão A; nas outras fica no menu principal e no seletor de modelos | Arquivo ▸ Abrir | Arquivo ▸ Abrir | existe | Ctrl+O
 cab.visualizar-menu | Visualização (botão de menu) | View | Menu Visualizar do iWork como botão de texto: painéis, régua, layout, invisíveis, zoom | Botão View da barra e menu View | Botão Visualizar | existe | -
 cab.inserir-menu | Inserir (botão de menu) | Insert | Menu Inserir inteiro, com os objetos e o resto (quebras, campos, notas, link) | Menu Insert e botões Text Box, Shapes, Table, Charts, Comment | Botões e menu Inserir | existe | -
 cab.visualizar | Barra lateral e Visualização | Sidebar / View | AdwSplitButton: o botão mostra ou esconde a barra lateral; a seta abre o menu Visualização (painel da lateral, régua, barra de formatação, layout, invisíveis, tópicos, tela cheia, zoom) | Botão View (pop-up) e menu View | Botão Visualizar | muda | F9; itens: Ctrl+R, Ctrl+Shift+R, Ctrl+Shift+L, Ctrl+Shift+I, F11
-cab.lateral | Barra lateral | Sidebar | Mostra ou esconde a barra lateral (versão C e janelas estreitas, onde vira sobreposição) | Botão View | Botão Visualizar | muda | F9
-cab.inserir | Inserir | Insert | Botão de menu com ícone e rótulo: quebras, campos, nota de rodapé, sumário, marcador, link, caracteres especiais, Escolher. Em janela estreita recebe também os objetos | Menu Insert | Menu Inserir | muda | Escolher: Ctrl+Alt+P; caracteres especiais: Ctrl+.
+cab.lateral | Barra lateral | Sidebar | Mostra ou esconde a barra lateral (versão C e abaixo de 720 px, onde vira sobreposição) | Botão View | Botão Visualizar | muda | F9
+cab.inserir | Inserir | Insert | Botão de menu com ícone e rótulo: quebras, campos, nota de rodapé, sumário, marcador, link, caracteres especiais, Escolher. Abaixo de 720 px recebe também os objetos | Menu Insert | Menu Inserir | muda | Escolher: Ctrl+Alt+P; caracteres especiais: Ctrl+.
 cab.inserir.tabela | Tabela | Table | Popover com os estilos de tabela; clicar insere | Botão Table (Tables ▾ no Numbers) | Botão Tabela com galeria | novo | -
 cab.inserir.grafico | Gráfico | Chart | Popover com os tipos de gráfico em 2D, 3D e interativo | Botão Charts (grade 2D e 3D) | Botão Gráfico com galeria | novo | -
 cab.inserir.texto | Caixa de texto | Text Box | Insere uma caixa de texto no centro da vista | Botão Text Box | Botão Texto | muda | -
@@ -38,7 +38,7 @@ cab.documento | Documento | Document | Versão C: abre o painel nas opções do 
 cab.menu | Menu principal | Main Menu | Novo documento, Abrir, Abrir recente, Salvar, Salvar como, Exportar, Imprimir, Buscar comandos, Preferências, Atalhos de teclado, Ajuda, Sobre. Doze itens no máximo | Menus Pages/Keynote/Numbers, File e Help | Menus Arquivo e Ajuda | muda | F10
 
 ## Barra lateral
-lat.barra | Barra lateral de navegação | Sidebar | Painel da altura da janela (versões B e C) com cabeçalho próprio; some em tela cheia e vira sobreposição em janela estreita | Painel de miniaturas à esquerda | Barra lateral de miniaturas | muda | F9
+lat.barra | Barra lateral de navegação | Sidebar | Painel da altura da janela (versões B e C) com cabeçalho próprio; some em tela cheia e vira sobreposição abaixo de 720 px | Painel de miniaturas à esquerda | Barra lateral de miniaturas | muda | F9
 lat.modo | Conteúdo da barra lateral | - | Botão de menu no cabeçalho da lateral: Páginas, Estilos, Comentários, Resultados da busca (Writer); Planilhas, Estilos de tabela (Tables); Navegador, Tópicos, Slides mestres (Slides) | Pop-up View e gaveta de estilos | Menu Visualizar | novo | Ctrl+Shift+T estilos; Ctrl+Alt+F busca
 lat.adicionar | Adicionar página, planilha ou slide | Add Page / Sheet / Slide | Botão + do cabeçalho da lateral; abre as páginas do modelo, os tipos de planilha ou os slides mestres | Botões Sections, Sheet e New | Adicionar página / folha / slide | novo | Novo slide: Ctrl+M, como no Impress e no PowerPoint (Ctrl+Shift+N já é Nova janela no Desk)
 lat.miniaturas | Miniaturas das páginas | Page Thumbnails | Lista de páginas com número; arrastar reordena seções, menu de contexto duplica e exclui | Painel Page Thumbnails | Miniaturas de página | existe | F9
@@ -121,15 +121,13 @@ doc.notas | Notas do apresentador | Presenter Notes | Campo de texto sob o slide
 doc.mesa-de-luz | Mesa de luz | Light Table | Grade de miniaturas no lugar do slide, para reordenar muitos slides | Modo Light Table | Mesa de luz | novo | -
 
 ## Inspetor
-insp.painel | Inspetor | Inspector | Painel utilitário à direita, sob a barra de cabeçalho (AdwOverlaySplitView); um só, contextual; vira folha inferior em janela estreita | Janelas do Inspetor (várias ao mesmo tempo) | Barra lateral Formatar / Documento | muda | Ctrl+Alt+I
+insp.painel | Inspetor | Inspector | Painel utilitário à direita, sob a barra de cabeçalho (AdwOverlaySplitView); um só, contextual; vira sobreposição abaixo de 520 px | Janelas do Inspetor (várias ao mesmo tempo) | Barra lateral Formatar / Documento | muda | Ctrl+Alt+I
 insp.nivel1 | Formato, Animação ou Dados, Documento | Format, Animation, Data, Document | Primeiro nível do painel em B: AdwToggleGroup arredondado. Writer tem Formato e Documento; Slides ganha Animação; Tables ganha Dados | Ícones dos 7 a 10 painéis | Botões Formatar, Animar, Organizar e Documento da barra | novo | Alt+Enter abre Documento
 insp.contexto | Título do contexto | - | Diz o que está selecionado: Texto, Imagem, Forma, Tabela, Gráfico, Slide | Título da janela do Inspetor | - | novo | -
 insp.estilo-atual | Estilo de parágrafo atual | Paragraph Style | Linha com o nome do estilo, o asterisco de alterado, Atualizar e a seta para a lista de estilos | Gaveta de estilos | Estilo de parágrafo no topo da aba Estilo | novo | Ctrl+Shift+T
 insp.abas | Abas do contexto | - | Segundo nível: AdwInlineViewSwitcher com rótulos de texto que mudam com a seleção (texto: Estilo, Layout, Mais; imagem: Estilo, Imagem, Organizar; forma: Estilo, Texto, Organizar; tabela: Tabela, Célula, Texto, Organizar; gráfico: Gráfico, Eixo, Séries, Organizar; Dados: Ordem, Filtro, Categorias; Animação: Entrada, Ação, Saída; Documento: Documento, Seção, Info no Writer, Planilha, Info no Tables, Documento, Áudio, Info no Slides). Rótulos curtos, até 3 abas de mesma largura; com uma página só, o seletor some | Abas internas de cada painel | Abas da barra lateral Formatar | novo | -
 insp.icones | Ícones dos painéis | - | Versão A: um ícone por painel do Inspetor do iWork '09, na ordem dele | Ícones do Inspetor | - | existe | -
 insp.subabas | Abas do painel | - | Versão A: abas do painel escolhido (Texto, Lista, Tabulações, Mais) | Abas do painel Text | - | existe | -
-insp.folha | Inspetor em folha inferior | - | Janela estreita: AdwBottomSheet com o mesmo conteúdo do painel | - | Painel de formato do iPhone | novo | -
-insp.folha.barra | Barra da folha | - | Barra inferior que mostra o contexto e puxa a folha para cima | - | - | novo | -
 insp.texto.fonte | Fonte | Font | Família (abre Fontes), tipo, tamanho, estilo B I U S, cor do texto e opções avançadas (espaçamento entre caracteres, linha de base, maiúsculas, ligaduras, cor de fundo) | Painel Text e janela Fonts | Aba Estilo ▸ Fonte | muda | Ctrl+T
 insp.texto.f.negrito | Negrito (Inspetor) | Bold | Botão de alternância na linha Estilo | Janela Fonts | Botão B | muda | Ctrl+B
 insp.texto.f.italico | Itálico (Inspetor) | Italic | Botão de alternância na linha Estilo | Janela Fonts | Botão I | muda | Ctrl+I
@@ -261,6 +259,7 @@ busca.substituir-campo | Substituir por | Replace | Campo do texto novo | Campo 
 busca.substituir | Substituir | Replace | Troca o resultado atual | Botão Replace | Botão Substituir | existe | -
 busca.substituir-tudo | Substituir tudo | Replace All | Troca todos | Botão Replace All | Botão Substituir tudo | existe | -
 aviso.banner | Avisos do documento | Document Warnings | AdwBanner depois de abrir ou exportar com perdas; o botão abre a lista | Janela Document Warnings | Avisos | existe | -
+aviso.resolucao | Aviso de tela pequena | - | AdwBanner ao abrir a janela num monitor com menos de 1280 × 720 pixels lógicos, a resolução mínima do Desk; não impede o uso, e o botão Fechar a esconde até a próxima abertura | - | - | novo | -
 comandos.dialogo | Buscar comandos | Search Commands | Diálogo com um campo e a lista de todos os comandos, inclusive os que o iWork tinha só na barra de menus | Barra de menus e Ajuda ▸ Buscar | Ajuda ▸ Buscar | novo | Ctrl+/ (vence o selecionar tudo dos campos de texto do GTK, que continua em Ctrl+A)
 comandos.campo | Campo de comandos | - | Digitar filtra a lista | Ajuda ▸ Buscar | - | novo | -
 comandos.lista | Lista de comandos | - | Nome do comando, o menu de origem e o atalho (AdwShortcutLabel) | - | - | novo | Enter executa

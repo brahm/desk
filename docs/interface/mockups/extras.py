@@ -28,44 +28,32 @@ def popup(cid):
 # ------------------------------------------------------------- narrow Writer
 
 
-def writer_narrow(win, phone=False):
-    """Version B in a narrow window. Medium (720): the sidebar becomes an
-    overlay and the insert buttons go into the Insert menu. Phone (400): the
-    Inspector becomes a bottom sheet and the format bar keeps the essentials."""
+def writer_narrow(win):
+    """Version B in half of the smallest screen Desk supports (1280 × 720),
+    below the 720 px breakpoint: the sidebar becomes an overlay and the
+    insert buttons go into the Insert menu. The Inspector stays beside the
+    page down to 520 px, and over it below that."""
     side = shell.nav_sidebar('writer', parts.thumbs_list('page', 5, 2), writer.SIDE_MODES, 'Adicionar página',
                              writer.ADD_PAGE)
     start = [icon_button('sidebar-show', 'Barra lateral', 'cab.lateral', toggle=True),
-             parts.insert_menu_button('writer') if not phone else
-             menu_button(icon='desk-insert', tip='Inserir', cid='cab.inserir', menu=parts.insert_menu('writer', True))]
-    end = [menu_button(icon='open-menu', tip='Menu principal', cid='cab.menu', menu=parts.main_menu('writer'))]
-    if not phone:
-        end += [icon_button('sidebar-show-right', 'Inspetor', 'cab.inspetor', toggle=True, active=True),
-                icon_button('edit-find', 'Buscar', 'cab.localizar', toggle=True)]
-    else:
-        end += [icon_button('edit-find', 'Buscar', 'cab.localizar', toggle=True)]
+             parts.insert_menu_button('writer')]
+    end = [menu_button(icon='open-menu', tip='Menu principal', cid='cab.menu', menu=parts.main_menu('writer')),
+           icon_button('sidebar-show-right', 'Inspetor', 'cab.inspetor', toggle=True, active=True),
+           icon_button('edit-find', 'Buscar', 'cab.localizar', toggle=True)]
     hb = Adw.HeaderBar()
-    title = Adw.WindowTitle(title='Relatório anual 2026', subtitle='' if phone else 'Documentos · Editado')
+    title = Adw.WindowTitle(title='Relatório anual 2026', subtitle='Documentos · Editado')
     hb.set_title_widget(tag(title, 'cab.titulo'))
     for w in start:
         hb.pack_start(w)
     for w in end:
         hb.pack_end(w)
     tag(hb, 'cab.barra')
-    fbar = tag(parts.format_bar_text('fmt', slim=True, compact='phone' if phone else 'medium'), 'fmt.barra')
+    fbar = tag(parts.format_bar_text('fmt', slim=True, compact='medium'), 'fmt.barra')
     doc = writer.doc_view('text', rulers=False)
-    if phone:
-        handle = hbox(label('Formato', 'heading', hexpand=True), label('Texto · Corpo', 'dimmed'),
-                      Gtk.Image(icon_name='go-up-symbolic'), spacing=8)
-        classes(handle, 'sheet-handle-bar')
-        sheet = Adw.BottomSheet(content=doc, sheet=writer.inspector_b('text'), bottom_bar=tag(handle, 'insp.folha.barra'),
-                                open=False)
-        body = tag(sheet, 'insp.folha')
-        bottom = None
-    else:
-        body = shell.split(writer.inspector_b('text'), doc, shell.INSPECTOR_W, Gtk.PackType.END)
-        bottom = shell.bottom_bar(parts.flat_menu('100 %', 'Zoom', 'inf.zoom', menu=parts.zoom_menu()), expand(),
-                                  parts.flat_menu('Página 6 de 41', 'Ir para e navegar por', 'inf.pagina',
-                                                  arrow=False, menu=menu_model(['Ir para a página…'])))
+    body = shell.split(writer.inspector_b('text'), doc, shell.INSPECTOR_W, Gtk.PackType.END)
+    bottom = shell.bottom_bar(parts.flat_menu('100 %', 'Zoom', 'inf.zoom', menu=parts.zoom_menu()), expand(),
+                              parts.flat_menu('Página 6 de 41', 'Ir para e navegar por', 'inf.pagina',
+                                              arrow=False, menu=menu_model(['Ir para a página…'])))
     content = shell.toolbar_view(body, top=[hb, fbar], bottom=[bottom])
     win.set_content(shell.split(side, content, shell.SIDEBAR_W, collapsed=True, show=False))
 
@@ -292,8 +280,9 @@ SCENES = [
     Scene('comum-preferencias', 'Preferências', wb(), 'comum', 'B', after=preferences_dialog),
     Scene('comum-atalhos', 'Atalhos de teclado', wb(), 'comum', 'B', after=shortcuts_dialog),
     Scene('comum-comandos', 'Buscar comandos', wb(), 'comum', 'B', after=command_dialog),
-    Scene('comum-media', 'Janela média (720 px)', lambda w: writer_narrow(w), 'comum', 'B', size=(720, 800)),
-    Scene('comum-estreita', 'Janela estreita (400 px)', lambda w: writer_narrow(w, phone=True), 'comum', 'B',
-          size=(400, 720)),
+    Scene('comum-media', 'Meia tela (640 × 720)', writer_narrow, 'comum', 'B', size=(640, 720),
+          note='Metade da tela mínima, lado a lado com outra janela.'),
+    Scene('comum-aviso', 'Tela menor que a mínima (1024 × 600)', wb(low_res=True), 'comum', 'B', size=(1024, 600),
+          note='A faixa que avisa, na abertura, que a tela tem menos de 1280 × 720.'),
     Scene('comum-escuro', 'Estilo escuro', wb(), 'comum', 'B', dark=True),
 ]

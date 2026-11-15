@@ -254,7 +254,7 @@ Pages	Writer	Barra de ferramentas	Shapes	Formas	-	Botão Forma da barra de cabe�
 Pages	Writer	Barra de ferramentas	Table	Tabela	-	Botão Tabela da barra de cabeçalho	cab.inserir.tabela	igual
 Pages	Writer	Barra de ferramentas	Charts	Gráfico	-	Botão Gráfico da barra de cabeçalho	cab.inserir.grafico	igual
 Pages	Writer	Barra de ferramentas	Comment	Comentário	-	Botão Comentário da barra de cabeçalho	cab.inserir.comentario	igual
-Pages	Writer	Barra de ferramentas	Objects	Objetos	-	Os botões de inserir; em janela estreita, o menu Inserir	cab.inserir	adaptado
+Pages	Writer	Barra de ferramentas	Objects	Objetos	-	Os botões de inserir; abaixo de 720 px, o menu Inserir	cab.inserir	adaptado
 Pages	Writer	Barra de ferramentas	Front	Frente	-	Botão Frente da barra de formatação do objeto	fmt.frente	adaptado
 Pages	Writer	Barra de ferramentas	Back	Fundo	-	Botão Trás da barra de formatação do objeto	fmt.fundo	adaptado
 Pages	Writer	Barra de ferramentas	Inspector	Inspetor	-	Botão Inspetor da barra de cabeçalho	cab.inspetor	igual
@@ -858,7 +858,7 @@ Keynote	Slides	Barra de ferramentas	Shapes	Formas	-	Botão Forma da barra de cab
 Keynote	Slides	Barra de ferramentas	Table	Tabela	-	Botão Tabela da barra de cabeçalho	cab.inserir.tabela	igual
 Keynote	Slides	Barra de ferramentas	Charts	Gráficos	-	Botão Gráfico da barra de cabeçalho	cab.inserir.grafico	igual
 Keynote	Slides	Barra de ferramentas	Comment	Comentário	-	Botão Comentário da barra de cabeçalho	cab.inserir.comentario	igual
-Keynote	Slides	Barra de ferramentas	Objects	Objetos	-	Os botões de inserir; em janela estreita, o menu Inserir	cab.inserir	adaptado
+Keynote	Slides	Barra de ferramentas	Objects	Objetos	-	Os botões de inserir; abaixo de 720 px, o menu Inserir	cab.inserir	adaptado
 Keynote	Slides	Barra de ferramentas	Connect	Unir	-	Menu Organizar da barra de formatação do objeto	fmt.organizar	adaptado
 Keynote	Slides	Barra de ferramentas	Front	Frente	-	Botão Frente da barra de formatação do objeto	fmt.frente	adaptado
 Keynote	Slides	Barra de ferramentas	Back	Fundo	-	Botão Trás da barra de formatação do objeto	fmt.fundo	adaptado

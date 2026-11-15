@@ -2,10 +2,10 @@
 
 The reference corpus of Desk: what Desk must do the same as iWork '09.
 
-- `matrix.tsv` is the parity matrix of Desk Writer, 310 rows, each with
+- `matrix.tsv` is the parity matrix of Desk Writer, 311 rows, each with
   the phase of the roadmap that completes it: the 260 rows of the survey
   of Pages '09, the 33 cases of integration among the three apps of the
-  surveys of Pages, Numbers and Keynote (`IOP`), 13 rows for what the
+  surveys of Pages, Numbers and Keynote (`IOP`), 14 rows for what the
   GNOME HIG and the desktop ask of the apps (`GNM`), and 4 commands that
   the inventory of Pages 4.3 on the reference virtual machine added to
   the survey (`VMI`). Its last column, `gnome`, says how Desk adapts a
@@ -15,7 +15,7 @@ The reference corpus of Desk: what Desk must do the same as iWork '09.
   that leave GNOME's own alone, and the interface that
   [`docs/interface`](../docs/interface/README.md) describes); the row
   passes when Desk does it that way.
-- `slides-matrix.tsv` and `tables-matrix.tsv` (180 rows each) are the
+- `slides-matrix.tsv` and `tables-matrix.tsv` (181 rows each) are the
   matrices of Desk Slides and Desk Tables, with a `shared` column that
   names the rows of the other surveys that describe the same feature, the
   same `gnome` column, their own GNOME rows (`KGNM`, `NGNM`) and their
