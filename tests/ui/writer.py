@@ -290,8 +290,8 @@ def main():
         check("it has the typography", True)
         press("Escape")
 
-        # Ctrl+Shift+T shows the Styles drawer, with the style of the
-        # paragraph chosen in its list (INT-18).
+        # Ctrl+Shift+T shows the Styles page of the sidebar, with the style
+        # of the paragraph chosen in its list (INT-18).
         subprocess.run(
             ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
             check=True,
@@ -310,7 +310,7 @@ def main():
                 None,
             ),
         )
-        check("Ctrl+Shift+T shows the Styles drawer (INT-18)", True)
+        check("Ctrl+Shift+T shows the styles in the sidebar (INT-18)", True)
         chosen = [
             n
             for n in walk(paragraphs)
@@ -359,7 +359,8 @@ def main():
         )
         press("End")
 
-        # The Search sidebar lists the matches as they are typed (TXT-13).
+        # The Search Results page of the sidebar lists the matches as they
+        # are typed (TXT-13).
         press("ctrl+alt+f")
         results = wait_for(
             "the Search sidebar",
@@ -494,6 +495,7 @@ def main():
     mask_from_the_menu(work)
     gnome_window(work)
     two_level_inspector(work)
+    sidebar_pages(work)
     header_and_menus(work)
     slim_format_bar(work)
     small_screen(work)
@@ -2447,6 +2449,86 @@ TEXT_BAR = ("Font Size", "Bold", "Italic", "Underline", "Text Color",
             "Align Left", "Line Spacing", "List", "Link", "More")
 OBJECT_BAR = ("Line", "Shadow", "Reflection", "Opacity", "Wrap", "Bring to Front",
               "Send to Back", "Arrange", "More")
+
+
+def action_state(name):
+    """The state of an action of the first window of Desk Writer, as GTK
+    describes it on the session bus, as text: "true", "'styles'"…"""
+    out = subprocess.run(
+        [
+            "gdbus", "call", "--session", "--dest", "br.com.brahm.Desk.Writer",
+            "--object-path", "/br/com/brahm/Desk/Writer/window/1",
+            "--method", "org.gtk.Actions.Describe", name,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    # (true, '', [<true>],)
+    inside = out[out.rfind("[") + 1 : out.rfind("]")]
+    return inside.strip().removeprefix("<").removesuffix(">")
+
+
+# The pages of the navigation sidebar and the actions that show them.
+SIDEBAR_PAGES = (("pages", "thumbnails"), ("styles", "styles-drawer"),
+                 ("comments", "comments"), ("search", "search"))
+
+
+def shown_pages():
+    """The pages of the sidebar whose actions say they show."""
+    return [page for page, action in SIDEBAR_PAGES if action_state(action) == "true"]
+
+
+def sidebar_pages(work):
+    """The navigation sidebar of interface B shows the page thumbnails,
+    the styles that were the Styles drawer, the comments and the search
+    results, one at a time; the View menu and their shortcuts choose them,
+    and F9 hides and shows the sidebar with the page it had (INT-18,
+    TXT-13, GNM-12)."""
+    name = "Sidebar.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+shift+t")
+        wait_for("the styles in the sidebar", lambda: shown_pages() == ["styles"])
+        wait_for("the paragraph styles", lambda: showing_named(app, "Paragraph Styles"))
+        check("Ctrl+Shift+T shows the Styles page of the sidebar, not a drawer (INT-18)", True)
+        activate("comments")
+        wait_for("the comments in the sidebar", lambda: shown_pages() == ["comments"])
+        check(
+            "the Comments page takes the place of the styles",
+            showing_named(app, "No Comments") is not None
+            and showing_named(app, "Paragraph Styles") is None,
+        )
+        press("ctrl+alt+f")
+        wait_for("the search results in the sidebar", lambda: shown_pages() == ["search"])
+        check(
+            "Ctrl+Alt+F shows the Search Results page of the sidebar (TXT-13)",
+            showing_named(app, "Search Results") is not None,
+        )
+        activate("sidebar")
+        wait_for("the sidebar to hide", lambda: action_state("sidebar") == "false")
+        check("the Sidebar button hides the sidebar (GNM-12)", shown_pages() == [])
+        activate("sidebar")
+        wait_for("the sidebar to show", lambda: action_state("sidebar") == "true")
+        check("and shows it again with the page it had (GNM-12)", shown_pages() == ["search"])
+        activate("thumbnails")
+        wait_for("the thumbnails", lambda: shown_pages() == ["pages"])
+        wait_for(
+            "the thumbnail of the first page",
+            lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
+        )
+        check("Page Thumbnails turns the sidebar back to the pages (INT-19)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
 
 
 def search_commands(app, query):
