@@ -178,6 +178,7 @@ pub(super) fn more_commands(opens: bool) -> gio::Menu {
         menu.append(Some(&tr("_New Window")), Some("app.new-window"));
         menu.append(Some(&tr("Save a _Copy…")), Some("win.save-copy"));
         menu.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
+        menu.append(Some(&tr("Re_name…")), Some("win.rename"));
         menu.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
         menu.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append(Some(&tr("Document _Warnings")), Some("win.warnings"));

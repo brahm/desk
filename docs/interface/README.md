@@ -513,6 +513,22 @@ etapas 1 a 6, e o Tables inteiro espera a fase 7 do Writer.
   avisa na abertura, sem impedir o uso. Os pontos de quebra ficam em 720
   e 520 px, e a folha inferior e o mockup de 400 px saíram.
 
+Brahm aprovou de novo os dez nomes e atalhos em 15/11/2026. Onde cada um
+está aplicado:
+
+| Decisão | Situação |
+|---|---|
+| Aba Info do Inspetor | No Writer, com as informações do documento |
+| Aba Dados do Inspetor | Espera o Tables |
+| Ctrl+/ para a busca de comandos | No Writer (etapa 7) |
+| F5 para reproduzir | Espera o Slides |
+| Ctrl+M para novo slide | Espera o Slides |
+| Ctrl+Shift+H para pular o slide | Espera o Slides |
+| Ctrl+Shift+M para a máscara | No Writer (etapa 7) |
+| Alt e as setas no Tables | Espera o Tables |
+| Ctrl+Shift+F para a lista de fórmulas | Espera o Tables |
+| Clique no título renomeia | No Writer: um popover renomeia o arquivo na pasta, com a mesma extensão, ou o nome que Salvar propõe para um documento novo; também em Mais ▸ Renomear… e na busca de comandos |
+
 ## Refazer os mockups
 
 Os mockups são janelas de verdade, montadas em Python com o GTK 4.24 e a
