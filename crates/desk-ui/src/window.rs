@@ -37,8 +37,11 @@ use crate::{AppInfo, Opener};
 pub(crate) use objects::OBJECT_ACCELS;
 
 mod command_search;
+mod format_actions;
 mod header;
 mod objects;
+
+pub(crate) use objects::arrange_menu;
 
 /// How far from the top of the screen the pointer brings the header bar
 /// back in full screen, in pixels.
@@ -551,6 +554,7 @@ impl DocumentWindow {
             draft_due: Cell::new(false),
         });
         this.add_actions();
+        this.add_format_bar_actions();
         this.connect_header(&find_toggle);
         warn_small_screen(&this.window, &screen_banner);
         this.show_rulers();
@@ -848,9 +852,7 @@ impl DocumentWindow {
     fn show_format(&self) {
         let Some(editor) = self.editor() else { return };
         let format = editor.format();
-        self.format_bar.show(&format);
-        self.format_bar
-            .show_character_style(editor.character_style());
+        self.show_format_bar(&editor, &format);
         self.inspector.show(&format);
         if self.drawer_split.shows_sidebar() {
             self.drawer.show(&editor);
@@ -952,7 +954,11 @@ impl DocumentWindow {
         ] {
             self.enable(action, enabled);
         }
-        for action in DOCUMENT_ACTIONS.iter().chain(&objects::OBJECT_ACTIONS) {
+        for action in DOCUMENT_ACTIONS
+            .iter()
+            .chain(&objects::OBJECT_ACTIONS)
+            .chain(&format_actions::FORMAT_BAR_ACTIONS)
+        {
             self.enable(action, has_document);
         }
         // Paste Style is off until a style is copied, as in Pages.
@@ -1714,6 +1720,7 @@ impl DocumentWindow {
             ]
             .into_iter()
             .map(|(name, menu)| (name, menu.upcast()))
+            .chain(this.format_bar.more_menus())
             .collect();
             command_search::present(&this.window, &menus);
         });

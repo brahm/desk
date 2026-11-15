@@ -493,6 +493,7 @@ def main():
     mask_from_the_menu(work)
     gnome_window(work)
     header_and_menus(work)
+    slim_format_bar(work)
     small_screen(work)
     print("All UI tests passed.")
 
@@ -2140,19 +2141,10 @@ def mask_from_the_menu(work):
 
 
 
-def character_styles(app):
-    """The menu of the character styles in the format bar, if it shows: a
-    menu of GTK takes the name of what it has chosen."""
-    return next(
-        (
-            n
-            for n in walk(app)
-            if n.get_role() == Atspi.Role.COMBO_BOX
-            and n.get_name() == "No Character Style"
-            and showing(n)
-        ),
-        None,
-    )
+def alignments(app):
+    """The alignments in the format bar, if they show: a narrow window
+    puts them under More."""
+    return showing_named(app, "Align Left")
 
 
 def extents(node):
@@ -2215,11 +2207,7 @@ def gnome_window(work):
         check("Ctrl+H shows Find & Replace with the replacement (TXT-12)", True)
         press("Escape")
 
-        check(
-            "the format bar has the character styles (STY-02)",
-            wait_for("the character styles", lambda: character_styles(app))
-            is not None,
-        )
+        wait_for("the alignments in the format bar", lambda: alignments(app))
 
         press("ctrl+alt+i")
         check(
@@ -2255,8 +2243,8 @@ def gnome_window(work):
             check=True,
         )
         wait_for(
-            "the format bar to leave out the character styles",
-            lambda: character_styles(app) is None,
+            "the format bar to leave out the alignments",
+            lambda: alignments(app) is None,
         )
         wait_for("the main menu in the narrow window", lambda: showing_named(app, "Main Menu"))
         check("a narrow window keeps the main controls (GNM-01)", True)
@@ -2387,6 +2375,91 @@ def header_and_menus(work):
             "below 720 px the header bar keeps Insert and leaves out the objects (INT-11)",
             not missing,
         )
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+# What the text variant of the format bar shows, and what it leaves for
+# More (INT-12).
+TEXT_BAR = ("Font Size", "Bold", "Italic", "Underline", "Text Color",
+            "Align Left", "Line Spacing", "List", "More")
+OBJECT_BAR = ("Line", "Shadow", "Reflection", "Opacity", "Wrap", "Bring to Front",
+              "Send to Back", "Arrange", "More")
+
+
+def search_commands(app, query):
+    """Opens Search Commands and types `query`."""
+    press("ctrl+slash")
+    wait_for("the command search", lambda: showing_named(app, "Search Commands"))
+    type_text(query)
+
+
+def slim_format_bar(work):
+    """The slim format bar of interface B: for text, the paragraph style,
+    the font and size, bold, italic and underline, the color, the
+    alignment, the line spacing and the list, with the rest under More,
+    where the character styles are (INT-12, STY-02); for an object, its
+    line, shadow, reflection and opacity, how it sits in the text, and
+    the Arrange commands (INT-12)."""
+    name = "Slim.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        wait_for("the text variant of the format bar", lambda: showing_named(app, "Line Spacing"))
+        missing = [b for b in TEXT_BAR if showing_named(app, b) is None]
+        check(
+            "the format bar of text has the style, font, size, B I U, color, alignment, spacing, list and More (INT-12)",
+            not missing,
+        )
+        check(
+            "strikethrough and the character styles leave the bar for More (INT-12)",
+            showing_named(app, "Strikethrough") is None
+            and showing_named(app, "Character Style") is None,
+        )
+        search_commands(app, "character style none")
+        wait_for("the character styles under More", lambda: showing_named(app, "None"))
+        check("the More menu has the character styles (STY-02)", True)
+        press("Escape")
+        wait_for("the command search to close", lambda: showing_named(app, "Search Commands") is None)
+
+        activate("line-spacing", "200")
+        activate("list-style", "bullets")
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for("the saved line spacing", lambda: saved_content(letter, r'fo:line-height="200%"'))
+        check("the line spacing of the bar is saved (INT-12)", True)
+        wait_for("the saved list", lambda: saved_content(letter, r"<text:list "))
+        check("the list of the bar is saved (INT-12)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+    writer, app, letter = open_with_a_shape(work, "SlimShape.odt")
+    try:
+        wait_for("the object variant of the format bar", lambda: showing_named(app, "Reflection"))
+        missing = [b for b in OBJECT_BAR if showing_named(app, b) is None]
+        check(
+            "a selected object turns the bar to its line, effects, wrap and Arrange (INT-12)",
+            not missing and showing_named(app, "Font Size") is None,
+        )
+        reflection = next(
+            n
+            for n in walk(app)
+            if n.get_name() == "Reflection" and n.get_role() == Atspi.Role.TOGGLE_BUTTON and showing(n)
+        )
+        Atspi.Action.do_action(reflection, 0)
+        time.sleep(1)
+        press("ctrl+s")
+        wait_for("the saved reflection", lambda: saved_content(letter, r'desk:reflection="50%"'))
+        check("Reflection in the bar reflects the shape (INT-12)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
