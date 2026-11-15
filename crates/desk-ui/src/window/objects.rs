@@ -16,7 +16,7 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::{tr, trc};
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 28] = [
+pub(super) const OBJECT_ACTIONS: [&str; 30] = [
     "mask-with-shape",
     "unmask",
     "duplicate-objects",
@@ -45,14 +45,18 @@ pub(super) const OBJECT_ACTIONS: [&str; 28] = [
     "unlock",
     "flip-horizontal",
     "flip-vertical",
+    "reapply-defaults",
+    "reset-text-handles",
 ];
 
 /// The keys of the Arrange menu.
-pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 10] = [
+pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 11] = [
     ("win.duplicate-objects", &["<Control>d"]),
     // Ctrl+Shift+V is Paste Special in GNOME, so Choose… of Pages moves
     // to Ctrl+Alt+P, for picture.
     ("win.insert-picture", &["<Control><Alt>p"]),
+    // Mask of Pages masks with a rectangle (OBJ-04).
+    ("win.mask-with-shape('rectangle')", &["<Control><Shift>m"]),
     ("win.bring-to-front", &["<Control><Shift>bracketright"]),
     ("win.bring-forward", &["<Control>bracketright"]),
     ("win.send-backward", &["<Control>bracketleft"]),
@@ -70,7 +74,7 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 21] = [
+        let simple: [(&str, EditorAction); 23] = [
             ("unmask", TextEditor::unmask_picture),
             ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),
@@ -94,6 +98,8 @@ impl DocumentWindow {
             ("unlock", |e| e.lock_objects(false)),
             ("flip-horizontal", |e| e.flip_objects(true)),
             ("flip-vertical", |e| e.flip_objects(false)),
+            ("reapply-defaults", TextEditor::reapply_defaults),
+            ("reset-text-handles", TextEditor::reset_text_and_handles),
         ];
         for (name, run) in simple {
             let weak = Rc::downgrade(self);
@@ -325,6 +331,10 @@ pub(crate) fn arrange_menu() -> gio::Menu {
     shape.append(Some(&tr("Make _Editable")), Some("win.make-editable"));
     shape.append(Some(&tr("Smoo_th Path")), Some("win.smooth-path"));
     shape.append(Some(&tr("Sha_rpen Path")), Some("win.sharpen-path"));
+    shape.append(
+        Some(&tr("_Reset Text and Object Handles")),
+        Some("win.reset-text-handles"),
+    );
     // Mask with Shape and Unmask for the selected picture (OBJ-04).
     let masks = gio::Menu::new();
     for (label, value) in shape_names() {

@@ -826,6 +826,16 @@ fn object_more_menu() -> gio::Menu {
     copy.append(Some(&tr("_Lock")), Some("win.lock"));
     copy.append(Some(&tr("U_nlock")), Some("win.unlock"));
     menu.append_section(None, &copy);
+    let defaults = gio::Menu::new();
+    defaults.append(
+        Some(&tr("Reapply _Defaults to Selection")),
+        Some("win.reapply-defaults"),
+    );
+    defaults.append(
+        Some(&tr("Show Co_nnection Lines")),
+        Some("win.connection-lines"),
+    );
+    menu.append_section(None, &defaults);
     let inspector = gio::Menu::new();
     inspector.append(Some(&tr("Show in _Inspector")), Some("win.show-inspector"));
     menu.append_section(None, &inspector);

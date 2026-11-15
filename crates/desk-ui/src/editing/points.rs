@@ -184,6 +184,53 @@ fn with_points(object: &Object, points: &[Point], closed: bool) -> Object {
     changed
 }
 
+/// A shape that is rotated or flipped, with its outline turned and
+/// flipped as it shows and no rotation or flip; none for any other object
+/// and for a line, whose ends turn with it (VMI-04).
+fn unturned(object: &Object) -> Option<Object> {
+    let ObjectKind::Shape(shape) = &object.kind else {
+        return None;
+    };
+    if object.locked
+        || shape.is_line()
+        || matches!(shape, Shape::Connection(_))
+        || (object.rotation == 0 && !object.flip_horizontal && !object.flip_vertical)
+    {
+        return None;
+    }
+    let (w, h) = (object.frame.width.to_pt(), object.frame.height.to_pt());
+    let a = (f64::from(object.rotation) / 100.0).to_radians();
+    let turn = |(x, y): (f64, f64)| {
+        let (mut dx, mut dy) = (x - w / 2.0, y - h / 2.0);
+        if object.flip_horizontal {
+            dx = -dx;
+        }
+        if object.flip_vertical {
+            dy = -dy;
+        }
+        (
+            w / 2.0 + dx * a.cos() + dy * a.sin(),
+            h / 2.0 - dx * a.sin() + dy * a.cos(),
+        )
+    };
+    let (points, closed) = points_of_outline(&shape.outline(w, h));
+    let points: Vec<Point> = points
+        .into_iter()
+        .map(|p| Point {
+            at: turn(p.at),
+            before: p.before.map(turn),
+            after: p.after.map(turn),
+        })
+        .collect();
+    let mut square = object.clone();
+    square.rotation = 0;
+    square.flip_horizontal = false;
+    square.flip_vertical = false;
+    let mut changed = with_points(&square, &points, closed);
+    super::objects::refresh_contour(&mut changed, object);
+    Some(changed)
+}
+
 /// A point of the frame on the page of a placed object.
 fn to_page(placed: &PlacedObject, (lx, ly): (f64, f64)) -> (f64, f64) {
     let object = &placed.object;
@@ -373,6 +420,32 @@ impl TextEditor {
         });
         self.show_points();
         true
+    }
+
+    /// Turns the outline of each selected shape that is rotated or flipped
+    /// so that the shape looks the same with no rotation: its text goes
+    /// back to horizontal and its handles to a box square with the page,
+    /// as Reset Text and Object Handles of Keynote does (VMI-04).
+    pub fn reset_text_and_handles(&self) {
+        self.stop_editing_points();
+        let changed: Vec<Object> = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            self.selected_objects()
+                .into_iter()
+                .filter_map(|id| document.objects().get(id))
+                .filter_map(unturned)
+                .collect()
+        };
+        if changed.is_empty() {
+            return;
+        }
+        self.arrange_objects("Reset Text and Object Handles", |edit, _| {
+            for object in changed {
+                edit.replace_object(object)?;
+            }
+            Ok(None)
+        });
     }
 
     /// Whether the points of a shape show.
@@ -793,5 +866,33 @@ mod tests {
         assert_eq!(smooth[1].after, Some((70.0, 10.0)));
         assert_eq!(sharpened(&smooth), points);
         assert!(distance_to_segment((5.0, 5.0), (0.0, 0.0), (10.0, 0.0)) == 5.0);
+    }
+
+    #[test]
+    fn vmi_04_reset_turns_the_outline_and_squares_the_frame() {
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            Shape::Rectangle.into(),
+            Frame::from_pt(100.0, 200.0, 100.0, 50.0),
+        );
+        // Not turned: nothing to reset.
+        assert!(unturned(&object).is_none());
+        object.rotation = 9000;
+        let square = unturned(&object).expect("a turned shape is reset");
+        assert_eq!(square.rotation, 0);
+        assert!(!square.flip_horizontal && !square.flip_vertical);
+        // A quarter turn stands the frame up, around the same middle.
+        let f = square.frame;
+        assert!((f.width.to_pt() - 50.0).abs() < 0.01, "{f:?}");
+        assert!((f.height.to_pt() - 100.0).abs() < 0.01, "{f:?}");
+        assert!((f.x.to_pt() + f.width.to_pt() / 2.0 - 150.0).abs() < 0.01);
+        assert!((f.y.to_pt() + f.height.to_pt() / 2.0 - 225.0).abs() < 0.01);
+        assert!(matches!(square.kind, ObjectKind::Shape(Shape::Path { .. })));
+        // A line keeps its rotation, and so does a locked shape.
+        let mut line = object.clone();
+        line.kind = Shape::Line { rising: false }.into();
+        assert!(unturned(&line).is_none());
+        object.locked = true;
+        assert!(unturned(&object).is_none());
     }
 }

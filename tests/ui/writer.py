@@ -497,6 +497,7 @@ def main():
     two_level_inspector(work)
     sidebar_pages(work)
     bottom_bar(work)
+    inventory_commands(work)
     header_and_menus(work)
     slim_format_bar(work)
     small_screen(work)
@@ -1712,6 +1713,60 @@ def position_of_a_turned_shape(work):
     finally:
         writer.terminate()
         writer.wait(timeout=10)
+
+def inventory_commands(work):
+    """The four commands that the inventory of Pages found beyond its
+    manuals: Reset Text and Object Handles squares a turned shape with the
+    page (VMI-04), Reapply Defaults to Selection gives it back the look of
+    a new shape (VMI-02), Show Connection Lines hides and shows the lines
+    between linked text boxes (VMI-03), and Ctrl+Shift+A takes the
+    selection away (VMI-01)."""
+    name = "Inventory.odt"
+    writer, app, letter = open_with_a_shape(work, name)
+    try:
+        Atspi.Value.set_current_value(spin_of(app, "Rotate"), 30)
+        wait_for(
+            "the shape to turn",
+            lambda: abs(Atspi.Value.get_current_value(spin_of(app, "Rotate")) - 30) < 0.5,
+        )
+        activate("reset-text-handles")
+        wait_for(
+            "the shape squared with the page",
+            lambda: abs(Atspi.Value.get_current_value(spin_of(app, "Rotate"))) < 0.5,
+        )
+        check("Reset Text and Object Handles takes the turn out of a shape (VMI-04)", True)
+        activate("reapply-defaults")
+        time.sleep(0.5)
+        press("ctrl+s")
+        wait_for(
+            "the shape saved with the look of a new one",
+            lambda: saved_content(letter, r'svg:stroke-color="#000000"')
+            and not saved_content(letter, r"rotate \("),
+        )
+        check(
+            "Reapply Defaults to Selection gives the shape the line of a new one (VMI-02)",
+            True,
+        )
+        check("and the shape is saved square with the page (VMI-04)", True)
+
+        activate("connection-lines")
+        wait_for("the lines to hide", lambda: action_state("connection-lines") == "false")
+        activate("connection-lines")
+        wait_for("the lines to show", lambda: action_state("connection-lines") == "true")
+        check("Show Connection Lines hides and shows the lines of linked boxes (VMI-03)", True)
+
+        # Back in the text, everything selected and then nothing.
+        press("Escape")
+        document = find(app, Atspi.Role.TEXT, name)
+        press("ctrl+a")
+        wait_for("the text selected", lambda: Atspi.Text.get_n_selections(document) > 0)
+        press("ctrl+shift+a")
+        wait_for("nothing selected", lambda: Atspi.Text.get_n_selections(document) == 0)
+        check("Ctrl+Shift+A takes the selection away (VMI-01)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
 
 def click_node(node, name):
     """Clicks the middle of a node of the window titled `name`."""

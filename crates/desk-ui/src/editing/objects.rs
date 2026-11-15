@@ -20,9 +20,9 @@ use std::sync::Arc;
 
 use desk_layout::{DocumentLayout, PlacedObject, object_at};
 use desk_model::{
-    Anchor, Distribution, Edit, Fill, Frame, Layer, Length, ModelError, NodeId, Object,
-    ObjectAlignment, ObjectKind, ParaAttrs, Paragraph, Rgba, Run, Shape, Story, Stroke, TextBox,
-    Wrap,
+    Anchor, Distribution, Document, Edit, Fill, Frame, GraphicStyle, Layer, Length, ModelError,
+    NodeId, Object, ObjectAlignment, ObjectKind, ParaAttrs, Paragraph, Rgba, Run, Shape, Story,
+    Stroke, TextBox, Wrap,
 };
 use gtk::gdk;
 
@@ -723,6 +723,72 @@ impl NewShape {
     }
 }
 
+/// The look that a new object of a kind takes, and that Reapply Defaults
+/// to Selection gives back (VMI-02): a shape is filled with the blue of
+/// Pages and outlined in black, a line is black, and a text box, a
+/// picture or a movie has neither.
+pub fn default_style(kind: &ObjectKind) -> GraphicStyle {
+    let line = Stroke::new(Rgba::BLACK, Length::from_points(1));
+    let mut style = GraphicStyle::default();
+    if let ObjectKind::Shape(shape) = kind {
+        style.stroke = Some(line);
+        if !shape.is_line() && !matches!(shape, Shape::Connection(_)) {
+            style.fill = Some(Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8)));
+        }
+    }
+    style
+}
+
+/// The lines between the text boxes linked with `ids`, from the end of
+/// each box to the start of the next, where both are on the same page
+/// (VMI-03).
+fn connection_marks(
+    document: &Document,
+    layout: &DocumentLayout,
+    ids: &[NodeId],
+) -> Vec<ObjectMark> {
+    let mut chains: Vec<Vec<NodeId>> = Vec::new();
+    for &id in ids {
+        if !matches!(
+            document.objects().get(id).map(|o| &o.kind),
+            Some(ObjectKind::TextBox(_))
+        ) {
+            continue;
+        }
+        let chain = document.text_box_chain(document.text_box_head(id));
+        if chain.len() > 1 && !chains.contains(&chain) {
+            chains.push(chain);
+        }
+    }
+    let mut marks = Vec::new();
+    for chain in chains {
+        for pair in chain.windows(2) {
+            let (Some((page, from)), Some((to_page, to))) =
+                (find(layout, pair[0]), find(layout, pair[1]))
+            else {
+                continue;
+            };
+            if page != to_page {
+                continue;
+            }
+            let out = from.to_page(from.width, from.height);
+            let into = to.to_page(0.0, 0.0);
+            marks.push(ObjectMark {
+                page,
+                outline: vec![
+                    (f64::from(out.0), f64::from(out.1)),
+                    (f64::from(into.0), f64::from(into.1)),
+                ],
+                closed: false,
+                handles: Vec::new(),
+                locked: false,
+                master: false,
+            });
+        }
+    }
+    marks
+}
+
 /// What the Metrics and Wrap inspectors show of the selected objects.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObjectInfo {
@@ -786,6 +852,9 @@ impl TextEditor {
                         if let Some((page, placed)) = find(&state.layout, id) {
                             marks.push(mark(page, placed));
                         }
+                    }
+                    if state.connection_lines {
+                        marks.extend(connection_marks(&document, &state.layout, &state.objects));
                     }
                 }
             }
@@ -1444,6 +1513,16 @@ impl TextEditor {
         });
     }
 
+    /// Gives the selected objects back the look that a new object of their
+    /// kind takes (VMI-02). A group keeps its own.
+    pub fn reapply_defaults(&self) {
+        self.set_each_object("Reapply Defaults", |object, _| {
+            if !matches!(object.kind, ObjectKind::Group(_)) {
+                object.style = default_style(&object.kind);
+            }
+        });
+    }
+
     /// Puts a new shape or text box in the middle of the page in sight,
     /// in front of the others, and selects it (OBJ-08, OBJ-13).
     pub fn insert_shape(&self, shape: NewShape) {
@@ -1469,11 +1548,8 @@ impl TextEditor {
         let selection = self.selection();
         let result = self.state.borrow_mut().editor.edit(name, |edit| {
             let id = edit.new_id();
-            let line = Stroke::new(Rgba::BLACK, Length::from_points(1));
-            // The blue that the shapes of Pages are filled with.
-            let blue = Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8));
-            let (kind, fill, stroke) = match shape {
-                NewShape::Line => (Shape::Line { rising: false }.into(), None, Some(line)),
+            let kind = match shape {
+                NewShape::Line => Shape::Line { rising: false }.into(),
                 NewShape::TextBox => {
                     let style = edit.document().styles().default_paragraph();
                     let paragraph = Paragraph::from_runs(
@@ -1482,25 +1558,16 @@ impl TextEditor {
                         ParaAttrs::default(),
                         [Run::new(&crate::i18n::tr("Text"))],
                     )?;
-                    (
-                        ObjectKind::TextBox(TextBox::new(
-                            Arc::from([paragraph]),
-                            Length::from_points(4),
-                        )),
-                        None,
-                        None,
-                    )
+                    ObjectKind::TextBox(TextBox::new(
+                        Arc::from([paragraph]),
+                        Length::from_points(4),
+                    ))
                 }
-                other => (
-                    other.shape().unwrap_or(Shape::Rectangle).into(),
-                    Some(blue),
-                    Some(line),
-                ),
+                other => other.shape().unwrap_or(Shape::Rectangle).into(),
             };
             let mut object = Object::new(id, kind, frame);
             object.anchor = Anchor::Page(page as u32);
-            object.style.fill = fill;
-            object.style.stroke = stroke;
+            object.style = default_style(&object.kind);
             if shape == NewShape::TextBox {
                 object.wrap = Wrap::Through;
             }
@@ -2399,5 +2466,20 @@ mod tests {
         };
         assert_eq!(picture_size(&png(200, 100), (468.0, 648.0)), (200.0, 100.0));
         assert_eq!(picture_size(&png(936, 200), (468.0, 648.0)), (468.0, 100.0));
+    }
+
+    #[test]
+    fn vmi_02_the_defaults_are_those_of_a_new_object() {
+        let shape = default_style(&Shape::Rectangle.into());
+        assert!(shape.fill.is_some() && shape.stroke.is_some());
+        assert_eq!(shape.opacity, 100);
+        assert!(shape.shadow.is_none() && shape.reflection.is_none());
+        let line = default_style(&Shape::Line { rising: false }.into());
+        assert!(line.fill.is_none() && line.stroke.is_some());
+        let text = default_style(&ObjectKind::TextBox(TextBox::new(
+            Arc::from([]),
+            Length::from_points(4),
+        )));
+        assert_eq!(text, GraphicStyle::default());
     }
 }

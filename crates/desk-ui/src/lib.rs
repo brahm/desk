@@ -389,6 +389,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         app.set_accels_for_action("win.copy", &["<Control>c"]);
         app.set_accels_for_action("win.paste", &["<Control>v"]);
         app.set_accels_for_action("win.select-all", &["<Control>a"]);
+        app.set_accels_for_action("win.deselect-all", &["<Control><Shift>a"]);
         app.set_accels_for_action("win.special-characters", &["<Control>period"]);
     });
     app.connect_activate(move |app| {

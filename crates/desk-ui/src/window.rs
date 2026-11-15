@@ -149,7 +149,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 66] = [
+const DOCUMENT_ACTIONS: [&str; 68] = [
     "outline",
     "sidebar",
     "comments",
@@ -165,6 +165,8 @@ const DOCUMENT_ACTIONS: [&str; 66] = [
     "duplicate",
     "fullscreen",
     "select-all",
+    "deselect-all",
+    "connection-lines",
     "cut",
     "copy",
     "paste",
@@ -779,6 +781,7 @@ impl DocumentWindow {
             }
         });
         editor.set_show_invisibles(self.action_state("invisibles"));
+        editor.set_show_connection_lines(self.action_state("connection-lines"));
         editor.set_show_layout(self.action_state("show-layout"));
         *self.editor.borrow_mut() = Some(editor);
         self.stack.set_visible_child_name("document");
@@ -1747,6 +1750,7 @@ impl DocumentWindow {
                 (tr("Main Menu"), header::more_commands(opens)),
                 (tr("View"), header::view_menu()),
                 (tr("Insert"), header::insert_menu(true)),
+                (tr("Edit"), edit_menu()),
                 (tr("Format"), format_menu()),
                 (tr("Arrange"), objects::arrange_menu()),
             ]
@@ -1851,6 +1855,7 @@ impl DocumentWindow {
             ("paste", TextEditor::paste),
             ("paste-match-style", TextEditor::paste_matching_style),
             ("select-all", TextEditor::select_all),
+            ("deselect-all", TextEditor::deselect_all),
             ("special-characters", TextEditor::special_characters),
         ] {
             let weak = Rc::downgrade(self);
@@ -1956,6 +1961,22 @@ impl DocumentWindow {
             }
         });
         self.window.add_action(&invisibles);
+
+        // The lines between linked text boxes, which show until hidden
+        // (VMI-03).
+        let lines = gio::SimpleAction::new_stateful("connection-lines", None, &true.to_variant());
+        let weak = Rc::downgrade(self);
+        lines.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            if let Some(editor) = this.editor() {
+                editor.set_show_connection_lines(on);
+            }
+        });
+        self.window.add_action(&lines);
 
         // The outlines of the body, the columns, the headers, the footers
         // and the text boxes (INT-09).
@@ -2692,6 +2713,7 @@ impl DocumentWindow {
             Some("win.paste-match-style"),
         );
         edit.append(Some(&tr("Select _All")), Some("win.select-all"));
+        edit.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
         menu.append_section(None, &edit);
         let format = gio::Menu::new();
         format.append(Some(&tr("_Bold")), Some("win.bold"));
@@ -3078,6 +3100,14 @@ pub(crate) fn format_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append_section(None, &fonts);
     menu.append_section(None, &styles);
+    menu
+}
+
+/// Select All and Deselect All, for the command search (VMI-01).
+pub(crate) fn edit_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&tr("Select _All")), Some("win.select-all"));
+    menu.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
     menu
 }
 
