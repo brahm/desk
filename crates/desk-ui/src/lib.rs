@@ -32,6 +32,7 @@ mod gradient_bar;
 mod graphic_pane;
 mod headers_pane;
 pub mod i18n;
+mod inspector;
 mod layout_pane;
 mod links;
 mod links_pane;

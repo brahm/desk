@@ -11,6 +11,7 @@
 
 use crate::compact;
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -20,6 +21,7 @@ use gtk::{gdk, glib};
 use crate::editing::{Format, TextEditor};
 use crate::effects::Effects;
 use crate::i18n::{n_, tr};
+use crate::inspector::{Context, Levels, Tab};
 use crate::layout_pane::LayoutGroups;
 use crate::lists_pane::ListsGroup;
 use crate::preferences::{self, Units};
@@ -72,12 +74,17 @@ pub fn from_gdk(color: &gdk::RGBA) -> Rgba {
 
 pub use crate::format_bar::FormatBar;
 
-/// The Inspector: the spacing and indents of the paragraphs (the Text
-/// inspector of Pages).
+/// The Inspector: Format, with the tabs of what is selected, and Document
+/// (INT-13).
 pub struct Inspector {
     root: gtk::Box,
-    /// The panes, kept for the handlers that follow what is selected.
-    _panes: Rc<InspectorPanes>,
+    /// Format and Document, and their tabs.
+    levels: Rc<Levels>,
+    /// The counts of the Info tab of Document.
+    statistics: InfoRows,
+    /// The hyperlink and the bookmarks, which the format bar shows.
+    link_popover: gtk::Popover,
+    editor: EditorOf,
     line_spacing: compact::SpinRow,
     before: compact::SpinRow,
     after: compact::SpinRow,
@@ -216,18 +223,65 @@ impl Inspector {
         document.add(&document_hyphenation);
         document.add(&document_ligatures);
         document.add(&facing_pages);
-        // The panes of the Inspector of Pages, in its order (C of the
-        // interface plan). Table, Chart and QuickTime show only when such
-        // an object is selected; Desk Writer has QuickTime so far.
+        // The tabs of Format for each kind of selection, and those of
+        // Document (INT-13, the Inspector of interface B).
         let [metrics, shape, picture, media, graphic, wrap, text_box] = objects.groups();
         let [character, text_shadow, borders] = effects.groups();
         let [page, layout, section] = layouts.groups();
         let [link, bookmarks] = links.groups();
-        let panes = InspectorPanes::new(&[
-            (
+        let arrange = || Tab::new("arrange", n_("Arrange"), &[metrics, wrap]);
+        let style = || Tab::new("style", n_("Style"), &[graphic, shape]);
+        let mut contexts = HashMap::new();
+        contexts.insert(
+            Context::Text,
+            vec![
+                Tab::new(
+                    "style",
+                    n_("Style"),
+                    &[character, text_shadow, &spacing, lists.widget()],
+                ),
+                Tab::new(
+                    "layout",
+                    n_("Layout"),
+                    &[&indents, tabs.widget(), layout, borders],
+                ),
+                Tab::new("more", n_("More"), &[&hyphenation]),
+            ],
+        );
+        contexts.insert(
+            Context::Image,
+            vec![
+                Tab::new("style", n_("Style"), &[graphic]),
+                Tab::new("image", n_("Image"), &[picture]),
+                arrange(),
+            ],
+        );
+        for context in [Context::Shape, Context::TextBox] {
+            contexts.insert(
+                context,
+                vec![
+                    style(),
+                    Tab::new("text", n_("Text"), &[text_box]),
+                    arrange(),
+                ],
+            );
+        }
+        for context in [Context::Movie, Context::Sound] {
+            contexts.insert(
+                context,
+                vec![
+                    Tab::new("style", n_("Style"), &[graphic]),
+                    Tab::new("media", n_("Media"), &[media]),
+                    arrange(),
+                ],
+            );
+        }
+        contexts.insert(Context::Group, vec![style(), arrange()]);
+        let statistics = InfoRows::new();
+        let document_tabs = vec![
+            Tab::new(
                 "document",
                 n_("Document"),
-                "x-office-document-symbolic",
                 &[
                     page,
                     &document,
@@ -236,59 +290,19 @@ impl Inspector {
                     toc.widget(),
                 ],
             ),
-            (
-                "layout",
-                n_("Layout"),
-                "view-dual-symbolic",
-                &[layout, section],
-            ),
-            ("wrap", n_("Wrap"), "format-indent-more-symbolic", &[wrap]),
-            (
-                "text",
-                n_("Text"),
-                "insert-text-symbolic",
-                &[
-                    &spacing,
-                    &indents,
-                    lists.widget(),
-                    tabs.widget(),
-                    &hyphenation,
-                    character,
-                    borders,
-                    text_box,
-                ],
-            ),
-            (
-                "graphic",
-                n_("Graphic"),
-                "applications-graphics-symbolic",
-                &[graphic, shape, picture, text_shadow],
-            ),
-            (
-                "metrics",
-                n_("Metrics"),
-                "zoom-fit-best-symbolic",
-                &[metrics],
-            ),
-            (
-                "link",
-                n_("Link"),
-                "insert-link-symbolic",
-                &[link, bookmarks],
-            ),
-            (
-                "quicktime",
-                n_("QuickTime"),
-                "video-x-generic-symbolic",
-                &[media],
-            ),
-        ]);
-        panes.show_only_with("quicktime", media);
-        let root = panes.widget().clone();
+            Tab::new("section", n_("Section"), &[section]),
+            Tab::new("info", n_("Info"), &[&statistics.group]),
+        ];
+        let levels = Levels::new(contexts, document_tabs);
+        let link_popover = link_popover(&[link, bookmarks]);
+        let root = levels.widget().clone();
 
         let this = Rc::new(Self {
             root,
-            _panes: panes,
+            levels,
+            statistics,
+            link_popover,
+            editor: editor.clone(),
             line_spacing,
             before,
             after,
@@ -313,6 +327,12 @@ impl Inspector {
             updating: Cell::new(false),
         });
         this.set_units(units);
+        let weak = Rc::downgrade(&this);
+        this.levels.connect_document_shown(move || {
+            if let Some(this) = weak.upgrade() {
+                this.show_statistics();
+            }
+        });
         let weak = Rc::downgrade(&this);
         preferences::connect_changed(move |p| {
             if let Some(this) = weak.upgrade() {
@@ -400,6 +420,33 @@ impl Inspector {
         &self.root
     }
 
+    /// The popover of the hyperlink and the bookmarks at the selection,
+    /// which the Link button of the format bar opens.
+    pub fn link_popover(&self) -> &gtk::Popover {
+        &self.link_popover
+    }
+
+    /// Shows a tab, by its name: "style", "image", "arrange", "document"…
+    pub fn show_tab(&self, name: &str) -> bool {
+        self.levels.show_tab(name)
+    }
+
+    /// Shows a level: "format" or "document".
+    pub fn show_level(&self, name: &str) {
+        self.levels.show_level(name);
+    }
+
+    /// Counts the document again while its Info tab shows.
+    fn show_statistics(&self) {
+        if self.levels.document_tab().as_deref() != Some("info") {
+            return;
+        }
+        if let Some(editor) = (self.editor)() {
+            let (all, _) = editor.statistics();
+            self.statistics.show(&all);
+        }
+    }
+
     /// Measures the indents in other units.
     fn set_units(&self, units: Units) {
         self.updating.set(true);
@@ -424,6 +471,8 @@ impl Inspector {
     pub fn show(&self, format: &Format) {
         *self.shown.borrow_mut() = Some(format.clone());
         self.objects.show_format(format);
+        self.levels.show(Context::of(format.object.as_ref()));
+        self.show_statistics();
         self.updating.set(true);
         let paragraph = &format.paragraph;
         let set = |row: &compact::SpinRow, value: f64| {
@@ -480,6 +529,84 @@ impl Inspector {
     }
 }
 
+/// The counts of the document in the Info tab of Document.
+struct InfoRows {
+    group: compact::Group,
+    values: Vec<gtk::Label>,
+}
+
+impl InfoRows {
+    fn new() -> Self {
+        let group = compact::Group::builder().title(tr("Statistics")).build();
+        let all = gtk::Button::builder()
+            .label(tr("Show All"))
+            .action_name("win.statistics")
+            .css_classes(["flat"])
+            .build();
+        group.set_header_suffix(Some(&all));
+        let values = [
+            n_("Words"),
+            n_("Characters"),
+            n_("Paragraphs"),
+            n_("Sections"),
+            n_("Graphics"),
+        ]
+        .into_iter()
+        .map(|title| {
+            let row = compact::ActionRow::builder().title(tr(title)).build();
+            let value = gtk::Label::builder()
+                .css_classes(["numeric"])
+                .selectable(true)
+                .build();
+            row.add_suffix(&value);
+            group.add(&row);
+            value
+        })
+        .collect();
+        Self { group, values }
+    }
+
+    fn show(&self, statistics: &desk_model::Statistics) {
+        let counts = [
+            statistics.words,
+            statistics.characters,
+            statistics.paragraphs,
+            statistics.sections,
+            statistics.graphics,
+        ];
+        for (label, count) in self.values.iter().zip(counts) {
+            let text = count.to_string();
+            if label.label() != text {
+                label.set_label(&text);
+            }
+        }
+    }
+}
+
+/// A popover that holds the groups of the hyperlink and the bookmarks,
+/// as the Link inspector of Pages became in interface B.
+fn link_popover(groups: &[&compact::Group]) -> gtk::Popover {
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(18)
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .width_request(308)
+        .build();
+    for group in groups {
+        content.append(group.widget());
+    }
+    let scrolled = gtk::ScrolledWindow::builder()
+        .child(&content)
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_height(true)
+        .max_content_height(520)
+        .build();
+    gtk::Popover::builder().child(&scrolled).build()
+}
+
 /// Names a button that shows only an icon, for screen readers.
 pub fn labelled(widget: &impl IsA<gtk::Accessible>, label: &str) {
     widget.update_property(&[gtk::accessible::Property::Label(label)]);
@@ -501,165 +628,6 @@ pub fn set_state(window: &impl IsA<gtk::gio::ActionMap>, name: &str, value: glib
         && action.state().as_ref() != Some(&value)
     {
         action.set_state(&value);
-    }
-}
-
-/// The panes of the Inspector, one at a time, chosen by a row of toggles at
-/// its top as in Pages. A pane whose groups all hide says that nothing it
-/// sets is selected.
-/// The toggle of a pane of the Inspector.
-fn pane_toggle(name: &str, title: &str, icon: &str) -> adw::Toggle {
-    adw::Toggle::builder()
-        .name(name)
-        .icon_name(icon)
-        .tooltip(title)
-        .build()
-}
-
-struct InspectorPanes {
-    root: gtk::Box,
-    toggles: adw::ToggleGroup,
-    stack: gtk::Stack,
-    /// The names, titles and icons of the panes, in order.
-    panes: Vec<(String, String, String)>,
-    /// The panes left out while nothing they set is selected.
-    hidden: RefCell<std::collections::HashSet<String>>,
-}
-
-impl InspectorPanes {
-    /// The panes: their names, titles, icons and groups.
-    #[allow(clippy::type_complexity)]
-    fn new(panes: &[(&str, &str, &str, &[&compact::Group])]) -> Rc<Self> {
-        let toggles = adw::ToggleGroup::builder()
-            .halign(gtk::Align::Center)
-            .css_classes(["flat"])
-            .build();
-        let stack = gtk::Stack::builder().vhomogeneous(false).build();
-        for (name, title, icon, groups) in panes {
-            let title = tr(title);
-            toggles.add(pane_toggle(name, &title, icon));
-            let content = gtk::Box::builder()
-                .orientation(gtk::Orientation::Vertical)
-                .spacing(18)
-                .margin_top(12)
-                .margin_bottom(12)
-                .margin_start(12)
-                .margin_end(12)
-                .build();
-            let heading = gtk::Label::builder()
-                .label(&title)
-                .xalign(0.0)
-                .css_classes(["title-4"])
-                .build();
-            content.append(&heading);
-            let empty = gtk::Label::builder()
-                .label(tr("Nothing that this pane sets is selected."))
-                .wrap(true)
-                .xalign(0.0)
-                .css_classes(["dim-label"])
-                .build();
-            content.append(&empty);
-            for group in *groups {
-                content.append(group.widget());
-            }
-            let all: Vec<compact::Group> = groups.iter().map(|g| (*g).clone()).collect();
-            let show_empty = {
-                let empty = empty.downgrade();
-                let all = all.clone();
-                move || {
-                    if let Some(empty) = empty.upgrade() {
-                        empty.set_visible(!all.iter().any(compact::Group::is_visible));
-                    }
-                }
-            };
-            show_empty();
-            let show_empty = Rc::new(show_empty);
-            for group in &all {
-                let show_empty = show_empty.clone();
-                group.connect_visible_notify(move |_| show_empty());
-            }
-            let scrolled = gtk::ScrolledWindow::builder()
-                .child(&content)
-                .hscrollbar_policy(gtk::PolicyType::Never)
-                .vexpand(true)
-                .build();
-            stack.add_titled(&scrolled, Some(name), &title);
-        }
-        toggles.set_active_name(Some("text"));
-        stack.set_visible_child_name("text");
-        let shown = stack.downgrade();
-        toggles.connect_active_name_notify(move |toggles| {
-            if let (Some(stack), Some(name)) = (shown.upgrade(), toggles.active_name()) {
-                stack.set_visible_child_name(&name);
-            }
-        });
-        let bar = gtk::Box::builder()
-            .margin_top(6)
-            .margin_bottom(6)
-            .margin_start(6)
-            .margin_end(6)
-            .build();
-        toggles.set_hexpand(true);
-        bar.append(&toggles);
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .width_request(332)
-            .build();
-        root.append(&bar);
-        root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-        root.append(&stack);
-        Rc::new(Self {
-            root,
-            toggles,
-            stack,
-            panes: panes
-                .iter()
-                .map(|(name, title, icon, _)| ((*name).to_owned(), tr(title), (*icon).to_owned()))
-                .collect(),
-            hidden: RefCell::new(std::collections::HashSet::new()),
-        })
-    }
-
-    fn widget(&self) -> &gtk::Box {
-        &self.root
-    }
-
-    /// Shows the toggle of a pane only while `group` shows, as Pages
-    /// shows the QuickTime inspector only for a movie or a sound.
-    fn show_only_with(self: &Rc<Self>, name: &str, group: &compact::Group) {
-        let weak = Rc::downgrade(self);
-        let name = name.to_owned();
-        let update = move |visible: bool| {
-            let Some(this) = weak.upgrade() else { return };
-            let changed = if visible {
-                this.hidden.borrow_mut().remove(&name)
-            } else {
-                this.hidden.borrow_mut().insert(name.clone())
-            };
-            if changed {
-                this.refresh_toggles();
-            }
-        };
-        update(group.is_visible());
-        group.connect_visible_notify(move |group| update(group.is_visible()));
-    }
-
-    /// Puts back the toggles of the panes that are not left out, in their
-    /// order, keeping the pane shown unless it is left out.
-    fn refresh_toggles(&self) {
-        let active = self.toggles.active_name();
-        let hidden = self.hidden.borrow();
-        self.toggles.remove_all();
-        for (name, title, icon) in &self.panes {
-            if !hidden.contains(name) {
-                self.toggles.add(pane_toggle(name, title, icon));
-            }
-        }
-        let active = active
-            .filter(|name| !hidden.contains(name.as_str()))
-            .map_or_else(|| "metrics".to_owned(), |name| name.to_string());
-        self.toggles.set_active_name(Some(&active));
-        self.stack.set_visible_child_name(&active);
     }
 }
 

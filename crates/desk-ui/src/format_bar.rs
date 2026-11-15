@@ -76,6 +76,8 @@ pub struct FormatBar {
     /// under More: the alignment, the line spacing and the list.
     secondary: [gtk::Widget; 3],
     text_more: gtk::MenuButton,
+    /// The hyperlink at the selection, in a popover from the Inspector.
+    link: gtk::MenuButton,
     /// The tools of a picture, which only a picture shows.
     picture_tools: gtk::Box,
     stroke: gtk::DropDown,
@@ -122,6 +124,7 @@ impl FormatBar {
             color: text_parts.color,
             secondary: text_parts.secondary,
             text_more: text_parts.more,
+            link: text_parts.link,
             picture_tools: object_parts.picture_tools,
             stroke: object_parts.stroke,
             stroke_width: object_parts.stroke_width,
@@ -151,6 +154,11 @@ impl FormatBar {
     /// Opens the color chooser of the text color.
     pub fn choose_color(&self) {
         self.color.activate();
+    }
+
+    /// Gives the Link button the popover of the hyperlink.
+    pub fn set_link_popover(&self, popover: &gtk::Popover) {
+        self.link.set_popover(Some(popover));
     }
 
     /// The widget to put under the header bar.
@@ -415,6 +423,7 @@ struct TextParts {
     color: gtk::ColorDialogButton,
     secondary: [gtk::Widget; 3],
     more: gtk::MenuButton,
+    link: gtk::MenuButton,
 }
 
 /// The text variant: the paragraph style, the font and its size, bold,
@@ -500,6 +509,13 @@ fn text_variant(character_menu: &gio::Menu) -> (gtk::Box, TextParts) {
     bar.append(&spacing);
     let lists = icon_menu_button("view-list-bullet-symbolic", &tr("List"), &list_menu());
     bar.append(&lists);
+    // The Link inspector of Pages is a popover in interface B (INT-13).
+    let link = gtk::MenuButton::builder()
+        .icon_name("desk-link-symbolic")
+        .tooltip_text(tr("Link"))
+        .build();
+    labelled(&link, &tr("Link"));
+    bar.append(&link);
 
     bar.append(&gtk::Box::builder().hexpand(true).build());
     let more = icon_menu_button(
@@ -516,6 +532,7 @@ fn text_variant(character_menu: &gio::Menu) -> (gtk::Box, TextParts) {
         color,
         secondary: [alignments.upcast(), spacing.upcast(), lists.upcast()],
         more,
+        link,
     };
     (bar, parts)
 }
@@ -570,7 +587,10 @@ fn line_spacing_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append_section(None, &spacings);
     let more = gio::Menu::new();
-    more.append(Some(&tr("Show in _Inspector")), Some("win.show-inspector"));
+    more.append(
+        Some(&tr("Show in _Inspector")),
+        Some("win.inspector-tab::style"),
+    );
     menu.append_section(None, &more);
     menu
 }
@@ -729,7 +749,7 @@ fn object_variant() -> (gtk::Box, ObjectParts) {
     tools.append(&icon_button(
         "desk-image-adjust-symbolic",
         &tr("Adjust Image"),
-        "win.show-inspector",
+        "win.inspector-tab::image",
         false,
     ));
     picture_tools.append(&tools);

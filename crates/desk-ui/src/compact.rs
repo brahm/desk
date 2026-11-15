@@ -79,6 +79,7 @@ impl Line {
             .build();
         let subtitle = gtk::Label::builder()
             .xalign(0.0)
+            .wrap(true)
             .visible(false)
             .css_classes(["dim-label", "caption"])
             .build();
@@ -94,6 +95,8 @@ impl Line {
     /// Sets the title, which is markup as in Libadwaita.
     fn set_title(&self, title: &str) {
         self.title.set_markup(title);
+        // A row of buttons has no title, and gives its place to them.
+        self.title.set_visible(!title.is_empty());
         self.root
             .update_property(&[gtk::accessible::Property::Label(&self.title.text())]);
     }
@@ -576,6 +579,10 @@ impl ComboRow {
             .valign(gtk::Align::Center)
             .hexpand(true)
             .build();
+        // The button cuts a long name short, so that the row keeps to the
+        // width of the Inspector; the list shows names whole.
+        dropdown.set_factory(Some(&crate::formatting::label_factory(Some(16))));
+        dropdown.set_list_factory(Some(&crate::formatting::label_factory(None)));
         let line = Line::new("");
         line.root.append(&line.title);
         line.root.append(&dropdown);
@@ -683,6 +690,9 @@ impl ComboRowBuilder {
             row.set_subtitle(&subtitle);
         }
         if let Some(expression) = self.expression {
+            // The names come from the expression, as GTK shows them.
+            row.set_factory(None::<&gtk::ListItemFactory>);
+            row.set_list_factory(None::<&gtk::ListItemFactory>);
             row.set_expression(Some(&expression));
         }
         if let Some(model) = self.model {
