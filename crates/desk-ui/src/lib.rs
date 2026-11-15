@@ -17,6 +17,7 @@ pub use gtk;
 mod access;
 mod area;
 mod auto_numbers;
+mod bottom_bar;
 mod bullet_pictures;
 mod compact;
 mod editing;

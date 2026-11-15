@@ -408,7 +408,7 @@ funcionando.
 | 3. Barra de formatação enxuta (feita) | As variantes de texto e de objeto, o menu Mais e o menu Organizar | INT-12 |
 | 4. Inspetor em dois níveis (feita) | Formato e Documento, o título do contexto, as abas de texto, imagem e forma, e o Inspetor sobreposto abaixo de 520 px | INT-13 |
 | 5. Páginas da barra lateral (feita) | Estilos no lugar da gaveta, Comentários e Resultados da busca | INT-18, TXT-13 |
-| 6. Barra inferior | Zoom, posição com Ir para e Navegar por, contagem e seleção | GNM-13, INT-07, INT-19, DOC-20 |
+| 6. Barra inferior (feita) | Zoom, posição com Ir para e Navegar por, contagem e seleção | GNM-13, INT-07, INT-19, DOC-20 |
 | 7. Comandos e atalhos | Os quatro comandos do inventário, os atalhos confirmados, o diálogo de atalhos, as traduções e os testes pela árvore de acessibilidade | VMI-01 a VMI-04 |
 
 Oito linhas que já têm testes mudam de forma com a interface B e ficam
@@ -453,7 +453,16 @@ escondem a barra com a página que ela tinha. A barra fica com 196 px nas
 miniaturas e nos comentários, 220 px nos estilos e 260 px nos resultados
 da busca. O Desk ainda não tem comentários (REV-08, fase 8), então a
 página Comentários diz que não há nenhum, e o botão Comentário segue
-desativado até lá. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
+desativado até lá. A etapa 6 refez a barra inferior (GNM-13): o zoom no
+início (INT-07); no centro, entre as setas de anterior e seguinte, a
+posição (Página 6 de 41), cujo menu tem Ir para a página e Navegar por
+(INT-19); e no fim a contagem de palavras, que passa a ser a da seleção
+quando há texto selecionado, como em 19 de 26.171 palavras. O menu da
+contagem troca o que ela conta (palavras, caracteres, caracteres sem
+espaços, parágrafos ou páginas), escolha que fica nas Preferências, e
+abre as estatísticas (DOC-20). As setas dizem para onde vão, e Navegar
+por ganhou as notas de rodapé e de fim; Comentário entra com os
+comentários, na fase 8. O relatório de paridade continua a contá-las como testadas enquanto os testes verificarem a forma antiga, e
 cada etapa troca os testes junto com o código.
 
 Depois disso:

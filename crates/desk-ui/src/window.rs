@@ -24,7 +24,7 @@ use crate::find::{self, FindWindow, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
-use crate::i18n::{n_, tr, trn};
+use crate::i18n::{n_, tr};
 use crate::nav_sidebar::{self, NavSidebar};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
@@ -85,8 +85,11 @@ pub struct DocumentWindow {
     header: adw::HeaderBar,
     stack: gtk::Stack,
     view: DocumentView,
-    zoom_button: gtk::MenuButton,
-    counts_label: gtk::Label,
+    /// Zoom, the position and the count (GNM-13).
+    bottom: crate::bottom_bar::BottomBar,
+    /// The counts of the document as it last changed, which a change of
+    /// the selection does not count again.
+    counted: Cell<Option<desk_model::Statistics>>,
     /// Says that the document has warnings, with a button to see them.
     warnings_banner: adw::Banner,
     /// The file of the document; none for an untitled one.
@@ -108,8 +111,6 @@ pub struct DocumentWindow {
     find: Rc<FindWindow>,
     /// The search results, a page of the navigation sidebar (TXT-13).
     search_sidebar: Rc<SearchSidebar>,
-    navigate_by: gtk::MenuButton,
-    page_entry: gtk::Entry,
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
     outline: Rc<crate::outline_view::OutlineView>,
     /// The navigation sidebar, with the page thumbnails (GNM-12).
@@ -301,67 +302,8 @@ impl DocumentWindow {
         let stack = gtk::Stack::builder().hhomogeneous(false).build();
         stack.add_named(&status, Some("empty"));
 
-        let zoom_button = gtk::MenuButton::builder()
-            .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
-            .menu_model(&zoom_menu())
-            .direction(gtk::ArrowType::Up)
-            .tooltip_text(tr("Zoom"))
-            .css_classes(["flat"])
-            .build();
-        // The counts give way in a narrow window (GNM-01).
-        let counts_label = gtk::Label::builder()
-            .css_classes(["dim-label", "caption", "numeric"])
-            .hexpand(true)
-            .xalign(1.0)
-            .ellipsize(gtk::pango::EllipsizeMode::End)
-            .build();
-        let bottom = gtk::Box::builder()
-            .spacing(6)
-            .margin_start(6)
-            .margin_end(12)
-            .margin_top(3)
-            .margin_bottom(3)
-            .build();
-        bottom.append(&zoom_button);
-        // The arrows, what they go to, and Go to Page (INT-19).
-        let previous = gtk::Button::builder()
-            .icon_name("go-up-symbolic")
-            .tooltip_text(tr("Previous"))
-            .action_name("win.navigate")
-            .action_target(&false.to_variant())
-            .css_classes(["flat"])
-            .build();
-        let next = gtk::Button::builder()
-            .icon_name("go-down-symbolic")
-            .tooltip_text(tr("Next"))
-            .action_name("win.navigate")
-            .action_target(&true.to_variant())
-            .css_classes(["flat"])
-            .build();
-        let navigate_by = gtk::MenuButton::builder()
-            .label(tr("Page"))
-            .menu_model(&navigate_menu())
-            .direction(gtk::ArrowType::Up)
-            .tooltip_text(tr("Go To"))
-            .css_classes(["flat"])
-            .build();
-        let page_entry = gtk::Entry::builder()
-            .width_chars(4)
-            .max_width_chars(5)
-            .input_purpose(gtk::InputPurpose::Digits)
-            .xalign(0.5)
-            .tooltip_text(tr("Go to Page"))
-            .valign(gtk::Align::Center)
-            .build();
-        crate::formatting::labelled(&page_entry, &tr("Go to Page"));
-        bottom.append(&previous);
-        bottom.append(&next);
-        bottom.append(&navigate_by);
-        bottom.append(&page_entry);
-        bottom.append(&counts_label);
-        let bottom_bar = gtk::ActionBar::new();
-        bottom_bar.pack_start(&bottom);
-        bottom_bar.set_revealed(false);
+        let bottom = crate::bottom_bar::BottomBar::new();
+        let bottom_bar = bottom.bar.clone();
 
         let editor: Rc<RefCell<Option<TextEditor>>> = Rc::new(RefCell::new(None));
         let editor_of = || -> EditorOf {
@@ -521,8 +463,8 @@ impl DocumentWindow {
             header,
             stack,
             view,
-            zoom_button,
-            counts_label,
+            bottom,
+            counted: Cell::new(None),
             warnings_banner,
             path: RefCell::new(None),
             name: RefCell::new(String::new()),
@@ -536,8 +478,6 @@ impl DocumentWindow {
             search,
             find,
             search_sidebar,
-            navigate_by,
-            page_entry,
             thumbnails,
             outline,
             nav,
@@ -563,7 +503,8 @@ impl DocumentWindow {
         {
             let current = preferences::get();
             this.view.set_zoom(f64::from(current.zoom) / 100.0);
-            this.zoom_button
+            this.bottom
+                .zoom
                 .set_label(&geometry::zoom_label(this.view.zoom()));
             this.show_window_preferences(&current);
         }
@@ -588,7 +529,7 @@ impl DocumentWindow {
             }
         });
         {
-            let label = this.zoom_button.downgrade();
+            let label = this.bottom.zoom.downgrade();
             this.view.connect_zoom_changed(move |zoom| {
                 if let Some(label) = label.upgrade() {
                     label.set_label(&geometry::zoom_label(zoom));
@@ -596,18 +537,15 @@ impl DocumentWindow {
             });
         }
         {
-            // The page in sight shows in Go to Page.
+            // The page in sight shows in the position and in Go to Page.
             let weak = Rc::downgrade(&this);
             this.view.connect_moved(move || {
-                if let Some(this) = weak.upgrade()
-                    && !this.page_entry.has_focus()
-                    && let Some(page) = this.view.current_page()
-                {
-                    this.page_entry.set_text(&(page + 1).to_string());
+                if let Some(this) = weak.upgrade() {
+                    this.show_position();
                 }
             });
             let weak = Rc::downgrade(&this);
-            this.page_entry.connect_activate(move |entry| {
+            this.bottom.page_entry.connect_activate(move |entry| {
                 let Some(this) = weak.upgrade() else {
                     return;
                 };
@@ -616,10 +554,28 @@ impl DocumentWindow {
                     (entry.text().trim().parse::<usize>(), this.editor())
                     && (1..=count).contains(&page)
                 {
+                    this.bottom.position.popdown();
                     editor.go_to_page(page - 1);
                     editor.focus();
+                } else {
+                    this.window.error_bell();
                 }
             });
+            // Go to Page opens with the page in sight, ready to be typed
+            // over.
+            let weak = Rc::downgrade(&this);
+            if let Some(popover) = this.bottom.position.popover() {
+                popover.connect_show(move |_| {
+                    if let Some(this) = weak.upgrade() {
+                        let entry = &this.bottom.page_entry;
+                        if let Some(page) = this.view.current_page() {
+                            entry.set_text(&(page + 1).to_string());
+                        }
+                        entry.grab_focus();
+                        entry.select_region(0, -1);
+                    }
+                });
+            }
         }
         {
             let bar = bottom_bar.downgrade();
@@ -819,6 +775,7 @@ impl DocumentWindow {
         editor.connect_selection_changed(move || {
             if let Some(this) = weak.upgrade() {
                 this.show_format();
+                this.show_count();
             }
         });
         editor.set_show_invisibles(self.action_state("invisibles"));
@@ -890,7 +847,10 @@ impl DocumentWindow {
     /// Shows what the preferences say about the window: the counts at
     /// the bottom, the color of invisibles and that of the guides.
     fn show_window_preferences(&self, preferences: &preferences::Preferences) {
-        self.counts_label.set_visible(preferences.show_counts);
+        self.bottom.count.set_visible(preferences.show_counts);
+        let count = crate::bottom_bar::Count::from_name(&preferences.count);
+        formatting::set_state(&self.window, "count", count.name().to_variant());
+        self.show_count();
         self.view.set_invisibles_color(preferences.invisibles_color);
         self.view.set_guide_color(preferences.guide_color);
     }
@@ -940,6 +900,40 @@ impl DocumentWindow {
         }
     }
 
+    /// Shows at the end of the bottom bar the count of the document, or of
+    /// the selection when text is selected (DOC-20).
+    fn show_count(&self) {
+        let Some(editor) = self.editor() else {
+            return;
+        };
+        let kind = self
+            .window
+            .lookup_action("count")
+            .and_then(|a| a.state())
+            .and_then(|s| s.get::<String>())
+            .map_or(crate::bottom_bar::Count::Words, |n| {
+                crate::bottom_bar::Count::from_name(&n)
+            });
+        let all = self.counted.get().unwrap_or_else(|| {
+            let all = editor.main_statistics();
+            self.counted.set(Some(all));
+            all
+        });
+        self.bottom.show_count(&crate::bottom_bar::count_label(
+            kind,
+            &all,
+            editor.selection_statistics().as_ref(),
+            self.view.page_count(),
+        ));
+    }
+
+    /// Shows in the middle of the bottom bar the page in sight (INT-19).
+    fn show_position(&self) {
+        let count = self.view.page_count().max(1);
+        let page = self.view.current_page().map_or(1, |p| p + 1).min(count);
+        self.bottom.show_position(page, count);
+    }
+
     fn action_state(&self, name: &str) -> bool {
         self.window
             .lookup_action(name)
@@ -969,8 +963,9 @@ impl DocumentWindow {
             self.view
                 .access()
                 .update_property(&[gtk::accessible::Property::Label(&name)]);
-            self.counts_label
-                .set_label(&counts(editor.word_count(), self.view.page_count()));
+            self.counted.set(Some(editor.main_statistics()));
+            self.show_count();
+            self.show_position();
         }
         // A dialog over the window keeps the keys of editing, such as
         // Ctrl+A in a field, from reaching the document.
@@ -2009,9 +2004,33 @@ impl DocumentWindow {
             };
             action.set_state(&value.to_variant());
             let kind = crate::editing::Navigate::from_name(&value);
-            this.navigate_by.set_label(&navigate_label(kind));
+            this.bottom.show_navigate(kind);
         });
         self.window.add_action(&navigate_by);
+        // What the count at the bottom counts (DOC-20), kept in the
+        // preferences for every window.
+        let count = gio::SimpleAction::new_stateful(
+            "count",
+            Some(glib::VariantTy::STRING),
+            &preferences::get().count.to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        count.connect_activate(move |action, parameter| {
+            let (Some(this), Some(value)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+            else {
+                return;
+            };
+            let kind = crate::bottom_bar::Count::from_name(&value);
+            action.set_state(&kind.name().to_variant());
+            this.show_count();
+            let mut current = preferences::get();
+            if current.count != kind.name() {
+                current.count = kind.name().to_owned();
+                preferences::set(current);
+            }
+        });
+        self.window.add_action(&count);
         let navigate = gio::SimpleAction::new("navigate", Some(glib::VariantTy::BOOLEAN));
         let weak = Rc::downgrade(self);
         navigate.connect_activate(move |_, parameter| {
@@ -3099,13 +3118,6 @@ fn writing_tools_menu() -> gio::Menu {
     menu
 }
 
-/// The counts at the bottom of the window.
-fn counts(words: usize, pages: usize) -> String {
-    let words = trn("{n} word", "{n} words", words as u64).replace("{n}", &words.to_string());
-    let pages = trn("{n} page", "{n} pages", pages as u64).replace("{n}", &pages.to_string());
-    format!("{words} · {pages}")
-}
-
 /// A path with the extension of the kind of file saved, unless it has it.
 fn with_extension(path: PathBuf, extension: &str) -> PathBuf {
     let has = path
@@ -3120,59 +3132,6 @@ fn with_extension(path: PathBuf, extension: &str) -> PathBuf {
         name.push(extension);
         path.with_file_name(name)
     }
-}
-
-/// The name of what the arrows go to, on the button that chooses it.
-fn navigate_label(kind: crate::editing::Navigate) -> String {
-    use crate::editing::Navigate;
-    match kind {
-        Navigate::Page => tr("Page"),
-        Navigate::Section => tr("Section"),
-        Navigate::Link => tr("Link"),
-        Navigate::Bookmark => tr("Bookmark"),
-        Navigate::Style => tr("Style"),
-    }
-}
-
-/// The menu of what the arrows at the bottom go to (INT-19).
-fn navigate_menu() -> gio::Menu {
-    let menu = gio::Menu::new();
-    for kind in crate::editing::Navigate::ALL {
-        let item = gio::MenuItem::new(Some(&navigate_label(kind)), None);
-        item.set_action_and_target_value(Some("win.navigate-by"), Some(&kind.name().to_variant()));
-        menu.append_item(&item);
-    }
-    menu
-}
-
-/// The zoom menu at the bottom of the window (INT-07).
-fn zoom_menu() -> gio::Menu {
-    let menu = gio::Menu::new();
-    let levels = gio::Menu::new();
-    for level in geometry::ZOOM_LEVELS {
-        let item = gio::MenuItem::new(Some(&geometry::zoom_label(level)), None);
-        item.set_action_and_target_value(Some("win.zoom"), Some(&level.to_string().to_variant()));
-        levels.append_item(&item);
-    }
-    menu.append_section(None, &levels);
-    let fit = gio::Menu::new();
-    for (label, target) in [
-        (tr("Fit _Width"), "fit-width"),
-        (tr("Fit _Page"), "fit-page"),
-    ] {
-        let item = gio::MenuItem::new(Some(&label), None);
-        item.set_action_and_target_value(Some("win.zoom"), Some(&target.to_variant()));
-        fit.append_item(&item);
-    }
-    menu.append_section(None, &fit);
-    let layout = gio::Menu::new();
-    for (label, target) in [(tr("_One Page"), "one"), (tr("_Two Pages"), "two")] {
-        let item = gio::MenuItem::new(Some(&label), None);
-        item.set_action_and_target_value(Some("win.page-layout"), Some(&target.to_variant()));
-        layout.append_item(&item);
-    }
-    menu.append_section(None, &layout);
-    menu
 }
 
 thread_local! {
@@ -3253,11 +3212,5 @@ mod tests {
             with_extension(PathBuf::from("/d/Report.pages"), "odt"),
             PathBuf::from("/d/Report.pages.odt")
         );
-    }
-
-    #[test]
-    fn doc_07_the_counts_name_words_and_pages() {
-        assert_eq!(counts(1, 1), "1 word · 1 page");
-        assert_eq!(counts(0, 3), "0 words · 3 pages");
     }
 }

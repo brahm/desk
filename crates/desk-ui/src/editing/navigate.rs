@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Going from page to page, and from one section, link, bookmark or
-//! paragraph of a style to the next, as the arrows at the bottom of the
+//! Going from page to page, and from one section, note, link, bookmark
+//! or paragraph of a style to the next, as the arrows at the bottom of the
 //! window do (INT-19).
 
 use desk_model::{Document, Field};
@@ -16,6 +16,8 @@ pub enum Navigate {
     Page,
     /// The start of the next section.
     Section,
+    /// The mark of the next footnote or endnote.
+    Note,
     /// The next link.
     Link,
     /// The next bookmark.
@@ -26,9 +28,10 @@ pub enum Navigate {
 
 impl Navigate {
     /// Every kind, in the order of the menu.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Page,
         Self::Section,
+        Self::Note,
         Self::Link,
         Self::Bookmark,
         Self::Style,
@@ -39,6 +42,7 @@ impl Navigate {
         match self {
             Self::Page => "page",
             Self::Section => "section",
+            Self::Note => "note",
             Self::Link => "link",
             Self::Bookmark => "bookmark",
             Self::Style => "style",
@@ -73,6 +77,19 @@ fn places(document: &Document, kind: Navigate, here: usize) -> Vec<Spot> {
                 .filter(|(_, p)| p.style() == style)
                 .map(|(i, _)| Spot::new(i, 0))
                 .collect()
+        }
+        Navigate::Note => {
+            let mut out = Vec::new();
+            for (index, paragraph) in body.iter().enumerate() {
+                let mut offset = 0;
+                for run in paragraph.runs() {
+                    if matches!(&run.attrs.field, Some(Some(Field::NoteMark { .. }))) {
+                        out.push(Spot::new(index, offset));
+                    }
+                    offset += run.len();
+                }
+            }
+            out
         }
         Navigate::Link | Navigate::Bookmark => {
             let mut out = Vec::new();
