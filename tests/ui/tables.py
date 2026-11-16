@@ -307,6 +307,9 @@ def main():
         # A narrow window (NGNM-01).
         resize(640, 600)
         wait_for("the objects to leave the header bar", lambda: showing_named(app, "Chart") is None)
+        # The breakpoint rebuilds the Insert button, so its buttons come
+        # back a moment after the objects leave.
+        wait_for("the header bar to settle", lambda: all(showing_named(app, b) for b in HEADER))
         missing = [b for b in HEADER if showing_named(app, b) is None]
         check("below 720 px the header bar keeps Insert and leaves out the objects (NGNM-01)", not missing)
         check("and the format bar leaves out its secondary controls (NGNM-01)", showing_named(app, "Fewer Decimals") is None)
