@@ -106,6 +106,19 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
     hrefs.dedup();
     for href in hrefs {
         let path = href.strip_prefix("./").unwrap_or(&href);
+        let folder = path.trim_end_matches('/');
+        if let Ok(mut file) = archive.by_name(&format!("{folder}/content.xml")) {
+            let mut bytes = Vec::new();
+            (&mut file).take(MAX_STREAM + 1).read_to_end(&mut bytes)?;
+            drop(file);
+            if bytes.len() as u64 <= MAX_STREAM
+                && let Ok(text) = String::from_utf8(bytes)
+                && let Ok(Some(chart)) = crate::chart::read_chart(&text)
+            {
+                document.charts.push((href.clone(), chart));
+            }
+            continue;
+        }
         let Ok(file) = archive.by_name(path) else {
             continue;
         };
@@ -113,6 +126,20 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
         file.take(MAX_STREAM + 1).read_to_end(&mut bytes)?;
         if bytes.len() as u64 <= MAX_STREAM {
             document.pictures.push((href, bytes));
+        }
+    }
+    // The embedded objects that are not charts are left out.
+    let lost = document
+        .page_objects
+        .iter()
+        .chain(document.body.iter().flat_map(|p| p.all_objects()))
+        .flat_map(|o| o.embedded())
+        .filter(|href| !document.charts.iter().any(|(h, _)| h == href))
+        .count();
+    if lost > 0 {
+        match document.skipped.iter_mut().find(|(n, _)| n == "object") {
+            Some((_, count)) => *count += lost,
+            None => document.skipped.push(("object".to_owned(), lost)),
         }
     }
     Ok(document)
@@ -150,6 +177,7 @@ pub fn write_odt_with_thumbnail(
                 thumbnail.is_some(),
                 streams.settings.is_some(),
                 &document.pictures,
+                &document.charts,
             ),
         ),
     ] {
@@ -159,6 +187,17 @@ pub fn write_odt_with_thumbnail(
     if let Some(settings) = &streams.settings {
         zip.start_file("settings.xml", deflated)?;
         zip.write_all(settings.as_bytes())?;
+    }
+    for (href, chart) in &document.charts {
+        let folder = href
+            .strip_prefix("./")
+            .unwrap_or(href)
+            .trim_end_matches('/');
+        let (content, styles) = crate::chart::write_chart(chart);
+        for (name, text) in [("content.xml", content), ("styles.xml", styles)] {
+            zip.start_file(format!("{folder}/{name}"), deflated)?;
+            zip.write_all(text.as_bytes())?;
+        }
     }
     for (path, bytes) in &document.pictures {
         // Pictures are compressed already.
@@ -199,7 +238,12 @@ fn picture_type(path: &str) -> &'static str {
     }
 }
 
-fn manifest(thumbnail: bool, settings: bool, pictures: &[(String, Vec<u8>)]) -> String {
+fn manifest(
+    thumbnail: bool,
+    settings: bool,
+    pictures: &[(String, Vec<u8>)],
+    charts: &[(String, crate::chart::ChartDocument)],
+) -> String {
     let mut w = crate::xml::Writer::new();
     w.start("manifest:manifest")
         .attr("xmlns:manifest", crate::ns::MANIFEST)
@@ -221,6 +265,23 @@ fn manifest(thumbnail: bool, settings: bool, pictures: &[(String, Vec<u8>)]) -> 
             .attr("manifest:full-path", THUMBNAIL)
             .attr("manifest:media-type", "image/png")
             .end();
+    }
+    for (href, _) in charts {
+        let folder = href
+            .strip_prefix("./")
+            .unwrap_or(href)
+            .trim_end_matches('/');
+        w.start("manifest:file-entry")
+            .attr("manifest:full-path", &format!("{folder}/"))
+            .attr("manifest:version", VERSION)
+            .attr("manifest:media-type", crate::chart::CHART_TYPE)
+            .end();
+        for name in ["content.xml", "styles.xml"] {
+            w.start("manifest:file-entry")
+                .attr("manifest:full-path", &format!("{folder}/{name}"))
+                .attr("manifest:media-type", "text/xml")
+                .end();
+        }
     }
     for (path, _) in pictures {
         w.start("manifest:file-entry")

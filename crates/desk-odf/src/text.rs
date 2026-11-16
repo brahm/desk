@@ -51,6 +51,9 @@ pub struct TextDocument {
     /// The pictures of the package that the document links to, by path,
     /// as `Pictures/bullet1.png`, with their bytes.
     pub pictures: Vec<(String, Vec<u8>)>,
+    /// The charts of the package that the document's objects link to, by
+    /// the path of their folder, as `./Object 1`.
+    pub charts: Vec<(String, crate::chart::ChartDocument)>,
     /// The section styles, common and automatic, which the sections of
     /// the body name.
     pub section_styles: Vec<SectionStyle>,
@@ -424,6 +427,15 @@ pub enum Family {
     List,
     /// A graphic style, for drawing objects.
     Graphic,
+    /// A table style (`table`).
+    Table,
+    /// A style of table columns (`table-column`).
+    TableColumn,
+    /// A style of table rows (`table-row`).
+    TableRow,
+    /// A style of table cells (`table-cell`), which may also set
+    /// paragraph and text properties for the text of the cells.
+    TableCell,
 }
 
 /// A style.
@@ -464,6 +476,10 @@ pub struct Properties {
     pub text: TextProperties,
     /// `style:graphic-properties`, of a graphic style.
     pub graphic: crate::draw::GraphicProperties,
+    /// `style:table-properties`, `style:table-column-properties`,
+    /// `style:table-row-properties` and `style:table-cell-properties`, of
+    /// the styles of tables.
+    pub table: crate::table::TableProperties,
 }
 
 /// A line under or through text.

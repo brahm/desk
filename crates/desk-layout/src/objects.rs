@@ -52,6 +52,10 @@ pub struct PlacedObject {
     /// What the objects above a text box on its page take from its text,
     /// which goes around them as body text does (OBJ-13, OBJ-17).
     pub(crate) wraps: Arc<[Exclusion]>,
+    /// A table laid out, from the top left corner of the frame (TAB-01).
+    pub table: Option<Arc<crate::TableLayout>>,
+    /// A chart laid out, from the top left corner of the frame (GRF-01).
+    pub chart: Option<Arc<crate::ChartLayout>>,
 }
 
 impl PlacedObject {
@@ -76,6 +80,8 @@ impl PlacedObject {
             lines: Vec::new(),
             children,
             wraps: Arc::from([]),
+            table: None,
+            chart: None,
         }
     }
 
@@ -708,6 +714,28 @@ pub fn place_object_text(
 fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut TextSystem) {
     for child in &mut placed.children {
         lay_out_text(document, child, system);
+    }
+    match &placed.object.kind {
+        ObjectKind::Table(table) => {
+            let locale = crate::document_locale(document);
+            let laid = crate::lay_out_table(document, table, system, &locale, crate::today());
+            placed.table = Some(Arc::new(laid));
+            return;
+        }
+        ObjectKind::Chart(chart) => {
+            let locale = crate::document_locale(document);
+            let laid = crate::lay_out_chart(
+                document,
+                chart,
+                placed.width,
+                placed.height,
+                system,
+                &locale,
+            );
+            placed.chart = Some(Arc::new(laid));
+            return;
+        }
+        _ => {}
     }
     let Some(text) = placed.object.text_box() else {
         return;

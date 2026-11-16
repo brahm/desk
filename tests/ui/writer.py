@@ -503,6 +503,7 @@ def main():
     object_styles(work)
     text_of_a_shape(work)
     small_screen(work)
+    tables_and_charts(work)
     print("All UI tests passed.")
 
 
@@ -1290,7 +1291,7 @@ SWITCHES = {Atspi.Role.CHECK_BOX, getattr(Atspi.Role, "SWITCH", Atspi.Role.CHECK
 # their toggles (INT-13).
 LEVELS = ("Format", "Document")
 TABS = ("Style", "Layout", "More", "Image", "Text", "Media", "Arrange", "Document",
-        "Section", "Info")
+        "Section", "Info", "Table", "Cell", "Chart", "Axis", "Series")
 
 
 def toggles_named(app, names, role=Atspi.Role.RADIO_BUTTON):
@@ -3006,6 +3007,78 @@ def small_screen(work):
         writer.wait(timeout=10)
         screen.terminate()
         screen.wait(timeout=10)
+
+
+
+def tables_and_charts(work):
+    """A table from the Insert menu takes typing in its cells, Tab goes
+    to the next one and a formula adds them; the Inspector shows the
+    Table, Cell and Text tabs, and the screen reader hears the cell. A
+    chart from the menu shows the Chart, Axis and Series tabs, and both
+    are saved in the file (TAB-01, TAB-02, TAB-22, GRF-01, GRF-03,
+    GNM-04)."""
+    name = "Tables.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    # A command that takes a screenshot by a name, for the pull request.
+    shots = os.environ.get("DESK_UI_SHOTS")
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        activate("show-inspector")
+        activate("insert-table")
+        wait_for("the Table tab", lambda: context_title(app, "Table"))
+        check(
+            "a table shows the tabs Table, Cell, Text and Arrange (TAB-02)",
+            tab_names(app) == ["Arrange", "Cell", "Table", "Text"],
+        )
+        type_text("12")
+        press("Tab")
+        type_text("30")
+        press("Tab")
+        type_text("=B2+C2")
+        press("Return")
+        wait_for(
+            "the cell for the screen reader",
+            lambda: "Table 1" in (document.get_description() or ""),
+        )
+        check("the screen reader hears the table and the cell (GNM-04)", True)
+        if shots:
+            subprocess.run([*shots.split(), "table"], check=False)
+        press("ctrl+s")
+        wait_for(
+            "the sum in the saved file",
+            lambda: saved_content(letter, r'<table:table-cell [^>]*table:formula="[^"]*B2[^"]*C2[^"]*"')
+            and saved_content(letter, r'<table:table-cell [^>]*office:value="42"'),
+        )
+        check("typing in the cells and a formula reach the file (TAB-01, TAB-22)", True)
+        activate("insert-chart-kind", "pie")
+        wait_for("the Chart tab", lambda: context_title(app, "Chart"))
+        check(
+            "a chart shows the tabs Chart, Axis, Series and Arrange (GRF-03)",
+            tab_names(app) == ["Arrange", "Axis", "Chart", "Series"],
+        )
+        if shots:
+            subprocess.run([*shots.split(), "chart"], check=False)
+        press("ctrl+s")
+
+        def chart_saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    return "Object 1/content.xml" in package.namelist()
+            except (zipfile.BadZipFile, OSError):
+                return False
+
+        wait_for("the chart in the saved file", chart_saved)
+        check("the chart is saved as a chart of ODF (GRF-01)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
 
 
 if __name__ == "__main__":

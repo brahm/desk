@@ -744,6 +744,24 @@ fn object_item(placed: &PlacedObject) -> Item {
         ObjectKind::Group(_) => {
             list.items.extend(placed.children.iter().map(object_item));
         }
+        ObjectKind::Table(table) => {
+            flips = false;
+            if let Some(laid) = &placed.table {
+                list.items.extend(table_items(table, laid, x, y));
+            }
+        }
+        ObjectKind::Chart(_) => {
+            if fill.is_some() || stroke.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill: fill.clone(),
+                    stroke: stroke.clone(),
+                });
+            }
+            if let Some(laid) = &placed.chart {
+                list.items.extend(chart_items(laid, x, y));
+            }
+        }
         ObjectKind::Media(media) => {
             match &media.poster {
                 Some(poster) if !media.is_sound() => list.items.push(Item::Image {
@@ -1221,4 +1239,294 @@ pub fn shape_path(shape: &Shape, x: f32, y: f32, w: f32, h: f32) -> Vec<PathOp> 
             PathSegment::Close => PathOp::Close,
         })
         .collect()
+}
+
+/// The lines of text of a table or a chart, moved from its frame onto the
+/// page.
+fn moved_lines(lines: &[PlacedLine], dx: f32, dy: f32) -> Vec<PlacedLine> {
+    lines
+        .iter()
+        .map(|l| PlacedLine {
+            origin: (l.origin.0 + dx, l.origin.1 + dy),
+            ..l.clone()
+        })
+        .collect()
+}
+
+fn table_color(c: desk_model::table::Color) -> Rgba {
+    Rgba {
+        r: c.r,
+        g: c.g,
+        b: c.b,
+        a: c.a,
+    }
+}
+
+/// What a table draws: the fills of its cells, their borders and their
+/// text, at a place on the page (TAB-04, TAB-14, TAB-20, TAB-25).
+fn table_items(
+    table: &desk_model::Table,
+    laid: &desk_layout::TableLayout,
+    x: f32,
+    y: f32,
+) -> Vec<Item> {
+    let mut list = DisplayList::default();
+    for cell in &laid.cells {
+        if let Some(color) = cell.fill {
+            let (cx, cy, cw, ch) = cell.rect;
+            list.items.push(Item::Rect {
+                x: x + cx,
+                y: y + cy,
+                width: cw,
+                height: ch,
+                color,
+            });
+        }
+    }
+    // The borders, by segment, but those inside merged cells.
+    let inside = |r: u32, c: u32, horizontal: bool| {
+        table.merges().iter().any(|m| {
+            if horizontal {
+                r > m.row && r < m.row_end() && c >= m.col && c < m.col_end()
+            } else {
+                c > m.col && c < m.col_end() && r >= m.row && r < m.row_end()
+            }
+        })
+    };
+    let stroke = |b: desk_model::table::Border, a: (f32, f32), z: (f32, f32)| {
+        let width = b.width as f32 / 1000.0;
+        Item::Stroke {
+            points: vec![a, z],
+            closed: false,
+            width,
+            color: table_color(b.color),
+            dashes: match b.style {
+                desk_model::table::LineStyle::Solid => Vec::new(),
+                desk_model::table::LineStyle::Dashed => {
+                    vec![2.0 * width.max(0.5), 2.0 * width.max(0.5)]
+                }
+                desk_model::table::LineStyle::Dotted => vec![width.max(0.5), width.max(0.5)],
+            },
+        }
+    };
+    for r in 0..=table.rows() {
+        for c in 0..table.cols() {
+            if let Some(b) = table.h_border(r, c)
+                && !inside(r, c, true)
+                && b.width > 0
+            {
+                let yy = y + laid.rows[r as usize];
+                list.items.push(stroke(
+                    b,
+                    (x + laid.cols[c as usize], yy),
+                    (x + laid.cols[c as usize + 1], yy),
+                ));
+            }
+        }
+    }
+    for r in 0..table.rows() {
+        for c in 0..=table.cols() {
+            if let Some(b) = table.v_border(r, c)
+                && !inside(r, c, false)
+                && b.width > 0
+            {
+                let xx = x + laid.cols[c as usize];
+                list.items.push(stroke(
+                    b,
+                    (xx, y + laid.rows[r as usize]),
+                    (xx, y + laid.rows[r as usize + 1]),
+                ));
+            }
+        }
+    }
+    for cell in &laid.cells {
+        let (cx, cy, cw, ch) = cell.rect;
+        let lines = moved_lines(&cell.lines, x, y);
+        if cell.overflow {
+            list.items.push(Item::Clipped {
+                rect: (x + cx, y + cy, cw, ch),
+                items: {
+                    let mut inner = DisplayList::default();
+                    inner.lines(lines.iter());
+                    inner.items
+                },
+            });
+            // The + mark of text that does not fit (TAB-20).
+            let (mx, my) = (x + cx + cw - 7.0, y + cy + ch - 7.0);
+            let mark = Rgba::rgb(0x77, 0x76, 0x7b);
+            list.items.push(Item::Rect {
+                x: mx,
+                y: my,
+                width: 6.0,
+                height: 6.0,
+                color: Rgba::WHITE,
+            });
+            list.items.push(Item::Stroke {
+                points: vec![
+                    (mx, my),
+                    (mx + 6.0, my),
+                    (mx + 6.0, my + 6.0),
+                    (mx, my + 6.0),
+                ],
+                closed: true,
+                width: 0.5,
+                color: mark,
+                dashes: Vec::new(),
+            });
+            list.items.push(Item::Rect {
+                x: mx + 1.5,
+                y: my + 2.75,
+                width: 3.0,
+                height: 0.5,
+                color: mark,
+            });
+            list.items.push(Item::Rect {
+                x: mx + 2.75,
+                y: my + 1.5,
+                width: 0.5,
+                height: 3.0,
+                color: mark,
+            });
+        } else {
+            list.lines(lines.iter());
+        }
+        if cell.comment {
+            // A comment shows as a small corner of yellow (TAB-27).
+            let (tx, ty) = (x + cx + cw, y + cy);
+            list.items.push(Item::Path {
+                path: vec![
+                    PathOp::Move(tx - 6.0, ty),
+                    PathOp::Line(tx, ty),
+                    PathOp::Line(tx, ty + 6.0),
+                    PathOp::Close,
+                ],
+                fill: Some(Paint::Color(Rgba::rgb(0xf6, 0xd3, 0x2d))),
+                stroke: None,
+            });
+        }
+    }
+    let name = moved_lines(&laid.name, x, y);
+    list.lines(name.iter());
+    list.items
+}
+
+fn chart_paint(paint: &desk_model::chart::Paint, bounds: (f32, f32, f32, f32)) -> Paint {
+    match paint {
+        desk_model::chart::Paint::Color(c) => Paint::Color(table_color(*c)),
+        desk_model::chart::Paint::Gradient(a, b) => Paint::Linear {
+            start: (bounds.0, bounds.1),
+            end: (bounds.0, bounds.3),
+            stops: vec![(0.0, table_color(*a)), (1.0, table_color(*b))],
+        },
+        desk_model::chart::Paint::Texture(t) => Paint::Linear {
+            // The grain of a texture, as bands of its two colors.
+            start: (bounds.0, bounds.1),
+            end: (bounds.2, bounds.3),
+            stops: (0..=8)
+                .map(|i| {
+                    let c = if i % 2 == 0 { t.base() } else { t.grain() };
+                    (i as f32 / 8.0, table_color(c))
+                })
+                .collect(),
+        },
+    }
+}
+
+/// What a chart draws, at a place on the page (GRF-01).
+fn chart_items(laid: &desk_layout::ChartLayout, x: f32, y: f32) -> Vec<Item> {
+    use desk_model::chart::{Mark, PathOp as ChartOp};
+    let mut items = Vec::new();
+    let mut labels = laid.labels.iter();
+    for mark in &laid.drawing.marks {
+        match mark {
+            Mark::Shape {
+                path,
+                fill,
+                stroke,
+                opacity,
+                shadow,
+            } => {
+                let ops: Vec<PathOp> = path
+                    .iter()
+                    .map(|op| match *op {
+                        ChartOp::Move(a, b) => PathOp::Move(x + a, y + b),
+                        ChartOp::Line(a, b) => PathOp::Line(x + a, y + b),
+                        ChartOp::Curve(a, b, c, d, e, f) => {
+                            PathOp::Curve(x + a, y + b, x + c, y + d, x + e, y + f)
+                        }
+                        ChartOp::Close => PathOp::Close,
+                    })
+                    .collect();
+                let points: Vec<(f32, f32)> = ops
+                    .iter()
+                    .filter_map(|op| match *op {
+                        PathOp::Move(a, b)
+                        | PathOp::Line(a, b)
+                        | PathOp::Curve(_, _, _, _, a, b) => Some((a, b)),
+                        PathOp::Close => None,
+                    })
+                    .collect();
+                let bounds = points
+                    .iter()
+                    .fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |b, p| {
+                        (b.0.min(p.0), b.1.min(p.1), b.2.max(p.0), b.3.max(p.1))
+                    });
+                let item = Item::Path {
+                    path: ops,
+                    fill: fill.as_ref().map(|f| chart_paint(f, bounds)),
+                    stroke: stroke.as_ref().map(|(w, c, d)| PathStroke {
+                        width: *w,
+                        color: table_color(*c),
+                        dashes: d.clone(),
+                    }),
+                };
+                if *shadow {
+                    items.push(Item::CastShadow {
+                        items: vec![item.clone()],
+                        offset: (2.0, 2.0),
+                        blur: 3.0,
+                        color: Rgba {
+                            a: 96,
+                            ..Rgba::BLACK
+                        },
+                    });
+                }
+                if *opacity < 1.0 {
+                    items.push(Item::Group {
+                        transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                        opacity: *opacity,
+                        items: vec![item],
+                    });
+                } else {
+                    items.push(item);
+                }
+            }
+            Mark::Text { .. } => {
+                let Some(label) = labels.next() else { continue };
+                let (ax, ay) = (x + label.at.0, y + label.at.1);
+                let lines = moved_lines(&label.lines, ax, ay);
+                let mut list = DisplayList::default();
+                list.lines(lines.iter());
+                if label.angle == 0.0 {
+                    items.extend(list.items);
+                } else {
+                    // Turned counterclockwise around its point.
+                    let (sin, cos) = (-label.angle.to_radians()).sin_cos();
+                    items.push(Item::Group {
+                        transform: [
+                            cos,
+                            sin,
+                            -sin,
+                            cos,
+                            ax - (cos * ax - sin * ay),
+                            ay - (sin * ax + cos * ay),
+                        ],
+                        opacity: 1.0,
+                        items: list.items,
+                    });
+                }
+            }
+        }
+    }
+    items
 }

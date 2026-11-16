@@ -19,6 +19,8 @@ mod area;
 mod auto_numbers;
 mod bottom_bar;
 mod bullet_pictures;
+mod chart_data;
+mod chart_pane;
 mod compact;
 mod editing;
 mod effects;
@@ -28,6 +30,7 @@ mod find;
 mod fonts;
 mod format_bar;
 mod formatting;
+mod function_browser;
 pub mod geometry;
 mod gradient_bar;
 mod graphic_pane;
@@ -58,6 +61,8 @@ mod spelling;
 mod spelling_window;
 mod styles_drawer;
 mod tab_stops;
+mod table_bars;
+mod table_pane;
 mod tables;
 pub mod text_nav;
 mod thumbnails;
@@ -403,6 +408,9 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         for (action, keys) in window::OBJECT_ACCELS {
             app.set_accels_for_action(action, keys);
         }
+        for (action, keys) in window::TABLE_ACCELS {
+            app.set_accels_for_action(action, keys);
+        }
         app.set_accels_for_action("win.zoom('in')", &["<Control>plus", "<Control>equal"]);
         app.set_accels_for_action("win.zoom('out')", &["<Control>minus"]);
         app.set_accels_for_action("win.zoom('1')", &["<Control>0"]);
@@ -459,6 +467,8 @@ fn load_css() {
          .desk-thumb-section.selected { border-color: var(--accent-color); }\n\
          .desk-compact-group { padding-top: 3px; padding-bottom: 3px; }\n\
          .desk-compact-row { min-height: 30px; }\n\
+         .desk-inspector-tabs toggle { padding: 0 4px; min-width: 0; }\n\
+         .desk-inspector-tabs indicatorbin { padding: 0; margin: 0; }\n\
          .desk-compact-row spinbutton, .desk-compact-row dropdown > button, \
          .desk-compact-row entry { min-height: 26px; }\n\
          .desk-template { padding: 9px; }\n\

@@ -35,6 +35,7 @@ use crate::writing_tools::{self, Lookup};
 use crate::{AppInfo, Opener};
 
 pub(crate) use objects::OBJECT_ACCELS;
+pub(crate) use tables::TABLE_ACCELS;
 
 pub(crate) mod command_search;
 mod format_actions;
@@ -42,6 +43,7 @@ mod header;
 mod objects;
 mod rename;
 mod slides;
+mod tables;
 
 pub(crate) use objects::arrange_menu;
 
@@ -101,6 +103,8 @@ pub struct DocumentWindow {
     warnings: RefCell<Vec<crate::Warning>>,
     editor: Rc<RefCell<Option<TextEditor>>>,
     format_bar: Rc<FormatBar>,
+    /// The variants of the format bar for cells and charts (INT-12).
+    table_bars: Rc<crate::table_bars::TableBars>,
     inspector: Rc<Inspector>,
     /// The styles, a page of the navigation sidebar (INT-18).
     drawer: Rc<StylesDrawer>,
@@ -321,6 +325,9 @@ impl DocumentWindow {
         let format_bar = FormatBar::new(editor_of());
         let inspector = Inspector::new(editor_of());
         format_bar.set_link_popover(inspector.link_popover());
+        let table_bars = crate::table_bars::TableBars::new(editor_of());
+        format_bar.add_variant(crate::table_bars::CELLS, table_bars.cells());
+        format_bar.add_variant(crate::table_bars::CHART, table_bars.chart());
         let drawer = StylesDrawer::new(editor_of());
         let search = Rc::new(Search::default());
         let search_sidebar = SearchSidebar::new(editor_of(), search.clone());
@@ -533,6 +540,7 @@ impl DocumentWindow {
             warnings: RefCell::new(Vec::new()),
             editor,
             format_bar,
+            table_bars,
             inspector,
             drawer,
             fonts: FontsSlot::default(),
@@ -1101,6 +1109,7 @@ impl DocumentWindow {
         for action in DOCUMENT_ACTIONS
             .iter()
             .chain(&objects::OBJECT_ACTIONS)
+            .chain(&tables::TABLE_ACTIONS)
             .chain(&format_actions::FORMAT_BAR_ACTIONS)
         {
             self.enable(action, has_document);
@@ -2357,6 +2366,7 @@ impl DocumentWindow {
 
         self.add_find_actions();
         self.add_object_actions();
+        self.add_table_actions();
         self.add_spelling_actions();
 
         for (name, kind) in [

@@ -41,3 +41,10 @@ pub const XLINK: &str = "http://www.w3.org/1999/xlink";
 
 /// `xml:`, for `xml:id`.
 pub const XML: &str = "http://www.w3.org/XML/1998/namespace";
+
+/// `chart:`, for the charts of embedded objects.
+pub const CHART: &str = "urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
+
+/// `calcext:`, the extensions of LibreOffice Calc, as the type of a
+/// value that a formula gives.
+pub const CALCEXT: &str = "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";

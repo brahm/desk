@@ -3335,17 +3335,23 @@ fn int_22_what_a_file_of_another_program_loses_is_listed() {
         [
             (Warning::Content(Content::AcceptedChanges), 2),
             (Warning::Content(Content::Comments), 1),
-            (Warning::Content(Content::Tables), 1),
             (Warning::Content(Content::UnreadObjects), 1),
         ]
     );
-    // The text of the table is kept, as a paragraph.
-    let text: Vec<String> = document
-        .body()
+    // The table is read as a table, in a paragraph of its own.
+    let tables: Vec<_> = document
+        .objects()
         .iter()
-        .map(|p| p.runs().map(|r| r.text()).collect())
+        .filter_map(|o| match &o.kind {
+            desk_model::ObjectKind::Table(t) => Some(t.clone()),
+            _ => None,
+        })
         .collect();
-    assert!(text.iter().any(|t| t == "Cell"), "{text:?}");
+    assert_eq!(tables.len(), 1);
+    assert_eq!(
+        tables[0].cell(0, 0).content,
+        desk_table::Content::Text("Cell".to_owned())
+    );
 }
 
 #[test]

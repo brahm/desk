@@ -274,7 +274,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
     if objects {
         let items = gio::Menu::new();
         items.append(Some(&tr("_Table")), Some("win.insert-table"));
-        items.append(Some(&tr("C_hart")), Some("win.insert-chart"));
+        items.append_submenu(Some(&tr("C_hart")), &super::tables::chart_menu());
         items.append(Some(&tr("Te_xt Box")), Some("win.insert-text-box"));
         items.append_submenu(Some(&tr("S_hape")), &shape_menu());
         items.append(

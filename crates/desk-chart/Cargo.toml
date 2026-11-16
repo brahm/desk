@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-desk-render.workspace = true
+serde = { workspace = true, features = ["rc"] }
 desk-table.workspace = true
 
 [lints]

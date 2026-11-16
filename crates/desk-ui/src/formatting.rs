@@ -113,6 +113,10 @@ pub struct Inspector {
     object_text: Rc<crate::object_text_pane::ObjectTextGroups>,
     /// The object styles of the selected object (MOD-04).
     object_styles: Rc<crate::object_styles_pane::StylesGroup>,
+    /// The Table, Cell and Text tabs of a selected table (TAB-02).
+    table: Rc<crate::table_pane::TableGroups>,
+    /// The Chart, Axis and Series tabs of a selected chart (GRF-03).
+    chart: Rc<crate::chart_pane::ChartGroups>,
     /// The units of the indents, those of the rulers.
     units: Cell<Units>,
     /// The paragraph format shown, to show again in other units.
@@ -199,6 +203,8 @@ impl Inspector {
         let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
         let object_text = crate::object_text_pane::ObjectTextGroups::new(editor.clone());
         let object_styles = crate::object_styles_pane::StylesGroup::new();
+        let table = crate::table_pane::TableGroups::new(editor.clone());
+        let chart = crate::chart_pane::ChartGroups::new(editor.clone());
 
         let spacing = compact::Group::builder().title(tr("Spacing")).build();
         spacing.add(&line_spacing);
@@ -286,6 +292,26 @@ impl Inspector {
             );
         }
         contexts.insert(Context::Group, vec![style(), arrange()]);
+        let [table_group, rows_cols, cell, highlight, cell_text] = table.groups();
+        contexts.insert(
+            Context::Table,
+            vec![
+                Tab::new("table", n_("Table"), &[table_group, rows_cols]),
+                Tab::new("cell", n_("Cell"), &[cell, highlight]),
+                Tab::new("text", n_("Text"), &[cell_text]),
+                arrange(),
+            ],
+        );
+        let [chart_group, scene, value_axis, category_axis, series] = chart.groups();
+        contexts.insert(
+            Context::Chart,
+            vec![
+                Tab::new("chart", n_("Chart"), &[chart_group, scene]),
+                Tab::new("axis", n_("Axis"), &[value_axis, category_axis]),
+                Tab::new("series", n_("Series"), &[series]),
+                arrange(),
+            ],
+        );
         let statistics = InfoRows::new();
         let document_tabs = vec![
             Tab::new(
@@ -333,6 +359,8 @@ impl Inspector {
             objects,
             object_text,
             object_styles,
+            table,
+            chart,
             units: Cell::new(units),
             shown: RefCell::new(None),
             updating: Cell::new(false),
@@ -497,7 +525,15 @@ impl Inspector {
         self.objects.show_format(format);
         self.object_text.show(format, format.object_text);
         self.object_styles.show(format.object.as_ref());
-        self.levels.show(Context::of(format.object.as_ref()));
+        let context = Context::of(format.object.as_ref());
+        if let Some(editor) = (self.editor)() {
+            match context {
+                Context::Table => self.table.show(&editor),
+                Context::Chart => self.chart.show(&editor),
+                _ => {}
+            }
+        }
+        self.levels.show(context);
         self.show_statistics();
         self.updating.set(true);
         let paragraph = &format.paragraph;

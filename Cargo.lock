@@ -218,8 +218,8 @@ dependencies = [
 name = "desk-chart"
 version = "0.1.0"
 dependencies = [
- "desk-render",
  "desk-table",
+ "serde",
 ]
 
 [[package]]
@@ -243,6 +243,7 @@ version = "0.1.0"
 dependencies = [
  "desk-anim",
  "desk-chart",
+ "desk-formula",
  "desk-iwork",
  "desk-model",
  "desk-odf",
@@ -251,6 +252,7 @@ dependencies = [
  "glib",
  "png",
  "poppler-rs",
+ "serde_json",
  "tiff",
  "zip",
 ]
@@ -289,6 +291,8 @@ dependencies = [
 name = "desk-model"
 version = "0.1.0"
 dependencies = [
+ "desk-chart",
+ "desk-table",
  "imbl",
  "proptest",
  "unicode-segmentation",
@@ -329,7 +333,7 @@ name = "desk-table"
 version = "0.1.0"
 dependencies = [
  "desk-formula",
- "desk-model",
+ "serde",
 ]
 
 [[package]]

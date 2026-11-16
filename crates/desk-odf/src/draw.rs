@@ -423,6 +423,21 @@ impl DrawObject {
         )
     }
 
+    /// The embedded objects of the package, as charts, that it and the
+    /// objects of a group link to.
+    pub(crate) fn embedded(&self) -> Vec<&str> {
+        match &self.kind {
+            DrawKind::Object { href, .. } => vec![href.as_str()],
+            DrawKind::Group(objects) => objects.iter().flat_map(Self::embedded).collect(),
+            DrawKind::TextBox { paragraphs, .. } => paragraphs
+                .iter()
+                .flat_map(Paragraph::objects)
+                .flat_map(Self::embedded)
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// The pictures of the package that it and the objects of a group
     /// link to.
     pub fn hrefs(&self) -> Vec<&str> {
@@ -432,6 +447,7 @@ impl DrawObject {
                 .chain(poster.as_deref())
                 .collect(),
             DrawKind::Group(objects) => objects.iter().flat_map(Self::hrefs).collect(),
+            DrawKind::Object { href, .. } => vec![href.as_str()],
             _ if !self.text.is_empty() => self
                 .text
                 .iter()
@@ -559,6 +575,20 @@ pub enum DrawKind {
     },
     /// `draw:g`.
     Group(Vec<DrawObject>),
+    /// `draw:frame` with a `table:table` in its `draw:text-box`, as Desk
+    /// writes a table that floats; or a `table:table` in the text, which
+    /// is read as a table in a paragraph of its own.
+    Table(crate::table::Table),
+    /// `draw:frame` with a `draw:object`: an object of its own in the
+    /// package, as a chart.
+    Object {
+        /// `xlink:href`: the folder of the object in the package, as
+        /// `./Object 1`.
+        href: String,
+        /// `desk:chart`: all that Desk keeps of a chart, which the object
+        /// shows to other programs.
+        desk: Option<String>,
+    },
 }
 
 pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
@@ -856,7 +886,17 @@ fn draw_object_at(
             }
         }
         "frame" => {
-            if let Some(plugin) = e.child(DRAW, "plugin") {
+            let table = e
+                .child(DRAW, "text-box")
+                .and_then(|t| t.child(crate::ns::TABLE, "table"));
+            if let Some(object) = e.child(DRAW, "object") {
+                DrawKind::Object {
+                    href: object.attr(XLINK, "href")?.to_owned(),
+                    desk: object.attr(DESK, "chart").map(str::to_owned),
+                }
+            } else if let Some(table) = table {
+                DrawKind::Table(crate::table::read_table(table, paragraph))
+            } else if let Some(plugin) = e.child(DRAW, "plugin") {
                 let text = |ns, name| plugin.attr(ns, name).map(str::to_owned);
                 DrawKind::Media {
                     href: plugin.attr(XLINK, "href")?.to_owned(),
@@ -983,7 +1023,11 @@ pub(crate) fn write_draw_object(
         DrawKind::Connector { .. } => "draw:connector",
         DrawKind::Polygon { .. } => "draw:polygon",
         DrawKind::CustomShape { .. } => "draw:custom-shape",
-        DrawKind::Image { .. } | DrawKind::Media { .. } | DrawKind::TextBox { .. } => "draw:frame",
+        DrawKind::Image { .. }
+        | DrawKind::Media { .. }
+        | DrawKind::TextBox { .. }
+        | DrawKind::Table(_)
+        | DrawKind::Object { .. } => "draw:frame",
         DrawKind::Group(_) => "draw:g",
     };
     w.start(name);
@@ -1139,6 +1183,20 @@ pub(crate) fn write_draw_object(
                     .attr("xlink:actuate", "onLoad")
                     .end();
             }
+        }
+        DrawKind::Table(table) => {
+            w.start("draw:text-box");
+            crate::table::write_table(w, table, paragraph);
+            w.end();
+        }
+        DrawKind::Object { href, desk } => {
+            w.start("draw:object")
+                .attr("xlink:href", href)
+                .attr("xlink:type", "simple")
+                .attr("xlink:show", "embed")
+                .attr("xlink:actuate", "onLoad");
+            w.attr_opt("desk:chart", desk.as_deref());
+            w.end();
         }
         DrawKind::TextBox {
             paragraphs,

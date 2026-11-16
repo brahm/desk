@@ -329,6 +329,11 @@ pub enum ObjectKind {
     /// Objects grouped into one, with frames on the same page as the
     /// group's, from back to front.
     Group(Arc<[Object]>),
+    /// A table, whose frame gives its place; its size is that of its
+    /// columns and rows (TAB-01).
+    Table(Arc<crate::Table>),
+    /// A chart, drawn in its frame (GRF-01).
+    Chart(Arc<desk_chart::Chart>),
 }
 
 impl From<Shape> for ObjectKind {

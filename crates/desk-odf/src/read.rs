@@ -192,6 +192,10 @@ impl Reader {
             "paragraph" => Family::Paragraph,
             "text" => Family::Text,
             "graphic" => Family::Graphic,
+            "table" => Family::Table,
+            "table-column" => Family::TableColumn,
+            "table-row" => Family::TableRow,
+            "table-cell" => Family::TableCell,
             _ => return None,
         };
         Some(Style {
@@ -301,6 +305,7 @@ impl Reader {
                 .child(STYLE, "graphic-properties")
                 .map(crate::draw::graphic_properties)
                 .unwrap_or_default(),
+            table: crate::table::table_properties(element, &border),
         }
     }
 
@@ -771,9 +776,7 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
 fn left_out(e: &Element, out: &mut Vec<(String, usize)>) {
     for child in e.elements() {
         let name = &child.name;
-        let skipped = if name.is(TABLE, "table") {
-            Some("table")
-        } else if name.is(OFFICE, "annotation") {
+        let skipped = if name.is(OFFICE, "annotation") {
             Some("annotation")
         } else if name.is(TEXT, "changed-region") {
             Some("changed-region")
@@ -1061,6 +1064,19 @@ fn collect_paragraphs(
                     }
                 }
             }
+        } else if name.is(TABLE, "table") {
+            // A table in the text, in a line of its own.
+            let mut object = crate::draw::DrawObject::new(crate::draw::DrawKind::Table(
+                crate::table::read_table(child, &paragraph),
+            ));
+            object.anchor = Some("as-char".into());
+            out.push(Paragraph {
+                spans: vec![Span {
+                    field: Some(Field::Object(Box::new(object))),
+                    ..Span::default()
+                }],
+                ..Paragraph::default()
+            });
         } else if name.ns == DRAW {
             // Objects outside paragraphs, as those anchored to pages.
             objects.extend(crate::draw::draw_object(child, &paragraph));
