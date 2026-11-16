@@ -235,6 +235,10 @@ matrix rows done on 9 November, before the change of target.
   Lion machine as the reference for the features only iWork '09 has.
   Left undone and moved to phase B1: three reference documents that carry
   media from Apple software are remade there (backlog item B-010).
+  The owner then approved the last two items, the Compressor and Perian
+  installers downloaded on 31 October for a video export that never
+  worked in the virtual machine, and the merge of pull requests 120 and
+  121. The project folder on Defiant went from about 50 GB to 42 GB.
 
 ## Decisions, with their reasons and consequences
 
