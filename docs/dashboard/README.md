@@ -62,14 +62,14 @@ that come back in it.
 
 ## How a feature counts as done
 
-A row of the inventory is **done** when `escopo` is `Dentro`,
-`situacao_no_desk` is `Pronto` and `revisar` is `-`. A row that is
-`Pronto` with a reason in `revisar` shows as "Pronto, a rever" and does
+A row of the inventory is **done** when `scope` is `In`,
+`status_in_desk` is `Done` and `review` is `-`. A row that is
+`Done` with a reason in `review` shows as "Pronto, a rever" and does
 not count, as in the roadmap.
 
-When you finish a feature, set `situacao_no_desk` to `Pronto` and
-`revisar` to `-`, and **leave its phase in `fase`**. The phase then shows
-its own progress. `feito` in `fase` is only for the rows that were done
+When you finish a feature, set `status_in_desk` to `Done` and
+`review` to `-`, and **leave its phase in `phase`**. The phase then shows
+its own progress. `done` in `phase` is only for the rows that were done
 before the plan of 2026-11-16.
 
 ## How the forecast is worked out

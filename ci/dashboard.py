@@ -87,18 +87,18 @@ def feature_state(row):
     """The state of one row of the inventory, as a key of STATE_LABEL.
 
     A feature is `done` only when it is `Pronto` and nothing asks for a
-    second look (`revisar` is `-`); `Pronto` with a reason to review is
+    second look (`review` is `-`); `Done` with a reason to review is
     `review`, which the roadmap does not count as done.
     """
-    if row['escopo'] != 'Dentro':
-        return 'out' if row['escopo'].startswith('Fora') else 'na'
-    status = row['situacao_no_desk']
-    if status == 'Pronto':
-        return 'done' if row['revisar'].strip() in ('', '-') else 'review'
+    if row['scope'] != 'In':
+        return 'out' if row['scope'].startswith('Out') else 'na'
+    status = row['status_in_desk']
+    if status == 'Done':
+        return 'done' if row['review'].strip() in ('', '-') else 'review'
     try:
-        return {'Parcial': 'partial', 'Base pronta': 'base', 'Ausente': 'missing'}[status]
+        return {'Partial': 'partial', 'Engine ready': 'base', 'Missing': 'missing'}[status]
     except KeyError:
-        sys.exit(f'{row["id"]}: unknown situacao_no_desk "{status}" for a row in scope')
+        sys.exit(f'{row["id"]}: unknown status_in_desk "{status}" for a row in scope')
 
 
 def load_features():
@@ -131,7 +131,7 @@ def load_phases(features):
             sys.exit(f'docs/dashboard/phases.tsv has no row for phase {pid} of the roadmap')
         if st['status'] not in PHASE_STATUS:
             sys.exit(f'phase {pid}: status must be one of {sorted(PHASE_STATUS)}')
-        counts = collections.Counter(f['state'] for f in features if f['fase'] == pid)
+        counts = collections.Counter(f['state'] for f in features if f['phase'] == pid)
         total = sum(counts[k] for k, _ in STATES)
         if planned_rows != '-' and int(planned_rows) != total:
             print(f'warning: the roadmap gives {planned_rows} rows to {pid}, the inventory has {total}',
@@ -405,7 +405,7 @@ def just_done(features, phases, backlog, prs, changes, history):
                      '<th>Aplicativo</th><th>Antes</th><th>Agora</th></tr></thead><tbody>')
             for c in sorted(ft, key=lambda c: (c['to'] != 'done', c['id'])):
                 f = names.get(c['id'], {})
-                o.append(f'<tr><td class="id">{esc(c["id"])}</td><td class="wide">{esc(f.get("recurso", ""))}</td>'
+                o.append(f'<tr><td class="id">{esc(c["id"])}</td><td class="wide">{esc(f.get("feature", ""))}</td>'
                          f'<td>{esc(dict(APPS).get(f.get("app"), ""))}</td><td>{esc(STATE_LABEL.get(c["from"], "Novo"))}</td>'
                          f'<td><span class="pill"><span class="key s-{esc(c["to"])}"></span>{esc(STATE_LABEL.get(c["to"], c["to"]))}</span></td></tr>')
             o.append('</tbody></table></div>')
@@ -441,7 +441,7 @@ def coming_next(features, phases, open_items):
     if not shown:
         o.append('<p>Todas as fases do roadmap estão concluídas.</p>')
     for p, tag in shown:
-        todo = [f for f in features if f['fase'] == p['id'] and f['state'] in dict(STATES) and f['state'] != 'done']
+        todo = [f for f in features if f['phase'] == p['id'] and f['state'] in dict(STATES) and f['state'] != 'done']
         back = [b for b in open_items if b['to_phase'] == p['id']]
         o.append(f'<div class="next"><h3><span class="pill {p["status"]}">{tag}</span> {esc(p["id"])} {esc(p["name"])}'
                  + (f' <span class="dim">· {p["days"]} dias estimados</span>' if p['days'] else '') + '</h3>'
@@ -450,8 +450,8 @@ def coming_next(features, phases, open_items):
             o.append(f'<h4>{len(todo)} recursos a implementar ou conferir</h4><div class="scroll box"><table><thead><tr><th>Id</th><th>Recurso</th>'
                      '<th>Aplicativo</th><th>Situação hoje</th></tr></thead><tbody>')
             for f in todo:
-                note = f'<div class="sub">{esc(f["nota"])}</div>' if f['nota'] not in ('', '-') else ''
-                o.append(f'<tr><td class="id">{esc(f["id"])}</td><td class="wide">{esc(f["recurso"])}{note}</td><td>{esc(dict(APPS)[f["app"]])}</td>'
+                note = f'<div class="sub">{esc(f["note"])}</div>' if f['note'] not in ('', '-') else ''
+                o.append(f'<tr><td class="id">{esc(f["id"])}</td><td class="wide">{esc(f["feature"])}{note}</td><td>{esc(dict(APPS)[f["app"]])}</td>'
                          f'<td><span class="pill"><span class="key s-{f["state"]}"></span>{esc(STATE_LABEL[f["state"]])}</span></td></tr>')
             o.append('</tbody></table></div>')
         elif p['total']:
@@ -584,17 +584,17 @@ JS = """
     var q = f.q.value.trim().toLowerCase(), n = 0, frag = document.createDocumentFragment();
     data.rows.forEach(function (r) {
       if (f.app.value && r.app !== f.app.value) return;
-      if (f.fase.value && r.fase !== f.fase.value) return;
+      if (f.fase.value && r.phase !== f.fase.value) return;
       if (f.state.value && r.state !== f.state.value) return;
-      if (q && (r.id + ' ' + r.recurso + ' ' + r.area + ' ' + r.nota).toLowerCase().indexOf(q) < 0) return;
+      if (q && (r.id + ' ' + r.feature + ' ' + r.area + ' ' + r.note).toLowerCase().indexOf(q) < 0) return;
       n += 1;
       var tr = document.createElement('tr');
       cell(tr, r.id, 'id');
-      var td = cell(tr, r.recurso, 'wide');
-      if (r.nota && r.nota !== '-') { var s = document.createElement('div'); s.className = 'sub'; s.textContent = r.nota; td.appendChild(s); }
+      var td = cell(tr, r.feature, 'wide');
+      if (r.note && r.note !== '-') { var s = document.createElement('div'); s.className = 'sub'; s.textContent = r.note; td.appendChild(s); }
       cell(tr, data.apps[r.app]);
       cell(tr, r.area);
-      cell(tr, r.fase);
+      cell(tr, r.phase);
       var p = document.createElement('span'); p.className = 'pill'; p.textContent = data.states[r.state];
       if (r.state !== 'out' && r.state !== 'na') { var k = document.createElement('span'); k.className = 'key s-' + r.state; p.insertBefore(k, p.firstChild); }
       cell(tr, '').appendChild(p);
@@ -712,7 +712,7 @@ def render(features, phases, backlog, prs, prs_source, history, changes, fc, tod
               f'<td class="n">{p["days"] if p["days"] else "–"}</td>'
               f'<td class="n">{by_phase.get(p["id"], 0) or "–"}</td></tr>')
     w('</tbody></table></div>' + legend())
-    before = sum(1 for f in scope if f['fase'] == 'feito')
+    before = sum(1 for f in scope if f['phase'] == 'done')
     w(f'<p class="foot" style="margin-top:8px">{before} recursos já estavam prontos antes deste plano e não pertencem a nenhuma fase.</p>')
     w('</section>')
 
@@ -759,7 +759,7 @@ def render(features, phases, backlog, prs, prs_source, history, changes, fc, tod
     w('</section>')
 
     # Out of scope.
-    reasons = collections.Counter(f['escopo'] for f in out_rows)
+    reasons = collections.Counter(f['scope'] for f in out_rows)
     w(f'<section class="card" id="fora"><h2>Fora das fases</h2><p class="intro">{len(out_rows)} linhas do inventário não entram em nenhuma fase. '
       'Elas continuam registradas com o motivo.</p><div class="scroll"><table><thead><tr><th>Motivo</th><th class="n">Recursos</th></tr></thead><tbody>'
       + ''.join(f'<tr><td>{esc(k)}</td><td class="n">{v}</td></tr>' for k, v in reasons.most_common())
@@ -768,13 +768,13 @@ def render(features, phases, backlog, prs, prs_source, history, changes, fc, tod
     # Every feature, with filters.
     phase_ids = [p['id'] for p in phases if p['total']]
     w('<section class="card" id="recursos"><h2>Todos os recursos</h2>'
-      '<p class="intro">As linhas do inventário, uma por recurso. A fase "feito" marca o que já estava pronto antes do plano.</p>'
+      '<p class="intro">As linhas do inventário, uma por recurso. A fase "done" marca o que já estava pronto antes do plano. Os nomes e as notas vêm do inventário, que está em inglês.</p>'
       '<div class="filters">'
       '<select id="dk-app" aria-label="Aplicativo"><option value="">Todos os aplicativos</option>'
       + ''.join(f'<option value="{a}">Desk {n}</option>' for a, n in APPS) + '</select>'
       '<select id="dk-fase" aria-label="Fase"><option value="">Todas as fases</option>'
       + ''.join(f'<option value="{esc(p)}">{esc(p)}</option>' for p in phase_ids)
-      + '<option value="feito">feito</option><option value="-">fora das fases</option></select>'
+      + '<option value="done">já pronto antes do plano</option><option value="-">fora das fases</option></select>'
       '<select id="dk-state" aria-label="Situação"><option value="">Todas as situações</option>'
       + ''.join(f'<option value="{k}">{esc(v)}</option>' for k, v in STATE_LABEL.items()) + '</select>'
       '<input id="dk-q" type="search" placeholder="Buscar recurso" aria-label="Buscar recurso">'
@@ -790,7 +790,7 @@ def render(features, phases, backlog, prs, prs_source, history, changes, fc, tod
     w('</div>')
 
     data = {'apps': {a: n for a, n in APPS}, 'states': STATE_LABEL,
-            'rows': [{k: f[k] for k in ('id', 'app', 'area', 'recurso', 'fase', 'state', 'nota')} for f in features]}
+            'rows': [{k: f[k] for k in ('id', 'app', 'area', 'feature', 'phase', 'state', 'note')} for f in features]}
     blob = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
     o.append(f'<script type="application/json" id="dk-data">{blob}</script><script>{JS}</script>')
     return '\n'.join(o)
@@ -813,7 +813,7 @@ def main():
              else datetime.datetime.now(zoneinfo.ZoneInfo('America/Sao_Paulo')).date())
     features = load_features()
     phases = load_phases(features)
-    stray = sorted({f['fase'] for f in features} - {p['id'] for p in phases} - {'feito', '-'})
+    stray = sorted({f['phase'] for f in features} - {p['id'] for p in phases} - {'done', '-'})
     if stray:
         sys.exit(f'the inventory names phases the roadmap does not have: {stray}')
     backlog = read_tsv(ROOT / 'docs' / 'backlog' / 'deferred.tsv')

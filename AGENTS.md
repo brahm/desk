@@ -37,8 +37,12 @@ purpose and point to the full pages.
    `ci/check-backlog.py`.
 9. **Progress.** When a set of tasks ends, update the status of its rows
    in `corpus/inventory` and of its phase in `docs/dashboard/phases.tsv`,
-   then update the dashboard as
-   [docs/dashboard/README.md](docs/dashboard/README.md) says.
+   then run `python3 ci/dashboard.py --record`, which writes the log of
+   what changed (`docs/dashboard/changes.tsv`) and the history, and
+   publish the dashboard as
+   [docs/dashboard/README.md](docs/dashboard/README.md) says. The log is
+   one of the documents kept current for the whole project, like the
+   inventory, the roadmap, the backlog and the decisions.
 10. **Apple material.** Never extract anything from Apple software, and
    never add its templates, fonts, images or format definitions to the
    repository (D-011).
