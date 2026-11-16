@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Render the mockups: python3 render.py OUTDIR [scene-prefix ...]
 
-The scenes were written with their text in Brazilian Portuguese and are
-drawn in English (see english.py); DESK_MOCKUP_LANG=pt draws the original.
+The scenes are written in English. DESK_MOCKUP_LANG=pt draws them in
+Brazilian Portuguese, for the Portuguese page of the site (see translate.py).
 """
 import importlib
 import os
@@ -17,9 +17,9 @@ def main():
     outdir = sys.argv[1]
     only = sys.argv[2:]
     kit.init()
-    if os.environ.get('DESK_MOCKUP_LANG', 'en') != 'pt':
-        import english
-        english.install()
+    if os.environ.get('DESK_MOCKUP_LANG', 'en') == 'pt':
+        import translate
+        translate.install('pt_BR.tsv')
     scenes = []
     for mod in ('writer', 'tables', 'slides', 'extras', 'proposals'):
         try:

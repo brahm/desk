@@ -362,6 +362,55 @@ matrix rows done on 9 November, before the change of target.
   English for M+ in one go rather than translated first and rewritten
   after. Both items stay open in B1.
 
+### 16 November: docs/interface in English and for window M+
+
+- `docs/interface/README.md` was rewritten in English for window M+
+  (D-008): the regions of the window, the sidebar, the two-level
+  Inspector, the menus (the main menu takes View and loses Save), the
+  breakpoints, the small screen notice, the shortcuts under D-017 with the
+  iWork 15.4 column where it differs from '09, and the five steps that move
+  the apps from interface B to M+ in B1. Interface B is kept as history.
+  B-006 and B-009 are closed.
+- The mockup scripts are now written in English in the source, ids
+  included (`cab.inserir.tabela` became `head.insert.table`). Before, the
+  scenes were written in Portuguese and `english.py` translated them while
+  they loaded. Why the direction was turned rather than the translator
+  just kept: D-018 puts everything in the repository in English, and the
+  Portuguese pictures are needed only for the Portuguese page of the site,
+  which is a translation. So `translate.py` and `mockups/pt_BR.tsv` now draw
+  the Portuguese version. Every English picture came out the same as
+  before, except the secondary scenes of interface B, which had stayed in
+  Portuguese and are now English, and every Portuguese picture came out the
+  same as before.
+- Three Portuguese words had two translations in the same function of a
+  scene (Nenhum and Nenhuma, Agrupar and Grupo, Filtrar and Filtro), so a
+  table keyed by the English text can give only one of them there; none of
+  those spots is visible in a picture, which is why the Portuguese pictures
+  still came out the same. Elsewhere a context column (the module or the
+  function) chooses between the two.
+- `components.tsv` is now the inventory of the M+ scenes (101 components),
+  and four secondary M+ scenes were added (selected image, Document, dark
+  style, Data and Animation) so that the Inspector levels are in it. The
+  state of each component is now measured against the Desk of today, with
+  interface B built, instead of the Desk Writer of 14 November: 69 exist,
+  11 change and 21 are new. Five components that only M+ has entered the
+  catalogue (Open documents, the document tabs, the sheet switcher, its +
+  button, and the objects of the sheet in the sidebar).
+- `iwork09-to-desk.tsv` (renamed from `iwork-para-desk.tsv`) gives each of
+  the 933 items of iWork '09 its place in M+: what was in the format bar is
+  now in the Format pane of the Inspector, so the three commands that show
+  and hide the format bar and the toolbar item for it are out of scope (66
+  items out, 124 the same, 725 adapted, 18 left to the system).
+- Consequence: the popovers and dialogs (Fonts, Colors, Insert, Search
+  Commands, Preferences, the template chooser) are still drawn only in the
+  scenes of interface B, so they are not yet in `components.tsv`. That is
+  B-003, which stays open in B1. The pictures of interface B in
+  `docs/interface/janelas` were removed; they are in the history of the
+  repository.
+- Open question for the owner, found while writing the README: the
+  document tabs of M+ need a shortcut to switch, and GNOME uses
+  Ctrl+PageUp and Ctrl+PageDown, which Tables uses for the sheets.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -703,7 +752,8 @@ understood on their own. When the first version of the replanning came
 with documentation in English and matrices in Portuguese, he ordered
 everything kept in English, the mockups included.
 *Consequences:* `docs/`, `CONTRIBUTING.md` and `AGENTS.md`; the older
-material in Portuguese is translated in phase B1 (backlog item B-009);
+material in Portuguese is translated in phase B1 (backlog item B-009,
+done on 16 November: the matrices, `docs/interface` and the mockups);
 bringing the comments of the existing code to the new standard is in
 phase X1.
 

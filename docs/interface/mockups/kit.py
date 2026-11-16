@@ -217,7 +217,7 @@ def run(scenes, outdir, only=None):
             Adw.ColorScheme.FORCE_DARK if scene.dark else Adw.ColorScheme.FORCE_LIGHT)
         win = Adw.ApplicationWindow(application=app, default_width=scene.size[0],
                                     default_height=scene.size[1], title=scene.title)
-        tag(win, 'janela')
+        tag(win, 'window')
         actions = Gio.SimpleActionGroup()
         actions.add_action(Gio.SimpleAction.new('none', None))
         win.insert_action_group('mock', actions)

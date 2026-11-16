@@ -26,13 +26,13 @@ SIDEBAR_W = 196
 INSPECTOR_W = 332      # versions B and C: rows of Libadwaita
 INSPECTOR_A_W = 290    # version A: the compact rows of Desk
 # The first level of the Inspector of version B. They are views, so nouns.
-FORMAT, ANIMATION, DATA, DOCUMENT = 'Formato', 'Animação', 'Dados', 'Documento'
+FORMAT, ANIMATION, DATA, DOCUMENT = 'Format', 'Animation', 'Data', 'Document'
 
 
 def window_title(app, edited=True):
     doc = parts.APPS[app]['doc']
-    return tag(Adw.WindowTitle(title=doc, subtitle='Documentos' + (' · Editado' if edited else '')),
-               'cab.titulo')
+    return tag(Adw.WindowTitle(title=doc, subtitle='Documents' + (' · Edited' if edited else '')),
+               'head.title')
 
 
 def split(start, content, width, position=Gtk.PackType.START, collapsed=False, show=True):
@@ -59,34 +59,34 @@ def toolbar_view(content, top=(), bottom=(), style=None):
 def nav_sidebar(app, content, modes, add_tip, add_menu=None, title=None, add_popover=None):
     """The navigation sidebar of versions B and C, as high as the window."""
     hb = Adw.HeaderBar()
-    mode = menu_button(text=title or modes[0], tip='Conteúdo da barra lateral', cid='lat.modo',
+    mode = menu_button(text=title or modes[0], tip='Sidebar content', cid='side.mode',
                        menu=menu_model(modes))
     classes(mode, 'flat')
     hb.set_title_widget(mode)
-    add = menu_button(icon='list-add', tip=add_tip, cid='lat.adicionar', popover=add_popover,
-                      menu=add_menu or menu_model(['Em branco']))
+    add = menu_button(icon='list-add', tip=add_tip, cid='side.add', popover=add_popover,
+                      menu=add_menu or menu_model(['Blank']))
     hb.pack_end(add)
-    return tag(toolbar_view(content, top=[hb]), 'lat.barra')
+    return tag(toolbar_view(content, top=[hb]), 'side.bar')
 
 
-def inspector_pane(*children, cid='insp.painel', width=None):
+def inspector_pane(*children, cid='insp.pane', width=None):
     box = vbox(*children)
     box.set_size_request(width or INSPECTOR_W, -1)
     return tag(box, cid)
 
 
-def level1(names, active=0, cid='insp.nivel1'):
+def level1(names, active=0, cid='insp.level1'):
     g = toggle_group([(n, n, None, None) for n in names], active, cid, 'round', homogeneous=len(names) == 2)
     classes(g, 'inspector-switch')
     return g
 
 
-def context_title(text, cid='insp.contexto'):
+def context_title(text, cid='insp.context'):
     lab = label(text, 'heading', margin_start=14, margin_top=12, margin_bottom=2)
     return tag(lab, cid)
 
 
-def bottom_bar(*children, cid='inf.barra'):
+def bottom_bar(*children, cid='bottom.bar'):
     bar = hbox(*children, spacing=4)
     classes(bar, 'toolbar', 'bottombar')
     return tag(bar, cid)
@@ -106,7 +106,7 @@ def header_bar(app, start=(), end=(), title=True):
         hb.pack_start(w)
     for w in end:
         hb.pack_end(w)
-    return tag(hb, 'cab.barra')
+    return tag(hb, 'head.bar')
 
 
 # ---------------------------------------------------------------- Inspector
@@ -118,7 +118,7 @@ def _tabs(pages, visible, *css, top=8):
     stack = view_stack(pages, visible)
     if len(pages) == 1:
         return [stack]             # one page needs no switcher
-    sw = inline_switcher(stack, 'insp.abas', *css, margin_start=12, margin_end=12, margin_top=top,
+    sw = inline_switcher(stack, 'insp.tabs', *css, margin_start=12, margin_end=12, margin_top=top,
                          homogeneous=len(pages) <= 3 and max(len(p[1]) for p in pages) <= 8)
     return [sw, stack]
 
@@ -187,11 +187,11 @@ def compact_group(title, *rows, cid=None, suffix=None):
 def inspector_a(icons, active, title, subtabs, groups, sub_active=0):
     """Version A: one icon per pane of the iWork '09 Inspector, in its order;
     the pane does not change by itself when the selection changes."""
-    tabs = toggle_group([(n, None, i, t) for n, i, t in icons], active, 'insp.icones', 'flat', 'icon-tabs',
+    tabs = toggle_group([(n, None, i, t) for n, i, t in icons], active, 'insp.icons', 'flat', 'icon-tabs',
                         halign=Gtk.Align.CENTER, margin_top=8)
     kids = [tabs, context_title(title)]
     if subtabs:
-        kids.append(toggle_group([(s, s, None, None) for s in subtabs], sub_active, 'insp.subabas',
+        kids.append(toggle_group([(s, s, None, None) for s in subtabs], sub_active, 'insp.subtabs',
                                  margin_start=12, margin_end=12, margin_top=8,
                                  homogeneous=len(subtabs) <= 3))
     body = vbox(*groups, spacing=14)

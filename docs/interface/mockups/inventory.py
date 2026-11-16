@@ -4,8 +4,9 @@
 """Join the rendered scenes with the catalogue: python3 inventory.py OUTDIR TSV JSON [VERSION]
 
 Fails when a scene has a component that the catalogue does not describe, so a
-mockup cannot gain a control that nobody documented. With VERSION (A, B or C)
-the inventory keeps only the scenes and the components of that version.
+mockup cannot gain a control that nobody documented. With VERSION (A, B, C, N,
+M or M+) the inventory keeps only the scenes and the components of that
+version; run.sh asks for M+, the window that Desk follows (D-008).
 """
 import csv
 import glob
@@ -14,19 +15,20 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FIELDS = ('id', 'nome', 'origem', 'funcao', 'iwork09', 'iwork_atual', 'estado', 'atalho')
+FIELDS = ('id', 'name', 'source', 'does', 'iwork09', 'iwork_current', 'state', 'shortcut')
 APPS = ('writer', 'tables', 'slides')
-MAIN = [f'{a}-{v}' for a in APPS for v in 'abc']
+MAIN = [f'{a}-{v}' for a in APPS for v in ('m-plus', 'a', 'b', 'c', 'n', 'm')]
+VERSIONS = ('A', 'B', 'C', 'N', 'M', 'M+')
 NOTE = """# SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The components of the interface of Desk, one row for each piece of the
-# mockups in docs/interface/mockups: what it is, the widget of GTK or
-# Libadwaita that draws it, what it does, what it was in iWork '09 and is
-# in iWork today, and its state in Desk Writer (existe: already there;
-# muda: there in another form; novo: to be written). Made by
-# mockups/inventory.py from mockups/catalog.txt and the rendered scenes.
-# Tab-separated.
+# The components of the window of Desk (M+, decision D-008), one row for
+# each piece of the mockups in docs/interface/mockups: what it is, the
+# widget of GTK or Libadwaita that draws it, what it does, what it was in
+# iWork '09 and is in iWork today, and its state in Desk today (exists:
+# already there, even if it does nothing yet; changes: there in another
+# form or place; new: to be written). Made by mockups/inventory.py from
+# mockups/catalog.txt and the rendered scenes. Tab-separated.
 """
 
 
@@ -41,14 +43,14 @@ def catalogue(path):
             continue
         parts = [p.strip() for p in line.split(' | ')]
         if len(parts) != len(FIELDS):
-            sys.exit(f'catalog.txt:{n}: {len(parts)} campos, esperava {len(FIELDS)}')
+            sys.exit(f'catalog.txt:{n}: {len(parts)} fields, expected {len(FIELDS)}')
         entry = dict(zip(FIELDS, parts))
         if entry['id'] in out:
-            sys.exit(f'catalog.txt:{n}: id repetido {entry["id"]}')
-        if entry['estado'] not in ('existe', 'muda', 'novo'):
-            sys.exit(f'catalog.txt:{n}: estado desconhecido {entry["estado"]}')
-        entry['secao'] = section
-        entry['ordem'] = len(out)
+            sys.exit(f'catalog.txt:{n}: repeated id {entry["id"]}')
+        if entry['state'] not in ('exists', 'changes', 'new'):
+            sys.exit(f'catalog.txt:{n}: unknown state {entry["state"]}')
+        entry['section'] = section
+        entry['order'] = len(out)
         out[entry['id']] = entry
     return out
 
@@ -85,7 +87,7 @@ def main():
                 if scene['app'] in APPS:
                     u['apps'].add(scene['app'])
     if missing:
-        sys.exit('sem linha no catálogo: ' + ', '.join(sorted(missing)))
+        sys.exit('no line in the catalogue: ' + ', '.join(sorted(missing)))
     undrawn = [cid for cid, u in use.items() if not u['shown'] and not u['hidden']]
 
     rows = []
@@ -95,19 +97,19 @@ def main():
             continue                    # a component of another version
         # the pieces drawn only in the common scenes belong to the three apps
         apps = u['apps'] or set(APPS)
-        if any(s.startswith('comum-') for s in u['shown'] + u['hidden']) and cid.split('.')[0] in (
-                'janela', 'dialogo', 'comandos', 'modelos', 'aviso', 'busca', 'cores', 'fontes'):
+        if any(s.startswith('common-') for s in u['shown'] + u['hidden']) and cid.split('.')[0] in (
+                'window', 'dialog', 'commands', 'templates', 'notice', 'find', 'colors', 'fonts'):
             apps = set(APPS)
         rows.append({**entry, 'widget': ', '.join(u['gtypes']) or '-',
-                     'versoes': ''.join(v for v in 'ABC' if v in u['versions']) or '-',
+                     'versions': ' '.join(v for v in VERSIONS if v in u['versions']) or '-',
                      'apps': ', '.join(a for a in APPS if a in apps),
-                     'cenas': ', '.join(u['shown']) or '-',
-                     'so_em_aba_oculta': 'sim' if (u['hidden'] and not u['shown']) else
-                                         ('fora das cenas' if not u['shown'] else 'não')})
-    head = ['id', 'secao', 'nome', 'origem', 'widget', 'funcao', 'iwork09', 'iwork_atual', 'estado',
-            'atalho', 'versoes', 'apps', 'cenas', 'so_em_aba_oculta']
+                     'scenes': ', '.join(u['shown']) or '-',
+                     'only_in_hidden_tab': 'yes' if (u['hidden'] and not u['shown']) else
+                                           ('not drawn' if not u['shown'] else 'no')})
+    head = ['id', 'section', 'name', 'source', 'widget', 'does', 'iwork09', 'iwork_current', 'state',
+            'shortcut', 'versions', 'apps', 'scenes', 'only_in_hidden_tab']
     if only:
-        head.remove('versoes')
+        head.remove('versions')
     with open(tsv_path, 'w', encoding='utf-8', newline='') as f:
         f.write(NOTE)
         w = csv.writer(f, delimiter='\t', lineterminator='\n', quoting=csv.QUOTE_NONE, quotechar=None)
@@ -121,10 +123,10 @@ def main():
                               for s in scenes]}, f, ensure_ascii=False, separators=(',', ':'))
     states = {}
     for r in rows:
-        states[r['estado']] = states.get(r['estado'], 0) + 1
-    print(f'{len(rows)} componentes, {len(scenes)} cenas; estado: {states}')
+        states[r['state']] = states.get(r['state'], 0) + 1
+    print(f'{len(rows)} components, {len(scenes)} scenes; state: {states}')
     if undrawn and not only:
-        print('no catálogo, fora das cenas:', ', '.join(undrawn))
+        print('in the catalogue, not drawn:', ', '.join(undrawn))
 
 
 if __name__ == '__main__':
