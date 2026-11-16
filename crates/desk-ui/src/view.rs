@@ -184,6 +184,13 @@ impl DocumentView {
             .hexpand(true)
             .vexpand(true)
             .build();
+        // The area is as big as all the pages, so the viewport would
+        // scroll to its top whenever it takes the keyboard back from a
+        // button: a click on a later page would show the first. The
+        // editor scrolls to the cursor itself.
+        if let Some(viewport) = scrolled.child().and_downcast::<gtk::Viewport>() {
+            viewport.set_scroll_to_focus(false);
+        }
         let state = Rc::new(RefCell::new(State {
             pages: Vec::new(),
             zoom: geometry::DEFAULT_ZOOM,

@@ -353,6 +353,26 @@ impl Levels {
         self.format.set(tabs, chosen.as_deref());
     }
 
+    /// Adds a level of an app before Document, such as Animation in
+    /// Desk Slides (KINT-14).
+    pub fn add_level(&self, name: &str, label: &str, child: &impl IsA<gtk::Widget>) {
+        let Some(levels) = self.root.last_child().and_downcast::<gtk::Stack>() else {
+            return;
+        };
+        levels.add_named(child, Some(name));
+        let document = self.level.toggle_by_name(DOCUMENT);
+        if let Some(document) = &document {
+            self.level.remove(document);
+        }
+        self.level
+            .add(adw::Toggle::builder().name(name).label(label).build());
+        if let Some(document) = document {
+            self.level.add(document);
+        }
+        // Three titles do not fit in toggles of one width.
+        self.level.set_homogeneous(false);
+    }
+
     /// Shows a level: [`FORMAT`] or [`DOCUMENT`].
     pub fn show_level(&self, name: &str) {
         self.level.set_active_name(Some(name));

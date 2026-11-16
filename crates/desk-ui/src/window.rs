@@ -24,7 +24,7 @@ use crate::find::{self, FindWindow, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
 use crate::formatting::{self, EditorOf, FormatBar, Inspector};
 use crate::geometry;
-use crate::i18n::{n_, tr};
+use crate::i18n::{n_, tr, trc};
 use crate::nav_sidebar::{self, NavSidebar};
 use crate::preferences;
 use crate::ruler::{self, Ruler};
@@ -42,6 +42,7 @@ mod format_actions;
 mod header;
 mod objects;
 mod rename;
+mod slides;
 mod tables;
 
 pub(crate) use objects::arrange_menu;
@@ -143,6 +144,8 @@ pub struct DocumentWindow {
     closing: Cell<bool>,
     /// The recovery draft of the document, once one is written.
     draft: RefCell<Option<crate::recovery::Draft>>,
+    /// What Desk Slides adds to the window; none in Desk Writer.
+    slides: Option<Rc<slides::Slides>>,
     /// Whether the document changed since the last draft.
     draft_due: Cell<bool>,
 }
@@ -252,6 +255,7 @@ impl DocumentWindow {
             media_button,
             find_toggle,
         } = header::Header::new(info, opener.is_some());
+        let is_slides = crate::is_slides(info);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -310,7 +314,7 @@ impl DocumentWindow {
         let stack = gtk::Stack::builder().hhomogeneous(false).build();
         stack.add_named(&status, Some("empty"));
 
-        let bottom = crate::bottom_bar::BottomBar::new();
+        let bottom = crate::bottom_bar::BottomBar::new_for(is_slides);
         let bottom_bar = bottom.bar.clone();
 
         let editor: Rc<RefCell<Option<TextEditor>>> = Rc::new(RefCell::new(None));
@@ -340,7 +344,22 @@ impl DocumentWindow {
         pages.attach(ruler.widget(), 1, 0, 1, 1);
         pages.attach(vertical_ruler.widget(), 0, 1, 1, 1);
         pages.attach(view.widget(), 1, 1, 1, 1);
-        stack.add_named(&pages, Some("document"));
+        // Desk Slides has the presenter notes under the slide, and the
+        // light table in its place (KINT-05, KINT-09).
+        let slides = is_slides.then(|| slides::Slides::new(editor_of()));
+        if let Some(slides) = &slides {
+            let column = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .build();
+            pages.set_vexpand(true);
+            column.append(&pages);
+            column.append(&slides.notes_revealer);
+            stack.add_named(&column, Some("document"));
+            stack.add_named(slides.light_table.widget(), Some("light-table"));
+            bottom.bar.pack_start(&slides.size);
+        } else {
+            stack.add_named(&pages, Some("document"));
+        }
         // The document as an outline (TXT-14).
         let outline = crate::outline_view::OutlineView::new(editor_of());
         stack.add_named(outline.widget(), Some("outline"));
@@ -357,17 +376,43 @@ impl DocumentWindow {
         // The page thumbnails, in the navigation sidebar (INT-19, EST-17,
         // GNM-12).
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
-        let nav = NavSidebar::new(&tr("Add Page"), add_page_menu().upcast_ref());
-        nav.add_page(
-            "pages",
-            &tr("Pages"),
-            nav_sidebar::WIDTH,
-            thumbnails.widget(),
-        );
+        let nav = if let Some(slides) = &slides {
+            // The navigator, the outline and the master slides of Keynote
+            // (KINT-07, KINT-08, KGNM-13).
+            let nav = NavSidebar::new(&tr("Add Slide"), slides::add_slide_menu().upcast_ref());
+            nav.add_page(
+                "pages",
+                &tr("Navigator"),
+                nav_sidebar::WIDTH,
+                thumbnails.widget(),
+            );
+            nav.add_page(
+                "topics",
+                &trc("slides", "Outline"),
+                slides::TOPICS_WIDTH,
+                slides.topics.widget(),
+            );
+            nav.add_page(
+                "masters",
+                &tr("Master Slides"),
+                nav_sidebar::WIDTH,
+                &slides::masters_page(),
+            );
+            nav
+        } else {
+            let nav = NavSidebar::new(&tr("Add Page"), add_page_menu().upcast_ref());
+            nav.add_page(
+                "pages",
+                &tr("Pages"),
+                nav_sidebar::WIDTH,
+                thumbnails.widget(),
+            );
+            nav.add_page("styles", &tr("Styles"), STYLES_WIDTH, drawer.widget());
+            nav
+        };
         // The styles that were the Styles drawer of Pages (INT-18), the
         // comments, and the search results that were its search sidebar
         // (TXT-13), as pages of the sidebar of interface B.
-        nav.add_page("styles", &tr("Styles"), STYLES_WIDTH, drawer.widget());
         nav.add_page(
             "comments",
             &tr("Comments"),
@@ -380,6 +425,18 @@ impl DocumentWindow {
             SEARCH_WIDTH,
             search_sidebar.widget(),
         );
+        if slides.is_some() {
+            // The format bar of the slide (KINT-13) and the Animation
+            // level of the Inspector (KINT-14).
+            if let Some(slides) = &slides {
+                format_bar.add_variant("slide", &slides.variant);
+            }
+            inspector.add_level(
+                slides::ANIMATION,
+                &tr("Animation"),
+                &slides::animation_page(),
+            );
+        }
         let side = gtk::Stack::builder()
             .transition_type(gtk::StackTransitionType::Crossfade)
             .build();
@@ -447,11 +504,12 @@ impl DocumentWindow {
                 // The buttons of the objects go into the Insert menu
                 // (INT-11).
                 breakpoint.add_setter(&object_buttons, "visible", Some(&false.to_value()));
-                breakpoint.add_setter(
-                    &insert_button,
-                    "menu-model",
-                    Some(&header::insert_menu(true).to_value()),
-                );
+                let menu = if is_slides {
+                    slides::insert_menu(true)
+                } else {
+                    header::insert_menu(true)
+                };
+                breakpoint.add_setter(&insert_button, "menu-model", Some(&menu.to_value()));
             }
             let bar = format_bar.clone();
             breakpoint.connect_apply(move |_| bar.set_compact(true));
@@ -506,11 +564,13 @@ impl DocumentWindow {
             closing: Cell::new(false),
             draft: RefCell::new(None),
             draft_due: Cell::new(false),
+            slides,
         });
         this.add_actions();
         this.add_format_bar_actions();
         this.connect_header(&find_toggle);
         this.add_rename();
+        this.add_slides_actions();
         warn_small_screen(&this.window, &screen_banner);
         this.show_rulers();
         {
@@ -610,7 +670,11 @@ impl DocumentWindow {
             let shortcuts = gio::SimpleAction::new("shortcuts", None);
             shortcuts.connect_activate(move |_, _| {
                 if let Some(window) = window.upgrade() {
-                    crate::shortcuts::dialog(opens).present(Some(&window));
+                    if is_slides {
+                        crate::shortcuts::slides_dialog().present(Some(&window));
+                    } else {
+                        crate::shortcuts::dialog(opens).present(Some(&window));
+                    }
                 }
             });
             this.window.add_action(&shortcuts);
@@ -648,6 +712,11 @@ impl DocumentWindow {
                     }
                 });
             });
+        }
+        // A window of Desk Slides starts a presentation at once, until the
+        // theme chooser comes in phase 3.
+        if is_slides && opener.is_none() {
+            this.show_new_presentation();
         }
         WINDOWS.with(|w| w.borrow_mut().push(this.clone()));
         let weak = Rc::downgrade(&this);
@@ -698,8 +767,11 @@ impl DocumentWindow {
     /// Whether closing would lose something: changes since the document
     /// was saved, or a document that has never been saved.
     fn needs_saving(&self) -> bool {
-        self.editor()
-            .is_some_and(|e| e.is_modified() || self.path.borrow().is_none())
+        // Desk Slides saves presentations with phase 1 of its plan.
+        self.opener.is_some()
+            && self
+                .editor()
+                .is_some_and(|e| e.is_modified() || self.path.borrow().is_none())
     }
 
     /// Opens a document in this window, or says why it cannot.
@@ -782,6 +854,7 @@ impl DocumentWindow {
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
                 this.outline.document_changed();
+                this.slides_changed();
             }
         });
         let weak = Rc::downgrade(self);
@@ -802,8 +875,18 @@ impl DocumentWindow {
         }
         // A page layout document opens with its thumbnails and both
         // rulers, as in Pages (INT-03).
+        let presentation = self.editor().is_some_and(|e| e.is_presentation());
+        if presentation {
+            // A slide fills the window, as in Keynote, without rulers.
+            self.view.set_fit(Some(geometry::Fit::Page));
+            self.window
+                .change_action_state("ruler", &false.to_variant());
+            self.show_rulers();
+        }
         if self.editor().is_some_and(|e| e.is_page_layout()) {
-            self.window.change_action_state("ruler", &true.to_variant());
+            if !presentation {
+                self.window.change_action_state("ruler", &true.to_variant());
+            }
             self.show_rulers();
             // The sidebar opens once the window has its size.
             let weak = Rc::downgrade(self);
@@ -826,6 +909,7 @@ impl DocumentWindow {
         let Some(editor) = self.editor() else { return };
         let format = editor.format();
         self.show_format_bar(&editor, &format);
+        self.show_slide_format(&editor);
         self.inspector.show(&format);
         if self.nav_shows("styles") {
             self.drawer.show(&editor);
@@ -861,7 +945,10 @@ impl DocumentWindow {
     /// Shows what the preferences say about the window: the counts at
     /// the bottom, the color of invisibles and that of the guides.
     fn show_window_preferences(&self, preferences: &preferences::Preferences) {
-        self.bottom.count.set_visible(preferences.show_counts);
+        // Desk Slides has the Notes button there (KGNM-14).
+        self.bottom
+            .count
+            .set_visible(preferences.show_counts && self.slides.is_none());
         let count = crate::bottom_bar::Count::from_name(&preferences.count);
         formatting::set_state(&self.window, "count", count.name().to_variant());
         self.show_count();
@@ -893,7 +980,7 @@ impl DocumentWindow {
         let width = self.nav.width(&page);
         self.nav_split.set_min_sidebar_width(width);
         self.nav_split.set_max_sidebar_width(width);
-        for (name, action) in NAV_PAGES {
+        for &(name, action) in self.nav_pages() {
             let on = shown && page == name;
             let was = self.action_state(action);
             formatting::set_state(&self.window, action, on.to_variant());
@@ -909,6 +996,11 @@ impl DocumentWindow {
                     }
                 }
                 "styles" => self.show_format(),
+                "topics" => {
+                    if let Some(slides) = &self.slides {
+                        slides.topics.set_shown(on);
+                    }
+                }
                 _ => {}
             }
         }
@@ -941,8 +1033,22 @@ impl DocumentWindow {
         ));
     }
 
+    /// The pages of the navigation sidebar, and the actions that show
+    /// them.
+    fn nav_pages(&self) -> &'static [(&'static str, &'static str)] {
+        if self.slides.is_some() {
+            &slides::NAV_PAGES
+        } else {
+            &NAV_PAGES
+        }
+    }
+
     /// Shows in the middle of the bottom bar the page in sight (INT-19).
     fn show_position(&self) {
+        if self.slides.is_some() {
+            self.show_slide();
+            return;
+        }
         let count = self.view.page_count().max(1);
         let page = self.view.current_page().map_or(1, |p| p + 1).min(count);
         self.bottom.show_position(page, count);
@@ -1007,6 +1113,11 @@ impl DocumentWindow {
             .chain(&format_actions::FORMAT_BAR_ACTIONS)
         {
             self.enable(action, has_document);
+        }
+        if self.slides.is_some() {
+            for action in slides::ACTIONS {
+                self.enable(action, has_document);
+            }
         }
         // Paste Style is off until a style is copied, as in Pages.
         let copied = COPIED_STYLE.with(|c| c.borrow().is_some());
@@ -1757,11 +1868,16 @@ impl DocumentWindow {
         search.connect_activate(move |_, _| {
             let Some(this) = weak.upgrade() else { return };
             let opens = this.opener.is_some();
-            let menus: Vec<(String, gio::MenuModel)> = [
+            let (view, insert) = if this.slides.is_some() {
+                (slides::view_menu(), slides::insert_menu(true))
+            } else {
+                (header::view_menu(), header::insert_menu(true))
+            };
+            let mut menus: Vec<(String, gio::MenuModel)> = [
                 (tr("Main Menu"), header::main_menu(this.info, opens)),
                 (tr("Main Menu"), header::more_commands(opens)),
-                (tr("View"), header::view_menu()),
-                (tr("Insert"), header::insert_menu(true)),
+                (tr("View"), view),
+                (tr("Insert"), insert),
                 (tr("Edit"), edit_menu()),
                 (tr("Format"), format_menu()),
                 (tr("Arrange"), objects::arrange_menu()),
@@ -1770,6 +1886,9 @@ impl DocumentWindow {
             .map(|(name, menu)| (name, menu.upcast()))
             .chain(this.format_bar.more_menus())
             .collect();
+            if this.slides.is_some() {
+                menus.push((tr("Slide"), slides::slide_menu().upcast()));
+            }
             command_search::present(&this.window, &menus);
         });
         self.window.add_action(&search);
@@ -2099,7 +2218,7 @@ impl DocumentWindow {
             }
         });
         self.window.add_action(&sidebar);
-        for (page, name) in NAV_PAGES {
+        for &(page, name) in self.nav_pages() {
             let action = gio::SimpleAction::new_stateful(name, None, &false.to_variant());
             let weak = Rc::downgrade(self);
             action.connect_change_state(move |_, value| {

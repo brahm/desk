@@ -1686,6 +1686,16 @@ impl TextEditor {
             NewShape::TextBox => (144.0, 72.0),
             _ => (100.0, 100.0),
         };
+        // A slide is read from afar, with bigger text, so its new objects
+        // are bigger too: a text box takes a line of 36 pt text.
+        let (w, h) = if self.is_presentation() {
+            match shape {
+                NewShape::TextBox => (432.0, 72.0),
+                _ => (w * 2.0, h * 2.0),
+            }
+        } else {
+            (w, h)
+        };
         let frame = Frame::from_pt((width - w) / 2.0, (height - h) / 2.0, w, h);
         let name = match shape {
             NewShape::TextBox => "Insert Text Box",

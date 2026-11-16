@@ -31,6 +31,15 @@ pub(super) struct Header {
 impl Header {
     pub fn new(info: AppInfo, opens: bool) -> Self {
         let title = adw::WindowTitle::new(info.name, "");
+        let slides = crate::is_slides(info);
+        let (view, insert) = if slides {
+            (
+                super::slides::view_menu(),
+                super::slides::insert_menu(false),
+            )
+        } else {
+            (view_menu(), insert_menu(false))
+        };
         let header = adw::HeaderBar::builder().title_widget(&title).build();
 
         // The Sidebar button shows the navigation sidebar (F9), and its
@@ -38,7 +47,7 @@ impl Header {
         let sidebar_button = adw::SplitButton::builder()
             .icon_name("sidebar-show-symbolic")
             .action_name("win.sidebar")
-            .menu_model(&view_menu())
+            .menu_model(&view)
             .tooltip_text(tr("Sidebar"))
             .dropdown_tooltip(tr("View"))
             .build();
@@ -50,7 +59,7 @@ impl Header {
             .build();
         let insert_button = gtk::MenuButton::builder()
             .child(&insert_label)
-            .menu_model(&insert_menu(false))
+            .menu_model(&insert)
             .tooltip_text(tr("Insert"))
             .build();
         let objects = gtk::Box::builder().spacing(6).build();
@@ -109,6 +118,10 @@ impl Header {
             .build();
         formatting::labelled(&find_toggle, &tr("Find"));
         let end = gtk::Box::builder().spacing(6).visible(false).build();
+        if slides {
+            // Play, before Find (KINT-05, KINT-12).
+            end.append(&super::slides::play_button());
+        }
         end.append(&find_toggle);
         end.append(&inspector_toggle);
         header.pack_end(&end);

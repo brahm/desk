@@ -364,9 +364,12 @@ pub struct Document {
     metadata: Metadata,
     text_settings: TextSettings,
     view: Option<ViewSettings>,
-    styles: Styles,
+    pub(crate) styles: Styles,
     pub(crate) object_styles: crate::ObjectStyles,
-    container: Container,
+    pub(crate) container: Container,
+    /// The slides of a presentation, one for each page; none for other
+    /// documents.
+    pub(crate) slides: Option<imbl::Vector<crate::Slide>>,
 }
 
 impl PartialEq for Document {
@@ -378,6 +381,7 @@ impl PartialEq for Document {
             && self.styles == other.styles
             && self.object_styles == other.object_styles
             && self.container == other.container
+            && self.slides == other.slides
     }
 }
 
@@ -416,6 +420,7 @@ impl Document {
                 notes: Notes::default(),
                 objects: Objects::default(),
             }),
+            slides: None,
         }
     }
 
@@ -903,6 +908,10 @@ impl Document {
             Op::SetTextSettings { settings } => {
                 let old = std::mem::replace(&mut self.text_settings, settings);
                 Ok(Op::SetTextSettings { settings: old })
+            }
+            Op::SetSlides { slides } => {
+                let old = std::mem::replace(&mut self.slides, slides);
+                Ok(Op::SetSlides { slides: old })
             }
         }
     }

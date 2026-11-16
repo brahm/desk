@@ -653,6 +653,10 @@ impl Edit {
             self.replace_object(object)?;
         }
         setup.layout_pages = Some(pages.saturating_add(1));
+        self.change_slides(|slides| {
+            let at = (after as usize + 1).min(slides.len());
+            slides.insert(at, crate::Slide::default());
+        })?;
         self.set_page_setup(setup)
     }
 
@@ -691,6 +695,11 @@ impl Edit {
             }
         }
         setup.layout_pages = Some(pages - 1);
+        self.change_slides(|slides| {
+            if (page as usize) < slides.len() {
+                slides.remove(page as usize);
+            }
+        })?;
         self.set_page_setup(setup)
     }
 
@@ -740,6 +749,14 @@ impl Edit {
             }
             self.replace_object(object)?;
         }
+        self.change_slides(|slides| {
+            let old = slides.clone();
+            for (new, &from) in order.iter().enumerate() {
+                if let (Some(slot), Some(slide)) = (slides.get_mut(new), old.get(from as usize)) {
+                    *slot = slide.clone();
+                }
+            }
+        })?;
         Ok(at as u32)
     }
 
@@ -774,6 +791,13 @@ impl Edit {
             self.replace_object(object)?;
         }
         setup.layout_pages = Some(count.saturating_add(added));
+        self.change_slides(|slides| {
+            let at = (before as usize).min(slides.len());
+            for (i, page) in (0..clip.pages.len()).enumerate() {
+                let slide = clip.slides.get(page).cloned().unwrap_or_default();
+                slides.insert(at + i, slide);
+            }
+        })?;
         self.set_page_setup(setup)?;
         let objects: Vec<Object> = clip
             .pages
@@ -881,6 +905,8 @@ impl Edit {
 pub struct LayoutPagesClip {
     /// The objects of each page, from back to front.
     pages: Vec<Vec<Object>>,
+    /// The slides of the pages, when they come from a presentation.
+    slides: Vec<crate::Slide>,
 }
 
 impl crate::Document {
@@ -888,7 +914,7 @@ impl crate::Document {
     /// the objects fixed on them.
     pub fn copy_layout_pages(&self, pages: &[u32]) -> LayoutPagesClip {
         let count = self.page_setup().layout_pages.unwrap_or(0);
-        let pages = (0..count)
+        let copied = (0..count)
             .filter(|p| pages.contains(p))
             .map(|page| {
                 self.objects()
@@ -898,7 +924,19 @@ impl crate::Document {
                     .collect()
             })
             .collect();
-        LayoutPagesClip { pages }
+        let slides = self
+            .fitted_slides()
+            .map(|all| {
+                (0..count)
+                    .filter(|p| pages.contains(p))
+                    .map(|p| all.get(p as usize).cloned().unwrap_or_default())
+                    .collect()
+            })
+            .unwrap_or_default();
+        LayoutPagesClip {
+            pages: copied,
+            slides,
+        }
     }
 }
 

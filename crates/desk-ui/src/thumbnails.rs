@@ -173,7 +173,20 @@ impl Thumbnails {
                 .build();
             item.append(&picture);
             item.append(&label);
-            let name = tr("Page {n}").replace("{n}", &number);
+            // The navigator of Desk Slides names slides, and dims those
+            // that the presentation skips (KINT-07, KSLD-06).
+            let name = if editor.is_presentation() {
+                let name = tr("Slide {n}").replace("{n}", &number);
+                if editor.slide_skipped(index) {
+                    picture.set_opacity(0.4);
+                    label.set_label(&tr("{n}, skipped").replace("{n}", &number));
+                    tr("{slide}, skipped").replace("{slide}", &name)
+                } else {
+                    name
+                }
+            } else {
+                tr("Page {n}").replace("{n}", &number)
+            };
             picture.set_alternative_text(Some(&name));
             item.update_property(&[gtk::accessible::Property::Label(&name)]);
             self.connect_page(&item, index, section);

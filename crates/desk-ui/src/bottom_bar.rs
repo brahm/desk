@@ -144,6 +144,13 @@ pub fn position_label(page: usize, count: usize) -> String {
         .replace("{count}", &grouped(count))
 }
 
+/// The position in the middle of the bar of Desk Slides (KGNM-14).
+pub fn slide_position_label(slide: usize, count: usize) -> String {
+    tr("Slide {slide} of {count}")
+        .replace("{slide}", &grouped(slide))
+        .replace("{count}", &grouped(count))
+}
+
 /// The name of what the arrows go to, in the Navigate By menu.
 fn navigate_label(kind: Navigate) -> String {
     match kind {
@@ -173,8 +180,21 @@ pub fn arrow_tooltips(kind: Navigate) -> (String, String) {
 
 /// The menu of the position: Go to Page, a field held by the item
 /// `go-to-page`, and Navigate By (INT-19).
-fn position_menu() -> gio::Menu {
+fn position_menu(slides: bool) -> gio::Menu {
     let menu = gio::Menu::new();
+    if slides {
+        // Go To of the Slide menu of Keynote (KINT-11).
+        let go = gio::Menu::new();
+        let item = gio::MenuItem::new(None, None);
+        item.set_attribute_value("custom", Some(&"go-to-page".to_variant()));
+        go.append_item(&item);
+        menu.append_section(None, &go);
+        let ends = gio::Menu::new();
+        ends.append(Some(&tr("_First Slide")), Some("win.go-to-slide('first')"));
+        ends.append(Some(&tr("_Last Slide")), Some("win.go-to-slide('last')"));
+        menu.append_section(None, &ends);
+        return menu;
+    }
     let go = gio::Menu::new();
     let item = gio::MenuItem::new(None, None);
     item.set_attribute_value("custom", Some(&"go-to-page".to_variant()));
@@ -266,7 +286,10 @@ pub struct BottomBar {
 }
 
 impl BottomBar {
-    pub fn new() -> Self {
+    /// The bar of Desk Writer, or with `slides` that of Desk Slides: the
+    /// position counts slides, and the button of the presenter notes takes
+    /// the place of the count (KGNM-14).
+    pub fn new_for(slides: bool) -> Self {
         let zoom = gtk::MenuButton::builder()
             .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
             .menu_model(&zoom_menu())
@@ -274,7 +297,11 @@ impl BottomBar {
             .tooltip_text(tr("Zoom"))
             .css_classes(["flat"])
             .build();
-        let (previous_tip, next_tip) = arrow_tooltips(Navigate::Page);
+        let (previous_tip, next_tip) = if slides {
+            (tr("Previous Slide"), tr("Next Slide"))
+        } else {
+            arrow_tooltips(Navigate::Page)
+        };
         let previous = gtk::Button::builder()
             .icon_name("go-up-symbolic")
             .tooltip_text(previous_tip)
@@ -289,16 +316,25 @@ impl BottomBar {
             .action_target(&true.to_variant())
             .css_classes(["flat"])
             .build();
-        let (position, position_label) = menu_button(&tr("Go To and Navigate By"));
+        let (position, position_label) = menu_button(&if slides {
+            tr("Go To")
+        } else {
+            tr("Go To and Navigate By")
+        });
         let page_entry = gtk::Entry::builder()
             .width_chars(4)
             .max_width_chars(5)
             .input_purpose(gtk::InputPurpose::Digits)
             .xalign(0.5)
             .build();
-        crate::formatting::labelled(&page_entry, &tr("Go to Page"));
+        let go_to = if slides {
+            (tr("Go to Slide"), tr("_Go to Slide"))
+        } else {
+            (tr("Go to Page"), tr("_Go to Page"))
+        };
+        crate::formatting::labelled(&page_entry, &go_to.0);
         let go_label = gtk::Label::builder()
-            .label(tr("_Go to Page"))
+            .label(go_to.1)
             .use_underline(true)
             .mnemonic_widget(&page_entry)
             .xalign(0.0)
@@ -313,7 +349,7 @@ impl BottomBar {
             .build();
         go.append(&go_label);
         go.append(&page_entry);
-        let popover = gtk::PopoverMenu::from_model(Some(&position_menu()));
+        let popover = gtk::PopoverMenu::from_model(Some(&position_menu(slides)));
         popover.add_child(&go, "go-to-page");
         position.set_popover(Some(&popover));
         let center = gtk::Box::builder().spacing(2).build();
@@ -329,10 +365,22 @@ impl BottomBar {
         if let Some(popover) = zoom.popover() {
             popover.set_halign(gtk::Align::Start);
         }
+        // Presenter Notes, at the end of the bar of Desk Slides in place
+        // of the count (KGNM-14).
+        let notes = gtk::ToggleButton::builder()
+            .icon_name("desk-notes-symbolic")
+            .action_name("win.presenter-notes")
+            .tooltip_text(tr("Presenter Notes"))
+            .css_classes(["flat"])
+            .visible(slides)
+            .build();
+        crate::formatting::labelled(&notes, &tr("Presenter Notes"));
         let bar = gtk::ActionBar::new();
         bar.pack_start(&zoom);
         bar.set_center_widget(Some(&center));
         bar.pack_end(&count);
+        bar.pack_end(&notes);
+        count.set_visible(!slides);
         bar.set_revealed(false);
         Self {
             bar,
@@ -344,6 +392,16 @@ impl BottomBar {
             page_entry,
             count,
             count_label,
+        }
+    }
+
+    /// Shows a position of the bar of Desk Slides: the slide in sight and
+    /// the number of slides (KGNM-14).
+    pub fn show_slide_position(&self, slide: usize, count: usize) {
+        let text = slide_position_label(slide, count);
+        if self.position_label.label() != text {
+            self.position_label.set_label(&text);
+            crate::formatting::labelled(&self.position, &text);
         }
     }
 
@@ -422,6 +480,12 @@ mod tests {
         assert_eq!(count_label(Count::Words, &all, None, 3), "1 word");
         assert_eq!(position_label(1, 3), "Page 1 of 3");
         assert_eq!(count_label(Count::Pages, &all, None, 1), "1 page");
+    }
+
+    #[test]
+    fn kgnm_14_the_position_of_slides_names_the_slide() {
+        assert_eq!(slide_position_label(3, 12), "Slide 3 of 12");
+        assert_eq!(slide_position_label(1, 1_200), "Slide 1 of 1,200");
     }
 
     #[test]
