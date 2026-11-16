@@ -1,0 +1,177 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id	area	recurso	no_iwork	alvo	regra	escopo	situacao_no_desk	revisar	fase	nota
+W001	3.1 Janela, menus e painéis	Barra de menus	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Menus do GNOME (Visualização no botão Barra lateral, Inserir, menu Mais) e busca de comandos (GNM-10); compartilhar fica fora por ser online
+W002	3.1 Janela, menus e painéis	Barra de ferramentas	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra de cabeçalho da interface B com botões de inserir e do Inspetor juntos (INT-11)
+W003	3.1 Janela, menus e painéis	Barra de formatação (Format Bar)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra de formatação enxuta e contextual da interface B (INT-12)
+W004	3.1 Janela, menus e painéis	Inspetor	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Um Inspetor só, na barra lateral direita, em dois níveis, que muda com a seleção (INT-13)
+W005	3.1 Janela, menus e painéis	Gaveta de estilos (Styles Drawer)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Página Estilos da barra lateral, com as três listas (INT-18)
+W006	3.1 Janela, menus e painéis	Media Browser 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Popover Mídia com busca e pastas (INT-14); Content Hub e Fotos ficam fora (online/assinatura); gravar áudio vai na linha Som e vídeo
+W007	3.1 Janela, menus e painéis	Janela Colors / Fonts	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Popover de fontes (Ctrl+T) e paleta de cores (INT-15, INT-16)
+W008	3.1 Janela, menus e painéis	Janela Adjust Image	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Ajustar Imagem na aba Imagem do Inspetor (OBJ-07, etapa 4)
+W009	3.1 Janela, menus e painéis	Janela de avisos (Document Warnings)	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 oferece direto do aviso
+W010	3.1 Janela, menus e painéis	Barra inferior	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Barra inferior com posição, Ir para página, Navegar por e contagem (etapa 6, GNM-13)
+W011	3.1 Janela, menus e painéis	Painel esquerdo	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Miniaturas, estilos e resultados da busca na barra lateral; falta o sumário vivo do 15 e a página Comentários só diz que não há (fase 8)
+W012	3.1 Janela, menus e painéis	Tela cheia	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Tela cheia por F11 (DOC-07); falta o Screen View do 15 (fluxo contínuo para escrever)
+W013	3.1 Janela, menus e painéis	Vários documentos	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Uma janela por documento; faltam abas (AdwTabView)
+W014	3.1 Janela, menus e painéis	Modo escuro	Só 15	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Libadwaita segue o estilo claro/escuro do sistema
+W015	3.1 Janela, menus e painéis	Preferências	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Preferências (Geral, Réguas, Correção) com AdwPreferencesDialog
+W016	3.1 Janela, menus e painéis	Desfazer/refazer	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Desfazer e refazer ilimitados, com o nome da mudança (DOC-12)
+W017	3.2 Documentos, modelos e arquivos	Dois tipos de documento	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Os dois tipos existem (INT-02, INT-03); falta converter de um para o outro
+W018	3.2 Documentos, modelos e arquivos	Seletor de modelos 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Galeria de modelos na janela vazia existe, mas o seletor completo (INT-01) é da fase 9; modelos premium e baixados ficam fora
+W019	3.2 Documentos, modelos e arquivos	Novo documento sempre do mesmo modelo	Igual	Igual nas duas	-	Dentro	Parcial	-	a definir no plano novo	Ctrl+N cria do modelo padrão; a preferência de escolher o modelo (DOC-02) é da fase 9
+W020	3.2 Documentos, modelos e arquivos	Salvar	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Salvar manual e rascunho de recuperação a cada 2 min (caminho L); o alvo do 15 é salvamento automático contínuo, o que reabre a decisão de 13/11
+W021	3.2 Documentos, modelos e arquivos	Renomear pelo título da janela	Só 15	15.4	D-001	Dentro	Pronto	-	a definir no plano novo	Renomear com um clique no título (PR de 15/11)
+W022	3.2 Documentos, modelos e arquivos	Versões anteriores	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Sem histórico de versões por decisão (caminho L); o alvo do 15 pede navegar e copiar trechos de versões
+W023	3.2 Documentos, modelos e arquivos	Salvar como modelo	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Salvar como modelo e gerir modelos no app (DOC-13, fase 9)
+W024	3.2 Documentos, modelos e arquivos	Autoria de modelos	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Padrões de caixa de texto, forma e imagem (MOD-04, MOD-07); faltam texto e mídia reservados, Capturar Páginas e o resto da fase 9
+W025	3.2 Documentos, modelos e arquivos	Pacote vs arquivo único	Diferente	15.4	D-001	Dentro	Pronto	-	a definir no plano novo	ODT é um arquivo único
+W026	3.2 Documentos, modelos e arquivos	Senha	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Senha para abrir (DOC-08, fase 8), também nas cópias exportadas
+W027	3.2 Documentos, modelos e arquivos	Bloquear documento	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Bloquear documento no app (DOC-17, fase 8)
+W028	3.2 Documentos, modelos e arquivos	Informações do documento (autor, título, palavras-chave, comentários)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	a definir no plano novo	Informações do documento no Inspetor (DOC-19)
+W029	3.2 Documentos, modelos e arquivos	Reduzir tamanho	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Reduzir imagens e mídia como o '09 (OBJ-05, OBJ-20); faltam as opções de vídeo do 15 (H.264/HEVC, qualidade)
+W030	3.2 Documentos, modelos e arquivos	Abrir formatos	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Abre ODT e Pages '09 (DOC-03, DOC-22); Word, RTF, texto e AppleWorks são da fase 10
+W031	3.2 Documentos, modelos e arquivos	Exportar	Diferente	15.4	D-001	Dentro	Parcial	D-019	a definir no plano novo	D-019: só ODF, Microsoft Office, PDF e EPUB. Só PDF pela linha de comando (desk-convert); exportar PDF, Word, RTF, texto e imagens pela janela é da fase 10
+W032	3.2 Documentos, modelos e arquivos	ePub	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	EPUB refluxível e fixo (fase 10)
+W033	3.2 Documentos, modelos e arquivos	Publicar no Apple Books 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Publicar no Apple Books (online)
+W034	3.2 Documentos, modelos e arquivos	Imprimir	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Imprimir com intervalo, comentários e fundos (EXP-03, fase 10)
+W035	3.2 Documentos, modelos e arquivos	Envelopes	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Modelos de envelope (fase 9)
+W036	3.2 Documentos, modelos e arquivos	Enviar 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Enviar por Mail/Mensagens/AirDrop (online)
+W037	3.2 Documentos, modelos e arquivos	Arquivos recentes	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Abrir recente pelo RecentManager do GTK
+W038	3.3 Visualização e navegação	Zoom	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Zoom (INT-07)
+W039	3.3 Visualização e navegação	Duas páginas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Uma ou duas páginas (INT-08)
+W040	3.3 Visualização e navegação	Miniaturas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Miniaturas que reordenam seções (EST-17)
+W041	3.3 Visualização e navegação	Sumário de navegação lateral	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Sumário vivo na barra lateral
+W042	3.3 Visualização e navegação	Modo Esboço (Outline)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	a definir no plano novo	Modo Estrutura de Tópicos (TXT-14)
+W043	3.3 Visualização e navegação	Screen View	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Screen View
+W044	3.3 Visualização e navegação	Invisíveis	Igual (15 escolhe a cor)	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Invisíveis (INT-10); a cor configurável do 15 não existe
+W045	3.3 Visualização e navegação	Marcas de leiaute	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Mostrar leiaute (INT-09)
+W046	3.3 Visualização e navegação	Réguas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Réguas e guias (INT-17)
+W047	3.3 Visualização e navegação	Ir para página	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	a definir no plano novo	Ir para página pela barra inferior (INT-19)
+W048	3.3 Visualização e navegação	Percorrer itens (página, seção, comentário, alteração, marcador, ocorrência)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	a definir no plano novo	Navegar por tipo de item pela barra inferior (INT-19)
+W049	3.4 Texto e caracteres	Seleção de texto	Diferente	15.4	D-001	Dentro	Pronto	-	a definir no plano novo	Seleção descontínua com Ctrl (TXT-03)
+W050	3.4 Texto e caracteres	Fonte, tamanho, negrito, itálico, sublinhado, tachado	Diferente (lugar)	15.4	D-001	Dentro	Pronto	-	a definir no plano novo	Barra de formatação e Inspetor (FMT-01, FMT-02, FMT-05)
+W051	3.4 Texto e caracteres	Fonte padrão	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	A fonte padrão vem do modelo; falta escolhê-la nas Preferências
+W052	3.4 Texto e caracteres	Cor do texto	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Cor sólida (FMT-11); falta gradiente e imagem no texto
+W053	3.4 Texto e caracteres	Contorno e sombra	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Contorno e sombra de texto (FMT-03, FMT-04)
+W054	3.4 Texto e caracteres	Maiúsculas	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Maiúsculas e versalete (FMT-07); faltam Título e Início de frase e as transformações do 15
+W055	3.4 Texto e caracteres	Sobrescrito/subscrito, deslocamento de linha de base	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Sobrescrito e linha de base (FMT-06)
+W056	3.4 Texto e caracteres	Espaçamento entre caracteres e ligaduras	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Espaçamento e ligaduras (FMT-09, FMT-10)
+W057	3.4 Texto e caracteres	Suavização de fontes	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Suavização de fontes é do sistema no GNOME
+W058	3.4 Texto e caracteres	Cor de fundo de caractere e de parágrafo	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Fundo de caractere e de parágrafo (FMT-20)
+W059	3.4 Texto e caracteres	Realce de revisão (highlight)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Realce de revisão com comentário (fase 8)
+W060	3.4 Texto e caracteres	Capitular (drop cap)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Capitular
+W061	3.4 Texto e caracteres	Frações automáticas	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Frações automáticas
+W062	3.4 Texto e caracteres	Aspas e travessões inteligentes	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Aspas inteligentes como o '09 (TXT-06); faltam escolher o estilo de aspas e converter as existentes
+W063	3.4 Texto e caracteres	Hifenização	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Hifenização (TXT-09)
+W064	3.4 Texto e caracteres	Substituição de texto	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Lista de substituição do próprio Desk (TXT-07); o GNOME não tem lista do sistema, então o alvo vale como lista comum aos três apps
+W065	3.4 Texto e caracteres	Caracteres especiais, acentos, emoji	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Seletor de emoji e símbolos do GTK (TXT-05)
+W066	3.4 Texto e caracteres	Data e hora	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Data e hora como campo (EST-27)
+W067	3.4 Texto e caracteres	Número e total de páginas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Número e total de páginas (EST-27)
+W068	3.4 Texto e caracteres	Ditado 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Ditado (IA)
+W069	3.4 Texto e caracteres	Previsão ao digitar 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Previsão ao digitar (IA)
+W070	3.4 Texto e caracteres	Tradução 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Tradução (IA/online)
+W071	3.4 Texto e caracteres	Idiomas: bidirecional, vertical, guia fonético, ênfase CJK	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Texto bidirecional, vertical e guia fonético (GNM-08, fase 11)
+W072	3.4 Texto e caracteres	Formatação por idioma do documento	Só 15	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Idioma do texto por trecho (FMT-22); falta idioma e região por documento
+W073	3.5 Estilos	Estilos de parágrafo, caractere e lista	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	a definir no plano novo	Estilos sempre à vista na barra lateral (STY-01, STY-02)
+W074	3.5 Estilos	Indicar e atualizar substituições	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Sobreposições e atualizar (STY-06)
+W075	3.5 Estilos	Atalhos para estilos	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Atalhos de estilo Ctrl+1 a 8 (STY-04)
+W076	3.5 Estilos	Copiar e colar estilo	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Copiar e colar estilo (STY-08)
+W077	3.5 Estilos	Importar estilos de outro documento	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	a definir no plano novo	Importar estilos (STY-10)
+W078	3.5 Estilos	Localizar e substituir estilos	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	a definir no plano novo	Localizar e substituir estilos (STY-09)
+W079	3.5 Estilos	Mostrar só estilos usados	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	a definir no plano novo	Mostrar só estilos usados na página Estilos
+W080	3.5 Estilos	Estilos de objeto, tabela e gráfico	Só 15	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Estilos de objeto no Inspetor (PR de 15/11); faltam estilos de tabela e de gráfico
+W081	3.5 Estilos	Estilo padrão de caixa de texto	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Padrão de caixa de texto gravado no modelo (MOD-04); falta definir por documento
+W082	3.6 Parágrafo, listas e colunas	Alinhamento, espaçamento de linha e de parágrafo, recuos	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Alinhamento, espaçamento e recuos (FMT-12 a FMT-18)
+W083	3.6 Parágrafo, listas e colunas	Tabulações	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Tabulações (FMT-16)
+W084	3.6 Parágrafo, listas e colunas	Paginação (manter juntas, com a próxima, nova página, viúvas/órfãs)	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Paginação (EST-05)
+W085	3.6 Parágrafo, listas e colunas	Bordas e linhas de parágrafo	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Bordas e filetes (FMT-21)
+W086	3.6 Parágrafo, listas e colunas	Listas automáticas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Listas automáticas (LST-01)
+W087	3.6 Parágrafo, listas e colunas	Marcadores de texto, de imagem, números, níveis (Tiered Numbers)	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Marcadores e listas escalonadas (LST-03 a LST-05)
+W088	3.6 Parágrafo, listas e colunas	Reordenar itens de lista arrastando	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Reordenar no modo tópicos; falta arrastar pelo marcador direto no texto
+W089	3.6 Parágrafo, listas e colunas	Colunas	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Colunas e quebras manuais do '09 (EST-07 a EST-10); faltam as colunas da seleção com quebras automáticas do 15
+W090	3.6 Parágrafo, listas e colunas	Quebra de coluna, de linha, de página, de seção	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Quebras de coluna, linha, página e seção (EST-04, EST-06, EST-08)
+W091	3.6 Parágrafo, listas e colunas	Caixas de texto encadeadas	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Caixas vinculadas e linhas de conexão (OBJ-15, VMI-03); faltam os fios numerados e coloridos e vários fios
+W092	3.7 Estrutura do documento	Tamanho, orientação, margens	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Papel e margens (EST-02, EST-03)
+W093	3.7 Estrutura do documento	Páginas espelhadas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Páginas espelhadas (EST-11)
+W094	3.7 Estrutura do documento	Seções	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Seções (EST-16 a EST-19); falta reutilizar seções capturadas (EST-20, fase 9)
+W095	3.7 Estrutura do documento	Modelos de página (Page Templates)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Modelos de página com etiquetas
+W096	3.7 Estrutura do documento	Cabeçalho e rodapé	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Cabeçalho livre do '09 (EST-12); faltam os três campos rápidos do 15
+W097	3.7 Estrutura do documento	Objetos mestres / de leiaute de seção (marca-d'água)	Igual (nome novo)	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Objetos mestres de seção (EST-21, INT-05)
+W098	3.7 Estrutura do documento	Fundo e borda de página	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Fundo e borda de página por página, seção ou modelo
+W099	3.7 Estrutura do documento	Notas de rodapé e de fim	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Notas de rodapé e de fim (EST-13 a EST-15)
+W100	3.7 Estrutura do documento	Sumário (TOC) inserido	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Vários sumários, cada um até o próximo (EST-22); falta o escopo por seção do 15
+W101	3.7 Estrutura do documento	Marcadores (bookmarks)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Marcadores (EST-26); faltam a aba própria e as sugestões a partir de estilos
+W102	3.7 Estrutura do documento	Links	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Links do '09, inclusive para outro documento (EST-25, IOP-32); faltam telefone e link a partir de objetos
+W103	3.7 Estrutura do documento	Bibliografia 🧩 (nas duas)	Igual	Igual nas duas	-	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Bibliografia exige o EndNote, programa pago
+W104	3.7 Estrutura do documento	Equações 🧩 (no '09)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Equações LaTeX/MathML
+W105	3.7 Estrutura do documento	Mala direta	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Mala direta com pré-visualização (MAL-01 a MAL-09, fase 9)
+W106	3.8 Objetos: imagens, formas, mídia	Objetos flutuantes e em linha	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Flutuante e em linha (OBJ-01); falta aninhar objetos dentro de caixas e formas
+W107	3.8 Objetos: imagens, formas, mídia	Contorno de texto	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	a definir no plano novo	Contorno com escolha de lado (OBJ-17)
+W108	3.8 Objetos: imagens, formas, mídia	Imagens 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	PNG, JPEG, PDF, GIF (OBJ-02); faltam SVG e HEIC; Content Hub e iPhone ficam fora
+W109	3.8 Objetos: imagens, formas, mídia	Remover fundo 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	a definir no plano novo	O Remover Fundo do 15 usa IA; vale o Alfa Instantâneo manual do '09 (OBJ-06)
+W110	3.8 Objetos: imagens, formas, mídia	Ajustes de imagem	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Ajustar Imagem do '09 (OBJ-07); falta o Realçar automático e o painel enxuto do 15
+W111	3.8 Objetos: imagens, formas, mídia	Galeria de imagens	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Galeria de imagens
+W112	3.8 Objetos: imagens, formas, mídia	IA para imagens **(assinatura)** 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	IA para imagens (assinatura)
+W113	3.8 Objetos: imagens, formas, mídia	Formas 🤖💲 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Formas, caneta e paramétricas (OBJ-08 a OBJ-11); faltam a biblioteca pesquisável e combinar formas; gerar forma por IA fica fora
+W114	3.8 Objetos: imagens, formas, mídia	Editar pontos e curvas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Editar pontos (OBJ-10)
+W115	3.8 Objetos: imagens, formas, mídia	Linhas e conexões	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Linha de conexão (OBJ-31)
+W116	3.8 Objetos: imagens, formas, mídia	Objetos 3D (USDZ)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Objetos 3D (USDZ)
+W117	3.8 Objetos: imagens, formas, mídia	Desenhos (Apple Pencil)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Desenho à mão livre animável (o equivalente do Apple Pencil)
+W118	3.8 Objetos: imagens, formas, mídia	Som e vídeo 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Áudio e vídeo (OBJ-18, OBJ-19); faltam gravar áudio, aparar, capa e descrição; vídeo da web fica fora
+W119	3.8 Objetos: imagens, formas, mídia	Formatos de mídia	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Reduz mídia (OBJ-20); falta otimizar ao inserir
+W120	3.8 Objetos: imagens, formas, mídia	Bordas, molduras artísticas, sombra, reflexo, opacidade	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Bordas, molduras, sombra, reflexo e opacidade (OBJ-35 a OBJ-39)
+W121	3.8 Objetos: imagens, formas, mídia	Preenchimento	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Cor, gradiente e imagem (OBJ-40 a OBJ-42); faltam gradiente avançado e salvar preenchimento
+W122	3.8 Objetos: imagens, formas, mídia	Legenda e título de objeto	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Legenda e título de objeto
+W123	3.8 Objetos: imagens, formas, mídia	Posição exata, alinhar e distribuir	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Posição, alinhar e distribuir (OBJ-26, OBJ-29)
+W124	3.8 Objetos: imagens, formas, mídia	Guias de alinhamento	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Guias dinâmicas e fixas (OBJ-27, OBJ-28); falta a cor própria
+W125	3.8 Objetos: imagens, formas, mídia	Camadas, agrupar, travar	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Camadas, agrupar, travar (OBJ-24, OBJ-30, OBJ-32)
+W126	3.8 Objetos: imagens, formas, mídia	Redimensionar, girar, espelhar	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Redimensionar, girar, espelhar (OBJ-33, OBJ-34)
+W127	3.9 Tabelas	Inserir tabela	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Inserir tabela (TAB-01); faltam os estilos de tabela à vista
+W128	3.9 Tabelas	Linhas, colunas, cabeçalhos, rodapés, repetir cabeçalho	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Linhas, colunas, cabeçalhos e rodapés (TAB-10 a TAB-13)
+W129	3.9 Tabelas	Converter texto em tabela	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	a definir no plano novo	Converter texto em tabela (TAB-05)
+W130	3.9 Tabelas	Criar tabela a partir de células	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Criar tabela arrastando células para fora
+W131	3.9 Tabelas	Mesclar e dividir células	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	a definir no plano novo	Mesclar e dividir (TAB-23, TAB-24)
+W132	3.9 Tabelas	Formatos de célula	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Formatos, fração e sistema numérico (TAB-28 a TAB-30); falta a janela de gerenciar formatos (TAB-31)
+W133	3.9 Tabelas	Fórmulas e funções 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Navegador de funções e 94 funções; o 15 tem 250+; funções que buscam na internet ficam fora
+W134	3.9 Tabelas	Realce condicional	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Formatação condicional (TAB-21)
+W135	3.9 Tabelas	Ordenar	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Ordenar (TAB-15)
+W136	3.9 Tabelas	Preenchimento automático e autocompletar	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Preenchimento automático e sugestões da coluna (TAB-19)
+W137	3.9 Tabelas	Cores alternadas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Cores alternadas (TAB-14)
+W138	3.9 Tabelas	Título da tabela	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Título da tabela
+W139	3.9 Tabelas	Direção da tabela (bidi)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Tabela da direita para a esquerda
+W140	3.9 Tabelas	Travar tabela	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Travar tabela
+W141	3.10 Gráficos	Tipos	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Onze tipos 2D e 3D (GRF-01); faltam rosca, radar, bolhas e interativo
+W142	3.10 Gráficos	Dados	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Editor de Dados (GRF-03, GRF-05); faltam compartilhar o eixo X e a amostragem
+W143	3.10 Gráficos	Eixos, rótulos, legendas	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Eixos, rótulos e legenda (GRF-07, GRF-10, GRF-12)
+W144	3.10 Gráficos	Barras de erro e linhas de tendência	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Barras de erro e tendência (GRF-13, GRF-14); faltam linhas de referência
+W145	3.10 Gráficos	Cantos arredondados, chanfro 3D, buraco da rosca	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Cantos arredondados, chanfro e furo da rosca
+W146	3.10 Gráficos	Cena 3D (luz, ângulo)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Cena 3D com luz (GRF-20)
+W147	3.10 Gráficos	Estilos de gráfico	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Estilos de gráfico
+W148	3.11 Revisão e ferramentas de escrita	Controle de alterações	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Controle de alterações (REV-01 a REV-07, fase 8)
+W149	3.11 Revisão e ferramentas de escrita	Comentários	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Comentários com respostas (REV-08, fase 8)
+W150	3.11 Revisão e ferramentas de escrita	Nome do autor e cor	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Nome e cor do autor (fase 8)
+W151	3.11 Revisão e ferramentas de escrita	Verificação ortográfica e gramatical	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Ortografia e gramática ao digitar (TXT-10)
+W152	3.11 Revisão e ferramentas de escrita	Proofreader (revisão de estilo e gramática do app) 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	a definir no plano novo	O Proofreader do 15 usa IA; vale o revisor próprio do '09 (TXT-11)
+W153	3.11 Revisão e ferramentas de escrita	Localizar e substituir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Barra de busca ao vivo do 15 com as opções avançadas e estilos do '09 (TXT-12)
+W154	3.11 Revisão e ferramentas de escrita	Lista de todas as ocorrências	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Resultados da busca na barra lateral (TXT-13)
+W155	3.11 Revisão e ferramentas de escrita	Contagem de palavras	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Contagem sempre visível e estatísticas (DOC-20)
+W156	3.11 Revisão e ferramentas de escrita	Dicionário e pesquisa 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Dicionário e pesquisa (parte online)
+W157	3.11 Revisão e ferramentas de escrita	Writing Tools (IA) 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Writing Tools (IA)
+W158	3.12 Colaboração, nuvem, automação e acessibilidade	Colaboração em tempo real 🌐 (nas duas) 💲 (no 15)	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Colaboração pelo iCloud (online)
+W159	3.12 Colaboração, nuvem, automação e acessibilidade	iCloud Drive, Handoff, AirDrop, Pages para iCloud 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	iCloud, Handoff, AirDrop (online)
+W160	3.12 Colaboração, nuvem, automação e acessibilidade	AppleScript	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	AppleScript não existe no GNOME; o equivalente (D-Bus) não está pedido
+W161	3.12 Colaboração, nuvem, automação e acessibilidade	Atalhos (Shortcuts)	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	O app Atalhos não existe no GNOME
+W162	3.12 Colaboração, nuvem, automação e acessibilidade	Siri 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Siri (IA/online)
+W163	3.12 Colaboração, nuvem, automação e acessibilidade	VoiceOver	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Leitor de tela no texto e nas células (Orca); faltam rotor de comentários e alterações e descrições de mídia
+W164	3.12 Colaboração, nuvem, automação e acessibilidade	Privacidade e análise 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Privacidade e análise (online)
+W165	3.12 Colaboração, nuvem, automação e acessibilidade	Assinatura Creator Studio 💲🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Assinatura
+W166	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do Desk, com as extensões	-	Decisão do projeto	D-009	Dentro	Pronto	-	a definir no plano novo	-
+W167	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do LibreOffice e do OpenOffice atuais	-	Decisão do projeto	D-010	Dentro	Parcial	-	a definir no plano novo	-
+W168	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork '09	-	Decisão do projeto	D-010	Dentro	Pronto	-	a definir no plano novo	-
+W169	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork atual	-	Decisão do projeto	D-010, D-011	Dentro	Ausente	-	a definir no plano novo	-
+W170	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do Microsoft Office atual	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
+W171	Compatibilidade de arquivos (D-010, D-019)	Salvar ODF com as extensões do Desk	-	Decisão do projeto	D-009	Dentro	Pronto	-	a definir no plano novo	-
+W172	Compatibilidade de arquivos (D-010, D-019)	Exportar para o Microsoft Office	-	Decisão do projeto	D-019	Dentro	Ausente	-	a definir no plano novo	-
+W173	Compatibilidade de arquivos (D-010, D-019)	Exportar PDF	-	Decisão do projeto	D-019	Dentro	Parcial	-	a definir no plano novo	-
+W174	Compatibilidade de arquivos (D-010, D-019)	Exportar EPUB	-	Decisão do projeto	D-019	Dentro	Ausente	-	a definir no plano novo	-
