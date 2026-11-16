@@ -276,6 +276,9 @@ impl DocumentWindow {
             .then(|| editor.object_info())
             .flatten();
         self.format_bar.show_objects(info.as_ref());
+        if let Some(variant) = self.table_bars.show(editor) {
+            self.format_bar.show_variant(variant);
+        }
         let set =
             |name: &str, value: glib::Variant| formatting::set_state(&self.window, name, value);
         set(

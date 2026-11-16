@@ -30,6 +30,8 @@ pub enum Context {
     Movie,
     Sound,
     Group,
+    Table,
+    Chart,
 }
 
 impl Context {
@@ -42,6 +44,8 @@ impl Context {
             Some(ObjectKind::TextBox(_)) => Self::TextBox,
             Some(ObjectKind::Media(media)) if media.is_sound() => Self::Sound,
             Some(ObjectKind::Media(_)) => Self::Movie,
+            Some(ObjectKind::Table(_)) => Self::Table,
+            Some(ObjectKind::Chart(_)) => Self::Chart,
             // A group, or a kind of object that came later.
             Some(_) => Self::Group,
         }
@@ -58,6 +62,8 @@ impl Context {
             Self::Sound => tr("Sound"),
             // A noun, where the Arrange menu has the verb.
             Self::Group => trc("inspector title", "Group"),
+            Self::Table => tr("Table"),
+            Self::Chart => tr("Chart"),
         }
     }
 }
@@ -109,7 +115,9 @@ impl Tabs {
         let switcher = adw::InlineViewSwitcher::builder()
             .stack(&stack)
             .homogeneous(true)
-            .css_classes(["flat"])
+            .css_classes(["flat", "desk-inspector-tabs"])
+            // A title cut short says nothing: the Inspector widens first.
+            .can_shrink(false)
             .margin_start(12)
             .margin_end(12)
             .margin_top(8)
@@ -172,9 +180,15 @@ impl Tabs {
             });
         }
         self.switcher.set_visible(tabs.len() > 1);
-        // Tabs of one width only while every title fits in it.
+        // Tabs of one width only while every title fits in it: four tabs
+        // of a table or a chart in 332 pixels take their own widths.
+        let longest = tabs
+            .iter()
+            .map(|tab| tr(tab.title).chars().count())
+            .max()
+            .unwrap_or(0);
         self.switcher
-            .set_homogeneous(tabs.iter().all(|tab| tr(tab.title).chars().count() <= 8));
+            .set_homogeneous(longest <= 8 && longest * tabs.len() <= 24);
         let visible = visible
             .filter(|name| tabs.iter().any(|tab| tab.name == *name))
             .or_else(|| tabs.first().map(|tab| tab.name));
@@ -394,6 +408,8 @@ mod tests {
             Context::Movie,
             Context::Sound,
             Context::Group,
+            Context::Table,
+            Context::Chart,
         ] {
             assert!(!context.title().is_empty());
         }

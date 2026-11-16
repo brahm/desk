@@ -39,6 +39,7 @@ mod pen;
 mod points;
 mod sections;
 mod stories;
+mod tables;
 
 pub use navigate::Navigate;
 pub use objects::{NewShape, ObjectInfo, ObjectStylesInfo};
@@ -447,6 +448,10 @@ struct State {
     selectable: objects::Selectable,
     /// The guides it snaps to.
     guides: Vec<crate::view::Guide>,
+    /// The cells selected in the selected table (TAB-05).
+    cells: Option<tables::CellSelection>,
+    /// The field that edits the text of a cell.
+    cell_editor: Option<tables::CellEditor>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -575,6 +580,8 @@ impl TextEditor {
                 guide_drag: None,
                 selectable: objects::Selectable::default(),
                 guides: Vec::new(),
+                cells: None,
+                cell_editor: None,
             })),
         };
         this.show_pages();
@@ -782,6 +789,13 @@ impl TextEditor {
     /// with its formatting for the other programs that read it, and as
     /// text alone for the rest (TXT-04).
     pub fn copy(&self) {
+        // Cells go as lines of values between tabs, as spreadsheets read
+        // them (IOP-19).
+        if let Some(text) = self.cells_text() {
+            copies::forget_copied_objects();
+            self.view.area().clipboard().set_text(&text);
+            return;
+        }
         if self.has_selected_objects() {
             self.copy_objects();
             return;
@@ -843,6 +857,11 @@ impl TextEditor {
 
     /// Copies the selection and deletes it.
     pub fn cut(&self) {
+        if self.selected_cells().is_some() {
+            self.copy();
+            self.clear_cells(false);
+            return;
+        }
         if self.has_selected_objects() {
             self.cut_objects();
             return;
@@ -868,6 +887,19 @@ impl TextEditor {
     }
 
     fn paste_keeping_style(&self, keep: bool) {
+        // Into selected cells, from the focused one (IOP-19).
+        if self.selected_cells().is_some() {
+            let weak = self.downgrade();
+            self.view.area().clipboard().read_text_async(
+                gtk::gio::Cancellable::NONE,
+                move |result| {
+                    if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
+                        this.paste_in_cells(&text);
+                    }
+                },
+            );
+            return;
+        }
         if self.paste_objects() {
             return;
         }
@@ -3241,6 +3273,11 @@ impl TextEditor {
             }
             (rects, text_nav::caret(&state.layout, selection.focus))
         };
+        // The selected cells of a table, in place of the text's.
+        let (rects, caret) = match self.cell_rects() {
+            Some(cells) => (cells, None),
+            None => (rects, caret),
+        };
         self.view.set_marks(rects, caret);
         let (focus, range) = {
             let state = self.state.borrow();
@@ -3459,7 +3496,10 @@ impl TextEditor {
                 this.leave_story(None);
                 return glib::Propagation::Stop;
             }
-            if this.object_key(key, modifiers) || this.handle_key(key, modifiers) {
+            if this.table_key(key, modifiers)
+                || this.object_key(key, modifiers)
+                || this.handle_key(key, modifiers)
+            {
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed
@@ -3493,6 +3533,10 @@ impl TextEditor {
                 return Default::default();
             };
             this.view.set_preedit("");
+            // Typing with cells selected goes in the cell (TAB-18).
+            if this.type_in_cell(text) {
+                return;
+            }
             // Typing with objects selected does not reach the text.
             if this.has_selected_objects() {
                 return;

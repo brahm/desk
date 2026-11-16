@@ -863,6 +863,7 @@ impl TextEditor {
             state.objects = ids;
         }
         self.show_objects();
+        self.describe_table_or_chart();
         self.selection_changed();
     }
 
@@ -2012,6 +2013,11 @@ impl TextEditor {
             }
             return false;
         };
+        // A click on a selected table selects its cells (TAB-05), and a
+        // double click on a chart edits its data (GRF-02).
+        if self.press_table(id, page, px, py, presses, shift) {
+            return true;
+        }
         // A click in the text box being edited is a click in its text.
         let head = Self::main_document(&self.state.borrow()).text_box_head(id);
         if self.story() == Some(Story::TextBox(head)) {
@@ -2294,6 +2300,9 @@ impl TextEditor {
                     object = before.clone();
                 }
                 refresh_contour(&mut object, &before);
+                if matches!(drag.kind, DragKind::Resize(_)) {
+                    self.fit_table_to_frame(&mut object, &before);
+                }
                 object
             })
             .collect();

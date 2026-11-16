@@ -1927,4 +1927,135 @@ mod tests {
         assert!(!chart.value_axis.gridlines);
         assert!(chart.series[0].trend.is_none());
     }
+
+    fn hit(d: &Drawing, series: usize, category: usize) -> (f32, f32, f32, f32) {
+        d.hits
+            .iter()
+            .find(|h| h.series == series && h.category == Some(category))
+            .map(|h| h.rect)
+            .expect("a hit for the bar")
+    }
+
+    #[test]
+    fn grf_02_series_in_rows_or_in_columns() {
+        let mut chart = Chart::new(ChartKind::Column);
+        assert_eq!((chart.series_count(), chart.category_count()), (2, 4));
+        chart.series_in_rows = false;
+        assert_eq!((chart.series_count(), chart.category_count()), (4, 2));
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        let mut series: Vec<usize> = d.hits.iter().map(|h| h.series).collect();
+        series.dedup();
+        series.sort_unstable();
+        series.dedup();
+        assert_eq!(series, [0, 1, 2, 3]);
+        assert!(texts(&d).contains(&"2010".to_string()));
+    }
+
+    #[test]
+    fn grf_05_edited_data_redraws() {
+        let mut chart = Chart::new(ChartKind::Column);
+        let before = hit(&draw(&chart, 300.0, 200.0, &rough_width, ',', '.'), 0, 0);
+        chart.data.set(0, 0, Some(90.0));
+        let after = hit(&draw(&chart, 300.0, 200.0, &rough_width, ',', '.'), 0, 0);
+        assert!(after.3 > before.3 * 4.0, "{before:?} {after:?}");
+    }
+
+    #[test]
+    fn grf_09_a_larger_frame_draws_larger() {
+        let chart = Chart::new(ChartKind::Column);
+        let small = hit(&draw(&chart, 300.0, 200.0, &rough_width, ',', '.'), 1, 3);
+        let large = hit(&draw(&chart, 600.0, 400.0, &rough_width, ',', '.'), 1, 3);
+        assert!(large.2 > small.2 * 1.8 && large.3 > small.3 * 1.8);
+    }
+
+    #[test]
+    fn grf_11_series_fill() {
+        let mut chart = Chart::new(ChartKind::Column);
+        let red = Color::rgb(200, 0, 0);
+        chart.series[0].fill = SeriesFill::Color(red);
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        assert!(d.marks.iter().any(|m| matches!(
+            m,
+            Mark::Shape { fill: Some(Paint::Color(c)), .. } if *c == red
+        )));
+    }
+
+    #[test]
+    fn grf_16_columns_stand_and_bars_lie() {
+        let column = hit(
+            &draw(
+                &Chart::new(ChartKind::Column),
+                300.0,
+                200.0,
+                &rough_width,
+                ',',
+                '.',
+            ),
+            0,
+            3,
+        );
+        assert!(column.3 > column.2, "{column:?}");
+        let bar = hit(
+            &draw(
+                &Chart::new(ChartKind::Bar),
+                300.0,
+                200.0,
+                &rough_width,
+                ',',
+                '.',
+            ),
+            0,
+            3,
+        );
+        assert!(bar.2 > bar.3, "{bar:?}");
+    }
+
+    fn lines_and_fills(d: &Drawing) -> (usize, usize) {
+        let lines = d
+            .marks
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m,
+                    Mark::Shape {
+                        fill: None,
+                        stroke: Some(_),
+                        ..
+                    }
+                )
+            })
+            .count();
+        (lines, shapes(d))
+    }
+
+    #[test]
+    fn grf_17_lines_stroke_and_areas_fill() {
+        let line = lines_and_fills(&draw(
+            &Chart::new(ChartKind::Line),
+            300.0,
+            200.0,
+            &rough_width,
+            ',',
+            '.',
+        ));
+        assert!(line.0 >= 2, "{line:?}");
+        let area = draw(
+            &Chart::new(ChartKind::Area),
+            300.0,
+            200.0,
+            &rough_width,
+            ',',
+            '.',
+        );
+        assert!(shapes(&area) >= 2);
+    }
+
+    #[test]
+    fn grf_19_mixed_draws_columns_and_a_line() {
+        let mut chart = Chart::new(ChartKind::Mixed);
+        chart.series[0].kind = SeriesKind::Column;
+        chart.series[1].kind = SeriesKind::Line;
+        let (lines, fills) = lines_and_fills(&draw(&chart, 300.0, 200.0, &rough_width, ',', '.'));
+        assert!(lines >= 1 && fills >= 4, "{lines} {fills}");
+    }
 }

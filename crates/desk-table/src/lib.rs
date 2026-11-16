@@ -35,4 +35,4 @@ pub use table::{
     Region, Table, TableError, TableOptions, TableStyle,
 };
 
-pub use desk_formula::{CellRef, ErrorKind, Formula, Value};
+pub use desk_formula::{CellRef, ErrorKind, FUNCTIONS, Formula, FunctionInfo, Value};
