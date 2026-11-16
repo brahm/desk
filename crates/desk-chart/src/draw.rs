@@ -1787,7 +1787,7 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ErrorAmount, ErrorBars, Trendline};
+    use crate::model::{ChartText, ErrorAmount, ErrorBars, Trendline};
     use desk_table::Num;
 
     fn texts(d: &Drawing) -> Vec<String> {
@@ -1837,6 +1837,49 @@ mod tests {
         assert!(!t.contains(&"Região 1".to_string()));
         assert!(!t.contains(&"2008".to_string()));
         assert!(t.contains(&"2009".to_string()));
+    }
+
+    #[test]
+    fn grf_08_the_text_of_the_chart_formats_every_title_and_label() {
+        let mut chart = Chart::new(ChartKind::Column);
+        chart.title = Some("Vendas".into());
+        chart.value_axis.title = Some("Milhares".into());
+        chart.text = ChartText {
+            font: "Cantarell".into(),
+            size: 14_000,
+            color: Color::rgb(0x1c, 0x71, 0xd8),
+            bold: false,
+            italic: true,
+        };
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        let mut count = 0;
+        for mark in &d.marks {
+            if let Mark::Text {
+                font,
+                color,
+                italic,
+                ..
+            } = mark
+            {
+                count += 1;
+                assert_eq!(font, "Cantarell");
+                assert_eq!(*color, Color::rgb(0x1c, 0x71, 0xd8));
+                assert!(*italic);
+            }
+        }
+        // The title, the axis title, the legend and the axis labels.
+        assert!(count > 5, "{count} texts");
+        // The size of the text sets the size of the labels; the title is
+        // drawn larger than them.
+        let sizes: Vec<f32> = d
+            .marks
+            .iter()
+            .filter_map(|m| match m {
+                Mark::Text { size, .. } => Some(*size),
+                _ => None,
+            })
+            .collect();
+        assert!(sizes.contains(&14.0), "{sizes:?}");
     }
 
     #[test]

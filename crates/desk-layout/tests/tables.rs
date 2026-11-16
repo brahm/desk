@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tables laid out: the fills of alternating rows, text that does not
-//! fit in its cell, comments and sizes.
+//! Tables laid out: the fills of the parts of a table and of alternating
+//! rows, text that does not fit in its cell, comments and sizes.
 
 use desk_layout::{TableLayout, lay_out_table, table_size};
 use desk_model::table::{Color, Locale};
@@ -87,4 +87,31 @@ fn tab_03_a_table_scaled_by_its_handle_keeps_its_proportions() {
     assert!((w2 - 2.0 * w).abs() < 1.0, "{w} {w2}");
     assert_eq!(table.width(1), table.width(2));
     assert!(table.width(0) < table.width(1));
+}
+
+#[test]
+fn tab_04_each_part_of_the_table_takes_the_fill_of_its_style() {
+    let mut table = Table::new(5, 3);
+    table.set_footer_rows(1).unwrap();
+    let (header_row, header_col, footer, body) = (
+        Color::rgb(0x10, 0x20, 0x30),
+        Color::rgb(0x40, 0x50, 0x60),
+        Color::rgb(0x70, 0x80, 0x90),
+        Color::rgb(0xa0, 0xb0, 0xc0),
+    );
+    table.style.header_row_fill = Some(header_row);
+    table.style.header_column_fill = Some(header_col);
+    table.style.footer_fill = Some(footer);
+    table.style.body_fill = Some(body);
+    // A cell with a fill of its own keeps it over the style.
+    let own = Color::rgb(0xff, 0x00, 0x00);
+    table.cell_mut(2, 2).style.fill = Some(desk_model::table::CellFill::Color(own));
+    let layout = lay_out(&table);
+    let fill = |r, c| cell(&layout, r, c).fill.map(|f| (f.r, f.g, f.b));
+    let rgb = |c: Color| Some((c.r, c.g, c.b));
+    assert_eq!(fill(0, 1), rgb(header_row));
+    assert_eq!(fill(2, 0), rgb(header_col));
+    assert_eq!(fill(4, 1), rgb(footer));
+    assert_eq!(fill(1, 1), rgb(body));
+    assert_eq!(fill(2, 2), rgb(own));
 }

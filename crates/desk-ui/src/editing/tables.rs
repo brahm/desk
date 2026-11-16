@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use desk_model::chart::{Chart, ChartKind};
 use desk_model::table::{
-    Area, BorderSet, CellStyle, FillDirection, Format, LastCellTab, Locale, TextStyle,
+    Area, BorderSet, CellStyle, FillDirection, Format, Landing, Locale, Step, TextStyle,
 };
 use desk_model::{Anchor, NodeId, Object, ObjectKind, Table, Wrap};
 use gtk::prelude::*;
@@ -38,21 +38,9 @@ pub(crate) struct CellSelection {
 }
 
 impl CellSelection {
-    /// The cells, grown to take in whole merged cells.
+    /// The cells, grown to take in whole merged cells (TAB-07).
     pub fn area(&self, table: &Table) -> Area {
-        let mut area = Area::between(self.anchor, self.focus);
-        loop {
-            let mut grown = area;
-            for (r, c) in area.cells() {
-                if let Some(merge) = table.merge_at(r, c) {
-                    grown = grown.union(&merge);
-                }
-            }
-            if grown == area {
-                return area;
-            }
-            area = grown;
-        }
+        table.selection_area(self.anchor, self.focus)
     }
 }
 
@@ -65,17 +53,6 @@ pub(crate) struct CellEditor {
     /// Set while the field's text is being set, so that it suggests
     /// nothing then.
     filling: bool,
-}
-
-/// Where a key takes the selection of cells.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Move {
-    Up,
-    Down,
-    Left,
-    Right,
-    Next,
-    Previous,
 }
 
 impl TextEditor {
@@ -337,7 +314,7 @@ impl TextEditor {
         });
     }
 
-    /// Adds rows above or below the selected ones (TAB-06).
+    /// Adds rows above or below the selected ones (TAB-10).
     pub fn add_rows(&self, below: bool) {
         self.change_table("Add Row", |table, cells| {
             let area = cells.area(table);
@@ -349,7 +326,7 @@ impl TextEditor {
         });
     }
 
-    /// Adds columns before or after the selected ones (TAB-06).
+    /// Adds columns before or after the selected ones (TAB-10).
     pub fn add_cols(&self, after: bool) {
         self.change_table("Add Column", |table, cells| {
             let area = cells.area(table);
@@ -361,7 +338,7 @@ impl TextEditor {
         });
     }
 
-    /// Deletes the selected rows (TAB-06).
+    /// Deletes the selected rows (TAB-11).
     pub fn delete_rows(&self) {
         self.change_table("Delete Row", |table, cells| {
             let area = cells.area(table);
@@ -369,7 +346,7 @@ impl TextEditor {
         });
     }
 
-    /// Deletes the selected columns (TAB-06).
+    /// Deletes the selected columns (TAB-11).
     pub fn delete_cols(&self) {
         self.change_table("Delete Column", |table, cells| {
             let area = cells.area(table);
@@ -377,7 +354,7 @@ impl TextEditor {
         });
     }
 
-    /// Merges the selected cells, or unmerges a merged cell (TAB-09).
+    /// Merges the selected cells, or unmerges a merged cell (TAB-23, TAB-24).
     pub fn merge_cells(&self) {
         self.change_table("Merge Cells", |table, cells| {
             let area = cells.area(table);
@@ -393,7 +370,7 @@ impl TextEditor {
         });
     }
 
-    /// Unmerges the selected merged cells (TAB-09).
+    /// Unmerges the selected merged cells (TAB-24).
     pub fn unmerge_cells(&self) {
         self.change_table("Unmerge Cells", |table, cells| {
             for (r, c) in cells.area(table).cells() {
@@ -456,7 +433,7 @@ impl TextEditor {
     }
 
     /// Makes the selected rows or columns as high or wide as each other
-    /// (TAB-07).
+    /// (TAB-13).
     pub fn distribute_cells(&self, rows: bool) {
         self.change_table("Distribute", |table, cells| {
             let area = cells.area(table);
@@ -642,15 +619,15 @@ impl TextEditor {
             return false;
         }
         let step = match key {
-            gdk::Key::Up => Move::Up,
-            gdk::Key::Down => Move::Down,
-            gdk::Key::Left => Move::Left,
-            gdk::Key::Right => Move::Right,
-            gdk::Key::Tab | gdk::Key::KP_Tab => Move::Next,
-            gdk::Key::ISO_Left_Tab => Move::Previous,
+            gdk::Key::Up => Step::Up,
+            gdk::Key::Down => Step::Down,
+            gdk::Key::Left => Step::Left,
+            gdk::Key::Right => Step::Right,
+            gdk::Key::Tab | gdk::Key::KP_Tab => Step::Next,
+            gdk::Key::ISO_Left_Tab => Step::Previous,
             gdk::Key::Return | gdk::Key::KP_Enter => {
                 if shift {
-                    Move::Up
+                    Step::Up
                 } else {
                     // Return edits the cell; in the field it goes down.
                     self.edit_cell(None);
@@ -671,65 +648,41 @@ impl TextEditor {
             }
             _ => return false,
         };
-        let extend = shift && matches!(step, Move::Up | Move::Down | Move::Left | Move::Right);
+        let extend = shift && matches!(step, Step::Up | Step::Down | Step::Left | Step::Right);
         self.move_cells(cells, step, extend);
         true
     }
 
-    /// Moves the selected cell, or extends the selection.
-    fn move_cells(&self, cells: CellSelection, step: Move, extend: bool) {
+    /// Moves the selected cell, or extends the selection, by the rules of
+    /// [`Table::step`] (TAB-08), adding a row or a column when Tab leaves
+    /// the last cell of a table that says so.
+    fn move_cells(&self, cells: CellSelection, step: Step, extend: bool) {
         let Some((table, _)) = self.table_selection() else {
             return;
         };
         let (rows, cols) = (table.rows(), table.cols());
-        let (mut r, mut c) = cells.focus;
-        // Out of a merged cell, from its edge.
-        let span = table.span(r, c);
-        match step {
-            Move::Up => r = span.row.saturating_sub(1),
-            Move::Down => r = (span.row_end()).min(rows - 1),
-            Move::Left => c = span.col.saturating_sub(1),
-            Move::Right => c = (span.col_end()).min(cols - 1),
-            Move::Next => {
-                if span.col_end() < cols {
-                    c = span.col_end();
-                } else if r + 1 < rows {
-                    (r, c) = (r + 1, 0);
-                } else {
-                    // Tab in the last cell (TAB-08).
-                    match table.options.last_cell_tab {
-                        LastCellTab::AddRow => {
-                            self.change_table("Add Row", |table, cells| {
-                                if table.insert_rows(rows, 1).is_ok() {
-                                    cells.anchor = (rows, 0);
-                                    cells.focus = (rows, 0);
-                                }
-                            });
-                            return;
-                        }
-                        LastCellTab::AddColumn => {
-                            self.change_table("Add Column", |table, cells| {
-                                if table.insert_cols(cols, 1).is_ok() {
-                                    cells.anchor = (r, cols);
-                                    cells.focus = (r, cols);
-                                }
-                            });
-                            return;
-                        }
-                        LastCellTab::Wrap => (r, c) = (0, 0),
+        let at = match table.step(cells.focus, step) {
+            Landing::Cell(r, c) => (r, c),
+            Landing::AddRow => {
+                self.change_table("Add Row", |table, cells| {
+                    if table.insert_rows(rows, 1).is_ok() {
+                        cells.anchor = (rows, 0);
+                        cells.focus = (rows, 0);
                     }
-                }
+                });
+                return;
             }
-            Move::Previous => {
-                if span.col > 0 {
-                    c = span.col - 1;
-                } else if r > 0 {
-                    (r, c) = (r - 1, cols - 1);
-                }
+            Landing::AddColumn => {
+                let r = cells.focus.0;
+                self.change_table("Add Column", |table, cells| {
+                    if table.insert_cols(cols, 1).is_ok() {
+                        cells.anchor = (r, cols);
+                        cells.focus = (r, cols);
+                    }
+                });
+                return;
             }
-        }
-        let span = table.span(r, c);
-        let at = (span.row, span.col);
+        };
         let moved = CellSelection {
             id: cells.id,
             anchor: if extend { cells.anchor } else { at },
@@ -825,7 +778,7 @@ impl TextEditor {
         let weak = self.downgrade();
         entry.connect_activate(move |_| {
             if let Some(this) = weak.upgrade() {
-                this.finish_cell(Some(Move::Down));
+                this.finish_cell(Some(Step::Down));
             }
         });
         let keys = gtk::EventControllerKey::new();
@@ -836,14 +789,14 @@ impl TextEditor {
                 return glib::Propagation::Proceed;
             };
             let step = match key {
-                gdk::Key::Tab | gdk::Key::KP_Tab => Move::Next,
-                gdk::Key::ISO_Left_Tab => Move::Previous,
-                gdk::Key::Up => Move::Up,
-                gdk::Key::Down => Move::Down,
+                gdk::Key::Tab | gdk::Key::KP_Tab => Step::Next,
+                gdk::Key::ISO_Left_Tab => Step::Previous,
+                gdk::Key::Up => Step::Up,
+                gdk::Key::Down => Step::Down,
                 gdk::Key::Return | gdk::Key::KP_Enter
                     if modifiers.contains(gdk::ModifierType::SHIFT_MASK) =>
                 {
-                    Move::Up
+                    Step::Up
                 }
                 gdk::Key::Escape => {
                     this.close_cell_editor(false);
@@ -913,7 +866,7 @@ impl TextEditor {
     }
 
     /// Puts the text of the field in its cell, as one step, and moves.
-    fn finish_cell(&self, step: Option<Move>) {
+    fn finish_cell(&self, step: Option<Step>) {
         let (cell, text, popover) = {
             let mut state = self.state.borrow_mut();
             let Some(editor) = state.cell_editor.as_mut() else {
@@ -1011,17 +964,8 @@ impl TextEditor {
     pub fn cells_text(&self) -> Option<String> {
         let (table, area) = self.table_selection()?;
         self.selected_cells()?;
-        let locale = self.table_locale();
         let values = table.values(desk_layout::today());
-        let mut out = String::new();
-        for r in area.row..area.row_end() {
-            let row: Vec<String> = (area.col..area.col_end())
-                .map(|c| table.shown(&values, r, c, &locale).text)
-                .collect();
-            out.push_str(&row.join("\t"));
-            out.push('\n');
-        }
-        Some(out)
+        Some(table.area_text(area, &values, &self.table_locale()))
     }
 
     /// Pastes text of tabs and lines into the cells from the focused one,
@@ -1033,31 +977,9 @@ impl TextEditor {
         let locale = self.table_locale();
         let text = text.to_owned();
         self.change_table("Paste", |table, sel| {
-            let (r0, c0) = cells.focus;
-            let lines: Vec<&str> = text.trim_end_matches('\n').split('\n').collect();
-            for (i, line) in lines.iter().enumerate() {
-                let r = r0 + i as u32;
-                if r >= table.rows() {
-                    let _ = table.insert_rows(table.rows(), 1);
-                }
-                for (j, value) in line.trim_end_matches('\r').split('\t').enumerate() {
-                    let c = c0 + j as u32;
-                    if c >= table.cols() {
-                        let _ = table.insert_cols(table.cols(), 1);
-                    }
-                    table.type_text(r, c, value, &locale);
-                }
-            }
-            let width = lines
-                .iter()
-                .map(|l| l.split('\t').count())
-                .max()
-                .unwrap_or(1) as u32;
-            sel.anchor = (r0, c0);
-            sel.focus = (
-                (r0 + lines.len() as u32 - 1).min(table.rows() - 1),
-                (c0 + width - 1).min(table.cols() - 1),
-            );
+            let area = table.paste_text(cells.focus, &text, &locale);
+            sel.anchor = (area.row, area.col);
+            sel.focus = (area.row_end() - 1, area.col_end() - 1);
         });
         true
     }

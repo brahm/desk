@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Tests for six more rows of Writer tables and charts (62 of 76
+  tested); selection and keyboard navigation of cells, and copying cells
+  as text, moved into the table engine shared by the three apps; the 14
+  rows that need later features moved to phases W1, W4, T2, T3, T4, S3
+  and X1.
 * Added: Full definitions of the 43 `desk:` extensions to ODF (element,
   value, fallback, matrix rows), and a check that keeps the catalogue and
   the code in step; phase B1 starts.

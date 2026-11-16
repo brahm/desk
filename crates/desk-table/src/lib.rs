@@ -15,8 +15,10 @@
 
 mod cell;
 mod conditional;
+mod copy;
 mod eval;
 mod format;
+mod nav;
 mod ops;
 mod table;
 
@@ -29,6 +31,7 @@ pub use format::{
     CustomFormat, DateStyle, DurationStyle, Format, FractionPrecision, Locale, Negative, Shown,
     TimeStyle, parse_date, parse_input, parse_number,
 };
+pub use nav::{Landing, Step};
 pub use ops::{FillDirection, Split};
 pub use table::{
     Area, Border, BorderSet, DEFAULT_BORDER, LastCellTab, LineStyle, MAX_CELLS, MAX_HEADERS,
