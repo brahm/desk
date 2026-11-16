@@ -526,9 +526,13 @@ that the laws differ.
 the reader is written from public third-party documentation and from
 documents made by the project; no template, theme, font or image of Apple
 enters the repository; the product names are used only to say what Desk
-is compatible with. A lawyer should review the second rule before version
-1.0 (backlog item B-004); if the answer is no, the owner's fallback
-applies. The readers of Numbers '09 and Keynote '09 became new work.
+is compatible with. The first record of the decision asked for a lawyer's
+review of the second rule before version 1.0 (backlog item B-004). Later
+the same day the owner decided that the project follows the practice of
+LibreOffice, whose import filter for these files (libetonyek, under
+MPL-2.0) was written from the file format and has been distributed for
+years, and that no legal review is required; B-004 was dropped (pull
+request 119). The readers of Numbers '09 and Keynote '09 became new work.
 
 **D-019: four export targets.** ODF as LibreOffice and OpenOffice read
 it, Microsoft Office, PDF and EPUB.
@@ -605,14 +609,12 @@ version 1.0.
 
 Open questions that this log should close when they are answered:
 
-- The legal review of the sources for the reader of current iWork files
-  (B-004).
 - Whether CSV export comes back into scope for Tables.
 - How close the estimate was, phase by phase.
 
 ## Sources
 
-- The repository history and its pull requests 1 to 118.
+- The repository history and its pull requests 1 to 119.
 - [decisions.md](decisions.md), [goals.md](goals.md),
   [roadmap.md](roadmap.md) and [backlog](backlog/README.md).
 - The project conversations between the owner and Claude from 30 October
