@@ -73,3 +73,25 @@ O resto é nativo: `AdwHeaderBar`, `AdwTabView` e `AdwTabBar`,
 - Os documentos abrem em abas, e não mais numa janela cada um.
 - As planilhas do Tables deixam a barra lateral.
 - O subtítulo "Editado" some: o salvamento é automático.
+
+## M+: o M com os objetos no cabeçalho
+
+Variante desenhada em 16/11 para que nenhuma função do N fique escondida no
+M: Tabela, Gráfico, Texto, Forma, Mídia e Comentário voltam ao cabeçalho
+como botões de ícone com dica, ao lado de Inserir, que guarda o resto
+(quebras, campos, notas). A HIG aceita: são as ações mais usadas da janela.
+
+![Desk Writer M+](writer-m-mais.png)
+![Desk Tables M+](tables-m-mais.png)
+![Desk Slides M+](slides-m-mais.png)
+
+| No N, explícito na barra | No M e no M+ |
+| --- | --- |
+| Tabela, Gráfico, Texto, Forma, Mídia, Comentário | M: dentro do botão Inserir. M+: botões de ícone no cabeçalho |
+| Visualizar | Botão da barra lateral e o seletor de conteúdo no alto dela |
+| Zoom | Controle sobreposto ao documento |
+| Adicionar página ou slide | Botão + no alto da barra lateral |
+| Formatar, Documento, Animar, Organizar | Botão Inspetor, e a escolha no alto do painel |
+| Categoria e Tabela dinâmica | Aba Dados do Inspetor e Inserir |
+| Reproduzir | Botão no cabeçalho |
+| Planilhas em abas no alto | Seletor na barra inferior |

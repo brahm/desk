@@ -254,7 +254,7 @@ def slides_n(win, context='image', level=shell.FORMAT):
 # -------------------------------------------------------------- version M
 
 
-def header_m(app, extra_start=()):
+def header_m(app, extra_start=(), objects=False):
     """The header bar of the mix: what the HIG asks of one. Icon buttons
     for the window as a whole, the title in the middle, the primary menu
     at the end. Saving is automatic, so the subtitle is the folder alone."""
@@ -262,8 +262,15 @@ def header_m(app, extra_start=()):
     hb.set_title_widget(tag(Adw.WindowTitle(title=parts.APPS[app]['doc'], subtitle='Documentos'),
                             'cab.titulo'))
     hb.pack_start(icon_button('sidebar-show', 'Barra lateral', 'cab.lateral', toggle=True, active=True))
-    hb.pack_start(menu_button(icon='desk-insert', text='Inserir', tip='Inserir', cid='cab.inserir',
-                              arrow=False, popover=writer.insert_all_popover(app)))
+    if objects:
+        # Variant M+: the six kinds of object stay one click away, as icon
+        # buttons with a tooltip, and Insert keeps the rest (breaks, fields).
+        hb.pack_start(parts.insert_menu_button(app))
+        for b in parts.insert_buttons():
+            hb.pack_start(b)
+    else:
+        hb.pack_start(menu_button(icon='desk-insert', text='Inserir', tip='Inserir', cid='cab.inserir',
+                                  arrow=False, popover=writer.insert_all_popover(app)))
     for w in extra_start:
         hb.pack_start(w)
     hb.pack_end(menu_button(icon='open-menu', tip='Menu principal', cid='cab.menu',
@@ -274,7 +281,7 @@ def header_m(app, extra_start=()):
     return tag(hb, 'cab.barra')
 
 
-def writer_m(win, context='text', level=shell.FORMAT):
+def writer_m(win, context='text', level=shell.FORMAT, objects=False):
     _css()
     app = 'writer'
     side = shell.nav_sidebar(app, parts.thumbs_list('page', 5, 2), writer.SIDE_MODES, 'Adicionar página',
@@ -284,11 +291,11 @@ def writer_m(win, context='text', level=shell.FORMAT):
     doc = writer.doc_view(context, rulers=False, overlays=(zoom_pill('125 %'), words))
     body = shell.split(writer.inspector_b(context, level), doc, shell.INSPECTOR_W, Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
-    content = shell.toolbar_view(view, top=[header_m(app), tabs])
+    content = shell.toolbar_view(view, top=[header_m(app, objects=objects), tabs])
     win.set_content(shell.split(side, content, shell.SIDEBAR_W))
 
 
-def tables_m(win, level=shell.FORMAT):
+def tables_m(win, level=shell.FORMAT, objects=False):
     _css()
     app = 'tables'
     switch = toggle_group([(n, n, None, None) for n in tables.SHEETS], 1, 'inf.planilhas', 'round',
@@ -300,14 +307,14 @@ def tables_m(win, level=shell.FORMAT):
     insp, width = wide(lambda: tables.inspector_b(level), 404)
     body = shell.split(insp, tables.sheet_view(overlays=(zoom_pill('100 %'),)), width, Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
-    content = shell.toolbar_view(view, top=[header_m(app), tabs, tables.formula_bar()], bottom=[bottom])
+    content = shell.toolbar_view(view, top=[header_m(app, objects=objects), tabs, tables.formula_bar()], bottom=[bottom])
     side = shell.nav_sidebar(app, objects_sidebar(), ['Tabelas e gráficos', 'Estilos de tabela', 'Comentários',
                                                       'Resultados da busca', 'Lista de fórmulas'],
                              'Adicionar tabela ou gráfico', menu_model(['Tabela', 'Gráfico']))
     win.set_content(shell.split(side, content, shell.SIDEBAR_W))
 
 
-def slides_m(win, context='image', level=shell.FORMAT):
+def slides_m(win, context='image', level=shell.FORMAT, objects=False):
     _css()
     app = 'slides'
     side = shell.nav_sidebar(app, slides.navigator(), slides.SIDE_MODES, 'Adicionar slide',
@@ -318,7 +325,7 @@ def slides_m(win, context='image', level=shell.FORMAT):
     body = shell.split(insp, slides.slide_view(context, notes=True, overlays=(zoom_pill('62 %'),)), width,
                        Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
-    content = shell.toolbar_view(view, top=[header_m(app, [spacer(), play]), tabs])
+    content = shell.toolbar_view(view, top=[header_m(app, [spacer(), play], objects=objects), tabs])
     win.set_content(shell.split(side, content, shell.SIDEBAR_W))
 
 
@@ -337,6 +344,9 @@ SCENES = [
     Scene('writer-m-escuro', 'Writer M · estilo escuro', lambda w: writer_m(w), 'writer', 'M', dark=True),
     Scene('tables-m', 'Desk Tables · M Mix com a HIG', lambda w: tables_m(w), 'tables', 'M'),
     Scene('slides-m', 'Desk Slides · M Mix com a HIG', lambda w: slides_m(w), 'slides', 'M'),
+    Scene('writer-m-mais', 'Writer M+ · objetos no cabeçalho', lambda w: writer_m(w, objects=True), 'writer', 'M'),
+    Scene('tables-m-mais', 'Tables M+ · objetos no cabeçalho', lambda w: tables_m(w, objects=True), 'tables', 'M'),
+    Scene('slides-m-mais', 'Slides M+ · objetos no cabeçalho', lambda w: slides_m(w, objects=True), 'slides', 'M'),
     Scene('slides-m-animar', 'Slides M · Animação', lambda w: slides_m(w, level=shell.ANIMATION), 'slides',
           'M'),
 ]
