@@ -29,7 +29,7 @@ what exists today, and what the new target still needs.
 
 ## Extensions that exist today
 
-Read from `crates/desk-odf/src` at commit `0888aa9`: 43 names. The
+Read from `crates/desk-odf/src` on 2026-11-16: 43 names. The
 description is the first sentence of the comment in the source file; the
 full definition (values, fallback) is still to be written here for each
 (backlog B-008).

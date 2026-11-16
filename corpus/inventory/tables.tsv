@@ -1,199 +1,199 @@
 # SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 id	area	recurso	no_iwork	alvo	regra	escopo	situacao_no_desk	revisar	fase	nota
-T001	3.1 Janela, menus e painéis	Barra de menus	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Menus do GNOME da interface B (NGNM-10); falta o menu Organizar (ordenar, filtrar, categorias), que vem com a fase 5
-T002	3.1 Janela, menus e painéis	Barra de ferramentas	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra de cabeçalho da interface B (NINT-07)
-T003	3.1 Janela, menus e painéis	Barra de formatação (Format Bar)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra de formatação das células (NINT-08)
-T004	3.1 Janela, menus e painéis	Barra de fórmula	Só '09	'09, na forma do 15	D-002	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	A barra de fórmulas está na janela, mas as células ainda não têm conteúdo (NINT-10, fase 4)
-T005	3.1 Janela, menus e painéis	Inspetor	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Inspetor com Formato, Dados e Documento (NINT-09)
-T006	3.1 Janela, menus e painéis	Painel Sheets (lateral)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Planilhas, tabelas e gráficos na barra lateral (NINT-03)
-T007	3.1 Janela, menus e painéis	Painel Styles (lateral)	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Estilos de tabela com miniaturas (fase 5)
-T008	3.1 Janela, menus e painéis	Cálculos instantâneos	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Cálculos na barra inferior (NGNM-13); falta escolher as funções e não há valores nas células ainda
-T009	3.1 Janela, menus e painéis	Reorganize	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Organizar (ordenar, filtrar) numa barra lateral (fase 5)
-T010	3.1 Janela, menus e painéis	Function Browser	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	O Navegador de Funções existe no Writer; falta abrir ao digitar \"=\" nas Tables
-T011	3.1 Janela, menus e painéis	Media Browser 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	O popover Mídia existe no Writer; falta na janela das Tables (NINT-14)
-T012	3.1 Janela, menus e painéis	Janela Colors / Fonts	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Popovers de fontes e cores do Writer; falta ligar às Tables
-T013	3.1 Janela, menus e painéis	Janela de avisos (Document Warnings)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Banner de avisos do Writer; falta nas Tables (NINT-15)
-T014	3.1 Janela, menus e painéis	Zoom	Diferente (lugar)	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Zoom (NINT-04)
-T015	3.1 Janela, menus e painéis	Tela cheia	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	F11 existe no Writer; falta conferir nas Tables (NINT-06)
-T016	3.1 Janela, menus e painéis	Vários documentos	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Abas
-T017	3.1 Janela, menus e painéis	Modo escuro	Só 15	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Estilo claro/escuro do sistema
-T018	3.1 Janela, menus e painéis	Preferências	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Preferências do Writer; falta a versão das Tables
-T019	3.1 Janela, menus e painéis	Desfazer/refazer	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Desfazer e refazer (NDOC-08)
-T020	3.2 Planilhas, modelos e arquivos	Seletor de modelos 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Seletor de modelos (fase 8)
-T021	3.2 Planilhas, modelos e arquivos	Nova planilha sempre do mesmo modelo	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Modelo padrão (fase 8)
-T022	3.2 Planilhas, modelos e arquivos	Salvar	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	As Tables ainda não salvam nem abrem arquivos (NDOC-07; ODS é da fase 1)
-T023	3.2 Planilhas, modelos e arquivos	Renomear pelo título da janela	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Renomear pelo título existe no Writer
-T024	3.2 Planilhas, modelos e arquivos	Versões anteriores	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Versões (decisão caminho L)
-T025	3.2 Planilhas, modelos e arquivos	Salvar como modelo	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Salvar como modelo (fase 8)
-T026	3.2 Planilhas, modelos e arquivos	Autoria de modelos	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	a definir no plano novo	Tabelas prontas e autoria de modelos (fase 8)
-T027	3.2 Planilhas, modelos e arquivos	Pacote vs arquivo único	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Arquivo ODS único (depende de salvar)
-T028	3.2 Planilhas, modelos e arquivos	Senha	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Senha (fase 8)
-T029	3.2 Planilhas, modelos e arquivos	Bloquear planilha	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Bloquear (fase 8)
-T030	3.2 Planilhas, modelos e arquivos	Informações do documento (autor, título, palavras-chave, comentários)	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Informações para busca (NDOC-13, fase 1)
-T031	3.2 Planilhas, modelos e arquivos	Reduzir tamanho	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Reduzir mídia existe no Writer
-T032	3.2 Planilhas, modelos e arquivos	Abrir e importar	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	a definir no plano novo	Abrir ODS, Numbers '09, Excel, CSV (fases 1 e 7)
-T033	3.2 Planilhas, modelos e arquivos	Exportar	Diferente	15.4	D-001	Dentro	Ausente	D-019	a definir no plano novo	D-019: só ODF, Microsoft Office, PDF e EPUB. Exportar PDF, Excel, CSV (fase 7)
-T034	3.2 Planilhas, modelos e arquivos	Dados do Address Book	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Contatos do GNOME nas tabelas (NCON, fase 8)
-T035	3.2 Planilhas, modelos e arquivos	Imprimir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	a definir no plano novo	Imprimir e Visualização de Impressão (fase 7)
-T036	3.2 Planilhas, modelos e arquivos	Enviar 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Enviar (online)
-T037	3.2 Planilhas, modelos e arquivos	Arquivos recentes	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Recentes do GTK no Writer
-T038	3.3 Folhas e páginas	Várias folhas por planilha	Diferente (lugar)	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Várias planilhas existem, na barra lateral (decisão da interface B); o 15 as mostra em abas
-T039	3.3 Folhas e páginas	Renomear, duplicar, apagar, reordenar folhas	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Renomear, duplicar, apagar e reordenar planilhas (NTAB-02 a NTAB-04)
-T040	3.3 Folhas e páginas	Cor da aba	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Cor da aba
-T041	3.3 Folhas e páginas	Ocultar folha	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Ocultar planilha
-T042	3.3 Folhas e páginas	Fundo da folha	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Fundo da planilha
-T043	3.3 Folhas e páginas	Borda da folha	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Borda da planilha
-T044	3.3 Folhas e páginas	Direção da folha (direita para esquerda)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Planilha da direita para a esquerda
-T045	3.3 Folhas e páginas	Dividir em páginas	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	a definir no plano novo	Arrumar objetos por página na Visualização de Impressão (fase 7)
-T046	3.3 Folhas e páginas	Cabeçalho e rodapé	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Cabeçalho e rodapé de página (NIMP-04)
-T047	3.3 Folhas e páginas	Numeração de páginas	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Numeração de páginas
-T048	3.3 Folhas e páginas	Margens	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	a definir no plano novo	Margens de impressão
-T049	3.3 Folhas e páginas	Tamanho de papel	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Tamanho do papel (NIMP-03)
-T050	3.4 Tabelas: estrutura	Várias tabelas soltas na folha	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Várias tabelas soltas na planilha (NTAB-05)
-T051	3.4 Tabelas: estrutura	Inserir tabela	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	a definir no plano novo	Inserir tabela do modelo (NTAB-05); faltam fórmulas prontas e estilos à vista
-T052	3.4 Tabelas: estrutura	Tabelas reutilizáveis (Capture Table)	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Tabelas reutilizáveis (fase 5)
-T053	3.4 Tabelas: estrutura	Criar tabela a partir de células	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Criar tabela arrastando células
-T054	3.4 Tabelas: estrutura	Linhas e colunas de cabeçalho e rodapé	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Até 5 cabeçalhos no motor (desk-table) e no Writer; falta nas Tables (NTAB-19)
-T055	3.4 Tabelas: estrutura	Congelar cabeçalhos	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Congelar cabeçalhos (NTAB-20)
-T056	3.4 Tabelas: estrutura	Repetir cabeçalhos ao imprimir	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Repetir cabeçalhos ao imprimir
-T057	3.4 Tabelas: estrutura	Acrescentar e apagar linhas e colunas	Igual	Igual nas duas	-	Dentro	Parcial	-	a definir no plano novo	Alt+setas acrescentam linhas e colunas; apagar e vários de uma vez vêm na fase 3
-T058	3.4 Tabelas: estrutura	Mover linhas e colunas arrastando	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Mover linhas e colunas existe no motor; falta na tela das Tables
-T059	3.4 Tabelas: estrutura	Transpor linhas e colunas	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Transpor
-T060	3.4 Tabelas: estrutura	Ocultar e mostrar	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Ocultar linhas e colunas (NTAB-23)
-T061	3.4 Tabelas: estrutura	Redimensionar linhas e colunas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Redimensionar no motor e no Writer; falta nas Tables
-T062	3.4 Tabelas: estrutura	Mesclar células	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Mesclar no motor e no Writer
-T063	3.4 Tabelas: estrutura	Dividir células	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	a definir no plano novo	Dividir células no motor e no Writer
-T064	3.4 Tabelas: estrutura	Nome da tabela	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Nome da tabela (NTAB-09)
-T065	3.4 Tabelas: estrutura	Contorno, grade e bordas de célula	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Bordas por segmento no motor; faltam os estilos de borda prontos do 15
-T066	3.4 Tabelas: estrutura	Cores alternadas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Cores alternadas no motor e no Writer
-T067	3.4 Tabelas: estrutura	Tamanho da fonte da tabela toda	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Aumentar e diminuir a fonte da tabela toda
-T068	3.4 Tabelas: estrutura	Estilos de tabela	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Estilos de tabela (fase 5)
-T069	3.4 Tabelas: estrutura	Copiar e colar estilo	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Copiar e colar estilo existe no Writer
-T070	3.4 Tabelas: estrutura	Travar tabela	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Travar objetos existe no Writer
-T071	3.4 Tabelas: estrutura	Direção da tabela (bidi)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Tabela da direita para a esquerda
-T072	3.4 Tabelas: estrutura	Mover objetos quando a tabela cresce	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Afastar objetos quando a tabela cresce (NTAB-15); conferido no Numbers 15.4: o 15 não tem a opção
-T073	3.4 Tabelas: estrutura	Copiar tabela entre apps	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Copiar células como texto com tabulações no Writer; falta copiar a tabela entre apps
-T074	3.5 Células: conteúdo, formatos e controles	Digitar e editar em células	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Digitar e editar células existe no Writer; as Tables ainda não ligam as células ao motor
-T075	3.5 Células: conteúdo, formatos e controles	Tecla Return passa à próxima célula	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	a definir no plano novo	Return vai para a próxima célula no Writer; conferido no Numbers 15.4: o 15 não tem a opção
-T076	3.5 Células: conteúdo, formatos e controles	Autocompletar com valores da coluna	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Sugestões da coluna no Writer
-T077	3.5 Células: conteúdo, formatos e controles	Magic Fill 🤖💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Magic Fill (IA, assinatura)
-T078	3.5 Células: conteúdo, formatos e controles	Preenchimento automático (Autofill)	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Preencher no motor e no Writer
-T079	3.5 Células: conteúdo, formatos e controles	Copiar, mover, colar valores	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Copiar e colar no Writer; faltam colar valores e mover fórmulas (NFOR-13)
-T080	3.5 Células: conteúdo, formatos e controles	Limpar	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Limpar no motor
-T081	3.5 Células: conteúdo, formatos e controles	Destacar linha e coluna sob o ponteiro	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Destacar linha e coluna sob o ponteiro
-T082	3.5 Células: conteúdo, formatos e controles	Objetos dentro de células	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Imagem como fundo de célula no motor; faltam forma, gráfico e equação
-T083	3.5 Células: conteúdo, formatos e controles	Quebrar texto na célula	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Quebra de texto na célula no Writer
-T084	3.5 Células: conteúdo, formatos e controles	Formatos automático, número, moeda, porcentagem, data e hora, duração, fração, científico, texto	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Formatos no motor e no Writer
-T085	3.5 Células: conteúdo, formatos e controles	Sistema numérico (bases 2 a 36, complemento de dois)	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	a definir no plano novo	Sistema numérico no motor
-T086	3.5 Células: conteúdo, formatos e controles	Formatos personalizados	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou	a definir no plano novo	Formatos personalizados no motor; falta a janela de gerenciar
-T087	3.5 Células: conteúdo, formatos e controles	Lista completa de moedas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Moedas no motor
-T088	3.5 Células: conteúdo, formatos e controles	Caixa de seleção, deslizante, stepper, menu pop-up	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Controles de célula (fase 5)
-T089	3.5 Células: conteúdo, formatos e controles	Avaliação por estrelas	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Avaliação por estrelas
-T090	3.5 Células: conteúdo, formatos e controles	Realce condicional	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Formatação condicional do '09 no motor; faltam os tipos de regra do 15
-T091	3.5 Células: conteúdo, formatos e controles	Cotações de ações 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Cotações de ações (online)
-T092	3.5 Células: conteúdo, formatos e controles	Comentários em células	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Comentários em células no Writer, sem respostas
-T093	3.5 Células: conteúdo, formatos e controles	Links em células	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Links em células
-T094	3.5 Células: conteúdo, formatos e controles	Smart Cell View (valor real da célula)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Valor real da célula na barra inferior; hoje a barra de fórmulas faz esse papel
-T095	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Ordenar pela coluna	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Ordenar no motor e no Writer
-T096	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Regras de ordenação com várias colunas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Ordenar por várias colunas no motor
-T097	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Filtros por regra	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Filtros (fase 5)
-T098	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Quick Filter (marcar valores a mostrar)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Filtro rápido
-T099	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Filtrar duplicados e valores únicos	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Filtrar duplicados
-T100	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Categorias	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Categorias (fase 5)
-T101	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Tabelas dinâmicas (pivot)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Tabelas dinâmicas
-T102	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Instantâneo de tabela	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Instantâneo de tabela
-T103	3.7 Fórmulas e funções	Editor de fórmulas	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Fórmulas no motor e no Writer; faltam o editor móvel e as fichas do 15
-T104	3.7 Fórmulas e funções	Navegador de funções	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Navegador de Funções no Writer, como diálogo; o 15 o põe numa barra lateral
-T105	3.7 Fórmulas e funções	Fórmulas rápidas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Fórmulas rápidas no motor
-T106	3.7 Fórmulas e funções	Quantidade de funções 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	94 funções no motor; o 15.4 tem 355 (conferido no Mac: as 262 do '09 e 93 novas); STOCK, STOCKH, CURRENCYCONV e CURRENCYH buscam na internet e ficam fora
-T107	3.7 Fórmulas e funções	Matrizes que derramam (spilling arrays)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Matrizes que derramam
-T108	3.7 Fórmulas e funções	Referências a outra tabela e folha, nomes de cabeçalho, absolutas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Referências a outras tabelas e por nome de cabeçalho no motor
-T109	3.7 Fórmulas e funções	Indicação de erro	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Erros no motor
-T110	3.7 Fórmulas e funções	Aviso de fórmula que aponta para célula vazia	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	a definir no plano novo	Aviso de célula vazia no motor; conferido no Numbers 15.4: o 15 não tem a opção
-T111	3.7 Fórmulas e funções	Formula List	Só '09	'09, na forma do 15	D-002	Dentro	Parcial	-	a definir no plano novo	Ctrl+Shift+F mostra a Lista de Fórmulas, ainda sem fórmulas para listar
-T112	3.7 Fórmulas e funções	Localizar e substituir dentro de fórmulas	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Buscar dentro de fórmulas
-T113	3.7 Fórmulas e funções	Imprimir a lista de fórmulas	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Imprimir a lista de fórmulas
-T114	3.7 Fórmulas e funções	Usar o editor como calculadora	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Editor de fórmulas como calculadora
-T115	3.7 Fórmulas e funções	Ajuda de funções	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Ajuda das funções no navegador, sem internet
-T116	3.8 Gráficos	Tipos	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Onze tipos no motor e no Writer; faltam rosca, radar, bolhas, interativo e dinâmico
-T117	3.8 Gráficos	Inserir e escolher dados	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Gráfico a partir das células da tabela (fase 6)
-T118	3.8 Gráficos	Dados ocultos	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Dados ocultos (fase 6)
-T119	3.8 Gráficos	Muitos pontos (downsampling)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Amostragem de muitos pontos
-T120	3.8 Gráficos	Gráfico vinculado no Pages e no Keynote	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Gráfico vinculado no Writer e no Slides
-T121	3.8 Gráficos	Título, legenda, eixos, grades, marcas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Título, legenda e eixos no motor e no Writer
-T122	3.8 Gráficos	Rótulos de valor	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Rótulos de valor do '09; faltam as opções do 15
-T123	3.8 Gráficos	Rótulos de resumo em empilhados	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Rótulos de resumo
-T124	3.8 Gráficos	Barras de erro e linhas de tendência	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Erro e tendência no motor
-T125	3.8 Gráficos	Linhas de referência (média, mediana, mín., máx., valor)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Linhas de referência
-T126	3.8 Gráficos	Cores, texturas e imagens por série	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Cores e texturas por série no motor
-T127	3.8 Gráficos	Estilos de gráfico	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Estilos de gráfico
-T128	3.8 Gráficos	Pizza: separar fatias, sombras, girar	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Pizza no motor
-T129	3.8 Gráficos	Cena 3D (profundidade, luz, girar)	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Cena 3D no motor
-T130	3.8 Gráficos	Cantos arredondados, buraco da rosca, grade do radar	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Cantos arredondados, furo da rosca
-T131	3.8 Gráficos	Borda e fundo do gráfico	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Borda e fundo do gráfico no Writer
-T132	3.9 Texto e estilos	Caixas de texto e texto em formas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Caixas de texto e texto em formas do Writer; falta na janela das Tables
-T133	3.9 Texto e estilos	Fonte, tamanho, negrito, itálico, sublinhado, tachado, contorno, sombra	Diferente (lugar)	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Formatação de texto do Writer
-T134	3.9 Texto e estilos	Cor do texto	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Cor sólida do Writer; faltam gradiente e imagem
-T135	3.9 Texto e estilos	Maiúsculas	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Maiúsculas do '09 no Writer; faltam as do 15
-T136	3.9 Texto e estilos	Sobrescrito, subscrito, linha de base	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Sobrescrito no Writer
-T137	3.9 Texto e estilos	Espaçamento de caracteres, ligaduras	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Espaçamento e ligaduras no Writer
-T138	3.9 Texto e estilos	Suavização de fontes	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Suavização de fontes é do sistema
-T139	3.9 Texto e estilos	Estilos de parágrafo, caractere e lista	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Estilos de parágrafo, caractere e lista do Writer
-T140	3.9 Texto e estilos	Alinhamento, espaçamento, recuos, tabulações	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Parágrafo do Writer
-T141	3.9 Texto e estilos	Listas com marcadores, números, níveis	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Listas do Writer
-T142	3.9 Texto e estilos	Colunas em caixa de texto	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Colunas em caixas do Writer
-T143	3.9 Texto e estilos	Capitular, frações automáticas, realce de revisão	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Capitular, frações automáticas, realce
-T144	3.9 Texto e estilos	Aspas e travessões inteligentes	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Aspas do '09 no Writer
-T145	3.9 Texto e estilos	Substituição de texto	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Substituição do Writer
-T146	3.9 Texto e estilos	Caracteres especiais, acentos	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Caracteres especiais do GTK
-T147	3.9 Texto e estilos	Data, nome do arquivo, número de página	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou	a definir no plano novo	Campos de data e página no Writer; falta o nome do arquivo
-T148	3.9 Texto e estilos	Idiomas: bidirecional, vertical, guia fonético, CJK	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Bidi, vertical, fonético
-T149	3.9 Texto e estilos	Formatação por idioma da planilha	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Idioma por planilha
-T150	3.9 Texto e estilos	Ditado 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Ditado
-T151	3.9 Texto e estilos	Previsão ao digitar 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Previsão ao digitar
-T152	3.9 Texto e estilos	Tradução 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Tradução
-T153	3.9 Texto e estilos	Equações 🧩 (no '09)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Equações LaTeX/MathML
-T154	3.9 Texto e estilos	Links em texto e objetos	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Links do Writer; faltam telefone e outra folha
-T155	3.10 Objetos: imagens, formas, mídia	Imagens 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Imagens do Writer (sem SVG e HEIC)
-T156	3.10 Objetos: imagens, formas, mídia	Remover fundo 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	a definir no plano novo	O do 15 usa IA; vale o Alfa Instantâneo do Writer
-T157	3.10 Objetos: imagens, formas, mídia	Ajustes de imagem	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Ajustar Imagem do Writer
-T158	3.10 Objetos: imagens, formas, mídia	Galeria de imagens	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Galeria de imagens
-T159	3.10 Objetos: imagens, formas, mídia	IA para imagens 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	IA para imagens
-T160	3.10 Objetos: imagens, formas, mídia	Formas 🤖💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Formas e caneta do Writer; faltam biblioteca e combinar
-T161	3.10 Objetos: imagens, formas, mídia	Editar pontos e curvas	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Editar pontos do Writer
-T162	3.10 Objetos: imagens, formas, mídia	Linhas e conexões	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Conexões do Writer
-T163	3.10 Objetos: imagens, formas, mídia	Objetos 3D (USDZ)	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Objetos 3D
-T164	3.10 Objetos: imagens, formas, mídia	Desenhos (Apple Pencil)	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Desenho à mão livre
-T165	3.10 Objetos: imagens, formas, mídia	Som e vídeo	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Som e filme do Writer; faltam gravar e aparar
-T166	3.10 Objetos: imagens, formas, mídia	Bordas, molduras, sombra, reflexo, opacidade	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Efeitos de objeto do Writer
-T167	3.10 Objetos: imagens, formas, mídia	Preenchimento	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Preenchimento do Writer
-T168	3.10 Objetos: imagens, formas, mídia	Legenda e título de objeto	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Legenda e título de objeto
-T169	3.10 Objetos: imagens, formas, mídia	Estilos de objeto	Só 15	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Estilos de objeto do Writer
-T170	3.10 Objetos: imagens, formas, mídia	Objetos dentro de caixas e formas	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Objetos dentro de caixas
-T171	3.10 Objetos: imagens, formas, mídia	Posição exata, alinhar, distribuir, guias	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Alinhar e guias do Writer
-T172	3.10 Objetos: imagens, formas, mídia	Camadas, agrupar, travar, girar, espelhar	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Camadas e grupos do Writer
-T173	3.11 Revisão e busca	Localizar e substituir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Barra de busca do Writer; falta buscar em fórmulas
-T174	3.11 Revisão e busca	Comentários	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Comentários (fase 8)
-T175	3.11 Revisão e busca	Nome do autor e cor	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Nome e cor do autor
-T176	3.11 Revisão e busca	Controle de alterações	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Nenhuma das versões tem controle de alterações no Numbers
-T177	3.11 Revisão e busca	Ortografia e gramática	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Ortografia do Writer
-T178	3.11 Revisão e busca	Dicionário e pesquisa 🌐 (nas duas)	Igual	Igual nas duas	-	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Dicionário e pesquisa (online)
-T179	3.11 Revisão e busca	Writing Tools (IA) 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Writing Tools
-T180	3.12 Colaboração, nuvem, automação e acessibilidade	Colaboração em tempo real 🌐 (nas duas) 💲 (no 15)	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Colaboração
-T181	3.12 Colaboração, nuvem, automação e acessibilidade	iCloud Drive, Numbers para iCloud, Handoff, AirDrop 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	iCloud
-T182	3.12 Colaboração, nuvem, automação e acessibilidade	AppleScript	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	AppleScript
-T183	3.12 Colaboração, nuvem, automação e acessibilidade	Atalhos (Shortcuts)	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Atalhos
-T184	3.12 Colaboração, nuvem, automação e acessibilidade	Siri 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Siri
-T185	3.12 Colaboração, nuvem, automação e acessibilidade	VoiceOver	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Leitor de tela do Writer nas células; falta nas Tables (NGNM-04)
-T186	3.12 Colaboração, nuvem, automação e acessibilidade	Privacidade e análise 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Privacidade e análise
-T187	3.12 Colaboração, nuvem, automação e acessibilidade	Assinatura Creator Studio 💲🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Assinatura
-T188	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do Desk, com as extensões	-	Decisão do projeto	D-009	Dentro	Ausente	-	a definir no plano novo	-
-T189	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do LibreOffice e do OpenOffice atuais	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
-T190	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork '09	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
-T191	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork atual	-	Decisão do projeto	D-010, D-011	Dentro	Ausente	-	a definir no plano novo	-
-T192	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do Microsoft Office atual	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
-T193	Compatibilidade de arquivos (D-010, D-019)	Salvar ODF com as extensões do Desk	-	Decisão do projeto	D-009	Dentro	Ausente	-	a definir no plano novo	-
-T194	Compatibilidade de arquivos (D-010, D-019)	Exportar para o Microsoft Office	-	Decisão do projeto	D-019	Dentro	Ausente	-	a definir no plano novo	-
-T195	Compatibilidade de arquivos (D-010, D-019)	Exportar PDF	-	Decisão do projeto	D-019	Dentro	Ausente	-	a definir no plano novo	-
-T196	Compatibilidade de arquivos (D-010, D-019)	Exportar EPUB	-	Decisão do projeto	D-019	Não se aplica a este aplicativo	Não se aplica	-	a definir no plano novo	-
+T001	3.1 Janela, menus e painéis	Barra de menus	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	B1	Menus do GNOME da interface B (NGNM-10); falta o menu Organizar (ordenar, filtrar, categorias), que vem com a fase 5
+T002	3.1 Janela, menus e painéis	Barra de ferramentas	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Barra de cabeçalho da interface B (NINT-07)
+T003	3.1 Janela, menus e painéis	Barra de formatação (Format Bar)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	B1	Barra de formatação das células (NINT-08)
+T004	3.1 Janela, menus e painéis	Barra de fórmula	Só '09	'09, na forma do 15	D-002	Dentro	Parcial	a janela muda (D-008)	B1	A barra de fórmulas está na janela, mas as células ainda não têm conteúdo (NINT-10, fase 4)
+T005	3.1 Janela, menus e painéis	Inspetor	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Inspetor com Formato, Dados e Documento (NINT-09)
+T006	3.1 Janela, menus e painéis	Painel Sheets (lateral)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	B1	Planilhas, tabelas e gráficos na barra lateral (NINT-03)
+T007	3.1 Janela, menus e painéis	Painel Styles (lateral)	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	B1	Estilos de tabela com miniaturas (fase 5)
+T008	3.1 Janela, menus e painéis	Cálculos instantâneos	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	B1	Cálculos na barra inferior (NGNM-13); falta escolher as funções e não há valores nas células ainda
+T009	3.1 Janela, menus e painéis	Reorganize	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	B1	Organizar (ordenar, filtrar) numa barra lateral (fase 5)
+T010	3.1 Janela, menus e painéis	Function Browser	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	O Navegador de Funções existe no Writer; falta abrir ao digitar \"=\" nas Tables
+T011	3.1 Janela, menus e painéis	Media Browser 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	O popover Mídia existe no Writer; falta na janela das Tables (NINT-14)
+T012	3.1 Janela, menus e painéis	Janela Colors / Fonts	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Popovers de fontes e cores do Writer; falta ligar às Tables
+T013	3.1 Janela, menus e painéis	Janela de avisos (Document Warnings)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Banner de avisos do Writer; falta nas Tables (NINT-15)
+T014	3.1 Janela, menus e painéis	Zoom	Diferente (lugar)	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Zoom (NINT-04)
+T015	3.1 Janela, menus e painéis	Tela cheia	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	B1	F11 existe no Writer; falta conferir nas Tables (NINT-06)
+T016	3.1 Janela, menus e painéis	Vários documentos	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	B1	Abas
+T017	3.1 Janela, menus e painéis	Modo escuro	Só 15	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Estilo claro/escuro do sistema
+T018	3.1 Janela, menus e painéis	Preferências	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	B1	Preferências do Writer; falta a versão das Tables
+T019	3.1 Janela, menus e painéis	Desfazer/refazer	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	B1	Desfazer e refazer (NDOC-08)
+T020	3.2 Planilhas, modelos e arquivos	Seletor de modelos 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Ausente	-	T5	Seletor de modelos (fase 8)
+T021	3.2 Planilhas, modelos e arquivos	Nova planilha sempre do mesmo modelo	Igual	Igual nas duas	-	Dentro	Ausente	-	T5	Modelo padrão (fase 8)
+T022	3.2 Planilhas, modelos e arquivos	Salvar	Diferente	15.4	D-001	Dentro	Ausente	-	T5	As Tables ainda não salvam nem abrem arquivos (NDOC-07; ODS é da fase 1)
+T023	3.2 Planilhas, modelos e arquivos	Renomear pelo título da janela	Só 15	15.4	D-001	Dentro	Base pronta	-	T5	Renomear pelo título existe no Writer
+T024	3.2 Planilhas, modelos e arquivos	Versões anteriores	Diferente	15.4	D-001	Dentro	Ausente	-	T5	Versões (decisão caminho L)
+T025	3.2 Planilhas, modelos e arquivos	Salvar como modelo	Diferente	15.4	D-001	Dentro	Ausente	-	T5	Salvar como modelo (fase 8)
+T026	3.2 Planilhas, modelos e arquivos	Autoria de modelos	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	T5	Tabelas prontas e autoria de modelos (fase 8)
+T027	3.2 Planilhas, modelos e arquivos	Pacote vs arquivo único	Diferente	15.4	D-001	Dentro	Ausente	-	T5	Arquivo ODS único (depende de salvar)
+T028	3.2 Planilhas, modelos e arquivos	Senha	Diferente	15.4	D-001	Dentro	Ausente	-	T5	Senha (fase 8)
+T029	3.2 Planilhas, modelos e arquivos	Bloquear planilha	Diferente	15.4	D-001	Dentro	Ausente	-	T5	Bloquear (fase 8)
+T030	3.2 Planilhas, modelos e arquivos	Informações do documento (autor, título, palavras-chave, comentários)	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T5	Informações para busca (NDOC-13, fase 1)
+T031	3.2 Planilhas, modelos e arquivos	Reduzir tamanho	Diferente	15.4	D-001	Dentro	Base pronta	-	T5	Reduzir mídia existe no Writer
+T032	3.2 Planilhas, modelos e arquivos	Abrir e importar	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	T5	Abrir ODS, Numbers '09, Excel, CSV (fases 1 e 7)
+T033	3.2 Planilhas, modelos e arquivos	Exportar	Diferente	15.4	D-001	Dentro	Ausente	D-019	T5	D-019: só ODF, Microsoft Office, PDF e EPUB. Exportar PDF, Excel, CSV (fase 7)
+T034	3.2 Planilhas, modelos e arquivos	Dados do Address Book	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T5	Contatos do GNOME nas tabelas (NCON, fase 8)
+T035	3.2 Planilhas, modelos e arquivos	Imprimir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	T5	Imprimir e Visualização de Impressão (fase 7)
+T036	3.2 Planilhas, modelos e arquivos	Enviar 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Enviar (online)
+T037	3.2 Planilhas, modelos e arquivos	Arquivos recentes	Igual	Igual nas duas	-	Dentro	Base pronta	-	T5	Recentes do GTK no Writer
+T038	3.3 Folhas e páginas	Várias folhas por planilha	Diferente (lugar)	15.4	D-001	Dentro	Parcial	-	T1	Várias planilhas existem, na barra lateral (decisão da interface B); o 15 as mostra em abas
+T039	3.3 Folhas e páginas	Renomear, duplicar, apagar, reordenar folhas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Renomear, duplicar, apagar e reordenar planilhas (NTAB-02 a NTAB-04)
+T040	3.3 Folhas e páginas	Cor da aba	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Cor da aba
+T041	3.3 Folhas e páginas	Ocultar folha	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Ocultar planilha
+T042	3.3 Folhas e páginas	Fundo da folha	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Fundo da planilha
+T043	3.3 Folhas e páginas	Borda da folha	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Borda da planilha
+T044	3.3 Folhas e páginas	Direção da folha (direita para esquerda)	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Planilha da direita para a esquerda
+T045	3.3 Folhas e páginas	Dividir em páginas	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	T1	Arrumar objetos por página na Visualização de Impressão (fase 7)
+T046	3.3 Folhas e páginas	Cabeçalho e rodapé	Igual	Igual nas duas	-	Dentro	Ausente	-	T1	Cabeçalho e rodapé de página (NIMP-04)
+T047	3.3 Folhas e páginas	Numeração de páginas	Igual	Igual nas duas	-	Dentro	Ausente	-	T1	Numeração de páginas
+T048	3.3 Folhas e páginas	Margens	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	T1	Margens de impressão
+T049	3.3 Folhas e páginas	Tamanho de papel	Igual	Igual nas duas	-	Dentro	Ausente	-	T1	Tamanho do papel (NIMP-03)
+T050	3.4 Tabelas: estrutura	Várias tabelas soltas na folha	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Várias tabelas soltas na planilha (NTAB-05)
+T051	3.4 Tabelas: estrutura	Inserir tabela	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	T1	Inserir tabela do modelo (NTAB-05); faltam fórmulas prontas e estilos à vista
+T052	3.4 Tabelas: estrutura	Tabelas reutilizáveis (Capture Table)	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T1	Tabelas reutilizáveis (fase 5)
+T053	3.4 Tabelas: estrutura	Criar tabela a partir de células	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Criar tabela arrastando células
+T054	3.4 Tabelas: estrutura	Linhas e colunas de cabeçalho e rodapé	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Até 5 cabeçalhos no motor (desk-table) e no Writer; falta nas Tables (NTAB-19)
+T055	3.4 Tabelas: estrutura	Congelar cabeçalhos	Igual	Igual nas duas	-	Dentro	Ausente	-	T1	Congelar cabeçalhos (NTAB-20)
+T056	3.4 Tabelas: estrutura	Repetir cabeçalhos ao imprimir	Igual	Igual nas duas	-	Dentro	Ausente	-	T1	Repetir cabeçalhos ao imprimir
+T057	3.4 Tabelas: estrutura	Acrescentar e apagar linhas e colunas	Igual	Igual nas duas	-	Dentro	Parcial	-	T1	Alt+setas acrescentam linhas e colunas; apagar e vários de uma vez vêm na fase 3
+T058	3.4 Tabelas: estrutura	Mover linhas e colunas arrastando	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Mover linhas e colunas existe no motor; falta na tela das Tables
+T059	3.4 Tabelas: estrutura	Transpor linhas e colunas	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Transpor
+T060	3.4 Tabelas: estrutura	Ocultar e mostrar	Igual	Igual nas duas	-	Dentro	Ausente	-	T1	Ocultar linhas e colunas (NTAB-23)
+T061	3.4 Tabelas: estrutura	Redimensionar linhas e colunas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Redimensionar no motor e no Writer; falta nas Tables
+T062	3.4 Tabelas: estrutura	Mesclar células	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Mesclar no motor e no Writer
+T063	3.4 Tabelas: estrutura	Dividir células	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	T1	Dividir células no motor e no Writer
+T064	3.4 Tabelas: estrutura	Nome da tabela	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Nome da tabela (NTAB-09)
+T065	3.4 Tabelas: estrutura	Contorno, grade e bordas de célula	Diferente	15.4	D-001	Dentro	Base pronta	-	T1	Bordas por segmento no motor; faltam os estilos de borda prontos do 15
+T066	3.4 Tabelas: estrutura	Cores alternadas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Cores alternadas no motor e no Writer
+T067	3.4 Tabelas: estrutura	Tamanho da fonte da tabela toda	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Aumentar e diminuir a fonte da tabela toda
+T068	3.4 Tabelas: estrutura	Estilos de tabela	Diferente	15.4	D-001	Dentro	Ausente	-	T1	Estilos de tabela (fase 5)
+T069	3.4 Tabelas: estrutura	Copiar e colar estilo	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Copiar e colar estilo existe no Writer
+T070	3.4 Tabelas: estrutura	Travar tabela	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Travar objetos existe no Writer
+T071	3.4 Tabelas: estrutura	Direção da tabela (bidi)	Só 15	15.4	D-001	Dentro	Ausente	-	T1	Tabela da direita para a esquerda
+T072	3.4 Tabelas: estrutura	Mover objetos quando a tabela cresce	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T1	Afastar objetos quando a tabela cresce (NTAB-15); conferido no Numbers 15.4: o 15 não tem a opção
+T073	3.4 Tabelas: estrutura	Copiar tabela entre apps	Igual	Igual nas duas	-	Dentro	Base pronta	-	T1	Copiar células como texto com tabulações no Writer; falta copiar a tabela entre apps
+T074	3.5 Células: conteúdo, formatos e controles	Digitar e editar em células	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Digitar e editar células existe no Writer; as Tables ainda não ligam as células ao motor
+T075	3.5 Células: conteúdo, formatos e controles	Tecla Return passa à próxima célula	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	T2	Return vai para a próxima célula no Writer; conferido no Numbers 15.4: o 15 não tem a opção
+T076	3.5 Células: conteúdo, formatos e controles	Autocompletar com valores da coluna	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Sugestões da coluna no Writer
+T077	3.5 Células: conteúdo, formatos e controles	Magic Fill 🤖💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Magic Fill (IA, assinatura)
+T078	3.5 Células: conteúdo, formatos e controles	Preenchimento automático (Autofill)	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Preencher no motor e no Writer
+T079	3.5 Células: conteúdo, formatos e controles	Copiar, mover, colar valores	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Copiar e colar no Writer; faltam colar valores e mover fórmulas (NFOR-13)
+T080	3.5 Células: conteúdo, formatos e controles	Limpar	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Limpar no motor
+T081	3.5 Células: conteúdo, formatos e controles	Destacar linha e coluna sob o ponteiro	Só 15	15.4	D-001	Dentro	Ausente	-	T2	Destacar linha e coluna sob o ponteiro
+T082	3.5 Células: conteúdo, formatos e controles	Objetos dentro de células	Diferente	15.4	D-001	Dentro	Base pronta	-	T2	Imagem como fundo de célula no motor; faltam forma, gráfico e equação
+T083	3.5 Células: conteúdo, formatos e controles	Quebrar texto na célula	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Quebra de texto na célula no Writer
+T084	3.5 Células: conteúdo, formatos e controles	Formatos automático, número, moeda, porcentagem, data e hora, duração, fração, científico, texto	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Formatos no motor e no Writer
+T085	3.5 Células: conteúdo, formatos e controles	Sistema numérico (bases 2 a 36, complemento de dois)	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	T2	Sistema numérico no motor
+T086	3.5 Células: conteúdo, formatos e controles	Formatos personalizados	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou	T2	Formatos personalizados no motor; falta a janela de gerenciar
+T087	3.5 Células: conteúdo, formatos e controles	Lista completa de moedas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Moedas no motor
+T088	3.5 Células: conteúdo, formatos e controles	Caixa de seleção, deslizante, stepper, menu pop-up	Diferente	15.4	D-001	Dentro	Ausente	-	T2	Controles de célula (fase 5)
+T089	3.5 Células: conteúdo, formatos e controles	Avaliação por estrelas	Só 15	15.4	D-001	Dentro	Ausente	-	T2	Avaliação por estrelas
+T090	3.5 Células: conteúdo, formatos e controles	Realce condicional	Diferente	15.4	D-001	Dentro	Base pronta	-	T2	Formatação condicional do '09 no motor; faltam os tipos de regra do 15
+T091	3.5 Células: conteúdo, formatos e controles	Cotações de ações 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Cotações de ações (online)
+T092	3.5 Células: conteúdo, formatos e controles	Comentários em células	Diferente	15.4	D-001	Dentro	Base pronta	-	T2	Comentários em células no Writer, sem respostas
+T093	3.5 Células: conteúdo, formatos e controles	Links em células	Diferente	15.4	D-001	Dentro	Ausente	-	T2	Links em células
+T094	3.5 Células: conteúdo, formatos e controles	Smart Cell View (valor real da célula)	Só 15	15.4	D-001	Dentro	Ausente	-	T2	Valor real da célula na barra inferior; hoje a barra de fórmulas faz esse papel
+T095	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Ordenar pela coluna	Igual	Igual nas duas	-	Dentro	Base pronta	-	T3	Ordenar no motor e no Writer
+T096	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Regras de ordenação com várias colunas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T3	Ordenar por várias colunas no motor
+T097	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Filtros por regra	Diferente	15.4	D-001	Dentro	Ausente	-	T3	Filtros (fase 5)
+T098	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Quick Filter (marcar valores a mostrar)	Só 15	15.4	D-001	Dentro	Ausente	-	T3	Filtro rápido
+T099	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Filtrar duplicados e valores únicos	Só 15	15.4	D-001	Dentro	Ausente	-	T3	Filtrar duplicados
+T100	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Categorias	Diferente	15.4	D-001	Dentro	Ausente	-	T3	Categorias (fase 5)
+T101	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Tabelas dinâmicas (pivot)	Só 15	15.4	D-001	Dentro	Ausente	-	T3	Tabelas dinâmicas
+T102	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	Instantâneo de tabela	Só 15	15.4	D-001	Dentro	Ausente	-	T3	Instantâneo de tabela
+T103	3.7 Fórmulas e funções	Editor de fórmulas	Diferente	15.4	D-001	Dentro	Base pronta	-	T2	Fórmulas no motor e no Writer; faltam o editor móvel e as fichas do 15
+T104	3.7 Fórmulas e funções	Navegador de funções	Diferente	15.4	D-001	Dentro	Base pronta	-	T2	Navegador de Funções no Writer, como diálogo; o 15 o põe numa barra lateral
+T105	3.7 Fórmulas e funções	Fórmulas rápidas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Fórmulas rápidas no motor
+T106	3.7 Fórmulas e funções	Quantidade de funções 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	T2	94 funções no motor; o 15.4 tem 355 (conferido no Mac: as 262 do '09 e 93 novas); STOCK, STOCKH, CURRENCYCONV e CURRENCYH buscam na internet e ficam fora
+T107	3.7 Fórmulas e funções	Matrizes que derramam (spilling arrays)	Só 15	15.4	D-001	Dentro	Ausente	-	T2	Matrizes que derramam
+T108	3.7 Fórmulas e funções	Referências a outra tabela e folha, nomes de cabeçalho, absolutas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Referências a outras tabelas e por nome de cabeçalho no motor
+T109	3.7 Fórmulas e funções	Indicação de erro	Igual	Igual nas duas	-	Dentro	Base pronta	-	T2	Erros no motor
+T110	3.7 Fórmulas e funções	Aviso de fórmula que aponta para célula vazia	Só '09	'09, na forma do 15	D-002	Dentro	Base pronta	-	T2	Aviso de célula vazia no motor; conferido no Numbers 15.4: o 15 não tem a opção
+T111	3.7 Fórmulas e funções	Formula List	Só '09	'09, na forma do 15	D-002	Dentro	Parcial	-	T2	Ctrl+Shift+F mostra a Lista de Fórmulas, ainda sem fórmulas para listar
+T112	3.7 Fórmulas e funções	Localizar e substituir dentro de fórmulas	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T2	Buscar dentro de fórmulas
+T113	3.7 Fórmulas e funções	Imprimir a lista de fórmulas	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T2	Imprimir a lista de fórmulas
+T114	3.7 Fórmulas e funções	Usar o editor como calculadora	Igual	Igual nas duas	-	Dentro	Ausente	-	T2	Editor de fórmulas como calculadora
+T115	3.7 Fórmulas e funções	Ajuda de funções	Diferente	15.4	D-001	Dentro	Base pronta	-	T2	Ajuda das funções no navegador, sem internet
+T116	3.8 Gráficos	Tipos	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Onze tipos no motor e no Writer; faltam rosca, radar, bolhas, interativo e dinâmico
+T117	3.8 Gráficos	Inserir e escolher dados	Diferente	15.4	D-001	Dentro	Ausente	-	T4	Gráfico a partir das células da tabela (fase 6)
+T118	3.8 Gráficos	Dados ocultos	Igual	Igual nas duas	-	Dentro	Ausente	-	T4	Dados ocultos (fase 6)
+T119	3.8 Gráficos	Muitos pontos (downsampling)	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Amostragem de muitos pontos
+T120	3.8 Gráficos	Gráfico vinculado no Pages e no Keynote	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	T4	Gráfico vinculado no Writer e no Slides
+T121	3.8 Gráficos	Título, legenda, eixos, grades, marcas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Título, legenda e eixos no motor e no Writer
+T122	3.8 Gráficos	Rótulos de valor	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Rótulos de valor do '09; faltam as opções do 15
+T123	3.8 Gráficos	Rótulos de resumo em empilhados	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Rótulos de resumo
+T124	3.8 Gráficos	Barras de erro e linhas de tendência	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Erro e tendência no motor
+T125	3.8 Gráficos	Linhas de referência (média, mediana, mín., máx., valor)	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Linhas de referência
+T126	3.8 Gráficos	Cores, texturas e imagens por série	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Cores e texturas por série no motor
+T127	3.8 Gráficos	Estilos de gráfico	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Estilos de gráfico
+T128	3.8 Gráficos	Pizza: separar fatias, sombras, girar	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Pizza no motor
+T129	3.8 Gráficos	Cena 3D (profundidade, luz, girar)	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Cena 3D no motor
+T130	3.8 Gráficos	Cantos arredondados, buraco da rosca, grade do radar	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Cantos arredondados, furo da rosca
+T131	3.8 Gráficos	Borda e fundo do gráfico	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Borda e fundo do gráfico no Writer
+T132	3.9 Texto e estilos	Caixas de texto e texto em formas	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Caixas de texto e texto em formas do Writer; falta na janela das Tables
+T133	3.9 Texto e estilos	Fonte, tamanho, negrito, itálico, sublinhado, tachado, contorno, sombra	Diferente (lugar)	15.4	D-001	Dentro	Base pronta	-	T4	Formatação de texto do Writer
+T134	3.9 Texto e estilos	Cor do texto	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Cor sólida do Writer; faltam gradiente e imagem
+T135	3.9 Texto e estilos	Maiúsculas	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Maiúsculas do '09 no Writer; faltam as do 15
+T136	3.9 Texto e estilos	Sobrescrito, subscrito, linha de base	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Sobrescrito no Writer
+T137	3.9 Texto e estilos	Espaçamento de caracteres, ligaduras	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Espaçamento e ligaduras no Writer
+T138	3.9 Texto e estilos	Suavização de fontes	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Suavização de fontes é do sistema
+T139	3.9 Texto e estilos	Estilos de parágrafo, caractere e lista	Só 15	15.4	D-001	Dentro	Base pronta	-	T4	Estilos de parágrafo, caractere e lista do Writer
+T140	3.9 Texto e estilos	Alinhamento, espaçamento, recuos, tabulações	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Parágrafo do Writer
+T141	3.9 Texto e estilos	Listas com marcadores, números, níveis	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Listas do Writer
+T142	3.9 Texto e estilos	Colunas em caixa de texto	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Colunas em caixas do Writer
+T143	3.9 Texto e estilos	Capitular, frações automáticas, realce de revisão	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Capitular, frações automáticas, realce
+T144	3.9 Texto e estilos	Aspas e travessões inteligentes	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Aspas do '09 no Writer
+T145	3.9 Texto e estilos	Substituição de texto	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Substituição do Writer
+T146	3.9 Texto e estilos	Caracteres especiais, acentos	Igual	Igual nas duas	-	Dentro	Base pronta	-	T4	Caracteres especiais do GTK
+T147	3.9 Texto e estilos	Data, nome do arquivo, número de página	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou	T4	Campos de data e página no Writer; falta o nome do arquivo
+T148	3.9 Texto e estilos	Idiomas: bidirecional, vertical, guia fonético, CJK	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Bidi, vertical, fonético
+T149	3.9 Texto e estilos	Formatação por idioma da planilha	Só 15	15.4	D-001	Dentro	Ausente	-	T4	Idioma por planilha
+T150	3.9 Texto e estilos	Ditado 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Ditado
+T151	3.9 Texto e estilos	Previsão ao digitar 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Previsão ao digitar
+T152	3.9 Texto e estilos	Tradução 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Tradução
+T153	3.9 Texto e estilos	Equações 🧩 (no '09)	Diferente	15.4	D-001	Dentro	Ausente	-	T4	Equações LaTeX/MathML
+T154	3.9 Texto e estilos	Links em texto e objetos	Diferente	15.4	D-001	Dentro	Base pronta	-	T4	Links do Writer; faltam telefone e outra folha
+T155	3.10 Objetos: imagens, formas, mídia	Imagens 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T4	Imagens do Writer (sem SVG e HEIC)
+T156	3.10 Objetos: imagens, formas, mídia	Remover fundo 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	T4	O do 15 usa IA; vale o Alfa Instantâneo do Writer
+T157	3.10 Objetos: imagens, formas, mídia	Ajustes de imagem	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T4	Ajustar Imagem do Writer
+T158	3.10 Objetos: imagens, formas, mídia	Galeria de imagens	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T4	Galeria de imagens
+T159	3.10 Objetos: imagens, formas, mídia	IA para imagens 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	IA para imagens
+T160	3.10 Objetos: imagens, formas, mídia	Formas 🤖💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T4	Formas e caneta do Writer; faltam biblioteca e combinar
+T161	3.10 Objetos: imagens, formas, mídia	Editar pontos e curvas	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	T4	Editar pontos do Writer
+T162	3.10 Objetos: imagens, formas, mídia	Linhas e conexões	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	T4	Conexões do Writer
+T163	3.10 Objetos: imagens, formas, mídia	Objetos 3D (USDZ)	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T4	Objetos 3D
+T164	3.10 Objetos: imagens, formas, mídia	Desenhos (Apple Pencil)	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T4	Desenho à mão livre
+T165	3.10 Objetos: imagens, formas, mídia	Som e vídeo	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T4	Som e filme do Writer; faltam gravar e aparar
+T166	3.10 Objetos: imagens, formas, mídia	Bordas, molduras, sombra, reflexo, opacidade	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	T4	Efeitos de objeto do Writer
+T167	3.10 Objetos: imagens, formas, mídia	Preenchimento	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T4	Preenchimento do Writer
+T168	3.10 Objetos: imagens, formas, mídia	Legenda e título de objeto	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T4	Legenda e título de objeto
+T169	3.10 Objetos: imagens, formas, mídia	Estilos de objeto	Só 15	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T4	Estilos de objeto do Writer
+T170	3.10 Objetos: imagens, formas, mídia	Objetos dentro de caixas e formas	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T4	Objetos dentro de caixas
+T171	3.10 Objetos: imagens, formas, mídia	Posição exata, alinhar, distribuir, guias	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	T4	Alinhar e guias do Writer
+T172	3.10 Objetos: imagens, formas, mídia	Camadas, agrupar, travar, girar, espelhar	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	T4	Camadas e grupos do Writer
+T173	3.11 Revisão e busca	Localizar e substituir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	T3	Barra de busca do Writer; falta buscar em fórmulas
+T174	3.11 Revisão e busca	Comentários	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T3	Comentários (fase 8)
+T175	3.11 Revisão e busca	Nome do autor e cor	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	T3	Nome e cor do autor
+T176	3.11 Revisão e busca	Controle de alterações	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Nenhuma das versões tem controle de alterações no Numbers
+T177	3.11 Revisão e busca	Ortografia e gramática	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	T3	Ortografia do Writer
+T178	3.11 Revisão e busca	Dicionário e pesquisa 🌐 (nas duas)	Igual	Igual nas duas	-	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Dicionário e pesquisa (online)
+T179	3.11 Revisão e busca	Writing Tools (IA) 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Writing Tools
+T180	3.12 Colaboração, nuvem, automação e acessibilidade	Colaboração em tempo real 🌐 (nas duas) 💲 (no 15)	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Colaboração
+T181	3.12 Colaboração, nuvem, automação e acessibilidade	iCloud Drive, Numbers para iCloud, Handoff, AirDrop 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	iCloud
+T182	3.12 Colaboração, nuvem, automação e acessibilidade	AppleScript	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	AppleScript
+T183	3.12 Colaboração, nuvem, automação e acessibilidade	Atalhos (Shortcuts)	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Atalhos
+T184	3.12 Colaboração, nuvem, automação e acessibilidade	Siri 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Siri
+T185	3.12 Colaboração, nuvem, automação e acessibilidade	VoiceOver	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	T5	Leitor de tela do Writer nas células; falta nas Tables (NGNM-04)
+T186	3.12 Colaboração, nuvem, automação e acessibilidade	Privacidade e análise 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Privacidade e análise
+T187	3.12 Colaboração, nuvem, automação e acessibilidade	Assinatura Creator Studio 💲🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Assinatura
+T188	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do Desk, com as extensões	-	Decisão do projeto	D-009	Dentro	Ausente	-	T5	-
+T189	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do LibreOffice e do OpenOffice atuais	-	Decisão do projeto	D-010	Dentro	Ausente	-	T5	-
+T190	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork '09	-	Decisão do projeto	D-010	Dentro	Ausente	-	T5	-
+T191	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork atual	-	Decisão do projeto	D-010, D-011	Dentro	Ausente	-	T5	-
+T192	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do Microsoft Office atual	-	Decisão do projeto	D-010	Dentro	Ausente	-	T5	-
+T193	Compatibilidade de arquivos (D-010, D-019)	Salvar ODF com as extensões do Desk	-	Decisão do projeto	D-009	Dentro	Ausente	-	T5	-
+T194	Compatibilidade de arquivos (D-010, D-019)	Exportar para o Microsoft Office	-	Decisão do projeto	D-019	Dentro	Ausente	-	T5	-
+T195	Compatibilidade de arquivos (D-010, D-019)	Exportar PDF	-	Decisão do projeto	D-019	Dentro	Ausente	-	T5	-
+T196	Compatibilidade de arquivos (D-010, D-019)	Exportar EPUB	-	Decisão do projeto	D-019	Não se aplica a este aplicativo	Não se aplica	-	-	-

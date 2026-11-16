@@ -15,7 +15,7 @@ the project takes the decisions; the date is the day he took them.
 | D-005 | 2026-11-16 | Features tied to Apple platforms are "not applicable to GNOME" unless GNOME has an equivalent. | Current (assumed, not contested) |
 | D-006 | 2026-11-16 | The target version is 15.4; a new release of iWork is a review of the inventory. | Current (assumed, not contested) |
 | D-007 | 2026-11-16 | Native Libadwaita widgets wherever one exists; otherwise a widget of Desk that follows the HIG, marked for review at each new Libadwaita. | Current |
-| D-008 | 2026-11-16 | The window: proposal N (current iWork) or M (mix with the HIG), in `docs/interface/propostas`. | Open |
+| D-008 | 2026-11-16 | The window is proposal M+ of `docs/interface/propostas`: the mix with the HIG, with the six object buttons (Table, Chart, Text, Shape, Media, Comment) in the header bar beside Insert, so that no function shown in the toolbar of iWork is hidden. | Current |
 | D-009 | 2026-11-16 | ODF stays the native format; every implemented feature that standard ODF cannot hold gets a documented extension. | Current |
 | D-010 | 2026-11-16 | Desk reads and imports: Desk ODF, iWork '09, current iWork, current Microsoft Office, current LibreOffice and OpenOffice. | Current |
 | D-011 | 2026-11-16 | The reader of current iWork files is permanent and is written under four rules: nothing is extracted from Apple's executables and no definition file taken from them is copied; it is written from public third-party documentation and from documents made by the project; no template, theme, font or image of Apple enters the repository; the names Pages, Numbers and Keynote are used only to say what Desk is compatible with. A lawyer should review the second rule before version 1.0; if the answer is no, the reader stays only as a parity checking tool and leaves the product. | Current, legal review pending |
@@ -35,6 +35,6 @@ the project takes the decisions; the date is the day he took them.
 | R-001 | 2026-10-30 | Feature parity and document compatibility with iWork '09 (9.3). | Replaced by D-001 |
 | R-002 | 2026-11-13 | Path L: manual saving and a recovery draft every two minutes, without versions. | Replaced by D-001 (automatic saving and versions, as in iWork 15) |
 | R-003 | 2026-11-13 | One window per document. | Replaced by D-001 (documents in tabs) |
-| R-004 | 2026-11-14 | Interface B, with the sheets of Tables in the sidebar, a format bar and a bottom bar. | Replaced by D-008 when it is taken |
+| R-004 | 2026-11-14 | Interface B, with the sheets of Tables in the sidebar, a format bar and a bottom bar. | Replaced by D-008 |
 | R-005 | 2026-11-16 | In each feature, the better version according to the comparison reports. | Replaced by D-001 to D-003 |
 | R-006 | 2026-10-30 | Layout compared with PDFs of Pages '09 on the Lion virtual machine. | Replaced by D-012 |

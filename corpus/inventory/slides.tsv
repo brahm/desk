@@ -1,199 +1,199 @@
 # SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 id	area	recurso	no_iwork	alvo	regra	escopo	situacao_no_desk	revisar	fase	nota
-S001	3.1 Janela, menus e painéis	Barra de menus	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Menus do GNOME e busca de comandos da interface B (KGNM-10)
-S002	3.1 Janela, menus e painéis	Barra de ferramentas	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra de cabeçalho com Reproduzir e inserir (KINT-12)
-S003	3.1 Janela, menus e painéis	Barra de formatação (Format Bar)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra de formatação do slide e da seleção (KINT-13)
-S004	3.1 Janela, menus e painéis	Inspetor	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Inspetor contextual com o nível Animação (KINT-14 no que cabe à fase 2)
-S005	3.1 Janela, menus e painéis	Gaveta Build Order	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Ordem das composições (fase 5)
-S006	3.1 Janela, menus e painéis	Media Browser 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Popover Mídia do Writer, sem verificação nas Slides
-S007	3.1 Janela, menus e painéis	Janelas Colors e Fonts	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Popovers de fontes e cores do Writer
-S008	3.1 Janela, menus e painéis	Janela Adjust Image	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Ajustar Imagem no Inspetor do Writer
-S009	3.1 Janela, menus e painéis	Ferramentas de organizar	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Organizar no Inspetor do Writer
-S010	3.1 Janela, menus e painéis	Avisos do documento	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Banner de avisos do Writer
-S011	3.1 Janela, menus e painéis	Borda inferior	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Barra inferior com \"Slide 3 de 12\" e Notas (KGNM-14)
-S012	3.1 Janela, menus e painéis	Tela cheia	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Tela cheia e só o slide (KINT-10)
-S013	3.1 Janela, menus e painéis	Vários documentos	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Abas
-S014	3.1 Janela, menus e painéis	Modo escuro	Só 15	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Estilo claro/escuro do sistema
-S015	3.1 Janela, menus e painéis	Preferências	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	Preferências do Writer; faltam Apresentação e Controle remoto
-S016	3.1 Janela, menus e painéis	Desfazer/refazer	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	a definir no plano novo	Desfazer e refazer
-S017	3.2 Documentos, temas e arquivos	Seletor de temas 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Seletor de temas (fase 3)
-S018	3.2 Documentos, temas e arquivos	Apresentação a partir de esboço 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Apresentação gerada por IA
-S019	3.2 Documentos, temas e arquivos	Novos slides a partir de esboço 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Slides gerados por IA
-S020	3.2 Documentos, temas e arquivos	Nova apresentação sempre do mesmo tema	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Tema padrão (fase 3)
-S021	3.2 Documentos, temas e arquivos	Trocar o tema	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Trocar o tema (fase 3)
-S022	3.2 Documentos, temas e arquivos	Salvar tema	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Salvar tema (fase 3)
-S023	3.2 Documentos, temas e arquivos	Salvar	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	As Slides ainda não salvam em ODP (fase 1); o alvo do 15 é salvamento automático
-S024	3.2 Documentos, temas e arquivos	Renomear pelo título da janela	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Renomear pelo título existe na janela compartilhada
-S025	3.2 Documentos, temas e arquivos	Versões anteriores	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Versões (decisão caminho L)
-S026	3.2 Documentos, temas e arquivos	Pacote ou arquivo único	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Arquivo ODP único (fase 1)
-S027	3.2 Documentos, temas e arquivos	Copiar mídia para o documento	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Copiar mídia para o documento (depende de ODP)
-S028	3.2 Documentos, temas e arquivos	Senha	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Senha (fase 8)
-S029	3.2 Documentos, temas e arquivos	Bloquear apresentação	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Bloquear (fase 8)
-S030	3.2 Documentos, temas e arquivos	Metadados do Spotlight (autor, título, palavras-chave, comentários)	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Metadados (KDOC-11, fase 1)
-S031	3.2 Documentos, temas e arquivos	Reduzir tamanho	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Reduzir mídia do Writer
-S032	3.2 Documentos, temas e arquivos	Abrir formatos	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Abrir ODP, Keynote '09 e PowerPoint (fases 1 e 8)
-S033	3.2 Documentos, temas e arquivos	Linguagem e região por apresentação	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Idioma por apresentação
-S034	3.2 Documentos, temas e arquivos	Arquivos recentes	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Recentes do GTK
-S035	3.2 Documentos, temas e arquivos	Apresentação nova pelo ícone do Dock	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Ícone do Dock é do macOS
-S036	3.3 Visualização e navegação	Navegador de slides	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Navegador de slides (KINT-07, KSLD-04)
-S037	3.3 Visualização e navegação	Esboço (Outline)	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Estrutura de tópicos (KINT-08)
-S038	3.3 Visualização e navegação	Somente slide	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Só o slide (KINT-10)
-S039	3.3 Visualização e navegação	Mesa de luz (Light Table)	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Mesa de luz (KINT-09); falta esconder os ignorados
-S040	3.3 Visualização e navegação	Lista de objetos	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Lista de objetos
-S041	3.3 Visualização e navegação	Área de trabalho em volta do slide	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Área de trabalho em volta do slide
-S042	3.3 Visualização e navegação	Notas do apresentador	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Notas do apresentador (KSLD-15)
-S043	3.3 Visualização e navegação	Notas geradas pela IA 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Notas por IA
-S044	3.3 Visualização e navegação	Zoom	Igual	Igual nas duas	-	Dentro	Pronto	-	a definir no plano novo	Zoom (KINT-06)
-S045	3.3 Visualização e navegação	Réguas	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Réguas do Writer (unidades por localidade)
-S046	3.3 Visualização e navegação	Guias de alinhamento	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Guias do Writer; falta a cor própria
-S047	3.3 Visualização e navegação	Ir para slide	Diferente	15.4	D-001	Dentro	Pronto	-	a definir no plano novo	Ir para um slide (KINT-11)
-S048	3.4 Slides, leiautes e mestres	Adicionar, duplicar, apagar slides	Igual	Igual nas duas	-	Dentro	Parcial	-	a definir no plano novo	Adicionar, duplicar e apagar (KSLD-01, KSLD-05); falta arrastar entre apresentações
-S049	3.4 Slides, leiautes e mestres	Ignorar slide	Diferente	15.4	D-001	Dentro	Parcial	-	a definir no plano novo	Pular slide (KSLD-06); falta pular o grupo recolhido
-S050	3.4 Slides, leiautes e mestres	Números de slide	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Número do slide (KSLD-08)
-S051	3.4 Slides, leiautes e mestres	Tamanho do slide	Igual	Igual nas duas	-	Dentro	Parcial	-	a definir no plano novo	1024 × 768 (KAPR-04); faltam outros tamanhos e o tamanho próprio
-S052	3.4 Slides, leiautes e mestres	Fundo do slide	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Fundo do slide (KSLD-12)
-S053	3.4 Slides, leiautes e mestres	Fundos dinâmicos (animados)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Fundos animados
-S054	3.4 Slides, leiautes e mestres	Slides mestres / leiautes	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Folhas-mestras (fase 3); a página Mestres na barra lateral ainda não funciona
-S055	3.4 Slides, leiautes e mestres	Aplicar e reaplicar leiaute	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Aplicar e reaplicar leiaute (fase 3)
-S056	3.4 Slides, leiautes e mestres	Mostrar ou esconder título e corpo	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Título e corpo (fase 3)
-S057	3.4 Slides, leiautes e mestres	Marcadores de posição de texto e mídia	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Espaços reservados com etiquetas (fase 3)
-S058	3.4 Slides, leiautes e mestres	Marcador de objeto (tabela, gráfico)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Espaço reservado de objeto (fase 3)
-S059	3.4 Slides, leiautes e mestres	Camadas entre slide e mestre	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Camadas entre slide e mestre (fase 3)
-S060	3.4 Slides, leiautes e mestres	Padrões por mestre e por tema	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	a definir no plano novo	Padrões por mestre e por tema (fases 3 e 7)
-S061	3.4 Slides, leiautes e mestres	Importar estilos de objeto de outro tema	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	a definir no plano novo	Importar estilos de outro tema (fase 3)
-S062	3.4 Slides, leiautes e mestres	Slide Clean Up 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Slide Clean Up (IA)
-S063	3.5 Texto e caracteres	Seleção de texto	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Seleção descontínua do Writer
-S064	3.5 Texto e caracteres	Fonte, tamanho, negrito, itálico, sublinhado, tachado	Diferente (lugar)	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Formatação do Writer
-S065	3.5 Texto e caracteres	Reduzir o texto para caber	Igual	Igual nas duas	-	Dentro	Ausente	-	a definir no plano novo	Encolher texto para caber (KTXT-03)
-S066	3.5 Texto e caracteres	Cor do texto	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Cor sólida do Writer; faltam gradiente e imagem
-S067	3.5 Texto e caracteres	Contorno e sombra	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Contorno e sombra do Writer
-S068	3.5 Texto e caracteres	Maiúsculas	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Maiúsculas do '09 no Writer
-S069	3.5 Texto e caracteres	Sobrescrito, subscrito, linha de base	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Sobrescrito do Writer
-S070	3.5 Texto e caracteres	Espaçamento entre caracteres e ligaduras	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Espaçamento e ligaduras do Writer
-S071	3.5 Texto e caracteres	Suavização de fontes	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Suavização de fontes é do sistema
-S072	3.5 Texto e caracteres	Capitular (drop cap)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Capitular
-S073	3.5 Texto e caracteres	Frações automáticas	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Frações automáticas
-S074	3.5 Texto e caracteres	Aspas e travessões inteligentes	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Aspas do Writer
-S075	3.5 Texto e caracteres	Substituição de texto	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Substituição do Writer
-S076	3.5 Texto e caracteres	Caracteres especiais, acentos, emoji	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Caracteres especiais do GTK
-S077	3.5 Texto e caracteres	Ditado 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Ditado
-S078	3.5 Texto e caracteres	Previsão ao digitar 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Previsão ao digitar
-S079	3.5 Texto e caracteres	Tradução 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Tradução
-S080	3.5 Texto e caracteres	Bidirecional, vertical, guia fonético, ênfase CJK	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Bidi, vertical, fonético
-S081	3.6 Estilos	Estilos de parágrafo	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Estilos de parágrafo do Writer; falta mostrá-los nas Slides
-S082	3.6 Estilos	Estilos de caractere	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Estilos de caractere do Writer
-S083	3.6 Estilos	Estilos de lista	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Estilos de lista do Writer
-S084	3.6 Estilos	Atalhos F1–F8 para estilos	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Atalhos de estilo do Writer
-S085	3.6 Estilos	Copiar e colar estilo	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Copiar e colar estilo do Writer
-S086	3.6 Estilos	Estilos de objeto, tabela e gráfico	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Estilos de objeto do Writer; faltam tabela e gráfico
-S087	3.6 Estilos	Caixa de texto padrão	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Caixa de texto padrão por apresentação
-S088	3.7 Parágrafo, listas e colunas	Alinhamento, espaçamento de linha e de parágrafo, margem interna	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Parágrafo do Writer
-S089	3.7 Parágrafo, listas e colunas	Tabulações e recuos	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Tabulações e recuos do Writer
-S090	3.7 Parágrafo, listas e colunas	Bordas, linhas e fundo de parágrafo	Só 15	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Bordas e fundo de parágrafo do Writer
-S091	3.7 Parágrafo, listas e colunas	Listas automáticas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Listas automáticas do Writer
-S092	3.7 Parágrafo, listas e colunas	Marcadores de texto, de imagem e números	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Marcadores do Writer
-S093	3.7 Parágrafo, listas e colunas	Reordenar itens arrastando	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Reordenar itens arrastando no texto
-S094	3.7 Parágrafo, listas e colunas	Colunas de texto	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Colunas do Writer
-S095	3.8 Objetos: imagens e formas	Imagens 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Imagens do Writer (sem SVG e HEIC)
-S096	3.8 Objetos: imagens e formas	Remover fundo 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou	a definir no plano novo	O do 15 usa IA; vale o Alfa Instantâneo do Writer
-S097	3.8 Objetos: imagens e formas	Ajustes de imagem	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Ajustar Imagem do Writer
-S098	3.8 Objetos: imagens e formas	Galeria de imagens	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Galeria de imagens
-S099	3.8 Objetos: imagens e formas	IA para imagens 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	IA para imagens
-S100	3.8 Objetos: imagens e formas	Image Playground 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Image Playground
-S101	3.8 Objetos: imagens e formas	Formas 🤖💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Formas do Writer; faltam biblioteca e combinar
-S102	3.8 Objetos: imagens e formas	Editar pontos e curvas	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Editar pontos do Writer
-S103	3.8 Objetos: imagens e formas	Linhas e conexões	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Conexões do Writer; faltam as em ângulo
-S104	3.8 Objetos: imagens e formas	Objetos 3D (USDZ)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Objetos 3D
-S105	3.8 Objetos: imagens e formas	Desenhos (Apple Pencil)	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Desenho à mão livre animável
-S106	3.8 Objetos: imagens e formas	Bordas, molduras, sombra, reflexo, opacidade	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Efeitos de objeto do Writer
-S107	3.8 Objetos: imagens e formas	Preenchimento	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Preenchimento do Writer
-S108	3.8 Objetos: imagens e formas	Legenda e título de objeto	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Legenda e título de objeto
-S109	3.8 Objetos: imagens e formas	Objetos dentro de caixas e formas	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Objetos dentro de caixas
-S110	3.8 Objetos: imagens e formas	Posição exata, alinhar, distribuir	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Alinhar e distribuir do Writer
-S111	3.8 Objetos: imagens e formas	Camadas, agrupar, travar	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Camadas, grupos e travar do Writer
-S112	3.8 Objetos: imagens e formas	Redimensionar, girar, espelhar	Igual	Igual nas duas	-	Dentro	Base pronta	-	a definir no plano novo	Redimensionar e girar do Writer
-S113	3.8 Objetos: imagens e formas	Equações 🧩 (no '09)	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Equações LaTeX/MathML
-S114	3.9 Som e vídeo	Filme no slide	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Filmes do Writer; falta tocar através dos slides
-S115	3.9 Som e vídeo	Áudio no slide	Diferente	15.4	D-001	Dentro	Base pronta	-	a definir no plano novo	Áudio do Writer
-S116	3.9 Som e vídeo	Trilha sonora	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Trilha sonora (fase 6)
-S117	3.9 Som e vídeo	Narração da apresentação inteira	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Narração (fase 6)
-S118	3.9 Som e vídeo	Gravar áudio como objeto	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Gravar áudio
-S119	3.9 Som e vídeo	Vídeo da web 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Vídeo da web
-S120	3.9 Som e vídeo	Vídeo ao vivo	Só 15	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Vídeo ao vivo da câmera
-S121	3.9 Som e vídeo	Formatos de mídia	Diferente	15.4	D-001	Dentro	Ausente	-	a definir no plano novo	Otimizar mídia ao inserir
-S122	3.10 Tabelas	Inserir tabela	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Inserir tabela do Writer; faltam estilos
-S123	3.10 Tabelas	Linhas, colunas, cabeçalhos, rodapé	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Linhas e colunas do Writer
-S124	3.10 Tabelas	Mesclar e dividir células	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Mesclar e dividir do Writer
-S125	3.10 Tabelas	Formatos de célula	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Formatos do Writer
-S126	3.10 Tabelas	Fórmulas e funções 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Fórmulas do Writer; o 15 tem mais funções
-S127	3.10 Tabelas	Realce condicional, ordenar, preencher	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Condicional, ordenar e preencher do Writer
-S128	3.10 Tabelas	Título da tabela, travar tabela, direção bidi	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Título, travar e bidi de tabela
-S129	3.11 Gráficos	Tipos	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Onze tipos do Writer; faltam rosca, radar e bolhas
-S130	3.11 Gráficos	Gráfico interativo	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Gráfico interativo
-S131	3.11 Gráficos	Dados	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Editor de dados do Writer
-S132	3.11 Gráficos	Eixos, rótulos, legendas, barras de erro, tendência	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Eixos, erro e tendência do Writer; faltam linhas de referência
-S133	3.11 Gráficos	Estilos de gráfico	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Estilos de gráfico
-S134	3.11 Gráficos	Cena 3D (luz, ângulo)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	a definir no plano novo	Cena 3D do Writer
-S135	3.12 Animação: transições, composições e ações	Onde se configura	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	a definir no plano novo	O nível Animação do Inspetor existe (fase 2); as animações são das fases 4 e 5
-S136	3.12 Animação: transições, composições e ações	Transições	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Transições (fase 4); lista do 15.4 conferida no Mac: 43 efeitos, mais Anagram, Blur, Burn, Falling Tiles, Flash, Motion Dissolve e Shutter do '09
-S137	3.12 Animação: transições, composições e ações	Magic Move	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Movimento Mágico (fase 4)
-S138	3.12 Animação: transições, composições e ações	Composições de entrada e saída	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Composições (fase 5); lista do 15.4 conferida no Mac: 43 de entrada e 42 de saída para texto, mais Convergence e Typewriter do '09
-S139	3.12 Animação: transições, composições e ações	Ações (animar sobre o slide)	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Ações (fase 5); no 15.4: Move, Opacity, Rotate, Scale e as ênfases Blink, Bounce, Flip, Jiggle, Pop, Pulse
-S140	3.12 Animação: transições, composições e ações	Ordem e tempo das composições	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Ordem e tempo das composições (fase 5)
-S141	3.12 Animação: transições, composições e ações	Smart Builds	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Composições inteligentes (fase 5)
-S142	3.12 Animação: transições, composições e ações	Copiar e colar animação	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Copiar e colar animação (fase 5); conferido no Keynote 15.4: Format > Copy/Paste Animation existe e funciona
-S143	3.12 Animação: transições, composições e ações	Animações para máquinas fracas	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Animações para máquinas fracas (KVMI-02)
-S144	3.13 Apresentar	Tipo de apresentação	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Tipo de apresentação (fase 6)
-S145	3.13 Apresentar	Reproduzir ao abrir, repetir, reiniciar se ocioso	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Reproduzir ao abrir e repetir (fase 6)
-S146	3.13 Apresentar	Senha para sair da apresentação	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Senha para sair (fase 6)
-S147	3.13 Apresentar	Apresentar em tela cheia	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Apresentar em tela cheia (fase 4); o botão Reproduzir já existe
-S148	3.13 Apresentar	Apresentar numa janela	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Apresentar numa janela
-S149	3.13 Apresentar	Tela do apresentador	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Tela do apresentador (fase 6)
-S150	3.13 Apresentar	Vários monitores	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Vários monitores (fase 6)
-S151	3.13 Apresentar	Ensaiar	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Ensaiar (fase 6)
-S152	3.13 Apresentar	Teclas durante a apresentação	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Teclas durante a apresentação (fase 4)
-S153	3.13 Apresentar	Controle remoto 🌐 (no 15, rede local)	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Controle remoto pela rede local (fase 6); sem internet, então fica no escopo
-S154	3.13 Apresentar	Vários apresentadores 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Vários apresentadores (online)
-S155	3.13 Apresentar	Apresentar no FaceTime 🌐	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	FaceTime (online)
-S156	3.13 Apresentar	Touch Bar	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Touch Bar é hardware Apple
-S157	3.13 Apresentar	Ponteiro durante a apresentação	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Ponteiro durante a apresentação (fase 6)
-S158	3.14 Revisão e ferramentas de escrita	Comentários	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Comentários (fase 8)
-S159	3.14 Revisão e ferramentas de escrita	Nome do autor e cor	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Nome e cor do autor
-S160	3.14 Revisão e ferramentas de escrita	Realce de revisão	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Realce de revisão
-S161	3.14 Revisão e ferramentas de escrita	Ortografia e gramática	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Ortografia do Writer
-S162	3.14 Revisão e ferramentas de escrita	Correção automática	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Correção automática do Writer; faltam frações e estilo de aspas
-S163	3.14 Revisão e ferramentas de escrita	Localizar e substituir	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	a definir no plano novo	Barra de busca ao vivo do Writer
-S164	3.14 Revisão e ferramentas de escrita	Dicionário 🌐 (no 15, parcial)	Igual	Igual nas duas	-	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Dicionário (parte online)
-S165	3.14 Revisão e ferramentas de escrita	Writing Tools 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Writing Tools
-S166	3.15 Imprimir, exportar e enviar	Imprimir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Imprimir (fase 8)
-S167	3.15 Imprimir, exportar e enviar	PDF	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	PDF (fase 8)
-S168	3.15 Imprimir, exportar e enviar	PowerPoint	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	PowerPoint (fase 8)
-S169	3.15 Imprimir, exportar e enviar	Filme	Diferente	15.4	D-001	Fora: exportação não suportada (D-019)	Fora do escopo	-	a definir no plano novo	Exportar filme (fase 8)
-S170	3.15 Imprimir, exportar e enviar	GIF animado	Só 15	15.4	D-001	Fora: exportação não suportada (D-019)	Fora do escopo	-	a definir no plano novo	GIF animado
-S171	3.15 Imprimir, exportar e enviar	Imagens	Igual	Igual nas duas	-	Fora: exportação não suportada (D-019)	Fora do escopo	-	a definir no plano novo	Imagens (fase 8)
-S172	3.15 Imprimir, exportar e enviar	HTML	Igual	Igual nas duas	-	Fora: exportação não suportada (D-019)	Fora do escopo	-	a definir no plano novo	HTML (fase 8)
-S173	3.15 Imprimir, exportar e enviar	Exportar para iPod	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	iPod não existe mais
-S174	3.15 Imprimir, exportar e enviar	Salvar no formato da versão anterior	Diferente	15.4	D-001	Fora: exportação não suportada (D-019)	Fora do escopo	-	a definir no plano novo	Salvar no formato da versão anterior
-S175	3.15 Imprimir, exportar e enviar	Enviar para iDVD, iPhoto, iTunes, GarageBand, YouTube 🌐 (YouTube)	Só '09	'09, na forma do 15	D-002	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Enviar ao iDVD, iPhoto, YouTube (serviços extintos ou online)
-S176	3.15 Imprimir, exportar e enviar	Enviar por e-mail 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Enviar por e-mail
-S177	3.15 Imprimir, exportar e enviar	Publicar em blog 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Publicar em blog
-S178	3.15 Imprimir, exportar e enviar	iWork.com 🌐	Só '09	'09, na forma do 15	D-002	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	iWork.com
-S179	3.16 Colaboração, nuvem, automação e acessibilidade	Colaboração em tempo real 🌐💲 (até 4 GB só com assinatura)	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Colaboração
-S180	3.16 Colaboração, nuvem, automação e acessibilidade	iCloud Drive, Keynote para iCloud, Handoff, AirDrop 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	iCloud
-S181	3.16 Colaboração, nuvem, automação e acessibilidade	AppleScript	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	AppleScript
-S182	3.16 Colaboração, nuvem, automação e acessibilidade	Automator	Diferente	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Automator e Atalhos são do macOS
-S183	3.16 Colaboração, nuvem, automação e acessibilidade	Atalhos (Shortcuts)	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	a definir no plano novo	Atalhos
-S184	3.16 Colaboração, nuvem, automação e acessibilidade	Siri 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Siri
-S185	3.16 Colaboração, nuvem, automação e acessibilidade	VoiceOver	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	a definir no plano novo	Leitor de tela nas Slides (KGNM-04, fase 6)
-S186	3.16 Colaboração, nuvem, automação e acessibilidade	Privacidade e análise 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Privacidade e análise
-S187	3.16 Colaboração, nuvem, automação e acessibilidade	Assinatura Creator Studio 💲🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	a definir no plano novo	Assinatura
-S188	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do Desk, com as extensões	-	Decisão do projeto	D-009	Dentro	Ausente	-	a definir no plano novo	-
-S189	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do LibreOffice e do OpenOffice atuais	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
-S190	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork '09	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
-S191	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork atual	-	Decisão do projeto	D-010, D-011	Dentro	Ausente	-	a definir no plano novo	-
-S192	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do Microsoft Office atual	-	Decisão do projeto	D-010	Dentro	Ausente	-	a definir no plano novo	-
-S193	Compatibilidade de arquivos (D-010, D-019)	Salvar ODF com as extensões do Desk	-	Decisão do projeto	D-009	Dentro	Ausente	-	a definir no plano novo	-
-S194	Compatibilidade de arquivos (D-010, D-019)	Exportar para o Microsoft Office	-	Decisão do projeto	D-019	Dentro	Ausente	-	a definir no plano novo	-
-S195	Compatibilidade de arquivos (D-010, D-019)	Exportar PDF	-	Decisão do projeto	D-019	Dentro	Ausente	-	a definir no plano novo	-
-S196	Compatibilidade de arquivos (D-010, D-019)	Exportar EPUB	-	Decisão do projeto	D-019	Não se aplica a este aplicativo	Não se aplica	-	a definir no plano novo	-
+S001	3.1 Janela, menus e painéis	Barra de menus	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Menus do GNOME e busca de comandos da interface B (KGNM-10)
+S002	3.1 Janela, menus e painéis	Barra de ferramentas	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Barra de cabeçalho com Reproduzir e inserir (KINT-12)
+S003	3.1 Janela, menus e painéis	Barra de formatação (Format Bar)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	B1	Barra de formatação do slide e da seleção (KINT-13)
+S004	3.1 Janela, menus e painéis	Inspetor	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Inspetor contextual com o nível Animação (KINT-14 no que cabe à fase 2)
+S005	3.1 Janela, menus e painéis	Gaveta Build Order	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	B1	Ordem das composições (fase 5)
+S006	3.1 Janela, menus e painéis	Media Browser 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Popover Mídia do Writer, sem verificação nas Slides
+S007	3.1 Janela, menus e painéis	Janelas Colors e Fonts	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Popovers de fontes e cores do Writer
+S008	3.1 Janela, menus e painéis	Janela Adjust Image	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Ajustar Imagem no Inspetor do Writer
+S009	3.1 Janela, menus e painéis	Ferramentas de organizar	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Organizar no Inspetor do Writer
+S010	3.1 Janela, menus e painéis	Avisos do documento	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	B1	Banner de avisos do Writer
+S011	3.1 Janela, menus e painéis	Borda inferior	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Barra inferior com \"Slide 3 de 12\" e Notas (KGNM-14)
+S012	3.1 Janela, menus e painéis	Tela cheia	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	B1	Tela cheia e só o slide (KINT-10)
+S013	3.1 Janela, menus e painéis	Vários documentos	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	B1	Abas
+S014	3.1 Janela, menus e painéis	Modo escuro	Só 15	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Estilo claro/escuro do sistema
+S015	3.1 Janela, menus e painéis	Preferências	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	B1	Preferências do Writer; faltam Apresentação e Controle remoto
+S016	3.1 Janela, menus e painéis	Desfazer/refazer	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	B1	Desfazer e refazer
+S017	3.2 Documentos, temas e arquivos	Seletor de temas 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Seletor de temas (fase 3)
+S018	3.2 Documentos, temas e arquivos	Apresentação a partir de esboço 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Apresentação gerada por IA
+S019	3.2 Documentos, temas e arquivos	Novos slides a partir de esboço 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Slides gerados por IA
+S020	3.2 Documentos, temas e arquivos	Nova apresentação sempre do mesmo tema	Igual	Igual nas duas	-	Dentro	Ausente	-	S1	Tema padrão (fase 3)
+S021	3.2 Documentos, temas e arquivos	Trocar o tema	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Trocar o tema (fase 3)
+S022	3.2 Documentos, temas e arquivos	Salvar tema	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Salvar tema (fase 3)
+S023	3.2 Documentos, temas e arquivos	Salvar	Diferente	15.4	D-001	Dentro	Ausente	-	S1	As Slides ainda não salvam em ODP (fase 1); o alvo do 15 é salvamento automático
+S024	3.2 Documentos, temas e arquivos	Renomear pelo título da janela	Só 15	15.4	D-001	Dentro	Base pronta	-	S1	Renomear pelo título existe na janela compartilhada
+S025	3.2 Documentos, temas e arquivos	Versões anteriores	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Versões (decisão caminho L)
+S026	3.2 Documentos, temas e arquivos	Pacote ou arquivo único	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Arquivo ODP único (fase 1)
+S027	3.2 Documentos, temas e arquivos	Copiar mídia para o documento	Igual	Igual nas duas	-	Dentro	Ausente	-	S1	Copiar mídia para o documento (depende de ODP)
+S028	3.2 Documentos, temas e arquivos	Senha	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Senha (fase 8)
+S029	3.2 Documentos, temas e arquivos	Bloquear apresentação	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Bloquear (fase 8)
+S030	3.2 Documentos, temas e arquivos	Metadados do Spotlight (autor, título, palavras-chave, comentários)	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	S1	Metadados (KDOC-11, fase 1)
+S031	3.2 Documentos, temas e arquivos	Reduzir tamanho	Diferente	15.4	D-001	Dentro	Base pronta	-	S1	Reduzir mídia do Writer
+S032	3.2 Documentos, temas e arquivos	Abrir formatos	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Abrir ODP, Keynote '09 e PowerPoint (fases 1 e 8)
+S033	3.2 Documentos, temas e arquivos	Linguagem e região por apresentação	Só 15	15.4	D-001	Dentro	Ausente	-	S1	Idioma por apresentação
+S034	3.2 Documentos, temas e arquivos	Arquivos recentes	Igual	Igual nas duas	-	Dentro	Base pronta	-	S1	Recentes do GTK
+S035	3.2 Documentos, temas e arquivos	Apresentação nova pelo ícone do Dock	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Ícone do Dock é do macOS
+S036	3.3 Visualização e navegação	Navegador de slides	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Navegador de slides (KINT-07, KSLD-04)
+S037	3.3 Visualização e navegação	Esboço (Outline)	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Estrutura de tópicos (KINT-08)
+S038	3.3 Visualização e navegação	Somente slide	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Só o slide (KINT-10)
+S039	3.3 Visualização e navegação	Mesa de luz (Light Table)	Diferente	15.4	D-001	Dentro	Parcial	-	S1	Mesa de luz (KINT-09); falta esconder os ignorados
+S040	3.3 Visualização e navegação	Lista de objetos	Só 15	15.4	D-001	Dentro	Ausente	-	S1	Lista de objetos
+S041	3.3 Visualização e navegação	Área de trabalho em volta do slide	Só 15	15.4	D-001	Dentro	Ausente	-	S1	Área de trabalho em volta do slide
+S042	3.3 Visualização e navegação	Notas do apresentador	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Notas do apresentador (KSLD-15)
+S043	3.3 Visualização e navegação	Notas geradas pela IA 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Notas por IA
+S044	3.3 Visualização e navegação	Zoom	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Zoom (KINT-06)
+S045	3.3 Visualização e navegação	Réguas	Diferente	15.4	D-001	Dentro	Base pronta	-	S1	Réguas do Writer (unidades por localidade)
+S046	3.3 Visualização e navegação	Guias de alinhamento	Diferente	15.4	D-001	Dentro	Base pronta	-	S1	Guias do Writer; falta a cor própria
+S047	3.3 Visualização e navegação	Ir para slide	Diferente	15.4	D-001	Dentro	Pronto	-	feito	Ir para um slide (KINT-11)
+S048	3.4 Slides, leiautes e mestres	Adicionar, duplicar, apagar slides	Igual	Igual nas duas	-	Dentro	Parcial	-	S1	Adicionar, duplicar e apagar (KSLD-01, KSLD-05); falta arrastar entre apresentações
+S049	3.4 Slides, leiautes e mestres	Ignorar slide	Diferente	15.4	D-001	Dentro	Parcial	-	S1	Pular slide (KSLD-06); falta pular o grupo recolhido
+S050	3.4 Slides, leiautes e mestres	Números de slide	Igual	Igual nas duas	-	Dentro	Ausente	-	S1	Número do slide (KSLD-08)
+S051	3.4 Slides, leiautes e mestres	Tamanho do slide	Igual	Igual nas duas	-	Dentro	Parcial	-	S1	1024 × 768 (KAPR-04); faltam outros tamanhos e o tamanho próprio
+S052	3.4 Slides, leiautes e mestres	Fundo do slide	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Fundo do slide (KSLD-12)
+S053	3.4 Slides, leiautes e mestres	Fundos dinâmicos (animados)	Só 15	15.4	D-001	Dentro	Ausente	-	S1	Fundos animados
+S054	3.4 Slides, leiautes e mestres	Slides mestres / leiautes	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Folhas-mestras (fase 3); a página Mestres na barra lateral ainda não funciona
+S055	3.4 Slides, leiautes e mestres	Aplicar e reaplicar leiaute	Igual	Igual nas duas	-	Dentro	Ausente	-	S1	Aplicar e reaplicar leiaute (fase 3)
+S056	3.4 Slides, leiautes e mestres	Mostrar ou esconder título e corpo	Igual	Igual nas duas	-	Dentro	Ausente	-	S1	Título e corpo (fase 3)
+S057	3.4 Slides, leiautes e mestres	Marcadores de posição de texto e mídia	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Espaços reservados com etiquetas (fase 3)
+S058	3.4 Slides, leiautes e mestres	Marcador de objeto (tabela, gráfico)	Diferente	15.4	D-001	Dentro	Ausente	-	S1	Espaço reservado de objeto (fase 3)
+S059	3.4 Slides, leiautes e mestres	Camadas entre slide e mestre	Igual	Igual nas duas	-	Dentro	Ausente	-	S1	Camadas entre slide e mestre (fase 3)
+S060	3.4 Slides, leiautes e mestres	Padrões por mestre e por tema	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	-	S1	Padrões por mestre e por tema (fases 3 e 7)
+S061	3.4 Slides, leiautes e mestres	Importar estilos de objeto de outro tema	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	-	S1	Importar estilos de outro tema (fase 3)
+S062	3.4 Slides, leiautes e mestres	Slide Clean Up 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Slide Clean Up (IA)
+S063	3.5 Texto e caracteres	Seleção de texto	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Seleção descontínua do Writer
+S064	3.5 Texto e caracteres	Fonte, tamanho, negrito, itálico, sublinhado, tachado	Diferente (lugar)	15.4	D-001	Dentro	Base pronta	-	S2	Formatação do Writer
+S065	3.5 Texto e caracteres	Reduzir o texto para caber	Igual	Igual nas duas	-	Dentro	Ausente	-	S2	Encolher texto para caber (KTXT-03)
+S066	3.5 Texto e caracteres	Cor do texto	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Cor sólida do Writer; faltam gradiente e imagem
+S067	3.5 Texto e caracteres	Contorno e sombra	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Contorno e sombra do Writer
+S068	3.5 Texto e caracteres	Maiúsculas	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Maiúsculas do '09 no Writer
+S069	3.5 Texto e caracteres	Sobrescrito, subscrito, linha de base	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Sobrescrito do Writer
+S070	3.5 Texto e caracteres	Espaçamento entre caracteres e ligaduras	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Espaçamento e ligaduras do Writer
+S071	3.5 Texto e caracteres	Suavização de fontes	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Suavização de fontes é do sistema
+S072	3.5 Texto e caracteres	Capitular (drop cap)	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Capitular
+S073	3.5 Texto e caracteres	Frações automáticas	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Frações automáticas
+S074	3.5 Texto e caracteres	Aspas e travessões inteligentes	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Aspas do Writer
+S075	3.5 Texto e caracteres	Substituição de texto	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Substituição do Writer
+S076	3.5 Texto e caracteres	Caracteres especiais, acentos, emoji	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Caracteres especiais do GTK
+S077	3.5 Texto e caracteres	Ditado 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Ditado
+S078	3.5 Texto e caracteres	Previsão ao digitar 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Previsão ao digitar
+S079	3.5 Texto e caracteres	Tradução 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Tradução
+S080	3.5 Texto e caracteres	Bidirecional, vertical, guia fonético, ênfase CJK	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Bidi, vertical, fonético
+S081	3.6 Estilos	Estilos de parágrafo	Só 15	15.4	D-001	Dentro	Base pronta	-	S2	Estilos de parágrafo do Writer; falta mostrá-los nas Slides
+S082	3.6 Estilos	Estilos de caractere	Só 15	15.4	D-001	Dentro	Base pronta	-	S2	Estilos de caractere do Writer
+S083	3.6 Estilos	Estilos de lista	Só 15	15.4	D-001	Dentro	Base pronta	-	S2	Estilos de lista do Writer
+S084	3.6 Estilos	Atalhos F1–F8 para estilos	Só 15	15.4	D-001	Dentro	Base pronta	-	S2	Atalhos de estilo do Writer
+S085	3.6 Estilos	Copiar e colar estilo	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Copiar e colar estilo do Writer
+S086	3.6 Estilos	Estilos de objeto, tabela e gráfico	Só 15	15.4	D-001	Dentro	Base pronta	-	S2	Estilos de objeto do Writer; faltam tabela e gráfico
+S087	3.6 Estilos	Caixa de texto padrão	Diferente	15.4	D-001	Dentro	Ausente	-	S2	Caixa de texto padrão por apresentação
+S088	3.7 Parágrafo, listas e colunas	Alinhamento, espaçamento de linha e de parágrafo, margem interna	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Parágrafo do Writer
+S089	3.7 Parágrafo, listas e colunas	Tabulações e recuos	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Tabulações e recuos do Writer
+S090	3.7 Parágrafo, listas e colunas	Bordas, linhas e fundo de parágrafo	Só 15	15.4	D-001	Dentro	Base pronta	-	S2	Bordas e fundo de parágrafo do Writer
+S091	3.7 Parágrafo, listas e colunas	Listas automáticas	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Listas automáticas do Writer
+S092	3.7 Parágrafo, listas e colunas	Marcadores de texto, de imagem e números	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Marcadores do Writer
+S093	3.7 Parágrafo, listas e colunas	Reordenar itens arrastando	Diferente	15.4	D-001	Dentro	Ausente	-	S2	Reordenar itens arrastando no texto
+S094	3.7 Parágrafo, listas e colunas	Colunas de texto	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Colunas do Writer
+S095	3.8 Objetos: imagens e formas	Imagens 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Imagens do Writer (sem SVG e HEIC)
+S096	3.8 Objetos: imagens e formas	Remover fundo 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou	S2	O do 15 usa IA; vale o Alfa Instantâneo do Writer
+S097	3.8 Objetos: imagens e formas	Ajustes de imagem	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Ajustar Imagem do Writer
+S098	3.8 Objetos: imagens e formas	Galeria de imagens	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Galeria de imagens
+S099	3.8 Objetos: imagens e formas	IA para imagens 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	IA para imagens
+S100	3.8 Objetos: imagens e formas	Image Playground 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Image Playground
+S101	3.8 Objetos: imagens e formas	Formas 🤖💲 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Formas do Writer; faltam biblioteca e combinar
+S102	3.8 Objetos: imagens e formas	Editar pontos e curvas	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Editar pontos do Writer
+S103	3.8 Objetos: imagens e formas	Linhas e conexões	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Conexões do Writer; faltam as em ângulo
+S104	3.8 Objetos: imagens e formas	Objetos 3D (USDZ)	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Objetos 3D
+S105	3.8 Objetos: imagens e formas	Desenhos (Apple Pencil)	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Desenho à mão livre animável
+S106	3.8 Objetos: imagens e formas	Bordas, molduras, sombra, reflexo, opacidade	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Efeitos de objeto do Writer
+S107	3.8 Objetos: imagens e formas	Preenchimento	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Preenchimento do Writer
+S108	3.8 Objetos: imagens e formas	Legenda e título de objeto	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Legenda e título de objeto
+S109	3.8 Objetos: imagens e formas	Objetos dentro de caixas e formas	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Objetos dentro de caixas
+S110	3.8 Objetos: imagens e formas	Posição exata, alinhar, distribuir	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Alinhar e distribuir do Writer
+S111	3.8 Objetos: imagens e formas	Camadas, agrupar, travar	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Camadas, grupos e travar do Writer
+S112	3.8 Objetos: imagens e formas	Redimensionar, girar, espelhar	Igual	Igual nas duas	-	Dentro	Base pronta	-	S2	Redimensionar e girar do Writer
+S113	3.8 Objetos: imagens e formas	Equações 🧩 (no '09)	Diferente	15.4	D-001	Dentro	Ausente	-	S2	Equações LaTeX/MathML
+S114	3.9 Som e vídeo	Filme no slide	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Filmes do Writer; falta tocar através dos slides
+S115	3.9 Som e vídeo	Áudio no slide	Diferente	15.4	D-001	Dentro	Base pronta	-	S2	Áudio do Writer
+S116	3.9 Som e vídeo	Trilha sonora	Diferente	15.4	D-001	Dentro	Ausente	-	S2	Trilha sonora (fase 6)
+S117	3.9 Som e vídeo	Narração da apresentação inteira	Diferente	15.4	D-001	Dentro	Ausente	-	S2	Narração (fase 6)
+S118	3.9 Som e vídeo	Gravar áudio como objeto	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Gravar áudio
+S119	3.9 Som e vídeo	Vídeo da web 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Vídeo da web
+S120	3.9 Som e vídeo	Vídeo ao vivo	Só 15	15.4	D-001	Dentro	Ausente	-	S2	Vídeo ao vivo da câmera
+S121	3.9 Som e vídeo	Formatos de mídia	Diferente	15.4	D-001	Dentro	Ausente	-	S2	Otimizar mídia ao inserir
+S122	3.10 Tabelas	Inserir tabela	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S5	Inserir tabela do Writer; faltam estilos
+S123	3.10 Tabelas	Linhas, colunas, cabeçalhos, rodapé	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	S5	Linhas e colunas do Writer
+S124	3.10 Tabelas	Mesclar e dividir células	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	S5	Mesclar e dividir do Writer
+S125	3.10 Tabelas	Formatos de célula	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	S5	Formatos do Writer
+S126	3.10 Tabelas	Fórmulas e funções 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S5	Fórmulas do Writer; o 15 tem mais funções
+S127	3.10 Tabelas	Realce condicional, ordenar, preencher	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	S5	Condicional, ordenar e preencher do Writer
+S128	3.10 Tabelas	Título da tabela, travar tabela, direção bidi	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S5	Título, travar e bidi de tabela
+S129	3.11 Gráficos	Tipos	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S5	Onze tipos do Writer; faltam rosca, radar e bolhas
+S130	3.11 Gráficos	Gráfico interativo	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S5	Gráfico interativo
+S131	3.11 Gráficos	Dados	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S5	Editor de dados do Writer
+S132	3.11 Gráficos	Eixos, rótulos, legendas, barras de erro, tendência	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S5	Eixos, erro e tendência do Writer; faltam linhas de referência
+S133	3.11 Gráficos	Estilos de gráfico	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S5	Estilos de gráfico
+S134	3.11 Gráficos	Cena 3D (luz, ângulo)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Base pronta	o alvo mudou; a janela muda (D-008)	S5	Cena 3D do Writer
+S135	3.12 Animação: transições, composições e ações	Onde se configura	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	S3	O nível Animação do Inspetor existe (fase 2); as animações são das fases 4 e 5
+S136	3.12 Animação: transições, composições e ações	Transições	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S3	Transições (fase 4); lista do 15.4 conferida no Mac: 43 efeitos, mais Anagram, Blur, Burn, Falling Tiles, Flash, Motion Dissolve e Shutter do '09
+S137	3.12 Animação: transições, composições e ações	Magic Move	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S3	Movimento Mágico (fase 4)
+S138	3.12 Animação: transições, composições e ações	Composições de entrada e saída	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S3	Composições (fase 5); lista do 15.4 conferida no Mac: 43 de entrada e 42 de saída para texto, mais Convergence e Typewriter do '09
+S139	3.12 Animação: transições, composições e ações	Ações (animar sobre o slide)	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S3	Ações (fase 5); no 15.4: Move, Opacity, Rotate, Scale e as ênfases Blink, Bounce, Flip, Jiggle, Pop, Pulse
+S140	3.12 Animação: transições, composições e ações	Ordem e tempo das composições	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S3	Ordem e tempo das composições (fase 5)
+S141	3.12 Animação: transições, composições e ações	Smart Builds	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	a janela muda (D-008)	S3	Composições inteligentes (fase 5)
+S142	3.12 Animação: transições, composições e ações	Copiar e colar animação	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	S3	Copiar e colar animação (fase 5); conferido no Keynote 15.4: Format > Copy/Paste Animation existe e funciona
+S143	3.12 Animação: transições, composições e ações	Animações para máquinas fracas	Só '09	'09, na forma do 15	D-002	Dentro	Ausente	a janela muda (D-008)	S3	Animações para máquinas fracas (KVMI-02)
+S144	3.13 Apresentar	Tipo de apresentação	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	S4	Tipo de apresentação (fase 6)
+S145	3.13 Apresentar	Reproduzir ao abrir, repetir, reiniciar se ocioso	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	S4	Reproduzir ao abrir e repetir (fase 6)
+S146	3.13 Apresentar	Senha para sair da apresentação	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	a janela muda (D-008)	S4	Senha para sair (fase 6)
+S147	3.13 Apresentar	Apresentar em tela cheia	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Apresentar em tela cheia (fase 4); o botão Reproduzir já existe
+S148	3.13 Apresentar	Apresentar numa janela	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Apresentar numa janela
+S149	3.13 Apresentar	Tela do apresentador	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Tela do apresentador (fase 6)
+S150	3.13 Apresentar	Vários monitores	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Vários monitores (fase 6)
+S151	3.13 Apresentar	Ensaiar	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Ensaiar (fase 6)
+S152	3.13 Apresentar	Teclas durante a apresentação	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Teclas durante a apresentação (fase 4)
+S153	3.13 Apresentar	Controle remoto 🌐 (no 15, rede local)	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S4	Controle remoto pela rede local (fase 6); sem internet, então fica no escopo
+S154	3.13 Apresentar	Vários apresentadores 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Vários apresentadores (online)
+S155	3.13 Apresentar	Apresentar no FaceTime 🌐	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	FaceTime (online)
+S156	3.13 Apresentar	Touch Bar	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Touch Bar é hardware Apple
+S157	3.13 Apresentar	Ponteiro durante a apresentação	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	S4	Ponteiro durante a apresentação (fase 6)
+S158	3.14 Revisão e ferramentas de escrita	Comentários	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S2	Comentários (fase 8)
+S159	3.14 Revisão e ferramentas de escrita	Nome do autor e cor	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S2	Nome e cor do autor
+S160	3.14 Revisão e ferramentas de escrita	Realce de revisão	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S2	Realce de revisão
+S161	3.14 Revisão e ferramentas de escrita	Ortografia e gramática	Igual	Igual nas duas	-	Dentro	Base pronta	a janela muda (D-008)	S2	Ortografia do Writer
+S162	3.14 Revisão e ferramentas de escrita	Correção automática	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S2	Correção automática do Writer; faltam frações e estilo de aspas
+S163	3.14 Revisão e ferramentas de escrita	Localizar e substituir	Diferente	15.4	D-001	Dentro	Base pronta	a janela muda (D-008)	S2	Barra de busca ao vivo do Writer
+S164	3.14 Revisão e ferramentas de escrita	Dicionário 🌐 (no 15, parcial)	Igual	Igual nas duas	-	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Dicionário (parte online)
+S165	3.14 Revisão e ferramentas de escrita	Writing Tools 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Writing Tools
+S166	3.15 Imprimir, exportar e enviar	Imprimir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	a janela muda (D-008)	S5	Imprimir (fase 8)
+S167	3.15 Imprimir, exportar e enviar	PDF	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S5	PDF (fase 8)
+S168	3.15 Imprimir, exportar e enviar	PowerPoint	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S5	PowerPoint (fase 8)
+S169	3.15 Imprimir, exportar e enviar	Filme	Diferente	15.4	D-001	Fora: exportação não suportada (D-019)	Fora do escopo	-	-	Exportar filme (fase 8)
+S170	3.15 Imprimir, exportar e enviar	GIF animado	Só 15	15.4	D-001	Fora: exportação não suportada (D-019)	Fora do escopo	-	-	GIF animado
+S171	3.15 Imprimir, exportar e enviar	Imagens	Igual	Igual nas duas	-	Fora: exportação não suportada (D-019)	Fora do escopo	-	-	Imagens (fase 8)
+S172	3.15 Imprimir, exportar e enviar	HTML	Igual	Igual nas duas	-	Fora: exportação não suportada (D-019)	Fora do escopo	-	-	HTML (fase 8)
+S173	3.15 Imprimir, exportar e enviar	Exportar para iPod	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	iPod não existe mais
+S174	3.15 Imprimir, exportar e enviar	Salvar no formato da versão anterior	Diferente	15.4	D-001	Fora: exportação não suportada (D-019)	Fora do escopo	-	-	Salvar no formato da versão anterior
+S175	3.15 Imprimir, exportar e enviar	Enviar para iDVD, iPhoto, iTunes, GarageBand, YouTube 🌐 (YouTube)	Só '09	'09, na forma do 15	D-002	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Enviar ao iDVD, iPhoto, YouTube (serviços extintos ou online)
+S176	3.15 Imprimir, exportar e enviar	Enviar por e-mail 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Enviar por e-mail
+S177	3.15 Imprimir, exportar e enviar	Publicar em blog 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Publicar em blog
+S178	3.15 Imprimir, exportar e enviar	iWork.com 🌐	Só '09	'09, na forma do 15	D-002	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	iWork.com
+S179	3.16 Colaboração, nuvem, automação e acessibilidade	Colaboração em tempo real 🌐💲 (até 4 GB só com assinatura)	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Colaboração
+S180	3.16 Colaboração, nuvem, automação e acessibilidade	iCloud Drive, Keynote para iCloud, Handoff, AirDrop 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	iCloud
+S181	3.16 Colaboração, nuvem, automação e acessibilidade	AppleScript	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	AppleScript
+S182	3.16 Colaboração, nuvem, automação e acessibilidade	Automator	Diferente	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Automator e Atalhos são do macOS
+S183	3.16 Colaboração, nuvem, automação e acessibilidade	Atalhos (Shortcuts)	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Atalhos
+S184	3.16 Colaboração, nuvem, automação e acessibilidade	Siri 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Siri
+S185	3.16 Colaboração, nuvem, automação e acessibilidade	VoiceOver	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	S5	Leitor de tela nas Slides (KGNM-04, fase 6)
+S186	3.16 Colaboração, nuvem, automação e acessibilidade	Privacidade e análise 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Privacidade e análise
+S187	3.16 Colaboração, nuvem, automação e acessibilidade	Assinatura Creator Studio 💲🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Assinatura
+S188	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do Desk, com as extensões	-	Decisão do projeto	D-009	Dentro	Ausente	-	S5	-
+S189	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do LibreOffice e do OpenOffice atuais	-	Decisão do projeto	D-010	Dentro	Ausente	-	S5	-
+S190	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork '09	-	Decisão do projeto	D-010	Dentro	Ausente	-	S5	-
+S191	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork atual	-	Decisão do projeto	D-010, D-011	Dentro	Ausente	-	S5	-
+S192	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do Microsoft Office atual	-	Decisão do projeto	D-010	Dentro	Ausente	-	S5	-
+S193	Compatibilidade de arquivos (D-010, D-019)	Salvar ODF com as extensões do Desk	-	Decisão do projeto	D-009	Dentro	Ausente	-	S5	-
+S194	Compatibilidade de arquivos (D-010, D-019)	Exportar para o Microsoft Office	-	Decisão do projeto	D-019	Dentro	Ausente	-	S5	-
+S195	Compatibilidade de arquivos (D-010, D-019)	Exportar PDF	-	Decisão do projeto	D-019	Dentro	Ausente	-	S5	-
+S196	Compatibilidade de arquivos (D-010, D-019)	Exportar EPUB	-	Decisão do projeto	D-019	Não se aplica a este aplicativo	Não se aplica	-	-	-

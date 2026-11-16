@@ -35,8 +35,8 @@ Numbers and Keynote 15.4, the versions checked on a Mac on 2026-11-16.
 The window follows the look of the current iWork with native Libadwaita
 widgets wherever one exists. Where none exists, Desk builds one that
 follows the GNOME HIG and marks it for review at each new Libadwaita
-(D-007). The window itself is being chosen between two proposals:
-[interface/propostas](interface/propostas/README.md) (D-008, open).
+(D-007). The window is proposal M+ of
+[interface/propostas](interface/propostas/README.md) (D-008).
 
 ## Documents and compatibility
 
