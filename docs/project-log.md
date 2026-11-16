@@ -224,6 +224,16 @@ matrix rows done on 9 November, before the change of target.
   and their coding agents.
 - He asked for a progress dashboard kept up to date and published on the
   website (pull request 118), and for this log.
+- He asked for a cleanup of the repository and of the project folder on
+  Defiant, and approved the list of candidates. On the PC: five worktrees
+  and eleven local branches whose work is on `main`, the two installer
+  images of the virtual machines, the resources taken from the iWork '09
+  apps for the inventory of 14 November, and old captures, about 7.5 GB.
+  In the repository: the text engine experiment and 28 remote branches
+  (pull request 121). Both virtual machines stay, because the readers of
+  Numbers '09 and Keynote '09 still need documents made in iWork '09.
+  Left undone and moved to phase B1: three reference documents that carry
+  media from Apple software are remade there (backlog item B-010).
 
 ## Decisions, with their reasons and consequences
 
@@ -614,7 +624,7 @@ Open questions that this log should close when they are answered:
 
 ## Sources
 
-- The repository history and its pull requests 1 to 119.
+- The repository history and its pull requests 1 to 121.
 - [decisions.md](decisions.md), [goals.md](goals.md),
   [roadmap.md](roadmap.md) and [backlog](backlog/README.md).
 - The project conversations between the owner and Claude from 30 October
