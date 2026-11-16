@@ -32,7 +32,8 @@ spellbook = "0.4.2"
 # The encodings of the dictionaries that are not in UTF-8, by their SET line.
 encoding_rs = "0.8.35"
 
-# Text layout, as decided by the proof of concept in experiments/text-engine.
+# Text layout, as decided by the proof of concept of pull request 5 (its
+# code left the tree on 2026-11-16; see docs/project-log.md).
 # icu_segmenter and skrifa are pinned to the versions Parley itself uses.
 icu_segmenter = "2.4.0"
 parley = "0.12.0"

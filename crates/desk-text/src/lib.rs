@@ -11,8 +11,8 @@
 //! shapes the text with HarfRust, picks fonts through fontconfig, places
 //! the glyphs and aligns the lines. Desk decides where each line ends,
 //! which keeps hyphens and the space around wrapped objects under its
-//! control. `experiments/text-engine` has the comparison behind this
-//! choice.
+//! control. The proof of concept of pull request 5 has the comparison
+//! behind this choice; `docs/project-log.md` summarizes it.
 //!
 //! A family that the system does not have is laid out with a free font
 //! that stands for it, as the [`fonts`] module chooses (DOC-05).

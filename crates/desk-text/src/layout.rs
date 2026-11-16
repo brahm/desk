@@ -5,7 +5,7 @@
 //!
 //! Parley shapes the text, picks the fonts, places the glyphs and aligns
 //! each line. Desk decides where each line ends, as the proof of concept
-//! in `experiments/text-engine` settled: that keeps hyphens, the space
+//! of pull request 5 settled (see `docs/project-log.md`): that keeps hyphens, the space
 //! around wrapped objects and the rules that must match Pages in our code.
 
 use std::collections::HashMap;
