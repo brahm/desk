@@ -63,7 +63,7 @@ them one after the other.
 | **S3** Slides: animation | The transition and build engine, Magic Move, the effects of '09 kept by D-003 | 9 | 5 |
 | **S4** Slides: presenting | Play full screen and in a window, presenter display, rehearsal, recording, links and kiosk options | 11 | 3 |
 | **S5** Slides: tables, charts, files, print | Tables and charts on slides; open `.pptx`, `.key` of '09 and current; export `.pptx` and PDF; handouts | 25 | 5 |
-| **X1** Across the apps and 1.0 | Live links of charts and tables between documents (D-002), copy and paste among the apps, the legal review of D-011 (B-004), comments of the existing code brought to the standard, final parity report | - | 3 |
+| **X1** Across the apps and 1.0 | Live links of charts and tables between documents (D-002), copy and paste among the apps, comments of the existing code brought to the standard, final parity report | - | 3 |
 
 **Estimate: about 70 working days with the apps in sequence**, which puts
 parity near the end of January 2027; between 55 and 90 days (10 January to
