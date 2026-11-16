@@ -38,6 +38,7 @@ mod outline;
 mod pen;
 mod points;
 mod sections;
+mod slides;
 mod stories;
 
 pub use navigate::Navigate;
@@ -3258,7 +3259,10 @@ impl TextEditor {
         }
         self.selection_changed();
         self.show_objects();
-        if let Some(caret) = caret.filter(|_| !self.has_selected_objects()) {
+        // A page layout document has no body text, so the cursor of its
+        // body, on the first page, does not scroll there.
+        let body_only = self.is_page_layout() && self.story().is_none();
+        if let Some(caret) = caret.filter(|_| !self.has_selected_objects() && !body_only) {
             self.view.scroll_to(&caret);
             if let Some((x, y)) = self.view.to_area(caret.page, caret.x, caret.top) {
                 let (_, bottom) = self

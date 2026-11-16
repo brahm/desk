@@ -96,6 +96,12 @@ pub struct AppInfo {
     pub version: &'static str,
 }
 
+/// Whether an app is Desk Slides, whose window shows presentations
+/// (KINT-05).
+pub(crate) fn is_slides(info: AppInfo) -> bool {
+    info.id.ends_with(".Slides")
+}
+
 /// A document that an app read, and what the reading left out.
 pub struct Opened {
     /// The document.
@@ -345,6 +351,18 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             app.set_accels_for_action("win.properties", &["<Alt>Return"]);
         }
         app.set_accels_for_action("win.fullscreen", &["F11"]);
+        if is_slides(info) {
+            // The shortcuts of Desk Slides approved on 14/11/2026: Ctrl+M
+            // for a new slide, Ctrl+Shift+H to skip it and F5 to play
+            // (KGNM-11). Ctrl+N starts a presentation too, until it can
+            // be saved.
+            app.set_accels_for_action("win.new-slide", &["<Control>m"]);
+            app.set_accels_for_action("win.skip-slide", &["<Control><Shift>h"]);
+            app.set_accels_for_action("win.play", &["F5"]);
+            if opener.is_none() {
+                app.set_accels_for_action("app.new-window", &["<Control><Shift>n", "<Control>n"]);
+            }
+        }
         for (action, keys) in [
             ("win.bold", &["<Control>b"][..]),
             ("win.italic", &["<Control>i"]),

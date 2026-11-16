@@ -66,6 +66,7 @@ mod object_style;
 mod op;
 mod outline;
 mod picture;
+mod presentation;
 mod section;
 mod shape_path;
 mod story;
@@ -118,6 +119,7 @@ pub use object_style::{ObjectStyle, ObjectStyleKind, ObjectStyles, apply_object_
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::{Picture, PictureFormat};
+pub use presentation::{SLIDE_SIZE, Slide, Topics};
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 pub use shape_path::PathSegment;
 pub use story::Story;
