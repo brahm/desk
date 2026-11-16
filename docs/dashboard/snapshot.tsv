@@ -31,7 +31,7 @@ feature	S009	base
 feature	S010	base
 feature	S011	review
 feature	S012	review
-feature	S013	missing
+feature	S013	review
 feature	S014	review
 feature	S015	partial
 feature	S016	review
@@ -230,7 +230,7 @@ feature	T012	base
 feature	T013	base
 feature	T014	review
 feature	T015	base
-feature	T016	missing
+feature	T016	review
 feature	T017	review
 feature	T018	base
 feature	T019	review
@@ -423,7 +423,7 @@ feature	W009	partial
 feature	W010	review
 feature	W011	partial
 feature	W012	partial
-feature	W013	partial
+feature	W013	review
 feature	W014	review
 feature	W015	review
 feature	W016	review

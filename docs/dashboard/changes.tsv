@@ -21,3 +21,6 @@ date	kind	id	from	to
 2026-11-16	backlog	B-009	open	done
 2026-11-16	backlog	B-003	open	done
 2026-11-16	backlog	B-010	open	done
+2026-11-16	feature	W013	partial	review
+2026-11-16	feature	T016	missing	review
+2026-11-16	feature	S013	missing	review

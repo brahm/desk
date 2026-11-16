@@ -114,7 +114,7 @@ impl DocumentWindow {
                     run(&editor);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         let weak = Rc::downgrade(self);
         let action = gio::SimpleAction::new("insert-picture", None);
@@ -123,7 +123,7 @@ impl DocumentWindow {
                 this.choose_picture();
             }
         });
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
         self.add_media_browser_action();
         self.add_selectable_actions();
         let with_string: [(&str, ChoiceAction); 4] = [
@@ -163,7 +163,7 @@ impl DocumentWindow {
                     run(&editor, &value);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
     }
 
@@ -223,7 +223,7 @@ impl DocumentWindow {
                 editor.set_selectable(selectable);
                 action.set_state(&on.to_variant());
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
     }
 
@@ -237,7 +237,7 @@ impl DocumentWindow {
                 this.media_button.popup();
             }
         });
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
     }
 
     /// The Media Browser, made the first time it is asked for.

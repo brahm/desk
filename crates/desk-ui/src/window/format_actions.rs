@@ -98,7 +98,7 @@ impl DocumentWindow {
                     apply(&this, &editor, value);
                 }
             });
-            this.window.add_action(&action);
+            this.actions.add_action(&action);
         }
 
         stateful(
@@ -184,18 +184,18 @@ impl DocumentWindow {
                 editor.focus();
             }
         });
-        self.window.add_action(&list);
+        self.actions.add_action(&list);
 
         let inspector = gio::SimpleAction::new("show-inspector", None);
         let weak = Rc::downgrade(self);
         inspector.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
                 this.inspector.show_level(crate::inspector::FORMAT);
-                this.window
+                this.actions
                     .change_action_state("inspector", &true.to_variant());
             }
         });
-        self.window.add_action(&inspector);
+        self.actions.add_action(&inspector);
 
         // A tab of the Inspector by its name, as Adjust Image opens the
         // Image tab.
@@ -208,11 +208,11 @@ impl DocumentWindow {
                 if !this.inspector.show_tab(&name) {
                     this.inspector.show_level(crate::inspector::FORMAT);
                 }
-                this.window
+                this.actions
                     .change_action_state("inspector", &true.to_variant());
             }
         });
-        self.window.add_action(&tab);
+        self.actions.add_action(&tab);
 
         // The object styles (MOD-04, MOD-07): the style of the selected
         // object is the state, and choosing another applies it.
@@ -246,7 +246,7 @@ impl DocumentWindow {
                     run(&editor);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         let rename = gio::SimpleAction::new("rename-object-style", None);
         let weak = Rc::downgrade(self);
@@ -255,7 +255,7 @@ impl DocumentWindow {
                 this.rename_object_style();
             }
         });
-        self.window.add_action(&rename);
+        self.actions.add_action(&rename);
 
         let alpha = gio::SimpleAction::new("instant-alpha", None);
         let weak = Rc::downgrade(self);
@@ -264,7 +264,7 @@ impl DocumentWindow {
                 editor.start_instant_alpha();
             }
         });
-        self.window.add_action(&alpha);
+        self.actions.add_action(&alpha);
     }
 
     /// Puts the format bar and the states of its actions in step with the
@@ -280,7 +280,7 @@ impl DocumentWindow {
             self.format_bar.show_variant(variant);
         }
         let set =
-            |name: &str, value: glib::Variant| formatting::set_state(&self.window, name, value);
+            |name: &str, value: glib::Variant| formatting::set_state(&self.actions, name, value);
         set(
             "character-style",
             self.format_bar

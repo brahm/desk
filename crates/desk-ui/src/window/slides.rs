@@ -878,7 +878,7 @@ impl DocumentWindow {
                     run(&this, &editor);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         // Skip This Slide (KSLD-06), in the format bar of the slide and
@@ -898,7 +898,7 @@ impl DocumentWindow {
                 }
             }
         });
-        self.window.add_action(&skip);
+        self.actions.add_action(&skip);
 
         // The presenter notes under the slide (KINT-05).
         let notes = gio::SimpleAction::new_stateful("presenter-notes", None, &true.to_variant());
@@ -912,7 +912,7 @@ impl DocumentWindow {
                 revealer.set_reveal_child(on);
             }
         });
-        self.window.add_action(&notes);
+        self.actions.add_action(&notes);
         // Puts the cursor in the notes, opening them.
         let edit_notes = gio::SimpleAction::new("edit-notes", None);
         let weak = Rc::downgrade(self);
@@ -920,12 +920,12 @@ impl DocumentWindow {
             if let Some(this) = weak.upgrade()
                 && let Some(slides) = this.slides()
             {
-                this.window
+                this.actions
                     .change_action_state("presenter-notes", &true.to_variant());
                 slides.notes.grab_focus();
             }
         });
-        self.window.add_action(&edit_notes);
+        self.actions.add_action(&edit_notes);
 
         // The light table, in the place of the slide (KINT-09).
         let light_table = gio::SimpleAction::new_stateful("light-table", None, &false.to_variant());
@@ -938,11 +938,11 @@ impl DocumentWindow {
             action.set_state(&on.to_variant());
             this.show_light_table(on);
         });
-        self.window.add_action(&light_table);
+        self.actions.add_action(&light_table);
         let weak = Rc::downgrade(self);
         slides.light_table.connect_open(move |slide| {
             if let Some(this) = weak.upgrade() {
-                this.window
+                this.actions
                     .change_action_state("light-table", &false.to_variant());
                 if let Some(editor) = this.editor() {
                     editor.go_to_page(slide);
@@ -973,7 +973,7 @@ impl DocumentWindow {
                 }
             }
         });
-        self.window.add_action(&go_to);
+        self.actions.add_action(&go_to);
 
         // The notes go into the document a moment after the last key, as
         // one action of the history for each slide.
@@ -1068,7 +1068,7 @@ impl DocumentWindow {
         }
         slides.notes_slide.set(Some(slide));
         let skipped = editor.slide_skipped(self.chosen_slide(&editor));
-        formatting::set_state(&self.window, "skip-slide", skipped.to_variant());
+        formatting::set_state(&self.actions, "skip-slide", skipped.to_variant());
         self.bottom
             .show_slide_position(slide + 1, editor.slide_count().max(1));
     }

@@ -99,7 +99,7 @@ impl DocumentWindow {
         self.title.add_controller(click);
         let action = gio::SimpleAction::new("rename", None);
         action.connect_activate(move |_, _| open());
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
 
         let rename = {
             let weak = Rc::downgrade(self);

@@ -426,7 +426,7 @@ request each:
 
 | Step | What it does | Matrix rows |
 | --- | --- | --- |
-| 1. Header bar and document tabs | Sidebar button without the View menu, Open documents, the main menu with View and without Save, documents in tabs of one window | INT-11, GNM-01, GNM-10 |
+| 1. Header bar and document tabs (done) | Sidebar button without the View menu, Open documents, the main menu with View and without Save, documents in tabs of one window | INT-11, GNM-01, GNM-10 |
 | 2. Format pane in place of the format bar | What the format bar held moves to the Format pane, with Fonts and Colors as popovers from its rows, and Arrange becomes a tab | INT-12, INT-13 |
 | 3. Controls over the document | The zoom control and the word count overlaid, in place of the bottom bar of Writer and Slides | GNM-13, KGNM-14, INT-07, INT-19, DOC-20 |
 | 4. Bottom bar of Tables | The sheet switcher and the + button with the instant calculations; the sidebar shows the tables and charts of the sheet | NGNM-12, NGNM-13 |

@@ -276,11 +276,11 @@ def main():
         check("the Inspector shows the table of contents and links (EST-23, EST-25)", True)
         press("ctrl+alt+i")
 
-        # Ctrl+T shows the Fonts popover, with its effects and typography
-        # (INT-15, FMT-08).
-        press("ctrl+t")
+        # The Fonts popover has its effects and typography (INT-15,
+        # FMT-08); it has no shortcut of its own (D-024).
+        activate("fonts")
         wait_for("the Fonts popover", lambda: showing_named(app, "Ligatures"))
-        check("Ctrl+T shows the Fonts popover (INT-15, IOP-06)", True)
+        check("win.fonts shows the Fonts popover (INT-15, IOP-06)", True)
         check("it has the shadow", showing_named(app, "Shadow") is not None)
         check(
             "it has the colors of the underline and the strikethrough (FMT-01, FMT-02)",
@@ -2358,7 +2358,7 @@ def gnome_window(work):
         )
         press("ctrl+alt+i")
 
-        press("ctrl+t")
+        activate("fonts")
         wait_for("the Fonts popover", lambda: showing_named(app, "Favorites"))
         check("the Fonts popover has Favorites and its star (INT-15)", showing_named(app, "Favorite") is not None)
         press("Escape")
@@ -2425,7 +2425,7 @@ def gnome_window(work):
 
 # The buttons of the header bar of interface B, by their names, and the
 # ones a window narrower than 720 px puts in the Insert menu (INT-11).
-HEADER = ("Sidebar", "Insert", "Find", "Inspector", "Main Menu")
+HEADER = ("Sidebar", "Insert", "Find", "Inspector", "Open Documents", "Main Menu")
 OBJECTS = ("Table", "Chart", "Text Box", "Shape", "Media", "Comment")
 
 
@@ -2505,6 +2505,31 @@ def header_and_menus(work):
             lambda: next((n for n in walk(app) if (n.get_name() or "").endswith(" of 2")), None),
         )
         check("a command found runs with Enter (GNM-10)", True)
+
+        # Documents open as tabs of the window (W013, D-023, D-024): the
+        # tab bar shows from the second tab, Ctrl+Page Up goes back,
+        # Ctrl+W closes the tab and the window stays.
+        check("one document shows no tab bar", not document_tabs(app))
+        press("ctrl+t")
+        wait_for("the second tab", lambda: len(document_tabs(app)) == 2)
+        check("Ctrl+T opens a new document in a tab (D-024)", window_named("Untitled"))
+        press("ctrl+Page_Up")
+        wait_for("the first tab", lambda: window_named(name))
+        check("Ctrl+Page Up shows the tab before, and the window takes its title (D-023)", True)
+        press("ctrl+Page_Down")
+        wait_for("the new tab", lambda: window_named("Untitled"))
+        # Until saving is automatic (step 5 of M+), a new document asks
+        # to be saved when its tab closes.
+        press("ctrl+w")
+        wait_for("the question to save", lambda: showing_named(app, "Save Changes?"))
+        Atspi.Action.do_action(showing_named(app, "Discard"), 0)
+        wait_for("the tab to close", lambda: not document_tabs(app))
+        check("Ctrl+W closes the tab and leaves the window (D-023)", window_named(name))
+        Atspi.Action.do_action(showing_named(app, "Open Documents"), 0)
+        wait_for("the tab overview", lambda: showing_named(app, "New Tab"))
+        check("Open Documents shows the open documents (GNM-01)", True)
+        press("Escape")
+        wait_for("the tab overview to close", lambda: showing_named(app, "New Tab") is None)
 
         subprocess.run(
             ["xdotool", "search", "--name", name, "windowsize", "700", "600"],
@@ -2814,6 +2839,23 @@ def context_title(app, title):
         )
     except GLib.GError:
         return None
+
+
+def document_tabs(app):
+    """The titles of the document tabs that show in the tab bar; an empty
+    list while one document is open, since the bar hides then."""
+    return [
+        n.get_name() or ""
+        for n in walk(app)
+        if n.get_role() == Atspi.Role.PAGE_TAB and showing(n) and n.get_name() not in TABS
+    ]
+
+
+def window_named(title):
+    """Whether a window has a title that contains title, as xdotool sees it."""
+    return subprocess.run(
+        ["xdotool", "search", "--name", title], capture_output=True
+    ).returncode == 0
 
 
 def tab_names(app):

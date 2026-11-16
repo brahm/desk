@@ -25,10 +25,11 @@ from gi.repository import Atspi, GLib  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 TABLES = ROOT / "target" / "debug" / "desk-tables"
 TIMEOUT = 20
-# The window of a new document, which xdotool finds by its title.
-TITLE = "Untitled – Desk Tables"
+# The window of a new document, which xdotool finds by its title: the
+# window takes the title of the tab shown.
+TITLE = "Untitled"
 # The buttons of the header bar of interface B, by their names (NINT-07).
-HEADER = ("Sidebar", "Insert", "Find", "Inspector", "Main Menu")
+HEADER = ("Sidebar", "Insert", "Find", "Inspector", "Open Documents", "Main Menu")
 OBJECTS = ("Table", "Chart", "Text Box", "Shape", "Media", "Comment")
 
 
@@ -235,9 +236,9 @@ def main():
         activate("add-sheet")
         wait_for("the new sheet", lambda: showing_named(app, "Sheet 2 (2 of 2)"))
         check("the Add button adds a sheet with a table after the one shown (NTAB-02)", showing_named(app, "Sheet 2"))
-        press("ctrl+Page_Up")
+        press("alt+Page_Up")
         wait_for("the first sheet", lambda: showing_named(app, "Sheet 1 (1 of 2)"))
-        check("Ctrl+Page Up shows the sheet before (NGNM-13)", True)
+        check("Alt+Page Up shows the sheet before (NGNM-13, D-023)", True)
         activate("rename-sheet")
         wait_for("the dialog", lambda: showing_named(app, "Rename Sheet"))
         press("ctrl+a")
