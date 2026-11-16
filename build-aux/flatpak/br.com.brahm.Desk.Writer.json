@@ -533,8 +533,7 @@
                         "target",
                         "fuzz",
                         "corpus",
-                        "site",
-                        "experiments"
+                        "site"
                     ]
                 }
             ]
