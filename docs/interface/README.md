@@ -214,7 +214,8 @@ would go before it is read.
 
 ## Shortcuts
 
-Three rules, in this order (D-017):
+Desk is made for users of GNOME first (D-022). Three rules, in this order
+(D-017):
 
 1. Where GNOME has a standard shortcut, it applies.
 2. Where GNOME says nothing, the shortcut of iWork 15.4 applies, with Ctrl
@@ -258,20 +259,22 @@ ten names and shortcuts of the table below again on 2026-11-15. The
 format bar had Ctrl+Shift+R in interface B; M+ has no format bar, and the
 shortcut goes away with it.
 
-The document tabs follow D-021. `AdwTabView` brings the shortcuts of GNOME
-for tabs, and Desk keeps those that conflict with nothing:
+The document tabs follow D-023. `AdwTabView` brings the shortcuts of GNOME
+for tabs, the same in the three apps:
 
-| Command | Writer and Slides | Tables |
-| --- | --- | --- |
-| Next and previous document | Ctrl+PageDown and Ctrl+PageUp, or Ctrl+Tab and Ctrl+Shift+Tab | Ctrl+Tab and Ctrl+Shift+Tab |
-| Document 1 to 9 | Alt+1 to Alt+9 | Alt+1 to Alt+9 |
-| Move the tab left or right | Ctrl+Shift+PageUp and Ctrl+Shift+PageDown | Dragging the tab |
-| Next and previous sheet | Does not apply | Ctrl+PageDown and Ctrl+PageUp, as in the spreadsheets of LibreOffice and Microsoft Office |
+| Command | Shortcut |
+| --- | --- |
+| Next and previous document | Ctrl+PageDown and Ctrl+PageUp, or Ctrl+Tab and Ctrl+Shift+Tab |
+| Document 1 to 9 | Alt+1 to Alt+9 |
+| Move the tab left or right | Ctrl+Shift+PageUp and Ctrl+Shift+PageDown |
+| Next and previous sheet (Tables) | Alt+PageDown and Alt+PageUp |
 
-Ctrl+Home and Ctrl+End, which `AdwTabView` would give to the first and last
-tab, stay with the text and the cells (the start and the end of the
-document or of the table), so they are turned off in the tab view of the
-three apps.
+The sheets had Ctrl+PageUp and Ctrl+PageDown, as in the spreadsheets of
+LibreOffice and Microsoft Office; GNOME gives those keys to tabs, so the
+sheets moved (rule 3). Ctrl+Home and Ctrl+End, which `AdwTabView` would
+give to the first and last tab, stay with the text and the cells (the start
+and the end of the document or of the table), so they are turned off in the
+tab view of the three apps.
 
 ## HIG practices that the window follows
 

@@ -17,7 +17,9 @@ purpose and point to the full pages.
    `desk-formula`) depend on no other Desk crate; formats meet the model
    only in `desk-filters`; every change to a document is an operation of
    `desk-model` with an inverse.
-4. **Interface.** Use a native Libadwaita widget when one exists. When
+4. **Interface.** Desk is for users of GNOME first (D-022): where the
+   behaviour or the shortcut of GNOME and that of iWork differ, follow
+   GNOME. Use a native Libadwaita widget when one exists. When
    none does, build one that follows the GNOME HIG and record it in the
    component table of `docs/interface/proposals/README.md`, to be reviewed
    at each new Libadwaita.

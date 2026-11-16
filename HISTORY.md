@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Desk is made for users of GNOME first: where GNOME and iWork
+  differ, Desk follows GNOME. The document tabs take GNOME's shortcuts in
+  the three apps, and the sheets of Tables move to Alt+PageUp and
+  Alt+PageDown.
 * Changed: Three Pages '09 test documents (custom bullets, sound and
   movie, movie settings) were made again with a sound, a movie and pictures
   made by the project, so no file from Apple software is left in them.

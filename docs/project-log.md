@@ -479,6 +479,28 @@ matrix rows done on 9 November, before the change of target.
   tab view would take for the first and last tab, are turned off there,
   because they move to the start and end of the text and of the table.
 
+### 16 November: Desk is for GNOME users first (D-022)
+
+- The owner set the direction of the product: Desk is made for users of
+  the GNOME desktop, used to its workflow and its shortcuts. It aims to be
+  familiar to those who come from iWork, the owner included, but where the
+  two pull apart, GNOME wins. *Why:* once the 1.0 versions of the three
+  apps are done, Desk will grow new features of its own and an ever closer
+  integration with the GNOME desktop and its applications, so compatibility
+  with GNOME is what lasts. Recorded as D-022 in `docs/decisions.md`, in
+  `docs/goals.md` (Who Desk is for) and in `AGENTS.md`.
+- *Consequences, reviewed the same day:*
+  - D-021, an hour old, kept Ctrl+PageUp and Ctrl+PageDown for the sheets
+    of Tables, against GNOME's use of those keys for tabs. It is replaced
+    by D-023: the document tabs take GNOME's shortcuts in the three apps,
+    and the sheets move to Alt+PageUp and Alt+PageDown, by rule 3 of D-017
+    (the command of iWork that collides gets a new shortcut).
+  - Fonts has Ctrl+T, as in iWork, which GNOME gives to a new tab. Now
+    that documents open in tabs, the two collide; the choice of what Fonts
+    gets is with the owner.
+  - The rest of the shortcut table already put GNOME first (D-017), and
+    nothing else in it collides with a standard shortcut of GNOME.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
