@@ -126,4 +126,10 @@ pub enum Op {
         /// The settings.
         settings: TextSettings,
     },
+    /// Sets the slides of a presentation, or makes the document another
+    /// kind with none (KSLD-06, KSLD-15).
+    SetSlides {
+        /// The slides.
+        slides: Option<imbl::Vector<crate::Slide>>,
+    },
 }

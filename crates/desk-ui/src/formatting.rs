@@ -449,6 +449,12 @@ impl Inspector {
         self.levels.show_tab(name)
     }
 
+    /// Adds a level of an app before Document, such as Animation in
+    /// Desk Slides (KINT-14).
+    pub fn add_level(&self, name: &str, label: &str, child: &impl IsA<gtk::Widget>) {
+        self.levels.add_level(name, label, child);
+    }
+
     /// Shows a level: "format" or "document".
     pub fn show_level(&self, name: &str) {
         self.levels.show_level(name);

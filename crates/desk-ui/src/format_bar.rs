@@ -142,6 +142,18 @@ impl FormatBar {
         this
     }
 
+    /// Adds a variant of an app, which [`Self::show_variant`] shows in
+    /// place of those of text and objects, such as that of a slide when
+    /// nothing is selected in Desk Slides (KINT-13).
+    pub fn add_variant(&self, name: &str, variant: &impl IsA<gtk::Widget>) {
+        self.stack.add_named(variant, Some(name));
+    }
+
+    /// Shows a variant added with [`Self::add_variant`].
+    pub fn show_variant(&self, name: &str) {
+        self.stack.set_visible_child_name(name);
+    }
+
     /// Leaves out the secondary controls of text, on a narrow window: they
     /// go under More.
     pub fn set_compact(&self, compact: bool) {

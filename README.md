@@ -57,8 +57,10 @@ done (the first six phases of the plan;
 
 The new window comes next, then tables and charts, then review and
 collaboration. Desk Slides
-and Desk Tables have their own parity matrices, with 181 rows each, and
-start once the table and chart engine is ready.
+and Desk Tables have their own parity matrices, with 181 rows each.
+Desk Slides already has its window: a new presentation with the slide
+navigator, the outline, the light table and presenter notes. Opening and
+saving ODP presentations comes next, in its phase 1.
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
 has a nightly branch built from `main` every night:
