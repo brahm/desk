@@ -30,14 +30,14 @@ impl Header {
         let title = adw::WindowTitle::new(info.name, "");
         let header = adw::HeaderBar::builder().title_widget(&title).build();
 
-        let sidebar_button = adw::SplitButton::builder()
+        // The Sidebar button shows the navigation sidebar (F9). In window
+        // M+ it has no menu: View is a submenu of the main menu.
+        let sidebar_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-symbolic")
             .action_name("win.sidebar")
-            .menu_model(&view_menu())
             .tooltip_text(tr("Sidebar"))
-            .dropdown_tooltip(tr("View"))
             .build();
-        formatting::labelled(sidebar_button.upcast_ref::<gtk::Widget>(), &tr("Sidebar"));
+        formatting::labelled(&sidebar_button, &tr("Sidebar"));
         let insert_label = adw::ButtonContent::builder()
             .icon_name("desk-insert-symbolic")
             .label(tr("_Insert"))
@@ -95,7 +95,16 @@ impl Header {
             .tooltip_text(tr("Find"))
             .build();
         formatting::labelled(&find_button, &tr("Find"));
+        // Open Documents shows the open documents as a grid
+        // (AdwTabOverview), to switch between them.
+        let overview_button = gtk::Button::builder()
+            .icon_name("view-grid-symbolic")
+            .action_name("win.tab-overview")
+            .tooltip_text(tr("Open Documents"))
+            .build();
+        formatting::labelled(&overview_button, &tr("Open Documents"));
         let end = gtk::Box::builder().spacing(6).build();
+        end.append(&overview_button);
         end.append(&find_button);
         end.append(&inspector_toggle);
         header.pack_end(&end);
@@ -117,6 +126,10 @@ pub(super) fn main_menu(info: AppInfo) -> gio::Menu {
     file.append(Some(&tr("_New Document")), Some("app.new-document"));
     file.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
     menu.append_section(None, &file);
+    // View, which was the menu of the Sidebar button in interface B.
+    let shown = gio::Menu::new();
+    shown.append_submenu(Some(&tr("_View")), &view_menu());
+    menu.append_section(None, &shown);
     let commands = gio::Menu::new();
     commands.append(Some(&tr("Search _Commands…")), Some("win.command-search"));
     menu.append_section(None, &commands);
@@ -140,12 +153,13 @@ pub(super) fn more_commands() -> gio::Menu {
     menu.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
     menu.append(Some(&tr("_Previous Sheet")), Some("win.previous-sheet"));
     menu.append(Some(&tr("_Next Sheet")), Some("win.next-sheet"));
-    menu.append(Some(&tr("C_lose")), Some("window.close"));
+    menu.append(Some(&tr("C_lose")), Some("win.close"));
+    menu.append(Some(&tr("Close _Window")), Some("window.close"));
     menu.append(Some(&tr("Close _All Windows")), Some("app.close-all"));
     menu
 }
 
-/// The View menu, under the arrow of the Sidebar button (NGNM-10): the
+/// The View menu, a submenu of the main menu (NGNM-10): the
 /// pages of the sidebar, the bars the window shows, and the zoom.
 pub(super) fn view_menu() -> gio::Menu {
     let panes = gio::Menu::new();

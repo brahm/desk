@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Documents open as tabs of one window, with an overview of the
+  open documents; Ctrl+T opens a new document in a tab. The Sidebar button
+  only shows the sidebar, and View is in the main menu.
 * Changed: Desk is made for users of GNOME first: where GNOME and iWork
   differ, Desk follows GNOME. The document tabs take GNOME's shortcuts in
   the three apps, and the sheets of Tables move to Alt+PageUp and

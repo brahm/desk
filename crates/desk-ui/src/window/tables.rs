@@ -95,7 +95,7 @@ impl DocumentWindow {
                     run(&editor);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         let weak = Rc::downgrade(self);
         let action = gio::SimpleAction::new("insert-chart-kind", Some(glib::VariantTy::STRING));
@@ -111,7 +111,7 @@ impl DocumentWindow {
                 }
             }
         });
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
         let weak = Rc::downgrade(self);
         let action = gio::SimpleAction::new("edit-chart-data", None);
         action.connect_activate(move |_, _| {
@@ -119,7 +119,7 @@ impl DocumentWindow {
                 editor.edit_chart_data();
             }
         });
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
         let weak = Rc::downgrade(self);
         let action = gio::SimpleAction::new("function-browser", None);
         action.connect_activate(move |_, _| {
@@ -132,7 +132,7 @@ impl DocumentWindow {
                 }
             });
         });
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
     }
 }
 

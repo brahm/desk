@@ -35,10 +35,13 @@ use window::TablesWindow;
 /// (docs/interface, decided on 2026-11-14).
 pub(crate) const ACCELS: &[(&str, &[&str])] = &[
     ("app.quit", &["<Control>q"]),
-    ("app.new-document", &["<Control>n"]),
+    // Ctrl+T is a new tab in GNOME (D-024).
+    ("app.new-document", &["<Control>n", "<Control>t"]),
     ("app.new-window", &["<Control><Shift>n"]),
     ("app.close-all", &["<Control><Alt>w"]),
-    ("window.close", &["<Control>w"]),
+    // Ctrl+W closes the tab and Ctrl+Shift+W the window, as in GNOME.
+    ("win.close", &["<Control>w"]),
+    ("window.close", &["<Control><Shift>w"]),
     ("win.duplicate", &["<Control><Shift>d"]),
     ("win.fullscreen", &["F11"]),
     ("win.inspector", &["<Control><Alt>i"]),
@@ -59,8 +62,10 @@ pub(crate) const ACCELS: &[(&str, &[&str])] = &[
     ("win.add-row-below", &["<Alt>Down"]),
     ("win.add-column-before", &["<Alt>Left"]),
     ("win.add-column-after", &["<Alt>Right"]),
-    ("win.previous-sheet", &["<Control>Page_Up"]),
-    ("win.next-sheet", &["<Control>Page_Down"]),
+    // Ctrl+PageUp and Ctrl+PageDown switch the document tabs, as in GNOME,
+    // so the sheets take Alt (D-023).
+    ("win.previous-sheet", &["<Alt>Page_Up"]),
+    ("win.next-sheet", &["<Alt>Page_Down"]),
 ];
 
 /// Runs Desk Tables until its last window closes, and returns its exit
@@ -81,7 +86,7 @@ pub fn run(info: AppInfo) -> gtk::glib::ExitCode {
         }
     });
     app.connect_activate(move |app| {
-        TablesWindow::new(app, info).window().present();
+        TablesWindow::new(app, info).show();
     });
     app.run()
 }
@@ -120,16 +125,17 @@ fn add_actions(app: &adw::Application, info: AppInfo) {
     let close_windows = gio::ActionEntry::builder("close-all")
         .activate(move |app: &adw::Application, _, _| close_all(app))
         .build();
-    // Desk Tables does not open documents yet, so a new window and a new
-    // document are the same: a document of the Blank template.
+    // Desk Tables does not open documents yet: a new window and a new
+    // document both start from the Blank template, one in a window of its
+    // own and the other in a tab of the window in front.
     let new_window = gio::ActionEntry::builder("new-window")
         .activate(move |app: &adw::Application, _, _| {
-            TablesWindow::new(app, info).window().present();
+            TablesWindow::new_window(app, info).show();
         })
         .build();
     let new_document = gio::ActionEntry::builder("new-document")
         .activate(move |app: &adw::Application, _, _| {
-            TablesWindow::new(app, info).window().present();
+            TablesWindow::new(app, info).show();
         })
         .build();
     app.add_action_entries([about, quit, close_windows, new_window, new_document]);

@@ -503,6 +503,29 @@ matrix rows done on 9 November, before the change of target.
   - The rest of the shortcut table already put GNOME first (D-017), and
     nothing else in it collides with a standard shortcut of GNOME.
 
+### 16 November: step 1 of window M+, the document tabs
+
+- The three apps open their documents as tabs of one window
+  (AdwTabView), with a tab bar that shows from the second tab and the tab
+  overview behind the new Open documents button of the header bar. Ctrl+N
+  and Ctrl+T open a new document in a tab, Ctrl+W closes the tab and
+  Ctrl+Shift+W the window; New Window still opens a window of its own.
+  Rows W013, T016 and S013 (several documents) are done.
+- The Sidebar button only shows and hides the sidebar. View moved to a
+  submenu of the main menu, and Save left the main menu for the More menu,
+  since saving is automatic in M+ (step 5).
+- *How, and why:* each document keeps its own actions, and the window
+  forwards its actions to the document of the selected tab. GTK finds the
+  application's shortcuts and the D-Bus actions only in the window's own
+  action map, so actions set on each tab would not answer either; the
+  forwarding keeps both working. The breakpoints of the narrow window moved
+  from the window to each document, since a window applies only one set.
+- *Consequences:* the window's title is the name of the document shown,
+  so the title of Tables no longer ends in "Desk Tables". The UI tests
+  follow the new shortcuts (D-023, D-024) and the Open documents button.
+  The matrix rows of the menus (GNM-10, NGNM-10, KGNM-10) were brought in
+  line with M+, where View is in the main menu.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

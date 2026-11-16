@@ -16,7 +16,7 @@ T012	3.1 Window, menus and panes	Colors / Fonts window	Different	15.4	D-001	In	E
 T013	3.1 Window, menus and panes	Document Warnings window	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	Warnings banner of Writer; missing in Tables (NINT-15)
 T014	3.1 Window, menus and panes	Zoom	Different (place)	15.4	D-001	In	Done	the window changes (D-008)	B1	Zoom (NINT-04)
 T015	3.1 Window, menus and panes	Full screen	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	B1	F11 exists in Writer; checking it in Tables is missing (NINT-06)
-T016	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Tabs
+T016	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
 T017	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	the window changes (D-008)	B1	Light/dark style of the system
 T018	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	B1	Preferences of Writer; the Tables version is missing
 T019	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Undo and redo (NDOC-08)

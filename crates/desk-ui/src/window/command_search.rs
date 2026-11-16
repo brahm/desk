@@ -88,20 +88,28 @@ pub(super) fn matches(command: &Command, query: &str) -> bool {
 }
 
 /// Whether the window or the app can run the action now.
-fn enabled(window: &adw::ApplicationWindow, action: &str) -> bool {
-    let found = if let Some(name) = action.strip_prefix("win.") {
-        window.lookup_action(name)
+fn enabled(window: &adw::ApplicationWindow, actions: &gio::ActionGroup, action: &str) -> bool {
+    if let Some(name) = action.strip_prefix("win.") {
+        actions.has_action(name) && actions.is_action_enabled(name)
     } else if let Some(name) = action.strip_prefix("app.") {
-        window.application().and_then(|app| app.lookup_action(name))
+        window
+            .application()
+            .and_then(|app| app.lookup_action(name))
+            .is_some_and(|a| a.is_enabled())
     } else {
-        None
-    };
-    found.is_some_and(|a| a.is_enabled())
+        false
+    }
 }
 
 /// Shows the search over `window`, with the commands of `menus`: each a
 /// menu and the name of where it is.
-pub(crate) fn present(window: &adw::ApplicationWindow, menus: &[(String, gio::MenuModel)]) {
+/// `actions` are those of the document in sight, the `win.` group of the
+/// window.
+pub(crate) fn present(
+    window: &adw::ApplicationWindow,
+    actions: &gio::ActionGroup,
+    menus: &[(String, gio::MenuModel)],
+) {
     let mut found = Vec::new();
     for (path, menu) in menus {
         commands(menu, path, &mut found);
@@ -125,7 +133,7 @@ pub(crate) fn present(window: &adw::ApplicationWindow, menus: &[(String, gio::Me
     list.update_property(&[gtk::accessible::Property::Label(&tr("Commands"))]);
     let mut rows = Vec::new();
     for command in found {
-        if !enabled(window, &command.action) {
+        if !enabled(window, actions, &command.action) {
             continue;
         }
         let row = adw::ActionRow::builder()

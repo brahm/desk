@@ -427,7 +427,7 @@ feature	iWork.com 🌐	iWork.com 🌐
 feature	Colaboração em tempo real 🌐💲 (até 4 GB só com assinatura)	Real-time collaboration 🌐💲 (up to 4 GB only with a subscription)
 feature	iCloud Drive, Keynote para iCloud, Handoff, AirDrop 🌐	iCloud Drive, Keynote for iCloud, Handoff, AirDrop 🌐
 feature	Automator	Automator
-note	Menus do GNOME (Visualização no botão Barra lateral, Inserir, menu Mais) e busca de comandos (GNM-10); compartilhar fica fora por ser online	GNOME menus (View on the Sidebar button, Insert, the More menu) and command search (GNM-10); sharing stays out because it is online
+note	Menus do GNOME (Inserir, o menu principal com Visualização, menu Mais) e busca de comandos (GNM-10); compartilhar fica fora por ser online	GNOME menus (Insert, the main menu with View, the More menu) and command search (GNM-10); sharing stays out because it is online
 note	Barra de cabeçalho da interface B com botões de inserir e do Inspetor juntos (INT-11)	Header bar of interface B with the insert buttons and the Inspector button together (INT-11)
 note	Barra de formatação enxuta e contextual da interface B (INT-12)	Lean, contextual format bar of interface B (INT-12)
 note	Um Inspetor só, na barra lateral direita, em dois níveis, que muda com a seleção (INT-13)	A single Inspector, in the right sidebar, in two levels, that changes with the selection (INT-13)
@@ -439,7 +439,7 @@ note	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 ofe
 note	Barra inferior com posição, Ir para página, Navegar por e contagem (etapa 6, GNM-13)	Bottom bar with position, Go to Page, Navigate By and word count (stage 6, GNM-13)
 note	Miniaturas, estilos e resultados da busca na barra lateral; falta o sumário vivo do 15 e a página Comentários só diz que não há (fase 8)	Thumbnails, styles and search results in the sidebar; the live table of contents of the 15 is missing and the Comments page only says there are none (phase 8)
 note	Tela cheia por F11 (DOC-07); falta o Screen View do 15 (fluxo contínuo para escrever)	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
-note	Uma janela por documento; faltam abas (AdwTabView)	One window per document; tabs (AdwTabView) are missing
+note	Documentos em abas de uma janela, com a visão geral das abas (AdwTabView, passo 1 da M+)	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
 note	Libadwaita segue o estilo claro/escuro do sistema	Libadwaita follows the light/dark style of the system
 note	Preferências (Geral, Réguas, Correção) com AdwPreferencesDialog	Preferences (General, Rulers, Correction) with AdwPreferencesDialog
 note	Desfazer e refazer ilimitados, com o nome da mudança (DOC-12)	Unlimited undo and redo, with the name of the change (DOC-12)
@@ -607,7 +607,6 @@ note	Popovers de fontes e cores do Writer; falta ligar às Tables	Fonts and colo
 note	Banner de avisos do Writer; falta nas Tables (NINT-15)	Warnings banner of Writer; missing in Tables (NINT-15)
 note	Zoom (NINT-04)	Zoom (NINT-04)
 note	F11 existe no Writer; falta conferir nas Tables (NINT-06)	F11 exists in Writer; checking it in Tables is missing (NINT-06)
-note	Abas	Tabs
 note	Estilo claro/escuro do sistema	Light/dark style of the system
 note	Preferências do Writer; falta a versão das Tables	Preferences of Writer; the Tables version is missing
 note	Desfazer e refazer (NDOC-08)	Undo and redo (NDOC-08)

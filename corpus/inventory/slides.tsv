@@ -13,7 +13,7 @@ S009	3.1 Window, menus and panes	Arrange tools	Different	15.4	D-001	In	Engine re
 S010	3.1 Window, menus and panes	Document warnings	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	Warnings banner of Writer
 S011	3.1 Window, menus and panes	Bottom border	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Bottom bar with \"Slide 3 of 12\" and Notes (KGNM-14)
 S012	3.1 Window, menus and panes	Full screen	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Full screen and slide only (KINT-10)
-S013	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Tabs
+S013	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
 S014	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	the window changes (D-008)	B1	Light/dark style of the system
 S015	3.1 Window, menus and panes	Preferences	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	Preferences of Writer; Presentation and Remote control are missing
 S016	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Undo and redo

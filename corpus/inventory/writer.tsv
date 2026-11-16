@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 id	area	feature	in_iwork	target	rule	scope	status_in_desk	review	phase	note
-W001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	GNOME menus (View on the Sidebar button, Insert, the More menu) and command search (GNM-10); sharing stays out because it is online
+W001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	GNOME menus (Insert, the main menu with View, the More menu) and command search (GNM-10); sharing stays out because it is online
 W002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Header bar of interface B with the insert buttons and the Inspector button together (INT-11)
 W003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	Lean, contextual format bar of interface B (INT-12)
 W004	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	A single Inspector, in the right sidebar, in two levels, that changes with the selection (INT-13)
@@ -13,7 +13,7 @@ W009	3.1 Window, menus and panes	Document Warnings window	Different	15.4	D-001	I
 W010	3.1 Window, menus and panes	Bottom bar	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	Bottom bar with position, Go to Page, Navigate By and word count (stage 6, GNM-13)
 W011	3.1 Window, menus and panes	Left pane	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed; the window changes (D-008)	B1	Thumbnails, styles and search results in the sidebar; the live table of contents of the 15 is missing and the Comments page only says there are none (phase 8)
 W012	3.1 Window, menus and panes	Full screen	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed; the window changes (D-008)	B1	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
-W013	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	One window per document; tabs (AdwTabView) are missing
+W013	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
 W014	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	the window changes (D-008)	B1	Libadwaita follows the light/dark style of the system
 W015	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Preferences (General, Rulers, Correction) with AdwPreferencesDialog
 W016	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Unlimited undo and redo, with the name of the change (DOC-12)

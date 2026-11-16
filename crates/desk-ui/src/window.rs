@@ -30,6 +30,7 @@ use crate::preferences;
 use crate::ruler::{self, Ruler};
 use crate::spelling::MistakeKind;
 use crate::styles_drawer::StylesDrawer;
+use crate::tabs::{Frame, FramePage};
 use crate::view::DocumentView;
 use crate::writing_tools::{self, Lookup};
 use crate::{AppInfo, Opener};
@@ -81,7 +82,17 @@ type EditorAction = fn(&TextEditor);
 
 /// A window and the document it shows, if any.
 pub struct DocumentWindow {
+    /// The window that holds the tab of the document, shared with the
+    /// other documents of that window.
     window: adw::ApplicationWindow,
+    frame: Rc<Frame>,
+    /// The tab of the document: everything the document shows, with its
+    /// own breakpoints, since the window has the tabs of other documents.
+    root: adw::BreakpointBin,
+    tab: std::cell::OnceCell<adw::TabPage>,
+    /// The actions of the document (`win.`), which the window answers
+    /// while its tab is in sight (see tabs.rs).
+    actions: gio::SimpleActionGroup,
     info: AppInfo,
     opener: Option<&'static Opener>,
     title: adw::WindowTitle,
@@ -139,9 +150,6 @@ pub struct DocumentWindow {
     vertical_ruler: Ruler,
     /// The corner where the rulers meet.
     ruler_corner: gtk::Box,
-    /// Whether closing was asked for and answered, so that the window
-    /// closes without asking again.
-    closing: Cell<bool>,
     /// The recovery draft of the document, once one is written.
     draft: RefCell<Option<crate::recovery::Draft>>,
     /// What Desk Slides adds to the window; none in Desk Writer.
@@ -244,8 +252,44 @@ const TOGGLES: [(&str, &str); 4] = [
 ];
 
 impl DocumentWindow {
-    /// A new, empty window.
+    /// A new, empty document in a tab of the window in front, or in a new
+    /// window when the app has none.
     pub fn new(app: &adw::Application, info: AppInfo, opener: Option<&'static Opener>) -> Rc<Self> {
+        let frame = Frame::active(app).unwrap_or_else(|| Self::new_frame(app, info, opener));
+        Self::new_in(&frame, info, opener)
+    }
+
+    /// A new, empty document in a new window (New Window).
+    pub fn new_window(
+        app: &adw::Application,
+        info: AppInfo,
+        opener: Option<&'static Opener>,
+    ) -> Rc<Self> {
+        let frame = Self::new_frame(app, info, opener);
+        Self::new_in(&frame, info, opener)
+    }
+
+    /// A new window of the app, whose overview opens a new document.
+    fn new_frame(
+        app: &adw::Application,
+        info: AppInfo,
+        opener: Option<&'static Opener>,
+    ) -> Rc<Frame> {
+        let frame = Frame::new(app, info.name);
+        let weak = Rc::downgrade(&frame);
+        frame.set_new_tab(move || {
+            let frame = weak.upgrade()?;
+            let document = Self::new_in(&frame, info, opener);
+            if opener.is_some() {
+                document.new_from_blank();
+            }
+            document.tab.get().cloned()
+        });
+        frame
+    }
+
+    /// A new, empty document in a new tab of `frame`.
+    fn new_in(frame: &Rc<Frame>, info: AppInfo, opener: Option<&'static Opener>) -> Rc<Self> {
         let header::Header {
             header,
             title,
@@ -452,6 +496,14 @@ impl DocumentWindow {
             .build();
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
+        // The tabs of the open documents, under the header bar; it shows
+        // once two documents are open.
+        toolbar_view.add_top_bar(
+            &adw::TabBar::builder()
+                .view(frame.view())
+                .autohide(true)
+                .build(),
+        );
         toolbar_view.add_top_bar(&screen_banner);
         toolbar_view.add_top_bar(&warnings_banner);
         toolbar_view.add_top_bar(&format_revealer);
@@ -471,15 +523,15 @@ impl DocumentWindow {
             .show_sidebar(false)
             .build();
 
-        let window = adw::ApplicationWindow::builder()
-            .application(app)
-            .title(info.name)
-            .default_width(1280)
-            .default_height(720)
-            .content(&nav_split)
+        let window = frame.window().clone();
+        let root = adw::BreakpointBin::builder()
+            .child(&nav_split)
+            .width_request(360)
+            .height_request(294)
             .build();
 
-        // Of the breakpoints that match, the window applies the one added
+        // The breakpoints belong to the tab, which is as wide as the window.
+        // Of the breakpoints that match, the bin applies the one added
         // last, so each one sets what the wider ones set too. Below about
         // a thousand pixels the format bar leaves out its secondary
         // controls; below 720, as when the window takes half of a screen
@@ -518,13 +570,15 @@ impl DocumentWindow {
             breakpoints.push(breakpoint);
         }
         for breakpoint in breakpoints {
-            window.add_breakpoint(breakpoint);
+            root.add_breakpoint(breakpoint);
         }
-        window.set_width_request(360);
-        window.set_height_request(294);
 
         let this = Rc::new(Self {
             window,
+            frame: frame.clone(),
+            root,
+            tab: std::cell::OnceCell::new(),
+            actions: gio::SimpleActionGroup::new(),
             info,
             opener,
             title,
@@ -561,7 +615,6 @@ impl DocumentWindow {
             ruler,
             vertical_ruler,
             ruler_corner,
-            closing: Cell::new(false),
             draft: RefCell::new(None),
             draft_due: Cell::new(false),
             slides,
@@ -587,12 +640,12 @@ impl DocumentWindow {
                 this.show_rulers();
                 this.show_window_preferences(p);
                 formatting::set_state(
-                    &this.window,
+                    &this.actions,
                     "check-spelling-while-typing",
                     p.check_spelling.to_variant(),
                 );
                 formatting::set_state(
-                    &this.window,
+                    &this.actions,
                     "proofread-while-typing",
                     p.proofread.to_variant(),
                 );
@@ -677,19 +730,7 @@ impl DocumentWindow {
                     }
                 }
             });
-            this.window.add_action(&shortcuts);
-        }
-        {
-            let weak = Rc::downgrade(&this);
-            this.window.connect_close_request(move |_| {
-                weak.upgrade().map_or(glib::Propagation::Proceed, |this| {
-                    let propagation = this.close_request();
-                    if propagation == glib::Propagation::Proceed {
-                        this.drop_draft();
-                    }
-                    propagation
-                })
-            });
+            this.actions.add_action(&shortcuts);
         }
         {
             let weak = Rc::downgrade(&this);
@@ -719,16 +760,36 @@ impl DocumentWindow {
             this.show_new_presentation();
         }
         WINDOWS.with(|w| w.borrow_mut().push(this.clone()));
-        let weak = Rc::downgrade(&this);
-        this.window.connect_destroy(move |_| {
-            // The list is gone when the app ends with windows in it.
-            let _ = WINDOWS.try_with(|w| {
-                if let Ok(mut w) = w.try_borrow_mut() {
-                    w.retain(|o| weak.upgrade().is_none_or(|me| !Rc::ptr_eq(o, &me)));
-                }
-            });
-        });
+        let tab = frame.add(&this.root, this.clone());
+        this.tab.set(tab).ok();
+        this.show_title(info.name);
         this
+    }
+
+    /// Starts the document from the Blank template (Ctrl+N, INT-01).
+    pub fn new_from_blank(&self) {
+        gio::prelude::ActionGroupExt::activate_action(
+            &self.actions,
+            "new-from-template",
+            Some(&"blank".to_variant()),
+        );
+    }
+
+    /// Brings the tab of the document and its window to the front.
+    pub fn show(&self) {
+        if let Some(tab) = self.tab.get() {
+            self.frame.view().set_selected_page(tab);
+        }
+        self.window.present();
+    }
+
+    /// The name of the document on its tab, which the window shows as its
+    /// title while the tab is in sight.
+    fn show_title(&self, title: &str) {
+        if let Some(tab) = self.tab.get() {
+            tab.set_title(title);
+            tab.set_tooltip(title);
+        }
     }
 
     /// The GTK window.
@@ -824,7 +885,7 @@ impl DocumentWindow {
     /// Shows a document as it showed when it was saved.
     fn show_view(&self, view: desk_model::ViewSettings) {
         let layout = if view.two_pages { "two" } else { "one" };
-        if let Some(action) = self.window.lookup_action("page-layout") {
+        if let Some(action) = self.actions.lookup_action("page-layout") {
             action.activate(Some(&layout.to_variant()));
         }
         match view.zoom {
@@ -833,7 +894,7 @@ impl DocumentWindow {
             desk_model::ViewZoom::Percent(p) => self.view.set_zoom(f64::from(p) / 100.0),
         }
         self.outline.set_options(view.outline_options);
-        if let Some(action) = self.window.lookup_action("outline") {
+        if let Some(action) = self.actions.lookup_action("outline") {
             action.change_state(&view.outline.to_variant());
         }
     }
@@ -879,20 +940,21 @@ impl DocumentWindow {
         if presentation {
             // A slide fills the window, as in Keynote, without rulers.
             self.view.set_fit(Some(geometry::Fit::Page));
-            self.window
+            self.actions
                 .change_action_state("ruler", &false.to_variant());
             self.show_rulers();
         }
         if self.editor().is_some_and(|e| e.is_page_layout()) {
             if !presentation {
-                self.window.change_action_state("ruler", &true.to_variant());
+                self.actions
+                    .change_action_state("ruler", &true.to_variant());
             }
             self.show_rulers();
             // The sidebar opens once the window has its size.
             let weak = Rc::downgrade(self);
             glib::idle_add_local_once(move || {
                 if let Some(this) = weak.upgrade() {
-                    this.window
+                    this.actions
                         .change_action_state("thumbnails", &true.to_variant());
                 }
             });
@@ -928,15 +990,15 @@ impl DocumentWindow {
             ("underline", character.underline != LineStyle::None),
             ("strikethrough", character.strikethrough != LineStyle::None),
         ] {
-            formatting::set_state(&self.window, name, on.to_variant());
+            formatting::set_state(&self.actions, name, on.to_variant());
         }
         formatting::set_state(
-            &self.window,
+            &self.actions,
             "align",
             formatting::alignment_name(format.paragraph.alignment).to_variant(),
         );
         formatting::set_state(
-            &self.window,
+            &self.actions,
             "columns",
             i32::from(format.layout.columns.count).to_variant(),
         );
@@ -950,7 +1012,7 @@ impl DocumentWindow {
             .count
             .set_visible(preferences.show_counts && self.slides.is_none());
         let count = crate::bottom_bar::Count::from_name(&preferences.count);
-        formatting::set_state(&self.window, "count", count.name().to_variant());
+        formatting::set_state(&self.actions, "count", count.name().to_variant());
         self.show_count();
         self.view.set_invisibles_color(preferences.invisibles_color);
         self.view.set_guide_color(preferences.guide_color);
@@ -975,7 +1037,7 @@ impl DocumentWindow {
     /// and what its pages show in step with what it shows.
     fn sync_nav(&self) {
         let shown = self.nav_split.shows_sidebar();
-        formatting::set_state(&self.window, "sidebar", shown.to_variant());
+        formatting::set_state(&self.actions, "sidebar", shown.to_variant());
         let page = self.nav.page();
         let width = self.nav.width(&page);
         self.nav_split.set_min_sidebar_width(width);
@@ -983,7 +1045,7 @@ impl DocumentWindow {
         for &(name, action) in self.nav_pages() {
             let on = shown && page == name;
             let was = self.action_state(action);
-            formatting::set_state(&self.window, action, on.to_variant());
+            formatting::set_state(&self.actions, action, on.to_variant());
             if on == was {
                 continue;
             }
@@ -1055,7 +1117,7 @@ impl DocumentWindow {
     }
 
     fn action_state(&self, name: &str) -> bool {
-        self.window
+        self.actions
             .lookup_action(name)
             .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
             .is_some_and(|a| formatting::state_of(&a))
@@ -1079,7 +1141,7 @@ impl DocumentWindow {
             self.title.set_title(&format!("{edited}{name}"));
             self.title
                 .set_subtitle(&path.as_deref().map(folder_of).unwrap_or_default());
-            self.window.set_title(Some(&format!("{edited}{name}")));
+            self.show_title(&format!("{edited}{name}"));
             self.view
                 .access()
                 .update_property(&[gtk::accessible::Property::Label(&name)]);
@@ -1584,7 +1646,7 @@ impl DocumentWindow {
                 window
             }
         };
-        window.window.present();
+        window.show();
         if !bookmark.is_empty()
             && let Some(editor) = window.editor()
         {
@@ -1707,10 +1769,17 @@ impl DocumentWindow {
         );
     }
 
-    /// Asks to save the changes before the window closes (DOC-18).
-    fn close_request(self: &Rc<Self>) -> glib::Propagation {
-        if self.closing.get() || !self.needs_saving() {
-            return glib::Propagation::Proceed;
+    /// Asks to save the changes before the tab closes (DOC-18), and says
+    /// through `done` whether it closes.
+    fn ask_to_close(self: &Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+        if !self.needs_saving() {
+            self.drop_draft();
+            done(true);
+            return;
+        }
+        // The tab must be in sight for its dialog to make sense.
+        if let Some(tab) = self.tab.get() {
+            self.frame.view().set_selected_page(tab);
         }
         // The dialog of GNOME apps, rather than Don't Save of Pages.
         let dialog = adw::AlertDialog::new(
@@ -1732,27 +1801,28 @@ impl DocumentWindow {
             Some(&self.window),
             gio::Cancellable::NONE,
             move |response| {
-                let Some(this) = weak.upgrade() else { return };
+                let Some(this) = weak.upgrade() else {
+                    done(false);
+                    return;
+                };
                 match response.as_str() {
-                    "discard" => this.close_now(),
+                    "discard" => {
+                        this.drop_draft();
+                        done(true);
+                    }
                     "save" => {
                         let weak = Rc::downgrade(&this);
                         this.save(move |saved| {
                             if let (true, Some(this)) = (saved, weak.upgrade()) {
-                                this.close_now();
+                                this.drop_draft();
                             }
+                            done(saved);
                         });
                     }
-                    _ => {}
+                    _ => done(false),
                 }
             },
         );
-        glib::Propagation::Stop
-    }
-
-    fn close_now(&self) {
-        self.closing.set(true);
-        self.window.close();
     }
 
     /// Full screen hides the header bar until the pointer reaches the top
@@ -1874,7 +1944,10 @@ impl DocumentWindow {
                 (header::view_menu(), header::insert_menu(true))
             };
             let mut menus: Vec<(String, gio::MenuModel)> = [
-                (tr("Main Menu"), header::main_menu(this.info, opens)),
+                (
+                    tr("Main Menu"),
+                    header::main_menu(this.info, opens, &gio::Menu::new()),
+                ),
                 (tr("Main Menu"), header::more_commands(opens)),
                 (tr("View"), view),
                 (tr("Insert"), insert),
@@ -1889,13 +1962,13 @@ impl DocumentWindow {
             if this.slides.is_some() {
                 menus.push((tr("Slide"), slides::slide_menu().upcast()));
             }
-            command_search::present(&this.window, &menus);
+            command_search::present(&this.window, this.actions.upcast_ref(), &menus);
         });
-        self.window.add_action(&search);
+        self.actions.add_action(&search);
     }
 
     fn add_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 9] = [
+        let simple: [(&str, WindowAction); 10] = [
             ("warnings", |this| this.show_warnings()),
             ("save", |this| this.save(|_| {})),
             ("save-as", |this| this.save_as(|_| {})),
@@ -1914,9 +1987,9 @@ impl DocumentWindow {
                     this.window.fullscreen();
                 }
             }),
-            ("close", |this| {
-                this.window.close();
-            }),
+            // Ctrl+W closes the tab, as in GNOME.
+            ("close", |this| this.frame.close(&this.root)),
+            ("tab-overview", |this| this.frame.show_overview()),
         ];
         let template = gio::SimpleAction::new("new-from-template", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
@@ -1926,7 +1999,7 @@ impl DocumentWindow {
             };
             this.load_untitled(from_template(target), tr("Untitled"));
         });
-        self.window.add_action(&template);
+        self.actions.add_action(&template);
         for (name, run) in simple {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
@@ -1935,7 +2008,7 @@ impl DocumentWindow {
                     run(&this);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         self.enable_warnings();
 
@@ -1958,7 +2031,7 @@ impl DocumentWindow {
             };
             view.set_zoom(zoom);
         });
-        self.window.add_action(&zoom);
+        self.actions.add_action(&zoom);
 
         // One page to a row, or two side by side (INT-08).
         let weak = Rc::downgrade(self);
@@ -1976,7 +2049,7 @@ impl DocumentWindow {
             action.set_state(&value.to_variant());
             this.view.set_columns(if value == "two" { 2 } else { 1 });
         });
-        self.window.add_action(&layout);
+        self.actions.add_action(&layout);
 
         for (name, run) in [
             ("undo", TextEditor::undo as fn(&TextEditor)),
@@ -2001,7 +2074,7 @@ impl DocumentWindow {
                     run(&editor);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         self.add_format_actions();
         self.refresh();
@@ -2047,7 +2120,7 @@ impl DocumentWindow {
                 };
                 editor.set_character_attrs(label, &attrs);
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         let align = gio::SimpleAction::new_stateful(
@@ -2077,7 +2150,7 @@ impl DocumentWindow {
                 );
             }
         });
-        self.window.add_action(&align);
+        self.actions.add_action(&align);
 
         let invisibles = gio::SimpleAction::new_stateful("invisibles", None, &false.to_variant());
         let weak = Rc::downgrade(self);
@@ -2091,7 +2164,7 @@ impl DocumentWindow {
                 editor.set_show_invisibles(on);
             }
         });
-        self.window.add_action(&invisibles);
+        self.actions.add_action(&invisibles);
 
         // The lines between linked text boxes, which show until hidden
         // (VMI-03).
@@ -2107,7 +2180,7 @@ impl DocumentWindow {
                 editor.set_show_connection_lines(on);
             }
         });
-        self.window.add_action(&lines);
+        self.actions.add_action(&lines);
 
         // The outlines of the body, the columns, the headers, the footers
         // and the text boxes (INT-09).
@@ -2124,9 +2197,9 @@ impl DocumentWindow {
             }
             // As in Pages, Show Layout shows the rulers too, and Hide
             // Layout hides them.
-            this.window.change_action_state("ruler", &on.to_variant());
+            this.actions.change_action_state("ruler", &on.to_variant());
         });
-        self.window.add_action(&layout);
+        self.actions.add_action(&layout);
 
         // The rulers show in a word processing document (INT-02).
         let ruler = gio::SimpleAction::new_stateful("ruler", None, &true.to_variant());
@@ -2139,7 +2212,7 @@ impl DocumentWindow {
             action.set_state(&on.to_variant());
             this.show_rulers();
         });
-        self.window.add_action(&ruler);
+        self.actions.add_action(&ruler);
 
         // The arrows at the bottom, and what they go to (INT-19).
         let navigate_by = gio::SimpleAction::new_stateful(
@@ -2158,7 +2231,7 @@ impl DocumentWindow {
             let kind = crate::editing::Navigate::from_name(&value);
             this.bottom.show_navigate(kind);
         });
-        self.window.add_action(&navigate_by);
+        self.actions.add_action(&navigate_by);
         // What the count at the bottom counts (DOC-20), kept in the
         // preferences for every window.
         let count = gio::SimpleAction::new_stateful(
@@ -2182,7 +2255,7 @@ impl DocumentWindow {
                 preferences::set(current);
             }
         });
-        self.window.add_action(&count);
+        self.actions.add_action(&count);
         let navigate = gio::SimpleAction::new("navigate", Some(glib::VariantTy::BOOLEAN));
         let weak = Rc::downgrade(self);
         navigate.connect_activate(move |_, parameter| {
@@ -2205,7 +2278,7 @@ impl DocumentWindow {
                 this.window.error_bell();
             }
         });
-        self.window.add_action(&navigate);
+        self.actions.add_action(&navigate);
 
         // The sidebar, with the page it shows (GNM-12), and its pages:
         // the page thumbnails (INT-19), the styles (INT-18), the comments
@@ -2217,7 +2290,7 @@ impl DocumentWindow {
                 this.nav_split.set_show_sidebar(on);
             }
         });
-        self.window.add_action(&sidebar);
+        self.actions.add_action(&sidebar);
         for &(page, name) in self.nav_pages() {
             let action = gio::SimpleAction::new_stateful(name, None, &false.to_variant());
             let weak = Rc::downgrade(self);
@@ -2234,7 +2307,7 @@ impl DocumentWindow {
                 }
                 this.sync_nav();
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         let weak = Rc::downgrade(self);
         self.nav.connect_page_changed(move |_| {
@@ -2260,7 +2333,7 @@ impl DocumentWindow {
             action.set_state(&on.to_variant());
             this.show_outline(on);
         });
-        self.window.add_action(&outline);
+        self.actions.add_action(&outline);
 
         // Edit ▸ Delete Page, after asking (TXT-02).
         let delete_page = gio::SimpleAction::new("delete-page", None);
@@ -2270,7 +2343,7 @@ impl DocumentWindow {
                 this.delete_page();
             }
         });
-        self.window.add_action(&delete_page);
+        self.actions.add_action(&delete_page);
 
         let inspector = gio::SimpleAction::new_stateful("inspector", None, &false.to_variant());
         let weak = Rc::downgrade(self);
@@ -2281,7 +2354,7 @@ impl DocumentWindow {
             };
             this.show_side("inspector", on);
         });
-        self.window.add_action(&inspector);
+        self.actions.add_action(&inspector);
 
         let fonts = gio::SimpleAction::new("fonts", None);
         let weak = Rc::downgrade(self);
@@ -2303,7 +2376,7 @@ impl DocumentWindow {
             let format = editor.format();
             window.show(&format.character, &format.paragraph);
         });
-        self.window.add_action(&fonts);
+        self.actions.add_action(&fonts);
         let colors = gio::SimpleAction::new("colors", None);
         let weak = Rc::downgrade(self);
         colors.connect_activate(move |_, _| {
@@ -2311,7 +2384,7 @@ impl DocumentWindow {
                 this.format_bar.choose_color();
             }
         });
-        self.window.add_action(&colors);
+        self.actions.add_action(&colors);
         // The format bar can be hidden for more room (Ctrl+Shift+R).
         let format_bar = gio::SimpleAction::new_stateful("format-bar", None, &true.to_variant());
         let revealer = self.format_revealer.downgrade();
@@ -2327,7 +2400,7 @@ impl DocumentWindow {
             action.set_state(&on.to_variant());
             revealer.set_reveal_child(on && stack.visible_child_name().as_deref() != Some("empty"));
         });
-        self.window.add_action(&format_bar);
+        self.actions.add_action(&format_bar);
 
         // Pages copies the style of the paragraph and that of the
         // characters apart, and pastes only what was copied (STY-08).
@@ -2350,7 +2423,7 @@ impl DocumentWindow {
                     }
                 }
             });
-            self.window.add_action(&copy_style);
+            self.actions.add_action(&copy_style);
         }
         let paste_style = gio::SimpleAction::new("paste-style", None);
         let weak = Rc::downgrade(self);
@@ -2362,7 +2435,7 @@ impl DocumentWindow {
                 editor.paste_style(&copied);
             }
         });
-        self.window.add_action(&paste_style);
+        self.actions.add_action(&paste_style);
 
         self.add_find_actions();
         self.add_object_actions();
@@ -2382,7 +2455,7 @@ impl DocumentWindow {
                     editor.insert_break(kind);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         for (name, kind) in [
@@ -2398,7 +2471,7 @@ impl DocumentWindow {
                     editor.insert_field(editor.new_field(kind));
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         // The number of columns of the layout at the cursor, which keep
@@ -2426,7 +2499,7 @@ impl DocumentWindow {
                 action.set_state(&i32::from(count).to_variant());
             }
         });
-        self.window.add_action(&columns);
+        self.actions.add_action(&columns);
 
         let auto = gio::SimpleAction::new("insert-auto-page-numbers", None);
         let weak = Rc::downgrade(self);
@@ -2437,7 +2510,7 @@ impl DocumentWindow {
                 crate::auto_numbers::present(&this.window, &editor);
             }
         });
-        self.window.add_action(&auto);
+        self.actions.add_action(&auto);
 
         let linked = gio::SimpleAction::new("open-linked", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
@@ -2446,7 +2519,7 @@ impl DocumentWindow {
                 this.open_linked(link);
             }
         });
-        self.window.add_action(&linked);
+        self.actions.add_action(&linked);
 
         let note = gio::SimpleAction::new("insert-note", None);
         let weak = Rc::downgrade(self);
@@ -2455,7 +2528,7 @@ impl DocumentWindow {
                 editor.insert_note();
             }
         });
-        self.window.add_action(&note);
+        self.actions.add_action(&note);
         // From note to note, each of which the Inspector shows (EST-15).
         for (name, forward) in [("next-note", true), ("previous-note", false)] {
             let action = gio::SimpleAction::new(name, None);
@@ -2465,7 +2538,7 @@ impl DocumentWindow {
                     editor.go_to_note(forward);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         self.add_field_actions();
@@ -2486,7 +2559,7 @@ impl DocumentWindow {
                     run(&editor);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         let import = gio::SimpleAction::new("import-styles", None);
@@ -2496,7 +2569,7 @@ impl DocumentWindow {
                 this.import_styles();
             }
         });
-        self.window.add_action(&import);
+        self.actions.add_action(&import);
         // The sidebar also closes by itself on a narrow window.
         let weak = Rc::downgrade(self);
         self.split.connect_show_sidebar_notify(move |_| {
@@ -2537,7 +2610,7 @@ impl DocumentWindow {
         let shown = self.split.shows_sidebar();
         let page = self.side.visible_child_name();
         let on = shown && page.as_deref() == Some("inspector");
-        formatting::set_state(&self.window, "inspector", on.to_variant());
+        formatting::set_state(&self.actions, "inspector", on.to_variant());
     }
 
     /// The formats of the field at the cursor, from its context menu
@@ -2567,7 +2640,7 @@ impl DocumentWindow {
                 other => other,
             });
         });
-        self.window.add_action(&number);
+        self.actions.add_action(&number);
         let date = gio::SimpleAction::new_stateful(
             "field-date-format",
             Some(glib::VariantTy::STRING),
@@ -2589,7 +2662,7 @@ impl DocumentWindow {
                 other => other,
             });
         });
-        self.window.add_action(&date);
+        self.actions.add_action(&date);
         type Toggle = fn(Field) -> Field;
         let toggles: [(&str, Toggle); 3] = [
             ("field-date-update", |field| match field {
@@ -2642,7 +2715,7 @@ impl DocumentWindow {
                     change(&this, &toggle);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
     }
 
@@ -2705,7 +2778,7 @@ impl DocumentWindow {
                     run(&this);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         let recent = gio::SimpleAction::new("recent-search", Some(glib::VariantTy::STRING));
@@ -2717,7 +2790,7 @@ impl DocumentWindow {
                 this.search_sidebar.search_for(&text);
             }
         });
-        self.window.add_action(&recent);
+        self.actions.add_action(&recent);
     }
 
     /// Spelling and proofreading (TXT-10, TXT-11).
@@ -2757,7 +2830,7 @@ impl DocumentWindow {
                     run(&this);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         for (name, never) in [("never-hyphenate", true), ("allow-hyphenation", false)] {
             let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
@@ -2779,7 +2852,7 @@ impl DocumentWindow {
                     });
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         let correct = gio::SimpleAction::new("correct-spelling", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
@@ -2791,7 +2864,7 @@ impl DocumentWindow {
                 editor.correct(&text);
             }
         });
-        self.window.add_action(&correct);
+        self.actions.add_action(&correct);
         let current = preferences::get();
         for (name, state, set) in [
             (
@@ -2812,7 +2885,7 @@ impl DocumentWindow {
                     preferences::set(preferences);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
     }
 
@@ -2966,6 +3039,24 @@ impl DocumentWindow {
 
 /// Fills the section of the context menu with Undo and Redo, named by the
 /// changes they take back and bring back, as in Pages (DOC-12).
+impl FramePage for DocumentWindow {
+    fn actions(&self) -> gio::ActionGroup {
+        self.actions.clone().upcast()
+    }
+
+    fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+        self.ask_to_close(done);
+    }
+
+    fn closed(&self) {
+        let _ = WINDOWS.try_with(|w| {
+            if let Ok(mut w) = w.try_borrow_mut() {
+                w.retain(|o| !std::ptr::eq(Rc::as_ptr(o), self));
+            }
+        });
+    }
+}
+
 fn fill_undo(menu: &gio::Menu, editor: Option<&TextEditor>) {
     menu.remove_all();
     let undo = editor.and_then(TextEditor::undo_name);

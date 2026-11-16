@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The header bar of interface B (INT-11, INT-14, GNM-10): at the start,
-//! the Sidebar button with the View menu, the Insert menu and the buttons
-//! of the objects; at the end, Find, the Inspector and the main menu.
+//! The header bar of window M+ (INT-11, INT-14, GNM-10): at the start,
+//! the Sidebar button, the Insert menu and the buttons of the objects; at
+//! the end, Open Documents, Find, the Inspector and the main menu, which
+//! holds View.
 
 use adw::prelude::*;
 use gtk::gio;
@@ -42,16 +43,14 @@ impl Header {
         };
         let header = adw::HeaderBar::builder().title_widget(&title).build();
 
-        // The Sidebar button shows the navigation sidebar (F9), and its
-        // arrow opens the View menu.
-        let sidebar_button = adw::SplitButton::builder()
+        // The Sidebar button shows the navigation sidebar (F9). In window
+        // M+ it has no menu: View is a submenu of the main menu.
+        let sidebar_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-symbolic")
             .action_name("win.sidebar")
-            .menu_model(&view)
             .tooltip_text(tr("Sidebar"))
-            .dropdown_tooltip(tr("View"))
             .build();
-        formatting::labelled(sidebar_button.upcast_ref::<gtk::Widget>(), &tr("Sidebar"));
+        formatting::labelled(&sidebar_button, &tr("Sidebar"));
         let insert_label = adw::ButtonContent::builder()
             .icon_name("desk-insert-symbolic")
             .label(tr("_Insert"))
@@ -100,7 +99,7 @@ impl Header {
 
         let menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
-            .menu_model(&main_menu(info, opens))
+            .menu_model(&main_menu(info, opens, &view))
             .primary(true)
             .tooltip_text(tr("Main Menu"))
             .build();
@@ -117,7 +116,16 @@ impl Header {
             .tooltip_text(tr("Find"))
             .build();
         formatting::labelled(&find_toggle, &tr("Find"));
+        // Open Documents shows the open documents as a grid
+        // (AdwTabOverview), to switch between them.
+        let overview_button = gtk::Button::builder()
+            .icon_name("view-grid-symbolic")
+            .action_name("win.tab-overview")
+            .tooltip_text(tr("Open Documents"))
+            .build();
+        formatting::labelled(&overview_button, &tr("Open Documents"));
         let end = gtk::Box::builder().spacing(6).visible(false).build();
+        end.append(&overview_button);
         if slides {
             // Play, before Find (KINT-05, KINT-12).
             end.append(&super::slides::play_button());
@@ -149,9 +157,12 @@ fn object_button(icon: &str, label: &str, action: &str) -> gtk::Button {
     button
 }
 
-/// The main menu: what belongs to the file and to the app (GNM-10). What
-/// the menu bar of iWork had and is not here, the command search finds.
-pub(super) fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
+/// The main menu: what belongs to the file and to the app (GNM-10), and
+/// `view`, the View menu, as a submenu. What the menu bar of iWork had and
+/// is not here, the command search finds. Save is not in it: saving
+/// becomes automatic in phase B1 (D-001), and until then Ctrl+S and the
+/// command search save.
+pub(super) fn main_menu(info: AppInfo, opens: bool, view: &gio::Menu) -> gio::Menu {
     let menu = gio::Menu::new();
     let file = gio::Menu::new();
     if opens {
@@ -164,10 +175,12 @@ pub(super) fn main_menu(info: AppInfo, opens: bool) -> gio::Menu {
     menu.append_section(None, &file);
     if opens {
         let save = gio::Menu::new();
-        save.append(Some(&tr("_Save")), Some("win.save"));
         save.append(Some(&tr("Save _As…")), Some("win.save-as"));
         menu.append_section(None, &save);
     }
+    let shown = gio::Menu::new();
+    shown.append_submenu(Some(&tr("_View")), view);
+    menu.append_section(None, &shown);
     let commands = gio::Menu::new();
     commands.append(Some(&tr("Search _Commands…")), Some("win.command-search"));
     menu.append_section(None, &commands);
@@ -189,6 +202,7 @@ pub(super) fn more_commands(opens: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     if opens {
         menu.append(Some(&tr("_New Window")), Some("app.new-window"));
+        menu.append(Some(&tr("_Save")), Some("win.save"));
         menu.append(Some(&tr("Save a _Copy…")), Some("win.save-copy"));
         menu.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
         menu.append(Some(&tr("Re_name…")), Some("win.rename"));
@@ -198,6 +212,7 @@ pub(super) fn more_commands(opens: bool) -> gio::Menu {
         menu.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
     }
     menu.append(Some(&tr("C_lose")), Some("win.close"));
+    menu.append(Some(&tr("Close _Window")), Some("window.close"));
     menu.append(Some(&tr("Close _All Windows")), Some("app.close-all"));
     menu
 }

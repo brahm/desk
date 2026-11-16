@@ -64,6 +64,7 @@ mod tab_stops;
 mod table_bars;
 mod table_pane;
 mod tables;
+mod tabs;
 pub mod text_nav;
 mod thumbnails;
 mod undo_names;
@@ -345,11 +346,15 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
         app.set_accels_for_action("app.new-window", &["<Control><Shift>n"]);
         app.set_accels_for_action("app.preferences", &["<Control>comma"]);
         app.set_accels_for_action("win.ruler", &["<Control>r"]);
-        app.set_accels_for_action("window.close", &["<Control>w"]);
+        // Ctrl+W closes the tab and Ctrl+Shift+W the window, as in GNOME.
+        app.set_accels_for_action("win.close", &["<Control>w"]);
+        app.set_accels_for_action("window.close", &["<Control><Shift>w"]);
         app.set_accels_for_action("app.close-all", &["<Control><Alt>w"]);
         if opener.is_some() {
             app.set_accels_for_action("app.open", &["<Control>o"]);
-            app.set_accels_for_action("app.new-document", &["<Control>n"]);
+            // Ctrl+T is a new tab in GNOME (D-024), and documents open in
+            // tabs.
+            app.set_accels_for_action("app.new-document", &["<Control>n", "<Control>t"]);
             app.set_accels_for_action("win.save", &["<Control>s"]);
             app.set_accels_for_action("win.save-as", &["<Control><Shift>s"]);
             app.set_accels_for_action("win.duplicate", &["<Control><Shift>d"]);
@@ -365,7 +370,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             app.set_accels_for_action("win.skip-slide", &["<Control><Shift>h"]);
             app.set_accels_for_action("win.play", &["F5"]);
             if opener.is_none() {
-                app.set_accels_for_action("app.new-window", &["<Control><Shift>n", "<Control>n"]);
+                app.set_accels_for_action("app.new-tab", &["<Control>n", "<Control>t"]);
             }
         }
         for (action, keys) in [
@@ -388,7 +393,6 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ),
             ("win.inspector", &["<Control><Alt>i"]),
             ("win.sidebar", &["F9"]),
-            ("win.fonts", &["<Control>t"]),
             ("win.find", &["<Control>f"]),
             ("win.find-replace", &["<Control>h"]),
             ("win.find-next", &["<Control>g"]),
@@ -425,7 +429,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
     });
     app.connect_activate(move |app| {
         let window = DocumentWindow::new(app, info, opener);
-        window.window().present();
+        window.show();
         offer_recovery(app, info, opener, &window);
     });
     // Files opened from outside: by double click, from the recent files or
@@ -489,7 +493,7 @@ fn load_css() {
 fn open_in_window(app: &adw::Application, info: AppInfo, opener: &'static Opener, path: &Path) {
     let window = DocumentWindow::find_empty()
         .unwrap_or_else(|| DocumentWindow::new(app, info, Some(opener)));
-    window.window().present();
+    window.show();
     window.load(opener, path);
 }
 
@@ -532,7 +536,14 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
         .build();
     let new_window = gio::ActionEntry::builder("new-window")
         .activate(move |app: &adw::Application, _, _| {
-            DocumentWindow::new(app, info, opener).window().present();
+            DocumentWindow::new_window(app, info, opener).show();
+        })
+        .build();
+    // A new document in a tab of the window in front: Desk Slides, until
+    // it opens files, starts a presentation in it.
+    let new_tab = gio::ActionEntry::builder("new-tab")
+        .activate(move |app: &adw::Application, _, _| {
+            DocumentWindow::new(app, info, opener).show();
         })
         .build();
     // Ctrl+N starts a document from the Blank template at once; a new
@@ -540,12 +551,8 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
     let new_document = gio::ActionEntry::builder("new-document")
         .activate(move |app: &adw::Application, _, _| {
             let window = DocumentWindow::new(app, info, opener);
-            gio::prelude::ActionGroupExt::activate_action(
-                window.window(),
-                "new-from-template",
-                Some(&"blank".to_variant()),
-            );
-            window.window().present();
+            window.new_from_blank();
+            window.show();
         })
         .build();
     let preferences = gio::ActionEntry::builder("preferences")
@@ -560,6 +567,7 @@ fn add_actions(app: &adw::Application, info: AppInfo, opener: Option<&'static Op
         quit,
         close_windows,
         new_window,
+        new_tab,
         new_document,
         preferences,
     ]);
@@ -645,7 +653,7 @@ fn offer_recovery(
                     DocumentWindow::new(&app, info, opener)
                 };
                 if window.recover(draft) {
-                    window.window().present();
+                    window.show();
                 }
             }
         },

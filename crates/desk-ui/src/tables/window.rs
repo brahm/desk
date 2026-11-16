@@ -105,7 +105,14 @@ enum MenuTarget {
 
 /// A window and its document.
 pub(super) struct TablesWindow {
+    /// The window that holds the tab of the document (see tabs.rs).
     window: adw::ApplicationWindow,
+    frame: Rc<crate::tabs::Frame>,
+    /// The tab of the document, with its own breakpoints.
+    root: adw::BreakpointBin,
+    tab: std::cell::OnceCell<adw::TabPage>,
+    /// The actions of the document (`win.`).
+    actions: gio::SimpleActionGroup,
     info: AppInfo,
     title: adw::WindowTitle,
     book: RefCell<Workbook>,
@@ -146,12 +153,36 @@ thread_local! {
 
 impl TablesWindow {
     /// A new window with a document of the Blank template.
+    /// A new document in a tab of the window in front, or in a new window
+    /// when the app has none.
     pub fn new(app: &adw::Application, info: AppInfo) -> Rc<Self> {
-        Self::with_book(app, info, Workbook::blank(&tr("Sheet"), &tr("Table")))
+        let frame = crate::tabs::Frame::active(app).unwrap_or_else(|| Self::new_frame(app, info));
+        Self::new_in(&frame, info)
     }
 
-    /// A new window with a document.
-    fn with_book(app: &adw::Application, info: AppInfo, book: Workbook) -> Rc<Self> {
+    /// A new document in a new window (New Window).
+    pub fn new_window(app: &adw::Application, info: AppInfo) -> Rc<Self> {
+        let frame = Self::new_frame(app, info);
+        Self::new_in(&frame, info)
+    }
+
+    fn new_frame(app: &adw::Application, info: AppInfo) -> Rc<crate::tabs::Frame> {
+        let frame = crate::tabs::Frame::new(app, info.name);
+        let weak = Rc::downgrade(&frame);
+        frame.set_new_tab(move || {
+            let frame = weak.upgrade()?;
+            Self::new_in(&frame, info).tab.get().cloned()
+        });
+        frame
+    }
+
+    /// A new document, from the Blank template, in a new tab of `frame`.
+    fn new_in(frame: &Rc<crate::tabs::Frame>, info: AppInfo) -> Rc<Self> {
+        Self::with_book(frame, info, Workbook::blank(&tr("Sheet"), &tr("Table")))
+    }
+
+    /// A new tab of `frame` with a document.
+    fn with_book(frame: &Rc<crate::tabs::Frame>, info: AppInfo, book: Workbook) -> Rc<Self> {
         let Header {
             header,
             title,
@@ -244,6 +275,13 @@ impl TablesWindow {
             .build();
         let toolbar_view = adw::ToolbarView::new();
         toolbar_view.add_top_bar(&header);
+        // The tabs of the open documents, once two are open.
+        toolbar_view.add_top_bar(
+            &adw::TabBar::builder()
+                .view(frame.view())
+                .autohide(true)
+                .build(),
+        );
         toolbar_view.add_top_bar(&screen_banner);
         toolbar_view.add_top_bar(&format_revealer);
         toolbar_view.add_top_bar(&formula_revealer);
@@ -257,17 +295,15 @@ impl TablesWindow {
             .max_sidebar_width(nav_sidebar::WIDTH)
             .show_sidebar(true)
             .build();
-        let window = adw::ApplicationWindow::builder()
-            .application(app)
-            .title(info.name)
-            .default_width(1280)
-            .default_height(720)
-            .content(&nav_split)
+        let window = frame.window().clone();
+        let root = adw::BreakpointBin::builder()
+            .child(&nav_split)
+            .width_request(360)
+            .height_request(294)
             .build();
-        window.set_width_request(360);
-        window.set_height_request(294);
 
-        // Of the breakpoints that match, the window applies the one added
+        // The breakpoints belong to the tab. Of the breakpoints that match,
+        // the bin applies the one added
         // last, so each one sets what the wider ones set too (NGNM-01).
         let mut breakpoints = Vec::new();
         for (width, collapsed) in [
@@ -299,7 +335,7 @@ impl TablesWindow {
             breakpoints.push(breakpoint);
         }
         for breakpoint in breakpoints {
-            window.add_breakpoint(breakpoint);
+            root.add_breakpoint(breakpoint);
         }
 
         let context_menu = gtk::PopoverMenu::builder()
@@ -311,6 +347,10 @@ impl TablesWindow {
 
         let this = Rc::new(Self {
             window,
+            frame: frame.clone(),
+            root,
+            tab: std::cell::OnceCell::new(),
+            actions: gio::SimpleActionGroup::new(),
             info,
             title,
             book: RefCell::new(book),
@@ -358,21 +398,19 @@ impl TablesWindow {
         }
         this.canvas.focus();
         WINDOWS.with(|w| w.borrow_mut().push(this.clone()));
-        let weak = Rc::downgrade(&this);
-        this.window.connect_destroy(move |_| {
-            // The list is gone when the app ends with windows in it.
-            let _ = WINDOWS.try_with(|w| {
-                if let Ok(mut w) = w.try_borrow_mut() {
-                    w.retain(|o| weak.upgrade().is_none_or(|me| !Rc::ptr_eq(o, &me)));
-                }
-            });
-        });
+        let tab = frame.add(&this.root, this.clone());
+        this.tab.set(tab).ok();
+        this.refresh();
+        this.canvas.focus();
         this
     }
 
-    /// The GTK window.
-    pub fn window(&self) -> &adw::ApplicationWindow {
-        &self.window
+    /// Brings the tab of the document and its window to the front.
+    pub fn show(&self) {
+        if let Some(tab) = self.tab.get() {
+            self.frame.view().set_selected_page(tab);
+        }
+        self.window.present();
     }
 
     /// Shows the document, the sheet and the selection everywhere.
@@ -405,8 +443,10 @@ impl TablesWindow {
         } else {
             String::new()
         });
-        self.window
-            .set_title(Some(&format!("{name} – {}", self.info.name)));
+        if let Some(tab) = self.tab.get() {
+            tab.set_title(&name);
+            tab.set_tooltip(&name);
+        }
         drop(book);
         self.update_actions();
     }
@@ -799,7 +839,7 @@ impl TablesWindow {
             ("deselect-all", selection != Selection::None),
         ] {
             if let Some(action) = self
-                .window
+                .actions
                 .lookup_action(name)
                 .and_downcast::<gio::SimpleAction>()
             {
@@ -807,7 +847,7 @@ impl TablesWindow {
             }
         }
         formatting::set_state(
-            &self.window,
+            &self.actions,
             "show-table-name",
             item.is_some_and(|i| i.name_shown).to_variant(),
         );
@@ -880,10 +920,8 @@ impl TablesWindow {
             ("duplicate", |this| {
                 // A copy without a title, opened beside the original
                 // (NDOC-11).
-                if let Some(app) = this.window.application().and_downcast::<adw::Application>() {
-                    let copy = Self::with_book(&app, this.info, this.book.borrow().clone());
-                    copy.window.present();
-                }
+                let copy = Self::with_book(&this.frame, this.info, this.book.borrow().clone());
+                copy.show();
             }),
         ];
         for (name, f) in simple {
@@ -894,7 +932,7 @@ impl TablesWindow {
                     f(&this);
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
 
         // Moves a sheet up or down in the list (NTAB-03).
@@ -928,7 +966,7 @@ impl TablesWindow {
                 Ok((current, selection))
             });
         });
-        self.window.add_action(&move_sheet);
+        self.actions.add_action(&move_sheet);
 
         // Moves a table or a chart in the list, or to another sheet,
         // without moving it on the sheet (NTAB-03).
@@ -965,7 +1003,7 @@ impl TablesWindow {
                 }
             });
         });
-        self.window.add_action(&move_item);
+        self.actions.add_action(&move_item);
 
         // Show Table Name, over the table (NTAB-09).
         let show_name =
@@ -976,7 +1014,7 @@ impl TablesWindow {
                 this.set_name_shown(on);
             }
         });
-        self.window.add_action(&show_name);
+        self.actions.add_action(&show_name);
 
         // The zoom (NINT-04).
         let zoom = gio::SimpleAction::new("zoom", Some(glib::VariantTy::STRING));
@@ -994,7 +1032,7 @@ impl TablesWindow {
             this.canvas.set_zoom(level);
             this.bottom.zoom.set_label(&geometry::zoom_label(level));
         });
-        self.window.add_action(&zoom);
+        self.actions.add_action(&zoom);
 
         // The bars and the panes the window shows.
         for (name, initial) in [
@@ -1018,13 +1056,13 @@ impl TablesWindow {
                     _ => this.formula_revealer.set_reveal_child(on),
                 }
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         // The panes follow the split views, which a narrow window closes.
         let weak = Rc::downgrade(self);
         self.nav_split.connect_show_sidebar_notify(move |split| {
             if let Some(this) = weak.upgrade() {
-                formatting::set_state(&this.window, "sidebar", split.shows_sidebar().to_variant());
+                formatting::set_state(&this.actions, "sidebar", split.shows_sidebar().to_variant());
                 this.sync_nav();
             }
         });
@@ -1032,7 +1070,7 @@ impl TablesWindow {
         self.split.connect_show_sidebar_notify(move |split| {
             if let Some(this) = weak.upgrade() {
                 formatting::set_state(
-                    &this.window,
+                    &this.actions,
                     "inspector",
                     split.shows_sidebar().to_variant(),
                 );
@@ -1057,7 +1095,7 @@ impl TablesWindow {
                 }
                 this.sync_nav();
             });
-            self.window.add_action(&action);
+            self.actions.add_action(&action);
         }
         let weak = Rc::downgrade(self);
         self.nav.connect_page_changed(move |_| {
@@ -1073,7 +1111,7 @@ impl TablesWindow {
                 super::shortcuts::dialog().present(Some(&window));
             }
         });
-        self.window.add_action(&shortcuts);
+        self.actions.add_action(&shortcuts);
 
         let search = gio::SimpleAction::new("command-search", None);
         let weak = Rc::downgrade(self);
@@ -1091,9 +1129,9 @@ impl TablesWindow {
             .into_iter()
             .map(|(name, menu)| (name, menu.upcast()))
             .collect();
-            crate::window::command_search::present(&this.window, &menus);
+            crate::window::command_search::present(&this.window, this.actions.upcast_ref(), &menus);
         });
-        self.window.add_action(&search);
+        self.actions.add_action(&search);
         self.sync_nav();
     }
 
@@ -1103,7 +1141,7 @@ impl TablesWindow {
         let shown = self.nav_split.shows_sidebar();
         let page = self.nav.page();
         for (name, action, _, _) in NAV_PAGES {
-            formatting::set_state(&self.window, action, (shown && page == name).to_variant());
+            formatting::set_state(&self.actions, action, (shown && page == name).to_variant());
         }
         let width = self.nav.width(&page);
         self.nav_split.set_min_sidebar_width(width);
@@ -1113,6 +1151,23 @@ impl TablesWindow {
     /// Full screen (NINT-06): F11 goes in and out, and so does Escape out
     /// of it. The sidebar and the Inspector hide, and come back after.
     fn connect_fullscreen(self: &Rc<Self>, leave: &gtk::Button) {
+        // Ctrl+W closes the tab of the document.
+        let close = gio::SimpleAction::new("close", None);
+        let weak = Rc::downgrade(self);
+        close.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.frame.close(&this.root);
+            }
+        });
+        self.actions.add_action(&close);
+        let overview = gio::SimpleAction::new("tab-overview", None);
+        let weak = Rc::downgrade(self);
+        overview.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.frame.show_overview();
+            }
+        });
+        self.actions.add_action(&overview);
         let action = gio::SimpleAction::new_stateful("fullscreen", None, &false.to_variant());
         let weak = Rc::downgrade(self);
         action.connect_change_state(move |action, value| {
@@ -1123,7 +1178,7 @@ impl TablesWindow {
             action.set_state(&on.to_variant());
             this.window.set_fullscreened(on);
         });
-        self.window.add_action(&action);
+        self.actions.add_action(&action);
         let leave = leave.downgrade();
         let weak = Rc::downgrade(self);
         let before = Rc::new(Cell::new(false));
@@ -1254,6 +1309,25 @@ fn warn_small_screen(window: &adw::ApplicationWindow, banner: &adw::Banner) {
             }
         }
     });
+}
+
+impl crate::tabs::FramePage for TablesWindow {
+    fn actions(&self) -> gio::ActionGroup {
+        self.actions.clone().upcast()
+    }
+
+    /// Desk Tables does not save documents yet, so a tab closes at once.
+    fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+        done(true);
+    }
+
+    fn closed(&self) {
+        let _ = WINDOWS.try_with(|w| {
+            if let Ok(mut w) = w.try_borrow_mut() {
+                w.retain(|o| !std::ptr::eq(Rc::as_ptr(o), self));
+            }
+        });
+    }
 }
 
 #[cfg(test)]

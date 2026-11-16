@@ -14,16 +14,31 @@ const SECTIONS: &[Section] = &[
     (
         n_("Windows"),
         &[
-            ("<Control>n", n_("New document")),
+            ("<Control>n <Control>t", n_("New document")),
             ("<Control><Shift>n", n_("New window")),
             ("<Control><Shift>d", n_("Duplicate")),
-            ("<Control>w", n_("Close the window")),
+            ("<Control>w", n_("Close the document")),
+            ("<Control><Shift>w", n_("Close the window")),
             ("<Control><Alt>w", n_("Close all windows")),
             ("<Control>q", n_("Quit")),
             ("F11", n_("Fullscreen")),
             ("<Control>question", n_("Keyboard shortcuts")),
             ("F10", n_("Main menu")),
             ("<Control>slash", n_("Search commands")),
+        ],
+    ),
+    (
+        n_("Documents"),
+        &[
+            (
+                "<Control>Page_Up <Control>Page_Down",
+                n_("Previous or next document"),
+            ),
+            ("<Alt>1 <Alt>9", n_("First to ninth document")),
+            (
+                "<Control>Tab <Control><Shift>Tab",
+                n_("Next or previous document"),
+            ),
         ],
     ),
     (
@@ -38,10 +53,7 @@ const SECTIONS: &[Section] = &[
     (
         n_("Sheets and Tables"),
         &[
-            (
-                "<Control>Page_Up <Control>Page_Down",
-                n_("Previous or next sheet"),
-            ),
+            ("<Alt>Page_Up <Alt>Page_Down", n_("Previous or next sheet")),
             ("Left Right Up Down", n_("Move to another cell")),
             ("Tab <Shift>Tab", n_("Next or previous cell in the row")),
             ("Return", n_("Next cell in the column")),
