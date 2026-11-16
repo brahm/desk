@@ -67,6 +67,9 @@ impl NavSidebar {
         let stack = gtk::Stack::builder()
             .transition_type(gtk::StackTransitionType::Crossfade)
             .vhomogeneous(false)
+            // Each page asks for its own width: the search results, wider
+            // in Portuguese, must not widen the thumbnails.
+            .hhomogeneous(false)
             .build();
         let root = adw::ToolbarView::new();
         root.add_top_bar(&header);

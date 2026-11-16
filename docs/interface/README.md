@@ -493,6 +493,12 @@ Depois disso:
   e as notas do apresentador (KINT-05 a KINT-13, KINT-15, KGNM-01,
   KGNM-13 a KGNM-15). O botão Reproduzir e a aba Animação já têm lugar nela e
   ganham função nas fases 4 e 5, e o Inspetor fecha na fase 7 (KINT-14).
+  Feita em 16/11/2026, com o mínimo da fase 1 de que ela precisa: slides,
+  notas do apresentador e pular slide no modelo, e o slide de 1024 × 768
+  (KSLD-01, KSLD-06, KSLD-15, KAPR-04). Abrir e salvar ODP, importar
+  `.key`, os tamanhos de slide e o fundo do slide continuam na fase 1. Os
+  tópicos só leem os slides até a fase 3, que traz os espaços reservados,
+  e recuar slides na mesa de luz (KINT-07) também fica para a fase 3.
 
 A fase 1 do Slides só depende do que o Desk Writer já tem e pode andar
 junto com as sete etapas. A fase 2 do Slides e a do Tables esperam as
@@ -521,9 +527,9 @@ está aplicado:
 | Aba Info do Inspetor | No Writer, com as informações do documento |
 | Aba Dados do Inspetor | Espera o Tables |
 | Ctrl+/ para a busca de comandos | No Writer (etapa 7) |
-| F5 para reproduzir | Espera o Slides |
-| Ctrl+M para novo slide | Espera o Slides |
-| Ctrl+Shift+H para pular o slide | Espera o Slides |
+| F5 para reproduzir | No Slides (fase 2): o botão Reproduzir já está na janela e ganha função na fase 4 |
+| Ctrl+M para novo slide | No Slides (fase 2) |
+| Ctrl+Shift+H para pular o slide | No Slides (fase 2) |
 | Ctrl+Shift+M para a máscara | No Writer (etapa 7) |
 | Alt e as setas no Tables | Espera o Tables |
 | Ctrl+Shift+F para a lista de fórmulas | Espera o Tables |

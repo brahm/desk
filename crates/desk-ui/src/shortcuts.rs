@@ -175,6 +175,36 @@ pub fn dialog(opens: bool) -> adw::ShortcutsDialog {
     dialog
 }
 
+/// The shortcuts of Desk Slides that Desk Writer does not have, approved
+/// on 14/11/2026 (KGNM-11).
+const SLIDES: Section = (
+    n_("Slides"),
+    true,
+    &[
+        ("<Control>m", n_("New slide")),
+        ("<Control><Shift>h", n_("Skip the slide")),
+        ("F5", n_("Play the presentation")),
+    ],
+);
+
+/// The dialog of Desk Slides, which opens no files yet: the sections that
+/// need a document but not a file, and the slides.
+pub fn slides_dialog() -> adw::ShortcutsDialog {
+    let dialog = adw::ShortcutsDialog::new();
+    for (title, _, shortcuts) in SECTIONS
+        .iter()
+        .filter(|(title, _, _)| *title != "Documents")
+        .chain([&SLIDES])
+    {
+        let section = adw::ShortcutsSection::new(Some(&tr(title)));
+        for (keys, what) in *shortcuts {
+            section.add(adw::ShortcutsItem::new(&tr(what), keys));
+        }
+        dialog.add(section);
+    }
+    dialog
+}
+
 /// The titles of the shortcuts the dialog lists, for the tests.
 #[cfg(test)]
 fn titles(opens: bool) -> Vec<&'static str> {
@@ -191,7 +221,7 @@ mod tests {
 
     #[test]
     fn int_21_every_shortcut_names_keys_gdk_knows() {
-        for (_, _, shortcuts) in SECTIONS {
+        for (_, _, shortcuts) in SECTIONS.iter().chain([&SLIDES]) {
             for (keys, _) in *shortcuts {
                 for key in keys.split(' ') {
                     // The modifiers, then a key that GDK knows by name.
