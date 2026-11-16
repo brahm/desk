@@ -30,6 +30,7 @@ use crate::log::{Content, ImportLog, Warning};
 use crate::sections;
 
 pub(crate) mod objects;
+mod tables;
 
 /// The ODF name of the default paragraph style.
 const DEFAULT_STYLE: &str = "Standard";
@@ -1085,7 +1086,12 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .find(|s| s.family == style.family && s.style == style.name)
                 .map(|s| s.key);
             let built: Style = match style.family {
-                odf::Family::List | odf::Family::Graphic => continue,
+                odf::Family::List
+                | odf::Family::Graphic
+                | odf::Family::Table
+                | odf::Family::TableColumn
+                | odf::Family::TableRow
+                | odf::Family::TableCell => continue,
                 odf::Family::Paragraph => ParagraphStyle {
                     id,
                     name: names[&id].as_str().into(),
@@ -2639,6 +2645,10 @@ pub fn export(document: &Document) -> odf::TextDocument {
             odf::Family::Text => "T",
             odf::Family::List => "L",
             odf::Family::Graphic => "gr",
+            odf::Family::Table => "ta",
+            odf::Family::TableColumn => "co",
+            odf::Family::TableRow => "ro",
+            odf::Family::TableCell => "ce",
         };
         let count = automatic.iter().filter(|s| s.family == family).count();
         let name = format!("{prefix}{}", count + 1);
@@ -2931,6 +2941,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             gradients: Vec::new(),
             markers: Vec::new(),
             fill_images: Vec::new(),
+            charts: Vec::new(),
         },
         &mut out,
     );

@@ -41,7 +41,7 @@ impl CellText for String {
 
 /// A number of a cell, compared by its bits so that the model stays
 /// comparable and hashable.
-#[derive(Clone, Copy, Debug, Default, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialOrd, serde::Serialize, serde::Deserialize)]
 pub struct Num(pub f64);
 
 impl PartialEq for Num {
@@ -59,7 +59,7 @@ impl Hash for Num {
 }
 
 /// What a cell holds, as it was typed (TAB-16, TAB-18).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Content<T> {
     /// Nothing.
     #[default]
@@ -94,7 +94,9 @@ impl<T> Content<T> {
 }
 
 /// A color, from 0 to 255 in each channel.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Color {
     /// Red.
     pub r: u8,
@@ -119,7 +121,7 @@ impl Color {
 }
 
 /// How a cell is filled (TAB-22).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CellFill {
     /// One color.
     Color(Color),
@@ -137,7 +139,9 @@ pub enum CellFill {
 }
 
 /// Where the text of a cell sits across it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum HAlign {
     /// Text to the left, numbers to the right, as iWork aligns by
     /// default.
@@ -154,7 +158,9 @@ pub enum HAlign {
 }
 
 /// Where the text of a cell sits down it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum VAlign {
     /// At the top.
     #[default]
@@ -167,7 +173,7 @@ pub enum VAlign {
 
 /// The character formatting of a cell that holds no text, and that typing
 /// in it starts with: what the format bar sets for the whole cell.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TextStyle {
     /// The font family; none for that of the table.
     pub font: Option<String>,
@@ -186,7 +192,7 @@ pub struct TextStyle {
 }
 
 /// How a cell looks.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CellStyle {
     /// Its fill; none for that of its area of the table.
     pub fill: Option<CellFill>,
@@ -202,7 +208,7 @@ pub struct CellStyle {
 }
 
 /// A cell.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Cell<T> {
     /// What it holds.
     pub content: Content<T>,

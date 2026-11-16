@@ -11,7 +11,9 @@ use desk_formula::{Value, date_from_days, days_from_date};
 use crate::cell::{Content, Num};
 
 /// How negative numbers are written.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Negative {
     /// With a minus sign: -100.
     #[default]
@@ -25,7 +27,9 @@ pub enum Negative {
 }
 
 /// How a date is written.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum DateStyle {
     /// Not written.
     None,
@@ -43,7 +47,9 @@ pub enum DateStyle {
 }
 
 /// How a time of day is written.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum TimeStyle {
     /// Not written.
     #[default]
@@ -55,7 +61,9 @@ pub enum TimeStyle {
 }
 
 /// How a duration is written.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum DurationStyle {
     /// 1sem 2d 3h 4min 5s, with the units that are not zero.
     #[default]
@@ -67,7 +75,7 @@ pub enum DurationStyle {
 }
 
 /// How exact a fraction is.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum FractionPrecision {
     /// The closest fraction with a denominator of up to this many digits,
     /// from 1 to 3.
@@ -84,7 +92,7 @@ impl Default for FractionPrecision {
 
 /// A format of numbers, dates or text that a person made, with a name
 /// (TAB-29 to TAB-31).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CustomFormat {
     /// The name that the format menu shows.
     pub name: String,
@@ -96,7 +104,7 @@ pub struct CustomFormat {
 }
 
 /// How a cell writes its value (TAB-28).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Format {
     /// As it was typed: numbers in their shortest form, and dates,
     /// percentages and currency as they were entered.

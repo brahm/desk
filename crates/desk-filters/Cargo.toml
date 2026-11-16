@@ -14,11 +14,13 @@ glib.workspace = true
 poppler-rs.workspace = true
 desk-anim.workspace = true
 desk-chart.workspace = true
+desk-formula.workspace = true
 desk-iwork.workspace = true
 desk-model.workspace = true
 desk-odf.workspace = true
 desk-table.workspace = true
 png.workspace = true
+serde_json.workspace = true
 tiff.workspace = true
 
 [dev-dependencies]

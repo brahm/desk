@@ -219,6 +219,7 @@ name = "desk-chart"
 version = "0.1.0"
 dependencies = [
  "desk-table",
+ "serde",
 ]
 
 [[package]]
@@ -242,6 +243,7 @@ version = "0.1.0"
 dependencies = [
  "desk-anim",
  "desk-chart",
+ "desk-formula",
  "desk-iwork",
  "desk-model",
  "desk-odf",
@@ -250,6 +252,7 @@ dependencies = [
  "glib",
  "png",
  "poppler-rs",
+ "serde_json",
  "tiff",
  "zip",
 ]
@@ -330,6 +333,7 @@ name = "desk-table"
 version = "0.1.0"
 dependencies = [
  "desk-formula",
+ "serde",
 ]
 
 [[package]]

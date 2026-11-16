@@ -920,6 +920,20 @@ fn kind(
                 padding.map_or(Length::ZERO, length),
             ))
         }
+        odf::DrawKind::Table(table) => {
+            ObjectKind::Table(Arc::new(super::tables::import_table(source, table)))
+        }
+        odf::DrawKind::Object { href, desk } => {
+            let chart = source
+                .charts
+                .iter()
+                .find(|(h, _)| h == href)
+                .map(|(_, c)| c);
+            match super::tables::import_chart(desk.as_deref(), chart) {
+                Some(chart) => ObjectKind::Chart(Arc::new(chart)),
+                None => return Ok(None),
+            }
+        }
         odf::DrawKind::Group(objects) => {
             let mut children = Vec::new();
             if depth < 16 {
@@ -1237,6 +1251,18 @@ fn import_one(
         y = 0.0;
     }
     let mut frame = Frame::from_pt(x, y, w, h);
+    // A table of the text has the size of its cells.
+    if let ObjectKind::Table(table) = &kind
+        && (w <= 0.0 || h <= 0.0)
+    {
+        let height: u32 = (0..table.rows()).map(|r| table.height(r)).sum();
+        frame = Frame::from_pt(
+            x,
+            y,
+            f64::from(table.total_width()) / 1000.0,
+            f64::from(height) / 1000.0,
+        );
+    }
     // A group is as large as what it holds.
     if let ObjectKind::Group(children) = &kind {
         let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
@@ -1586,6 +1612,20 @@ pub(super) struct Exporter<'a> {
     pub markers: Vec<odf::Marker>,
     /// The pictures that the objects fill with.
     pub fill_images: Vec<odf::FillImage>,
+    /// The charts, by the folder of each in the package.
+    pub charts: Vec<(String, odf::ChartDocument)>,
+}
+
+impl super::tables::TableStyles for Exporter<'_> {
+    fn table_style(&mut self, family: odf::Family, properties: odf::Properties) -> String {
+        let prefix = match family {
+            odf::Family::Table => "Ta",
+            odf::Family::TableColumn => "Co",
+            odf::Family::TableRow => "Ro",
+            _ => "Ce",
+        };
+        self.style(prefix, family, None, properties)
+    }
 }
 
 impl Exporter<'_> {
@@ -2028,6 +2068,19 @@ impl Exporter<'_> {
                     chain_next: text.next.map(text_box_name),
                 }
             }
+            ObjectKind::Table(table) => {
+                let locale = super::tables::locale(self.document);
+                odf::DrawKind::Table(super::tables::export_table(table, &locale, self))
+            }
+            ObjectKind::Chart(chart) => {
+                let href = format!("./Object {}", self.charts.len() + 1);
+                self.charts
+                    .push((href.clone(), super::tables::export_chart(chart, w, h)));
+                odf::DrawKind::Object {
+                    href,
+                    desk: serde_json::to_string(&**chart).ok(),
+                }
+            }
             // A draw:g is not turned: its objects are, about its center.
             ObjectKind::Group(objects) => odf::DrawKind::Group(
                 objects
@@ -2283,6 +2336,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     out.gradients = std::mem::take(&mut exporter.gradients);
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
+    out.charts.append(&mut exporter.charts);
 }
 
 /// Writes the objects of the masters of the sections in their master
@@ -2305,6 +2359,7 @@ pub(super) fn export_master_objects(
         gradients: std::mem::take(&mut out.gradients),
         markers: std::mem::take(&mut out.markers),
         fill_images: std::mem::take(&mut out.fill_images),
+        charts: Vec::new(),
     };
     // The objects in the lines of the headers and footers (EST-12), with
     // the styles of the master pages.
@@ -2352,6 +2407,7 @@ pub(super) fn export_master_objects(
     out.gradients = std::mem::take(&mut exporter.gradients);
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
+    out.charts.append(&mut exporter.charts);
     out.master_styles = automatic;
 }
 

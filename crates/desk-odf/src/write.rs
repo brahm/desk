@@ -43,6 +43,8 @@ fn root(w: &mut Writer, name: &'static str) {
         .attr("xmlns:meta", ns::META)
         .attr("xmlns:dc", ns::DC)
         .attr("xmlns:xlink", ns::XLINK)
+        .attr("xmlns:table", ns::TABLE)
+        .attr("xmlns:chart", ns::CHART)
         .attr("xmlns:desk", ns::DESK)
         .attr("office:version", VERSION);
 }
@@ -283,6 +285,10 @@ fn write_settings(document: &TextDocument) -> Option<String> {
             Family::Text => "text",
             Family::List => "list",
             Family::Graphic => "graphic",
+            Family::Table => "table",
+            Family::TableColumn => "table-column",
+            Family::TableRow => "table-row",
+            Family::TableCell => "table-cell",
         };
         w.start("config:config-item")
             .attr("config:name", &format!("F{}", shortcut.key))
@@ -327,6 +333,10 @@ fn write_style(w: &mut Writer, style: &Style) {
             match style.family {
                 Family::Paragraph => "paragraph",
                 Family::Graphic => "graphic",
+                Family::Table => "table",
+                Family::TableColumn => "table-column",
+                Family::TableRow => "table-row",
+                Family::TableCell => "table-cell",
                 // List styles are written as `text:list-style`.
                 Family::Text | Family::List => "text",
             },
@@ -602,6 +612,7 @@ fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
 }
 
 fn write_properties(w: &mut Writer, properties: &Properties) {
+    crate::table::write_table_properties(w, &properties.table, &border_value);
     if properties.paragraph != ParagraphProperties::default() {
         w.start("style:paragraph-properties");
         paragraph_attrs(w, &properties.paragraph);
@@ -614,6 +625,25 @@ fn write_properties(w: &mut Writer, properties: &Properties) {
         w.end();
     }
     crate::draw::write_graphic_properties(w, &properties.graphic);
+}
+
+/// The value of a side of `fo:border`.
+fn border_value(border: Border) -> String {
+    match border {
+        Border::None => "none".to_owned(),
+        Border::Line {
+            width,
+            style,
+            color,
+        } => {
+            let style = match style {
+                BorderLine::Solid => "solid",
+                BorderLine::Dashed => "dashed",
+                BorderLine::Dotted => "dotted",
+            };
+            format!("{width} {style} {color}")
+        }
+    }
 }
 
 fn len(w: &mut Writer, name: &str, value: Option<Length>) {
@@ -696,22 +726,7 @@ fn paragraph_attrs(w: &mut Writer, p: &ParagraphProperties) {
         ("right", p.border_right),
     ] {
         let Some(border) = border else { continue };
-        let value = match border {
-            Border::None => "none".to_owned(),
-            Border::Line {
-                width,
-                style,
-                color,
-            } => {
-                let style = match style {
-                    BorderLine::Solid => "solid",
-                    BorderLine::Dashed => "dashed",
-                    BorderLine::Dotted => "dotted",
-                };
-                format!("{width} {style} {color}")
-            }
-        };
-        w.attr(&format!("fo:border-{which}"), &value);
+        w.attr(&format!("fo:border-{which}"), &border_value(border));
     }
     len(w, "fo:padding-top", p.padding_top);
     len(w, "fo:padding-bottom", p.padding_bottom);

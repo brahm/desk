@@ -9,7 +9,9 @@ use std::sync::Arc;
 use desk_table::{Color, Num};
 
 /// What a chart draws (GRF-01).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum ChartKind {
     /// Columns side by side.
     #[default]
@@ -85,7 +87,9 @@ impl ChartKind {
 }
 
 /// What a series of a mixed or 2-axis chart draws (GRF-19).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum SeriesKind {
     /// Columns.
     #[default]
@@ -98,7 +102,7 @@ pub enum SeriesKind {
 
 /// The data of a chart: a table of values with names for its rows and
 /// columns, as the Chart Data Editor shows it (GRF-02, GRF-03).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ChartData {
     /// The names of the rows.
     pub rows: Vec<String>,
@@ -259,7 +263,7 @@ impl ChartData {
 
 /// A fill of a series: a color, a gradient or a texture of the
 /// collections of iWork, such as marble and wood (GRF-11).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SeriesFill {
     /// One color.
     Color(Color),
@@ -270,7 +274,7 @@ pub enum SeriesFill {
 }
 
 /// The textures of the fill collections (GRF-11).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Texture {
     /// Marble.
     Marble,
@@ -310,7 +314,9 @@ impl Texture {
 
 /// A collection of fills that the Chart inspector applies to all the
 /// series at once (GRF-11).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Collection {
     /// The colors of new charts.
     #[default]
@@ -398,7 +404,9 @@ pub fn darker(c: Color) -> Color {
 }
 
 /// The mark of the points of a line or a scatter chart (GRF-17).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Symbol {
     /// No mark.
     #[default]
@@ -414,7 +422,9 @@ pub enum Symbol {
 }
 
 /// Where the value labels of a series sit (GRF-12).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum LabelPosition {
     /// Above the bar or the point, or outside the end of a bar.
     #[default]
@@ -429,7 +439,7 @@ pub enum LabelPosition {
 
 /// The number format of values: on an axis, in a value label (GRF-10,
 /// GRF-12).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NumberStyle {
     /// The decimal places; none for as many as the value has.
     pub decimals: Option<u8>,
@@ -495,7 +505,7 @@ impl NumberStyle {
 }
 
 /// The value labels of a series (GRF-12).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ValueLabels {
     /// Whether they show.
     pub show: bool,
@@ -506,7 +516,9 @@ pub struct ValueLabels {
 }
 
 /// Which way error bars go (GRF-13).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum ErrorDirection {
     /// Above and below.
     #[default]
@@ -518,7 +530,7 @@ pub enum ErrorDirection {
 }
 
 /// How long error bars are (GRF-13).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ErrorAmount {
     /// A fixed value.
     Fixed(Num),
@@ -533,7 +545,7 @@ pub enum ErrorAmount {
 }
 
 /// The error bars of a series (GRF-13).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ErrorBars {
     /// Which way they go.
     pub direction: ErrorDirection,
@@ -544,7 +556,7 @@ pub struct ErrorBars {
 }
 
 /// The kind of a trendline (GRF-14).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TrendKind {
     /// A straight line.
     Linear,
@@ -561,7 +573,7 @@ pub enum TrendKind {
 }
 
 /// A trendline of a series (GRF-14).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Trendline {
     /// Its kind.
     pub kind: TrendKind,
@@ -576,7 +588,7 @@ pub struct Trendline {
 }
 
 /// The look of a series (GRF-11, GRF-12, GRF-16, GRF-17).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SeriesStyle {
     /// How bars, areas and slices are filled.
     pub fill: SeriesFill,
@@ -650,7 +662,9 @@ impl SeriesStyle {
 }
 
 /// The scale of a value axis (GRF-10).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Scale {
     /// Linear.
     #[default]
@@ -662,7 +676,7 @@ pub enum Scale {
 }
 
 /// A value axis (GRF-10).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ValueAxis {
     /// The least value; none for automatic.
     pub min: Option<Num>,
@@ -711,7 +725,7 @@ impl Default for ValueAxis {
 }
 
 /// The category axis (GRF-10).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CategoryAxis {
     /// Whether the labels show.
     pub labels: bool,
@@ -744,7 +758,9 @@ impl Default for CategoryAxis {
 }
 
 /// How a 3D chart is lit (GRF-20).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Lighting {
     /// Soft light from above.
     #[default]
@@ -756,7 +772,7 @@ pub enum Lighting {
 }
 
 /// The scene of a 3D chart (GRF-20).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Scene {
     /// The angle the chart is seen from, left to right, in degrees from
     /// -45 to 45.
@@ -785,7 +801,7 @@ impl Default for Scene {
 }
 
 /// The options of a pie (GRF-15).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct PieOptions {
     /// How far the first slice is turned, clockwise from the top, in
     /// degrees.
@@ -814,7 +830,7 @@ impl Default for PieOptions {
 }
 
 /// The text of a chart (GRF-08).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ChartText {
     /// The font family.
     pub font: String,
@@ -843,7 +859,7 @@ impl Default for ChartText {
 /// Where the data of a chart pasted from Desk Tables comes from: the
 /// document and the tables, kept with the data as they were last read, so
 /// the chart opens without them (GRF-06, IOP-02, IOP-21).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DataLink {
     /// The path or URI of the spreadsheet.
     pub source: String,
@@ -852,7 +868,7 @@ pub struct DataLink {
 }
 
 /// A chart (GRF-01 to GRF-20).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Chart {
     /// What it draws.
     pub kind: ChartKind,

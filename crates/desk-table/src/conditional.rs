@@ -9,18 +9,38 @@ use desk_formula::{CellRef, Value};
 use crate::cell::{Color, Num};
 
 /// What a rule compares the value of a cell with.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Operand {
     /// A number.
     Number(Num),
     /// Text.
     Text(String),
     /// The value of a cell of the same table.
-    Cell(CellRef),
+    Cell(#[serde(with = "cell_ref")] CellRef),
+}
+
+/// A cell reference, saved as its column, row and whether each stays.
+mod cell_ref {
+    use desk_formula::CellRef;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(r: &CellRef, s: S) -> Result<S::Ok, S::Error> {
+        (r.col, r.row, r.col_abs, r.row_abs).serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<CellRef, D::Error> {
+        let (col, row, col_abs, row_abs) = <(u32, u32, bool, bool)>::deserialize(d)?;
+        Ok(CellRef {
+            col,
+            row,
+            col_abs,
+            row_abs,
+        })
+    }
 }
 
 /// When a rule applies.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Condition {
     /// The value equals the operand.
     Equal(Operand),
@@ -63,7 +83,7 @@ pub enum Condition {
 }
 
 /// What a rule changes: the parts that are set (TAB-21).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RuleStyle {
     /// The color of the text.
     pub text_color: Option<Color>,
@@ -93,7 +113,7 @@ impl RuleStyle {
 }
 
 /// A rule of conditional formatting.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Rule {
     /// When it applies.
     pub condition: Condition,

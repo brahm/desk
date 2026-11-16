@@ -18,7 +18,9 @@ pub const MAX_HEADERS: u32 = 5;
 pub const MAX_CELLS: u32 = 65_535;
 
 /// A rectangle of cells.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Area {
     /// The first row.
     pub row: u32,
@@ -94,7 +96,7 @@ impl Area {
 }
 
 /// The part of the table a cell is in (TAB-12, TAB-23).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Region {
     /// A header row, the corner included.
     HeaderRow,
@@ -107,7 +109,9 @@ pub enum Region {
 }
 
 /// How a border line is drawn.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum LineStyle {
     /// Solid.
     #[default]
@@ -119,7 +123,7 @@ pub enum LineStyle {
 }
 
 /// A border of a cell (TAB-25).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Border {
     /// The width, in thousandths of a point.
     pub width: u32,
@@ -141,7 +145,7 @@ impl Border {
 }
 
 /// The look of the parts of a table (TAB-04, TAB-14).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TableStyle {
     /// The fill of the header rows.
     pub header_row_fill: Option<Color>,
@@ -178,7 +182,9 @@ impl Default for TableStyle {
 }
 
 /// What Tab does in the last cell (TAB-08).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum LastCellTab {
     /// Adds a row.
     #[default]
@@ -190,7 +196,7 @@ pub enum LastCellTab {
 }
 
 /// The options of a table (TAB-08, TAB-12, TAB-17).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TableOptions {
     /// Whether the name shows above the table.
     pub show_name: bool,
@@ -246,7 +252,7 @@ impl std::fmt::Display for TableError {
 impl std::error::Error for TableError {}
 
 /// A table.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Table<T> {
     /// The name, as Table 1, which formulas of other tables use.
     pub name: String,

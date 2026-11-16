@@ -37,16 +37,19 @@
 
 #![forbid(unsafe_code)]
 
+mod chart;
 mod draw;
 mod error;
 pub mod ns;
 mod package;
 mod read;
+mod table;
 mod text;
 mod units;
 mod write;
 mod xml;
 
+pub use chart::{CHART_TYPE, ChartDocument, ChartSeries};
 pub use draw::{
     DrawKind, DrawObject, FillImage, Gradient, GradientStop, GraphicProperties, Marker,
     parse_transform,
@@ -56,6 +59,7 @@ pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,
 };
 pub use read::read_streams;
+pub use table::{MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow};
 pub use text::{
     Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
