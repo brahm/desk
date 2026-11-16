@@ -1,0 +1,8 @@
+id	date	item	rows	task_set	reason	from_phase	to_phase	status	closed_by
+B-001	2026-11-16	Close phase 7 of Writer: 20 rows of tables and charts still without tests	TAB-04 TAB-06..TAB-09 GRF-06 GRF-08 IOP	Writer phase 7 (PR #114)	The phase was delivered with 56 of 76 rows tested	Writer 7	first phase of the new plan	open	-
+B-002	2026-11-16	Check with the app open the text and object features that Slides inherits from Writer	-	Inventory of 2026-11-16	The inventory read the code and the tests and did not run the apps	Slides 2	first Slides phase of the new plan	open	-
+B-003	2026-11-16	Draw the secondary scenes of the chosen window: popovers, menus, search, template chooser, dialogs, narrow window	-	Mockups N and M	Only the main window, a selected image, the animation pane and the dark style were drawn before the choice	Replanning, activity 4	after decision D-008	open	-
+B-004	2026-11-16	Legal review of the sources used to write the reader of current iWork files	-	Decision D-011	Needs a lawyer; cannot be settled by the project alone	Replanning	before version 1.0	open	-
+B-005	2026-11-16	Turn the additions of iWork 15 into rows of the three matrices, each with its phase	-	Inventory of 2026-11-16	The estimate summed them by group	Replanning	Replanning, activity 3	open	-
+B-006	2026-11-16	Update the matrices, corpus/README.md and docs/interface, which still describe the decisions replaced on 2026-11-16	-	Inventory of 2026-11-16	That round was read-only	Replanning	Replanning, activities 3 and 8	open	-
+B-007	2026-11-16	Update README, site and Flatpak metainfo, which still say parity with iWork '09	-	Replanning	Waits for the window choice, for new screenshots	Replanning	Replanning, activity 10	open	-
