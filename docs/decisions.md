@@ -29,6 +29,7 @@ the project takes the decisions; the date is the day he took them.
 | D-020 | 2026-11-16 | Checking has two references. Validations, interface tests and the documents made to compare parity are made on the Mac with the current iWork (15.4). Features that only iWork '09 has are tested, and their parity documents made and checked, on the Lion virtual machine that shows the screen, built for this purpose. | Current |
 | D-022 | 2026-11-16 | Desk is made for users of the GNOME desktop, used to its workflow and its shortcuts. Where compatibility with GNOME and familiarity for those who come from iWork pull apart, GNOME wins. Parity with iWork is the target of the 1.0 versions; after them Desk grows new features of its own and an ever closer integration with the GNOME desktop and its applications. | Current |
 | D-023 | 2026-11-16 | Under D-022, the document tabs take GNOME's shortcuts in the three apps: Ctrl+PageUp and Ctrl+PageDown (and Ctrl+Tab, Ctrl+Shift+Tab), Alt+1 to Alt+9, Ctrl+Shift+PageUp and Ctrl+Shift+PageDown to move a tab. The sheets of Tables, an iWork command that collides, move to Alt+PageUp and Alt+PageDown (rule 3 of D-017). Ctrl+Home and Ctrl+End stay with the text and the cells. | Current |
+| D-024 | 2026-11-16 | Under D-022, Ctrl+T opens a new document in a tab, as in GNOME. Fonts, which had Ctrl+T as in iWork, has no shortcut of its own: it opens from the Font row of the Format pane and from Search Commands. | Current |
 
 ## Replaced
 

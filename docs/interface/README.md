@@ -240,7 +240,9 @@ the Mac on 2026-11-16. Where the two agree, the table gives one column.
 | Insert, Choose | ⇧⌘V | Ctrl+Alt+P | 3 | Ctrl+Shift+V is paste and match style |
 | Inspector | ⌥⌘I | Ctrl+Alt+I | 2 | |
 | Ruler, layout, invisibles | ⌘R, ⇧⌘L, ⇧⌘I | Ctrl+R, Ctrl+Shift+L, Ctrl+Shift+I | 2 | |
-| Fonts, Colors | ⌘T, ⇧⌘C | Ctrl+T, Ctrl+Shift+C | 2 | They open as popovers |
+| Fonts | ⌘T | None | 3 | Ctrl+T is a new tab in GNOME (D-024); Fonts opens from the Font row of the Format pane and from Search Commands |
+| Colors | ⇧⌘C | Ctrl+Shift+C | 2 | It opens as a popover |
+| New document in a tab | ⌘N | Ctrl+N or Ctrl+T | 1 | Ctrl+Shift+N opens a new window |
 | Styles in the sidebar | ⇧⌘T in '09 (styles drawer); in 15.4, the comments pane | Ctrl+Shift+T | 2 | Kept as approved on 2026-11-15 |
 | Paragraph styles | F1 to F8 in '09 | Ctrl+1 to Ctrl+8 | 3 | GNOME reserves F1, F9 and F10 |
 | Duplicate, Lock, Group, Ungroup | ⌘D, ⌘L, ⌥⌘G, ⌥⇧⌘G | Ctrl+D, Ctrl+L, Ctrl+Alt+G, Ctrl+Shift+Alt+G | 2 | |

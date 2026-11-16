@@ -495,9 +495,11 @@ matrix rows done on 9 November, before the change of target.
     by D-023: the document tabs take GNOME's shortcuts in the three apps,
     and the sheets move to Alt+PageUp and Alt+PageDown, by rule 3 of D-017
     (the command of iWork that collides gets a new shortcut).
-  - Fonts has Ctrl+T, as in iWork, which GNOME gives to a new tab. Now
-    that documents open in tabs, the two collide; the choice of what Fonts
-    gets is with the owner.
+  - Fonts had Ctrl+T, as in iWork, which GNOME gives to a new tab. The
+    owner chose that Fonts has no shortcut of its own (D-024): Ctrl+T opens
+    a new document in a tab, and Fonts opens from the Font row of the
+    Format pane and from Search Commands, as in the apps of GNOME, which
+    have no shortcut for fonts.
   - The rest of the shortcut table already put GNOME first (D-017), and
     nothing else in it collides with a standard shortcut of GNOME.
 
