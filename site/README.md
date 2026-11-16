@@ -5,8 +5,9 @@ The project website, published on GitHub Pages at
 build tool and no scripts.
 
 `ci/build-site.sh` assembles it in `target/site`, copying the logo and
-the app icons from [data](../data), and three windows of the interface
-from [docs/interface/janelas](../docs/interface/janelas), so that they
+the app icons from [data](../data), and the English mockups of the
+chosen window (M+, D-008) from
+[docs/interface/proposals](../docs/interface/proposals), so that they
 have one source. Open
 `target/site/index.html` in a browser to see it. The
 [Website workflow](../.github/workflows/pages.yml) builds it on every
@@ -31,6 +32,15 @@ directory reach the shared files with `../`. When you add a language:
   `hreflang` and `lang`, and `aria-current="page"` on the page's own;
 - add it to the `<link rel="alternate" hreflang="...">` list in the head
   of every page, where `x-default` stays English.
+
+A translation shows the mockups of the window in its own language, in
+an `img/` directory of its own (`pt-BR/img/writer-m-mais.png` and the
+like), which the build copies with the page. They are drawn by the
+mockup scripts with `DESK_MOCKUP_LANG=pt` (see
+[docs/interface/mockups/run.sh](../docs/interface/mockups/run.sh)). Like
+the Portuguese page, they are content for users and fall under the
+exception of decision D-018, which keeps the repository in English but
+keeps the Portuguese translation of the apps and of the site. When the mockups change, draw them again in both languages.
 
 Those two lists are where a later step can pick the language of the
 browser, and where they can be generated once the page moves to a

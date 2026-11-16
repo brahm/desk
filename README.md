@@ -7,6 +7,7 @@
 
 <p align="center">
   <a href="https://brahm.github.io/desk/">Website</a> ·
+  <a href="https://brahm.github.io/desk/painel/">Progress dashboard</a> ·
   <a href="https://github.com/brahm/desk/issues">Report a bug or ask for a feature</a>
 </p>
 
@@ -16,51 +17,155 @@
   <img src="data/icons/hicolor/scalable/apps/br.com.brahm.Desk.Slides.svg" alt="" width="64">
 </p>
 
-Desk is a free office suite for the Linux desktop, made of three apps
-that share one document model:
+Desk is a free office suite of three apps designed to work as one, with
+each other and with the GNOME desktop. They share one document model, one
+window and one way of doing things, and each of them is simple and focused
+on its job without giving up the power that real work needs.
 
-- **Desk Writer**, for word processing and page layout
-- **Desk Tables**, for spreadsheets
-- **Desk Slides**, for presentations
+- **Desk Writer**, for word processing and page layout in one app, from a
+  school paper to the bakery's flyer.
+- **Desk Tables**, for spreadsheets laid out like a page, with several
+  free-floating tables and charts on each sheet. It is for organizing and
+  calculating, not a business intelligence tool or a database.
+- **Desk Slides**, for presentations with themes, transitions, builds and
+  a presenter display.
 
-The apps are written in Rust with GTK 4 and Libadwaita and follow the
-GNOME Human Interface Guidelines. They aim for feature parity and
-document compatibility with Apple iWork '09 (Pages, Numbers and Keynote
-9.3). Documents are saved as OpenDocument (ODF) files, with documented
-extensions for what standard ODF cannot hold.
+The three apps will share the window below, proposal M+ of
+[`docs/interface/proposals`](docs/interface/proposals/README.md) (D-008).
+These are mockups drawn with the real GTK 4 and Libadwaita widgets at
+1280 × 720, the smallest screen Desk is made for.
 
-The project is in development, starting with Desk Writer. Its text
-engine, its document structure, its writing tools and its objects are
-done (the first six phases of the plan;
-<!-- parity -->217 of the 311 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
+<p align="center">
+  <img src="docs/interface/proposals/writer-m-plus.png" alt="Desk Writer: page thumbnails in the sidebar, a report with a picture and a table, document tabs, and the Format pane open on the text style" width="800">
+  <br><em>Desk Writer</em>
+</p>
 
-- It opens ODT documents and Pages '09 documents, listing what they
-  hold that Desk cannot keep yet, and saves as ODT.
-- It pastes formatted text and pictures from other programs.
-- It edits and formats text with undo and the clipboard, with
-  paragraph, character and list styles, and works with a screen reader.
-- It checks spelling and grammar as you type, hyphenates, and finds and
-  replaces text in the whole document.
-- It lays out pages as Pages does: sections with their own columns,
-  margins and page numbers, facing pages, headers and footers, footnotes
-  and endnotes, tables of contents, hyperlinks and bookmarks.
-- It shows the pages one by one or two by two, with page thumbnails, and
-  shows the document as an outline whose topics can be moved.
-- It places pictures, shapes, text boxes, movies and sounds on the page
-  or in the text, with masks, Instant Alpha, image adjustments, fills,
-  strokes, shadows, reflections and picture frames; moves, resizes,
-  turns, flips, layers, aligns, groups and locks them; and wraps the
-  text around them, matching Pages page by page.
-- It lays out Helvetica Neue with Desk Neue, a free font with its
-  widths and kerning, so that lines break where Pages breaks them.
-- `desk-convert` exports documents to PDF from the command line.
+<p align="center">
+  <img src="docs/interface/proposals/tables-m-plus.png" alt="Desk Tables: a sheet with a table of expenses and a chart, the formula bar, and the sheet switcher at the bottom" width="800">
+  <br><em>Desk Tables</em>
+</p>
 
-The new window comes next, then tables and charts, then review and
-collaboration. Desk Slides
-and Desk Tables have their own parity matrices, with 181 rows each.
-Desk Slides already has its window: a new presentation with the slide
-navigator, the outline, the light table and presenter notes. Opening and
-saving ODP presentations comes next, in its phase 1.
+<p align="center">
+  <img src="docs/interface/proposals/slides-m-plus.png" alt="Desk Slides: the slide navigator in the sidebar, a slide with a picture selected, presenter notes below and the Play button in the header bar" width="800">
+  <br><em>Desk Slides</em>
+</p>
+
+## Why Desk
+
+*In the words of its author, Wagner Brahm.*
+
+Desk did not come from a lack of office suites on Linux: LibreOffice and
+ONLYOFFICE do that job very well. But neither of them follows the GNOME
+Human Interface Guidelines or feels at home on the GNOME desktop. Add to
+that my taste for simple tools, which does not mean weak ones, and I chose
+to go in the direction of Apple's iWork rather than of Microsoft 365, where
+LibreOffice tends to go these days, even though it comes from StarOffice,
+which was quite original.
+
+I have always been a fan of iWork '09, from before online collaboration,
+AI and subscriptions, and I never got over the move from 32 to 64 bits,
+which broke compatibility with my files and took away several unique and
+very useful features that I used every day. Today's Pages, Keynote and
+Numbers have brought many of them back, some of them behind a paywall.
+
+**Desk is not a clone of iWork.** iWork is the yardstick for what a simple
+and capable office suite can do, not a blueprint to copy. The goal is an
+office suite with simpler, focused apps, perfectly integrated with GNOME.
+Desk Tables does not try to be a business intelligence tool or a database,
+for example. The precise target, feature by feature, is in
+[docs/goals.md](docs/goals.md): the features of the current Pages, Numbers
+and Keynote (15.4), keeping what iWork '09 did and the newer versions lost,
+and leaving out what needs AI, an online service or a payment.
+
+## Architecture
+
+The decisions that shape all of Desk. The full picture, with diagrams, is
+in [docs/architecture.md](docs/architecture.md), and every decision with
+its reason is in [docs/decisions.md](docs/decisions.md).
+
+- **The engine is apart from the interface.** The document model, text
+  shaping, pagination, rendering, formulas, charts and file formats are
+  Rust crates with no GTK at all. Only `desk-ui` and the three apps use
+  GTK 4 and Libadwaita, and the CI enforces it (`ci/check-deps.sh`). That
+  is how `desk-convert` turns documents into PDF from the command line, and
+  how other projects can reuse the engine.
+- **File format libraries anyone can use.** `desk-odf`, `desk-iwork` and
+  `desk-formula` depend on no other Desk crate and are licensed under
+  MPL-2.0, so that other programs can read and write the same files. The
+  apps are GPL-3.0-or-later.
+- **One document model, one way to change it.** The three apps share
+  `desk-model`, so an object copied from one to another stays the same
+  object. Every change is an operation with an inverse, which gives undo,
+  and layout is a pure function of the model: the same document gives the
+  same pages on screen, in PDF and in the tests.
+- **OpenDocument first.** Documents are standard ODF; where ODF has no
+  place for a feature, Desk adds a `desk:` extension documented in
+  [docs/odf-extensions.md](docs/odf-extensions.md) (D-009). Files of iWork
+  '09, current iWork and Microsoft Office come in through `desk-filters`,
+  the only place where a format meets the model, and every import reports
+  what it could not keep.
+- **Native GNOME.** A Libadwaita widget wherever one exists; where none
+  does, Desk builds one that follows the HIG and reviews it at each new
+  Libadwaita (D-007). Spelling, printing, fonts, file dialogs and the
+  screen reader come from the platform.
+- **Flatpak on GNOME 51, and nothing online.** Desk ships as a Flatpak on
+  the GNOME 51 runtime, with GTK 4.24 and Libadwaita 1.10 (D-013). It has
+  no server and no account (D-004).
+- **Measured, not guessed.** Every feature is a row of
+  [`corpus/inventory`](corpus/inventory/README.md) with its phase and
+  tests, and the output is compared with documents made by iWork itself:
+  15.4 on a Mac, and 9.3 on a virtual machine for what only iWork '09 has
+  (D-020). UI tests drive the apps through the accessibility tree, as a
+  screen reader does.
+
+## Where Desk is
+
+Desk Writer came first, because the text engine is the hardest part and
+the other two apps depend on it. It has its text engine, document
+structure, writing tools, objects, tables and charts
+(<!-- parity -->217 of the 311 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
+it opens ODT and Pages '09 documents and saves ODT, edits and formats text
+with styles and a screen reader, checks spelling and grammar, lays out
+sections, headers, footers, notes and tables of contents as Pages does,
+places pictures, shapes, text boxes and media with text wrap, and exports
+PDF from the command line with `desk-convert`. It is in beta, still in the
+old window. Desk Tables and Desk Slides have their window and engines for
+tables, formulas, charts and animation that the apps do not use yet.
+
+Desk is built by Wagner Brahm working with Claude, Anthropic's AI, with
+the engineering rigor expected of any team: every change goes through
+review and a CI that checks formatting, lints, tests, licenses and the
+dependency rules. On 16 November 2026 the project was replanned for its
+new goals. The
+[progress dashboard](https://brahm.github.io/desk/painel/) (in Portuguese)
+shows every feature, phase, open item and the forecast, regenerated from
+this repository on each change, and [HISTORY.md](HISTORY.md) lists what is
+being done.
+
+## Roadmap
+
+The full plan is [docs/roadmap.md](docs/roadmap.md). In short:
+
+1. **Common base (B1):** the M+ window in the three apps, documents in
+   tabs, automatic saving with versions, and the reference documents
+   remade on the current iWork.
+2. **Desk Writer (W1 to W6):** the behaviour of the current Pages,
+   comments and change tracking, page templates and mail merge, new
+   objects and charts, `.docx` and current `.pages` files, printing and
+   export.
+3. **Desk Tables (T1 to T5):** ODS, cells and formulas, sorting, filters,
+   categories and pivot tables, charts, `.xlsx` and `.numbers` files.
+4. **Desk Slides (S1 to S5):** ODP, themes and masters, text and media,
+   transitions and builds, presenting, `.pptx` and `.key` files.
+5. **Across the apps and 1.0 (X1):** charts and tables linked between
+   documents, copy and paste among the apps, and the final parity report.
+
+After B1 the three app tracks can run side by side. Counted one after the
+other, the forecast is feature parity near the end of January 2027, between
+10 January and 15 February. It is an estimate, not a commitment, and each
+phase corrects it when it ends.
+
+## Install
 
 Desk Writer is in beta, in the Flatpak repository of Desk, which also
 has a nightly branch built from `main` every night:
@@ -79,38 +184,6 @@ least **1280 × 720 pixels** (720p), counted after display scaling, so a
 2560 × 1440 screen at 200 % qualifies and a 1920 × 1080 one at 200 %
 does not. Phones and smaller screens are not supported: the apps still
 open there, with a warning that parts of the window may not fit.
-
-Desk is built by one person working with Claude, Anthropic's AI, with
-the same engineering rigor expected of any team: every feature of the
-iWork '09 apps is a row of a parity matrix, and the output is compared
-with PDFs made by iWork 9.3 itself.
-
-## How the apps will look
-
-The three apps will share one window, chosen in November 2026: a sidebar
-to move around the document, a header bar with the insert buttons, a
-slim format bar that changes with the selection, one Inspector on the
-right and a bottom bar with the zoom and the position. Desk Writer moves
-to it before tables and charts. These are mockups drawn with the real
-GTK 4 and Libadwaita widgets at 1280 × 720, the smallest screen Desk is
-made for, shown in Brazilian Portuguese.
-[`docs/interface`](docs/interface/README.md) describes the window, lists
-its 208 components and says where each command of iWork '09 went.
-
-<p align="center">
-  <img src="docs/interface/janelas/writer-b.png" alt="Desk Writer: page thumbnails in the sidebar, a report with a picture and a table, and the Inspector open on the text format" width="800">
-  <br><em>Desk Writer</em>
-</p>
-
-<p align="center">
-  <img src="docs/interface/janelas/tables-b.png" alt="Desk Tables: sheets in the sidebar, a table of expenses with the formula bar, and instant calculations in the bottom bar" width="800">
-  <br><em>Desk Tables</em>
-</p>
-
-<p align="center">
-  <img src="docs/interface/janelas/slides-b.png" alt="Desk Slides: the slide navigator in the sidebar, a slide with a picture selected, presenter notes below and the Play button in the header bar" width="800">
-  <br><em>Desk Slides</em>
-</p>
 
 ## Building
 
@@ -226,6 +299,16 @@ to outlines, so the logo does not need the font to render.
 Every kind of help counts: trying the beta, reporting bugs, asking for the features you
 miss, sending old iWork documents for the test corpus, or sending code.
 Open an [issue](https://github.com/brahm/desk/issues) for any of these.
+Follow what is being done on the
+[progress dashboard](https://brahm.github.io/desk/painel/) and in
+[HISTORY.md](HISTORY.md), and see what is still to do in
+[docs/roadmap.md](docs/roadmap.md) and the
+[backlog](docs/backlog/README.md).
+
+Code contributions, by people or by their coding agents, start with
+[CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): find the
+feature in the inventory and its phase in the roadmap, keep to the layers
+of the architecture, and write the tests with it.
 Before you open a pull request, run `ci/check-all.sh`, which runs every
 check of the CI; `ci/setup-env.sh` installs what it needs.
 
@@ -243,7 +326,7 @@ will support, and when.
 ## Website
 
 The website at <https://brahm.github.io/desk/> lives in [site](site),
-and shares GitHub Pages with the future Flatpak repository; see
+and shares GitHub Pages with the Flatpak repository; see
 [site/README.md](site/README.md).
 
 ## License

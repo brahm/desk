@@ -7,7 +7,7 @@ on:
       - site/**
       - data/logo/**
       - data/icons/hicolor/scalable/apps/**
-      - docs/interface/janelas/**
+      - docs/interface/proposals/*.png
       - ci/build-site.sh
       - ci/dashboard.py
       - corpus/inventory/**
@@ -20,7 +20,7 @@ on:
       - site/**
       - data/logo/**
       - data/icons/hicolor/scalable/apps/**
-      - docs/interface/janelas/**
+      - docs/interface/proposals/*.png
       - ci/build-site.sh
       - ci/dashboard.py
       - corpus/inventory/**

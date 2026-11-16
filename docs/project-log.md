@@ -240,6 +240,46 @@ matrix rows done on 9 November, before the change of target.
   worked in the virtual machine, and the merge of pull requests 120 and
   121. The project folder on Defiant went from about 50 GB to 42 GB.
 
+### 16 November: the README and the website for the new goals
+
+- The owner asked for the README and the landing page to be rewritten
+  for the new goals, in a new order: what Desk is and what each app does,
+  shown with the mockups of the chosen M+ window (each page in its own
+  language); his story and motivation; a short status; a high-level
+  roadmap; how to help, with a link to the progress dashboard. He also
+  asked for the decisions of the architecture to be presented, such as
+  the Rust engine kept apart from the GTK 4 and Libadwaita interface so
+  that other projects can reuse it, and for a `HISTORY.md` at the root of
+  the repository, in the style of the history file of Textpattern.
+- His motivation, in his words paraphrased: Desk did not come from a lack
+  of office suites on Linux, since LibreOffice and ONLYOFFICE do that job
+  well, but neither follows the GNOME guidelines or feels at home in
+  GNOME. He prefers simple tools that are no less powerful, so he went in
+  the direction of iWork rather than of Microsoft 365, where LibreOffice
+  tends today. He never got over the move of iWork from 32 to 64 bits,
+  which broke his files and took away features he used daily; the current
+  versions brought many of them back, some behind a paywall. **Desk is not
+  a clone of iWork**: it is a suite of simpler, focused apps perfectly
+  integrated with GNOME, and Desk Tables does not try to be a business
+  intelligence tool or a database.
+- The website and the README were rewritten on those lines, with a new
+  section on the architecture (engine apart from the interface, MPL file
+  format libraries, one document model with reversible operations, ODF
+  first, native widgets, Flatpak on GNOME 51 and nothing online, checking
+  against iWork itself). The roadmap is shown by track (B1, Writer,
+  Tables, Slides, X1) with the forecast of parity near the end of January
+  2027. The Portuguese page uses the Portuguese mockups, kept in
+  `site/pt-BR/img` as part of the translation of the site that D-018
+  keeps; they were checked against the English ones and needed no new
+  drawing. The description of the Writer metainfo was updated too.
+- `HISTORY.md` was created with the whole history of the project by
+  release, one line per change, and joined this log, the dashboard and
+  the backlog among the documents kept up to date at the end of each set
+  of tasks (`AGENTS.md`).
+- Backlog item B-007 was closed. Left undone and moved to phase B1: the
+  screenshots of the Writer metainfo, which must be captures of the real
+  app in the M+ window (B-011).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -656,7 +696,9 @@ inventory, the backlog register and the dashboard.
 
 1. At the end of each set of tasks, add an entry to the timeline: the
    date, what was delivered with its pull requests, and what was left
-   undone and where it went.
+   undone and where it went. Add the same changes, one short line each,
+   to [HISTORY.md](../HISTORY.md), the summary for visitors of the
+   repository.
 2. When the owner takes a decision, or one is replaced, add it to
    [decisions.md](decisions.md) first, then here with its reason, in his
    words where they exist, and its consequences. Never rewrite an old

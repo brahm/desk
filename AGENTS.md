@@ -42,9 +42,11 @@ purpose and point to the full pages.
    publish the dashboard as
    [docs/dashboard/README.md](docs/dashboard/README.md) says. Also add
    to the project log, `docs/project-log.md`, what the set decided, why
-   and with what consequences. Both are kept current for the whole
-   project, like the inventory, the roadmap, the backlog and the
-   decisions.
+   and with what consequences, and to [HISTORY.md](HISTORY.md) one short
+   line per change under "Changes since" the last release, prefixed
+   `Added:`, `Changed:`, `Fixed:` or `Removed:` with its pull request.
+   All three are kept current for the whole project, like the inventory,
+   the roadmap, the backlog and the decisions.
 10. **Apple material.** Never extract anything from Apple software, and
    never add its templates, fonts, images or format definitions to the
    repository (D-011).
