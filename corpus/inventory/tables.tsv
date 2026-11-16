@@ -1,0 +1,199 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id	area	feature	in_iwork	target	rule	scope	status_in_desk	review	phase	note
+T001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	GNOME menus of interface B (NGNM-10); the Organize menu (sort, filter, categories) is missing and comes with phase 5
+T002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Header bar of interface B (NINT-07)
+T003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	Format bar for cells (NINT-08)
+T004	3.1 Window, menus and panes	Formula bar	Only '09	'09, in the form of the 15	D-002	In	Partial	the window changes (D-008)	B1	The formula bar is in the window, but the cells have no content yet (NINT-10, phase 4)
+T005	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Inspector with Format, Data and Document (NINT-09)
+T006	3.1 Window, menus and panes	Sheets pane (sidebar)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	Sheets, tables and charts in the sidebar (NINT-03)
+T007	3.1 Window, menus and panes	Styles pane (sidebar)	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Table styles with thumbnails (phase 5)
+T008	3.1 Window, menus and panes	Instant calculations	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	Calculations in the bottom bar (NGNM-13); choosing the functions is missing and the cells have no values yet
+T009	3.1 Window, menus and panes	Reorganize	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Organize (sort, filter) in a sidebar (phase 5)
+T010	3.1 Window, menus and panes	Function Browser	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	The Function Browser exists in Writer; opening it on typing \"=\" in Tables is missing
+T011	3.1 Window, menus and panes	Media Browser 🌐💲 (in 15)	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	The Media popover exists in Writer; it is missing in the Tables window (NINT-14)
+T012	3.1 Window, menus and panes	Colors / Fonts window	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	Fonts and colors popovers of Writer; connecting them to Tables is missing
+T013	3.1 Window, menus and panes	Document Warnings window	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	Warnings banner of Writer; missing in Tables (NINT-15)
+T014	3.1 Window, menus and panes	Zoom	Different (place)	15.4	D-001	In	Done	the window changes (D-008)	B1	Zoom (NINT-04)
+T015	3.1 Window, menus and panes	Full screen	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	B1	F11 exists in Writer; checking it in Tables is missing (NINT-06)
+T016	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Tabs
+T017	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	the window changes (D-008)	B1	Light/dark style of the system
+T018	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	B1	Preferences of Writer; the Tables version is missing
+T019	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Undo and redo (NDOC-08)
+T020	3.2 Spreadsheets, templates and files	Template chooser 🌐💲 (in 15)	Different	15.4	D-001	In	Missing	-	T5	Template chooser (phase 8)
+T021	3.2 Spreadsheets, templates and files	New spreadsheet always from the same template	Equal	Equal in both	-	In	Missing	-	T5	Default template (phase 8)
+T022	3.2 Spreadsheets, templates and files	Save	Different	15.4	D-001	In	Missing	-	T5	Tables does not save or open files yet (NDOC-07; ODS belongs to phase 1)
+T023	3.2 Spreadsheets, templates and files	Rename from the window title	Only 15	15.4	D-001	In	Engine ready	-	T5	Rename from the title exists in Writer
+T024	3.2 Spreadsheets, templates and files	Earlier versions	Different	15.4	D-001	In	Missing	-	T5	Versions (decision path L)
+T025	3.2 Spreadsheets, templates and files	Save as template	Different	15.4	D-001	In	Missing	-	T5	Save as template (phase 8)
+T026	3.2 Spreadsheets, templates and files	Template authoring	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	-	T5	Ready-made tables and template authoring (phase 8)
+T027	3.2 Spreadsheets, templates and files	Package vs single file	Different	15.4	D-001	In	Missing	-	T5	Single ODS file (depends on saving)
+T028	3.2 Spreadsheets, templates and files	Password	Different	15.4	D-001	In	Missing	-	T5	Password (phase 8)
+T029	3.2 Spreadsheets, templates and files	Lock spreadsheet	Different	15.4	D-001	In	Missing	-	T5	Lock (phase 8)
+T030	3.2 Spreadsheets, templates and files	Document information (author, title, keywords, comments)	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T5	Information for search (NDOC-13, phase 1)
+T031	3.2 Spreadsheets, templates and files	Reduce file size	Different	15.4	D-001	In	Engine ready	-	T5	Reduce media exists in Writer
+T032	3.2 Spreadsheets, templates and files	Open and import	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	-	T5	Open ODS, Numbers '09, Excel, CSV (phases 1 and 7)
+T033	3.2 Spreadsheets, templates and files	Export	Different	15.4	D-001	In	Missing	D-019	T5	D-019: only ODF, Microsoft Office, PDF and EPUB. Export PDF, Excel, CSV (phase 7)
+T034	3.2 Spreadsheets, templates and files	Address Book data	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T5	GNOME Contacts in tables (NCON, phase 8)
+T035	3.2 Spreadsheets, templates and files	Print	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	-	T5	Print and Print Preview (phase 7)
+T036	3.2 Spreadsheets, templates and files	Send 🌐 (in both)	Different	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Send (online)
+T037	3.2 Spreadsheets, templates and files	Recent files	Equal	Equal in both	-	In	Engine ready	-	T5	GTK recent files in Writer
+T038	3.3 Sheets and pages	Several sheets per spreadsheet	Different (place)	15.4	D-001	In	Partial	-	T1	Several sheets exist, in the sidebar (decision of interface B); the 15 shows them as tabs
+T039	3.3 Sheets and pages	Rename, duplicate, delete, reorder sheets	Equal	Equal in both	-	In	Done	-	done	Rename, duplicate, delete and reorder sheets (NTAB-02 to NTAB-04)
+T040	3.3 Sheets and pages	Tab color	Only 15	15.4	D-001	In	Missing	-	T1	Tab color
+T041	3.3 Sheets and pages	Hide sheet	Only 15	15.4	D-001	In	Missing	-	T1	Hide sheet
+T042	3.3 Sheets and pages	Sheet background	Only 15	15.4	D-001	In	Missing	-	T1	Sheet background
+T043	3.3 Sheets and pages	Sheet border	Only 15	15.4	D-001	In	Missing	-	T1	Sheet border
+T044	3.3 Sheets and pages	Sheet direction (right to left)	Only 15	15.4	D-001	In	Missing	-	T1	Right-to-left sheet
+T045	3.3 Sheets and pages	Split into pages	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	-	T1	Arrange objects by page in Print Preview (phase 7)
+T046	3.3 Sheets and pages	Header and footer	Equal	Equal in both	-	In	Missing	-	T1	Page header and footer (NIMP-04)
+T047	3.3 Sheets and pages	Page numbering	Equal	Equal in both	-	In	Missing	-	T1	Page numbering
+T048	3.3 Sheets and pages	Margins	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	-	T1	Print margins
+T049	3.3 Sheets and pages	Paper size	Equal	Equal in both	-	In	Missing	-	T1	Paper size (NIMP-03)
+T050	3.4 Tables: structure	Several free tables on a sheet	Equal	Equal in both	-	In	Done	-	done	Several free tables on the sheet (NTAB-05)
+T051	3.4 Tables: structure	Insert table	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	T1	Insert table from the template (NTAB-05); ready-made formulas and styles in view are missing
+T052	3.4 Tables: structure	Reusable tables (Capture Table)	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T1	Reusable tables (phase 5)
+T053	3.4 Tables: structure	Create a table from cells	Only 15	15.4	D-001	In	Missing	-	T1	Create a table by dragging cells
+T054	3.4 Tables: structure	Header and footer rows and columns	Equal	Equal in both	-	In	Engine ready	-	T1	Up to 5 headers in the engine (desk-table) and in Writer; missing in Tables (NTAB-19)
+T055	3.4 Tables: structure	Freeze headers	Equal	Equal in both	-	In	Missing	-	T1	Freeze headers (NTAB-20)
+T056	3.4 Tables: structure	Repeat headers when printing	Equal	Equal in both	-	In	Missing	-	T1	Repeat headers when printing
+T057	3.4 Tables: structure	Add and delete rows and columns	Equal	Equal in both	-	In	Partial	-	T1	Alt+arrows add rows and columns; deleting and several at once come in phase 3
+T058	3.4 Tables: structure	Move rows and columns by dragging	Equal	Equal in both	-	In	Engine ready	-	T1	Moving rows and columns exists in the engine; missing on screen in Tables
+T059	3.4 Tables: structure	Transpose rows and columns	Only 15	15.4	D-001	In	Missing	-	T1	Transpose
+T060	3.4 Tables: structure	Hide and show	Equal	Equal in both	-	In	Missing	-	T1	Hide rows and columns (NTAB-23)
+T061	3.4 Tables: structure	Resize rows and columns	Equal	Equal in both	-	In	Engine ready	-	T1	Resize in the engine and in Writer; missing in Tables
+T062	3.4 Tables: structure	Merge cells	Equal	Equal in both	-	In	Engine ready	-	T1	Merge in the engine and in Writer
+T063	3.4 Tables: structure	Split cells	Only '09	'09, in the form of the 15	D-002	In	Engine ready	-	T1	Split cells in the engine and in Writer
+T064	3.4 Tables: structure	Table name	Equal	Equal in both	-	In	Done	-	done	Table name (NTAB-09)
+T065	3.4 Tables: structure	Table outline, grid and cell borders	Different	15.4	D-001	In	Engine ready	-	T1	Borders per segment in the engine; the ready-made border styles of the 15 are missing
+T066	3.4 Tables: structure	Alternating colors	Equal	Equal in both	-	In	Engine ready	-	T1	Alternating colors in the engine and in Writer
+T067	3.4 Tables: structure	Font size of the whole table	Only 15	15.4	D-001	In	Missing	-	T1	Increase and decrease the font of the whole table
+T068	3.4 Tables: structure	Table styles	Different	15.4	D-001	In	Missing	-	T1	Table styles (phase 5)
+T069	3.4 Tables: structure	Copy and paste style	Equal	Equal in both	-	In	Engine ready	-	T1	Copy and paste style exists in Writer
+T070	3.4 Tables: structure	Lock table	Equal	Equal in both	-	In	Engine ready	-	T1	Locking objects exists in Writer
+T071	3.4 Tables: structure	Table direction (bidi)	Only 15	15.4	D-001	In	Missing	-	T1	Right-to-left table
+T072	3.4 Tables: structure	Move objects when the table grows	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T1	Push objects away when the table grows (NTAB-15); checked in Numbers 15.4: the 15 does not have the option
+T073	3.4 Tables: structure	Copy a table between apps	Equal	Equal in both	-	In	Engine ready	-	T1	Copy cells as tab-separated text in Writer; copying the table between apps is missing
+T074	3.5 Cells: content, formats and controls	Type and edit in cells	Equal	Equal in both	-	In	Engine ready	-	T2	Typing and editing cells exists in Writer; Tables does not connect the cells to the engine yet
+T075	3.5 Cells: content, formats and controls	Return key moves to the next cell	Only '09	'09, in the form of the 15	D-002	In	Engine ready	-	T2	Return goes to the next cell in Writer; checked in Numbers 15.4: the 15 does not have the option
+T076	3.5 Cells: content, formats and controls	Autocomplete with the values of the column	Equal	Equal in both	-	In	Engine ready	-	T2	Suggestions from the column in Writer
+T077	3.5 Cells: content, formats and controls	Magic Fill 🤖💲	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Magic Fill (AI, subscription)
+T078	3.5 Cells: content, formats and controls	Autofill	Equal	Equal in both	-	In	Engine ready	-	T2	Fill in the engine and in Writer
+T079	3.5 Cells: content, formats and controls	Copy, move, paste values	Equal	Equal in both	-	In	Engine ready	-	T2	Copy and paste in Writer; pasting values and moving formulas are missing (NFOR-13)
+T080	3.5 Cells: content, formats and controls	Clear	Equal	Equal in both	-	In	Engine ready	-	T2	Clear in the engine
+T081	3.5 Cells: content, formats and controls	Highlight the row and column under the pointer	Only 15	15.4	D-001	In	Missing	-	T2	Highlight the row and column under the pointer
+T082	3.5 Cells: content, formats and controls	Objects inside cells	Different	15.4	D-001	In	Engine ready	-	T2	Image as cell background in the engine; shape, chart and equation are missing
+T083	3.5 Cells: content, formats and controls	Wrap text in the cell	Equal	Equal in both	-	In	Engine ready	-	T2	Text wrap in the cell in Writer
+T084	3.5 Cells: content, formats and controls	Automatic, number, currency, percentage, date and time, duration, fraction, scientific and text formats	Equal	Equal in both	-	In	Engine ready	-	T2	Formats in the engine and in Writer
+T085	3.5 Cells: content, formats and controls	Numeral system (bases 2 to 36, two's complement)	Only '09	'09, in the form of the 15	D-002	In	Engine ready	-	T2	Numeral system in the engine
+T086	3.5 Cells: content, formats and controls	Custom formats	Different	15.4, plus what the '09 did	D-001, D-003	In	Engine ready	the target changed	T2	Custom formats in the engine; the window to manage them is missing
+T087	3.5 Cells: content, formats and controls	Full list of currencies	Equal	Equal in both	-	In	Engine ready	-	T2	Currencies in the engine
+T088	3.5 Cells: content, formats and controls	Checkbox, slider, stepper, pop-up menu	Different	15.4	D-001	In	Missing	-	T2	Cell controls (phase 5)
+T089	3.5 Cells: content, formats and controls	Star rating	Only 15	15.4	D-001	In	Missing	-	T2	Star rating
+T090	3.5 Cells: content, formats and controls	Conditional highlighting	Different	15.4	D-001	In	Engine ready	-	T2	Conditional formatting of the '09 in the engine; the rule types of the 15 are missing
+T091	3.5 Cells: content, formats and controls	Stock quotes 🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Stock quotes (online)
+T092	3.5 Cells: content, formats and controls	Comments on cells	Different	15.4	D-001	In	Engine ready	-	T2	Comments on cells in Writer, without replies
+T093	3.5 Cells: content, formats and controls	Links in cells	Different	15.4	D-001	In	Missing	-	T2	Links in cells
+T094	3.5 Cells: content, formats and controls	Smart Cell View (the actual value of the cell)	Only 15	15.4	D-001	In	Missing	-	T2	Actual value of the cell in the bottom bar; today the formula bar plays that role
+T095	3.6 Sort, filter, categories and pivot tables	Sort by the column	Equal	Equal in both	-	In	Engine ready	-	T3	Sort in the engine and in Writer
+T096	3.6 Sort, filter, categories and pivot tables	Sort rules with several columns	Equal	Equal in both	-	In	Engine ready	-	T3	Sort by several columns in the engine
+T097	3.6 Sort, filter, categories and pivot tables	Filters by rule	Different	15.4	D-001	In	Missing	-	T3	Filters (phase 5)
+T098	3.6 Sort, filter, categories and pivot tables	Quick Filter (tick the values to show)	Only 15	15.4	D-001	In	Missing	-	T3	Quick filter
+T099	3.6 Sort, filter, categories and pivot tables	Filter duplicates and unique values	Only 15	15.4	D-001	In	Missing	-	T3	Filter duplicates
+T100	3.6 Sort, filter, categories and pivot tables	Categories	Different	15.4	D-001	In	Missing	-	T3	Categories (phase 5)
+T101	3.6 Sort, filter, categories and pivot tables	Pivot tables	Only 15	15.4	D-001	In	Missing	-	T3	Pivot tables
+T102	3.6 Sort, filter, categories and pivot tables	Table snapshot	Only 15	15.4	D-001	In	Missing	-	T3	Table snapshot
+T103	3.7 Formulas and functions	Formula editor	Different	15.4	D-001	In	Engine ready	-	T2	Formulas in the engine and in Writer; the movable editor and the tokens of the 15 are missing
+T104	3.7 Formulas and functions	Function browser	Different	15.4	D-001	In	Engine ready	-	T2	Function Browser in Writer, as a dialog; the 15 puts it in a sidebar
+T105	3.7 Formulas and functions	Quick formulas	Equal	Equal in both	-	In	Engine ready	-	T2	Quick formulas in the engine
+T106	3.7 Formulas and functions	Number of functions 🌐 (in 15)	Different	15.4	D-001	In	Partial	-	T2	94 functions in the engine; the 15.4 has 355 (checked on the Mac: the 262 of the '09 and 93 new ones); STOCK, STOCKH, CURRENCYCONV and CURRENCYH fetch from the internet and stay out
+T107	3.7 Formulas and functions	Spilling arrays	Only 15	15.4	D-001	In	Missing	-	T2	Spilling arrays
+T108	3.7 Formulas and functions	References to another table and sheet, header names, absolute references	Equal	Equal in both	-	In	Engine ready	-	T2	References to other tables and by header name in the engine
+T109	3.7 Formulas and functions	Error indication	Equal	Equal in both	-	In	Engine ready	-	T2	Errors in the engine
+T110	3.7 Formulas and functions	Warning for a formula that points to an empty cell	Only '09	'09, in the form of the 15	D-002	In	Engine ready	-	T2	Empty-cell warning in the engine; checked in Numbers 15.4: the 15 does not have the option
+T111	3.7 Formulas and functions	Formula List	Only '09	'09, in the form of the 15	D-002	In	Partial	-	T2	Ctrl+Shift+F shows the Formula List, still with no formulas to list
+T112	3.7 Formulas and functions	Find and replace inside formulas	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T2	Search inside formulas
+T113	3.7 Formulas and functions	Print the formula list	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T2	Print the formula list
+T114	3.7 Formulas and functions	Use the editor as a calculator	Equal	Equal in both	-	In	Missing	-	T2	Formula editor as a calculator
+T115	3.7 Formulas and functions	Function help	Different	15.4	D-001	In	Engine ready	-	T2	Function help in the browser, without the internet
+T116	3.8 Charts	Types	Different	15.4	D-001	In	Engine ready	-	T4	Eleven types in the engine and in Writer; donut, radar, bubble, interactive and pivot are missing
+T117	3.8 Charts	Insert and choose data	Different	15.4	D-001	In	Missing	-	T4	Chart from the cells of the table (phase 6)
+T118	3.8 Charts	Hidden data	Equal	Equal in both	-	In	Missing	-	T4	Hidden data (phase 6)
+T119	3.8 Charts	Many points (downsampling)	Only 15	15.4	D-001	In	Missing	-	T4	Sampling of many points
+T120	3.8 Charts	Linked chart in Pages and Keynote	Only '09	'09, in the form of the 15	D-002	In	Missing	-	T4	Linked chart in Writer and in Slides
+T121	3.8 Charts	Title, legend, axes, gridlines, tick marks	Equal	Equal in both	-	In	Engine ready	-	T4	Title, legend and axes in the engine and in Writer
+T122	3.8 Charts	Value labels	Different	15.4	D-001	In	Engine ready	-	T4	Value labels of the '09; the options of the 15 are missing
+T123	3.8 Charts	Summary labels on stacked charts	Only 15	15.4	D-001	In	Missing	-	T4	Summary labels
+T124	3.8 Charts	Error bars and trendlines	Equal	Equal in both	-	In	Engine ready	-	T4	Error bars and trendline in the engine
+T125	3.8 Charts	Reference lines (average, median, min, max, value)	Only 15	15.4	D-001	In	Missing	-	T4	Reference lines
+T126	3.8 Charts	Colors, textures and images per series	Equal	Equal in both	-	In	Engine ready	-	T4	Colors and textures per series in the engine
+T127	3.8 Charts	Chart styles	Only 15	15.4	D-001	In	Missing	-	T4	Chart styles
+T128	3.8 Charts	Pie: explode wedges, shadows, rotate	Equal	Equal in both	-	In	Engine ready	-	T4	Pie in the engine
+T129	3.8 Charts	3D scene (depth, light, rotate)	Equal	Equal in both	-	In	Engine ready	-	T4	3D scene in the engine
+T130	3.8 Charts	Rounded corners, donut hole, radar grid	Only 15	15.4	D-001	In	Missing	-	T4	Rounded corners, donut hole
+T131	3.8 Charts	Chart border and background	Equal	Equal in both	-	In	Engine ready	-	T4	Chart border and background in Writer
+T132	3.9 Text and styles	Text boxes and text in shapes	Equal	Equal in both	-	In	Engine ready	-	T4	Text boxes and text in shapes of Writer; missing in the Tables window
+T133	3.9 Text and styles	Font, size, bold, italic, underline, strikethrough, outline, shadow	Different (place)	15.4	D-001	In	Engine ready	-	T4	Text formatting of Writer
+T134	3.9 Text and styles	Text color	Different	15.4	D-001	In	Engine ready	-	T4	Solid color of Writer; gradient and image are missing
+T135	3.9 Text and styles	Capitalization	Different	15.4	D-001	In	Engine ready	-	T4	Capitalization of the '09 in Writer; that of the 15 is missing
+T136	3.9 Text and styles	Superscript, subscript, baseline	Equal	Equal in both	-	In	Engine ready	-	T4	Superscript in Writer
+T137	3.9 Text and styles	Character spacing, ligatures	Equal	Equal in both	-	In	Engine ready	-	T4	Spacing and ligatures in Writer
+T138	3.9 Text and styles	Font smoothing	Only '09	'09, in the form of the 15	D-002	Not applicable to GNOME (D-005)	Not applicable	-	-	Font smoothing belongs to the system
+T139	3.9 Text and styles	Paragraph, character and list styles	Only 15	15.4	D-001	In	Engine ready	-	T4	Paragraph, character and list styles of Writer
+T140	3.9 Text and styles	Alignment, spacing, indents, tabs	Equal	Equal in both	-	In	Engine ready	-	T4	Paragraph of Writer
+T141	3.9 Text and styles	Lists with bullets, numbers, levels	Equal	Equal in both	-	In	Engine ready	-	T4	Lists of Writer
+T142	3.9 Text and styles	Columns in a text box	Equal	Equal in both	-	In	Engine ready	-	T4	Columns in boxes of Writer
+T143	3.9 Text and styles	Drop cap, automatic fractions, review highlight	Only 15	15.4	D-001	In	Missing	-	T4	Drop cap, automatic fractions, highlight
+T144	3.9 Text and styles	Smart quotes and dashes	Different	15.4	D-001	In	Engine ready	-	T4	Quotes of the '09 in Writer
+T145	3.9 Text and styles	Text replacement	Different	15.4	D-001	In	Engine ready	-	T4	Replacement of Writer
+T146	3.9 Text and styles	Special characters, accents	Equal	Equal in both	-	In	Engine ready	-	T4	GTK special characters
+T147	3.9 Text and styles	Date, file name, page number	Different	15.4, plus what the '09 did	D-001, D-003	In	Engine ready	the target changed	T4	Date and page fields in Writer; the file name is missing
+T148	3.9 Text and styles	Languages: bidirectional, vertical, phonetic guide, CJK	Only 15	15.4	D-001	In	Missing	-	T4	Bidi, vertical, phonetic
+T149	3.9 Text and styles	Formatting by spreadsheet language	Only 15	15.4	D-001	In	Missing	-	T4	Language per spreadsheet
+T150	3.9 Text and styles	Dictation 🤖🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Dictation
+T151	3.9 Text and styles	Predictive text 🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Predictive text
+T152	3.9 Text and styles	Translation 🌐🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Translation
+T153	3.9 Text and styles	Equations 🧩 (in '09)	Different	15.4	D-001	In	Missing	-	T4	LaTeX/MathML equations
+T154	3.9 Text and styles	Links on text and objects	Different	15.4	D-001	In	Engine ready	-	T4	Links of Writer; phone and another sheet are missing
+T155	3.10 Objects: images, shapes, media	Images 🌐💲 (in 15)	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	Images of Writer (without SVG and HEIC)
+T156	3.10 Objects: images, shapes, media	Remove background 🤖 (in 15)	Different	15.4, plus what the '09 did	D-001, D-003	In	Engine ready	the target changed; the window changes (D-008)	T4	That of the 15 uses AI; the Instant Alpha of Writer holds
+T157	3.10 Objects: images, shapes, media	Image adjustments	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	Adjust Image of Writer
+T158	3.10 Objects: images, shapes, media	Image gallery	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	T4	Image gallery
+T159	3.10 Objects: images, shapes, media	AI for images 🤖🌐💲	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	AI for images
+T160	3.10 Objects: images, shapes, media	Shapes 🤖💲 (in 15)	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	Shapes and pen of Writer; library and combining are missing
+T161	3.10 Objects: images, shapes, media	Edit points and curves	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	T4	Edit points of Writer
+T162	3.10 Objects: images, shapes, media	Lines and connections	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	T4	Connections of Writer
+T163	3.10 Objects: images, shapes, media	3D objects (USDZ)	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	T4	3D objects
+T164	3.10 Objects: images, shapes, media	Drawings (Apple Pencil)	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	T4	Freehand drawing
+T165	3.10 Objects: images, shapes, media	Sound and video	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	Sound and movie of Writer; recording and trimming are missing
+T166	3.10 Objects: images, shapes, media	Borders, picture frames, shadow, reflection, opacity	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	T4	Object effects of Writer
+T167	3.10 Objects: images, shapes, media	Fill	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	Fill of Writer
+T168	3.10 Objects: images, shapes, media	Object caption and title	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	T4	Object caption and title
+T169	3.10 Objects: images, shapes, media	Object styles	Only 15	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	Object styles of Writer
+T170	3.10 Objects: images, shapes, media	Objects inside boxes and shapes	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	T4	Objects inside boxes
+T171	3.10 Objects: images, shapes, media	Exact position, align, distribute, guides	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	T4	Align and guides of Writer
+T172	3.10 Objects: images, shapes, media	Layers, group, lock, rotate, flip	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	T4	Layers and groups of Writer
+T173	3.11 Review and search	Find and replace	Different	15.4, plus what the '09 did	D-001, D-003	In	Engine ready	the target changed; the window changes (D-008)	T3	Search bar of Writer; searching in formulas is missing
+T174	3.11 Review and search	Comments	Different	15.4	D-001	In	Missing	the window changes (D-008)	T3	Comments (phase 8)
+T175	3.11 Review and search	Author name and color	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	T3	Author name and color
+T176	3.11 Review and search	Change tracking	Equal	Equal in both	-	Not applicable to GNOME (D-005)	Not applicable	-	-	Neither version has change tracking in Numbers
+T177	3.11 Review and search	Spelling and grammar	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	T3	Spelling of Writer
+T178	3.11 Review and search	Dictionary and lookup 🌐 (in both)	Equal	Equal in both	-	Out: AI, online or paid (D-004)	Out of scope	-	-	Dictionary and lookup (online)
+T179	3.11 Review and search	Writing Tools (AI) 🤖🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Writing Tools
+T180	3.12 Collaboration, cloud, automation and accessibility	Real-time collaboration 🌐 (in both) 💲 (in 15)	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Collaboration
+T181	3.12 Collaboration, cloud, automation and accessibility	iCloud Drive, Numbers for iCloud, Handoff, AirDrop 🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	iCloud
+T182	3.12 Collaboration, cloud, automation and accessibility	AppleScript	Equal	Equal in both	-	Not applicable to GNOME (D-005)	Not applicable	-	-	AppleScript
+T183	3.12 Collaboration, cloud, automation and accessibility	Shortcuts	Only 15	15.4	D-001	Not applicable to GNOME (D-005)	Not applicable	-	-	Shortcuts
+T184	3.12 Collaboration, cloud, automation and accessibility	Siri 🌐🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Siri
+T185	3.12 Collaboration, cloud, automation and accessibility	VoiceOver	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T5	Screen reader of Writer in the cells; missing in Tables (NGNM-04)
+T186	3.12 Collaboration, cloud, automation and accessibility	Privacy and analytics 🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Privacy and analytics
+T187	3.12 Collaboration, cloud, automation and accessibility	Creator Studio subscription 💲🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Subscription
+T188	File compatibility (D-010, D-019)	Open Desk ODF, with the extensions	-	Project decision	D-009	In	Missing	-	T5	-
+T189	File compatibility (D-010, D-019)	Open ODF from current LibreOffice and OpenOffice	-	Project decision	D-010	In	Missing	-	T5	-
+T190	File compatibility (D-010, D-019)	Open iWork '09 files	-	Project decision	D-010	In	Missing	-	T5	-
+T191	File compatibility (D-010, D-019)	Open current iWork files	-	Project decision	D-010, D-011	In	Missing	-	T5	-
+T192	File compatibility (D-010, D-019)	Open current Microsoft Office files	-	Project decision	D-010	In	Missing	-	T5	-
+T193	File compatibility (D-010, D-019)	Save ODF with the Desk extensions	-	Project decision	D-009	In	Missing	-	T5	-
+T194	File compatibility (D-010, D-019)	Export to Microsoft Office	-	Project decision	D-019	In	Missing	-	T5	-
+T195	File compatibility (D-010, D-019)	Export PDF	-	Project decision	D-019	In	Missing	-	T5	-
+T196	File compatibility (D-010, D-019)	Export EPUB	-	Project decision	D-019	Not applicable to this app	Not applicable	-	-	-

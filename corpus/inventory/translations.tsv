@@ -1,0 +1,922 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+field	portuguese	english
+area	3.1 Janela, menus e painéis	3.1 Window, menus and panes
+area	3.10 Gráficos	3.10 Charts
+area	3.10 Objetos: imagens, formas, mídia	3.10 Objects: images, shapes, media
+area	3.10 Tabelas	3.10 Tables
+area	3.11 Gráficos	3.11 Charts
+area	3.11 Revisão e busca	3.11 Review and search
+area	3.11 Revisão e ferramentas de escrita	3.11 Review and writing tools
+area	3.12 Animação: transições, composições e ações	3.12 Animation: transitions, builds and actions
+area	3.12 Colaboração, nuvem, automação e acessibilidade	3.12 Collaboration, cloud, automation and accessibility
+area	3.13 Apresentar	3.13 Presenting
+area	3.14 Revisão e ferramentas de escrita	3.14 Review and writing tools
+area	3.15 Imprimir, exportar e enviar	3.15 Print, export and send
+area	3.16 Colaboração, nuvem, automação e acessibilidade	3.16 Collaboration, cloud, automation and accessibility
+area	3.2 Documentos, modelos e arquivos	3.2 Documents, templates and files
+area	3.2 Documentos, temas e arquivos	3.2 Documents, themes and files
+area	3.2 Planilhas, modelos e arquivos	3.2 Spreadsheets, templates and files
+area	3.3 Folhas e páginas	3.3 Sheets and pages
+area	3.3 Visualização e navegação	3.3 View and navigation
+area	3.4 Slides, leiautes e mestres	3.4 Slides, layouts and masters
+area	3.4 Tabelas: estrutura	3.4 Tables: structure
+area	3.4 Texto e caracteres	3.4 Text and characters
+area	3.5 Células: conteúdo, formatos e controles	3.5 Cells: content, formats and controls
+area	3.5 Estilos	3.5 Styles
+area	3.5 Texto e caracteres	3.5 Text and characters
+area	3.6 Estilos	3.6 Styles
+area	3.6 Ordenar, filtrar, categorias e tabelas dinâmicas	3.6 Sort, filter, categories and pivot tables
+area	3.6 Parágrafo, listas e colunas	3.6 Paragraph, lists and columns
+area	3.7 Estrutura do documento	3.7 Document structure
+area	3.7 Fórmulas e funções	3.7 Formulas and functions
+area	3.7 Parágrafo, listas e colunas	3.7 Paragraph, lists and columns
+area	3.8 Gráficos	3.8 Charts
+area	3.8 Objetos: imagens e formas	3.8 Objects: images and shapes
+area	3.8 Objetos: imagens, formas, mídia	3.8 Objects: images, shapes, media
+area	3.9 Som e vídeo	3.9 Sound and video
+area	3.9 Tabelas	3.9 Tables
+area	3.9 Texto e estilos	3.9 Text and styles
+feature	Barra de menus	Menu bar
+feature	Barra de ferramentas	Toolbar
+feature	Barra de formatação (Format Bar)	Format bar
+feature	Inspetor	Inspector
+feature	Gaveta de estilos (Styles Drawer)	Styles drawer
+feature	Media Browser 🌐💲 (no 15)	Media Browser 🌐💲 (in 15)
+feature	Janela Colors / Fonts	Colors / Fonts window
+feature	Janela Adjust Image	Adjust Image window
+feature	Janela de avisos (Document Warnings)	Document Warnings window
+feature	Barra inferior	Bottom bar
+feature	Painel esquerdo	Left pane
+feature	Tela cheia	Full screen
+feature	Vários documentos	Several documents
+feature	Modo escuro	Dark mode
+feature	Preferências	Preferences
+feature	Desfazer/refazer	Undo/redo
+feature	Dois tipos de documento	Two kinds of document
+feature	Seletor de modelos 🌐💲 (no 15)	Template chooser 🌐💲 (in 15)
+feature	Novo documento sempre do mesmo modelo	New document always from the same template
+feature	Salvar	Save
+feature	Renomear pelo título da janela	Rename from the window title
+feature	Versões anteriores	Earlier versions
+feature	Salvar como modelo	Save as template
+feature	Autoria de modelos	Template authoring
+feature	Pacote vs arquivo único	Package vs single file
+feature	Senha	Password
+feature	Bloquear documento	Lock document
+feature	Informações do documento (autor, título, palavras-chave, comentários)	Document information (author, title, keywords, comments)
+feature	Reduzir tamanho	Reduce file size
+feature	Abrir formatos	Open formats
+feature	Exportar	Export
+feature	ePub	ePub
+feature	Publicar no Apple Books 🌐	Publish to Apple Books 🌐
+feature	Imprimir	Print
+feature	Envelopes	Envelopes
+feature	Enviar 🌐 (nas duas)	Send 🌐 (in both)
+feature	Arquivos recentes	Recent files
+feature	Zoom	Zoom
+feature	Duas páginas	Two pages
+feature	Miniaturas	Thumbnails
+feature	Sumário de navegação lateral	Table of contents in the sidebar
+feature	Modo Esboço (Outline)	Outline mode
+feature	Screen View	Screen View
+feature	Invisíveis	Invisibles
+feature	Marcas de leiaute	Layout marks
+feature	Réguas	Rulers
+feature	Ir para página	Go to page
+feature	Percorrer itens (página, seção, comentário, alteração, marcador, ocorrência)	Step through items (page, section, comment, change, bookmark, match)
+feature	Seleção de texto	Text selection
+feature	Fonte, tamanho, negrito, itálico, sublinhado, tachado	Font, size, bold, italic, underline, strikethrough
+feature	Fonte padrão	Default font
+feature	Cor do texto	Text color
+feature	Contorno e sombra	Outline and shadow
+feature	Maiúsculas	Capitalization
+feature	Sobrescrito/subscrito, deslocamento de linha de base	Superscript/subscript, baseline shift
+feature	Espaçamento entre caracteres e ligaduras	Character spacing and ligatures
+feature	Suavização de fontes	Font smoothing
+feature	Cor de fundo de caractere e de parágrafo	Character and paragraph background color
+feature	Realce de revisão (highlight)	Review highlight
+feature	Capitular (drop cap)	Drop cap
+feature	Frações automáticas	Automatic fractions
+feature	Aspas e travessões inteligentes	Smart quotes and dashes
+feature	Hifenização	Hyphenation
+feature	Substituição de texto	Text replacement
+feature	Caracteres especiais, acentos, emoji	Special characters, accents, emoji
+feature	Data e hora	Date and time
+feature	Número e total de páginas	Page number and page count
+feature	Ditado 🤖🌐	Dictation 🤖🌐
+feature	Previsão ao digitar 🤖	Predictive text 🤖
+feature	Tradução 🌐🤖	Translation 🌐🤖
+feature	Idiomas: bidirecional, vertical, guia fonético, ênfase CJK	Languages: bidirectional, vertical, phonetic guide, CJK emphasis
+feature	Formatação por idioma do documento	Formatting by document language
+feature	Estilos de parágrafo, caractere e lista	Paragraph, character and list styles
+feature	Indicar e atualizar substituições	Show and update overrides
+feature	Atalhos para estilos	Shortcuts for styles
+feature	Copiar e colar estilo	Copy and paste style
+feature	Importar estilos de outro documento	Import styles from another document
+feature	Localizar e substituir estilos	Find and replace styles
+feature	Mostrar só estilos usados	Show only the styles in use
+feature	Estilos de objeto, tabela e gráfico	Object, table and chart styles
+feature	Estilo padrão de caixa de texto	Default text box style
+feature	Alinhamento, espaçamento de linha e de parágrafo, recuos	Alignment, line and paragraph spacing, indents
+feature	Tabulações	Tabs
+feature	Paginação (manter juntas, com a próxima, nova página, viúvas/órfãs)	Pagination (keep together, keep with next, new page, widows/orphans)
+feature	Bordas e linhas de parágrafo	Paragraph borders and rules
+feature	Listas automáticas	Automatic lists
+feature	Marcadores de texto, de imagem, números, níveis (Tiered Numbers)	Text bullets, image bullets, numbers, tiered numbers
+feature	Reordenar itens de lista arrastando	Reorder list items by dragging
+feature	Colunas	Columns
+feature	Quebra de coluna, de linha, de página, de seção	Column, line, page and section breaks
+feature	Caixas de texto encadeadas	Linked text boxes
+feature	Tamanho, orientação, margens	Size, orientation, margins
+feature	Páginas espelhadas	Facing pages
+feature	Seções	Sections
+feature	Modelos de página (Page Templates)	Page templates
+feature	Cabeçalho e rodapé	Header and footer
+feature	Objetos mestres / de leiaute de seção (marca-d'água)	Master / section layout objects (watermark)
+feature	Fundo e borda de página	Page background and border
+feature	Notas de rodapé e de fim	Footnotes and endnotes
+feature	Sumário (TOC) inserido	Inserted table of contents
+feature	Marcadores (bookmarks)	Bookmarks
+feature	Links	Links
+feature	Bibliografia 🧩 (nas duas)	Bibliography 🧩 (in both)
+feature	Equações 🧩 (no '09)	Equations 🧩 (in '09)
+feature	Mala direta	Mail merge
+feature	Objetos flutuantes e em linha	Floating and inline objects
+feature	Contorno de texto	Text wrap
+feature	Imagens 🌐💲 (no 15)	Images 🌐💲 (in 15)
+feature	Remover fundo 🤖 (no 15)	Remove background 🤖 (in 15)
+feature	Ajustes de imagem	Image adjustments
+feature	Galeria de imagens	Image gallery
+feature	IA para imagens **(assinatura)** 🤖🌐💲	AI for images **(subscription)** 🤖🌐💲
+feature	Formas 🤖💲 (no 15)	Shapes 🤖💲 (in 15)
+feature	Editar pontos e curvas	Edit points and curves
+feature	Linhas e conexões	Lines and connections
+feature	Objetos 3D (USDZ)	3D objects (USDZ)
+feature	Desenhos (Apple Pencil)	Drawings (Apple Pencil)
+feature	Som e vídeo 🌐 (no 15)	Sound and video 🌐 (in 15)
+feature	Formatos de mídia	Media formats
+feature	Bordas, molduras artísticas, sombra, reflexo, opacidade	Borders, picture frames, shadow, reflection, opacity
+feature	Preenchimento	Fill
+feature	Legenda e título de objeto	Object caption and title
+feature	Posição exata, alinhar e distribuir	Exact position, align and distribute
+feature	Guias de alinhamento	Alignment guides
+feature	Camadas, agrupar, travar	Layers, group, lock
+feature	Redimensionar, girar, espelhar	Resize, rotate, flip
+feature	Inserir tabela	Insert table
+feature	Linhas, colunas, cabeçalhos, rodapés, repetir cabeçalho	Rows, columns, headers, footers, repeat header
+feature	Converter texto em tabela	Convert text to table
+feature	Criar tabela a partir de células	Create a table from cells
+feature	Mesclar e dividir células	Merge and split cells
+feature	Formatos de célula	Cell formats
+feature	Fórmulas e funções 🌐 (no 15)	Formulas and functions 🌐 (in 15)
+feature	Realce condicional	Conditional highlighting
+feature	Ordenar	Sort
+feature	Preenchimento automático e autocompletar	Autofill and autocomplete
+feature	Cores alternadas	Alternating colors
+feature	Título da tabela	Table title
+feature	Direção da tabela (bidi)	Table direction (bidi)
+feature	Travar tabela	Lock table
+feature	Tipos	Types
+feature	Dados	Data
+feature	Eixos, rótulos, legendas	Axes, labels, legends
+feature	Barras de erro e linhas de tendência	Error bars and trendlines
+feature	Cantos arredondados, chanfro 3D, buraco da rosca	Rounded corners, 3D bevel, donut hole
+feature	Cena 3D (luz, ângulo)	3D scene (light, angle)
+feature	Estilos de gráfico	Chart styles
+feature	Controle de alterações	Change tracking
+feature	Comentários	Comments
+feature	Nome do autor e cor	Author name and color
+feature	Verificação ortográfica e gramatical	Spelling and grammar check
+feature	Proofreader (revisão de estilo e gramática do app) 🤖 (no 15)	Proofreader (the app's style and grammar review) 🤖 (in 15)
+feature	Localizar e substituir	Find and replace
+feature	Lista de todas as ocorrências	List of all matches
+feature	Contagem de palavras	Word count
+feature	Dicionário e pesquisa 🌐 (nas duas)	Dictionary and lookup 🌐 (in both)
+feature	Writing Tools (IA) 🤖🌐	Writing Tools (AI) 🤖🌐
+feature	Colaboração em tempo real 🌐 (nas duas) 💲 (no 15)	Real-time collaboration 🌐 (in both) 💲 (in 15)
+feature	iCloud Drive, Handoff, AirDrop, Pages para iCloud 🌐	iCloud Drive, Handoff, AirDrop, Pages for iCloud 🌐
+feature	AppleScript	AppleScript
+feature	Atalhos (Shortcuts)	Shortcuts
+feature	Siri 🌐🤖	Siri 🌐🤖
+feature	VoiceOver	VoiceOver
+feature	Privacidade e análise 🌐	Privacy and analytics 🌐
+feature	Assinatura Creator Studio 💲🌐	Creator Studio subscription 💲🌐
+feature	Barra de fórmula	Formula bar
+feature	Painel Sheets (lateral)	Sheets pane (sidebar)
+feature	Painel Styles (lateral)	Styles pane (sidebar)
+feature	Cálculos instantâneos	Instant calculations
+feature	Reorganize	Reorganize
+feature	Function Browser	Function Browser
+feature	Nova planilha sempre do mesmo modelo	New spreadsheet always from the same template
+feature	Bloquear planilha	Lock spreadsheet
+feature	Abrir e importar	Open and import
+feature	Dados do Address Book	Address Book data
+feature	Várias folhas por planilha	Several sheets per spreadsheet
+feature	Renomear, duplicar, apagar, reordenar folhas	Rename, duplicate, delete, reorder sheets
+feature	Cor da aba	Tab color
+feature	Ocultar folha	Hide sheet
+feature	Fundo da folha	Sheet background
+feature	Borda da folha	Sheet border
+feature	Direção da folha (direita para esquerda)	Sheet direction (right to left)
+feature	Dividir em páginas	Split into pages
+feature	Numeração de páginas	Page numbering
+feature	Margens	Margins
+feature	Tamanho de papel	Paper size
+feature	Várias tabelas soltas na folha	Several free tables on a sheet
+feature	Tabelas reutilizáveis (Capture Table)	Reusable tables (Capture Table)
+feature	Linhas e colunas de cabeçalho e rodapé	Header and footer rows and columns
+feature	Congelar cabeçalhos	Freeze headers
+feature	Repetir cabeçalhos ao imprimir	Repeat headers when printing
+feature	Acrescentar e apagar linhas e colunas	Add and delete rows and columns
+feature	Mover linhas e colunas arrastando	Move rows and columns by dragging
+feature	Transpor linhas e colunas	Transpose rows and columns
+feature	Ocultar e mostrar	Hide and show
+feature	Redimensionar linhas e colunas	Resize rows and columns
+feature	Mesclar células	Merge cells
+feature	Dividir células	Split cells
+feature	Nome da tabela	Table name
+feature	Contorno, grade e bordas de célula	Table outline, grid and cell borders
+feature	Tamanho da fonte da tabela toda	Font size of the whole table
+feature	Estilos de tabela	Table styles
+feature	Mover objetos quando a tabela cresce	Move objects when the table grows
+feature	Copiar tabela entre apps	Copy a table between apps
+feature	Digitar e editar em células	Type and edit in cells
+feature	Tecla Return passa à próxima célula	Return key moves to the next cell
+feature	Autocompletar com valores da coluna	Autocomplete with the values of the column
+feature	Magic Fill 🤖💲	Magic Fill 🤖💲
+feature	Preenchimento automático (Autofill)	Autofill
+feature	Copiar, mover, colar valores	Copy, move, paste values
+feature	Limpar	Clear
+feature	Destacar linha e coluna sob o ponteiro	Highlight the row and column under the pointer
+feature	Objetos dentro de células	Objects inside cells
+feature	Quebrar texto na célula	Wrap text in the cell
+feature	Formatos automático, número, moeda, porcentagem, data e hora, duração, fração, científico, texto	Automatic, number, currency, percentage, date and time, duration, fraction, scientific and text formats
+feature	Sistema numérico (bases 2 a 36, complemento de dois)	Numeral system (bases 2 to 36, two's complement)
+feature	Formatos personalizados	Custom formats
+feature	Lista completa de moedas	Full list of currencies
+feature	Caixa de seleção, deslizante, stepper, menu pop-up	Checkbox, slider, stepper, pop-up menu
+feature	Avaliação por estrelas	Star rating
+feature	Cotações de ações 🌐	Stock quotes 🌐
+feature	Comentários em células	Comments on cells
+feature	Links em células	Links in cells
+feature	Smart Cell View (valor real da célula)	Smart Cell View (the actual value of the cell)
+feature	Ordenar pela coluna	Sort by the column
+feature	Regras de ordenação com várias colunas	Sort rules with several columns
+feature	Filtros por regra	Filters by rule
+feature	Quick Filter (marcar valores a mostrar)	Quick Filter (tick the values to show)
+feature	Filtrar duplicados e valores únicos	Filter duplicates and unique values
+feature	Categorias	Categories
+feature	Tabelas dinâmicas (pivot)	Pivot tables
+feature	Instantâneo de tabela	Table snapshot
+feature	Editor de fórmulas	Formula editor
+feature	Navegador de funções	Function browser
+feature	Fórmulas rápidas	Quick formulas
+feature	Quantidade de funções 🌐 (no 15)	Number of functions 🌐 (in 15)
+feature	Matrizes que derramam (spilling arrays)	Spilling arrays
+feature	Referências a outra tabela e folha, nomes de cabeçalho, absolutas	References to another table and sheet, header names, absolute references
+feature	Indicação de erro	Error indication
+feature	Aviso de fórmula que aponta para célula vazia	Warning for a formula that points to an empty cell
+feature	Formula List	Formula List
+feature	Localizar e substituir dentro de fórmulas	Find and replace inside formulas
+feature	Imprimir a lista de fórmulas	Print the formula list
+feature	Usar o editor como calculadora	Use the editor as a calculator
+feature	Ajuda de funções	Function help
+feature	Inserir e escolher dados	Insert and choose data
+feature	Dados ocultos	Hidden data
+feature	Muitos pontos (downsampling)	Many points (downsampling)
+feature	Gráfico vinculado no Pages e no Keynote	Linked chart in Pages and Keynote
+feature	Título, legenda, eixos, grades, marcas	Title, legend, axes, gridlines, tick marks
+feature	Rótulos de valor	Value labels
+feature	Rótulos de resumo em empilhados	Summary labels on stacked charts
+feature	Linhas de referência (média, mediana, mín., máx., valor)	Reference lines (average, median, min, max, value)
+feature	Cores, texturas e imagens por série	Colors, textures and images per series
+feature	Pizza: separar fatias, sombras, girar	Pie: explode wedges, shadows, rotate
+feature	Cena 3D (profundidade, luz, girar)	3D scene (depth, light, rotate)
+feature	Cantos arredondados, buraco da rosca, grade do radar	Rounded corners, donut hole, radar grid
+feature	Borda e fundo do gráfico	Chart border and background
+feature	Caixas de texto e texto em formas	Text boxes and text in shapes
+feature	Fonte, tamanho, negrito, itálico, sublinhado, tachado, contorno, sombra	Font, size, bold, italic, underline, strikethrough, outline, shadow
+feature	Sobrescrito, subscrito, linha de base	Superscript, subscript, baseline
+feature	Espaçamento de caracteres, ligaduras	Character spacing, ligatures
+feature	Alinhamento, espaçamento, recuos, tabulações	Alignment, spacing, indents, tabs
+feature	Listas com marcadores, números, níveis	Lists with bullets, numbers, levels
+feature	Colunas em caixa de texto	Columns in a text box
+feature	Capitular, frações automáticas, realce de revisão	Drop cap, automatic fractions, review highlight
+feature	Caracteres especiais, acentos	Special characters, accents
+feature	Data, nome do arquivo, número de página	Date, file name, page number
+feature	Idiomas: bidirecional, vertical, guia fonético, CJK	Languages: bidirectional, vertical, phonetic guide, CJK
+feature	Formatação por idioma da planilha	Formatting by spreadsheet language
+feature	Links em texto e objetos	Links on text and objects
+feature	IA para imagens 🤖🌐💲	AI for images 🤖🌐💲
+feature	Som e vídeo	Sound and video
+feature	Bordas, molduras, sombra, reflexo, opacidade	Borders, picture frames, shadow, reflection, opacity
+feature	Estilos de objeto	Object styles
+feature	Objetos dentro de caixas e formas	Objects inside boxes and shapes
+feature	Posição exata, alinhar, distribuir, guias	Exact position, align, distribute, guides
+feature	Camadas, agrupar, travar, girar, espelhar	Layers, group, lock, rotate, flip
+feature	Ortografia e gramática	Spelling and grammar
+feature	iCloud Drive, Numbers para iCloud, Handoff, AirDrop 🌐	iCloud Drive, Numbers for iCloud, Handoff, AirDrop 🌐
+feature	Gaveta Build Order	Build Order drawer
+feature	Janelas Colors e Fonts	Colors and Fonts windows
+feature	Ferramentas de organizar	Arrange tools
+feature	Avisos do documento	Document warnings
+feature	Borda inferior	Bottom border
+feature	Seletor de temas 🌐💲 (no 15)	Theme chooser 🌐💲 (in 15)
+feature	Apresentação a partir de esboço 🤖🌐💲	Presentation from an outline 🤖🌐💲
+feature	Novos slides a partir de esboço 🤖🌐💲	New slides from an outline 🤖🌐💲
+feature	Nova apresentação sempre do mesmo tema	New presentation always from the same theme
+feature	Trocar o tema	Change the theme
+feature	Salvar tema	Save theme
+feature	Pacote ou arquivo único	Package or single file
+feature	Copiar mídia para o documento	Copy media into the document
+feature	Bloquear apresentação	Lock presentation
+feature	Metadados do Spotlight (autor, título, palavras-chave, comentários)	Spotlight metadata (author, title, keywords, comments)
+feature	Linguagem e região por apresentação	Language and region per presentation
+feature	Apresentação nova pelo ícone do Dock	New presentation from the Dock icon
+feature	Navegador de slides	Slide navigator
+feature	Esboço (Outline)	Outline
+feature	Somente slide	Slide only
+feature	Mesa de luz (Light Table)	Light table
+feature	Lista de objetos	Object list
+feature	Área de trabalho em volta do slide	Work area around the slide
+feature	Notas do apresentador	Presenter notes
+feature	Notas geradas pela IA 🤖🌐💲	Notes generated by AI 🤖🌐💲
+feature	Ir para slide	Go to slide
+feature	Adicionar, duplicar, apagar slides	Add, duplicate, delete slides
+feature	Ignorar slide	Skip slide
+feature	Números de slide	Slide numbers
+feature	Tamanho do slide	Slide size
+feature	Fundo do slide	Slide background
+feature	Fundos dinâmicos (animados)	Dynamic (animated) backgrounds
+feature	Slides mestres / leiautes	Master slides / layouts
+feature	Aplicar e reaplicar leiaute	Apply and reapply layout
+feature	Mostrar ou esconder título e corpo	Show or hide title and body
+feature	Marcadores de posição de texto e mídia	Text and media placeholders
+feature	Marcador de objeto (tabela, gráfico)	Object placeholder (table, chart)
+feature	Camadas entre slide e mestre	Layers between slide and master
+feature	Padrões por mestre e por tema	Defaults per master and per theme
+feature	Importar estilos de objeto de outro tema	Import object styles from another theme
+feature	Slide Clean Up 🤖🌐💲	Slide Clean Up 🤖🌐💲
+feature	Reduzir o texto para caber	Shrink text to fit
+feature	Bidirecional, vertical, guia fonético, ênfase CJK	Bidirectional, vertical, phonetic guide, CJK emphasis
+feature	Estilos de parágrafo	Paragraph styles
+feature	Estilos de caractere	Character styles
+feature	Estilos de lista	List styles
+feature	Atalhos F1–F8 para estilos	F1–F8 shortcuts for styles
+feature	Caixa de texto padrão	Default text box
+feature	Alinhamento, espaçamento de linha e de parágrafo, margem interna	Alignment, line and paragraph spacing, inset margin
+feature	Tabulações e recuos	Tabs and indents
+feature	Bordas, linhas e fundo de parágrafo	Paragraph borders, rules and background
+feature	Marcadores de texto, de imagem e números	Text bullets, image bullets and numbers
+feature	Reordenar itens arrastando	Reorder items by dragging
+feature	Colunas de texto	Text columns
+feature	Image Playground 🤖	Image Playground 🤖
+feature	Posição exata, alinhar, distribuir	Exact position, align, distribute
+feature	Filme no slide	Movie on the slide
+feature	Áudio no slide	Audio on the slide
+feature	Trilha sonora	Soundtrack
+feature	Narração da apresentação inteira	Narration of the whole presentation
+feature	Gravar áudio como objeto	Record audio as an object
+feature	Vídeo da web 🌐	Web video 🌐
+feature	Vídeo ao vivo	Live video
+feature	Linhas, colunas, cabeçalhos, rodapé	Rows, columns, headers, footer
+feature	Realce condicional, ordenar, preencher	Conditional highlighting, sort, fill
+feature	Título da tabela, travar tabela, direção bidi	Table title, lock table, bidi direction
+feature	Gráfico interativo	Interactive chart
+feature	Eixos, rótulos, legendas, barras de erro, tendência	Axes, labels, legends, error bars, trendline
+feature	Onde se configura	Where it is set up
+feature	Transições	Transitions
+feature	Magic Move	Magic Move
+feature	Composições de entrada e saída	Build in and build out
+feature	Ações (animar sobre o slide)	Actions (animate on the slide)
+feature	Ordem e tempo das composições	Build order and timing
+feature	Smart Builds	Smart Builds
+feature	Copiar e colar animação	Copy and paste animation
+feature	Animações para máquinas fracas	Animations for slow machines
+feature	Tipo de apresentação	Presentation type
+feature	Reproduzir ao abrir, repetir, reiniciar se ocioso	Play on open, loop, restart if idle
+feature	Senha para sair da apresentação	Password to leave the presentation
+feature	Apresentar em tela cheia	Present in full screen
+feature	Apresentar numa janela	Present in a window
+feature	Tela do apresentador	Presenter display
+feature	Vários monitores	Several displays
+feature	Ensaiar	Rehearse
+feature	Teclas durante a apresentação	Keys during the presentation
+feature	Controle remoto 🌐 (no 15, rede local)	Remote control 🌐 (in 15, local network)
+feature	Vários apresentadores 🌐	Several presenters 🌐
+feature	Apresentar no FaceTime 🌐	Present on FaceTime 🌐
+feature	Touch Bar	Touch Bar
+feature	Ponteiro durante a apresentação	Pointer during the presentation
+feature	Realce de revisão	Review highlight
+feature	Correção automática	Autocorrection
+feature	Dicionário 🌐 (no 15, parcial)	Dictionary 🌐 (in 15, partial)
+feature	Writing Tools 🤖🌐	Writing Tools 🤖🌐
+feature	PDF	PDF
+feature	PowerPoint	PowerPoint
+feature	Filme	Movie
+feature	GIF animado	Animated GIF
+feature	Imagens	Images
+feature	HTML	HTML
+feature	Exportar para iPod	Export to iPod
+feature	Salvar no formato da versão anterior	Save in the format of the previous version
+feature	Enviar para iDVD, iPhoto, iTunes, GarageBand, YouTube 🌐 (YouTube)	Send to iDVD, iPhoto, iTunes, GarageBand, YouTube 🌐 (YouTube)
+feature	Enviar por e-mail 🌐 (nas duas)	Send by email 🌐 (in both)
+feature	Publicar em blog 🌐	Publish to a blog 🌐
+feature	iWork.com 🌐	iWork.com 🌐
+feature	Colaboração em tempo real 🌐💲 (até 4 GB só com assinatura)	Real-time collaboration 🌐💲 (up to 4 GB only with a subscription)
+feature	iCloud Drive, Keynote para iCloud, Handoff, AirDrop 🌐	iCloud Drive, Keynote for iCloud, Handoff, AirDrop 🌐
+feature	Automator	Automator
+note	Menus do GNOME (Visualização no botão Barra lateral, Inserir, menu Mais) e busca de comandos (GNM-10); compartilhar fica fora por ser online	GNOME menus (View on the Sidebar button, Insert, the More menu) and command search (GNM-10); sharing stays out because it is online
+note	Barra de cabeçalho da interface B com botões de inserir e do Inspetor juntos (INT-11)	Header bar of interface B with the insert buttons and the Inspector button together (INT-11)
+note	Barra de formatação enxuta e contextual da interface B (INT-12)	Lean, contextual format bar of interface B (INT-12)
+note	Um Inspetor só, na barra lateral direita, em dois níveis, que muda com a seleção (INT-13)	A single Inspector, in the right sidebar, in two levels, that changes with the selection (INT-13)
+note	Página Estilos da barra lateral, com as três listas (INT-18)	Styles page of the sidebar, with the three lists (INT-18)
+note	Popover Mídia com busca e pastas (INT-14); Content Hub e Fotos ficam fora (online/assinatura); gravar áudio vai na linha Som e vídeo	Media popover with search and folders (INT-14); Content Hub and Photos stay out (online/subscription); recording audio is in the Sound and video row
+note	Popover de fontes (Ctrl+T) e paleta de cores (INT-15, INT-16)	Fonts popover (Ctrl+T) and color palette (INT-15, INT-16)
+note	Ajustar Imagem na aba Imagem do Inspetor (OBJ-07, etapa 4)	Adjust Image in the Image tab of the Inspector (OBJ-07, stage 4)
+note	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 oferece direto do aviso	Banner with View Warnings (INT-22) done; Replace Fonts, which the 15 offers right from the warning, is missing
+note	Barra inferior com posição, Ir para página, Navegar por e contagem (etapa 6, GNM-13)	Bottom bar with position, Go to Page, Navigate By and word count (stage 6, GNM-13)
+note	Miniaturas, estilos e resultados da busca na barra lateral; falta o sumário vivo do 15 e a página Comentários só diz que não há (fase 8)	Thumbnails, styles and search results in the sidebar; the live table of contents of the 15 is missing and the Comments page only says there are none (phase 8)
+note	Tela cheia por F11 (DOC-07); falta o Screen View do 15 (fluxo contínuo para escrever)	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
+note	Uma janela por documento; faltam abas (AdwTabView)	One window per document; tabs (AdwTabView) are missing
+note	Libadwaita segue o estilo claro/escuro do sistema	Libadwaita follows the light/dark style of the system
+note	Preferências (Geral, Réguas, Correção) com AdwPreferencesDialog	Preferences (General, Rulers, Correction) with AdwPreferencesDialog
+note	Desfazer e refazer ilimitados, com o nome da mudança (DOC-12)	Unlimited undo and redo, with the name of the change (DOC-12)
+note	Os dois tipos existem (INT-02, INT-03); falta converter de um para o outro	Both kinds exist (INT-02, INT-03); converting from one to the other is missing
+note	Galeria de modelos na janela vazia existe, mas o seletor completo (INT-01) é da fase 9; modelos premium e baixados ficam fora	The template gallery in the empty window exists, but the full chooser (INT-01) belongs to phase 9; premium and downloaded templates stay out
+note	Ctrl+N cria do modelo padrão; a preferência de escolher o modelo (DOC-02) é da fase 9	Ctrl+N creates from the default template; the preference to choose the template (DOC-02) belongs to phase 9
+note	Salvar manual e rascunho de recuperação a cada 2 min (caminho L); o alvo do 15 é salvamento automático contínuo, o que reabre a decisão de 13/11	Manual save and a recovery draft every 2 min (path L); the target of the 15 is continuous automatic saving, which reopens the decision of 13 Nov
+note	Renomear com um clique no título (PR de 15/11)	Rename with a click on the title (PR of 15 Nov)
+note	Sem histórico de versões por decisão (caminho L); o alvo do 15 pede navegar e copiar trechos de versões	No version history by decision (path L); the target of the 15 asks for browsing versions and copying parts of them
+note	Salvar como modelo e gerir modelos no app (DOC-13, fase 9)	Save as template and manage templates in the app (DOC-13, phase 9)
+note	Padrões de caixa de texto, forma e imagem (MOD-04, MOD-07); faltam texto e mídia reservados, Capturar Páginas e o resto da fase 9	Defaults for text box, shape and image (MOD-04, MOD-07); placeholder text and media, Capture Pages and the rest of phase 9 are missing
+note	ODT é um arquivo único	ODT is a single file
+note	Senha para abrir (DOC-08, fase 8), também nas cópias exportadas	Password to open (DOC-08, phase 8), also on exported copies
+note	Bloquear documento no app (DOC-17, fase 8)	Lock document in the app (DOC-17, phase 8)
+note	Informações do documento no Inspetor (DOC-19)	Document information in the Inspector (DOC-19)
+note	Reduzir imagens e mídia como o '09 (OBJ-05, OBJ-20); faltam as opções de vídeo do 15 (H.264/HEVC, qualidade)	Reduce images and media like the '09 (OBJ-05, OBJ-20); the video options of the 15 (H.264/HEVC, quality) are missing
+note	Abre ODT e Pages '09 (DOC-03, DOC-22); Word, RTF, texto e AppleWorks são da fase 10	Opens ODT and Pages '09 (DOC-03, DOC-22); Word, RTF, plain text and AppleWorks belong to phase 10
+note	Só PDF pela linha de comando (desk-convert); exportar PDF, Word, RTF, texto e imagens pela janela é da fase 10	Only PDF from the command line (desk-convert); exporting PDF, Word, RTF, plain text and images from the window belongs to phase 10
+note	EPUB refluxível e fixo (fase 10)	Reflowable and fixed EPUB (phase 10)
+note	Publicar no Apple Books (online)	Publish to Apple Books (online)
+note	Imprimir com intervalo, comentários e fundos (EXP-03, fase 10)	Print with range, comments and backgrounds (EXP-03, phase 10)
+note	Modelos de envelope (fase 9)	Envelope templates (phase 9)
+note	Enviar por Mail/Mensagens/AirDrop (online)	Send by Mail/Messages/AirDrop (online)
+note	Abrir recente pelo RecentManager do GTK	Open Recent through the GTK RecentManager
+note	Zoom (INT-07)	Zoom (INT-07)
+note	Uma ou duas páginas (INT-08)	One or two pages (INT-08)
+note	Miniaturas que reordenam seções (EST-17)	Thumbnails that reorder sections (EST-17)
+note	Sumário vivo na barra lateral	Live table of contents in the sidebar
+note	Modo Estrutura de Tópicos (TXT-14)	Outline mode (TXT-14)
+note	Screen View	Screen View
+note	Invisíveis (INT-10); a cor configurável do 15 não existe	Invisibles (INT-10); the configurable color of the 15 does not exist
+note	Mostrar leiaute (INT-09)	Show Layout (INT-09)
+note	Réguas e guias (INT-17)	Rulers and guides (INT-17)
+note	Ir para página pela barra inferior (INT-19)	Go to page from the bottom bar (INT-19)
+note	Navegar por tipo de item pela barra inferior (INT-19)	Navigate by kind of item from the bottom bar (INT-19)
+note	Seleção descontínua com Ctrl (TXT-03)	Discontinuous selection with Ctrl (TXT-03)
+note	Barra de formatação e Inspetor (FMT-01, FMT-02, FMT-05)	Format bar and Inspector (FMT-01, FMT-02, FMT-05)
+note	A fonte padrão vem do modelo; falta escolhê-la nas Preferências	The default font comes from the template; choosing it in Preferences is missing
+note	Cor sólida (FMT-11); falta gradiente e imagem no texto	Solid color (FMT-11); gradient and image in text are missing
+note	Contorno e sombra de texto (FMT-03, FMT-04)	Text outline and shadow (FMT-03, FMT-04)
+note	Maiúsculas e versalete (FMT-07); faltam Título e Início de frase e as transformações do 15	All caps and small caps (FMT-07); Title Case, Sentence case and the transformations of the 15 are missing
+note	Sobrescrito e linha de base (FMT-06)	Superscript and baseline (FMT-06)
+note	Espaçamento e ligaduras (FMT-09, FMT-10)	Spacing and ligatures (FMT-09, FMT-10)
+note	Suavização de fontes é do sistema no GNOME	Font smoothing belongs to the system in GNOME
+note	Fundo de caractere e de parágrafo (FMT-20)	Character and paragraph background (FMT-20)
+note	Realce de revisão com comentário (fase 8)	Review highlight with a comment (phase 8)
+note	Capitular	Drop cap
+note	Frações automáticas	Automatic fractions
+note	Aspas inteligentes como o '09 (TXT-06); faltam escolher o estilo de aspas e converter as existentes	Smart quotes like the '09 (TXT-06); choosing the quote style and converting the existing ones are missing
+note	Hifenização (TXT-09)	Hyphenation (TXT-09)
+note	Lista de substituição do próprio Desk (TXT-07); o GNOME não tem lista do sistema, então o alvo vale como lista comum aos três apps	Desk's own replacement list (TXT-07); GNOME has no system list, so the target holds as a list shared by the three apps
+note	Seletor de emoji e símbolos do GTK (TXT-05)	GTK emoji and symbol chooser (TXT-05)
+note	Data e hora como campo (EST-27)	Date and time as a field (EST-27)
+note	Número e total de páginas (EST-27)	Page number and page count (EST-27)
+note	Ditado (IA)	Dictation (AI)
+note	Previsão ao digitar (IA)	Predictive text (AI)
+note	Tradução (IA/online)	Translation (AI/online)
+note	Texto bidirecional, vertical e guia fonético (GNM-08, fase 11)	Bidirectional text, vertical text and phonetic guide (GNM-08, phase 11)
+note	Idioma do texto por trecho (FMT-22); falta idioma e região por documento	Text language per range (FMT-22); language and region per document are missing
+note	Estilos sempre à vista na barra lateral (STY-01, STY-02)	Styles always in view in the sidebar (STY-01, STY-02)
+note	Sobreposições e atualizar (STY-06)	Overrides and update (STY-06)
+note	Atalhos de estilo Ctrl+1 a 8 (STY-04)	Style shortcuts Ctrl+1 to 8 (STY-04)
+note	Copiar e colar estilo (STY-08)	Copy and paste style (STY-08)
+note	Importar estilos (STY-10)	Import styles (STY-10)
+note	Localizar e substituir estilos (STY-09)	Find and replace styles (STY-09)
+note	Mostrar só estilos usados na página Estilos	Show only the styles in use on the Styles page
+note	Estilos de objeto no Inspetor (PR de 15/11); faltam estilos de tabela e de gráfico	Object styles in the Inspector (PR of 15 Nov); table and chart styles are missing
+note	Padrão de caixa de texto gravado no modelo (MOD-04); falta definir por documento	Text box default stored in the template (MOD-04); setting it per document is missing
+note	Alinhamento, espaçamento e recuos (FMT-12 a FMT-18)	Alignment, spacing and indents (FMT-12 to FMT-18)
+note	Tabulações (FMT-16)	Tabs (FMT-16)
+note	Paginação (EST-05)	Pagination (EST-05)
+note	Bordas e filetes (FMT-21)	Borders and rules (FMT-21)
+note	Listas automáticas (LST-01)	Automatic lists (LST-01)
+note	Marcadores e listas escalonadas (LST-03 a LST-05)	Bullets and tiered lists (LST-03 to LST-05)
+note	Reordenar no modo tópicos; falta arrastar pelo marcador direto no texto	Reorder in outline mode; dragging by the bullet right in the text is missing
+note	Colunas e quebras manuais do '09 (EST-07 a EST-10); faltam as colunas da seleção com quebras automáticas do 15	Columns and manual breaks of the '09 (EST-07 to EST-10); the columns on the selection with automatic breaks of the 15 are missing
+note	Quebras de coluna, linha, página e seção (EST-04, EST-06, EST-08)	Column, line, page and section breaks (EST-04, EST-06, EST-08)
+note	Caixas vinculadas e linhas de conexão (OBJ-15, VMI-03); faltam os fios numerados e coloridos e vários fios	Linked boxes and connection lines (OBJ-15, VMI-03); the numbered and colored threads and several threads are missing
+note	Papel e margens (EST-02, EST-03)	Paper and margins (EST-02, EST-03)
+note	Páginas espelhadas (EST-11)	Facing pages (EST-11)
+note	Seções (EST-16 a EST-19); falta reutilizar seções capturadas (EST-20, fase 9)	Sections (EST-16 to EST-19); reusing captured sections is missing (EST-20, phase 9)
+note	Modelos de página com etiquetas	Page templates with tags
+note	Cabeçalho livre do '09 (EST-12); faltam os três campos rápidos do 15	Free header of the '09 (EST-12); the three quick fields of the 15 are missing
+note	Objetos mestres de seção (EST-21, INT-05)	Section master objects (EST-21, INT-05)
+note	Fundo e borda de página por página, seção ou modelo	Page background and border per page, section or template
+note	Notas de rodapé e de fim (EST-13 a EST-15)	Footnotes and endnotes (EST-13 to EST-15)
+note	Vários sumários, cada um até o próximo (EST-22); falta o escopo por seção do 15	Several tables of contents, each up to the next one (EST-22); the per-section scope of the 15 is missing
+note	Marcadores (EST-26); faltam a aba própria e as sugestões a partir de estilos	Bookmarks (EST-26); their own tab and the suggestions from styles are missing
+note	Links do '09, inclusive para outro documento (EST-25, IOP-32); faltam telefone e link a partir de objetos	Links of the '09, including to another document (EST-25, IOP-32); phone links and links from objects are missing
+note	Bibliografia exige o EndNote, programa pago	Bibliography requires EndNote, a paid program
+note	Equações LaTeX/MathML	LaTeX/MathML equations
+note	Mala direta com pré-visualização (MAL-01 a MAL-09, fase 9)	Mail merge with preview (MAL-01 to MAL-09, phase 9)
+note	Flutuante e em linha (OBJ-01); falta aninhar objetos dentro de caixas e formas	Floating and inline (OBJ-01); nesting objects inside boxes and shapes is missing
+note	Contorno com escolha de lado (OBJ-17)	Wrap with a choice of side (OBJ-17)
+note	PNG, JPEG, PDF, GIF (OBJ-02); faltam SVG e HEIC; Content Hub e iPhone ficam fora	PNG, JPEG, PDF, GIF (OBJ-02); SVG and HEIC are missing; Content Hub and iPhone stay out
+note	O Remover Fundo do 15 usa IA; vale o Alfa Instantâneo manual do '09 (OBJ-06)	The Remove Background of the 15 uses AI; the manual Instant Alpha of the '09 holds (OBJ-06)
+note	Ajustar Imagem do '09 (OBJ-07); falta o Realçar automático e o painel enxuto do 15	Adjust Image of the '09 (OBJ-07); the automatic Enhance and the lean panel of the 15 are missing
+note	Galeria de imagens	Image gallery
+note	IA para imagens (assinatura)	AI for images (subscription)
+note	Formas, caneta e paramétricas (OBJ-08 a OBJ-11); faltam a biblioteca pesquisável e combinar formas; gerar forma por IA fica fora	Shapes, pen and parametric shapes (OBJ-08 to OBJ-11); the searchable library and combining shapes are missing; generating a shape by AI stays out
+note	Editar pontos (OBJ-10)	Edit points (OBJ-10)
+note	Linha de conexão (OBJ-31)	Connection line (OBJ-31)
+note	Objetos 3D (USDZ)	3D objects (USDZ)
+note	Desenho à mão livre animável (o equivalente do Apple Pencil)	Animatable freehand drawing (the equivalent of the Apple Pencil)
+note	Áudio e vídeo (OBJ-18, OBJ-19); faltam gravar áudio, aparar, capa e descrição; vídeo da web fica fora	Audio and video (OBJ-18, OBJ-19); recording audio, trimming, poster frame and description are missing; web video stays out
+note	Reduz mídia (OBJ-20); falta otimizar ao inserir	Reduces media (OBJ-20); optimizing on insert is missing
+note	Bordas, molduras, sombra, reflexo e opacidade (OBJ-35 a OBJ-39)	Borders, picture frames, shadow, reflection and opacity (OBJ-35 to OBJ-39)
+note	Cor, gradiente e imagem (OBJ-40 a OBJ-42); faltam gradiente avançado e salvar preenchimento	Color, gradient and image (OBJ-40 to OBJ-42); advanced gradient and saving a fill are missing
+note	Legenda e título de objeto	Object caption and title
+note	Posição, alinhar e distribuir (OBJ-26, OBJ-29)	Position, align and distribute (OBJ-26, OBJ-29)
+note	Guias dinâmicas e fixas (OBJ-27, OBJ-28); falta a cor própria	Dynamic and fixed guides (OBJ-27, OBJ-28); their own color is missing
+note	Camadas, agrupar, travar (OBJ-24, OBJ-30, OBJ-32)	Layers, group, lock (OBJ-24, OBJ-30, OBJ-32)
+note	Redimensionar, girar, espelhar (OBJ-33, OBJ-34)	Resize, rotate, flip (OBJ-33, OBJ-34)
+note	Inserir tabela (TAB-01); faltam os estilos de tabela à vista	Insert table (TAB-01); the table styles in view are missing
+note	Linhas, colunas, cabeçalhos e rodapés (TAB-10 a TAB-13)	Rows, columns, headers and footers (TAB-10 to TAB-13)
+note	Converter texto em tabela (TAB-05)	Convert text to table (TAB-05)
+note	Criar tabela arrastando células para fora	Create a table by dragging cells out
+note	Mesclar e dividir (TAB-23, TAB-24)	Merge and split (TAB-23, TAB-24)
+note	Formatos, fração e sistema numérico (TAB-28 a TAB-30); falta a janela de gerenciar formatos (TAB-31)	Formats, fraction and numeral system (TAB-28 to TAB-30); the window to manage formats is missing (TAB-31)
+note	Navegador de funções e 94 funções; o 15 tem 250+; funções que buscam na internet ficam fora	Function browser and 94 functions; the 15 has 250+; functions that fetch from the internet stay out
+note	Formatação condicional (TAB-21)	Conditional formatting (TAB-21)
+note	Ordenar (TAB-15)	Sort (TAB-15)
+note	Preenchimento automático e sugestões da coluna (TAB-19)	Autofill and suggestions from the column (TAB-19)
+note	Cores alternadas (TAB-14)	Alternating colors (TAB-14)
+note	Título da tabela	Table title
+note	Tabela da direita para a esquerda	Right-to-left table
+note	Travar tabela	Lock table
+note	Onze tipos 2D e 3D (GRF-01); faltam rosca, radar, bolhas e interativo	Eleven 2D and 3D types (GRF-01); donut, radar, bubble and interactive are missing
+note	Editor de Dados (GRF-03, GRF-05); faltam compartilhar o eixo X e a amostragem	Data Editor (GRF-03, GRF-05); sharing the X axis and sampling are missing
+note	Eixos, rótulos e legenda (GRF-07, GRF-10, GRF-12)	Axes, labels and legend (GRF-07, GRF-10, GRF-12)
+note	Barras de erro e tendência (GRF-13, GRF-14); faltam linhas de referência	Error bars and trendline (GRF-13, GRF-14); reference lines are missing
+note	Cantos arredondados, chanfro e furo da rosca	Rounded corners, bevel and donut hole
+note	Cena 3D com luz (GRF-20)	3D scene with light (GRF-20)
+note	Estilos de gráfico	Chart styles
+note	Controle de alterações (REV-01 a REV-07, fase 8)	Change tracking (REV-01 to REV-07, phase 8)
+note	Comentários com respostas (REV-08, fase 8)	Comments with replies (REV-08, phase 8)
+note	Nome e cor do autor (fase 8)	Author name and color (phase 8)
+note	Ortografia e gramática ao digitar (TXT-10)	Spelling and grammar as you type (TXT-10)
+note	O Proofreader do 15 usa IA; vale o revisor próprio do '09 (TXT-11)	The Proofreader of the 15 uses AI; the app's own proofreader of the '09 holds (TXT-11)
+note	Barra de busca ao vivo do 15 com as opções avançadas e estilos do '09 (TXT-12)	Live search bar of the 15 with the advanced options and styles of the '09 (TXT-12)
+note	Resultados da busca na barra lateral (TXT-13)	Search results in the sidebar (TXT-13)
+note	Contagem sempre visível e estatísticas (DOC-20)	Word count always visible and statistics (DOC-20)
+note	Dicionário e pesquisa (parte online)	Dictionary and lookup (online part)
+note	Writing Tools (IA)	Writing Tools (AI)
+note	Colaboração pelo iCloud (online)	Collaboration through iCloud (online)
+note	iCloud, Handoff, AirDrop (online)	iCloud, Handoff, AirDrop (online)
+note	AppleScript não existe no GNOME; o equivalente (D-Bus) não está pedido	AppleScript does not exist in GNOME; the equivalent (D-Bus) is not requested
+note	O app Atalhos não existe no GNOME	The Shortcuts app does not exist in GNOME
+note	Siri (IA/online)	Siri (AI/online)
+note	Leitor de tela no texto e nas células (Orca); faltam rotor de comentários e alterações e descrições de mídia	Screen reader in text and cells (Orca); the rotor for comments and changes and media descriptions are missing
+note	Privacidade e análise (online)	Privacy and analytics (online)
+note	Assinatura	Subscription
+note	Menus do GNOME da interface B (NGNM-10); falta o menu Organizar (ordenar, filtrar, categorias), que vem com a fase 5	GNOME menus of interface B (NGNM-10); the Organize menu (sort, filter, categories) is missing and comes with phase 5
+note	Barra de cabeçalho da interface B (NINT-07)	Header bar of interface B (NINT-07)
+note	Barra de formatação das células (NINT-08)	Format bar for cells (NINT-08)
+note	A barra de fórmulas está na janela, mas as células ainda não têm conteúdo (NINT-10, fase 4)	The formula bar is in the window, but the cells have no content yet (NINT-10, phase 4)
+note	Inspetor com Formato, Dados e Documento (NINT-09)	Inspector with Format, Data and Document (NINT-09)
+note	Planilhas, tabelas e gráficos na barra lateral (NINT-03)	Sheets, tables and charts in the sidebar (NINT-03)
+note	Estilos de tabela com miniaturas (fase 5)	Table styles with thumbnails (phase 5)
+note	Cálculos na barra inferior (NGNM-13); falta escolher as funções e não há valores nas células ainda	Calculations in the bottom bar (NGNM-13); choosing the functions is missing and the cells have no values yet
+note	Organizar (ordenar, filtrar) numa barra lateral (fase 5)	Organize (sort, filter) in a sidebar (phase 5)
+note	O Navegador de Funções existe no Writer; falta abrir ao digitar "=" nas Tables	The Function Browser exists in Writer; opening it on typing "=" in Tables is missing
+note	O popover Mídia existe no Writer; falta na janela das Tables (NINT-14)	The Media popover exists in Writer; it is missing in the Tables window (NINT-14)
+note	Popovers de fontes e cores do Writer; falta ligar às Tables	Fonts and colors popovers of Writer; connecting them to Tables is missing
+note	Banner de avisos do Writer; falta nas Tables (NINT-15)	Warnings banner of Writer; missing in Tables (NINT-15)
+note	Zoom (NINT-04)	Zoom (NINT-04)
+note	F11 existe no Writer; falta conferir nas Tables (NINT-06)	F11 exists in Writer; checking it in Tables is missing (NINT-06)
+note	Abas	Tabs
+note	Estilo claro/escuro do sistema	Light/dark style of the system
+note	Preferências do Writer; falta a versão das Tables	Preferences of Writer; the Tables version is missing
+note	Desfazer e refazer (NDOC-08)	Undo and redo (NDOC-08)
+note	Seletor de modelos (fase 8)	Template chooser (phase 8)
+note	Modelo padrão (fase 8)	Default template (phase 8)
+note	As Tables ainda não salvam nem abrem arquivos (NDOC-07; ODS é da fase 1)	Tables does not save or open files yet (NDOC-07; ODS belongs to phase 1)
+note	Renomear pelo título existe no Writer	Rename from the title exists in Writer
+note	Versões (decisão caminho L)	Versions (decision path L)
+note	Salvar como modelo (fase 8)	Save as template (phase 8)
+note	Tabelas prontas e autoria de modelos (fase 8)	Ready-made tables and template authoring (phase 8)
+note	Arquivo ODS único (depende de salvar)	Single ODS file (depends on saving)
+note	Senha (fase 8)	Password (phase 8)
+note	Bloquear (fase 8)	Lock (phase 8)
+note	Informações para busca (NDOC-13, fase 1)	Information for search (NDOC-13, phase 1)
+note	Reduzir mídia existe no Writer	Reduce media exists in Writer
+note	Abrir ODS, Numbers '09, Excel, CSV (fases 1 e 7)	Open ODS, Numbers '09, Excel, CSV (phases 1 and 7)
+note	Exportar PDF, Excel, CSV (fase 7)	Export PDF, Excel, CSV (phase 7)
+note	Contatos do GNOME nas tabelas (NCON, fase 8)	GNOME Contacts in tables (NCON, phase 8)
+note	Imprimir e Visualização de Impressão (fase 7)	Print and Print Preview (phase 7)
+note	Enviar (online)	Send (online)
+note	Recentes do GTK no Writer	GTK recent files in Writer
+note	Várias planilhas existem, na barra lateral (decisão da interface B); o 15 as mostra em abas	Several sheets exist, in the sidebar (decision of interface B); the 15 shows them as tabs
+note	Renomear, duplicar, apagar e reordenar planilhas (NTAB-02 a NTAB-04)	Rename, duplicate, delete and reorder sheets (NTAB-02 to NTAB-04)
+note	Cor da aba	Tab color
+note	Ocultar planilha	Hide sheet
+note	Fundo da planilha	Sheet background
+note	Borda da planilha	Sheet border
+note	Planilha da direita para a esquerda	Right-to-left sheet
+note	Arrumar objetos por página na Visualização de Impressão (fase 7)	Arrange objects by page in Print Preview (phase 7)
+note	Cabeçalho e rodapé de página (NIMP-04)	Page header and footer (NIMP-04)
+note	Numeração de páginas	Page numbering
+note	Margens de impressão	Print margins
+note	Tamanho do papel (NIMP-03)	Paper size (NIMP-03)
+note	Várias tabelas soltas na planilha (NTAB-05)	Several free tables on the sheet (NTAB-05)
+note	Inserir tabela do modelo (NTAB-05); faltam fórmulas prontas e estilos à vista	Insert table from the template (NTAB-05); ready-made formulas and styles in view are missing
+note	Tabelas reutilizáveis (fase 5)	Reusable tables (phase 5)
+note	Criar tabela arrastando células	Create a table by dragging cells
+note	Até 5 cabeçalhos no motor (desk-table) e no Writer; falta nas Tables (NTAB-19)	Up to 5 headers in the engine (desk-table) and in Writer; missing in Tables (NTAB-19)
+note	Congelar cabeçalhos (NTAB-20)	Freeze headers (NTAB-20)
+note	Repetir cabeçalhos ao imprimir	Repeat headers when printing
+note	Alt+setas acrescentam linhas e colunas; apagar e vários de uma vez vêm na fase 3	Alt+arrows add rows and columns; deleting and several at once come in phase 3
+note	Mover linhas e colunas existe no motor; falta na tela das Tables	Moving rows and columns exists in the engine; missing on screen in Tables
+note	Transpor	Transpose
+note	Ocultar linhas e colunas (NTAB-23)	Hide rows and columns (NTAB-23)
+note	Redimensionar no motor e no Writer; falta nas Tables	Resize in the engine and in Writer; missing in Tables
+note	Mesclar no motor e no Writer	Merge in the engine and in Writer
+note	Dividir células no motor e no Writer	Split cells in the engine and in Writer
+note	Nome da tabela (NTAB-09)	Table name (NTAB-09)
+note	Bordas por segmento no motor; faltam os estilos de borda prontos do 15	Borders per segment in the engine; the ready-made border styles of the 15 are missing
+note	Cores alternadas no motor e no Writer	Alternating colors in the engine and in Writer
+note	Aumentar e diminuir a fonte da tabela toda	Increase and decrease the font of the whole table
+note	Estilos de tabela (fase 5)	Table styles (phase 5)
+note	Copiar e colar estilo existe no Writer	Copy and paste style exists in Writer
+note	Travar objetos existe no Writer	Locking objects exists in Writer
+note	Afastar objetos quando a tabela cresce (NTAB-15); conferido no Numbers 15.4: o 15 não tem a opção	Push objects away when the table grows (NTAB-15); checked in Numbers 15.4: the 15 does not have the option
+note	Copiar células como texto com tabulações no Writer; falta copiar a tabela entre apps	Copy cells as tab-separated text in Writer; copying the table between apps is missing
+note	Digitar e editar células existe no Writer; as Tables ainda não ligam as células ao motor	Typing and editing cells exists in Writer; Tables does not connect the cells to the engine yet
+note	Return vai para a próxima célula no Writer; conferido no Numbers 15.4: o 15 não tem a opção	Return goes to the next cell in Writer; checked in Numbers 15.4: the 15 does not have the option
+note	Sugestões da coluna no Writer	Suggestions from the column in Writer
+note	Magic Fill (IA, assinatura)	Magic Fill (AI, subscription)
+note	Preencher no motor e no Writer	Fill in the engine and in Writer
+note	Copiar e colar no Writer; faltam colar valores e mover fórmulas (NFOR-13)	Copy and paste in Writer; pasting values and moving formulas are missing (NFOR-13)
+note	Limpar no motor	Clear in the engine
+note	Destacar linha e coluna sob o ponteiro	Highlight the row and column under the pointer
+note	Imagem como fundo de célula no motor; faltam forma, gráfico e equação	Image as cell background in the engine; shape, chart and equation are missing
+note	Quebra de texto na célula no Writer	Text wrap in the cell in Writer
+note	Formatos no motor e no Writer	Formats in the engine and in Writer
+note	Sistema numérico no motor	Numeral system in the engine
+note	Formatos personalizados no motor; falta a janela de gerenciar	Custom formats in the engine; the window to manage them is missing
+note	Moedas no motor	Currencies in the engine
+note	Controles de célula (fase 5)	Cell controls (phase 5)
+note	Avaliação por estrelas	Star rating
+note	Formatação condicional do '09 no motor; faltam os tipos de regra do 15	Conditional formatting of the '09 in the engine; the rule types of the 15 are missing
+note	Cotações de ações (online)	Stock quotes (online)
+note	Comentários em células no Writer, sem respostas	Comments on cells in Writer, without replies
+note	Links em células	Links in cells
+note	Valor real da célula na barra inferior; hoje a barra de fórmulas faz esse papel	Actual value of the cell in the bottom bar; today the formula bar plays that role
+note	Ordenar no motor e no Writer	Sort in the engine and in Writer
+note	Ordenar por várias colunas no motor	Sort by several columns in the engine
+note	Filtros (fase 5)	Filters (phase 5)
+note	Filtro rápido	Quick filter
+note	Filtrar duplicados	Filter duplicates
+note	Categorias (fase 5)	Categories (phase 5)
+note	Tabelas dinâmicas	Pivot tables
+note	Instantâneo de tabela	Table snapshot
+note	Fórmulas no motor e no Writer; faltam o editor móvel e as fichas do 15	Formulas in the engine and in Writer; the movable editor and the tokens of the 15 are missing
+note	Navegador de Funções no Writer, como diálogo; o 15 o põe numa barra lateral	Function Browser in Writer, as a dialog; the 15 puts it in a sidebar
+note	Fórmulas rápidas no motor	Quick formulas in the engine
+note	94 funções no motor; o 15.4 tem 355 (conferido no Mac: as 262 do '09 e 93 novas); STOCK, STOCKH, CURRENCYCONV e CURRENCYH buscam na internet e ficam fora	94 functions in the engine; the 15.4 has 355 (checked on the Mac: the 262 of the '09 and 93 new ones); STOCK, STOCKH, CURRENCYCONV and CURRENCYH fetch from the internet and stay out
+note	Matrizes que derramam	Spilling arrays
+note	Referências a outras tabelas e por nome de cabeçalho no motor	References to other tables and by header name in the engine
+note	Erros no motor	Errors in the engine
+note	Aviso de célula vazia no motor; conferido no Numbers 15.4: o 15 não tem a opção	Empty-cell warning in the engine; checked in Numbers 15.4: the 15 does not have the option
+note	Ctrl+Shift+F mostra a Lista de Fórmulas, ainda sem fórmulas para listar	Ctrl+Shift+F shows the Formula List, still with no formulas to list
+note	Buscar dentro de fórmulas	Search inside formulas
+note	Imprimir a lista de fórmulas	Print the formula list
+note	Editor de fórmulas como calculadora	Formula editor as a calculator
+note	Ajuda das funções no navegador, sem internet	Function help in the browser, without the internet
+note	Onze tipos no motor e no Writer; faltam rosca, radar, bolhas, interativo e dinâmico	Eleven types in the engine and in Writer; donut, radar, bubble, interactive and pivot are missing
+note	Gráfico a partir das células da tabela (fase 6)	Chart from the cells of the table (phase 6)
+note	Dados ocultos (fase 6)	Hidden data (phase 6)
+note	Amostragem de muitos pontos	Sampling of many points
+note	Gráfico vinculado no Writer e no Slides	Linked chart in Writer and in Slides
+note	Título, legenda e eixos no motor e no Writer	Title, legend and axes in the engine and in Writer
+note	Rótulos de valor do '09; faltam as opções do 15	Value labels of the '09; the options of the 15 are missing
+note	Rótulos de resumo	Summary labels
+note	Erro e tendência no motor	Error bars and trendline in the engine
+note	Linhas de referência	Reference lines
+note	Cores e texturas por série no motor	Colors and textures per series in the engine
+note	Pizza no motor	Pie in the engine
+note	Cena 3D no motor	3D scene in the engine
+note	Cantos arredondados, furo da rosca	Rounded corners, donut hole
+note	Borda e fundo do gráfico no Writer	Chart border and background in Writer
+note	Caixas de texto e texto em formas do Writer; falta na janela das Tables	Text boxes and text in shapes of Writer; missing in the Tables window
+note	Formatação de texto do Writer	Text formatting of Writer
+note	Cor sólida do Writer; faltam gradiente e imagem	Solid color of Writer; gradient and image are missing
+note	Maiúsculas do '09 no Writer; faltam as do 15	Capitalization of the '09 in Writer; that of the 15 is missing
+note	Sobrescrito no Writer	Superscript in Writer
+note	Espaçamento e ligaduras no Writer	Spacing and ligatures in Writer
+note	Suavização de fontes é do sistema	Font smoothing belongs to the system
+note	Estilos de parágrafo, caractere e lista do Writer	Paragraph, character and list styles of Writer
+note	Parágrafo do Writer	Paragraph of Writer
+note	Listas do Writer	Lists of Writer
+note	Colunas em caixas do Writer	Columns in boxes of Writer
+note	Capitular, frações automáticas, realce	Drop cap, automatic fractions, highlight
+note	Aspas do '09 no Writer	Quotes of the '09 in Writer
+note	Substituição do Writer	Replacement of Writer
+note	Caracteres especiais do GTK	GTK special characters
+note	Campos de data e página no Writer; falta o nome do arquivo	Date and page fields in Writer; the file name is missing
+note	Bidi, vertical, fonético	Bidi, vertical, phonetic
+note	Idioma por planilha	Language per spreadsheet
+note	Ditado	Dictation
+note	Previsão ao digitar	Predictive text
+note	Tradução	Translation
+note	Links do Writer; faltam telefone e outra folha	Links of Writer; phone and another sheet are missing
+note	Imagens do Writer (sem SVG e HEIC)	Images of Writer (without SVG and HEIC)
+note	O do 15 usa IA; vale o Alfa Instantâneo do Writer	That of the 15 uses AI; the Instant Alpha of Writer holds
+note	Ajustar Imagem do Writer	Adjust Image of Writer
+note	IA para imagens	AI for images
+note	Formas e caneta do Writer; faltam biblioteca e combinar	Shapes and pen of Writer; library and combining are missing
+note	Editar pontos do Writer	Edit points of Writer
+note	Conexões do Writer	Connections of Writer
+note	Objetos 3D	3D objects
+note	Desenho à mão livre	Freehand drawing
+note	Som e filme do Writer; faltam gravar e aparar	Sound and movie of Writer; recording and trimming are missing
+note	Efeitos de objeto do Writer	Object effects of Writer
+note	Preenchimento do Writer	Fill of Writer
+note	Estilos de objeto do Writer	Object styles of Writer
+note	Objetos dentro de caixas	Objects inside boxes
+note	Alinhar e guias do Writer	Align and guides of Writer
+note	Camadas e grupos do Writer	Layers and groups of Writer
+note	Barra de busca do Writer; falta buscar em fórmulas	Search bar of Writer; searching in formulas is missing
+note	Comentários (fase 8)	Comments (phase 8)
+note	Nome e cor do autor	Author name and color
+note	Nenhuma das versões tem controle de alterações no Numbers	Neither version has change tracking in Numbers
+note	Ortografia do Writer	Spelling of Writer
+note	Dicionário e pesquisa (online)	Dictionary and lookup (online)
+note	Writing Tools	Writing Tools
+note	Colaboração	Collaboration
+note	iCloud	iCloud
+note	AppleScript	AppleScript
+note	Atalhos	Shortcuts
+note	Siri	Siri
+note	Leitor de tela do Writer nas células; falta nas Tables (NGNM-04)	Screen reader of Writer in the cells; missing in Tables (NGNM-04)
+note	Privacidade e análise	Privacy and analytics
+note	Menus do GNOME e busca de comandos da interface B (KGNM-10)	GNOME menus and command search of interface B (KGNM-10)
+note	Barra de cabeçalho com Reproduzir e inserir (KINT-12)	Header bar with Play and insert (KINT-12)
+note	Barra de formatação do slide e da seleção (KINT-13)	Format bar for the slide and the selection (KINT-13)
+note	Inspetor contextual com o nível Animação (KINT-14 no que cabe à fase 2)	Contextual Inspector with the Animation level (KINT-14 as far as phase 2 goes)
+note	Ordem das composições (fase 5)	Build order (phase 5)
+note	Popover Mídia do Writer, sem verificação nas Slides	Media popover of Writer, not checked in Slides
+note	Popovers de fontes e cores do Writer	Fonts and colors popovers of Writer
+note	Ajustar Imagem no Inspetor do Writer	Adjust Image in the Inspector of Writer
+note	Organizar no Inspetor do Writer	Arrange in the Inspector of Writer
+note	Banner de avisos do Writer	Warnings banner of Writer
+note	Barra inferior com "Slide 3 de 12" e Notas (KGNM-14)	Bottom bar with "Slide 3 of 12" and Notes (KGNM-14)
+note	Tela cheia e só o slide (KINT-10)	Full screen and slide only (KINT-10)
+note	Preferências do Writer; faltam Apresentação e Controle remoto	Preferences of Writer; Presentation and Remote control are missing
+note	Desfazer e refazer	Undo and redo
+note	Seletor de temas (fase 3)	Theme chooser (phase 3)
+note	Apresentação gerada por IA	Presentation generated by AI
+note	Slides gerados por IA	Slides generated by AI
+note	Tema padrão (fase 3)	Default theme (phase 3)
+note	Trocar o tema (fase 3)	Change the theme (phase 3)
+note	Salvar tema (fase 3)	Save theme (phase 3)
+note	As Slides ainda não salvam em ODP (fase 1); o alvo do 15 é salvamento automático	Slides does not save to ODP yet (phase 1); the target of the 15 is automatic saving
+note	Renomear pelo título existe na janela compartilhada	Rename from the title exists in the shared window
+note	Arquivo ODP único (fase 1)	Single ODP file (phase 1)
+note	Copiar mídia para o documento (depende de ODP)	Copy media into the document (depends on ODP)
+note	Metadados (KDOC-11, fase 1)	Metadata (KDOC-11, phase 1)
+note	Reduzir mídia do Writer	Reduce media of Writer
+note	Abrir ODP, Keynote '09 e PowerPoint (fases 1 e 8)	Open ODP, Keynote '09 and PowerPoint (phases 1 and 8)
+note	Idioma por apresentação	Language per presentation
+note	Recentes do GTK	GTK recent files
+note	Ícone do Dock é do macOS	The Dock icon belongs to macOS
+note	Navegador de slides (KINT-07, KSLD-04)	Slide navigator (KINT-07, KSLD-04)
+note	Estrutura de tópicos (KINT-08)	Outline (KINT-08)
+note	Só o slide (KINT-10)	Slide only (KINT-10)
+note	Mesa de luz (KINT-09); falta esconder os ignorados	Light table (KINT-09); hiding the skipped slides is missing
+note	Lista de objetos	Object list
+note	Área de trabalho em volta do slide	Work area around the slide
+note	Notas do apresentador (KSLD-15)	Presenter notes (KSLD-15)
+note	Notas por IA	Notes by AI
+note	Zoom (KINT-06)	Zoom (KINT-06)
+note	Réguas do Writer (unidades por localidade)	Rulers of Writer (units by locale)
+note	Guias do Writer; falta a cor própria	Guides of Writer; their own color is missing
+note	Ir para um slide (KINT-11)	Go to a slide (KINT-11)
+note	Adicionar, duplicar e apagar (KSLD-01, KSLD-05); falta arrastar entre apresentações	Add, duplicate and delete (KSLD-01, KSLD-05); dragging between presentations is missing
+note	Pular slide (KSLD-06); falta pular o grupo recolhido	Skip slide (KSLD-06); skipping the collapsed group is missing
+note	Número do slide (KSLD-08)	Slide number (KSLD-08)
+note	1024 × 768 (KAPR-04); faltam outros tamanhos e o tamanho próprio	1024 × 768 (KAPR-04); other sizes and the custom size are missing
+note	Fundo do slide (KSLD-12)	Slide background (KSLD-12)
+note	Fundos animados	Animated backgrounds
+note	Folhas-mestras (fase 3); a página Mestres na barra lateral ainda não funciona	Master slides (phase 3); the Masters page in the sidebar does not work yet
+note	Aplicar e reaplicar leiaute (fase 3)	Apply and reapply layout (phase 3)
+note	Título e corpo (fase 3)	Title and body (phase 3)
+note	Espaços reservados com etiquetas (fase 3)	Placeholders with tags (phase 3)
+note	Espaço reservado de objeto (fase 3)	Object placeholder (phase 3)
+note	Camadas entre slide e mestre (fase 3)	Layers between slide and master (phase 3)
+note	Padrões por mestre e por tema (fases 3 e 7)	Defaults per master and per theme (phases 3 and 7)
+note	Importar estilos de outro tema (fase 3)	Import styles from another theme (phase 3)
+note	Slide Clean Up (IA)	Slide Clean Up (AI)
+note	Seleção descontínua do Writer	Discontinuous selection of Writer
+note	Formatação do Writer	Formatting of Writer
+note	Encolher texto para caber (KTXT-03)	Shrink text to fit (KTXT-03)
+note	Contorno e sombra do Writer	Outline and shadow of Writer
+note	Maiúsculas do '09 no Writer	Capitalization of the '09 in Writer
+note	Sobrescrito do Writer	Superscript of Writer
+note	Espaçamento e ligaduras do Writer	Spacing and ligatures of Writer
+note	Aspas do Writer	Quotes of Writer
+note	Estilos de parágrafo do Writer; falta mostrá-los nas Slides	Paragraph styles of Writer; showing them in Slides is missing
+note	Estilos de caractere do Writer	Character styles of Writer
+note	Estilos de lista do Writer	List styles of Writer
+note	Atalhos de estilo do Writer	Style shortcuts of Writer
+note	Copiar e colar estilo do Writer	Copy and paste style of Writer
+note	Estilos de objeto do Writer; faltam tabela e gráfico	Object styles of Writer; table and chart are missing
+note	Caixa de texto padrão por apresentação	Default text box per presentation
+note	Tabulações e recuos do Writer	Tabs and indents of Writer
+note	Bordas e fundo de parágrafo do Writer	Paragraph borders and background of Writer
+note	Listas automáticas do Writer	Automatic lists of Writer
+note	Marcadores do Writer	Bullets of Writer
+note	Reordenar itens arrastando no texto	Reorder items by dragging in the text
+note	Colunas do Writer	Columns of Writer
+note	Image Playground	Image Playground
+note	Formas do Writer; faltam biblioteca e combinar	Shapes of Writer; library and combining are missing
+note	Conexões do Writer; faltam as em ângulo	Connections of Writer; the angled ones are missing
+note	Desenho à mão livre animável	Animatable freehand drawing
+note	Alinhar e distribuir do Writer	Align and distribute of Writer
+note	Camadas, grupos e travar do Writer	Layers, groups and lock of Writer
+note	Redimensionar e girar do Writer	Resize and rotate of Writer
+note	Filmes do Writer; falta tocar através dos slides	Movies of Writer; playing across slides is missing
+note	Áudio do Writer	Audio of Writer
+note	Trilha sonora (fase 6)	Soundtrack (phase 6)
+note	Narração (fase 6)	Narration (phase 6)
+note	Gravar áudio	Record audio
+note	Vídeo da web	Web video
+note	Vídeo ao vivo da câmera	Live video from the camera
+note	Otimizar mídia ao inserir	Optimize media on insert
+note	Inserir tabela do Writer; faltam estilos	Insert table of Writer; styles are missing
+note	Linhas e colunas do Writer	Rows and columns of Writer
+note	Mesclar e dividir do Writer	Merge and split of Writer
+note	Formatos do Writer	Formats of Writer
+note	Fórmulas do Writer; o 15 tem mais funções	Formulas of Writer; the 15 has more functions
+note	Condicional, ordenar e preencher do Writer	Conditional, sort and fill of Writer
+note	Título, travar e bidi de tabela	Table title, lock and bidi
+note	Onze tipos do Writer; faltam rosca, radar e bolhas	Eleven types of Writer; donut, radar and bubble are missing
+note	Gráfico interativo	Interactive chart
+note	Editor de dados do Writer	Data editor of Writer
+note	Eixos, erro e tendência do Writer; faltam linhas de referência	Axes, error bars and trendline of Writer; reference lines are missing
+note	Cena 3D do Writer	3D scene of Writer
+note	O nível Animação do Inspetor existe (fase 2); as animações são das fases 4 e 5	The Animation level of the Inspector exists (phase 2); the animations belong to phases 4 and 5
+note	Transições (fase 4); lista do 15.4 conferida no Mac: 43 efeitos, mais Anagram, Blur, Burn, Falling Tiles, Flash, Motion Dissolve e Shutter do '09	Transitions (phase 4); list of the 15.4 checked on the Mac: 43 effects, plus Anagram, Blur, Burn, Falling Tiles, Flash, Motion Dissolve and Shutter of the '09
+note	Movimento Mágico (fase 4)	Magic Move (phase 4)
+note	Composições (fase 5); lista do 15.4 conferida no Mac: 43 de entrada e 42 de saída para texto, mais Convergence e Typewriter do '09	Builds (phase 5); list of the 15.4 checked on the Mac: 43 build in and 42 build out for text, plus Convergence and Typewriter of the '09
+note	Ações (fase 5); no 15.4: Move, Opacity, Rotate, Scale e as ênfases Blink, Bounce, Flip, Jiggle, Pop, Pulse	Actions (phase 5); in the 15.4: Move, Opacity, Rotate, Scale and the emphases Blink, Bounce, Flip, Jiggle, Pop, Pulse
+note	Ordem e tempo das composições (fase 5)	Build order and timing (phase 5)
+note	Composições inteligentes (fase 5)	Smart builds (phase 5)
+note	Copiar e colar animação (fase 5); conferido no Keynote 15.4: Format > Copy/Paste Animation existe e funciona	Copy and paste animation (phase 5); checked in Keynote 15.4: Format > Copy/Paste Animation exists and works
+note	Animações para máquinas fracas (KVMI-02)	Animations for slow machines (KVMI-02)
+note	Tipo de apresentação (fase 6)	Presentation type (phase 6)
+note	Reproduzir ao abrir e repetir (fase 6)	Play on open and loop (phase 6)
+note	Senha para sair (fase 6)	Password to leave (phase 6)
+note	Apresentar em tela cheia (fase 4); o botão Reproduzir já existe	Present in full screen (phase 4); the Play button already exists
+note	Apresentar numa janela	Present in a window
+note	Tela do apresentador (fase 6)	Presenter display (phase 6)
+note	Vários monitores (fase 6)	Several displays (phase 6)
+note	Ensaiar (fase 6)	Rehearse (phase 6)
+note	Teclas durante a apresentação (fase 4)	Keys during the presentation (phase 4)
+note	Controle remoto pela rede local (fase 6); sem internet, então fica no escopo	Remote control over the local network (phase 6); no internet, so it stays in scope
+note	Vários apresentadores (online)	Several presenters (online)
+note	FaceTime (online)	FaceTime (online)
+note	Touch Bar é hardware Apple	The Touch Bar is Apple hardware
+note	Ponteiro durante a apresentação (fase 6)	Pointer during the presentation (phase 6)
+note	Realce de revisão	Review highlight
+note	Correção automática do Writer; faltam frações e estilo de aspas	Autocorrection of Writer; fractions and quote style are missing
+note	Barra de busca ao vivo do Writer	Live search bar of Writer
+note	Dicionário (parte online)	Dictionary (online part)
+note	Imprimir (fase 8)	Print (phase 8)
+note	PDF (fase 8)	PDF (phase 8)
+note	PowerPoint (fase 8)	PowerPoint (phase 8)
+note	Exportar filme (fase 8)	Export movie (phase 8)
+note	GIF animado	Animated GIF
+note	Imagens (fase 8)	Images (phase 8)
+note	HTML (fase 8)	HTML (phase 8)
+note	iPod não existe mais	The iPod no longer exists
+note	Salvar no formato da versão anterior	Save in the format of the previous version
+note	Enviar ao iDVD, iPhoto, YouTube (serviços extintos ou online)	Send to iDVD, iPhoto, YouTube (services discontinued or online)
+note	Enviar por e-mail	Send by email
+note	Publicar em blog	Publish to a blog
+note	iWork.com	iWork.com
+note	Automator e Atalhos são do macOS	Automator and Shortcuts belong to macOS
+note	Leitor de tela nas Slides (KGNM-04, fase 6)	Screen reader in Slides (KGNM-04, phase 6)
