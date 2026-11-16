@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Full definitions of the 43 `desk:` extensions to ODF (element,
+  value, fallback, matrix rows), and a check that keeps the catalogue and
+  the code in step; phase B1 starts.
 * Changed: The README and the website start with what Desk is and what each
   app does, shown with mockups of the chosen window (M+) in the language of
   the page; then the story and the reasons behind Desk, its architecture,

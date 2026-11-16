@@ -8,7 +8,7 @@ backlog	B-004	dropped
 backlog	B-005	done
 backlog	B-006	open
 backlog	B-007	done
-backlog	B-008	open
+backlog	B-008	done
 backlog	B-009	open
 backlog	B-010	open
 backlog	B-011	open
@@ -578,8 +578,8 @@ feature	W171	done
 feature	W172	missing
 feature	W173	partial
 feature	W174	missing
-phase	B1	not-started
-phase	R	in-progress
+phase	B1	in-progress
+phase	R	done
 phase	S1	not-started
 phase	S2	not-started
 phase	S3	not-started

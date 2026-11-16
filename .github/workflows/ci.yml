@@ -97,6 +97,8 @@ jobs:
         with:
           path: target/odf-schema
           key: odf-schema-${{ hashFiles('ci/validate-odf.sh') }}
+      - name: Check that every desk: extension is defined
+        run: python3 ci/check-extensions.py
       - name: Validate against the ODF 1.3 schemas
         run: ci/validate-odf.sh
 
