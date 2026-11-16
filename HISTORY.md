@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The parity matrices, the parity report and the corpus cases
+  are in English, and the matrices describe the chosen window (M+) and
+  automatic saving with versions.
 * Added: Tests for six more rows of Writer tables and charts (62 of 76
   tested); selection and keyboard navigation of cells, and copying cells
   as text, moved into the table engine shared by the three apps; the 14

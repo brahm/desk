@@ -189,15 +189,17 @@ mod tests {
         assert_eq!(rows.len() - count("IOP") - count("GNM") - count("VMI"), 260);
         assert!(rows.iter().all(|r| r.phase.is_none_or(|p| p <= 11)));
         let gnome = |id: &str| &rows.iter().find(|r| r.id == id).unwrap().gnome;
-        // The decisions of 2026-11-13: one Inspector, a header bar
-        // without customization, no browser of versions.
+        // The decisions of 2026-11-13 that still stand: one Inspector and a
+        // header bar without customization.
         assert!(gnome("INT-13").contains("One Inspector"));
-        assert!(gnome("INT-11").contains("without customization"));
-        assert!(gnome("DOC-11").contains("Recovery draft"));
-        // The interface chosen on 2026-11-14: the navigation sidebar,
-        // the two levels of the Inspector and the slim format bar.
+        assert!(gnome("INT-11").contains("No customization"));
+        // The decisions of 2026-11-16: automatic saving with versions, and
+        // window M+, with the objects in the header bar, the Format and
+        // Document choice in the Inspector and no format bar.
+        assert!(gnome("DOC-11").contains("Automatic saving and versions"));
+        assert!(gnome("INT-11").contains("six object buttons"));
         assert!(gnome("INT-13").contains("Format and Document"));
-        assert!(gnome("INT-12").contains("More menu"));
+        assert!(gnome("INT-12").contains("no format bar"));
         assert!(gnome("INT-18").contains("navigation sidebar"));
     }
 

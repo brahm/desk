@@ -332,6 +332,36 @@ matrix rows done on 9 November, before the change of target.
   S3 (B-018). The reason in each case is that the feature either does not
   exist yet or needs another app to read and write tables first.
 
+### 16 November: the matrices in English and for window M+
+
+- The three parity matrices, the text of the parity report, the titles and
+  descriptions of the corpus cases and the feature names of the manifest
+  of Pages documents were translated to English (part of B-009, decision
+  D-018). Ids, phases and page references did not change. The text inside
+  the case documents stays in Portuguese, because the Pages references
+  were made from it and changing it would mean making them again.
+- Why a fix to the CI went into PR #124: the name of the new extension
+  check, "Check that every desk: extension is defined", had a colon that
+  made GitHub read the whole workflow file as invalid, so no job ran on
+  the PR. The step was renamed.
+- The `gnome` column of the matrices described interface B and path L,
+  both replaced on 16 November. It now describes window M+ (D-008): the
+  six object buttons in the header bar beside Insert, documents in tabs,
+  no format bar (its controls are in the Format pane), the zoom and the
+  word count overlaid on the document, the sheets of Tables in a switcher
+  of the bottom bar, and automatic saving with versions in place of the
+  recovery draft. The rows about the old bottom bar (GNM-13, KGNM-14,
+  NGNM-13) were rewritten for what replaces it. `corpus/README.md` now
+  says the target is the current iWork and that these matrices come from
+  iWork '09 (part of B-006).
+- Consequence: rows whose `gnome` text changed are not met until the
+  window is rebuilt, later in B1; the UI tests still check interface B and
+  change with it.
+- What is left of B-006 and B-009 is `docs/interface` (its README, the
+  two inventories and the mockup scripts), which will be rewritten in
+  English for M+ in one go rather than translated first and rewritten
+  after. Both items stay open in B1.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
