@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 kind	id	state
-backlog	B-001	open
+backlog	B-001	done
 backlog	B-002	open
 backlog	B-003	open
 backlog	B-004	dropped
@@ -12,6 +12,13 @@ backlog	B-008	done
 backlog	B-009	open
 backlog	B-010	open
 backlog	B-011	open
+backlog	B-012	open
+backlog	B-013	open
+backlog	B-014	open
+backlog	B-015	open
+backlog	B-016	open
+backlog	B-017	open
+backlog	B-018	open
 feature	S001	review
 feature	S002	review
 feature	S003	review
