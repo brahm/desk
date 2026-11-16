@@ -8,6 +8,7 @@ and contribute to Desk, and for a coding agent working for that person.
 | [goals.md](goals.md) | What Desk is trying to be, and the rules of its target |
 | [decisions.md](decisions.md) | Every decision of the project, and the ones each replaced |
 | [architecture.md](architecture.md) | The crates, the document model, the life of a document, with diagrams |
+| [project-log.md](project-log.md) | The history of the project: what was done, and each decision with its reasons and consequences |
 | [roadmap.md](roadmap.md) | The phases, what each delivers and how a phase is run and closed |
 | [odf-extensions.md](odf-extensions.md) | How Desk stores what standard ODF cannot hold |
 | [interface](interface/README.md) | The window, its components, and the chosen proposal in [interface/proposals](interface/proposals/README.md) |
