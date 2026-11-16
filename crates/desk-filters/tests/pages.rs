@@ -952,9 +952,9 @@ fn obj_01_obj_02_obj_18_obj_19_pictures_and_movies_saved_by_pages_are_read() {
     assert_eq!(kinds, [(true, false), (false, true)]);
     let (_, objects) = fixture_objects("obj-19-movie-settings.pages");
     assert!(matches!(&objects[0].kind, ObjectKind::Media(m) if m.repeat == Repeat::BackAndForth));
-    // Its poster frame, at 5744 of the 600 units a second of the movie.
+    // Its poster frame, at 16049 of the 1000 units a second of the movie.
     assert!(
-        matches!(&objects[0].kind, ObjectKind::Media(m) if m.poster_time == 9573),
+        matches!(&objects[0].kind, ObjectKind::Media(m) if m.poster_time == 16049),
         "{:?}",
         objects[0].kind
     );
