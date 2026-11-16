@@ -8,14 +8,14 @@
 # "-" = does not apply.
 
 ## Window
-window | Document window | - | One window per document (AdwApplicationWindow), which opens at 1280 × 720 and has breakpoints for half a screen (720 px) and smaller windows (520 px) | Document window | Document window | changes | Ctrl+N, Ctrl+W
+window | Document window | - | The window of the app (AdwApplicationWindow), with its open documents in tabs (in interface B, one window per document); it opens at 1280 × 720 and has breakpoints for half a screen (720 px) and smaller windows (520 px) | Document window | Document window | changes | Ctrl+N, Ctrl+W
 head.bar | Header bar | - | Controls for the whole window: view and insert at the start, title in the middle, find, Inspector and main menu at the end. Not customizable | Customizable toolbar (51 items in Pages) | Toolbar | changes | F10 opens the menu
 head.title | Window title | - | Name of the document and, below it, the folder. A click renames. In interface B the subtitle also said Edited; with automatic saving (M+) it shows the folder alone | Title with the proxy icon and versions | Title with the rename and move menu | changes | -
 head.open | Open | Open | Opens the file chooser. Only in version A; in the others it is in the main menu and the template chooser | File ▸ Open | File ▸ Open | exists | Ctrl+O
 head.view-menu | View (menu button) | View | The View menu of iWork as a text button: panes, ruler, layout, invisibles, zoom | View button of the toolbar and View menu | View button | exists | -
 head.insert-menu | Insert (menu button) | Insert | The whole Insert menu, with the objects and the rest (breaks, fields, notes, link) | Insert menu and the Text Box, Shapes, Table, Charts and Comment buttons | Buttons and Insert menu | exists | -
 head.view | Sidebar and View | Sidebar / View | AdwSplitButton: the button shows or hides the sidebar; the arrow opens the View menu (sidebar page, ruler, format bar, layout, invisibles, outline, full screen, zoom) | View button (pop-up) and View menu | View button | changes | F9; items: Ctrl+R, Ctrl+Shift+R, Ctrl+Shift+L, Ctrl+Shift+I, F11
-head.sidebar | Sidebar | Sidebar | Shows or hides the sidebar (version C, and below 720 px, where it becomes an overlay) | View button | View button | changes | F9
+head.sidebar | Sidebar | Sidebar | Shows or hides the sidebar (in M+ and version C; below 720 px the sidebar becomes an overlay, closed) | View button | View button | changes | F9
 head.insert | Insert | Insert | Menu button with an icon and a label: breaks, fields, footnote, table of contents, bookmark, link, special characters, Choose. Below 720 px it also takes the objects | Insert menu | Insert menu | exists | Choose: Ctrl+Alt+P; special characters: Ctrl+.
 head.insert.table | Table | Table | Popover with the table styles; a click inserts | Table button (Tables ▾ in Numbers) | Table button with a gallery | exists | -
 head.insert.chart | Chart | Chart | Popover with the chart types in 2D, 3D and interactive | Charts button (2D and 3D grid) | Chart button with a gallery | exists | -
@@ -107,7 +107,7 @@ fmt.chart-type | Chart type | Chart Type | Menu button with the current type; po
 fmt.edit-data | Edit data | Edit Data | Shows the data references (Tables) or the data editor (Writer and Slides) | Edit Data button and Chart Data Editor | Edit data references | new | -
 
 ## Formula bar (Tables)
-formula.bar | Formula bar | Formula Bar | Row under the format bar with the active cell, the function button and the content | Formula bar | Formula editor beside the cell | exists | -
+formula.bar | Formula bar | Formula Bar | Row under the header bar and the tabs (under the format bar in interface B) with the active cell, the function button and the content | Formula bar | Formula editor beside the cell | exists | -
 formula.cell | Active cell | Active Cell | Shows the reference; the menu goes to a cell or to a table | Reference tabs | - | exists | Ctrl+L goes to the cell (proposed)
 formula.function | Function | Function | Menu of the quick functions, More functions and Formula editor | Function button and fx button | Insert formula | exists | = starts a formula
 formula.field | Cell content | Cell Content | Text field in a monospaced font; the references are colored while editing | Field of the formula bar | Formula editor | exists | F2 edits (proposed)
@@ -234,7 +234,7 @@ insp.audio.soundtrack | Soundtrack | Soundtrack | Playback, file, volume, Choose
 insp.audio.recording | Recording | Slideshow Recording | Recorded narration and Record | Document ▸ Audio inspector and Play ▸ Record | Document ▸ Audio | new | -
 
 ## Bottom bar and controls over the view
-bottom.bar | Bottom bar | Bottom Bar | Thin bar with the zoom at the start, the position in the middle and the count or the selection at the end | Bottom edge of the window | - | changes | -
+bottom.bar | Bottom bar | Bottom Bar | In M+, Tables only: the + button, the sheet switcher and the instant calculations. In interface B, all three apps: the zoom at the start, the position in the middle and the count or the selection at the end | Bottom edge of the window | - | changes | -
 bottom.zoom | Zoom | Zoom | Menu button: fit width, fit page, percentages, one or two pages | Zoom pop-up | Zoom button of the toolbar | exists | Ctrl++, Ctrl+-, Ctrl+0
 bottom.previous | Previous | Previous | Previous page or item, after Navigate by | ▲ arrow | - | exists | Page Up
 bottom.next | Next | Next | Next page or item | ▼ arrow | - | exists | Page Down
@@ -246,8 +246,8 @@ bottom.selection | Selection | Selection | Tables: how many cells are selected; 
 bottom.notes | Presenter notes | Presenter Notes | Slides: shows or hides the notes field | View ▸ Show Presenter Notes | View ▸ Show notes | new | -
 bottom.thumbnail-size | Thumbnail size | Thumbnail Size | Light table: slider | Size pop-up of the light table | Zoom control of the light table | new | -
 bottom.cell | Cell bar | Cell Bar | Version C: function, reference, content and calculations in a single bar, at the bottom | - | Formula editor and quick calculation bar | new | -
-osd.zoom | Zoom over the view | - | Version C: .osd pill with zoom out, percentage and zoom in; it can cover content | - | Zoom button | changes | Ctrl++, Ctrl+-
-osd.count | Count over the view | - | Version C: .osd pill with the word count | - | Word count over the page | changes | -
+osd.zoom | Zoom over the view | - | M+ and version C: .osd pill at the bottom end of the document with zoom out, percentage and zoom in; it can cover content | - | Zoom button | changes | Ctrl++, Ctrl+-
+osd.count | Count over the view | - | M+ and version C: .osd pill with the word count, at the bottom middle of the document (above the zoom in a narrow window) | - | Word count over the page | changes | -
 tabs.sheets | Sheet tabs | Sheet Tabs | Version C: AdwTabBar with one tab for each sheet | - | Sheet tabs | new | Ctrl+PageUp/PageDown
 tabs.add | Add sheet | Add Sheet | Version C: button at the end of the tabs | Sheet button | + button of the tabs | new | -
 bottom.sheets | Sheet switcher | - | Tables: a round AdwToggleGroup with one button for each sheet, at the start of the bottom bar | Sheets pane | Sheet tabs | new | Ctrl+PageUp/PageDown

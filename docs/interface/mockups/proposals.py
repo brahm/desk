@@ -16,9 +16,13 @@ M  Mix        the same model (contextual Format pane, tabs, no format bar),
               title, one Insert button, one Inspector button and the
               Format/Document choice inside the pane, a primary menu, and
               the sheets in a view switcher at the bottom.
+M+ Chosen     M with the six kinds of object back in the header bar as
+              icon buttons (D-008). Its secondary scenes (menus, popovers,
+              find, dialogs, a narrow window, the small screen notice) are
+              at the end of this file.
 
 Widgets that Libadwaita does not have are built here and tagged with an id
-that starts with `proprio.`: they are the ones to review when a new
+that starts with `own.`: they are the ones to review when a new
 Libadwaita comes out.
 """
 import gi
@@ -27,6 +31,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Adw, Gdk, Gtk  # noqa: E402
 
+import extras
+import kit
 import parts
 import shell
 import slides
@@ -34,6 +40,7 @@ import tables
 import writer
 from kit import (Scene, classes, expand, hbox, icon_button, label, menu_button, menu_model, spacer,
                  tag, toggle_group, vbox)
+from extras import popup
 
 CSS = """
 .tool-item { padding: 3px 6px; min-width: 52px; }
@@ -254,15 +261,21 @@ def slides_n(win, context='image', level=shell.FORMAT):
 # -------------------------------------------------------------- version M
 
 
-def header_m(app, extra_start=(), objects=False):
+def header_m(app, extra_start=(), objects=False, find=False, narrow=False):
     """The header bar of the mix: what the HIG asks of one. Icon buttons
     for the window as a whole, the title in the middle, the primary menu
-    at the end. Saving is automatic, so the subtitle is the folder alone."""
+    at the end. Saving is automatic, so the subtitle is the folder alone.
+    `find` shows the Find button pressed; `narrow` is the window below the
+    720 px breakpoint, where the object buttons go back into Insert and
+    Open documents leaves the header (the tabs are still there)."""
     hb = Adw.HeaderBar()
     hb.set_title_widget(tag(Adw.WindowTitle(title=parts.APPS[app]['doc'], subtitle='Documents'),
                             'head.title'))
-    hb.pack_start(icon_button('sidebar-show', 'Sidebar', 'head.sidebar', toggle=True, active=True))
-    if objects:
+    hb.pack_start(icon_button('sidebar-show', 'Sidebar', 'head.sidebar', toggle=True, active=not narrow))
+    if narrow:
+        hb.pack_start(menu_button(icon='desk-insert', tip='Insert menu', cid='head.insert', arrow=False,
+                                  menu=parts.insert_menu(app, objects=True)))
+    elif objects:
         # Variant M+: the six kinds of object stay one click away, as icon
         # buttons with a tooltip, and Insert keeps the rest (breaks, fields).
         hb.pack_start(parts.insert_menu_button(app))
@@ -276,18 +289,28 @@ def header_m(app, extra_start=(), objects=False):
     hb.pack_end(menu_button(icon='open-menu', tip='Main menu', cid='head.menu',
                             menu=parts.main_menu(app, lean=True)))
     hb.pack_end(icon_button('sidebar-show-right', 'Inspector', 'head.inspector', toggle=True, active=True))
-    hb.pack_end(icon_button('edit-find', 'Find', 'head.find', toggle=True))
-    hb.pack_end(icon_button('view-grid', 'Open documents', 'head.tabs'))
+    hb.pack_end(icon_button('edit-find', 'Find', 'head.find', toggle=True, active=find))
+    if not narrow:
+        hb.pack_end(icon_button('view-grid', 'Open documents', 'head.tabs'))
     return tag(hb, 'head.bar')
 
 
-def writer_m(win, context='text', level=shell.FORMAT, objects=False):
+def writer_m(win, context='text', level=shell.FORMAT, objects=False, find=False, low_res=False,
+             banner=False, narrow=False):
+    """Desk Writer in M (`objects=False`) or M+. The other flags draw the
+    secondary scenes of M+: the find bar, the small screen notice and the
+    banner of import warnings under the bars at the top, and the window
+    below the 720 px breakpoint, where the sidebar is an overlay, closed."""
     _css()
     app = 'writer'
     side = shell.nav_sidebar(app, parts.thumbs_list('page', 5, 2), writer.SIDE_MODES, 'Add page',
                              writer.ADD_PAGE)
-    words = pill('26,171 words', 'osd.count', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
-                 margin_bottom=12)
+    if narrow:  # no room for both side by side: the count goes above the zoom
+        words = pill('26,171 words', 'osd.count', halign=Gtk.Align.END, valign=Gtk.Align.END,
+                     margin_bottom=60, margin_end=14)
+    else:
+        words = pill('26,171 words', 'osd.count', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
+                     margin_bottom=12)
     doc = writer.doc_view(context, rulers=False, overlays=(zoom_pill('125%'), words))
     if context == 'text':
         insp, width = writer.inspector_b(context, level), shell.INSPECTOR_W
@@ -295,8 +318,17 @@ def writer_m(win, context='text', level=shell.FORMAT, objects=False):
         insp, width = wide(lambda: writer.inspector_b(context, level))
     body = shell.split(insp, doc, width, Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
-    content = shell.toolbar_view(view, top=[header_m(app, objects=objects), tabs])
-    win.set_content(shell.split(side, content, shell.SIDEBAR_W))
+    tops = [header_m(app, objects=objects, find=find, narrow=narrow), tabs]
+    if find:
+        tops.append(writer.find_bar())
+    if low_res:
+        tops.append(tag(Adw.Banner(title='Screen smaller than 1280 × 720 ‒ parts of the window may not fit',
+                                   button_label='Close', revealed=True), 'notice.resolution'))
+    if banner:
+        tops.append(tag(Adw.Banner(title='This document was opened with 3 warnings',
+                                   button_label='Show warnings', revealed=True), 'notice.banner'))
+    content = shell.toolbar_view(view, top=tops)
+    win.set_content(shell.split(side, content, shell.SIDEBAR_W, collapsed=narrow, show=not narrow))
 
 
 def tables_m(win, level=shell.FORMAT, objects=False):
@@ -333,6 +365,39 @@ def slides_m(win, context='image', level=shell.FORMAT, objects=False):
     win.set_content(shell.split(side, content, shell.SIDEBAR_W))
 
 
+# ------------------------------------------------- secondary scenes of M+
+
+
+def row_popover(group_cid, title, build):
+    """Open, from the row `title` of the Inspector group `group_cid`, the
+    popover that `build` makes. In M+ there is no format bar, so Fonts and
+    Colors open from the rows of the Format pane (README, "The Inspector").
+    The popover is given to the row here, after the scene is built, so the
+    Format pane of the main scenes stays as it is."""
+    def after(win):
+        widget = kit.find(group_cid)
+        stack = [widget]
+        while stack:
+            w = stack.pop()
+            if isinstance(w, Adw.PreferencesRow) and w.get_title() == title:
+                pop = build()
+                pop.set_parent(w)
+                pop.set_position(Gtk.PositionType.LEFT)
+                pop.popup()
+                return
+            child = w.get_first_child()
+            while child is not None:
+                stack.append(child)
+                child = child.get_next_sibling()
+        raise KeyError(f'{group_cid}: {title}')
+    return after
+
+
+def wp(**kw):
+    """Desk Writer in M+, with the options of writer_m."""
+    return lambda w: writer_m(w, objects=True, **kw)
+
+
 SCENES = [
     Scene('writer-n', 'Desk Writer · N current iWork', lambda w: writer_n(w), 'writer', 'N'),
     Scene('writer-n-image', 'Writer N · image selected', lambda w: writer_n(w, context='image'),
@@ -365,4 +430,29 @@ SCENES = [
           lambda w: slides_m(w, level=shell.ANIMATION, objects=True), 'slides', 'M+'),
     Scene('slides-m-animate', 'Slides M · Animation', lambda w: slides_m(w, level=shell.ANIMATION), 'slides',
           'M'),
+    # The secondary scenes of M+ (backlog item B-003): what opens from the
+    # window, so that components.tsv lists it for M+. The close dialog has
+    # no M+ scene: saving is automatic (D-001), so closing asks nothing.
+    Scene('writer-m-plus-insert', 'Writer M+ · Insert menu', wp(), 'writer', 'M+',
+          after=popup('head.insert')),
+    Scene('writer-m-plus-shapes', 'Writer M+ · Shape popover', wp(), 'writer', 'M+',
+          after=popup('head.insert.shape')),
+    Scene('writer-m-plus-menu', 'Writer M+ · main menu', wp(), 'writer', 'M+', after=popup('head.menu')),
+    Scene('writer-m-plus-fonts', 'Writer M+ · Fonts popover', wp(), 'writer', 'M+',
+          after=row_popover('insp.text.font', 'Family', parts.fonts_popover)),
+    Scene('writer-m-plus-colors', 'Writer M+ · Colors popover', wp(), 'writer', 'M+',
+          after=row_popover('insp.text.font', 'Text color', parts.colors_popover)),
+    Scene('writer-m-plus-find', 'Writer M+ · find and notices', wp(find=True, banner=True), 'writer', 'M+'),
+    Scene('common-m-plus-templates', 'M+ · template chooser in the window', extras.template_chooser, 'common',
+          'M+'),
+    Scene('common-m-plus-preferences', 'M+ · Preferences', wp(), 'common', 'M+',
+          after=extras.preferences_dialog),
+    Scene('common-m-plus-shortcuts', 'M+ · Keyboard Shortcuts', wp(), 'common', 'M+',
+          after=extras.shortcuts_dialog),
+    Scene('common-m-plus-commands', 'M+ · Search commands', wp(), 'common', 'M+',
+          after=extras.command_dialog),
+    Scene('common-m-plus-half', 'M+ · half screen (640 × 720)', wp(narrow=True), 'common', 'M+',
+          size=(640, 720)),
+    Scene('common-m-plus-notice', 'M+ · screen smaller than the minimum (1024 × 600)', wp(low_res=True),
+          'common', 'M+', size=(1024, 600)),
 ]

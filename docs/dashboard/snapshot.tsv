@@ -3,14 +3,14 @@
 kind	id	state
 backlog	B-001	done
 backlog	B-002	open
-backlog	B-003	open
+backlog	B-003	done
 backlog	B-004	dropped
 backlog	B-005	done
 backlog	B-006	done
 backlog	B-007	done
 backlog	B-008	done
 backlog	B-009	done
-backlog	B-010	open
+backlog	B-010	done
 backlog	B-011	open
 backlog	B-012	open
 backlog	B-013	open

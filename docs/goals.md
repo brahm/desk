@@ -30,6 +30,16 @@ Numbers and Keynote 15.4, the versions checked on a Mac on 2026-11-16.
 6. **A new release of iWork** is a review of the inventory, not a change
    of target in the middle of a phase (D-006).
 
+## Who Desk is for
+
+Desk is made for users of the GNOME desktop, used to its workflow and its
+keyboard shortcuts. It aims to be familiar to those who come from iWork,
+but where that familiarity and compatibility with GNOME pull apart, GNOME
+wins. Parity with the current iWork is the target of the 1.0 versions of
+the three apps; after them, Desk grows with features of its own and an
+ever closer integration with the GNOME desktop and its applications
+(D-022).
+
 ## Interface
 
 The window follows the look of the current iWork with native Libadwaita
