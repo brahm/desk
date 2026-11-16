@@ -305,6 +305,33 @@ matrix rows done on 9 November, before the change of target.
   catalogue and fails on either side's leftovers; it runs in
   `ci/check-all.sh` and in the CI.
 
+### 16 November: the rows left from Writer phase 7
+
+- Backlog item B-001 listed the 20 rows of Writer phase 7 (tables and
+  charts) that had no tests. Each was read against the code. Six were
+  implemented and only lacked tests: the look of the parts of a table
+  (TAB-04), selecting cells across merged cells (TAB-07), moving among
+  cells with the arrows, Tab and Return (TAB-08), the text style of a chart
+  (GRF-08), formulas that name headers (IOP-15) and cells copied and
+  pasted as text (IOP-19). They now have tests, and Writer phase 7 has 62
+  of its 76 rows tested.
+- Why some code moved: selection and navigation lived inside the GTK
+  editor of Writer, where no test can reach them, and Desk Tables and
+  Desk Slides will need the same rules. They are now pure functions of
+  `desk-table` (`Table::selection_area`, `Table::step`, `Table::area_text`,
+  `Table::paste_text`), which the Writer editor calls. The comments of the
+  editor that cited the wrong matrix rows (the ids of an older numbering)
+  were corrected.
+- The other 14 rows need features that belong to later phases, and moved
+  there with the owner told: pushing objects aside, dragging cells,
+  managing custom formats and Copy/Paste Table Style to W1 (B-012); text
+  of one chart element to W4 (B-013); live links and copying among the
+  apps to X1 (B-014); cell controls and formulas that cite another table
+  to T2 (B-015); filters and categories to T3 (B-016); a Writer chart in
+  Tables to T4 (B-017); the animation of tables and charts from Tables to
+  S3 (B-018). The reason in each case is that the feature either does not
+  exist yet or needs another app to read and write tables first.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

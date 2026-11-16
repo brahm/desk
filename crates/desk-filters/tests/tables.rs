@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Tables and charts saved as ODT and read back (TAB-01, GRF-01,
-//! IOP-01).
+//! IOP-01, IOP-15).
 
 use std::sync::Arc;
 
@@ -158,4 +158,51 @@ fn iop_01_other_programs_read_the_cells_and_the_chart() {
     assert_eq!(chart.title.as_deref(), Some("Vendas por região"));
     assert_eq!(chart.series_count(), 2);
     assert_eq!(chart.value(1, 3), Some(58.0));
+}
+
+/// The table of [`document`] with a footer that sums its columns by the
+/// names of their headers.
+fn by_header_names() -> Document {
+    let document = document();
+    let mut object = document
+        .objects()
+        .iter()
+        .find(|o| matches!(o.kind, ObjectKind::Table(_)))
+        .cloned()
+        .expect("a table");
+    let mut table = table_of(&document);
+    // The headers of their own, not merged as in the other tests.
+    table.unmerge(0, 1);
+    let pt = desk_table::Locale::pt_br();
+    table.type_text(0, 1, "Jan", &pt);
+    table.type_text(0, 2, "Fev", &pt);
+    table.set_footer_rows(1).unwrap();
+    table.set_content(3, 1, Content::Formula("=SUM(Jan)".into()));
+    table.set_content(3, 2, Content::Formula("=SUM('fev')".into()));
+    object.kind = ObjectKind::Table(Arc::new(table));
+    let mut editor = Editor::new(document);
+    editor
+        .edit("Formulas", |edit| edit.replace_object(object))
+        .unwrap();
+    editor.document().clone()
+}
+
+#[test]
+fn iop_15_formulas_that_name_headers_keep_the_names_and_compute() {
+    let before = by_header_names();
+    let after = read_odt(&write_odt(&before).unwrap()).unwrap();
+    let table = table_of(&after);
+    // The names are kept as they were typed, not turned into ranges,
+    // and are found whatever their case.
+    assert_eq!(
+        table.cell(3, 1).content,
+        Content::Formula("=SUM(Jan)".into())
+    );
+    assert_eq!(
+        table.cell(3, 2).content,
+        Content::Formula("=SUM('fev')".into())
+    );
+    let values = table.values(0.0);
+    assert_eq!(values.get(3, 1), &desk_table::Value::Number(17.0));
+    assert_eq!(values.get(3, 2), &desk_table::Value::Number(21.5));
 }
