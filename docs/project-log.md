@@ -466,6 +466,19 @@ matrix rows done on 9 November, before the change of target.
   choosing the picture of the image bullet and replacing the speaker icon
   are still done by hand after it.
 
+### 16 November: the shortcuts of the document tabs (D-021)
+
+- The open question of the README was answered by the owner: follow GNOME
+  in every shortcut for an action like Desk's, whenever it does not
+  conflict (D-021, which confirms D-017).
+- *Consequence:* Writer and Slides switch documents with Ctrl+PageUp and
+  Ctrl+PageDown, as GNOME does. In Tables that would conflict with the
+  sheets, which keep Ctrl+PageUp and Ctrl+PageDown, so the documents there
+  use Ctrl+Tab and Ctrl+Shift+Tab, which `AdwTabView` also accepts. Alt+1 to
+  Alt+9 go to a tab in the three apps. Ctrl+Home and Ctrl+End, which the
+  tab view would take for the first and last tab, are turned off there,
+  because they move to the start and end of the text and of the table.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

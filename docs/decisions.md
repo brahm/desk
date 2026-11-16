@@ -23,10 +23,11 @@ the project takes the decisions; the date is the day he took them.
 | D-014 | 2026-11-16 | Documentation for outside contributors and their agents, diagrams of the design, and source files commented to be understood on their own. | Current |
 | D-015 | 2026-11-16 | A register of what each set of tasks left undone, with the reason, and a backlog worked at the end of each phase. | Current |
 | D-016 | 2026-11-16 | Help uses the native GNOME shortcut. | Current |
-| D-017 | 2026-11-16 | Shortcuts: GNOME's own first, then the shortcut of iWork 15.4. | Current (assumed, not contested) |
+| D-017 | 2026-11-16 | Shortcuts: GNOME's own first, then the shortcut of iWork 15.4. | Current (confirmed by the owner in D-021) |
 | D-018 | 2026-11-16 | Everything in the repository is in English: documentation, code comments, matrices, inventories and mockups. The Brazilian Portuguese translation of the apps and of the site stays, as a translation. Older material still in Portuguese is listed in backlog item B-009. | Current |
 | D-019 | 2026-11-16 | Export is limited to LibreOffice and OpenOffice (ODF), Microsoft Office, PDF and EPUB. The other exports of iWork (RTF, plain text, CSV and TSV, images, movie, animated GIF, HTML, the older Office formats) are out of scope and stay marked in the matrices. | Current |
 | D-020 | 2026-11-16 | Checking has two references. Validations, interface tests and the documents made to compare parity are made on the Mac with the current iWork (15.4). Features that only iWork '09 has are tested, and their parity documents made and checked, on the Lion virtual machine that shows the screen, built for this purpose. | Current |
+| D-021 | 2026-11-16 | The owner confirmed D-017: Desk follows GNOME's shortcut wherever the action is like Desk's and it does not conflict. Document tabs: Ctrl+PageUp and Ctrl+PageDown in Writer and Slides, Alt+1 to Alt+9 in the three apps. In Tables, Ctrl+PageUp and Ctrl+PageDown keep switching sheets and the tabs use Ctrl+Tab and Ctrl+Shift+Tab. Ctrl+Home and Ctrl+End stay with the text and the cells, not the tabs. | Current |
 
 ## Replaced
 

@@ -256,10 +256,22 @@ the Mac on 2026-11-16. Where the two agree, the table gives one column.
 The shortcuts that were proposals were confirmed on 2026-11-14, and the
 ten names and shortcuts of the table below again on 2026-11-15. The
 format bar had Ctrl+Shift+R in interface B; M+ has no format bar, and the
-shortcut goes away with it. The document tabs of M+ need a shortcut to
-switch between them: GNOME uses Ctrl+PageUp and Ctrl+PageDown, which Tables
-uses for the sheets, so that is a decision for the owner of the project in
-phase B1.
+shortcut goes away with it.
+
+The document tabs follow D-021. `AdwTabView` brings the shortcuts of GNOME
+for tabs, and Desk keeps those that conflict with nothing:
+
+| Command | Writer and Slides | Tables |
+| --- | --- | --- |
+| Next and previous document | Ctrl+PageDown and Ctrl+PageUp, or Ctrl+Tab and Ctrl+Shift+Tab | Ctrl+Tab and Ctrl+Shift+Tab |
+| Document 1 to 9 | Alt+1 to Alt+9 | Alt+1 to Alt+9 |
+| Move the tab left or right | Ctrl+Shift+PageUp and Ctrl+Shift+PageDown | Dragging the tab |
+| Next and previous sheet | Does not apply | Ctrl+PageDown and Ctrl+PageUp, as in the spreadsheets of LibreOffice and Microsoft Office |
+
+Ctrl+Home and Ctrl+End, which `AdwTabView` would give to the first and last
+tab, stay with the text and the cells (the start and the end of the
+document or of the table), so they are turned off in the tab view of the
+three apps.
 
 ## HIG practices that the window follows
 
