@@ -1,6 +1,6 @@
-title = "Recuos"
+title = "Indents"
 rows = ["FMT-18"]
-description = "Recuo da primeira linha, recuos à esquerda e à direita, e um recuo deslocado."
+description = "First line indent, left and right indents, and a hanging indent."
 
 [defaults]
 font = "Liberation Serif"

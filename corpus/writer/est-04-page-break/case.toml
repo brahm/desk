@@ -1,6 +1,6 @@
-title = "Quebra de página"
+title = "Page break"
 rows = ["EST-04"]
-description = "Um parágrafo que começa em nova página, logo depois de outro curto. O seguinte, já no topo de uma página, não cria outra."
+description = "A paragraph that starts on a new page, right after a short one. The next, already at the top of a page, does not create another."
 
 [defaults]
 font = "Liberation Serif"

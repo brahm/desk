@@ -1,6 +1,6 @@
-title = "Espaço antes e depois do parágrafo"
+title = "Space before and after the paragraph"
 rows = ["FMT-15"]
-description = "Entre dois parágrafos vale o maior dos dois espaços. O espaço antes do primeiro parágrafo da página é ignorado."
+description = "Between two paragraphs the larger of the two spaces counts. The space before the first paragraph of the page is ignored."
 
 [defaults]
 font = "Liberation Serif"

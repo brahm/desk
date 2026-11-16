@@ -1,6 +1,6 @@
-title = "Alinhamento horizontal"
+title = "Horizontal alignment"
 rows = ["FMT-12"]
-description = "O mesmo texto alinhado à esquerda, ao centro, à direita e justificado. A última linha do justificado fica à esquerda."
+description = "The same text aligned left, centered, right and justified. The last line of the justified one stays on the left."
 
 [defaults]
 font = "Liberation Serif"

@@ -1,6 +1,6 @@
-title = "Tamanho, linha de base e maiúsculas"
+title = "Size, baseline and capitals"
 rows = ["FMT-05", "FMT-06", "FMT-07"]
-description = "Tamanhos de 9 a 24 pt, sobrescrito e subscrito, e as três formas de maiúsculas."
+description = "Sizes from 9 to 24 pt, superscript and subscript, and the three forms of capitals."
 
 [defaults]
 font = "Liberation Serif"

@@ -63,9 +63,9 @@ impl Outcome {
     /// The outcome in a few words, in Portuguese as the report.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::NoReference { .. } => "sem referência",
-            Self::Pass { .. } => "igual ao Pages",
-            Self::Fail { .. } => "diferente do Pages",
+            Self::NoReference { .. } => "no reference",
+            Self::Pass { .. } => "same as Pages",
+            Self::Fail { .. } => "differs from Pages",
             Self::Error { .. } => "erro",
         }
     }
@@ -133,7 +133,7 @@ pub fn run_case(case: &Case, out: &Path) -> CaseResult {
                 warnings = log.entries().iter().map(ToString::to_string).collect();
                 run(case, &document, &out, &pdf)
             }
-            Err(error) => Err(format!("o documento do Pages não abriu: {error}")),
+            Err(error) => Err(format!("the Pages document did not open: {error}")),
         }
         .unwrap_or_else(|message| Outcome::Error { message });
         PagesResult {
@@ -172,20 +172,20 @@ fn run(case: &Case, document: &Document, out: &Path, pdf: &Path) -> Result<Outco
     let pixels = compare_pixels(&reference, pdf, out);
     let reason = if layout.reference_pages != layout.desk_pages {
         Some(format!(
-            "Desk fez {} páginas e o Pages, {}",
+            "Desk made {} pages and Pages {}",
             layout.desk_pages, layout.reference_pages
         ))
     } else if let Some(m) = &layout.first_mismatch {
         Some(format!(
-            "na página {}, a palavra {} é {:?} no Pages e {:?} no Desk",
+            "on page {}, word {} is {:?} in Pages and {:?} in Desk",
             m.page,
             m.index + 1,
-            m.reference.as_deref().unwrap_or("(nenhuma)"),
-            m.desk.as_deref().unwrap_or("(nenhuma)")
+            m.reference.as_deref().unwrap_or("(none)"),
+            m.desk.as_deref().unwrap_or("(none)")
         ))
     } else if layout.max_offset > tolerance {
         Some(format!(
-            "uma palavra está a {:.2} pt de onde o Pages a pôs, e o limite é {tolerance} pt",
+            "a word is {:.2} pt from where Pages put it, and the limit is {tolerance} pt",
             layout.max_offset
         ))
     } else {
@@ -196,7 +196,7 @@ fn run(case: &Case, document: &Document, out: &Path, pdf: &Path) -> Result<Outco
         Err(error) if reason.is_some() => {
             return Ok(Outcome::Fail {
                 reason: format!(
-                    "{}; e os pixels não foram comparados: {error}",
+                    "{}; and the pixels were not compared: {error}",
                     reason.unwrap()
                 ),
                 layout,
@@ -209,7 +209,7 @@ fn run(case: &Case, document: &Document, out: &Path, pdf: &Path) -> Result<Outco
         let limit = case.spec.pixel_tolerance?;
         (pixels.worst() > limit).then(|| {
             format!(
-                "{:.2}% dos pixels de uma página diferem, e o limite é {limit}%",
+                "{:.2}% of the pixels of a page differ, and the limit is {limit}%",
                 pixels.worst()
             )
         })
@@ -250,13 +250,13 @@ pub enum Status {
 impl Status {
     fn label(self) -> &'static str {
         match self {
-            Self::Matches => "igual ao Pages",
-            Self::Differs => "diferente do Pages",
-            Self::Compared => "comparado com o PDF do Pages",
-            Self::AwaitsReference => "sem referência",
-            Self::Reviewed => "conferido na VM do Lion",
-            Self::Tested => "só testes",
-            Self::Pending => "pendente",
+            Self::Matches => "same as Pages",
+            Self::Differs => "differs from Pages",
+            Self::Compared => "compared with the Pages PDF",
+            Self::AwaitsReference => "no reference",
+            Self::Reviewed => "reviewed on the Lion VM",
+            Self::Tested => "tests only",
+            Self::Pending => "pending",
         }
     }
 
@@ -407,13 +407,13 @@ impl Report {
     pub fn to_markdown(&self, base: &Path) -> String {
         let mut md = String::new();
         let relative = |p: &Path| p.strip_prefix(base).unwrap_or(p).display().to_string();
-        md.push_str("# Paridade do Desk Writer com o Pages '09\n\n");
+        md.push_str("# Parity of Desk Writer with Pages '09\n\n");
 
-        md.push_str("## Por fase\n\n| Fase |");
+        md.push_str("## By phase\n\n| Phase |");
         for status in Status::ALL {
             let _ = write!(md, " {} |", status.label());
         }
-        md.push_str(" Linhas |\n|---|");
+        md.push_str(" Rows |\n|---|");
         md.push_str(&"---:|".repeat(Status::ALL.len() + 1));
         md.push('\n');
         // Out of scope last.
@@ -427,7 +427,7 @@ impl Report {
         let all: Vec<&RowReport> = self.rows.iter().collect();
         for (&phase, rows) in &phases {
             let name = if phase == u16::MAX {
-                "fora do escopo".to_owned()
+                "out of scope".to_owned()
             } else {
                 phase.to_string()
             };
@@ -443,14 +443,14 @@ impl Report {
         }
         let _ = writeln!(md, " **{}** |\n", all.len());
 
-        md.push_str("## Casos\n\n");
+        md.push_str("## Cases\n\n");
         if self.cases.is_empty() {
-            md.push_str("Nenhum caso no corpus.\n\n");
+            md.push_str("No case in the corpus.\n\n");
         }
         for case in &self.cases {
             let _ = writeln!(
                 md,
-                "- **{}** ({}): {}. Linhas: {}. PDF do Desk: `{}`.",
+                "- **{}** ({}): {}. Rows: {}. Desk PDF: `{}`.",
                 case.name,
                 case.title,
                 case.outcome.label(),
@@ -461,29 +461,25 @@ impl Report {
             if let Some(pages) = &case.from_pages {
                 let _ = writeln!(
                     md,
-                    "  Do documento do Pages: {}. PDF do Desk: `{}`.",
+                    "  From the Pages document: {}. Desk PDF: `{}`.",
                     pages.outcome.label(),
                     relative(&pages.pdf)
                 );
                 details(&mut md, &pages.outcome, &relative);
                 if !pages.warnings.is_empty() {
-                    let _ = writeln!(
-                        md,
-                        "  Deixado de fora na importação: {}.",
-                        pages.warnings.join("; ")
-                    );
+                    let _ = writeln!(md, "  Left out on import: {}.", pages.warnings.join("; "));
                 }
             }
         }
         if !self.unknown_rows.is_empty() {
             let _ = writeln!(
                 md,
-                "\nLinhas que os casos citam e a matriz não tem: {}.",
+                "\nRows that the cases name and the matrix lacks: {}.",
                 self.unknown_rows.join(", ")
             );
         }
 
-        md.push_str("\n## Linhas\n\n| ID | Fase | Funcionalidade | Situação | Casos | Testes | Comparados com o Pages |\n|---|---:|---|---|---|---:|---:|\n");
+        md.push_str("\n## Linhas\n\n| ID | Phase | Feature | Status | Cases | Tests | Compared with Pages |\n|---|---:|---|---|---|---:|---:|\n");
         for row in &self.rows {
             let _ = writeln!(
                 md,
@@ -503,7 +499,7 @@ impl Report {
             .filter(|r| !r.differing.is_empty())
             .collect();
         if !differing.is_empty() {
-            md.push_str("\n## Documentos do Pages que ainda diferem\n\n");
+            md.push_str("\n## Pages documents that still differ\n\n");
             for row in differing {
                 let _ = writeln!(md, "- {}: {}", row.row.id, row.differing.join(", "));
             }
@@ -516,26 +512,26 @@ impl Report {
 fn details(md: &mut String, outcome: &Outcome, relative: &dyn Fn(&Path) -> String) {
     match outcome {
         Outcome::NoReference { pages } => {
-            let _ = writeln!(md, "  O Desk fez {pages} página(s).");
+            let _ = writeln!(md, "  Desk made {pages} page(s).");
         }
         Outcome::Pass { layout, pixels } => {
             let _ = writeln!(
                 md,
-                "  {} página(s); a maior distância de uma palavra é {:.2} pt; até {:.2}% dos pixels diferem.",
+                "  {} page(s); the largest distance of a word is {:.2} pt; up to {:.2}% of the pixels differ.",
                 layout.desk_pages,
                 layout.max_offset,
                 pixels.worst()
             );
         }
         Outcome::Fail { reason, pixels, .. } => {
-            let _ = writeln!(md, "  Motivo: {reason}.");
+            let _ = writeln!(md, "  Reason: {reason}.");
             if let Some(pixels) = pixels {
                 let images: Vec<String> = pixels
                     .images
                     .iter()
                     .map(|p| format!("`{}`", relative(p)))
                     .collect();
-                let _ = writeln!(md, "  Diferenças: {}.", images.join(", "));
+                let _ = writeln!(md, "  Differences: {}.", images.join(", "));
             }
         }
         Outcome::Error { message } => {

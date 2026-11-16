@@ -1,6 +1,11 @@
 # Corpus
 
-The reference corpus of Desk: what Desk must do the same as iWork '09.
+The reference corpus of Desk: what Desk must do the same as iWork. The
+target is the current iWork (15.4, decision D-001); the matrices and the
+cases here were written from iWork '09, whose features Desk keeps
+(D-002), and the parity documents of features only '09 has are made on
+the Lion virtual machine (D-020). The matrices of the current iWork are
+the inventory in [`inventory/`](inventory).
 
 - `matrix.tsv` is the parity matrix of Desk Writer, 311 rows, each with
   the phase of the roadmap that completes it: the 260 rows of the survey
@@ -9,12 +14,12 @@ The reference corpus of Desk: what Desk must do the same as iWork '09.
   GNOME HIG and the desktop ask of the apps (`GNM`), and 4 commands that
   the inventory of Pages 4.3 on the reference virtual machine added to
   the survey (`VMI`). Its last column, `gnome`, says how Desk adapts a
-  row to GNOME where the decisions of 2026-11-13 and 2026-11-14 changed
-  its form (one Inspector, a header bar without customization, popovers
-  for Fonts and Colors, a recovery draft in place of versions, shortcuts
-  that leave GNOME's own alone, and the interface that
-  [`docs/interface`](../docs/interface/README.md) describes); the row
-  passes when Desk does it that way.
+  row to GNOME where the decisions of 2026-11-13, 2026-11-14 and
+  2026-11-16 changed its form (one Inspector, a header bar without
+  customization, popovers for Fonts and Colors, shortcuts that leave
+  GNOME's own alone, automatic saving with versions, and window M+ of
+  [`docs/interface/proposals`](../docs/interface/proposals/README.md),
+  decision D-008); the row passes when Desk does it that way.
 - `slides-matrix.tsv` and `tables-matrix.tsv` (181 rows each) are the
   matrices of Desk Slides and Desk Tables, with a `shared` column that
   names the rows of the other surveys that describe the same feature, the
@@ -22,7 +27,7 @@ The reference corpus of Desk: what Desk must do the same as iWork '09.
   own rows of the inventory (`KVMI`, `NVMI`).
 - `vm-review.tsv` lists the rows whose interface was compared by eye with
   Pages 4.3 on the reference Mac OS X Lion; the parity report shows them
-  as "conferido na VM do Lion" when only tests check them otherwise.
+  as "reviewed on the Lion VM" when only tests check them otherwise.
 - Each folder under `writer/` is a case: `case.toml` describes a short
   document, and the reference virtual machine adds the `.pages` file that
   Pages builds from the same description and `reference.pdf`, the PDF that
@@ -35,9 +40,9 @@ that the comparison measures the layout and not a change of font.
 ## A case
 
 ```toml
-title = "Espaço antes e depois do parágrafo"
+title = "Space before and after the paragraph"
 rows = ["FMT-15"]
-description = "Entre dois parágrafos vale o maior dos dois espaços."
+description = "Between two paragraphs the larger of the two spaces counts."
 
 [page]                # a4 by default, or letter; landscape = true turns it
 size = "a4"
@@ -48,7 +53,7 @@ font = "Liberation Serif"
 size = 12
 
 [[paragraphs]]
-text = "Uma linha\noutra linha"   # \n is a line break
+text = "One line\nanother line"   # \n is a line break
 space_after = 24
 
 [[paragraphs]]
@@ -57,7 +62,7 @@ repeat = 3            # three copies of the paragraph
 align = "justify"
 
 [[paragraphs]]
-runs = [{ text = "Texto em " }, { text = "negrito", bold = true }]
+runs = [{ text = "Text in " }, { text = "bold", bold = true }]
 ```
 
 A paragraph takes `align`, `line_spacing` (`{ multiple = 150 }`,

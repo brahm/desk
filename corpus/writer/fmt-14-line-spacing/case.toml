@@ -1,6 +1,6 @@
-title = "Espaçamento entre linhas"
+title = "Line spacing"
 rows = ["FMT-14"]
-description = "Os seis modos do Inspetor de Texto: simples, duplo, múltiplo, pelo menos, exatamente e entre."
+description = "The six modes of the Text Inspector: single, double, multiple, at least, exactly and between."
 
 [defaults]
 font = "Liberation Serif"

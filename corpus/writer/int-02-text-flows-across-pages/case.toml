@@ -1,6 +1,6 @@
-title = "O texto flui de página em página"
+title = "Text flows from page to page"
 rows = ["INT-02", "EST-03"]
-description = "Duas páginas de texto corrido no modelo em branco, com as margens de uma polegada."
+description = "Two pages of running text in the blank template, with one inch margins."
 
 [defaults]
 font = "Liberation Serif"

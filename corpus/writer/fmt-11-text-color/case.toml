@@ -1,6 +1,6 @@
-title = "Cor do texto"
+title = "Text color"
 rows = ["FMT-11"]
-description = "Palavras em vermelho, verde e azul, e um parágrafo inteiro em cinza."
+description = "Words in red, green and blue, and a whole paragraph in gray."
 
 [defaults]
 font = "Liberation Sans"

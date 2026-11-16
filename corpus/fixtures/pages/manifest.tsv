@@ -1,68 +1,68 @@
 row	file	what it shows	status	note
-INT-01		Seletor de Modelos (Template Chooser)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-01		Template Chooser	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 INT-02	int-02-word-processing.pages	A word processing document whose text flows over pages	made	
 INT-02	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
 INT-03	int-03-page-layout.pages	A page layout document (Blank Canvas template) with a text box and a shape	made	Starts from the Blank Canvas template, the blank one for page layout.
 INT-03	phase6-newsletter.pages	A two page A4 newsletter in Page Layout (Blank Canvas template), positions in page points from the top left. Page 1: a rectangle 523x84 at (36, 36), fill RGB (0.098, 0.336, 0.687), no stroke, wrap none, behind a text box 499x56 at (48, 50) holding "The Desk Gazette" in Helvetica Neue Bold 36, white; a line from (36, 136) to (559, 136), 2 pt, the same blue; two linked text boxes 253x600 at (36, 150) and (306, 150) with one article of 450 words (6 paragraphs, Helvetica 11, space after 6) that flows from the first box into the second; a floating picture (test-picture.png, 96x64) scaled to 150x100 at (139, 200), inside the right side of the first column, with a drop shadow (black, angle 315, offset 5, blur 6, opacity 60%) and square wrap (largest side, extra space 9) that the article goes around; a caption text box 150x28 at (139, 306) in Helvetica Neue Italic 9, also with square wrap, largest side, extra space 9. Page 2: a text box 523x560 at (36, 60) with three equal columns (157 pt, gutter 26) holding a second article, a heading in Helvetica Neue Bold 18 (space after 6) and 400 words in 5 paragraphs (Helvetica 11, space after 6), ending in the third column; the same picture 150x100 at (316, 200), across the gutter between the second and third columns, with tight wrap (largest side, extra space 6, alpha threshold 50%) and no shadow; a rounded rectangle 240x110 at (60, 650), corner radius 15, fill RGB (1, 0.931, 0.641), 1 pt stroke in the same blue, wrap none, with "Callout: a rounded rectangle with text inside it, set in Helvetica Neue 14."	made	Our own text (lorem ipsum style words) and picture. Made by AppleScript (make new shape, text box and line with size, position, fill, stroke, wrap, extra space and shadow; font, size, bold, italic and color set on the object text) and by the interface: Format > Text Box > Add Linked Text Box made the second column (then moved to x 306), Insert > Choose placed the pictures, the Pages toolbar menu > Blank added page 2, the Layout inspector set the three columns, and the Wrap inspector set Text Fit (square on page 1; the inserted picture of page 2 was already tight). The dictionary's text fit is unreliable: setting it to rectangular gave tight. Wrap none is stored as no override (the Blank Canvas default has no floating wrap). Pages saves the shadow as a Core Image filter (inputDistance 5, inputAngle 315, inputRadius 6, inputOpacity 0.6), the wraps as sf:external-text-wrap (wrap-style regular for square, tight for tight, floating-wrap-type largest) and the linked boxes as an sl:textbox-chain. The test picture has no transparency, so its tight wrap follows its rectangle. The PDF is File > Export > PDF with Image Quality Best (SLPDFExportQuality 2); Pages crashed the first time that menu item was chosen (EXC_BAD_ACCESS, selector unlock) and exported on the second try, from the saved document.
 INT-04	txt-01-mod-08-placeholder.pages	Text defined as a placeholder	made	Text placeholder here; the media placeholder is in obj-03-mod-09-media-placeholder.
 INT-05	int-05-est-21-master-object.pages	An object moved to the section master	made	
-INT-06		Páginas pré-formatadas do modelo	skipped	Inserting a template page is an action; the document holds only the result.
+INT-06		Preformatted pages of the template	skipped	Inserting a template page is an action; the document holds only the result.
 INT-07	int-07-08-view-state.pages	A document saved at another zoom with thumbnails visible	made	
 INT-08	int-07-08-view-state.pages	A document saved at another zoom with thumbnails visible	made	Thumbnails shown and a zoom of 200; no two-up or fit modes.
-INT-09		Visualização de layout (Show Layout)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-10		Caracteres invisíveis	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-11		Barra de ferramentas personalizável	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-12		Barra de formatação contextual	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-13		Inspetor com dez painéis	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-14		Navegador de Mídia	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-15		Janela Fontes	skipped	The Fonts window is interface; its effects are in the FMT documents.
-INT-16		Janela Cores	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-17		Réguas e guias de alinhamento	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-18		Gaveta de Estilos (Styles Drawer)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-19		Navegação	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-20		Ferramentas de escrita (Writing Tools)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-21		Atalhos e menus de contexto	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-22		Janela de Avisos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-INT-23		Ajuda	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-01		Criar a partir de modelo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-02		Preferência para documentos novos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-03		Abrir documentos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-04		Abrir versões anteriores	skipped	Out of scope in the matrix: Desk reads only the format of Pages '09.
+INT-09		Show Layout	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-10		Invisible characters	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-11		Customizable toolbar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-12		Contextual format bar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-13		Inspector with ten panes	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-14		Media Browser	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-15		Fonts window	skipped	The Fonts window is interface; its effects are in the FMT documents.
+INT-16		Colors window	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-17		Rulers and alignment guides	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-18		Styles Drawer	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-19		Navigation	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-20		Writing Tools	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-21		Shortcuts and context menus	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-22		Warnings window	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+INT-23		Help	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-01		Create from a template	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-02		Preference for new documents	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-03		Open documents	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-04		Open earlier versions	skipped	Out of scope in the matrix: Desk reads only the format of Pages '09.
 DOC-05	doc-05-missing-fonts.pages	A document that names a font not installed	made	Copied from the case made for the corpus earlier (corpus/writer/doc-05-missing-fonts), not rebuilt in this run.
 DOC-05	doc-05-apple-fonts.pages	One 12 pt paragraph in each of 41 faces of the fonts of the Pages templates (Gill Sans, Optima, Futura, Baskerville, Hoefler Text, Didot, Cochin, American Typewriter, Marker Felt), US Letter, hyphenation removed	made	To check the metric substitutes against data/fonts. Each paragraph names its face and also has the bold and italic flags of that face: Pages draws the family's face that the flags pick, so a font name such as GillSans-Italic without the italic flag prints upright GillSans.
 DOC-05	doc-05-apple-fonts-sizes.pages	The regular face of each of those nine families at 9, 18 and 36 pt, to see how line heights round at other sizes	made	
-DOC-06		Importar outros formatos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-07		Tela cheia	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-08		Senha para abrir	skipped	Not made: it needs a password typed into a dialog, which I did not do, even a throwaway one. Can be made by hand.
-DOC-09		Salvar e Salvar Cópia Como	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-06		Import other formats	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-07		Full screen	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-08		Password to open	skipped	Not made: it needs a password typed into a dialog, which I did not do, even a throwaway one. Can be made by hand.
+DOC-09		Save and Save a Copy As	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-10	doc-10-linked-media.pages	Audio and movie linked rather than copied into the document (Copy audio and movies off)	made	Pages saves this choice as a single zip file, not a package.
-DOC-11		Salvamento automático e Versões	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-12		Desfazer, refazer e reverter	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-11		Automatic saving and Versions	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-12		Undo, redo and revert	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-13	mod-12-template.template	A document saved as a template (.template)	made	A .template package, not .pages, because that is what a template is.
-DOC-14		Duplicar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-15		Cópia de segurança ao salvar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-14		Duplicate	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-15		Backup when saving	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-16	txt-14-doc-16-outline.pages	A document saved in outline view with three levels	made	
-DOC-17		Bloquear documento	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-DOC-18		Fechar e Fechar Todos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-17		Lock document	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-18		Close and Close All	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-19	doc-19-20-info.pages	Author, title, keywords and comments of the document, and its statistics	made	
 DOC-20	doc-19-20-info.pages	Author, title, keywords and comments of the document, and its statistics	made	Statistics are computed on demand; the document simply has text to count.
-DOC-21		Informações do arquivo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+DOC-21		File information	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 DOC-22	doc-22-single-file.pages	The .pages format as a single zip file rather than a package	made	
 DOC-22	int-02-word-processing.pages	A word processing document whose text flows over pages	made	
 TXT-01	txt-01-mod-08-placeholder.pages	Text defined as a placeholder	made	
-TXT-02		Excluir páginas	skipped	Deleting pages leaves nothing in the file.
-TXT-03		Seleção de texto	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TXT-04		Copiar e colar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TXT-05		Acentos, teclados e caracteres especiais	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TXT-06		Aspas inteligentes	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TXT-07		Correção e substituição automáticas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-02		Delete pages	skipped	Deleting pages leaves nothing in the file.
+TXT-03		Selecting text	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-04		Copy and paste	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-05		Accents, keyboards and special characters	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-06		Smart quotes	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-07		Automatic correction and replacement	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-08	txt-08-est-06-breaks-spaces.pages	A non-breaking space and a manual line break	made	
 TXT-09	txt-09-hyphenation.pages	A paragraph with hyphenation removed	made	Automatic hyphenation of the document is off here, as in every document of the fixtures, so neither paragraph is hyphenated; the import logs the setting when it is on.
 TXT-09	txt-09-never-hyphenate.pages	Automatic hyphenation on, and Never Hyphenate chosen for one word	made	The document holds only kSFWPAutoHyphenationProperty: Pages keeps Never Hyphenate in the user's HyphenationExceptions.plist, for every document, not in the document. On the reference machine no word gets a hyphen, on screen or in the PDF.
-TXT-10		Verificação ortográfica	skipped	Spell checking is interface; the language it uses is in fmt-22-language.
-TXT-11		Revisor gramatical (Proofreader)	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TXT-12		Localizar e substituir	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TXT-13		Barra lateral de busca	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-10		Spelling	skipped	Spell checking is interface; the language it uses is in fmt-22-language.
+TXT-11		Proofreader	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-12		Find and replace	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TXT-13		Search sidebar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TXT-14	txt-14-doc-16-outline.pages	A document saved in outline view with three levels	made	Levels entered with Tab in outline view; Pages keeps them as paragraph styles.
 TXT-14	txt-14-outline-long.pages	Saved and exported in outline view: US Letter, margins 72/54/90/72, 20 topics in Heading 1 to 4 with wrapping Body paragraphs, a Body before the first topic, a Body with space before 12, after 6 and line spacing 1.5, a Heading 1 at 24 pt, a Body in Times 10 pt italic, a centered Body, three bullets and an inline picture	made	The PDF prints the outline (4 pages). In outline view the centered paragraph prints left aligned.
 TXT-14	txt-14-outline-long-normal.pages	The same document with outline view turned off	made	
@@ -71,12 +71,12 @@ TXT-14	txt-14-outline-levels.pages	The same document in outline view with Levels
 TXT-14	txt-14-outline-thumbnails.pages	The same document in outline view with pictures shown as thumbnails	made	kSFWPOutlinerThumbnailAttachmentsProperty 1; the PDF prints the picture small.
 TXT-14	txt-14-outline-a4-default.pages	A4 with the default margins in outline view: 30 one-line Heading 1 topics, each with a one-line Body paragraph	made	Page 1 ends after Topic 20; Body line 20 starts page 2.
 REV-01	rev-01-04-tracked-changes.pages	Tracked insertion, deletion and format change, with author and date	made	REV-06: accepting and rejecting are actions; the document holds changes still to accept or reject. Text in the body here and a cell in rev-05-cell-tracked; not headers, notes or shapes.
-REV-02		Barra de controle de alterações	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+REV-02		Track changes bar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 REV-03	rev-03-tracking-paused.pages	Tracked changes with tracking paused and an untracked edit	made	
 REV-04	rev-01-04-tracked-changes.pages	Tracked insertion, deletion and format change, with author and date	made	REV-06: accepting and rejecting are actions; the document holds changes still to accept or reject. The saved changes carry author and date; the balloons are the application's.
 REV-05	rev-05-cell-tracked.pages	A tracked change in a table cell	made	
 REV-06	rev-01-04-tracked-changes.pages	Tracked insertion, deletion and format change, with author and date	made	REV-06: accepting and rejecting are actions; the document holds changes still to accept or reject.
-REV-07		Salvar cópia como final	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+REV-07		Save a copy as final	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 REV-08	rev-08-comments.pages	Comments on a selection, at the cursor and on an object	made	
 FMT-01	fmt-01-02-emphasis.pages	Bold, italic, single and double underline, single and double strikethrough, line colors	made	
 FMT-02	fmt-01-02-emphasis.pages	Bold, italic, single and double underline, single and double strikethrough, line colors	made	
@@ -98,13 +98,13 @@ FMT-14	fmt-14-line-spacing.pages	Line spacing multiple, at least, between and ex
 FMT-14	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
 FMT-15	fmt-15-paragraph-spacing.pages	Space before and after paragraphs	made	
 FMT-16	fmt-16-tabs.pages	Left, center, right and decimal tab stops and a leader	made	Default decimal character; the leader is the first one in the menu.
-FMT-17		Preferências de régua	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+FMT-17		Ruler preferences	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 FMT-18	fmt-18-indents.pages	First line, left, right and hanging indents	made	
 FMT-19	obj-16-fmt-13-19-box-format.pages	A text box with two columns, inset margin and middle vertical alignment	made	
 FMT-20	fmt-20-backgrounds.pages	Character and paragraph background colors	made	
 FMT-21	fmt-21-borders-rules.pages	Rules above, below and both, a border, a dashed thick rule	made	The last paragraph's label says colored, but the rule is dashed and thick with the default black color.
 FMT-22	fmt-22-language.pages	Paragraphs in French and Brazilian Portuguese	made	
-LST-01		Detecção automática de listas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+LST-01		Automatic list detection	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 LST-02	lst-02-levels.pages	A bulleted list with three levels	made	
 LST-03	lst-03-bullets.pages	Text bullet with a custom string, color and size, and an image bullet	made	Custom text bullet at 150 percent and the default image bullet; no bullet color and no image of one's own.
 LST-04	lst-04-numbered.pages	Numbered lists in arabic, roman and letters	made	No Continue from Previous or Start At settings.
@@ -112,14 +112,14 @@ LST-05	lst-05-tiered.pages	Legal and Harvard tiered lists	made
 STY-01	sty-01-07-styles.pages	New paragraph and character styles, following style, an override, a renamed style	made	Made by script rather than from a selection; the saved styles are the same kind.
 STY-02	sty-01-07-styles.pages	New paragraph and character styles, following style, an override, a renamed style	made	Made by script rather than from a selection; the saved styles are the same kind. Applied by script, not from the drawer.
 STY-03	sty-01-07-styles.pages	New paragraph and character styles, following style, an override, a renamed style	made	Made by script rather than from a selection; the saved styles are the same kind.
-STY-04		Atalho de teclado por estilo	skipped	Not attempted: the shortcut is set in the Styles Drawer.
+STY-04		Keyboard shortcut per style	skipped	Not attempted: the shortcut is set in the Styles Drawer.
 STY-05	sty-01-07-styles.pages	New paragraph and character styles, following style, an override, a renamed style	made	Made by script rather than from a selection; the saved styles are the same kind.
 STY-06	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
 STY-06	sty-01-07-styles.pages	New paragraph and character styles, following style, an override, a renamed style	made	Made by script rather than from a selection; the saved styles are the same kind.
 STY-07	sty-01-07-styles.pages	New paragraph and character styles, following style, an override, a renamed style	made	Made by script rather than from a selection; the saved styles are the same kind.
-STY-08		Copiar e colar estilo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-STY-09		Localizar e substituir estilos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-STY-10		Importar estilos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+STY-08		Copy and paste style	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+STY-09		Find and replace styles	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+STY-10		Importing styles	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EST-01	est-03-margins.pages	Document margins set on all sides	made	Margins only; other Document Inspector settings are in the est-11, est-13 and doc-19 documents.
 EST-02	est-02-landscape-letter.pages	US Letter paper in landscape	made	Pages loses the orientation on reopening a saved file (see the VM README), so the reopened document may show portrait.
 EST-03	est-03-margins.pages	Document margins set on all sides	made	
@@ -149,7 +149,7 @@ EST-15	est-14-15-note-marks.pages	Symbol note marks, restarted on each page, wit
 EST-16	est-12-16-section-headers.pages	Facing pages and three sections: Header one, Header two with Use previous headers and footers unchecked, and a third section on a right page that uses previous headers	made	
 EST-16	est-16-18-sections.pages	Two sections, the second numbered from 5	made	
 EST-16	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
-EST-17		Organizar seções nas miniaturas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EST-17		Arranging sections in the thumbnails	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EST-18	est-16-18-sections.pages	Two sections, the second numbered from 5	made	
 EST-18	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
 EST-19	est-19-first-left-right.pages	Different first page and left and right headers and footers	made	
@@ -160,7 +160,7 @@ EST-22	est-22-23-toc.pages	A table of contents with two heading levels and page 
 EST-22	est-22-toc-page-links.pages	A table of contents with Make page numbers links on, and page numbers for Heading 1 but not for Heading 2	made	
 EST-22	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
 EST-23	est-22-23-toc.pages	A table of contents with two heading levels and page numbers	made	
-EST-24		Citações e bibliografia (EndNote X2)	skipped	Needs EndNote X2, which is not in the VM.
+EST-24		Citations and bibliography (EndNote X2)	skipped	Needs EndNote X2, which is not in the VM.
 EST-25	est-25-26-links-bookmarks.pages	Web and email hyperlinks, a bookmark and a link to it	made	Webpage and email links keep the default addresses Pages proposes, and the bookmark link saved as href="#". No link to another Pages document.
 EST-25	est-25-26-links.pages	A web link, a mailto link with a subject, a bookmark and a link to it, and a link to a bookmark in another document	made	
 EST-25	link-target.pages	The second document that est-25-26-links links to, with a bookmark named target	made	
@@ -177,7 +177,7 @@ OBJ-01	phase6-newsletter.pages	A two page A4 newsletter in Page Layout (Blank Ca
 OBJ-02	obj-02-image-formats.pages	Inline images in PNG, JPEG, TIFF, GIF and PDF	made	PSD, EPS and PICT were not tried.
 OBJ-03	obj-03-mod-09-media-placeholder.pages	An image defined as a media placeholder	made	
 OBJ-04	obj-04-mask.pages	A masked image	made	
-OBJ-05		Reduzir tamanho de imagens	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-05		Reduce image file size	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 OBJ-06	obj-06-instant-alpha.pages	An image with Instant Alpha applied	made	
 OBJ-07	obj-07-adjust-image.pages	An image with brightness and saturation adjusted	made	Brightness and saturation sliders moved by clicking; exact values were not chosen.
 OBJ-08	obj-08-11-shapes.pages	Every predefined shape and a line	made	OBJ-11: the parametric shapes keep the default values of their parameters; the handles cannot be dragged on the blank canvas.
@@ -198,19 +198,19 @@ OBJ-17	obj-17-wrap.pages	Floating objects with different wraps	made
 OBJ-17	phase6-newsletter.pages	A two page A4 newsletter in Page Layout (Blank Canvas template), positions in page points from the top left. Page 1: a rectangle 523x84 at (36, 36), fill RGB (0.098, 0.336, 0.687), no stroke, wrap none, behind a text box 499x56 at (48, 50) holding "The Desk Gazette" in Helvetica Neue Bold 36, white; a line from (36, 136) to (559, 136), 2 pt, the same blue; two linked text boxes 253x600 at (36, 150) and (306, 150) with one article of 450 words (6 paragraphs, Helvetica 11, space after 6) that flows from the first box into the second; a floating picture (test-picture.png, 96x64) scaled to 150x100 at (139, 200), inside the right side of the first column, with a drop shadow (black, angle 315, offset 5, blur 6, opacity 60%) and square wrap (largest side, extra space 9) that the article goes around; a caption text box 150x28 at (139, 306) in Helvetica Neue Italic 9, also with square wrap, largest side, extra space 9. Page 2: a text box 523x560 at (36, 60) with three equal columns (157 pt, gutter 26) holding a second article, a heading in Helvetica Neue Bold 18 (space after 6) and 400 words in 5 paragraphs (Helvetica 11, space after 6), ending in the third column; the same picture 150x100 at (316, 200), across the gutter between the second and third columns, with tight wrap (largest side, extra space 6, alpha threshold 50%) and no shadow; a rounded rectangle 240x110 at (60, 650), corner radius 15, fill RGB (1, 0.931, 0.641), 1 pt stroke in the same blue, wrap none, with "Callout: a rounded rectangle with text inside it, set in Helvetica Neue 14."	made	Our own text (lorem ipsum style words) and picture. Made by AppleScript (make new shape, text box and line with size, position, fill, stroke, wrap, extra space and shadow; font, size, bold, italic and color set on the object text) and by the interface: Format > Text Box > Add Linked Text Box made the second column (then moved to x 306), Insert > Choose placed the pictures, the Pages toolbar menu > Blank added page 2, the Layout inspector set the three columns, and the Wrap inspector set Text Fit (square on page 1; the inserted picture of page 2 was already tight). The dictionary's text fit is unreliable: setting it to rectangular gave tight. Wrap none is stored as no override (the Blank Canvas default has no floating wrap). Pages saves the shadow as a Core Image filter (inputDistance 5, inputAngle 315, inputRadius 6, inputOpacity 0.6), the wraps as sf:external-text-wrap (wrap-style regular for square, tight for tight, floating-wrap-type largest) and the linked boxes as an sl:textbox-chain. The test picture has no transparency, so its tight wrap follows its rectangle. The PDF is File > Export > PDF with Image Quality Best (SLPDFExportQuality 2); Pages crashed the first time that menu item was chosen (EXC_BAD_ACCESS, selector unlock) and exported on the second try, from the saved document.
 OBJ-18	obj-18-audio-video.pages	An inline audio file and an inline movie	made	
 OBJ-19	obj-19-movie-settings.pages	A movie with a poster frame and repeat	made	Poster frame and repeat set; start and stop times were not.
-OBJ-20		Reduzir mídia	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-OBJ-21		Selecionar objetos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-OBJ-22		Copiar e duplicar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-OBJ-23		Mover	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-20		Reduce media	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-21		Selecting objects	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-22		Copy and duplicate	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-23		Moving	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 OBJ-24	obj-24-layers.pages	Three overlapping shapes reordered	made	
 OBJ-25	long-document.pages	A 41 page A4 document in four sections: title page with a different first page, a table of contents from Heading 1 and 2, a section on a right page with facing pages (a blank left page before it) numbered from 1 with left and right footers, a two column section, a last section continuing the numbers, page number fields in every section, 8 footnotes, inline pictures in multiple, at least and exactly line spacing, square and contour wraps, a shape in the background, LD Child and an override with Space After and Left Indent 0 under a parent with both set, page breaks, a keep with next heading pushed to the next page, justified paragraphs	made	Public replacement for the private long document; lorem ipsum text, Liberation fonts. Pages kept the long footnote (note 7) whole on page 34 instead of continuing it on the next page.
 OBJ-25	obj-25-background.pages	An object sent to the background	made	
-OBJ-26		Alinhar e distribuir	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-OBJ-27		Guias dinâmicas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-OBJ-28		Guias fixas	skipped	Not attempted: guides are dragged out of the ruler, with no way to check them on the blank canvas.
+OBJ-26		Align and distribute	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-27		Dynamic guides	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+OBJ-28		Fixed guides	skipped	Not attempted: guides are dragged out of the ruler, with no way to check them on the blank canvas.
 OBJ-29	obj-29-33-position-size.pages	An object with exact position and size and constrained proportions	made	
 OBJ-30	obj-30-group.pages	A group of two shapes	made	
-OBJ-31		Linha de conexão	skipped	Could not be made: Insert > Connection Line stays greyed with two objects selected, in word processing and page layout.
+OBJ-31		Connection line	skipped	Could not be made: Insert > Connection Line stays greyed with two objects selected, in word processing and page layout.
 OBJ-32	obj-32-lock.pages	A locked object	made	
 OBJ-33	obj-29-33-position-size.pages	An object with exact position and size and constrained proportions	made	
 OBJ-34	obj-34-flip-rotate.pages	Rotated and flipped shapes	made	Both flips ended up on one arrow, a second arrow is rotated by 30 degrees.
@@ -223,45 +223,45 @@ OBJ-39	obj-37-38-39-effects.pages	Object shadow, reflection and opacity	made
 OBJ-40	obj-40-41-fills.pages	A solid color fill and a linear gradient	made	OBJ-41: linear gradient of two colors; the advanced gradient of several colors was not made.
 OBJ-41	obj-40-41-fills.pages	A solid color fill and a linear gradient	made	OBJ-41: linear gradient of two colors; the advanced gradient of several colors was not made.
 OBJ-42	obj-42-image-fill.pages	A shape with an image fill	made	Plain image fill here; the tinted image fill, red and blue, is in obj-42-tinted-image-fill.pages.
-OBJ-43		Equações (MathType 6)	skipped	Needs MathType 6, which is not in the VM.
+OBJ-43		Equations (MathType 6)	skipped	Needs MathType 6, which is not in the VM.
 TAB-01	tab-01-basic.pages	An inline table with text and numbers	made	
-TAB-02		Ferramentas de tabela	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-02		Table tools	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-03	tab-03-13-sizes.pages	A table with exact column width and row height	made	Exact width and height; no resizing of the whole table.
 TAB-04	tab-04-22-25-appearance.pages	Cells with color and gradient background and a border	made	Gradient in one cell, color fill and a 3 pt border elsewhere; Copy Table Style was not tried.
-TAB-05		Converter texto e tabela	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TAB-06		Copiar tabela entre aplicativos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-TAB-07		Seleção	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-05		Convert text and table	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-06		Copy a table between apps	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-07		Selection	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-08	tab-08-return-next-cell.pages	A table with Return moves to next cell turned on	made	
-TAB-09		Afastar objetos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-09		Move objects aside	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-10	tab-10-add-rows-columns.pages	A table with a row and a column added	made	
-TAB-11		Apagar linhas e colunas	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-11		Delete rows and columns	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-12	tab-12-headers-footer.pages	A table with two header rows, two header columns and a footer row	made	
 TAB-13	tab-03-13-sizes.pages	A table with exact column width and row height	made	
 TAB-14	tab-14-alternating.pages	A table with alternating row color	made	
-TAB-15		Ordenar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-15		Sort	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-16	tab-01-basic.pages	An inline table with text and numbers	made	Shows the result of editing cells, which is all a document holds of this row.
 TAB-17	tab-01-basic.pages	An inline table with text and numbers	made	Text in cells only; no Option-Return break and no suggestions, which are not saved.
 TAB-18	tab-01-basic.pages	An inline table with text and numbers	made	Plain numbers in cells; the input rules themselves are not saved.
-TAB-19		Preenchimento automático	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-19		Autofill	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-20	tab-20-overflow.pages	A cell whose text is larger than the cell, without wrap and without resizing	made	
 TAB-21	tab-21-conditional.pages	A conditional format rule	made	The rule came out as Not equal to 50, not the Greater than that was aimed for; it is a real rule either way.
 TAB-22	tab-04-22-25-appearance.pages	Cells with color and gradient background and a border	made	Color and gradient; no image background.
 TAB-23	tab-23-24-merge-split.pages	Merged cells and cells split into rows and into columns	made	Check in the XML which cells took each operation: the keyboard moves the selection. The merge also reached the header row, so more cells are merged than intended; spans are in the XML.
 TAB-24	tab-23-24-merge-split.pages	Merged cells and cells split into rows and into columns	made	Check in the XML which cells took each operation: the keyboard moves the selection.
 TAB-25	tab-04-22-25-appearance.pages	Cells with color and gradient background and a border	made	A uniform 3 pt border on the selected cells; no per-segment style.
-TAB-26		Copiar e mover células	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-26		Copy and move cells	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-27	tab-27-cell-comment.pages	A comment on a table cell	made	
 TAB-28	tab-28-cell-formats.pages	Number, currency, percentage, date, duration, fraction, numeral system, scientific and text cell formats	made	
 TAB-29	tab-29-30-custom-format.pages	A cell with a custom format	made	The default number format offered by the Custom dialog, accepted as it is.
-TAB-30		Formatos personalizados de data e hora	skipped	Not made: the custom date and time format needs dragging elements in a dialog.
-TAB-31		Gerenciar formatos personalizados	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+TAB-30		Custom date and time formats	skipped	Not made: the custom date and time format needs dragging elements in a dialog.
+TAB-31		Manage custom formats	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 TAB-32	tab-32-iop-05-formulas.pages	A cell with a function made from the Function menu	made	Only the Function menu worked: typing = does not open the formula editor in this VM, so formulas typed by hand were not made.
 GRF-01	grf-01-02-03-2d-types.pages	Column, stacked column, bar, stacked bar, line, area, stacked area and scatter charts with their data	made	
 GRF-02	grf-01-02-03-2d-types.pages	Column, stacked column, bar, stacked bar, line, area, stacked area and scatter charts with their data	made	Series by the default grouping; Rows vs. Columns was not switched.
 GRF-03	grf-01-02-03-2d-types.pages	Column, stacked column, bar, stacked bar, line, area, stacked area and scatter charts with their data	made	Floating charts made by the dictionary, not inline.
-GRF-04		Trocar o tipo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+GRF-04		Changing the type	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 GRF-05	grf-01-02-03-2d-types.pages	Column, stacked column, bar, stacked bar, line, area, stacked area and scatter charts with their data	made	Data given when the chart is made, through the dictionary, rather than typed in the Data Editor.
-GRF-06		Gráfico vinculado ao Numbers	skipped	Not attempted: needs a chart copied from Numbers.
+GRF-06		Chart linked to Numbers	skipped	Not attempted: needs a chart copied from Numbers.
 GRF-07	grf-07-title-legend.pages	A chart with title and legend	made	
 GRF-08	grf-08-chart-text.pages	A chart with its text made larger	made	
 GRF-09	grf-09-rotated.pages	A rotated, resized chart	made	
@@ -276,54 +276,54 @@ GRF-17	grf-01-02-03-2d-types.pages	Column, stacked column, bar, stacked bar, lin
 GRF-18	grf-01-02-03-2d-types.pages	Column, stacked column, bar, stacked bar, line, area, stacked area and scatter charts with their data	made	
 GRF-19	grf-19-mixed.pages	A mixed chart	made	
 GRF-19	grf-19-two-axis.pages	A two axis chart	made	
-GRF-20		Cena 3D	skipped	Could not be made: 3D charts crash Pages in this VM (CoinOffscreenGLCanvas needs OpenGL; see the two crash reports of 1 November).
+GRF-20		3D scene	skipped	Could not be made: 3D charts crash Pages in this VM (CoinOffscreenGLCanvas needs OpenGL; see the two crash reports of 1 November).
 MAL-01	mal-01-07-08-fields.pages	Merge fields and sender fields	made	
-MAL-02		Trocar o remetente	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-MAL-03		Mesclar um contato	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-MAL-04		Mesclar um grupo ou vários cartões	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-MAL-05		Fonte Numbers	skipped	Not attempted: needs a Numbers document and a mapping dialog.
-MAL-06		Digitar no campo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+MAL-02		Changing the sender	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+MAL-03		Merging a contact	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+MAL-04		Merging a group or several cards	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+MAL-05		Numbers source	skipped	Not attempted: needs a Numbers document and a mapping dialog.
+MAL-06		Typing in the field	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 MAL-07	mal-01-07-08-fields.pages	Merge fields and sender fields	made	
 MAL-08	mal-01-07-08-fields.pages	Merge fields and sender fields	made	Holds fields; altering one is an action.
-MAL-09		Nomes de campo e sinônimos	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+MAL-09		Field names and synonyms	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EXP-01	est-02-landscape-letter.pages	US Letter paper in landscape	made	Pages loses the orientation on reopening a saved file (see the VM README), so the reopened document may show portrait. A standard paper; no custom size with its own name.
-EXP-02		Pré-visualizar	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-03		Imprimir	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-04		Imprimir comentários e alterações	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-05		Exportar PDF	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-06		Exportar Word	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-07		Exportar RTF e texto simples	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-08		Senha na exportação	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-09		Exportar ePub	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-10		Salvar cópia como Word	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-02		Preview	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-03		Print	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-04		Print comments and changes	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-05		Export PDF	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-06		Export Word	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-07		Export RTF and plain text	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-08		Password on export	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-09		Export ePub	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-10		Save a copy as Word	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
 EXP-11		iWork.com (beta)	skipped	Out of scope in the matrix: the service has closed.
-EXP-12		Enviar por Mail	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-EXP-13		Enviar ao iWeb	skipped	Out of scope in the matrix: iWeb.
+EXP-12		Send by Mail	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+EXP-13		Send to iWeb	skipped	Out of scope in the matrix: iWeb.
 MOD-01	mod-12-template.template	A document saved as a template (.template)	made	A .template package, not .pages, because that is what a template is. A plain document saved as a template with a header; not everything a template can hold.
 MOD-02	mod-12-template.template	A document saved as a template (.template)	made	A .template package, not .pages, because that is what a template is. A plain document saved as a template.
 MOD-03	mod-12-template.template	A document saved as a template (.template)	made	A .template package, not .pages, because that is what a template is. The defaults the Blank template brings.
-MOD-04		Caixa de texto e forma padrão	skipped	Could not be made: Define Default Graphic Style ran, but the default style in the saved file did not change.
-MOD-05		Tabela padrão	skipped	Not attempted, after MOD-04 did not take.
-MOD-06		Gráfico padrão	skipped	Not attempted, after MOD-04 did not take.
-MOD-07		Imagem padrão	skipped	Not attempted, after MOD-04 did not take.
+MOD-04		Default text box and shape	skipped	Could not be made: Define Default Graphic Style ran, but the default style in the saved file did not change.
+MOD-05		Default table	skipped	Not attempted, after MOD-04 did not take.
+MOD-06		Default chart	skipped	Not attempted, after MOD-04 did not take.
+MOD-07		Default image	skipped	Not attempted, after MOD-04 did not take.
 MOD-08	txt-01-mod-08-placeholder.pages	Text defined as a placeholder	made	
 MOD-09	obj-03-mod-09-media-placeholder.pages	An image defined as a media placeholder	made	
 MOD-10	est-20-mod-10-capture-pages.pages	A document with a captured page	made	
 MOD-11	est-20-mod-10-capture-pages.pages	A document with a captured page	made	The captured page exists; renaming and reordering are actions that were not done.
 MOD-12	mod-12-template.template	A document saved as a template (.template)	made	A .template package, not .pages, because that is what a template is.
-IOP-01		Tabela entre aplicativos	skipped	Copying between applications is an action.
-IOP-02		Gráfico vinculado ao Numbers	skipped	Not attempted: needs a chart copied from Numbers.
-IOP-03		Numbers como fonte da mala direta	skipped	Not attempted: needs a Numbers document as the merge source.
-IOP-04		Contatos nas tabelas do Numbers	skipped	About Numbers and Address Book, not a Pages document.
+IOP-01		Table between applications	skipped	Copying between applications is an action.
+IOP-02		Chart linked to Numbers	skipped	Not attempted: needs a chart copied from Numbers.
+IOP-03		Numbers as the mail merge source	skipped	Not attempted: needs a Numbers document as the merge source.
+IOP-04		Contacts in Numbers tables	skipped	About Numbers and Address Book, not a Pages document.
 IOP-05	tab-32-iop-05-formulas.pages	A cell with a function made from the Function menu	made	Only the Function menu worked: typing = does not open the formula editor in this VM, so formulas typed by hand were not made. One function, the same document as TAB-32.
-IOP-06		Ferramentas de interface comuns	skipped	Interface shared between applications.
-IOP-07		Objetos e efeitos	skipped	Not a row of its own for Pages: see the OBJ documents.
-IOP-08		Equações	skipped	Needs MathType 6, which is not in the VM.
-IOP-09		Modelos e espaços reservados	skipped	Not a row of its own for Pages: see txt-01-mod-08-placeholder and obj-03-mod-09-media-placeholder.
-IOP-10		Exportar e compartilhar	skipped	Export and sharing are not held in a document.
-IOP-11		Senha e versões	skipped	Not made: the password needs a dialog, as DOC-08; versions are not held in a document.
-VMI-01		Desmarcar tudo	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
-VMI-02		Reaplicar padrões à seleção	skipped	An action; the document holds only the result.
-VMI-03		Linhas de conexão das caixas vinculadas	skipped	Not made: whether a document keeps this view setting was not checked.
-VMI-04		Redefinir texto e alças da forma	skipped	An action; the document holds only the result.
+IOP-06		Shared interface tools	skipped	Interface shared between applications.
+IOP-07		Objects and effects	skipped	Not a row of its own for Pages: see the OBJ documents.
+IOP-08		Equations	skipped	Needs MathType 6, which is not in the VM.
+IOP-09		Templates and placeholders	skipped	Not a row of its own for Pages: see txt-01-mod-08-placeholder and obj-03-mod-09-media-placeholder.
+IOP-10		Export and share	skipped	Export and sharing are not held in a document.
+IOP-11		Password and versions	skipped	Not made: the password needs a dialog, as DOC-08; versions are not held in a document.
+VMI-01		Deselect All	skipped	Only about the application, its dialogs or an action: a saved document does not hold it.
+VMI-02		Reapply defaults to the selection	skipped	An action; the document holds only the result.
+VMI-03		Connection lines of linked boxes	skipped	Not made: whether a document keeps this view setting was not checked.
+VMI-04		Reset text and object handles of a shape	skipped	An action; the document holds only the result.
 -	lossy-import.pages	Content Desk does not import, to check the warning log	made	All the items asked for; not tied to one row.

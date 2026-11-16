@@ -79,14 +79,14 @@ fn a_case_matches_its_own_pdf_and_not_another() {
     let Outcome::Fail { reason, pixels, .. } = &result.outcome else {
         panic!("{:?}", result.outcome);
     };
-    assert!(reason.contains("palavra"), "{reason}");
+    assert!(reason.contains("word"), "{reason}");
     assert!(pixels.as_ref().unwrap().worst() > 1.0);
 
     let report = Report::new(
         vec![matrix::Row {
             id: "FMT-12".into(),
             phase: Some(1),
-            feature: "Alinhamento".into(),
+            feature: "Alignment".into(),
             expected: String::new(),
             guide_pages: String::new(),
             shared: String::new(),
@@ -100,7 +100,7 @@ fn a_case_matches_its_own_pdf_and_not_another() {
     );
     assert_eq!(report.rows[0].status, Status::Differs);
     assert!(report.has_failures());
-    assert!(report.to_markdown(&out).contains("diferente do Pages"));
+    assert!(report.to_markdown(&out).contains("differs from Pages"));
     assert!(report.to_json().contains("\"status\": \"differs\""));
 }
 
@@ -187,7 +187,7 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
     assert!(
         report
             .to_markdown(Path::new("."))
-            .contains("comparado com o PDF do Pages")
+            .contains("compared with the Pages PDF")
     );
 }
 
@@ -223,7 +223,7 @@ fn the_report_tells_documents_of_pages_that_still_differ() {
     );
     assert_eq!(report.rows[0].status, Status::Differs);
     assert!(!report.has_failures());
-    assert!(report.to_markdown(Path::new(".")).contains("ainda diferem"));
+    assert!(report.to_markdown(Path::new(".")).contains("still differ"));
 }
 
 /// The rows compared by eye on the reference machine exist in the matrix
