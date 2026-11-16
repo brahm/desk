@@ -13,7 +13,7 @@ def main():
     only = sys.argv[2:]
     kit.init()
     scenes = []
-    for mod in ('writer', 'tables', 'slides', 'extras'):
+    for mod in ('writer', 'tables', 'slides', 'extras', 'novo'):
         try:
             m = importlib.import_module(mod)
         except ModuleNotFoundError as e:
