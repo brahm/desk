@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Mockups of what opens from the chosen window (M+): menus,
+  Fonts and Colors from the Format pane, find, dialogs, the template
+  chooser, a narrow window and the small screen notice; the component
+  inventory now lists them.
 * Changed: The description of the interface, its component inventory and
   the map of every iWork '09 command are in English and describe the
   chosen window (M+); the mockups are written in English and drawn in

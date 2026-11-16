@@ -411,6 +411,34 @@ matrix rows done on 9 November, before the change of target.
   document tabs of M+ need a shortcut to switch, and GNOME uses
   Ctrl+PageUp and Ctrl+PageDown, which Tables uses for the sheets.
 
+### 16 November: the secondary scenes of M+
+
+- Twelve more scenes of M+ were drawn (backlog item B-003, done): the
+  Insert menu, the Shape popover, the main menu, Fonts and Colors, the find
+  bar with the banner of import warnings, Search Commands, Preferences,
+  Keyboard Shortcuts, the template chooser, the window at half the minimum
+  screen (640 × 720) and the small screen notice (1024 × 600). With the
+  five drawn before, their pictures are in `docs/interface/scenes`, and
+  `components.tsv` now has 138 components: 90 exist, 19 change, 29 are new.
+- Fonts and Colors open from the Family and Text color rows of the Format
+  pane, since M+ has no format bar. The popover is attached to the row
+  after the scene is built, so the main pictures did not change.
+- There is no close dialog in M+. *Why:* saving is automatic (D-001), so
+  closing a document has nothing to ask; `dialog.close` stays in the
+  catalogue as a piece of interface B only.
+- At half the screen the object buttons go into Insert, as the README
+  already said, and Open documents also leaves the header bar, because the
+  title had no room; the tabs still switch documents. The word count goes
+  above the zoom control, since the two overlapped. This was a choice of
+  layout made while drawing, written into the breakpoint table of the
+  README; the owner can change it.
+- Some rows of the catalogue still described interface B (one window per
+  document, the formula bar under the format bar, the bottom bar of the
+  three apps); they now describe M+ and say what B had.
+- `ci/setup-env.sh` now installs `python3-gi-cairo`: without it the
+  mockups drew the document area empty, because the page is drawn with
+  cairo from Python.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

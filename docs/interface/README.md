@@ -180,7 +180,7 @@ not of phones:
 
 | Window width | What changes |
 | --- | --- |
-| Below 720 px | The navigation sidebar becomes an overlay, and the object buttons go into the Insert menu |
+| Below 720 px | The navigation sidebar becomes an overlay, the object buttons go into the Insert menu, and Open documents leaves the header bar (the tabs remain) |
 | Below 520 px | The Inspector becomes an overlay too: it closes and comes back over the document |
 
 They are `AdwBreakpoint`s of the window. There is no phone layout and no
@@ -342,7 +342,7 @@ window.
 
 ## The components
 
-[`components.tsv`](components.tsv) has 101 rows. Each one is a piece that
+[`components.tsv`](components.tsv) has 138 rows. Each one is a piece that
 appears in the mockups of M+, with the type of the widget read from the
 mockup itself, and its state measured against the Desk of today: `exists`
 is already there in this form, even if it does nothing yet; `changes` is
@@ -358,9 +358,13 @@ there in another form or place; `new` is still to be written.
 | Inspector of Tables | 3 | | 9 |
 | Inspector of Slides | | | 7 |
 | Bottom bar and controls over the view | | 3 | 3 |
-| **Total** | **69** | **11** | **21** |
+| Find, notices and commands | 9 | 1 | 4 |
+| Popovers | 6 | 1 | 3 |
+| Template chooser and dialogs | 6 | 6 | 1 |
+| **Total** | **90** | **19** | **29** |
 
-Writer uses 68 of them, Tables 58 and Slides 47; everything common to the
+Writer uses 105 of them, Tables 75 and Slides 64 (the dialogs and the
+template chooser count for the three); everything common to the
 three is in `desk-ui`. What changes from interface B is the frame of the
 window: the header bar loses the View menu of the Sidebar button and gains
 Open documents, the documents open in tabs, the main menu loses Save and
@@ -370,12 +374,32 @@ order and grouping move from the format bar to the Arrange tab. The new
 pieces are the document tabs, the sheet switcher, and the tabs of the
 Inspector that the phases of tables, charts and builds fill.
 
-The mockups of M+ draw the main windows and the Format, Data, Animation
-and Document levels of the Inspector. The popovers and the dialogs (Fonts,
-Colors, the Insert menu, Search Commands, Preferences, the template
-chooser, the close and find bars) are still drawn only in the scenes of
-interface B, and they stay in [`mockups/catalog.txt`](mockups/catalog.txt);
-drawing them over M+ is backlog item B-003.
+The mockups of M+ draw the main windows, the Format, Data, Animation and
+Document levels of the Inspector, and what opens from the window: the
+Insert menu, the Shape popover, the main menu, Fonts and Colors opened
+from their rows in the Format pane, the find bar with the banner of import
+warnings, Search Commands, Preferences, Keyboard Shortcuts, the template
+chooser, the window at half the minimum screen, and the small screen
+notice. Their pictures are in [`scenes`](scenes). There is no close dialog
+in M+: saving is automatic (D-001), so closing a document asks nothing,
+and `dialog.close` stays in `catalog.txt` as a piece of interface B only.
+
+| Scene | Picture |
+| --- | --- |
+| Image selected, Document level, dark style | [image](scenes/writer-m-plus-image.png), [Document](scenes/writer-m-plus-document.png), [dark](scenes/writer-m-plus-dark.png) |
+| Data level of Tables, Animation level of Slides | [Data](scenes/tables-m-plus-data.png), [Animation](scenes/slides-m-plus-animate.png) |
+| Insert menu, Shape popover, main menu | [Insert](scenes/writer-m-plus-insert.png), [Shape](scenes/writer-m-plus-shapes.png), [menu](scenes/writer-m-plus-menu.png) |
+| Fonts and Colors from the Format pane | [Fonts](scenes/writer-m-plus-fonts.png), [Colors](scenes/writer-m-plus-colors.png) |
+| Find bar and the banner of import warnings | [find](scenes/writer-m-plus-find.png) |
+| Search Commands, Preferences, Keyboard Shortcuts | [commands](scenes/common-m-plus-commands.png), [Preferences](scenes/common-m-plus-preferences.png), [shortcuts](scenes/common-m-plus-shortcuts.png) |
+| Template chooser | [templates](scenes/common-m-plus-templates.png) |
+| Half of the minimum screen (640 × 720) | [half](scenes/common-m-plus-half.png) |
+| Screen smaller than the minimum (1024 × 600) | [notice](scenes/common-m-plus-notice.png) |
+
+In the window at half the screen the sidebar is closed and the object
+buttons and Open documents leave the header bar: the objects go back into
+Insert, and the tabs still switch documents. The word count sits above the
+zoom control, since the two no longer fit side by side.
 
 ## The order of the work
 
