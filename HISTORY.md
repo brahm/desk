@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Three Pages '09 test documents (custom bullets, sound and
+  movie, movie settings) were made again with a sound, a movie and pictures
+  made by the project, so no file from Apple software is left in them.
 * Added: Mockups of what opens from the chosen window (M+): menus,
   Fonts and Colors from the Format pane, find, dialogs, the template
   chooser, a narrow window and the small screen notice; the component
