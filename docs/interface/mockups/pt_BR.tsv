@@ -1,0 +1,862 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The text of the mockups in Brazilian Portuguese, for the Portuguese page
+# of the site (see translate.py). Columns: English, Portuguese, context.
+4.0	4.0	
+1.0	1.0	canvas
+ · Edited	 · Editado	
+$	R$	
+%	 %	parts.opacity_popover
+-100 in red	-100 em vermelho	
+1,920 × 1,080 px · 412 kB	1.920 × 1.080 px · 412 kB	
+12 slides · 1 selected	12 slides · 1 selecionado	
+2 of 4	2 de 4	
+2 of 7	2 de 7	
+2027 target	Meta de 2027	
+26,171 words	26.171 palavras	
+26,171 words · 41 pages	26.171 palavras · 41 páginas	
+3D chart	Gráfico em 3D	
+3D scene	Cena 3D	
+6 cells	6 células	
+<b>Ana</b>\nCheck this number with finance	<b>Ana</b>\nConferir este número com o financeiro	
+= <span foreground="#1c71d8">SUM</span>(<span background="#f9f06b">B2:E2</span>) × <span background="#8ff0a4">Adjustment</span>	= <span foreground="#1c71d8">SOMA</span>(<span background="#f9f06b">B2:E2</span>) × <span background="#8ff0a4">Reajuste</span>	
+=SUM(B2:E2)	=SOMA(B2:E2)	
+AVERAGE	MÉDIA	
+About 	Sobre o 	
+Above and below	Acima e abaixo	
+Accept	Aceitar	
+Accessibility	Acessibilidade	
+Action	Ação	
+Active cell	Célula ativa	
+Actual	Realizado	
+Actual size	Tamanho real	
+Add column	Adicionar coluna	
+Add page	Adicionar página	
+Add rule	Adicionar regra	
+Add sheet	Adicionar planilha	
+Add slide	Adicionar slide	
+Add tab stop	Adicionar tabulação	
+Add table or chart	Adicionar tabela ou gráfico	
+Adjust image	Ajustar imagem	
+Adjustment	Reajuste	
+Advanced	Avançado	
+Advanced gradient	Gradiente avançado	
+Advanced options	Opções avançadas	
+After paragraph	Depois do parágrafo	
+After previous build	Após a composição anterior	
+Align	Alinhar	
+Align automatically	Alinhar automaticamente	
+Align left	Alinhar à esquerda	
+Align objects	Alinhar objetos	
+Align right	Alinhar à direita	
+Alignment	Alinhamento	
+Alignment guides	Guias de alinhamento	
+All	Todas	
+All	Todos	extras.template_chooser
+All at once	Tudo de uma vez	
+All caps	Todas maiúsculas	
+All rules	A todas as regras	
+Alternating row color	Cor alternada nas linhas	
+Angle	Ângulo	
+Animate	Animar	
+Animation	Animação	
+Annual report 2026	Relatório anual 2026	
+Any page	Qualquer página	
+Any rule	A qualquer regra	
+Appear	Aparecer	
+Appearance	Aparência	
+Apr	Abr	
+Area	Área	
+Around	Em volta	
+Arrange	Organizar	
+Arrows	Setas	
+Ascending	Crescente	
+Audience and channels	Público e canais	
+Audio	Áudio	
+Author	Autor	
+Auto-Correction	Autocorreção	
+Automatic	Automático	
+Automatic lists	Listas automáticas	
+Automatically	Automaticamente	
+Average	Média	
+Axis	Eixo	
+Background	Fundo	
+Background color	Cor de fundo	
+Bars	Barras	
+Baseline	Linha de base	
+Basic	Básico	
+Basic	Básicas	parts.gallery_popover
+Before paragraph	Antes do parágrafo	
+Below	Embaixo	
+Between lines	Entre linhas	
+Black	Preto	
+Blank	Em branco	
+Blank (landscape)	Em branco (paisagem)	
+Blank sheet	Planilha em branco	
+Blue	Azul	
+Blur	Desfoque	
+Body	Corpo	
+Bold	Negrito	
+Bold italic	Negrito itálico	
+Bookmark	Marcador	
+Border	Borda	
+Bottom	Inferior	
+Break	Quebra	
+Break, field or note…	Quebra, campo ou nota…	
+Bring forward	Trazer uma camada para a frente	
+Bring to front	Trazer para a frente	
+Brochure	Folheto	
+Brochures	Folhetos	
+Browse by	Navegar por	
+Budget	Orçamento	
+Budget 2027	Orçamento 2027	
+Build	Composição	
+Build In	Entrada	
+Build Out	Saída	
+Build order	Ordem das composições	
+Bullets and lists	Marcadores e listas	
+Business Cards	Cartões de visita	
+By bullet	Por marcador	
+By bullet group	Por grupo de marcadores	
+COUNT	CONT.	
+Cancel	Cancelar	
+Capitalization	Maiúsculas	
+Capitalize sentences	Capitalizar frases	
+Cards and Invitations	Cartões e convites	
+Cash flow	Fluxo de caixa	
+Categories	Categorias	
+Categorize by	Categorizar por	
+Category	Categoria	
+Category (X)	Categoria (X)	
+Cell	Célula	
+Cell background	Fundo da célula	
+Cell borders	Bordas da célula	
+Cell fill	Preenchimento da célula	
+Center	Centralizar	
+Center	Centro	parts
+Center	Centro	parts.arrange_page
+Centimeters	Centímetros	
+Chalkboard	Lousa	
+Change	Variação	
+Change theme…	Trocar de tema…	
+Chapter	Capítulo	
+Character	Caractere	
+Character spacing	Espaçamento entre caracteres	
+Character style	Estilo de caractere	
+Characters	Caracteres	
+Characters without spaces	Caracteres sem espaços	
+Chart	Gráfico	
+Chart (data)	Gráfico (dados)	
+Chart colors	Cores do gráfico	
+Chart type	Tipo de gráfico	
+Charts	Gráficos	
+Checkbox	Caixa de seleção	
+Choose audio…	Escolher áudio…	
+Choose file…	Escolher arquivo…	
+Choose theme…	Escolher tema…	
+Choose…	Escolher…	
+Classic letter	Carta clássica	
+Clear list	Limpar a lista	
+Close	Fechar	
+Close the window	Fechar a janela	
+Close with changes	Fechar com alterações	
+Color	Cor	
+Color and alignment	Cor e alinhamento	
+Colors	Cores	
+Column	De coluna	
+Column A	Coluna A	
+Column after	Coluna depois	
+Column before	Coluna antes	
+Column width	Largura da coluna	
+Columns	Colunas	
+Comment	Comentário	
+Comments	Comentários	
+Conditional highlighting	Formato condicional	
+Constrain proportions	Manter proporções	
+Content scale	Escala do conteúdo	
+Continue	Continuar	
+Contrast	Contraste	
+Copy character style	Copiar estilo de caractere	
+Copy graphic style	Copiar estilo gráfico	
+Copy paragraph style	Copiar estilo de parágrafo	
+Copy result	Copiar resultado	
+Copy style	Copiar estilo	
+Count	Contagem	
+Cover	Capa	
+Create	Criar	
+Create custom cell format…	Criar formato de célula personalizado…	
+Cube	Cubo	
+Currency	Moeda	
+Custom…	Personalizado…	
+Custom…	Personalizada…	parts.colors_popover
+Dark style	Estilo escuro	
+Dashed	Tracejado	
+Dashed	Tracejada	parts.text_layout_page
+Data	Dados	
+Data format	Formato de dados	
+Date and time	Data e hora	
+Decimals	Casas decimais	
+Decrease indent	Diminuir recuo	
+Default	Padrão	
+Delay	Atraso	
+Delivery	Entrega	
+Descending	Decrescente	
+Desk Slides · A Classic	Desk Slides · A Clássica	
+Desk Slides · M	Desk Slides · M Mix com a HIG	
+Desk Slides · N	Desk Slides · N iWork atual	
+Desk Tables · A Classic	Desk Tables · A Clássica	
+Desk Tables · M	Desk Tables · M Mix com a HIG	
+Desk Tables · N	Desk Tables · N iWork atual	
+Desk Writer · A Classic	Desk Writer · A Clássica	
+Desk Writer · M	Desk Writer · M Mix com a HIG	
+Desk Writer · N	Desk Writer · N iWork atual	
+Detect links and addresses	Detectar links e endereços	
+Different first page	Primeira página diferente	
+Different left and right pages	Páginas esquerda e direita diferentes	
+Direction	Direção	
+Discard	Descartar	
+Dissolve	Dissolver	
+Distribute	Distribuir	
+Distribute objects	Distribuir objetos	
+Document	Documento	
+Document endnotes	Notas de fim de documento	
+Document text	Texto do documento	
+Documents	Documentos	
+Dotted	Pontilhado	
+Dotted	Pontilhada	parts.text_layout_page
+Draw with the pen	Desenhar com a caneta	
+Duplicate	Duplicar	
+Duplicate sheet	Duplicar planilha	
+Duration	Duração	
+Edit	Editar	
+Edit data	Editar dados	
+Edit data references	Editar as referências de dados	
+Edit mask	Editar máscara	
+Edit slide layout	Editar o slide mestre	
+Editing	Edição	
+Effect	Efeito	
+Emphasis	Ênfase	
+English (US)	Inglês (EUA)	
+Enhance	Melhorar	
+Equal width	Largura igual	
+Error bars	Barras de erro	
+Every minute, while there are changes	A cada minuto, enquanto houver alterações	
+Expenses	Despesas	
+Expenses by month	Despesas por mês	
+Exponential	Exponencial	
+Export	Exportar	
+Exposure	Exposição	
+Extra space	Espaço extra	
+Eyedropper	Conta-gotas	
+Facing pages	Páginas opostas	
+Family	Família	
+Feb	Fev	
+Fewer decimals	Menos casas decimais	
+Field	Campo	
+File	Arquivo	
+File name	Nome do arquivo	
+Fill	Preenchimento	
+Fill and border	Preenchimento e borda	
+Filter	Filtrar	
+Filter	Filtro	tables.reorganize_pages
+Find	Buscar	
+Find in document…	Buscar no documento…	
+Find options	Opções da busca	
+First line	Primeira linha	
+First slide	Primeiro slide	
+Fit in window	Ajustar à janela	
+Fit page	Ajustar à página	
+Fit to content	Ajustar ao conteúdo	
+Fit width	Ajustar à largura	
+Fixed expenses	Despesas fixas	
+Fixed expenses :: B1:E1	Despesas fixas :: B1:E1	
+Fixed expenses :: B8:E8	Despesas fixas :: B8:E8	
+Flip	Virar	
+Flip	Espelhar	parts.arrange_page
+Flip horizontally	Espelhar horizontalmente	
+Flip vertically	Espelhar verticalmente	
+Floating	Flutuante	
+Following style	Estilo seguinte	
+Font	Fonte	
+Font size	Tamanho da fonte	
+Fonts	Fontes	
+Footer	Rodapé	
+Footer rows	Linhas de rodapé	
+Footnote	Nota de rodapé	
+Footnotes	Notas de rodapé	
+For the next cycle, the priority is to consolidate the digital channels without losing counter service, which is still the source of half of the recurring orders. The targets by region are in the table on the next page. 	Para o próximo ciclo, a prioridade é consolidar os canais digitais sem perder o atendimento de balcão, que continua sendo a origem de metade dos pedidos recorrentes. As metas por região estão na tabela da página seguinte. 	
+Format	Formato	
+Format	Formatar	proposals.slides_n
+Format	Formatar	proposals.tables_n
+Format	Formatar	proposals.writer_n
+Format	Formatar	slides.version_c
+Format	Formatar	tables.version_c
+Format	Formatar	writer.version_c
+Format bar	Barra de formatação	
+Format menu	Menu Formato	
+Format › Text	Formato › Texto	
+Forms	Formulários	
+Formula bar	Barra de fórmulas	
+Formula editor	Editor de fórmulas	
+Formula list	Lista de fórmulas	
+Fraction	Fração	
+Frame	Moldura	
+Freeze headers	Congelar os cabeçalhos	
+From bottom	De baixo	
+From the document	Do documento	
+From the slide layout	Do slide mestre	
+From top	De cima	
+Fullscreen	Tela cheia	
+Function	Função	
+Gap between columns	Espaço entre colunas	
+Gap between groups	Espaço entre grupos	
+General	Geral	
+Geometry	Geometria	
+Go to and browse by	Ir para e navegar por	
+Go to cell…	Ir para a célula…	
+Go to page…	Ir para a página…	
+Go to slide	Ir para o slide	
+Go to slide…	Ir para o slide…	
+Gradient	Gradiente	
+Gray	Cinza	
+Gray headers	Cabeçalhos cinza	
+Grid and background	Grade e fundo	
+Gridlines	Linhas de grade	
+Group	Agrupar	
+Group	Grupo	parts.arrange_page
+Group and lock	Grupo e trava	
+Guides at the center of the object	Guias no centro do objeto	
+Guides at the edges of the object	Guias nas bordas do objeto	
+Half of the minimum screen, side by side with another window.	Metade da tela mínima, lado a lado com outra janela.	
+Half screen (640 × 720)	Meia tela (640 × 720)	
+Header	Cabeçalho	
+Header and footer	Cabeçalho e rodapé	
+Header columns	Colunas de cabeçalho	
+Header rows	Linhas de cabeçalho	
+Headers and footer	Cabeçalhos e rodapé	
+Headers and footers	Cabeçalhos e rodapés	
+Heading 1	Cabeçalho 1	
+Heading 2	Cabeçalho 2	
+Height	Altura	
+Help	Ajuda	
+Hidden table text	Texto oculto de tabelas	
+Horizontally	Horizontalmente	
+Hyphenate	Hifenizar	
+Hyphenate words	Hifenizar palavras	
+Hyphenation	Hifenização	
+Hyphenation and language	Hifenização e idioma	
+If you do not save, they will be lost.	Se você não salvar, elas serão perdidas.	
+Image	Imagem	
+Image description	Descrição da imagem	
+Image, movie or sound…	Imagem, filme ou som…	
+Images…	Imagens…	
+In selection only	Só na seleção	
+In the document and recent	No documento e recentes	
+In the middle	No meio	
+In “Expenses”	Em “Despesas”	
+Inches	Polegadas	
+Include a preview in the document	Incluir a visualização no documento	
+Income	Receitas	
+Increase indent	Aumentar recuo	
+Indent	Recuo	
+Indents	Recuos	
+Information	Informações	
+Inline	Em linha	
+Insert	Inserir	
+Insert column break	Inserir quebra de coluna	
+Insert function	Inserir função	
+Insert layout break	Inserir quebra de layout	
+Insert menu	Menu Inserir	
+Insert page break	Inserir quebra de página	
+Insert paragraph break	Inserir quebra de parágrafo	
+Insert section break	Inserir quebra de seção	
+Insert tab	Inserir tabulação	
+Inset margin	Margem interna	
+Inside	Internas	
+Inspector	Inspetor	
+Instant Alpha	Alfa instantâneo	
+Interactive	Interativo	
+Investment in training doubled, and staff turnover was the lowest since the company was founded. Satisfaction scores, measured every quarter, stayed above nine points in every unit. 	O investimento em treinamento dobrou, e a rotatividade da equipe foi a menor desde a fundação. Os indicadores de satisfação, medidos a cada trimestre, ficaram acima de nove pontos em todas as unidades. 	
+Invisibles	Invisíveis	
+Italic	Itálico	
+Justify	Justificar	
+K	 mil	
+Keep a recovery draft	Guardar um rascunho de recuperação	
+Keep lines together	Manter linhas juntas	
+Keep with next paragraph	Manter com o parágrafo seguinte	
+Keyboard Shortcuts	Atalhos de teclado	
+Keywords	Palavras-chave	
+Labels	Rótulos	
+Labels and lines	Rótulos e linhas	
+Landscape	Paisagem	
+Language	Idioma	
+Larger	Maior	
+Last slide	Último slide	
+Launch plan	Plano de lançamento	
+Layout	De layout	parts.insert_menu
+Layouts	Mestres	
+Ledger	Livro-razão	
+Left	Esquerda	
+Left page	Página esquerda	
+Left to right	Da esquerda para a direita	
+Legal	Ofício	
+Legal	Legal	parts.format_bar_text
+Legend	Legenda	
+Letter	Carta	
+Letters	Cartas	
+Ligatures	Ligaduras	
+Light table	Mesa de luz	
+Line	Linha	
+Line spacing	Espaçamento entre linhas	
+Links only	Somente links	
+List	Lista	
+List style	Estilo de lista	
+Local partners for delivery	Parceiros locais para a entrega	
+Lock	Travar	
+Lock object	Travar o objeto	
+Logarithmic	Logarítmica	
+Logistics costs	O custo	
+Loop	Em repetição	
+Loop slideshow	Repetir a apresentação	
+MAX	MÁX	
+MIN	MÍN	
+Magic Move	Movimento mágico	
+Main menu	Menu principal	
+Make editable	Tornar editável	
+Make master objects selectable	Tornar objetos mestres selecionáveis	
+March minutes	Ata de março	
+Margin	Margem	
+Margins	Margens	
+Mask	Máscara	
+Mask and transparency	Máscara e transparência	
+Mask with shape	Mascarar com forma	
+Match	Corresponder	
+Match case	Diferenciar maiúsculas	
+Maximum	Máximo	
+Media	Mídia	
+Mention the February survey. Ask who already uses the service in the three capitals and show the map before talking about the partners.	Citar a pesquisa de fevereiro. Perguntar quem já usa o serviço nas três capitais e mostrar o mapa antes de falar dos parceiros.	
+Merge cells	Mesclar células	
+Merge field	Campo de mesclagem	
+Metrics	Métricas	
+Middle	Meio	
+Millimeters	Milímetros	
+Minimum	Mínimo	
+Mixed	Misto	
+Mode	Modo	
+Modern letter	Carta moderna	
+More	Mais	
+More adjustments	Mais ajustes	
+More decimals	Mais casas decimais	
+More format options	Mais opções de formatação	
+More formats	Mais formatos	
+More functions…	Mais funções…	
+Move	Mover	
+Move in	Mover para dentro	
+Movies	Filmes	
+Movie…	Filme…	
+Moving average	Média móvel	
+Music	Música	
+My Templates	Meus modelos	
+Name	Nome	
+Name in comments and changes	Nome nos comentários e nas alterações	
+Narration	Narração	
+Navigator	Navegador	
+Negative only	Só negativa	
+Negatives	Negativos	
+New Document	Novo documento	
+New documents	Novos documentos	
+New sheet	Nova planilha	
+New slide	Novo slide	
+New style from selection…	Novo estilo a partir da seleção…	
+Newsletter	Boletim	
+Newsletters	Boletins	
+Newsprint	Jornal	
+Next	Seguinte	
+Next page	Página seguinte	
+Next paragraph	Parágrafo seguinte	
+Next slide	Slide seguinte	
+Next steps	Próximos passos	
+No grid	Sem grade	
+No recording	Nenhuma gravação	
+None	Nenhum	
+None	Nenhuma	parts.colors_popover
+None	Nenhuma	parts.text_layout_page
+None	Nenhuma	parts.text_style_page
+None	Nenhuma	tables.chart_pages
+None	Nenhuma	tables.format_bar_cell
+None	Nenhuma	tables.reorganize_pages
+Northeast	Nordeste	
+Notes	Notas	
+Number	Número	
+Numbered	Numerada	
+Numbering	Numeração	
+Numbering starts at	Numeração começa em	
+Numeral system	Sistema numérico	
+Object	Objeto	
+Object styles	Estilos de objeto	
+Objects	Objetos	
+Off	Desligada	
+Offset	Deslocamento	
+On click	Ao clicar	
+On the left	À esquerda	
+On the right	À direita	
+On top	Em cima	
+Once	Uma vez	
+One page	Uma página	
+Opacity	Opacidade	
+Open	Abrir	
+Open Recent	Abrir recente	
+Open a document	Abrir um documento	
+Open documents	Documentos abertos	
+Open…	Abrir…	
+Options	Opções	
+Order	Ordem	
+Order and alignment	Ordem e alinhamento	
+Organize	Reorganizar	
+Orientation	Orientação	
+Origin at the center of the ruler	Origem no centro da régua	
+Original size	Tamanho original	
+Outline	Tópicos	
+Outline	Contorno	parts.arrange_page
+Outline	Contorno	parts.format_bar_text
+Outline mode	Modo de tópicos	
+Outside	Externas	
+Page	Página	
+Page	De página	parts.insert_menu
+Page 6 of 41	Página 6 de 41	
+Page Layout	Layout de página	
+Page break	Quebra de página	
+Page count	Total de páginas	
+Page number	Número da página	
+Page numbering	Numeração de páginas	
+Page thumbnails	Miniaturas das páginas	
+Pages	Páginas	
+Pagination and breaks	Paginação e quebras	
+Panes	Painéis	
+Paper	Papel	
+Paragraph borders and background	Bordas e fundo do parágrafo	
+Paragraph starts on a new page	Parágrafo começa em nova página	
+Paragraph style	Estilo de parágrafo	
+Paragraph styles 1 to 8	Estilos de parágrafo 1 a 8	
+Paragraph style…	Estilo de parágrafo…	
+Paragraphs	Parágrafos	
+Paste and match style	Colar e manter o estilo do destino	
+Paste graphic style	Colar estilo gráfico	
+Paste style	Colar estilo	
+People	Pessoas	
+Percentage	Porcentagem	
+Photo, horizontal	Foto na horizontal	
+Photos	Fotos	
+Picas	Paicas	
+Picture frame	Moldura de imagem	
+Pie	Pizza	
+Pivot table	Tabela dinâmica	
+Placement	Posicionamento	
+Plain text…	Texto simples…	
+Play	Reproduzir	
+Play from Start	Reproduzir do início	
+Play from This Slide	Reproduzir a partir deste slide	
+Play in Window	Reproduzir em janela	
+Play on open	Reproduzir ao abrir	
+Playback	Reprodução	
+Points	Pontos	
+Polynomial	Polinomial	
+Pop-up menu	Menu pop-up	
+Portrait	Retrato	
+Portuguese (Brazil)	Português (Brasil)	
+Position	Posição	
+Position and rotation	Posição e giro	
+Positive and negative	Positiva e negativa	
+Positive only	Só positiva	
+Posters	Cartazes	
+Power	Potência	
+Power	Energia	canvas.tables_canvas
+Preferences	Preferências	
+Presentation	Apresentação	
+Presentation theme	Tema da apresentação	
+Presenter display	Tela do apresentador	
+Presenter notes	Notas do apresentador	
+Prevent widow and orphan lines	Evitar linhas viúvas e órfãs	
+Preview	Pré-visualizar	
+Previous	Anterior	
+Previous page	Página anterior	
+Previous slide	Slide anterior	
+Print	Imprimir	
+Print preview	Visualização de impressão	
+Printing	Impressão	
+Print…	Imprimir…	
+Product	Produto	
+Product team · March 2027	Equipe de produto · março de 2027	
+Project report	Relatório de projeto	
+Proposal	Proposta	
+Quote	Citação	
+Radio and social campaign	Campanha em rádio e redes	
+Range	Intervalo	
+Rates	Taxas	
+Reapply layout to slide	Reaplicar o mestre ao slide	
+Recent	Recentes	
+Record Slideshow…	Gravar a apresentação…	
+Recorded	Gravada	
+Recording	Gravação	
+Record…	Gravar…	
+Rectangle	Retângulo	
+Redefine style from selection	Redefinir estilo a partir da seleção	
+Reflection	Reflexo	
+Region	Região	
+Rehearse Slideshow	Ensaiar a apresentação	
+Remove page breaks from the selection	Remover quebras de página da seleção	
+Remove paragraph hyphenation	Remover hifenização do parágrafo	
+Rent	Aluguel	
+Replace	Substituir	
+Replace All	Substituir tudo	
+Replace image…	Substituir imagem…	
+Replace with…	Substituir por…	
+Replace…	Substituir…	
+Reports	Relatórios	
+Require password to exit	Exigir senha para sair	
+Require password to open	Exigir senha para abrir	
+Reserve	Reserva	
+Reset	Redefinir	
+Reset mask	Redefinir máscara	
+Reset text geometry	Redefinir geometria do texto	
+Restart if idle	Reiniciar se ficar parada	
+Results of the year	Resultados do ano	
+Revenue grew twelve percent over the previous year, driven by direct sales and the opening of two stores. Logistics costs fell after the change of carrier, and the margin returned to the level of 2023. 	A receita cresceu doze por cento em relação ao ano anterior, puxada pelas vendas diretas e pela abertura de duas lojas. O custo de logística caiu depois da troca de transportadora, e a margem voltou ao patamar de 2023. 	
+Right	Direita	
+Right page	Página direita	
+Right to left	Da direita para a esquerda	
+Risks	Riscos	
+Rotate	Girar	
+Row above	Linha acima	
+Row below	Linha abaixo	
+Row height	Altura da linha	
+Rows	Linhas	
+Rows and columns	Linhas e colunas	
+Ruler	Régua	
+Ruler units	Unidade das réguas	
+Rulers	Réguas	
+Résumé	Currículo	
+Résumés	Currículos	
+SUM	SOMA	
+Sales meeting	Reunião de vendas	
+Sales proposal	Proposta comercial	
+Sales, people and targets for 2027	Vendas, pessoas e metas para 2027	
+Same	Mesmo	
+Same as data	Igual aos dados	
+Saturation	Saturação	
+Save	Salvar	
+Save As	Salvar como	
+Save As…	Salvar como…	
+Save the changes?	Salvar as alterações?	
+Saving	Salvamento	
+Scale	Escala	
+Scatter	Dispersão	
+Schedule	Calendário	
+School report	Relatório escolar	
+Scientific	Científico	
+Screen smaller than 1280 × 720 ‒ parts of the window may not fit	Tela menor que 1280 × 720 ‒ partes da janela podem não caber	
+Screen smaller than the minimum (1024 × 600)	Tela menor que a mínima (1024 × 600)	
+Search Commands…	Buscar comandos…	
+Search commands	Buscar comandos	
+Search fonts…	Buscar fontes…	
+Search results	Resultados da busca	
+Search shapes…	Buscar formas…	
+Search templates	Buscar modelos	
+Section	Seção	
+Section	De seção	parts.insert_menu
+Section break	Quebra de seção	
+Section endnotes	Notas de fim de seção	
+Section start	Início da seção	
+Section starts on	A seção começa em	
+Security	Segurança	
+Selection	Seleção	
+Self-playing	Reprodução automática	
+Send backward	Enviar uma camada para trás	
+Send by email…	Enviar por e-mail…	
+Send to back	Enviar para trás	
+Series	Séries	
+Set as master object	Definir como objeto mestre	
+Shadow	Sombra	
+Shape	Forma	
+Sharpness	Nitidez	
+Sheet	Planilha	
+Sheet 2 of 4	Planilha 2 de 4	
+Sheets	Planilhas	
+Show all results in the sidebar	Mostrar todos os resultados na barra lateral	
+Show in Inspector	Mostrar no Inspetor	
+Show invisibles (breaks and spaces)	Mostrar invisíveis (quebras e espaços)	
+Show more…	Mostrar mais…	
+Show rows that match	Mostrar as linhas que correspondem	
+Show rules…	Mostrar regras…	
+Show size and position when moving objects	Mostrar o tamanho e a posição ao mover objetos	
+Show statistics	Mostrar estatísticas	
+Show table name	Mostrar o nome da tabela	
+Show the template chooser	Mostrar o seletor de modelos	
+Show the word count	Mostrar a contagem de palavras	
+Show warnings	Ver avisos	
+Show when Desk Writer opens	Mostrar ao abrir o Desk Writer	
+Sidebar	Barra lateral	
+Sidebar content	Conteúdo da barra lateral	
+Size	Tamanho	
+Skip this slide	Pular este slide	
+Slide 3 of 12	Slide 3 de 12	
+Slide background	Fundo do slide	
+Slide layout	Slide mestre	
+Slide layouts	Slides mestres	
+Slide number	Número do slide	
+Slide only	Só o slide	
+Slide size	Tamanho do slide	
+Slider	Controle deslizante	
+Slides B · Animation	Slides B · Animação	
+Slides B · Document	Slides B · Documento	
+Slides B · light table	Slides B · mesa de luz	
+Slides B · nothing selected	Slides B · nada selecionado	
+Slides B · transition	Slides B · transição	
+Slides M+	Slides M+ · objetos no cabeçalho	
+Slideshow options	Opções da apresentação	
+Small caps	Versalete	
+Smaller	Menor	
+Smart build	Composição inteligente	
+Smart quotes	Aspas tipográficas	
+Sort	Ordenar	
+Sort now	Ordenar agora	
+Soundtrack	Trilha sonora	
+South	Sul	
+Southeast	Sudeste	
+Spacing	Espaçamento	
+Spanish	Espanhol	
+Special characters…	Caracteres especiais…	
+Stacked columns	Colunas empilhadas	
+Start	Iniciar	
+Start at	Iniciar em	
+Start transition	Iniciar transição	
+Statistics	Estatísticas	
+Step by step	Passo a passo	
+Steps	Passos	
+Strikethrough	Tachado	
+Stroke	Traço	
+Stroke color	Cor do traço	
+Stroke style	Estilo do traço	
+Stroke width	Espessura do traço	
+Strong	Forte	
+Style	Estilo	
+Style and color	Estilo e cor	
+Style, width and color…	Estilo, espessura e cor…	
+Styles	Estilos	
+Styles drawer	Gaveta de estilos	
+Subscript	Subscrito	
+Subtitle	Subtítulo	
+Sum	Soma	
+Summary	Resumo	
+Superscript	Sobrescrito	
+Supplies	Material	
+Table	Tabela	
+Table of contents	Sumário	
+Table styles	Estilos de tabela	
+Tables	Tabelas	
+Tables B · Data	Tables B · Dados	
+Tables B · Document	Tables B · Documento	
+Tables B · chart selected	Tables B · gráfico selecionado	
+Tables B · editing a formula	Tables B · editando uma fórmula	
+Tables M+	Tables M+ · objetos no cabeçalho	
+Tables and charts	Tabelas e gráficos	
+Tabs	Tabulações	
+Target	Meta	
+Target: 4,000 orders in the quarter	Meta: 4 mil pedidos no trimestre	
+Tax	Imposto	
+Temperature	Temperatura	
+Template	Modelo	
+Template chooser in the window	Seletor de modelos na janela	
+Template pages	Páginas do modelo	
+Text	Texto	
+Text background color	Cor de fundo do texto	
+Text box	Caixa de texto	
+Text color	Cor do texto	
+Text in cell	Texto na célula	
+Text wrap	Ajuste do texto	
+The banner that warns, on opening, that the screen has less than 1280 × 720.	A faixa que avisa, na abertura, que a tela tem menos de 1280 × 720.	
+The document “Annual report 2026” has changes that were not saved. 	O documento “Relatório anual 2026” tem alterações que não foram salvas. 	
+The format bar and the Inspector change with the selection.	A barra de formatação e o Inspetor trocam com a seleção.	
+The selected rows	As linhas selecionadas	
+The whole table	A tabela inteira	
+Theme	Tema	
+Themes	Temas	
+This document was opened with 3 warnings	Este documento foi aberto com 3 avisos	
+Thousands separator	Separador de milhar	
+Three capitals in the first wave	Três capitais na primeira onda	
+Thumbnail size	Tamanho das miniaturas	
+Tick marks	Marcas de escala	
+Tinted image	Imagem tingida	
+Title	Título	
+Title and bullets	Título e marcadores	
+Title and subtitle	Título e subtítulo	
+Title only	Só o título	
+Title, bullets and photo	Título, marcadores e foto	
+To the left	Para a esquerda	
+To the right	Para a direita	
+Top	Superior	
+Track changes	Controle de alterações	
+Transition	Transição	
+Transport	Transporte	
+Trendline	Linha de tendência	
+Two axes	Dois eixos	
+Two pages	Duas páginas	
+Type	Tipo	
+Typeface	Tipo	
+Typeface, spacing and ligatures in the Inspector	Tipo, espaçamento e ligaduras no Inspetor	
+Underline	Sublinhado	
+Ungroup	Desagrupar	
+Units	Unidades	
+Units as percentage	Unidades como porcentagem	
+Unlock	Destravar	
+Update	Atualizar	
+Use ligatures	Usar ligaduras	
+Use the chosen template	Usar o modelo escolhido	
+Use those of the previous section	Usar os da seção anterior	
+Value (Y)	Valor (Y)	
+Value labels	Rótulos de valor	
+Values	Valores	
+Vertical alignment	Alinhamento vertical	
+Vertically	Verticalmente	
+View	Visualização	
+View	Visualizar	proposals.slides_n
+View	Visualizar	proposals.tables_n
+View	Visualizar	proposals.writer_n
+View menu	Menu Visualização	
+Web view	Visualização web	
+When creating a document	Ao criar um documento	
+Where we are	Onde estamos	
+White	Branco	
+Whole words	Palavras inteiras	
+Width	Espessura	
+Width	Largura	parts.arrange_page
+With nothing selected, the format bar and the Inspector show what belongs to the slide.	Sem seleção, a barra de formatação e o Inspetor mostram o que é do slide.	
+With previous build	Com a composição anterior	
+Word Processing	Processamento de texto	
+Word count	Contagem de palavras	
+Words	Palavras	
+Wrap	Ajuste	
+Wrap text in cell	Ajustar texto na célula	
+Writer B · Colors popover	Writer B · popover Cores	
+Writer B · Document	Writer B · Documento	
+Writer B · Fonts popover	Writer B · popover Fontes	
+Writer B · Insert menu	Writer B · menu Inserir	
+Writer B · Shape popover	Writer B · popover Forma	
+Writer B · View menu	Writer B · menu Visualização	
+Writer B · find and notices	Writer B · busca e avisos	
+Writer B · image selected	Writer B · imagem selecionada	
+Writer B · main menu	Writer B · menu principal	
+Writer B · shape selected	Writer B · forma selecionada	
+Writer C · Insert	Writer C · Inserir	
+Writer M+	Writer M+ · objetos no cabeçalho	
+Zoom in	Ampliar	
+Zoom out	Reduzir	
+break	quebra	
+carrier	transportadora	
+cost	custo	
+is greater than 1,000	é maior que 1.000	
+landscape.jpg	paisagem.jpg	
+lines	lin.	
+opening.ogg	abertura.ogg	
+The document “Annual report 2026” has changes that were not saved. If you do not save, they will be lost.	O documento “Relatório anual 2026” tem alterações que não foram salvas. Se você não salvar, elas serão perdidas.	

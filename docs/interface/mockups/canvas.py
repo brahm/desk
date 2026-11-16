@@ -19,15 +19,15 @@ SERIF = 'TeX Gyre Termes'
 SANS = 'Adwaita Sans'
 
 LOREM = (
-    'A receita cresceu doze por cento em relação ao ano anterior, puxada pelas vendas diretas e '
-    'pela abertura de duas lojas. O custo de logística caiu depois da troca de transportadora, e a '
-    'margem voltou ao patamar de 2023. ',
-    'Para o próximo ciclo, a prioridade é consolidar os canais digitais sem perder o atendimento de '
-    'balcão, que continua sendo a origem de metade dos pedidos recorrentes. As metas por região '
-    'estão na tabela da página seguinte. ',
-    'O investimento em treinamento dobrou, e a rotatividade da equipe foi a menor desde a fundação. '
-    'Os indicadores de satisfação, medidos a cada trimestre, ficaram acima de nove pontos em todas '
-    'as unidades. ',
+    'Revenue grew twelve percent over the previous year, driven by direct sales and the opening '
+    'of two stores. Logistics costs fell after the change of carrier, and the margin returned to '
+    'the level of 2023. ',
+    'For the next cycle, the priority is to consolidate the digital channels without losing '
+    'counter service, which is still the source of half of the recurring orders. The targets by '
+    'region are in the table on the next page. ',
+    'Investment in training doubled, and staff turnover was the lowest since the company was '
+    'founded. Satisfaction scores, measured every quarter, stayed above nine points in every '
+    'unit. ',
 )
 
 
@@ -133,16 +133,16 @@ def writer_canvas(selection='text', page_w=560, dark_bg=False, comments=False):
         m = pw * 0.12
         tx, tw = px + m, pw - 2 * m
         y = py + m * 0.55
-        _text(cr, tx, y, 'Relatório anual 2026', SANS, 7.5, color=(0.5, 0.5, 0.5))
+        _text(cr, tx, y, 'Annual report 2026', SANS, 7.5, color=(0.5, 0.5, 0.5))
         _text(cr, tx, y, '6', SANS, 7.5, width=tw, color=(0.5, 0.5, 0.5), align=Pango.Alignment.RIGHT)
         y = py + m
-        y += _text(cr, tx, y, 'Resultados do ano', SANS + ' Bold', 19) + 4
-        y += _text(cr, tx, y, 'Vendas, pessoas e metas para 2027', SANS, 10.5, color=(0.4, 0.4, 0.4)) + 14
+        y += _text(cr, tx, y, 'Results of the year', SANS + ' Bold', 19) + 4
+        y += _text(cr, tx, y, 'Sales, people and targets for 2027', SANS, 10.5, color=(0.4, 0.4, 0.4)) + 14
         # first paragraph, with a selected sentence
         para = LOREM[0]
         if selection == 'text':
-            a = para.index('O custo')
-            b = para.index('transportadora') + len('transportadora')
+            a = para.index('Logistics costs')
+            b = para.index('carrier') + len('carrier')
             mk = (para[:a] + '<span background="#3584e4" background_alpha="32%">' + para[a:b]
                   + '</span>' + para[b:])
             y += _text(cr, tx, y, mk, SERIF, 10.5, width=tw, markup=True, spacing=1.25) + 9
@@ -156,7 +156,7 @@ def writer_canvas(selection='text', page_w=560, dark_bg=False, comments=False):
             cr.set_source_rgb(0.11, 0.44, 0.85)
             _rr(cr, ix, y + 3, iw, ih, 12)
             cr.fill()
-            _text(cr, ix, y + 3 + ih / 2 - 17, 'Meta de 2027', SANS + ' Bold', 12, width=iw,
+            _text(cr, ix, y + 3 + ih / 2 - 17, '2027 target', SANS + ' Bold', 12, width=iw,
                   color=(1, 1, 1), align=Pango.Alignment.CENTER)
             _text(cr, ix, y + 3 + ih / 2 + 3, '4 mil pedidos por trimestre', SANS, 8.5, width=iw,
                   color=(1, 1, 1), align=Pango.Alignment.CENTER)
@@ -168,14 +168,14 @@ def writer_canvas(selection='text', page_w=560, dark_bg=False, comments=False):
             _handles(cr, ix, y + 3, iw, ih)
         hy = _text(cr, tx, y, LOREM[1], SERIF, 10.5, width=tw - iw - 14, spacing=1.25)
         y += max(hy, ih + 6) + 9
-        y += _text(cr, tx, y, 'Pessoas', SANS + ' Bold', 13) + 5
+        y += _text(cr, tx, y, 'People', SANS + ' Bold', 13) + 5
         y += _text(cr, tx, y, LOREM[2], SERIF, 10.5, width=tw, spacing=1.25) + 9
         # a small table
         cols, rows = 4, 4
         cw, rh = tw / cols, 19
-        head = ('Região', 'Meta', 'Realizado', 'Variação')
-        data = (('Sul', '1.200', '1.340', '+11,7 %'), ('Sudeste', '2.800', '2.950', '+5,4 %'),
-                ('Nordeste', '950', '1.010', '+6,3 %'))
+        head = ('Region', 'Target', 'Actual', 'Change')
+        data = (('South', '1,200', '1,340', '+11.7%'), ('Southeast', '2,800', '2,950', '+5.4%'),
+                ('Northeast', '950', '1,010', '+6.3%'))
         cr.set_source_rgb(0.25, 0.33, 0.45)
         cr.rectangle(tx, y, tw, rh)
         cr.fill()
@@ -206,7 +206,7 @@ def writer_canvas(selection='text', page_w=560, dark_bg=False, comments=False):
             cr.set_source_rgb(1.0, 0.95, 0.67)
             _rr(cr, cx, py + m + 70, 120, 54, 6)
             cr.fill()
-            _text(cr, cx + 8, py + m + 76, '<b>Ana</b>\nConferir este número com o financeiro',
+            _text(cr, cx + 8, py + m + 76, '<b>Ana</b>\nCheck this number with finance',
                   SANS, 7.5, width=106, markup=True)
             info['comment'] = (cx, py + m + 70, 120, 54)
         info['page'] = (px, py, pw, ph)
@@ -332,13 +332,13 @@ def tables_canvas(selection='cell', editing=False):
         cr.set_source_rgb(1, 1, 1)
         cr.paint()
         ox, oy = 46, 56
-        cols = ('', 'Jan', 'Fev', 'Mar', 'Abr', 'Total')
-        rows = (('Aluguel', '2.400', '2.400', '2.400', '2.400', '9.600'),
-                ('Energia', '310', '295', '342', '318', '1.265'),
+        cols = ('', 'Jan', 'Feb', 'Mar', 'Apr', 'Total')
+        rows = (('Rent', '2,400', '2,400', '2,400', '2,400', '9,600'),
+                ('Power', '310', '295', '342', '318', '1,265'),
                 ('Internet', '129', '129', '129', '129', '516'),
-                ('Material', '860', '412', '590', '733', '2.595'),
-                ('Transporte', '540', '575', '498', '610', '2.223'),
-                ('Marketing', '1.200', '900', '1.450', '1.100', '4.650'))
+                ('Supplies', '860', '412', '590', '733', '2,595'),
+                ('Transport', '540', '575', '498', '610', '2,223'),
+                ('Marketing', '1,200', '900', '1,450', '1,100', '4,650'))
         cw = (104, 72, 72, 72, 72, 82)
         rh = 24
         tw = sum(cw)
@@ -360,7 +360,7 @@ def tables_canvas(selection='cell', editing=False):
             _text(cr, ox - 18, oy + i * rh + 5.5, str(i + 1), SANS, 8, color=(0.3, 0.3, 0.3))
         info['tabs'] = (ox - 26, oy - 20, tw + 26, 18)
         # table name
-        _text(cr, ox, oy - 44, 'Despesas fixas', SANS + ' Bold', 11)
+        _text(cr, ox, oy - 44, 'Fixed expenses', SANS + ' Bold', 11)
         # header row
         cr.set_source_rgb(0.25, 0.33, 0.45)
         cr.rectangle(ox, oy, tw, rh)
@@ -391,7 +391,7 @@ def tables_canvas(selection='cell', editing=False):
         cr.rectangle(ox, fy, tw, rh)
         cr.fill()
         x = ox
-        for i, t in enumerate(('Total', '5.439', '4.711', '5.409', '5.290', '20.849')):
+        for i, t in enumerate(('Total', '5,439', '4,711', '5,409', '5,290', '20,849')):
             _text(cr, x + 8, fy + 5, t, SANS + ' Bold', 9, width=cw[i] - 16,
                   align=Pango.Alignment.RIGHT if i else Pango.Alignment.LEFT)
             x += cw[i]
@@ -426,14 +426,14 @@ def tables_canvas(selection='cell', editing=False):
             cr.set_source_rgba(0, 0, 0, 0.25)
             cr.set_line_width(1)
             cr.stroke()
-            _text(cr, sx - 140, sy + 4, '= <span foreground="#1c71d8">SOMA</span>'
-                  '(<span background="#f9f06b">B2:E2</span>) × <span background="#8ff0a4">Reajuste</span>',
+            _text(cr, sx - 140, sy + 4, '= <span foreground="#1c71d8">SUM</span>'
+                  '(<span background="#f9f06b">B2:E2</span>) × <span background="#8ff0a4">Adjustment</span>',
                   SANS, 9.5, markup=True)
             info['editor'] = (sx - 150, sy - 6, 236, rh + 12)
         # chart
         gx, gy, gw, gh = ox + tw + 46, oy - 44, w - (ox + tw + 46) - 30, 236
         if gw > 160:
-            _text(cr, gx, gy, 'Despesas por mês', SANS + ' Bold', 11)
+            _text(cr, gx, gy, 'Expenses by month', SANS + ' Bold', 11)
             base = gy + gh - 22
             cr.set_source_rgb(0.8, 0.8, 0.8)
             cr.set_line_width(0.8)
@@ -441,7 +441,7 @@ def tables_canvas(selection='cell', editing=False):
                 yy = base - i * (gh - 60) / 4
                 cr.move_to(gx + 26, yy)
                 cr.line_to(gx + gw, yy)
-                _text(cr, gx, yy - 6, str(i * 2) + ' mil', SANS, 7, color=(0.45, 0.45, 0.45))
+                _text(cr, gx, yy - 6, str(i * 2) + 'K', SANS, 7, color=(0.45, 0.45, 0.45))
             cr.stroke()
             vals = (5.439, 4.711, 5.409, 5.290)
             bw = (gw - 60) / len(vals)
@@ -450,15 +450,15 @@ def tables_canvas(selection='cell', editing=False):
                 cr.set_source_rgb(*(ACCENT if i != 2 else (0.9, 0.38, 0.0)))
                 _rr(cr, gx + 40 + i * bw, base - bh, bw * 0.6, bh, 2)
                 cr.fill()
-                _text(cr, gx + 40 + i * bw + bw * 0.18, base + 4, ('Jan', 'Fev', 'Mar', 'Abr')[i], SANS, 7.5,
+                _text(cr, gx + 40 + i * bw + bw * 0.18, base + 4, ('Jan', 'Feb', 'Mar', 'Apr')[i], SANS, 7.5,
                       color=(0.35, 0.35, 0.35))
             info['chart'] = (gx - 6, gy - 6, gw + 12, gh + 12)
             if selection == 'chart':
                 _handles(cr, gx - 6, gy - 6, gw + 12, gh + 12)
         # second table
         ty = oy + nrows * rh + 62
-        _text(cr, ox, ty - 24, 'Taxas', SANS + ' Bold', 11)
-        t2 = (('Reajuste', '4,5 %'), ('Reserva', '10 %'), ('Imposto', '6 %'))
+        _text(cr, ox, ty - 24, 'Rates', SANS + ' Bold', 11)
+        t2 = (('Adjustment', '4.5%'), ('Reserve', '10%'), ('Tax', '6%'))
         for ri, (k, v) in enumerate(t2):
             ry = ty + ri * rh
             cr.set_source_rgb(0.93, 0.94, 0.96)
@@ -490,13 +490,13 @@ def sheet_thumb(kind='table'):
 # ------------------------------------------------------------------ Slides
 
 SLIDES = (
-    ('Plano de lançamento', 'title'),
-    ('Onde estamos', 'bullets'),
-    ('Público e canais', 'image'),
-    ('Calendário', 'table'),
-    ('Orçamento', 'chart'),
-    ('Riscos', 'bullets'),
-    ('Próximos passos', 'bullets'),
+    ('Launch plan', 'title'),
+    ('Where we are', 'bullets'),
+    ('Audience and channels', 'image'),
+    ('Schedule', 'table'),
+    ('Budget', 'chart'),
+    ('Risks', 'bullets'),
+    ('Next steps', 'bullets'),
 )
 
 
@@ -515,7 +515,7 @@ def _slide(cr, x, y, w, h, title, kind, big=False, selection=None, info=None):
         cr.rectangle(x, y, w, h * 0.55)
         cr.fill()
         _text(cr, x + 44 * s, y + h * 0.25, title, SANS + ' Bold', 30 * s, color=(1, 1, 1))
-        _text(cr, x + 44 * s, y + h * 0.63, 'Equipe de produto · março de 2027', SANS, 15 * s,
+        _text(cr, x + 44 * s, y + h * 0.63, 'Product team · March 2027', SANS, 15 * s,
               color=(0.3, 0.3, 0.3))
         cr.restore()
         return
@@ -532,8 +532,8 @@ def _slide(cr, x, y, w, h, title, kind, big=False, selection=None, info=None):
             _handles(cr, ix, iy, iw, ih)
         bw = w - iw - 110 * s
     if kind in ('bullets', 'image'):
-        items = ('Três capitais na primeira onda', 'Parceiros locais para a entrega',
-                 'Campanha em rádio e redes', 'Meta: 4 mil pedidos no trimestre')
+        items = ('Three capitals in the first wave', 'Local partners for delivery',
+                 'Radio and social campaign', 'Target: 4,000 orders in the quarter')
         for i, t in enumerate(items[:3] if kind == 'image' else items):
             cr.set_source_rgb(0.9, 0.38, 0.0)
             cr.arc(x + 48 * s, by + 14 * s, 4 * s, 0, 2 * math.pi)

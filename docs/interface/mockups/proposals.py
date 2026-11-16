@@ -83,16 +83,16 @@ def tool_item(caption, cid, icon=None, text=None, menu=None, popover=None, toggl
         b = Gtk.Button(child=child)
     classes(b, 'flat', 'tool-item')
     b.set_valign(Gtk.Align.CENTER)
-    return tag(b, 'proprio.' + cid)
+    return tag(b, 'own.' + cid)
 
 
 def insert_items(app, first):
     """Insert (or Play), Table, Chart, Text, Shape, Media and Comment."""
     items = [first]
-    names = {'texto': 'Texto'}
+    names = {'text': 'Text'}
     for suf, icon, tip, kind in parts.INSERT:
         pop = parts.gallery_popover(kind) if kind else None
-        items.append(tool_item(names.get(suf, tip), 'barra.' + suf, icon=icon, popover=pop))
+        items.append(tool_item(names.get(suf, tip), 'bar.' + suf, icon=icon, popover=pop))
     return hbox(*items, spacing=2)
 
 
@@ -104,11 +104,11 @@ def toolbar_n(app, start, centre, end):
     hb.set_title_widget(centre)
     for w in start:
         hb.pack_start(w)
-    hb.pack_end(menu_button(icon='open-menu', tip='Menu principal', cid='cab.menu',
+    hb.pack_end(menu_button(icon='open-menu', tip='Main menu', cid='head.menu',
                             menu=parts.main_menu(app, lean=True)))
     for w in reversed(end):
         hb.pack_end(w)
-    return tag(hb, 'cab.barra')
+    return tag(hb, 'head.bar')
 
 
 def document_tabs(app, others, child):
@@ -122,7 +122,7 @@ def document_tabs(app, others, child):
         first = first or pg
     view.set_selected_page(first)
     bar = Adw.TabBar(view=view, autohide=False)
-    return view, tag(bar, 'abas.documentos')
+    return view, tag(bar, 'tabs.documents')
 
 
 def pill(text, cid, **kw):
@@ -131,9 +131,9 @@ def pill(text, cid, **kw):
 
 
 def zoom_pill(text):
-    return shell.osd_pill(icon_button('zoom-out', 'Reduzir'),
+    return shell.osd_pill(icon_button('zoom-out', 'Zoom out'),
                           label(text, 'numeric', margin_start=4, margin_end=4),
-                          icon_button('zoom-in', 'Ampliar'), cid='osd.zoom',
+                          icon_button('zoom-in', 'Zoom in'), cid='osd.zoom',
                           halign=Gtk.Align.END, valign=Gtk.Align.END, margin_end=14, margin_bottom=12)
 
 
@@ -159,17 +159,17 @@ def objects_sidebar():
     """The tables and charts of the current sheet: what the Sheets pane of
     Numbers '09 listed, now that the sheets themselves are tabs."""
     sb = Adw.Sidebar()
-    sec = Adw.SidebarSection(title='Em “Despesas”')
+    sec = Adw.SidebarSection(title='In “Expenses”')
     for n, ic in tables.OBJECTS:
         sec.append(Adw.SidebarItem(title=n, icon_name=ic + '-symbolic'))
     sb.append(sec)
     sb.set_selected(0)
-    return tag(sb, 'lat.objetos')
+    return tag(sb, 'side.objects')
 
 
-OTHER_DOCS = {'writer': ['Ata de março', 'Proposta comercial'],
-              'tables': ['Fluxo de caixa'],
-              'slides': ['Reunião de vendas']}
+OTHER_DOCS = {'writer': ['March minutes', 'Sales proposal'],
+              'tables': ['Cash flow'],
+              'slides': ['Sales meeting']}
 
 
 # -------------------------------------------------------------- version N
@@ -178,16 +178,16 @@ OTHER_DOCS = {'writer': ['Ata de março', 'Proposta comercial'],
 def writer_n(win, context='text', level=shell.FORMAT):
     _css()
     app = 'writer'
-    start = [tool_item('Visualizar', 'barra.visualizar', icon='sidebar-show', menu=parts.view_menu(app)),
-             tool_item('Zoom', 'barra.zoom', text='125 %', menu=parts.zoom_menu()),
-             tool_item('Adicionar página', 'barra.adicionar', icon='list-add', menu=writer.ADD_PAGE)]
-    centre = insert_items(app, tool_item('Inserir', 'barra.inserir', icon='desk-insert',
+    start = [tool_item('View', 'bar.view', icon='sidebar-show', menu=parts.view_menu(app)),
+             tool_item('Zoom', 'bar.zoom', text='125%', menu=parts.zoom_menu()),
+             tool_item('Add page', 'bar.add', icon='list-add', menu=writer.ADD_PAGE)]
+    centre = insert_items(app, tool_item('Insert', 'bar.insert', icon='desk-insert',
                                          menu=parts.insert_menu(app)))
-    end = [tool_item('Formatar', 'barra.formatar', icon='desk-format', toggle=True,
+    end = [tool_item('Format', 'bar.format', icon='desk-format', toggle=True,
                      active=level == shell.FORMAT),
-           tool_item('Documento', 'barra.documento', icon='x-office-document', toggle=True,
+           tool_item('Document', 'bar.document', icon='x-office-document', toggle=True,
                      active=level == shell.DOCUMENT)]
-    words = pill('26.171 palavras', 'osd.contagem', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
+    words = pill('26,171 words', 'osd.count', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
                  margin_bottom=12)
     doc = writer.doc_view(context, rulers=False, overlays=(words,))
     inner = shell.split(writer.inspector_c(context, level), doc, shell.INSPECTOR_W, Gtk.PackType.END)
@@ -199,29 +199,29 @@ def writer_n(win, context='text', level=shell.FORMAT):
 def tables_n(win):
     _css()
     app = 'tables'
-    start = [tool_item('Visualizar', 'barra.visualizar', icon='sidebar-show', menu=parts.view_menu(app)),
-             tool_item('Zoom', 'barra.zoom', text='100 %', menu=parts.zoom_menu()),
-             tool_item('Categoria', 'barra.categoria', icon='desk-category', menu=menu_model(['—'])),
-             tool_item('Tabela dinâmica', 'barra.dinamica', icon='desk-sort')]
-    centre = insert_items(app, tool_item('Inserir', 'barra.inserir', icon='desk-function',
+    start = [tool_item('View', 'bar.view', icon='sidebar-show', menu=parts.view_menu(app)),
+             tool_item('Zoom', 'bar.zoom', text='100%', menu=parts.zoom_menu()),
+             tool_item('Category', 'bar.category', icon='desk-category', menu=menu_model(['—'])),
+             tool_item('Pivot table', 'bar.pivot', icon='desk-sort')]
+    centre = insert_items(app, tool_item('Insert', 'bar.insert', icon='desk-function',
                                          menu=tables.FUNCTIONS))
-    end = [tool_item('Formatar', 'barra.formatar', icon='desk-format', toggle=True, active=True),
-           tool_item('Organizar', 'barra.organizar', icon='desk-filter', toggle=True)]
+    end = [tool_item('Format', 'bar.format', icon='desk-format', toggle=True, active=True),
+           tool_item('Arrange', 'bar.arrange', icon='desk-filter', toggle=True)]
     sheets = Adw.TabView()
     chosen = None
     for n in tables.SHEETS:
-        pg = sheets.append(tables.sheet_view() if n == 'Despesas' else Gtk.Box())
+        pg = sheets.append(tables.sheet_view() if n == 'Expenses' else Gtk.Box())
         pg.set_title(n)
-        if n == 'Despesas':
+        if n == 'Expenses':
             chosen = pg
     sheets.set_selected_page(chosen)
     strip = Adw.TabBar(view=sheets, autohide=False, expand_tabs=False)
-    strip.set_start_action_widget(icon_button('list-add', 'Adicionar planilha', 'abas.adicionar'))
-    tag(strip, 'abas.planilhas')
-    cell = hbox(tag(classes(label('=SOMA(B2:E2)', 'formula-entry', hexpand=True), 'numeric'), 'inf.formula'),
+    strip.set_start_action_widget(icon_button('list-add', 'Add sheet', 'tabs.add'))
+    tag(strip, 'tabs.sheets')
+    cell = hbox(tag(classes(label('=SUM(B2:E2)', 'formula-entry', hexpand=True), 'numeric'), 'bottom.formula'),
                 tables.calc_chips(), spacing=8)
     classes(cell, 'toolbar', 'bottombar')
-    tag(cell, 'inf.celula')
+    tag(cell, 'bottom.cell')
     pages, vis = tables.format_pages()
     insp, width = wide(lambda: shell.inspector_c(None, pages, vis), 404)
     inner = shell.split(insp, shell.toolbar_view(sheets, top=[strip], bottom=[cell]), width,
@@ -233,16 +233,16 @@ def tables_n(win):
 def slides_n(win, context='image', level=shell.FORMAT):
     _css()
     app = 'slides'
-    start = [tool_item('Visualizar', 'barra.visualizar', icon='sidebar-show', menu=parts.view_menu(app)),
-             tool_item('Zoom', 'barra.zoom', text='62 %', menu=parts.zoom_menu()),
-             tool_item('Adicionar slide', 'barra.adicionar', icon='list-add',
+    start = [tool_item('View', 'bar.view', icon='sidebar-show', menu=parts.view_menu(app)),
+             tool_item('Zoom', 'bar.zoom', text='62%', menu=parts.zoom_menu()),
+             tool_item('Add slide', 'bar.add', icon='list-add',
                        popover=slides.masters_popover())]
-    centre = insert_items(app, tool_item('Reproduzir', 'barra.reproduzir', icon='media-playback-start'))
-    end = [tool_item('Formatar', 'barra.formatar', icon='desk-format', toggle=True,
+    centre = insert_items(app, tool_item('Play', 'bar.play', icon='media-playback-start'))
+    end = [tool_item('Format', 'bar.format', icon='desk-format', toggle=True,
                      active=level == shell.FORMAT),
-           tool_item('Animar', 'barra.animar', icon='desk-animate', toggle=True,
+           tool_item('Animate', 'bar.animate', icon='desk-animate', toggle=True,
                      active=level == shell.ANIMATION),
-           tool_item('Documento', 'barra.documento', icon='x-office-document', toggle=True,
+           tool_item('Document', 'bar.document', icon='x-office-document', toggle=True,
                      active=level == shell.DOCUMENT)]
     inner = shell.split(slides.inspector_c(context, level), slides.slide_view(context, notes=False),
                         shell.INSPECTOR_W, Gtk.PackType.END)
@@ -259,9 +259,9 @@ def header_m(app, extra_start=(), objects=False):
     for the window as a whole, the title in the middle, the primary menu
     at the end. Saving is automatic, so the subtitle is the folder alone."""
     hb = Adw.HeaderBar()
-    hb.set_title_widget(tag(Adw.WindowTitle(title=parts.APPS[app]['doc'], subtitle='Documentos'),
-                            'cab.titulo'))
-    hb.pack_start(icon_button('sidebar-show', 'Barra lateral', 'cab.lateral', toggle=True, active=True))
+    hb.set_title_widget(tag(Adw.WindowTitle(title=parts.APPS[app]['doc'], subtitle='Documents'),
+                            'head.title'))
+    hb.pack_start(icon_button('sidebar-show', 'Sidebar', 'head.sidebar', toggle=True, active=True))
     if objects:
         # Variant M+: the six kinds of object stay one click away, as icon
         # buttons with a tooltip, and Insert keeps the rest (breaks, fields).
@@ -269,26 +269,26 @@ def header_m(app, extra_start=(), objects=False):
         for b in parts.insert_buttons():
             hb.pack_start(b)
     else:
-        hb.pack_start(menu_button(icon='desk-insert', text='Inserir', tip='Inserir', cid='cab.inserir',
+        hb.pack_start(menu_button(icon='desk-insert', text='Insert', tip='Insert', cid='head.insert',
                                   arrow=False, popover=writer.insert_all_popover(app)))
     for w in extra_start:
         hb.pack_start(w)
-    hb.pack_end(menu_button(icon='open-menu', tip='Menu principal', cid='cab.menu',
+    hb.pack_end(menu_button(icon='open-menu', tip='Main menu', cid='head.menu',
                             menu=parts.main_menu(app, lean=True)))
-    hb.pack_end(icon_button('sidebar-show-right', 'Inspetor', 'cab.inspetor', toggle=True, active=True))
-    hb.pack_end(icon_button('edit-find', 'Buscar', 'cab.localizar', toggle=True))
-    hb.pack_end(icon_button('view-grid', 'Documentos abertos', 'cab.abas'))
-    return tag(hb, 'cab.barra')
+    hb.pack_end(icon_button('sidebar-show-right', 'Inspector', 'head.inspector', toggle=True, active=True))
+    hb.pack_end(icon_button('edit-find', 'Find', 'head.find', toggle=True))
+    hb.pack_end(icon_button('view-grid', 'Open documents', 'head.tabs'))
+    return tag(hb, 'head.bar')
 
 
 def writer_m(win, context='text', level=shell.FORMAT, objects=False):
     _css()
     app = 'writer'
-    side = shell.nav_sidebar(app, parts.thumbs_list('page', 5, 2), writer.SIDE_MODES, 'Adicionar página',
+    side = shell.nav_sidebar(app, parts.thumbs_list('page', 5, 2), writer.SIDE_MODES, 'Add page',
                              writer.ADD_PAGE)
-    words = pill('26.171 palavras', 'osd.contagem', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
+    words = pill('26,171 words', 'osd.count', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
                  margin_bottom=12)
-    doc = writer.doc_view(context, rulers=False, overlays=(zoom_pill('125 %'), words))
+    doc = writer.doc_view(context, rulers=False, overlays=(zoom_pill('125%'), words))
     if context == 'text':
         insp, width = writer.inspector_b(context, level), shell.INSPECTOR_W
     else:       # the three second-level names of an object need the wider pane
@@ -302,31 +302,31 @@ def writer_m(win, context='text', level=shell.FORMAT, objects=False):
 def tables_m(win, level=shell.FORMAT, objects=False):
     _css()
     app = 'tables'
-    switch = toggle_group([(n, n, None, None) for n in tables.SHEETS], 1, 'inf.planilhas', 'round',
+    switch = toggle_group([(n, n, None, None) for n in tables.SHEETS], 1, 'bottom.sheets', 'round',
                           'sheet-switch')
-    bottom = hbox(icon_button('list-add', 'Adicionar planilha', 'inf.adicionar'), switch, expand(),
+    bottom = hbox(icon_button('list-add', 'Add sheet', 'bottom.add'), switch, expand(),
                   tables.calc_chips(), spacing=6)
     classes(bottom, 'toolbar', 'bottombar')
-    tag(bottom, 'inf.barra')
+    tag(bottom, 'bottom.bar')
     insp, width = wide(lambda: tables.inspector_b(level), 404)
-    body = shell.split(insp, tables.sheet_view(overlays=(zoom_pill('100 %'),)), width, Gtk.PackType.END)
+    body = shell.split(insp, tables.sheet_view(overlays=(zoom_pill('100%'),)), width, Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
     content = shell.toolbar_view(view, top=[header_m(app, objects=objects), tabs, tables.formula_bar()], bottom=[bottom])
-    side = shell.nav_sidebar(app, objects_sidebar(), ['Tabelas e gráficos', 'Estilos de tabela', 'Comentários',
-                                                      'Resultados da busca', 'Lista de fórmulas'],
-                             'Adicionar tabela ou gráfico', menu_model(['Tabela', 'Gráfico']))
+    side = shell.nav_sidebar(app, objects_sidebar(), ['Tables and charts', 'Table styles', 'Comments',
+                                                      'Search results', 'Formula list'],
+                             'Add table or chart', menu_model(['Table', 'Chart']))
     win.set_content(shell.split(side, content, shell.SIDEBAR_W))
 
 
 def slides_m(win, context='image', level=shell.FORMAT, objects=False):
     _css()
     app = 'slides'
-    side = shell.nav_sidebar(app, slides.navigator(), slides.SIDE_MODES, 'Adicionar slide',
+    side = shell.nav_sidebar(app, slides.navigator(), slides.SIDE_MODES, 'Add slide',
                              add_popover=slides.masters_popover())
-    play = icon_button('media-playback-start', 'Reproduzir', 'cab.reproduzir')
+    play = icon_button('media-playback-start', 'Play', 'head.play')
     classes(play, 'suggested-action')
     insp, width = wide(lambda: slides.inspector_b(context, level))
-    body = shell.split(insp, slides.slide_view(context, notes=True, overlays=(zoom_pill('62 %'),)), width,
+    body = shell.split(insp, slides.slide_view(context, notes=True, overlays=(zoom_pill('62%'),)), width,
                        Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
     content = shell.toolbar_view(view, top=[header_m(app, [spacer(), play], objects=objects), tabs])
@@ -348,9 +348,21 @@ SCENES = [
     Scene('writer-m-dark', 'Writer M · dark style', lambda w: writer_m(w), 'writer', 'M', dark=True),
     Scene('tables-m', 'Desk Tables · M mix with the HIG', lambda w: tables_m(w), 'tables', 'M'),
     Scene('slides-m', 'Desk Slides · M mix with the HIG', lambda w: slides_m(w), 'slides', 'M'),
-    Scene('writer-m-plus', 'Writer M+ · objects in the header', lambda w: writer_m(w, objects=True), 'writer', 'M'),
-    Scene('tables-m-plus', 'Tables M+ · objects in the header', lambda w: tables_m(w, objects=True), 'tables', 'M'),
-    Scene('slides-m-plus', 'Slides M+ · objects in the header', lambda w: slides_m(w, objects=True), 'slides', 'M'),
+    # M+, the window chosen on 2026-11-16 (D-008). Its own version, so that
+    # inventory.py can list the components of this window alone.
+    Scene('writer-m-plus', 'Writer M+ · objects in the header', lambda w: writer_m(w, objects=True), 'writer', 'M+'),
+    Scene('writer-m-plus-image', 'Writer M+ · image selected',
+          lambda w: writer_m(w, context='image', objects=True), 'writer', 'M+'),
+    Scene('writer-m-plus-document', 'Writer M+ · Document',
+          lambda w: writer_m(w, level=shell.DOCUMENT, objects=True), 'writer', 'M+'),
+    Scene('writer-m-plus-dark', 'Writer M+ · dark style', lambda w: writer_m(w, objects=True), 'writer', 'M+',
+          dark=True),
+    Scene('tables-m-plus', 'Tables M+ · objects in the header', lambda w: tables_m(w, objects=True), 'tables', 'M+'),
+    Scene('tables-m-plus-data', 'Tables M+ · Data', lambda w: tables_m(w, level=shell.DATA, objects=True),
+          'tables', 'M+'),
+    Scene('slides-m-plus', 'Slides M+ · objects in the header', lambda w: slides_m(w, objects=True), 'slides', 'M+'),
+    Scene('slides-m-plus-animate', 'Slides M+ · Animation',
+          lambda w: slides_m(w, level=shell.ANIMATION, objects=True), 'slides', 'M+'),
     Scene('slides-m-animate', 'Slides M · Animation', lambda w: slides_m(w, level=shell.ANIMATION), 'slides',
           'M'),
 ]

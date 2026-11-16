@@ -8,7 +8,9 @@ stay here as the record of what was compared.
 The pictures are drawn with the real GTK 4.24 and Libadwaita 1.10, at
 1280 × 720, by the generator in [`../mockups`](../mockups)
 (`proposals.py`). None of them is implemented yet: the three apps keep
-interface B until phase B1 of the [roadmap](../../roadmap.md).
+interface B until phase B1 of the [roadmap](../../roadmap.md), and
+[docs/interface/README.md](../README.md) describes M+ and the
+steps that take the apps there.
 
 | | N: current iWork | M: mix with the HIG |
 | --- | --- | --- |
@@ -105,7 +107,6 @@ cd docs/interface/mockups
 ./run.sh out writer-m tables-m slides-m writer-n tables-n slides-n
 ```
 
-The scenes were written with their text in Brazilian Portuguese;
-`english.py` translates it as the scenes load, and a string it does not
-know shows in Portuguese in the picture. `DESK_MOCKUP_LANG=pt` draws the
-original.
+The scenes are written in English. `DESK_MOCKUP_LANG=pt` draws them in
+Brazilian Portuguese with `pt_BR.tsv`, for the Portuguese page of the site;
+a string the table does not know shows in English in the picture.

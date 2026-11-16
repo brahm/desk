@@ -1,0 +1,945 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Every menu command, toolbar item, format bar mode, Inspector tab, preference
+# pane and panel of Pages 4.3, Numbers 2.3 and Keynote 5.3 (iWork '09 9.3), read
+# on the reference virtual machine, and its place in the window of Desk (M+,
+# decision D-008). how: same (same place and form), adapted (another place or
+# form, the GNOME way), system (GNOME does it), out (out of scope). component
+# names a row of mockups/catalog.txt. apple_pt_br is the name in the Brazilian
+# Portuguese of iWork '09, which Search Commands also finds. Made by
+# iwork_map.py. Tab-separated.
+iwork	desk	where_in_iwork	item	apple_pt_br	iwork_shortcut	place_in_desk	component	how
+Pages	Writer	Menu	Pages ▸ About Pages	Sobre o Pages	-	Main menu ▸ About	head.menu	same
+Pages	Writer	Menu	Pages ▸ Preferences…	Preferências…	Cmd+,	Main menu ▸ Preferences	dialog.preferences	same
+Pages	Writer	Menu	Pages ▸ Try iWork…	Experimentar o iWork…	-	Does not apply to Desk	-	out
+Pages	Writer	Menu	Pages ▸ Provide Pages Feedback	Enviar Comentários Sobre o Pages	-	Does not apply to Desk	-	out
+Pages	Writer	Menu	Pages ▸ Register Pages	Registrar o Pages	-	Does not apply to Desk	-	out
+Pages	Writer	Menu	Pages ▸ Hide Pages	Ocultar Pages	Cmd+H	The system: GNOME takes care of windows and apps	-	system
+Pages	Writer	Menu	Pages ▸ Hide Others	Ocultar Outros	Opt+Cmd+H	The system: GNOME takes care of windows and apps	-	system
+Pages	Writer	Menu	Pages ▸ Show All	Mostrar Tudo	-	The system: GNOME takes care of windows and apps	-	system
+Pages	Writer	Menu	Pages ▸ Quit Pages	Encerrar o Pages	Cmd+Q	Ctrl+Q, with no menu item	-	adapted
+Pages	Writer	Menu	File ▸ New	Novo	Cmd+N	Main menu	head.menu	same
+Pages	Writer	Menu	File ▸ New from Template Chooser…	Novo a partir do Seletor de Modelos…	Shift+Cmd+N	Template chooser inside the window	templates.window	adapted
+Pages	Writer	Menu	File ▸ Open…	Abrir…	Cmd+O	Main menu	head.menu	same
+Pages	Writer	Menu	File ▸ Open Recent (1 items)	Abrir Recentes	-	Main menu	head.menu	same
+Pages	Writer	Menu	File ▸ Close	Fechar	Cmd+W	Close button of the document tab, and Ctrl+W	tabs.documents	adapted
+Pages	Writer	Menu	File ▸ Close All	Fechar Tudo	Opt+Cmd+W	Ctrl+Alt+W and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	File ▸ Save	Salvar	Cmd+S	Automatic saving and versions (D-001, DOC-11)	head.menu	adapted
+Pages	Writer	Menu	File ▸ Save As…	Salvar Como…	Shift+Cmd+S	Main menu	head.menu	same
+Pages	Writer	Menu	File ▸ Revert to Saved…	Reverter ao Salvo…	-	Main menu: browse and restore the versions (D-001, DOC-11)	head.menu	adapted
+Pages	Writer	Menu	File ▸ Export ▸ PDF…	-	-	Main menu ▸ Export	head.menu	same
+Pages	Writer	Menu	File ▸ Export ▸ Word…	-	-	Main menu ▸ Export	head.menu	same
+Pages	Writer	Menu	File ▸ Export ▸ RTF…	-	-	Main menu ▸ Export	head.menu	same
+Pages	Writer	Menu	File ▸ Export ▸ Plain Text…	Texto Normal…	-	Main menu ▸ Export	head.menu	same
+Pages	Writer	Menu	File ▸ Export ▸ ePub…	-	-	Main menu ▸ Export	head.menu	same
+Pages	Writer	Menu	File ▸ Reduce File Size	Reduzir Tamanho do Arquivo	-	Inspector ▸ Format ▸ Image and Search Commands (Ctrl+/)	insp.image.file	adapted
+Pages	Writer	Menu	File ▸ Save as Template…	Salvar como Modelo…	-	Search Commands (Ctrl+/) (Save as template)	commands.dialog	adapted
+Pages	Writer	Menu	File ▸ Page Setup…	Configuração de Página…	Shift+Cmd+P	Inspector ▸ Document (paper and margins) and the Print dialog	insp.doc.paper	adapted
+Pages	Writer	Menu	File ▸ Print…	Imprimir…	Cmd+P	Main menu	head.menu	same
+Pages	Writer	Menu	Edit ▸ Undo	Desfazer	Cmd+Z	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Redo	Refazer	Shift+Cmd+Z	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Cut	Cortar	Cmd+X	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Copy	Copiar	Cmd+C	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Paste	Colar	Cmd+V	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Paste and Match Style	Colar com o Mesmo Estilo	Opt+Shift+Cmd+V	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Delete	Apagar	-	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Delete Page…	Apagar Página…	-	Context menu of the thumbnails and the Delete key	side.thumbnails	adapted
+Pages	Writer	Menu	Edit ▸ Delete Page	Apagar Página	-	Context menu of the thumbnails and the Delete key	side.thumbnails	adapted
+Pages	Writer	Menu	Edit ▸ Clear All	Limpar Tudo	-	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Duplicate	Duplicar	Cmd+D	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Select All	Selecionar Tudo	Cmd+A	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Deselect All	Desmarcar Tudo	Shift+Cmd+A	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Track Changes	Controlar Alterações	-	Search Commands (Ctrl+/); the bar of tracked changes shows under the header bar	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Mail Merge…	Mala Direta…	-	Search Commands (Ctrl+/); it opens a dialog	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Find ▸ Search	Buscar	-	Sidebar ▸ Search results	side.mode	adapted
+Pages	Writer	Menu	Edit ▸ Find ▸ Find…	Buscar…	Cmd+F	Find bar, from the Find button	find.bar	adapted
+Pages	Writer	Menu	Edit ▸ Find ▸ Find Next	Buscar Seguinte	Cmd+G	Find bar, from the Find button	find.bar	adapted
+Pages	Writer	Menu	Edit ▸ Find ▸ Find Previous	Buscar Anterior	Shift+Cmd+G	Find bar, from the Find button	find.bar	adapted
+Pages	Writer	Menu	Edit ▸ Find ▸ Use Selection for Find	Usar Seleção para Buscar	Cmd+E	Find bar, from the Find button	find.bar	adapted
+Pages	Writer	Menu	Edit ▸ Find ▸ Jump to Selection	Saltar para Seleção	Cmd+J	Find bar, from the Find button	find.bar	adapted
+Pages	Writer	Menu	Edit ▸ Spelling ▸ Spelling…	Ortografia…	Cmd+:	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Spelling ▸ Check Spelling	Verificar Ortografia	Cmd+;	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Spelling ▸ Check Spelling as You Type	Verificar a Ortografia Enquanto Você Escreve	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Proofreading ▸ Proofreader…	Revisor…	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Proofreading ▸ Proofread	Revisar	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Proofreading ▸ Proofread as You Type	Revisar Enquanto Você Escreve	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Writing Tools ▸ Look Up in Dictionary and Thesaurus	Consultar o Dicionário e o Dicionário de Sinônimos	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Writing Tools ▸ Search in Spotlight	Buscar no Spotlight	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Writing Tools ▸ Search in Google	Buscar no Google	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Writing Tools ▸ Search in Wikipedia	Buscar na Wikipedia	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ Writing Tools ▸ Show Statistics	Mostrar Estatísticas	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ EndNote Citations ▸ Bibliography Format	Formato Bibliográfico	-	Search Commands (Ctrl+/), in the phase of citations	commands.dialog	adapted
+Pages	Writer	Menu	Edit ▸ EndNote Citations ▸ Manage Citations…	Gerenciar Citações…	-	Search Commands (Ctrl+/), in the phase of citations	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Section Break	Quebra de Seção	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Page Break	Quebra de Página	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Layout Break	Quebra de Leiaute	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Column Break	Quebra de Coluna	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Auto Page Numbers…	Números de Página Automáticos...	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Page Number	Número de Página	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Page Count	Contagem de Página	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Date & Time	Data e Hora	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Filename	Nome do arquivo	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Table of Contents	Índice	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Footnote	Nota de pé de página	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Custom Footnote…	Nota de Pé de Página Personalizada...	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Bookmark	Favorito	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Hyperlink ▸ Webpage	Página web	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Hyperlink ▸ Email Message	Mensagem de e-mail	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Hyperlink ▸ Bookmark	Favorito	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Hyperlink ▸ Pages Document	Documento do Pages	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Merge Field	Combinar Campo	-	Insert menu ▸ Field	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Sender Field	Campo do Remetente	-	Insert menu ▸ Field	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Comment	Comentário	-	Comment button of the header bar	head.insert.comment	same
+Pages	Writer	Menu	Insert ▸ EndNote Citation…	Citação EndNote...	Shift+Cmd+E	Insert menu, in the phase of citations and equations	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ EndNote Bibliography	Bibliografia EndNote	-	Insert menu, in the phase of citations and equations	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ MathType Equation	Equação MathType	-	Insert menu, in the phase of citations and equations	head.insert	adapted
+Pages	Writer	Menu	Insert ▸ Text Box	Caixa de Texto	-	Text button of the header bar	head.insert.text	same
+Pages	Writer	Menu	Insert ▸ Shape (16 items)	Forma	-	Shape button of the header bar	head.insert.shape	same
+Pages	Writer	Menu	Insert ▸ Table	Tabela	-	Table button of the header bar	head.insert.table	same
+Pages	Writer	Menu	Insert ▸ Function ▸ Sum	Soma	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Average	Média	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Minimum	Mínimo	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Maximum	Máximo	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Count	Contar	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Product	Produto	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Show Function Browser	Mostrar Navegador de Função	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Function ▸ Formula Editor	Editor de Fórmula	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Pages	Writer	Menu	Insert ▸ Chart (19 items)	Gráfico	-	Chart button of the header bar	head.insert.chart	same
+Pages	Writer	Menu	Insert ▸ Connection Line	Linha de Conexão	-	Insert menu	head.insert	same
+Pages	Writer	Menu	Insert ▸ Choose…	Escolher…	Shift+Cmd+V	Insert menu ▸ Choose, and the Media button	head.insert.media	same
+Pages	Writer	Menu	Format ▸ Font ▸ Show Fonts	Mostrar Fontes	Cmd+T	Inspector ▸ Format ▸ Style ▸ Font, whose family row opens the Fonts popover	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Bold	Negrito	Cmd+B	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Italic	Itálico	Cmd+I	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Underline	Sublinhado	Cmd+U	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Strikethrough	Tachado	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Outline	Esboço	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Bigger	Maior	Cmd++	Size field in Inspector ▸ Format ▸ Style ▸ Font; Ctrl++ and Ctrl+− are the zoom	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Smaller	Menor	Cmd+-	Size field in Inspector ▸ Format ▸ Style ▸ Font; Ctrl++ and Ctrl+− are the zoom	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Tracking ▸ Use None	Não Usar Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Tracking ▸ Tighten	Estreitar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Tracking ▸ Loosen	Ampliar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Ligature ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Ligature ▸ Use None	Não Usar Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Ligature ▸ Use All	Usar Tudo	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Baseline ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Baseline ▸ Superscript	Sobrescrito	Ctrl+Cmd++	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Baseline ▸ Subscript	Subscrito	Ctrl+Cmd+-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Baseline ▸ Raise	Aumentar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Baseline ▸ Lower	Diminuir	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Capitalization ▸ None	Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Capitalization ▸ All Caps	Todas Maiúsculas	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Capitalization ▸ Small Caps	Versalete	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Font ▸ Capitalization ▸ Title	Título	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Align Left	Alinhar à Esquerda	Cmd+{	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Center	Centralizar	Cmd+|	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Align Right	Alinhar à Direita	Cmd+}	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Justify	Justificar	Opt+Cmd+|	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Auto Align Table Cell	Alinhamento Automático de Célula de Tabela	-	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Decrease List Indent Level	Diminuir Nível de Recuo da Lista	Cmd+[	Shortcuts and Inspector ▸ Format ▸ Style ▸ Bullets and lists	insp.text.lists	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Decrease List Indent Level Ignoring Children	Diminuir Nível de Recuo da Lista Ignorando Secundário	Opt+Cmd+[	Shortcuts and Inspector ▸ Format ▸ Style ▸ Bullets and lists	insp.text.lists	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Increase List Indent Level	Aumentar Nível de Recuo da Lista	Cmd+]	Shortcuts and Inspector ▸ Format ▸ Style ▸ Bullets and lists	insp.text.lists	adapted
+Pages	Writer	Menu	Format ▸ Text ▸ Increase List Indent Level Ignoring Children	Aumentar Nível de Recuo da Lista Ignorando Secundário	Opt+Cmd+]	Shortcuts and Inspector ▸ Format ▸ Style ▸ Bullets and lists	insp.text.lists	adapted
+Pages	Writer	Menu	Format ▸ Table (41 items)	Tabela	-	Inspector ▸ Format ▸ Table and context menu of the table	insp.table.headers	adapted
+Pages	Writer	Menu	Format ▸ Chart (48 items)	Gráfico	-	Inspector ▸ Format ▸ Chart, Axis and Series	insp.axis.labels	adapted
+Pages	Writer	Menu	Format ▸ Shape (4 items)	Forma	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Text Box ▸ Add Linked Text Box	Adicionar Caixa de Texto Vinculada	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Text Box ▸ Link Selected Text Boxes	Vincular as Caixas de Texto Selecionadas	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Text Box ▸ Break Connection into Text Box	Interromper Conexão para Caixa de Texto	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Text Box ▸ Break Connection out of Text Box	Interromper Conexão desde a Caixa de Texto	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Text Box ▸ Hide Connection Lines	Ocultar Linhas de Conexão	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Image ▸ Reduce File Size	Reduzir Tamanho do Arquivo	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Copy Character Style	Copiar Estilo do Caractere	Opt+Shift+Cmd+C	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Copy Paragraph Style	Copiar Estilo do Parágrafo	Opt+Cmd+C	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Paste Style	Colar Estilo	Opt+Cmd+V	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Create New Paragraph Style from Selection…	Criar Novo Estilo de Parágrafo da Seleção…	-	Sidebar ▸ Styles, and the style row of the Inspector	insp.current-style	adapted
+Pages	Writer	Menu	Format ▸ Import Styles…	Importar Estilos…	-	Sidebar ▸ Styles, and the style row of the Inspector	insp.current-style	adapted
+Pages	Writer	Menu	Format ▸ Mask	Máscara	Shift+Cmd+M	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Pages	Writer	Menu	Format ▸ Mask with Shape (12 items)	Mascarar com Forma	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Pages	Writer	Menu	Format ▸ Instant Alpha	Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Pages	Writer	Menu	Format ▸ Remove Instant Alpha	Remover Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Pages	Writer	Menu	Format ▸ Reapply Defaults to Selection	Reaplicar Padrões à Seleção	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Capture Pages…	Capturar Páginas…	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Manage Pages…	Gerenciar Páginas…	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Define Chart for Current Template	Definir Gráfico para Modelo Atual	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Make Default Chart Type	Tornar Tipo de Gráfico Padrão	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Define as Placeholder Text	Definir como Texto de Marcador de Posição	Ctrl+Opt+Cmd+T	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Enable Placeholder Text Authoring	Ativar a Autoedição do Texto do Marcador de Posição	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Define as Media Placeholder	Definir como Marcador de Posição de Mídia	Ctrl+Opt+Cmd+I	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Make Master Objects Selectable	Permitir a Seleção dos Objetos da Matriz	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Format ▸ Advanced ▸ Move Object to Section Master	Mover Objeto à Seção Matriz	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Pages	Writer	Menu	Arrange ▸ Bring Forward	Trazer para Frente	Opt+Shift+Cmd+F	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Bring to Front	Em Primeiro Plano	Shift+Cmd+F	Inspector ▸ Format ▸ Arrange, and Ctrl+Shift+] and Ctrl+Shift+[	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Send Backward	Enviar Para Trás	Opt+Shift+Cmd+B	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Send to Back	Enviar para o Fundo	Shift+Cmd+B	Inspector ▸ Format ▸ Arrange, and Ctrl+Shift+] and Ctrl+Shift+[	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Send Objects to Background	Enviar Objetos ao Fundo	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Make Background Objects Selectable	Permitir a Seleção dos Objetos do Fundo	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Bring Background Objects to Front	Trazer Objetos do Fundo para Frente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Align Objects ▸ Left	Esquerda	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Align Objects ▸ Center	Centralizar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Align Objects ▸ Right	Direita	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Align Objects ▸ Top	Superior	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Align Objects ▸ Middle	Meio	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Align Objects ▸ Bottom	Inferior	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Distribute Objects ▸ Horizontally	Horizontalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Distribute Objects ▸ Vertically	Verticalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Flip Horizontally	Virar Horizontalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Flip Vertically	Virar Verticalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Lock	Bloquear	Cmd+L	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Unlock	Desbloquear	Opt+Cmd+L	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Group	Agrupar	Opt+Cmd+G	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	Arrange ▸ Ungroup	Desagrupar	Opt+Shift+Cmd+G	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Pages	Writer	Menu	View ▸ Page Thumbnails	Miniaturas de Página	Opt+Cmd+P	Sidebar, from its content switcher	side.mode	adapted
+Pages	Writer	Menu	View ▸ Search	Buscar	Opt+Cmd+F	Sidebar, from its content switcher	side.mode	adapted
+Pages	Writer	Menu	View ▸ Show Styles Drawer	Mostrar Gaveta de Estilos	Shift+Cmd+T	Sidebar, from its content switcher	side.mode	adapted
+Pages	Writer	Menu	View ▸ Show Rulers	Mostrar Réguas	Cmd+R	Main menu ▸ View	head.menu	adapted
+Pages	Writer	Menu	View ▸ Show Format Bar	Mostrar Barra de Formatos	Shift+Cmd+R	Does not apply: M+ has no format bar; its controls are in Inspector ▸ Format	-	out
+Pages	Writer	Menu	View ▸ Show Comments	Mostrar Comentários	-	Main menu ▸ View	head.menu	adapted
+Pages	Writer	Menu	View ▸ Show Layout	Mostrar Leiaute	Shift+Cmd+L	Main menu ▸ View	head.menu	adapted
+Pages	Writer	Menu	View ▸ Show Invisibles	Mostrar Invisíveis	Shift+Cmd+I	Main menu ▸ View	head.menu	adapted
+Pages	Writer	Menu	View ▸ Show Document Outline	Mostrar Esboço do Documento	-	Sidebar ▸ Outline	side.mode	adapted
+Pages	Writer	Menu	View ▸ Zoom ▸ Zoom In	Ampliar	Cmd+>	Zoom control over the document	osd.zoom	adapted
+Pages	Writer	Menu	View ▸ Zoom ▸ Zoom Out	Reduzir	Cmd+<	Zoom control over the document	osd.zoom	adapted
+Pages	Writer	Menu	View ▸ Zoom ▸ Actual Size	Tamanho Real	-	Zoom control over the document	osd.zoom	adapted
+Pages	Writer	Menu	View ▸ Zoom ▸ Fit Width	Ajustar à Profundidade	-	Zoom control over the document	osd.zoom	adapted
+Pages	Writer	Menu	View ▸ Zoom ▸ Fit Page	Ajustar à Página	-	Zoom control over the document	osd.zoom	adapted
+Pages	Writer	Menu	View ▸ Show Inspector	Mostrar Inspetor	Opt+Cmd+I	Inspector button of the header bar	head.inspector	same
+Pages	Writer	Menu	View ▸ New Inspector	Novo Inspetor	-	Does not apply: there is one Inspector	-	out
+Pages	Writer	Menu	View ▸ Show Colors	Mostrar Cores	Shift+Cmd+C	Colors popover, from the color rows of Inspector ▸ Format	colors.popover	adapted
+Pages	Writer	Menu	View ▸ Show Adjust Image	Mostrar Ajustar Imagem	-	Inspector ▸ Format ▸ Image ▸ Adjust image	insp.image.adjust	adapted
+Pages	Writer	Menu	View ▸ Show Media Browser	Mostrar Navegador de Mídia	-	Media button of the header bar, which opens a popover	head.insert.media	adapted
+Pages	Writer	Menu	View ▸ Show Document Warnings	Mostrar Avisos do Documento	-	Banner of warnings over the document	notice.banner	adapted
+Pages	Writer	Menu	View ▸ Enter Full Screen	Entrar no Modo Tela Cheia	Ctrl+Cmd+F	Main menu ▸ View ▸ Fullscreen (F11)	head.menu	adapted
+Pages	Writer	Menu	View ▸ Show Toolbar	Mostrar Barra de Ferramentas	Opt+Cmd+T	Does not apply: the header bar is not customizable	-	out
+Pages	Writer	Menu	View ▸ Customize Toolbar…	Personalizar Barra de Ferramentas…	-	Does not apply: the header bar is not customizable	-	out
+Pages	Writer	Menu	Window ▸ Minimize	Minimizar	Cmd+M	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Pages	Writer	Menu	Window ▸ Zoom Window	Ampliar/Reduzir	-	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Pages	Writer	Menu	Window ▸ Bring All to Front	Trazer Todas para Frente	-	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Pages	Writer	Menu	Share ▸ Share via iWork.com…	Compartilhar através do iWork.com…	-	Out of scope: iWork.com was shut down	-	out
+Pages	Writer	Menu	Share ▸ Show Shared Documents	Mostrar Documentos Compartilhados	-	Out of scope: iWork.com was shut down	-	out
+Pages	Writer	Menu	Share ▸ No unread comments	Nenhum comentário não lido	-	Out of scope: iWork.com was shut down	-	out
+Pages	Writer	Menu	Share ▸ Sign In…	Iniciar sessão…	-	Out of scope: iWork.com was shut down	-	out
+Pages	Writer	Menu	Share ▸ Send via Mail ▸ Pages	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Send via Mail ▸ Word	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Send via Mail ▸ PDF	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Export ▸ PDF…	-	-	Main menu ▸ Export	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Export ▸ Word…	-	-	Main menu ▸ Export	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Export ▸ RTF…	-	-	Main menu ▸ Export	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Export ▸ Plain Text…	Texto Normal…	-	Main menu ▸ Export	head.menu	adapted
+Pages	Writer	Menu	Share ▸ Export ▸ ePub…	-	-	Main menu ▸ Export	head.menu	adapted
+Pages	Writer	Menu	Help ▸ Pages Help	Ajuda Pages	Cmd+?	Main menu ▸ Help	head.menu	same
+Pages	Writer	Menu	Help ▸ Welcome to Pages	Bem-vindo ao Pages	-	Out of scope: Apple material	-	out
+Pages	Writer	Menu	Help ▸ Video Tutorials	Tutoriais de Vídeo	-	Out of scope: Apple material	-	out
+Pages	Writer	Menu	Help ▸ iWork Resources	Recursos do iWork	-	Out of scope: Apple material	-	out
+Pages	Writer	Menu	Help ▸ Pages User Guide	Manual do Usuário do Pages	-	Main menu ▸ Help	head.menu	same
+Pages	Writer	Menu	Help ▸ Formulas and Functions Help	Ajuda de Fórmulas e Funções	-	Main menu ▸ Help	head.menu	same
+Pages	Writer	Menu	Help ▸ Keyboard Shortcuts	Atalhos de Teclado	-	Main menu ▸ Keyboard Shortcuts	dialog.shortcuts	adapted
+Pages	Writer	Menu	Help ▸ Service and Support	Serviço e Suporte	-	Out of scope: Apple material	-	out
+Pages	Writer	Toolbar	View	Visualizar	-	Sidebar button, and Main menu ▸ View	head.sidebar	adapted
+Pages	Writer	Toolbar	Full Screen	Tela Cheia	-	Main menu ▸ View ▸ Fullscreen (F11)	head.menu	adapted
+Pages	Writer	Toolbar	Outline	Esboço	-	Sidebar ▸ Outline	side.mode	adapted
+Pages	Writer	Toolbar	Pages	Páginas	-	The + button at the top of the sidebar	side.add	adapted
+Pages	Writer	Toolbar	Columns	Colunas	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Guides	Guias	-	Main menu ▸ View	head.menu	adapted
+Pages	Writer	Toolbar	Share	Compartilhar	-	Out of scope: iWork.com was shut down	-	out
+Pages	Writer	Toolbar	Track Changes	Controlar Alterações	-	Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Toolbar	Style	Estilo	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Character	Caractere	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	List	Lista	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Wrap	Ajustar	-	Inspector ▸ Format ▸ Arrange ▸ Text wrap	insp.arrange.wrap	adapted
+Pages	Writer	Toolbar	Copy Style	Copiar Estilo	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Toolbar	Paste Style	Colar Estilo	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Pages	Writer	Toolbar	Lock	Bloquear	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Pages	Writer	Toolbar	Unlock	Desbloquear	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Pages	Writer	Toolbar	Text Box	Caixa de texto	-	Text button of the header bar	head.insert.text	same
+Pages	Writer	Toolbar	Shapes	Formas	-	Shape button of the header bar	head.insert.shape	same
+Pages	Writer	Toolbar	Table	Tabela	-	Table button of the header bar	head.insert.table	same
+Pages	Writer	Toolbar	Charts	Gráfico	-	Chart button of the header bar	head.insert.chart	same
+Pages	Writer	Toolbar	Comment	Comentário	-	Comment button of the header bar	head.insert.comment	same
+Pages	Writer	Toolbar	Objects	Objetos	-	The object buttons of the header bar; below 720 px, the Insert menu	head.insert	adapted
+Pages	Writer	Toolbar	Front	Frente	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Pages	Writer	Toolbar	Back	Fundo	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Pages	Writer	Toolbar	Inspector	Inspetor	-	Inspector button of the header bar	head.inspector	same
+Pages	Writer	Toolbar	Media	Mídia	-	Media button of the header bar	head.insert.media	same
+Pages	Writer	Toolbar	Adjust	Ajustar	-	Inspector ▸ Format ▸ Image ▸ Adjust image	insp.image.adjust	adapted
+Pages	Writer	Toolbar	Colors	Cores	-	Colors popover, from the color rows of Inspector ▸ Format	colors.popover	adapted
+Pages	Writer	Toolbar	Fonts	Fontes	-	Fonts popover, from the family row of Inspector ▸ Format ▸ Style ▸ Font	fonts.popover	adapted
+Pages	Writer	Toolbar	Format Bar	Barra de Formatos	-	Does not apply: M+ has no format bar; its controls are in Inspector ▸ Format	-	out
+Pages	Writer	Toolbar	Forward	Para Frente	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Pages	Writer	Toolbar	Backward	Para Trás	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Pages	Writer	Toolbar	Increase	Aumentar	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Decrease	Diminuir	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Bigger	Maior	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Smaller	Menor	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Subscript	Subscrito	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Superscript	Sobrescrito	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Pages	Writer	Toolbar	Group	Agrupar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Pages	Writer	Toolbar	Ungroup	Desagrupar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Pages	Writer	Toolbar	Alpha	Alfa	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Pages	Writer	Toolbar	Mask	Máscara	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Pages	Writer	Toolbar	Data Editor	Editor de Dados	-	Inspector ▸ Format ▸ Chart ▸ Edit data	insp.chart.options	adapted
+Pages	Writer	Toolbar	Find	Buscar	-	Find button of the header bar	head.find	same
+Pages	Writer	Toolbar	Print	Imprimir	-	Main menu ▸ Print	head.menu	adapted
+Pages	Writer	Toolbar	Flip Horizontal	Virar na Horizontal	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Pages	Writer	Toolbar	Flip Vertical	Virar na Vertical	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Pages	Writer	Toolbar	Customize	Personalizar	-	Does not apply: the header bar is not customizable	-	out
+Pages	Writer	Format bar	pieChart mode (11 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	valueAxis mode (12 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	categoryAxis mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	series mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	columnBarSeries mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	pieLabel mode (8 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	dataLabels mode (8 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	columnBarLabel mode (8 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	errorBar mode (7 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	legend mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	chart mode (12 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Pages	Writer	Format bar	graphic mode (9 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Pages	Writer	Format bar	shape mode (10 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Pages	Writer	Format bar	line mode (11 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Pages	Writer	Format bar	image mode (11 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Pages	Writer	Format bar	table mode (11 controls)	-	-	Inspector ▸ Format ▸ Table, Cell, Text and Arrange, and the formula bar	insp.tabs	adapted
+Pages	Writer	Format bar	text mode (13 controls)	-	-	Inspector ▸ Format ▸ Style, Layout and More (text)	insp.tabs	adapted
+Pages	Writer	Format bar	outliner mode (14 controls)	-	-	Inspector ▸ Format ▸ Style, Layout and More (text in the outline)	insp.tabs	adapted
+Pages	Writer	Inspector	Document ▸ Document	Documento	-	Inspector ▸ Document ▸ Document	insp.doc.paper	adapted
+Pages	Writer	Inspector	Document ▸ TOC	Índice	-	Inspector ▸ Format, with the table of contents selected	insp.tabs	adapted
+Pages	Writer	Inspector	Document ▸ Info	Info	-	Inspector ▸ Document ▸ Info	insp.info.fields	same
+Pages	Writer	Inspector	Layout ▸ Layout	Leiaute	-	Inspector ▸ Format ▸ Layout (columns) and Inspector ▸ Document ▸ Section	insp.layout.columns	adapted
+Pages	Writer	Inspector	Layout ▸ Section	Seção	-	Inspector ▸ Document ▸ Section	insp.section.setup	adapted
+Pages	Writer	Inspector	Wrap	Ajuste	-	Inspector ▸ Format ▸ Arrange ▸ Text wrap	insp.arrange.wrap	adapted
+Pages	Writer	Inspector	Text ▸ Text	Texto	-	Inspector ▸ Format ▸ Style	insp.text.spacing	adapted
+Pages	Writer	Inspector	Text ▸ List	Lista	-	Inspector ▸ Format ▸ Style ▸ Bullets and lists	insp.text.lists	adapted
+Pages	Writer	Inspector	Text ▸ Tabs	Tabulações	-	Inspector ▸ Format ▸ Layout ▸ Tabs	insp.layout.tab-stops	adapted
+Pages	Writer	Inspector	Text ▸ More	Mais	-	Inspector ▸ Format ▸ More	insp.more.pagination	same
+Pages	Writer	Inspector	Graphic	Gráfico	-	Inspector ▸ Format ▸ Style, with an object selected	insp.style.stroke	adapted
+Pages	Writer	Inspector	Metrics	Métricas	-	Inspector ▸ Format ▸ Arrange ▸ Size, Position and rotation	insp.arrange.metrics	adapted
+Pages	Writer	Inspector	Table ▸ Table	Tabela	-	Inspector ▸ Format ▸ Table	insp.table.headers	adapted
+Pages	Writer	Inspector	Table ▸ Format	Formato	-	Inspector ▸ Format ▸ Cell	insp.cell.format	adapted
+Pages	Writer	Inspector	Chart	Gráfico (dados)	-	Inspector ▸ Format ▸ Chart, Axis and Series	insp.chart.options	adapted
+Pages	Writer	Inspector	Link ▸ Hyperlink	Hiperlink	-	Link popover, from Insert ▸ Link and the context menu	head.insert	adapted
+Pages	Writer	Inspector	Link ▸ Bookmark	Marcador	-	Sidebar, from its content switcher, and Insert ▸ Bookmark	side.mode	adapted
+Pages	Writer	Inspector	Link ▸ Merge	Mesclar	-	Dialog of the mail merge	commands.dialog	adapted
+Pages	Writer	Inspector	QuickTime	QuickTime	-	Inspector ▸ Format, with a sound or movie selected	insp.tabs	adapted
+Pages	Writer	Preferences	General	Geral	-	Preferences ▸ General	dialog.preferences	same
+Pages	Writer	Preferences	Rulers	Réguas	-	Preferences ▸ Rulers	dialog.preferences	same
+Pages	Writer	Preferences	Auto-Correction	Correção Automática	-	Preferences ▸ Auto-Correction	dialog.preferences	same
+Pages	Writer	Windows and sheets	Template Chooser	Seletor de Modelos	-	Template chooser inside the window	templates.window	adapted
+Pages	Writer	Windows and sheets	Find & Replace	Buscar e Substituir	-	Find bar under the header bar	find.bar	adapted
+Pages	Writer	Windows and sheets	Search (side search)	Buscar	-	Sidebar ▸ Search results	side.mode	adapted
+Pages	Writer	Windows and sheets	Spelling and Proofreader	Ortografia e Revisor	-	Popover on the text and the context menu	commands.dialog	adapted
+Pages	Writer	Windows and sheets	Export	Exportar	-	Export dialog, from Main menu ▸ Export	head.menu	adapted
+Pages	Writer	Windows and sheets	Save options	Opções de salvar	-	File chooser of GNOME; the options are in Inspector ▸ Document	insp.doc.password	adapted
+Pages	Writer	Windows and sheets	Mail Merge	Mala direta	-	Dialog, from Search Commands	commands.dialog	adapted
+Pages	Writer	Windows and sheets	Page numbering, sections and deleting pages	-	-	Inspector ▸ Document ▸ Section and the context menu of the thumbnails	insp.section.numbering	adapted
+Pages	Writer	Windows and sheets	Styles: create, delete, import	-	-	Small dialogs, from Sidebar ▸ Styles	side.mode	adapted
+Pages	Writer	Windows and sheets	EndNote	-	-	The phase of citations	commands.dialog	adapted
+Pages	Writer	Windows and sheets	Warnings on opening, pasting and saving	-	-	Banner of warnings, toasts and alert dialogs	notice.banner	adapted
+Pages	Writer	Windows and sheets	Styles Drawer	Gaveta de Estilos	-	Sidebar ▸ Styles	side.mode	adapted
+Pages	Writer	Windows and sheets	Fonts (system panel)	Fontes	-	Fonts popover, from Inspector ▸ Format ▸ Style ▸ Font	fonts.popover	adapted
+Pages	Writer	Windows and sheets	Colors (system panel)	Cores	-	Colors popover, from the color rows of the Inspector	colors.popover	adapted
+Pages	Writer	Windows and sheets	Media Browser	Navegador de Mídia	-	Popover of the Media button	head.insert.media	adapted
+Pages	Writer	Windows and sheets	Adjust Image	Ajustar Imagem	-	Inspector ▸ Format ▸ Image ▸ Adjustments	insp.image.adjust	adapted
+Pages	Writer	Windows and sheets	Document Warnings	Avisos do Documento	-	Banner of warnings, which opens the list	notice.banner	adapted
+Pages	Writer	Windows and sheets	Customize Toolbar	Personalizar Barra de Ferramentas	-	Does not apply: the header bar is not customizable	-	out
+Pages	Writer	Windows and sheets	Full screen	Tela Cheia	-	Full screen of GNOME (F11), with the bars hidden	head.menu	adapted
+Numbers	Tables	Menu	Numbers ▸ About Numbers	Sobre Numbers	-	Main menu ▸ About	head.menu	same
+Numbers	Tables	Menu	Numbers ▸ Preferences…	Preferências…	Cmd+,	Main menu ▸ Preferences	dialog.preferences	same
+Numbers	Tables	Menu	Numbers ▸ Try iWork…	Experimentar o iWork…	-	Does not apply to Desk	-	out
+Numbers	Tables	Menu	Numbers ▸ Provide Numbers Feedback	Enviar Comentários Sobre o Numbers	-	Does not apply to Desk	-	out
+Numbers	Tables	Menu	Numbers ▸ Register Numbers	Registrar o Numbers	-	Does not apply to Desk	-	out
+Numbers	Tables	Menu	Numbers ▸ Hide Numbers	Ocultar Numbers	Cmd+H	The system: GNOME takes care of windows and apps	-	system
+Numbers	Tables	Menu	Numbers ▸ Hide Others	Ocultar Outros	Opt+Cmd+H	The system: GNOME takes care of windows and apps	-	system
+Numbers	Tables	Menu	Numbers ▸ Show All	Mostrar Tudo	-	The system: GNOME takes care of windows and apps	-	system
+Numbers	Tables	Menu	Numbers ▸ Quit Numbers	Encerrar Numbers	Cmd+Q	Ctrl+Q, with no menu item	-	adapted
+Numbers	Tables	Menu	File ▸ New	Novo	Cmd+N	Main menu	head.menu	same
+Numbers	Tables	Menu	File ▸ New from Template Chooser…	Novo a partir do Seletor de Modelos…	Shift+Cmd+N	Template chooser inside the window	templates.window	adapted
+Numbers	Tables	Menu	File ▸ Open…	Abrir…	Cmd+O	Main menu	head.menu	same
+Numbers	Tables	Menu	File ▸ Open Recent (1 items)	Abrir Recentes	-	Main menu	head.menu	same
+Numbers	Tables	Menu	File ▸ Close	Fechar	Cmd+W	Close button of the document tab, and Ctrl+W	tabs.documents	adapted
+Numbers	Tables	Menu	File ▸ Save	Salvar	Cmd+S	Automatic saving and versions (D-001, DOC-11)	head.menu	adapted
+Numbers	Tables	Menu	File ▸ Save As…	Salvar Como…	Shift+Cmd+S	Main menu	head.menu	same
+Numbers	Tables	Menu	File ▸ Revert to Saved…	Reverter ao Salvo…	-	Main menu: browse and restore the versions (D-001, DOC-11)	head.menu	adapted
+Numbers	Tables	Menu	File ▸ Export ▸ PDF…	-	-	Main menu ▸ Export	head.menu	same
+Numbers	Tables	Menu	File ▸ Export ▸ Excel…	-	-	Main menu ▸ Export	head.menu	same
+Numbers	Tables	Menu	File ▸ Export ▸ CSV…	-	-	Main menu ▸ Export	head.menu	same
+Numbers	Tables	Menu	File ▸ Reduce File Size	Reduzir Tamanho do Arquivo	-	Inspector ▸ Format ▸ Image and Search Commands (Ctrl+/)	insp.image.file	adapted
+Numbers	Tables	Menu	File ▸ Save as Template…	Salvar como Modelo…	-	Search Commands (Ctrl+/) (Save as template)	commands.dialog	adapted
+Numbers	Tables	Menu	File ▸ Show Print View	Mostrar Visualização da Impressão	-	Main menu ▸ View	head.menu	adapted
+Numbers	Tables	Menu	File ▸ Print…	Imprimir…	Cmd+P	Main menu	head.menu	same
+Numbers	Tables	Menu	Edit ▸ Undo	Desfazer	Cmd+Z	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Redo	Refazer	Shift+Cmd+Z	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Cut	Cortar	Cmd+X	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Copy	Copiar	Cmd+C	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Paste	Colar	Cmd+V	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Paste and Match Style	Colar com o Mesmo Estilo	Opt+Shift+Cmd+V	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Paste Values	Colar Valores	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Edit ▸ Delete	Apagar	-	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Delete Row	Apagar Linha	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Edit ▸ Delete Column	Apagar Coluna	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Edit ▸ Clear All	Limpar Tudo	-	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Mark for Move	Marcar para Mover	Shift+Cmd+X	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Edit ▸ Move	Mover	Shift+Cmd+V	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Edit ▸ Duplicate	Duplicar	Cmd+D	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Select All	Selecionar Tudo	Cmd+A	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Deselect All	Desmarcar Tudo	Shift+Cmd+A	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Find ▸ Show Search	Mostrar Busca	Cmd+F	Find bar, from the Find button	find.bar	adapted
+Numbers	Tables	Menu	Edit ▸ Find ▸ Find Next	Buscar Seguinte	Cmd+G	Find bar, from the Find button	find.bar	adapted
+Numbers	Tables	Menu	Edit ▸ Find ▸ Find Previous	Buscar Anterior	Shift+Cmd+G	Find bar, from the Find button	find.bar	adapted
+Numbers	Tables	Menu	Edit ▸ Find ▸ Use Selection for Find	Usar Seleção para Buscar	Cmd+E	Find bar, from the Find button	find.bar	adapted
+Numbers	Tables	Menu	Edit ▸ Find ▸ Jump to Selection	Saltar para Seleção	Cmd+J	Find bar, from the Find button	find.bar	adapted
+Numbers	Tables	Menu	Edit ▸ Spelling ▸ Spelling…	Ortografia…	Cmd+:	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Spelling ▸ Check Spelling	Verificar Ortografia	Cmd+;	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Edit ▸ Spelling ▸ Check Spelling as You Type	Verificar a Ortografia Enquanto Você Escreve	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Insert ▸ Sheet	Folha	-	The + button of the bottom bar, before the sheet switcher	bottom.add	adapted
+Numbers	Tables	Menu	Insert ▸ Table (1 items)	Tabela	-	Table button of the header bar	head.insert.table	same
+Numbers	Tables	Menu	Insert ▸ Chart (19 items)	Gráfico	-	Chart button of the header bar	head.insert.chart	same
+Numbers	Tables	Menu	Insert ▸ Shape (16 items)	Forma	-	Shape button of the header bar	head.insert.shape	same
+Numbers	Tables	Menu	Insert ▸ Text Box	Caixa de Texto	-	Text button of the header bar	head.insert.text	same
+Numbers	Tables	Menu	Insert ▸ Function ▸ Sum	Soma	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Average	Média	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Minimum	Mínimo	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Maximum	Máximo	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Count	Contar	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Product	Produto	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Show Function Browser	Mostrar Navegador de Função	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Function ▸ Formula Editor	Editor de Fórmula	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	Insert ▸ Connection Line	Linha de Conexão	-	Insert menu	head.insert	same
+Numbers	Tables	Menu	Insert ▸ Fill ▸ Fill Right	Preencher à Direita	-	Context menu of the cell and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Insert ▸ Fill ▸ Fill Down	Preencher Abaixo	-	Context menu of the cell and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Insert ▸ Fill ▸ Fill Left	Preencher à Esquerda	-	Context menu of the cell and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Insert ▸ Fill ▸ Fill Up	Encher	-	Context menu of the cell and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Insert ▸ Copied Rows	Linhas Copiadas	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Insert ▸ Copied Columns	Colunas Copiadas	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Insert ▸ Date & Time	Data e Hora	-	Insert menu	head.insert	same
+Numbers	Tables	Menu	Insert ▸ Filename	Nome do arquivo	-	Insert menu	head.insert	same
+Numbers	Tables	Menu	Insert ▸ Page Number	Número da Página	-	Insert menu	head.insert	same
+Numbers	Tables	Menu	Insert ▸ Page Count	Contagem de Página	-	Insert menu	head.insert	same
+Numbers	Tables	Menu	Insert ▸ Comment	Comentário	-	Comment button of the header bar	head.insert.comment	same
+Numbers	Tables	Menu	Insert ▸ Hyperlink ▸ Webpage	Página web	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Numbers	Tables	Menu	Insert ▸ Hyperlink ▸ Email Message	Mensagem de e-mail	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Numbers	Tables	Menu	Insert ▸ Column Break	Quebra de Coluna	-	Insert menu	head.insert	same
+Numbers	Tables	Menu	Insert ▸ MathType Equation	Equação MathType	-	Insert menu, in the phase of citations and equations	head.insert	adapted
+Numbers	Tables	Menu	Insert ▸ Choose…	Escolher…	-	Insert menu ▸ Choose, and the Media button	head.insert.media	same
+Numbers	Tables	Menu	Table ▸ Add Row Above	Adicionar Linha Acima	Opt+Up	Insert menu ▸ Rows and columns, context menu of the table and Alt+arrows	head.insert	adapted
+Numbers	Tables	Menu	Table ▸ Add Row Below	Adicionar Linha Abaixo	Opt+Down	Insert menu ▸ Rows and columns, context menu of the table and Alt+arrows	head.insert	adapted
+Numbers	Tables	Menu	Table ▸ Add Column Before	Adicionar Coluna Antes	Opt+Left	Insert menu ▸ Rows and columns, context menu of the table and Alt+arrows	head.insert	adapted
+Numbers	Tables	Menu	Table ▸ Add Column After	Adicionar Coluna Após	Opt+Right	Insert menu ▸ Rows and columns, context menu of the table and Alt+arrows	head.insert	adapted
+Numbers	Tables	Menu	Table ▸ Delete Row	Apagar Linha	-	Insert menu ▸ Rows and columns, context menu of the table and Alt+arrows	head.insert	adapted
+Numbers	Tables	Menu	Table ▸ Delete Column	Apagar Coluna	-	Insert menu ▸ Rows and columns, context menu of the table and Alt+arrows	head.insert	adapted
+Numbers	Tables	Menu	Table ▸ Header Rows (6 items)	Linhas do Cabeçalho	-	Inspector ▸ Format ▸ Table ▸ Headers and footer	insp.table.headers	adapted
+Numbers	Tables	Menu	Table ▸ Header Columns (6 items)	Colunas do Cabeçalho	-	Inspector ▸ Format ▸ Table ▸ Headers and footer	insp.table.headers	adapted
+Numbers	Tables	Menu	Table ▸ Freeze Header Rows	Congelar Linhas do Cabeçalho	-	Inspector ▸ Format ▸ Table ▸ Headers and footer	insp.table.headers	adapted
+Numbers	Tables	Menu	Table ▸ Freeze Header Columns	Congelar Colunas do Cabeçalho	-	Inspector ▸ Format ▸ Table ▸ Headers and footer	insp.table.headers	adapted
+Numbers	Tables	Menu	Table ▸ Footer Rows (6 items)	Linhas de Rodapé	-	Inspector ▸ Format ▸ Table ▸ Headers and footer	insp.table.headers	adapted
+Numbers	Tables	Menu	Table ▸ Resize Rows to Fit Content	Redimensionar Linhas para Ajustá-las ao Conteúdo	-	Inspector ▸ Format ▸ Table ▸ Rows and columns, and context menu of the table	insp.table.size	adapted
+Numbers	Tables	Menu	Table ▸ Resize Columns to Fit Content	Redimensionar Colunas para Ajustá-las ao Conteúdo	-	Inspector ▸ Format ▸ Table ▸ Rows and columns, and context menu of the table	insp.table.size	adapted
+Numbers	Tables	Menu	Table ▸ Unhide All Rows	Mostrar Todas as Linhas	-	Inspector ▸ Format ▸ Table ▸ Rows and columns, and context menu of the table	insp.table.size	adapted
+Numbers	Tables	Menu	Table ▸ Unhide All Columns	Mostrar Todas as Colunas	-	Inspector ▸ Format ▸ Table ▸ Rows and columns, and context menu of the table	insp.table.size	adapted
+Numbers	Tables	Menu	Table ▸ Enable All Categories	Ativar Todas as Categorias	-	Inspector ▸ Data ▸ Categories	insp.reorg.categories	adapted
+Numbers	Tables	Menu	Table ▸ Merge Cells	Combinar Células	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Table ▸ Split into Rows	Dividir em Linhas	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Table ▸ Split into Columns	Dividir em Colunas	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Table ▸ Distribute Rows Evenly	Distribuir Linhas Uniformemente	-	Inspector ▸ Format ▸ Table ▸ Rows and columns, and context menu of the table	insp.table.size	adapted
+Numbers	Tables	Menu	Table ▸ Distribute Columns Evenly	Distribuir Colunas Uniformemente	-	Inspector ▸ Format ▸ Table ▸ Rows and columns, and context menu of the table	insp.table.size	adapted
+Numbers	Tables	Menu	Table ▸ Allow Border Selection	Permitir Seleção de Borda	-	Context menu of the table and Search Commands (Ctrl+/)	doc.sheet	adapted
+Numbers	Tables	Menu	Table ▸ Show Reorganize Panel	Mostrar Painel Reorganizar⏎	-	Inspector ▸ Data	insp.level1	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Show Fonts	Mostrar Fontes	Cmd+T	Inspector ▸ Format ▸ Style ▸ Font, whose family row opens the Fonts popover	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Bold	Negrito	Cmd+B	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Italic	Itálico	Cmd+I	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Underline	Sublinhado	Cmd+U	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Outline	Esboço	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Bigger	Maior	Cmd++	Size field in Inspector ▸ Format ▸ Style ▸ Font; Ctrl++ and Ctrl+− are the zoom	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Smaller	Menor	Cmd+-	Size field in Inspector ▸ Format ▸ Style ▸ Font; Ctrl++ and Ctrl+− are the zoom	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Tracking ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Tracking ▸ Use None	Não Usar Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Tracking ▸ Tighten	Apertar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Tracking ▸ Loosen	Ampliar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Ligature ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Ligature ▸ Use None	Não Usar Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Ligature ▸ Use All	Usar Tudo	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Baseline ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Baseline ▸ Superscript	Sobrescrito	Ctrl+Cmd++	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Baseline ▸ Subscript	Subscrito	Ctrl+Cmd+-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Baseline ▸ Raise	Aumentar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Baseline ▸ Lower	Diminuir	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Capitalization ▸ None	Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Capitalization ▸ All Caps	Todas Maiúsculas	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Capitalization ▸ Small Caps	Versalete	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Font ▸ Capitalization ▸ Title	Título	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Numbers	Tables	Menu	Format ▸ Text ▸ Align Left	Alinhar à Esquerda	Cmd+{	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Numbers	Tables	Menu	Format ▸ Text ▸ Center	Centralizar	Cmd+|	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Numbers	Tables	Menu	Format ▸ Text ▸ Align Right	Alinhar à Direita	Cmd+}	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Numbers	Tables	Menu	Format ▸ Text ▸ Justify	Justificar	Opt+Cmd+|	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Numbers	Tables	Menu	Format ▸ Text ▸ Auto Align Table Cell	Alinhamento Automático de Célula de Tabela	-	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Numbers	Tables	Menu	Format ▸ Chart (47 items)	Gráfico	-	Inspector ▸ Format ▸ Chart, Axis and Series	insp.axis.labels	adapted
+Numbers	Tables	Menu	Format ▸ Shape (4 items)	Forma	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Image ▸ Reduce File Size	Reduzir Tamanho do Arquivo	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Copy Style	Copiar Estilo	Opt+Cmd+C	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Paste Style	Colar Estilo	Opt+Cmd+V	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Create New Table Style…	Criar Novo Estilo de Tabela...	-	Inspector ▸ Format ▸ Table ▸ Table styles	insp.table.styles	adapted
+Numbers	Tables	Menu	Format ▸ Show Conditional Format Rules	Mostrar Regras do Formato Condicional	-	Inspector ▸ Format ▸ Cell	insp.cell.conditional	adapted
+Numbers	Tables	Menu	Format ▸ Create Custom Cell Format…	Criar Formato de Célula Personalizado…	-	Inspector ▸ Format ▸ Cell	insp.cell.conditional	adapted
+Numbers	Tables	Menu	Format ▸ Manage Custom Cell Formats…	Gerenciar Formatos de Célula Personalizado…	-	Inspector ▸ Format ▸ Cell	insp.cell.conditional	adapted
+Numbers	Tables	Menu	Format ▸ Mask	Máscara	Shift+Cmd+M	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Numbers	Tables	Menu	Format ▸ Mask with Shape (12 items)	Mascarar com Forma	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Numbers	Tables	Menu	Format ▸ Instant Alpha	Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Numbers	Tables	Menu	Format ▸ Remove Instant Alpha	Remover Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Numbers	Tables	Menu	Format ▸ Reapply Defaults to Selection	Reaplicar Padrões à Seleção	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Advanced ▸ Capture Table…	Capturar Tabela…	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Advanced ▸ Manage Tables…	Gerenciar Tabelas…	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Advanced ▸ Define Style	Definir Estilo	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Numbers	Tables	Menu	Format ▸ Advanced ▸ Define as Media Placeholder	Definir como Marcador de Posição de Mídia	Ctrl+Opt+Cmd+I	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Numbers	Tables	Menu	Arrange ▸ Bring Forward	Trazer para Frente	Opt+Shift+Cmd+F	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Bring to Front	Em Primeiro Plano	Shift+Cmd+F	Inspector ▸ Format ▸ Arrange, and Ctrl+Shift+] and Ctrl+Shift+[	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Send Backward	Enviar Para Trás	Opt+Shift+Cmd+B	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Send to Back	Enviar para o Fundo	Shift+Cmd+B	Inspector ▸ Format ▸ Arrange, and Ctrl+Shift+] and Ctrl+Shift+[	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Align Objects ▸ Left	Esquerda	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Align Objects ▸ Center	Centralizar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Align Objects ▸ Right	Direita	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Align Objects ▸ Top	Superior	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Align Objects ▸ Middle	Meio	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Align Objects ▸ Bottom	Inferior	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Distribute Objects ▸ Horizontally	Horizontalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Distribute Objects ▸ Vertically	Verticalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Flip Horizontally	Virar Horizontalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Flip Vertically	Virar Verticalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Lock	Bloquear	Cmd+L	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Unlock	Desbloquear	Opt+Cmd+L	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Group	Grupo	Opt+Cmd+G	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	Arrange ▸ Ungroup	Desagrupar	Opt+Shift+Cmd+G	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Numbers	Tables	Menu	View ▸ Show Print View	Mostrar Visualização da Impressão	Opt+Cmd+P	Main menu ▸ View	head.menu	adapted
+Numbers	Tables	Menu	View ▸ Show Layout	Mostrar Leiaute	Shift+Cmd+L	Main menu ▸ View	head.menu	adapted
+Numbers	Tables	Menu	View ▸ Show Rulers	Mostrar Réguas	Cmd+R	Main menu ▸ View	head.menu	adapted
+Numbers	Tables	Menu	View ▸ Show Comments	Mostrar Comentários	-	Main menu ▸ View	head.menu	adapted
+Numbers	Tables	Menu	View ▸ Show Format Bar	Mostrar Barra de Formatos	Shift+Cmd+R	Does not apply: M+ has no format bar; its controls are in Inspector ▸ Format	-	out
+Numbers	Tables	Menu	View ▸ Zoom ▸ Zoom In	Ampliar	Cmd+>	Zoom control over the document	osd.zoom	adapted
+Numbers	Tables	Menu	View ▸ Zoom ▸ Zoom Out	Reduzir	Cmd+<	Zoom control over the document	osd.zoom	adapted
+Numbers	Tables	Menu	View ▸ Zoom ▸ Actual Size	Tamanho Real	-	Zoom control over the document	osd.zoom	adapted
+Numbers	Tables	Menu	View ▸ Show Inspector	Mostrar Inspetor	Opt+Cmd+I	Inspector button of the header bar	head.inspector	same
+Numbers	Tables	Menu	View ▸ New Inspector	Novo Inspetor	-	Does not apply: there is one Inspector	-	out
+Numbers	Tables	Menu	View ▸ Show Colors	Mostrar Cores	Shift+Cmd+C	Colors popover, from the color rows of Inspector ▸ Format	colors.popover	adapted
+Numbers	Tables	Menu	View ▸ Show Adjust Image	Mostrar	-	Inspector ▸ Format ▸ Image ▸ Adjust image	insp.image.adjust	adapted
+Numbers	Tables	Menu	View ▸ Show Media Browser	Mostrar Navegador de Mídia	-	Media button of the header bar, which opens a popover	head.insert.media	adapted
+Numbers	Tables	Menu	View ▸ Show Document Warnings	Mostrar Avisos do Documento	-	Banner of warnings over the document	notice.banner	adapted
+Numbers	Tables	Menu	View ▸ Show Function Browser	Mostrar Navegador de Função	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Menu	View ▸ Show Formula List	Mostrar Lista de Fórmulas	Opt+Cmd+F	Sidebar, from its content switcher	side.mode	adapted
+Numbers	Tables	Menu	View ▸ Enter Full Screen	Entrar em Tela Cheia	Ctrl+Cmd+F	Main menu ▸ View ▸ Fullscreen (F11)	head.menu	adapted
+Numbers	Tables	Menu	View ▸ Hide Toolbar	Ocultar Barra de Ferramentas	Opt+Cmd+T	Does not apply: the header bar is not customizable	-	out
+Numbers	Tables	Menu	View ▸ Customize Toolbar…	Personalizar Barra de Ferramentas…	-	Does not apply: the header bar is not customizable	-	out
+Numbers	Tables	Menu	Window ▸ Minimize	Minimizar	Cmd+M	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Numbers	Tables	Menu	Window ▸ Zoom Window	Ampliar/Reduzir	-	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Numbers	Tables	Menu	Window ▸ Bring All to Front	Trazer Todas Para Frente	-	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Numbers	Tables	Menu	Share ▸ Share via iWork.com…	Compartilhar pelo iWork.com…	-	Out of scope: iWork.com was shut down	-	out
+Numbers	Tables	Menu	Share ▸ Show Shared Documents	Mostrar documentos compartilhados	-	Out of scope: iWork.com was shut down	-	out
+Numbers	Tables	Menu	Share ▸ No unread comments	Nenhum comentário não lido	-	Out of scope: iWork.com was shut down	-	out
+Numbers	Tables	Menu	Share ▸ Sign In…	Iniciar sessão…	-	Out of scope: iWork.com was shut down	-	out
+Numbers	Tables	Menu	Share ▸ Send via Mail ▸ Numbers	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Numbers	Tables	Menu	Share ▸ Send via Mail ▸ Excel	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Numbers	Tables	Menu	Share ▸ Send via Mail ▸ PDF	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Numbers	Tables	Menu	Share ▸ Export ▸ PDF…	-	-	Main menu ▸ Export	head.menu	adapted
+Numbers	Tables	Menu	Share ▸ Export ▸ Excel…	-	-	Main menu ▸ Export	head.menu	adapted
+Numbers	Tables	Menu	Share ▸ Export ▸ CSV…	-	-	Main menu ▸ Export	head.menu	adapted
+Numbers	Tables	Menu	Help ▸ Numbers Help	Ajuda Numbers	Cmd+?	Main menu ▸ Help	head.menu	same
+Numbers	Tables	Menu	Help ▸ Welcome to Numbers	Bem-vindo ao Numbers	-	Out of scope: Apple material	-	out
+Numbers	Tables	Menu	Help ▸ Video Tutorials	Tutoriais de Vídeo	-	Out of scope: Apple material	-	out
+Numbers	Tables	Menu	Help ▸ iWork Resources	Recursos do iWork	-	Out of scope: Apple material	-	out
+Numbers	Tables	Menu	Help ▸ Numbers User Guide	Manual do Usuário do Numbers	-	Main menu ▸ Help	head.menu	same
+Numbers	Tables	Menu	Help ▸ Formulas and Functions Help	Ajuda de Fórmulas e Funções	-	Main menu ▸ Help	head.menu	same
+Numbers	Tables	Menu	Help ▸ Keyboard Shortcuts	Atalhos de Teclado	-	Main menu ▸ Keyboard Shortcuts	dialog.shortcuts	adapted
+Numbers	Tables	Menu	Help ▸ Service and Support	Serviço e Suporte	-	Out of scope: Apple material	-	out
+Numbers	Tables	Toolbar	Sheet	Folha	-	The + button of the bottom bar, before the sheet switcher	bottom.add	adapted
+Numbers	Tables	Toolbar	Tables	Tabelas	-	Table button of the header bar	head.insert.table	same
+Numbers	Tables	Toolbar	Function	Função	-	Function button of the formula bar	formula.function	adapted
+Numbers	Tables	Toolbar	Reorganize	Reorganizar	-	Inspector ▸ Data	insp.level1	adapted
+Numbers	Tables	Toolbar	Formula List	Lista de Fórmulas	-	Sidebar, from its content switcher	side.mode	adapted
+Numbers	Tables	Toolbar	Share	Compartilhar	-	Out of scope: iWork.com was shut down	-	out
+Numbers	Tables	Toolbar	Group	Agrupar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Numbers	Tables	Toolbar	Ungroup	Desagrupar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Numbers	Tables	Toolbar	Charts	Gráficos	-	Chart button of the header bar	head.insert.chart	same
+Numbers	Tables	Toolbar	Text Box	Caixa de texto	-	Text button of the header bar	head.insert.text	same
+Numbers	Tables	Toolbar	Shapes	Formas	-	Shape button of the header bar	head.insert.shape	same
+Numbers	Tables	Toolbar	Comment	Comentário	-	Comment button of the header bar	head.insert.comment	same
+Numbers	Tables	Toolbar	View	Visualizar	-	Sidebar button, and Main menu ▸ View	head.sidebar	adapted
+Numbers	Tables	Toolbar	Guides	Guias	-	Main menu ▸ View	head.menu	adapted
+Numbers	Tables	Toolbar	Front	Frente	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Numbers	Tables	Toolbar	Back	Fundo	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Numbers	Tables	Toolbar	Inspector	Inspetor	-	Inspector button of the header bar	head.inspector	same
+Numbers	Tables	Toolbar	Media	Mídia	-	Media button of the header bar	head.insert.media	same
+Numbers	Tables	Toolbar	Adjust	Ajustar	-	Inspector ▸ Format ▸ Image ▸ Adjust image	insp.image.adjust	adapted
+Numbers	Tables	Toolbar	Colors	Cores	-	Colors popover, from the color rows of Inspector ▸ Format	colors.popover	adapted
+Numbers	Tables	Toolbar	Fonts	Fontes	-	Fonts popover, from the family row of Inspector ▸ Format ▸ Style ▸ Font	fonts.popover	adapted
+Numbers	Tables	Toolbar	Find	Buscar	-	Find button of the header bar	head.find	same
+Numbers	Tables	Toolbar	Forward	Para Frente	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Numbers	Tables	Toolbar	Backward	Para Trás	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Numbers	Tables	Toolbar	Smaller	Menor	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Numbers	Tables	Toolbar	Bigger	Maior	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Numbers	Tables	Toolbar	Subscript	Subscrito	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Numbers	Tables	Toolbar	Superscript	Sobrescrito	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Numbers	Tables	Toolbar	Lock	Bloquear	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Numbers	Tables	Toolbar	Unlock	Desbloquear	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Numbers	Tables	Toolbar	Flip Horizontally	Virar na Horizontal	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Numbers	Tables	Toolbar	Flip Vertically	Virar na Vertical	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Numbers	Tables	Toolbar	Instant Alpha	Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Numbers	Tables	Toolbar	Mask	Máscara	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Numbers	Tables	Toolbar	Copy Style	Copiar Estilo	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Toolbar	Paste Style	Colar Estilo	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Numbers	Tables	Toolbar	Format Bar	Barra de Formatos	-	Does not apply: M+ has no format bar; its controls are in Inspector ▸ Format	-	out
+Numbers	Tables	Toolbar	Print	Imprimir	-	Main menu ▸ Print	head.menu	adapted
+Numbers	Tables	Toolbar	Customize Toolbar	Personalizar Barra de Ferramentas	-	Does not apply: the header bar is not customizable	-	out
+Numbers	Tables	Format bar	graphic mode (15 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Numbers	Tables	Format bar	shape mode (15 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Numbers	Tables	Format bar	line mode (8 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Numbers	Tables	Format bar	image mode (8 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Numbers	Tables	Format bar	table mode (16 controls)	-	-	Inspector ▸ Format ▸ Table, Cell, Text and Arrange, and the formula bar	insp.tabs	adapted
+Numbers	Tables	Format bar	tableName mode (6 controls)	-	-	Inspector ▸ Format ▸ Table, Cell, Text and Arrange, and the formula bar	insp.tabs	adapted
+Numbers	Tables	Format bar	pieChart mode (13 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	valueAxis mode (14 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	categoryAxis mode (12 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	series mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	columnBarSeries mode (8 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	pieLabel mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	dataLabels mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	columnBarLabel mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	errorBar mode (6 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	legend mode (13 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	chart mode (13 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Numbers	Tables	Format bar	text mode (15 controls)	-	-	Inspector ▸ Format ▸ Style, Layout and More (text)	insp.tabs	adapted
+Numbers	Tables	Format bar	tableFormula mode (6 controls)	-	-	Inspector ▸ Format ▸ Table, Cell, Text and Arrange, and the formula bar	insp.tabs	adapted
+Numbers	Tables	Inspector	Document	Documento	-	Inspector ▸ Document ▸ Info	insp.info.fields	adapted
+Numbers	Tables	Inspector	Sheet	Folha	-	Inspector ▸ Document ▸ Sheet	insp.sheet.printing	adapted
+Numbers	Tables	Inspector	Table	Tabela	-	Inspector ▸ Format ▸ Table	insp.table.headers	adapted
+Numbers	Tables	Inspector	Cells	Células	-	Inspector ▸ Format ▸ Cell	insp.cell.format	adapted
+Numbers	Tables	Inspector	Chart	Gráfico (dados)	-	Inspector ▸ Format ▸ Chart, Axis and Series	insp.chart.options	adapted
+Numbers	Tables	Inspector	Text ▸ Text	Texto	-	Inspector ▸ Format ▸ Text	insp.text.spacing	adapted
+Numbers	Tables	Inspector	Text ▸ Columns	Colunas	-	Inspector ▸ Format ▸ Text	insp.layout.columns	adapted
+Numbers	Tables	Inspector	Text ▸ Bullets	Marcadores	-	Inspector ▸ Format ▸ Text ▸ Bullets and lists	insp.text.lists	adapted
+Numbers	Tables	Inspector	Graphic	Gráfico	-	Inspector ▸ Format ▸ Style, with an object selected	insp.style.stroke	adapted
+Numbers	Tables	Inspector	Metrics	Métricas	-	Inspector ▸ Format ▸ Arrange	insp.arrange.metrics	adapted
+Numbers	Tables	Inspector	Hyperlink	Hiperlink	-	Link popover, from Insert ▸ Link and the context menu	head.insert	adapted
+Numbers	Tables	Inspector	QuickTime	QuickTime	-	Inspector ▸ Format, with a sound or movie selected	insp.tabs	adapted
+Numbers	Tables	Preferences	General	Geral	-	Preferences ▸ General	dialog.preferences	same
+Numbers	Tables	Preferences	Rulers	Réguas	-	Preferences ▸ Rulers	dialog.preferences	same
+Numbers	Tables	Preferences	Auto-Correction	Correção Automática	-	Preferences ▸ Auto-Correction	dialog.preferences	same
+Numbers	Tables	Windows and sheets	Template Chooser	Seletor de Modelos	-	Template chooser inside the window	templates.window	adapted
+Numbers	Tables	Windows and sheets	Reorganize (sort, filter, categories)	Reorganizar	-	Inspector ▸ Data ▸ Sort, Filter and Categories	insp.reorg.sort	adapted
+Numbers	Tables	Windows and sheets	Formula List and search	Lista de Fórmulas	-	Sidebar, from its content switcher	side.mode	adapted
+Numbers	Tables	Windows and sheets	Function Browser and formula editor	Navegador de Funções	-	Popover of the Function button and editing in the formula bar	formula.function	adapted
+Numbers	Tables	Windows and sheets	Find & Replace	Buscar e Substituir	-	Find bar under the header bar	find.bar	adapted
+Numbers	Tables	Windows and sheets	Export	Exportar	-	Export dialog, from Main menu ▸ Export	head.menu	adapted
+Numbers	Tables	Windows and sheets	Print	Imprimir	-	Print dialog of GNOME, with the print preview	head.menu	adapted
+Numbers	Tables	Windows and sheets	Table styles and predefined tables	-	-	Inspector ▸ Format ▸ Table ▸ Table styles, and the popover of the Table button	head.insert.table	adapted
+Numbers	Tables	Windows and sheets	Sheets pane, styles and instant calculations	-	-	Sheet switcher and instant calculations in the bottom bar; the tables and charts of the sheet in the sidebar	bottom.sheets	adapted
+Keynote	Slides	Menu	Keynote ▸ About Keynote	Sobre o Keynote	-	Main menu ▸ About	head.menu	same
+Keynote	Slides	Menu	Keynote ▸ Preferences…	Preferências…	Cmd+,	Main menu ▸ Preferences	dialog.preferences	same
+Keynote	Slides	Menu	Keynote ▸ Try iWork…	Experimentar o iWork…	-	Does not apply to Desk	-	out
+Keynote	Slides	Menu	Keynote ▸ Provide Keynote Feedback	Enviar Comentários Sobre o Keynote	-	Does not apply to Desk	-	out
+Keynote	Slides	Menu	Keynote ▸ Register Keynote	Registrar Keynote	-	Does not apply to Desk	-	out
+Keynote	Slides	Menu	Keynote ▸ Hide Keynote	Ocultar Keynote	Cmd+H	The system: GNOME takes care of windows and apps	-	system
+Keynote	Slides	Menu	Keynote ▸ Hide Others	Ocultar Outros	Opt+Cmd+H	The system: GNOME takes care of windows and apps	-	system
+Keynote	Slides	Menu	Keynote ▸ Show All	Mostrar Tudo	-	The system: GNOME takes care of windows and apps	-	system
+Keynote	Slides	Menu	Keynote ▸ Quit Keynote	Encerrar o Keynote	Cmd+Q	Ctrl+Q, with no menu item	-	adapted
+Keynote	Slides	Menu	File ▸ New	Novo	Cmd+N	Main menu	head.menu	same
+Keynote	Slides	Menu	File ▸ New from Theme Chooser…	Novo a partir do Seletor de Temas…	-	Template chooser inside the window	templates.window	adapted
+Keynote	Slides	Menu	File ▸ Open…	Abrir…	Cmd+O	Main menu	head.menu	same
+Keynote	Slides	Menu	File ▸ Open Recent (1 items)	Abrir Recentes	-	Main menu	head.menu	same
+Keynote	Slides	Menu	File ▸ Close	Fechar	Cmd+W	Close button of the document tab, and Ctrl+W	tabs.documents	adapted
+Keynote	Slides	Menu	File ▸ Close All	Fechar Tudo	Opt+Cmd+W	Ctrl+Alt+W and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	File ▸ Save	Salvar	Cmd+S	Automatic saving and versions (D-001, DOC-11)	head.menu	adapted
+Keynote	Slides	Menu	File ▸ Save As…	Salvar Como…	Shift+Cmd+S	Main menu	head.menu	same
+Keynote	Slides	Menu	File ▸ Revert to Saved…	Reverter ao Salvo…	-	Main menu: browse and restore the versions (D-001, DOC-11)	head.menu	adapted
+Keynote	Slides	Menu	File ▸ Export ▸ Quicktime…	-	-	Main menu ▸ Export	head.menu	same
+Keynote	Slides	Menu	File ▸ Export ▸ PPT…	-	-	Main menu ▸ Export	head.menu	same
+Keynote	Slides	Menu	File ▸ Export ▸ PDF…	-	-	Main menu ▸ Export	head.menu	same
+Keynote	Slides	Menu	File ▸ Export ▸ Images…	Imagens…	-	Main menu ▸ Export	head.menu	same
+Keynote	Slides	Menu	File ▸ Export ▸ HTML…	-	-	Main menu ▸ Export	head.menu	same
+Keynote	Slides	Menu	File ▸ Export ▸ iPod…	-	-	Out of scope: an Apple device; the movie comes out of Export ▸ Movie	-	out
+Keynote	Slides	Menu	File ▸ Reduce File Size	Reduzir Tamanho do Arquivo	-	Inspector ▸ Format ▸ Image and Search Commands (Ctrl+/)	insp.image.file	adapted
+Keynote	Slides	Menu	File ▸ Record Slideshow	Gravar Apresentação de Slides	-	Menu of the Play button and Inspector ▸ Document ▸ Audio	insp.audio.recording	adapted
+Keynote	Slides	Menu	File ▸ Clear Recording…	Limpar Gravação…	-	Menu of the Play button and Inspector ▸ Document ▸ Audio	insp.audio.recording	adapted
+Keynote	Slides	Menu	File ▸ Choose Theme…	Escolher Tema…	-	Inspector ▸ Document ▸ Theme	insp.show.theme	adapted
+Keynote	Slides	Menu	File ▸ Save Theme…	Salvar Tema…	-	Search Commands (Ctrl+/) (Save as template)	commands.dialog	adapted
+Keynote	Slides	Menu	File ▸ Page Setup…	Configuração de Página…	Shift+Cmd+P	Inspector ▸ Document (paper and margins) and the Print dialog	insp.doc.paper	adapted
+Keynote	Slides	Menu	File ▸ Print…	Imprimir…	Cmd+P	Main menu	head.menu	same
+Keynote	Slides	Menu	Edit ▸ Undo	Desfazer	Cmd+Z	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Redo	Refazer	Shift+Cmd+Z	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Cut	Cortar	Cmd+X	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Copy	Copiar	Cmd+C	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Paste	Colar	Cmd+V	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Paste and Match Style	Colar com o Mesmo Estilo	Opt+Shift+Cmd+V	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Delete	Apagar	-	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Clear All	Limpar Tudo	-	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Duplicate	Duplicar	Cmd+D	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Select All	Selecionar Tudo	Cmd+A	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Deselect All	Desmarcar Tudo	Shift+Cmd+A	Shortcut, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Find ▸ Find…	Buscar…	Cmd+F	Find bar, from the Find button	find.bar	adapted
+Keynote	Slides	Menu	Edit ▸ Find ▸ Find Next	Buscar Seguinte	Cmd+G	Find bar, from the Find button	find.bar	adapted
+Keynote	Slides	Menu	Edit ▸ Find ▸ Find Previous	Buscar Anterior	Shift+Cmd+G	Find bar, from the Find button	find.bar	adapted
+Keynote	Slides	Menu	Edit ▸ Find ▸ Use Selection for Find	Usar Seleção para Buscar	Cmd+E	Find bar, from the Find button	find.bar	adapted
+Keynote	Slides	Menu	Edit ▸ Find ▸ Jump to Selection	Saltar para Seleção	Cmd+J	Find bar, from the Find button	find.bar	adapted
+Keynote	Slides	Menu	Edit ▸ Spelling ▸ Spelling…	Ortografia…	Cmd+:	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Spelling ▸ Check Spelling	Verificar Ortografia	Cmd+;	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Edit ▸ Spelling ▸ Check Spelling as You Type	Verificar a Ortografia Enquanto Você Escreve	-	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Column Break	Quebra de Coluna	-	Insert menu	head.insert	same
+Keynote	Slides	Menu	Insert ▸ Text Box	Caixa de Texto	-	Text button of the header bar	head.insert.text	same
+Keynote	Slides	Menu	Insert ▸ Shape (16 items)	Forma	-	Shape button of the header bar	head.insert.shape	same
+Keynote	Slides	Menu	Insert ▸ Table	Tabela	-	Table button of the header bar	head.insert.table	same
+Keynote	Slides	Menu	Insert ▸ Function ▸ Sum	Soma	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Average	Média	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Minimum	Mínimo	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Maximum	Máximo	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Count	Contar	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Product	Produto	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Show Function Browser	Mostrar Navegador de Função	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Function ▸ Formula Editor	Editor de Fórmula	-	Context menu of the cell and Search Commands (Ctrl+/), with a table cell selected	commands.dialog	adapted
+Keynote	Slides	Menu	Insert ▸ Chart (19 items)	Gráfico	-	Chart button of the header bar	head.insert.chart	same
+Keynote	Slides	Menu	Insert ▸ Smart Build (1 items)	Composição Inteligente	-	Insert menu	head.insert	same
+Keynote	Slides	Menu	Insert ▸ Connection Line	Linha de Conexão	-	Insert menu	head.insert	same
+Keynote	Slides	Menu	Insert ▸ MathType Equation	Equação MathType	-	Insert menu, in the phase of citations and equations	head.insert	adapted
+Keynote	Slides	Menu	Insert ▸ Comment	Comentário	-	Comment button of the header bar	head.insert.comment	same
+Keynote	Slides	Menu	Insert ▸ Text Hyperlink ▸ Slide	-	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Keynote	Slides	Menu	Insert ▸ Text Hyperlink ▸ Webpage	Página web	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Keynote	Slides	Menu	Insert ▸ Text Hyperlink ▸ Keynote File…	Arquivo do Keynote…	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Keynote	Slides	Menu	Insert ▸ Text Hyperlink ▸ Email Message	Mensagem de E-mail	-	Insert menu ▸ Link, which opens a popover	head.insert	adapted
+Keynote	Slides	Menu	Insert ▸ Choose…	Escolher…	Shift+Cmd+V	Insert menu ▸ Choose, and the Media button	head.insert.media	same
+Keynote	Slides	Menu	Slide ▸ New Slide	Novo Slide	Shift+Cmd+N	The + button at the top of the sidebar	side.add	adapted
+Keynote	Slides	Menu	Slide ▸ Skip Slide	Ignorar Slide	-	Context menu of the navigator and Inspector ▸ Format ▸ Slide	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Expand	Expandir	-	Context menu of the navigator and Search Commands (Ctrl+/)	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Expand All	Expandir Tudo	-	Context menu of the navigator and Search Commands (Ctrl+/)	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Collapse	Contrair	-	Context menu of the navigator and Search Commands (Ctrl+/)	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Collapse All	Contrair Tudo	-	Context menu of the navigator and Search Commands (Ctrl+/)	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Show/Hide Slide Numbers on All Slides	Mostrar/Ocultar Números de Slide em Todos os Slides	-	Inspector ▸ Format ▸ Slide ▸ Appearance	insp.slide.appearance	adapted
+Keynote	Slides	Menu	Slide ▸ Go To ▸ Next Slide	Próximo Slide	-	Navigator in the sidebar and the page keys	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Go To ▸ Previous Slide	Slide Anterior	-	Navigator in the sidebar and the page keys	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Go To ▸ First Slide	Primeiro Slide	-	Navigator in the sidebar and the page keys	side.navigator	adapted
+Keynote	Slides	Menu	Slide ▸ Go To ▸ Last Slide	Último Slide	-	Navigator in the sidebar and the page keys	side.navigator	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Show Fonts	Mostrar Fontes	Cmd+T	Inspector ▸ Format ▸ Style ▸ Font, whose family row opens the Fonts popover	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Bold	Negrito	Cmd+B	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Italic	Itálico	Cmd+I	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Underline	Sublinhado	Cmd+U	Inspector ▸ Format ▸ Style ▸ Font, and the usual shortcuts	insp.text.f.bold	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Strikethrough	Tachado	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Outline	Esboço	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Bigger	Maior	Cmd++	Size field in Inspector ▸ Format ▸ Style ▸ Font; Ctrl++ and Ctrl+− are the zoom	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Smaller	Menor	Cmd+-	Size field in Inspector ▸ Format ▸ Style ▸ Font; Ctrl++ and Ctrl+− are the zoom	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Tracking ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Tracking ▸ Use None	Não Usar Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Tracking ▸ Tighten	Estreitar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Tracking ▸ Loosen	Ampliar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Ligature ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Ligature ▸ Use None	Não Usar Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Ligature ▸ Use All	Usar Tudo	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Baseline ▸ Use Default	Usar Padrão	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Baseline ▸ Superscript	Sobrescrito	Ctrl+Cmd++	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Baseline ▸ Subscript	Subscrito	Ctrl+Cmd+-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Baseline ▸ Raise	Aumentar	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Baseline ▸ Lower	Diminuir	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Capitalization ▸ None	Nenhum	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Capitalization ▸ All Caps	Todas Maiúsculas	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Capitalization ▸ Small Caps	Versalete	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Font ▸ Capitalization ▸ Title	Título	-	Inspector ▸ Format ▸ Style ▸ Font	insp.text.font	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Align Left	Alinhar à Esquerda	Cmd+{	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Center	Centralizar	Cmd+|	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Align Right	Alinhar à Direita	Cmd+}	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Justify	Justificar	Opt+Cmd+|	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Auto Align Table Cell	Alinhamento Automático de Célula de Tabela	-	Inspector ▸ Format ▸ Style ▸ Alignment, and shortcuts	insp.text.alignment	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Copy Ruler	Copiar Régua	Ctrl+Cmd+C	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Text ▸ Paste Ruler	Colar Régua	Ctrl+Cmd+V	Context menu of the text and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Table (39 items)	Tabela	-	Inspector ▸ Format ▸ Table and context menu of the table	insp.table.headers	adapted
+Keynote	Slides	Menu	Format ▸ Chart (48 items)	Gráfico	-	Inspector ▸ Format ▸ Chart, Axis and Series	insp.axis.labels	adapted
+Keynote	Slides	Menu	Format ▸ Shape (5 items)	Forma	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Image ▸ Reduce File Size	Reduzir Tamanho do Arquivo	-	Context menu of the object and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Copy Style	Copiar Estilo	Opt+Cmd+C	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Paste Style	Colar Estilo	Opt+Cmd+V	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Copy Animation	Copiar Animação	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Paste Animation	Colar Animação	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Mask	Máscara	Shift+Cmd+M	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Keynote	Slides	Menu	Format ▸ Mask with Shape (12 items)	Mascarar com Forma	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Keynote	Slides	Menu	Format ▸ Instant Alpha	Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Keynote	Slides	Menu	Format ▸ Remove Instant Alpha	Remover Alfa Instantâneo	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Keynote	Slides	Menu	Format ▸ Reapply Master to Slide	Reaplicar Mestre a Slide	-	Context menu of the navigator and Inspector ▸ Format ▸ Slide	side.navigator	adapted
+Keynote	Slides	Menu	Format ▸ Advanced ▸ Define Chart for Current Master…	Definir Gráfico para Mestre Atual...	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Advanced ▸ Define Chart for All Masters…	Definir Gráfico para Todos os Mestres…	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Advanced ▸ Set Chart and Legend Geometry for All Masters	Definir a Geometria do Gráfico e da Legenda para Todos os Slides Mestres	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Advanced ▸ Set Chart Type as Default for Current Theme	Definir Tipo de Gráfico como Padrão para o Tema Atual	-	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Advanced ▸ Define as Text Placeholder	Definir como Marcador de Posição de Texto	Ctrl+Opt+Cmd+T	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Keynote	Slides	Menu	Format ▸ Advanced ▸ Define as Media Placeholder	Definir como Marcador de Posição de Mídia	Ctrl+Opt+Cmd+I	Search Commands (Ctrl+/) (authoring of templates and themes)	commands.dialog	adapted
+Keynote	Slides	Menu	Arrange ▸ Bring Forward	Trazer para Frente	Opt+Shift+Cmd+F	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Bring to Front	Em Primeiro Plano	Shift+Cmd+F	Inspector ▸ Format ▸ Arrange, and Ctrl+Shift+] and Ctrl+Shift+[	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Send Backward	Enviar Para Trás	Opt+Shift+Cmd+B	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Send to Back	Enviar para o Fundo	Shift+Cmd+B	Inspector ▸ Format ▸ Arrange, and Ctrl+Shift+] and Ctrl+Shift+[	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Align Objects ▸ Left	Esquerda	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Align Objects ▸ Center	Centralizar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Align Objects ▸ Right	Direita	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Align Objects ▸ Top	Superior	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Align Objects ▸ Middle	Meio	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Align Objects ▸ Bottom	Inferior	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Distribute Objects ▸ Horizontally	Horizontalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Distribute Objects ▸ Vertically	Verticalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Flip Horizontally	Virar Horizontalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Flip Vertically	Virar Verticalmente	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Lock	Bloquear	Cmd+L	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Unlock	Desbloquear	Opt+Cmd+L	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Group	Grupo	Opt+Cmd+G	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	Arrange ▸ Ungroup	Desagrupar	Opt+Shift+Cmd+G	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.order	adapted
+Keynote	Slides	Menu	View ▸ Navigator	Navegador	-	Sidebar, from its content switcher	side.mode	adapted
+Keynote	Slides	Menu	View ▸ Outline	Esboço	-	Sidebar, from its content switcher	side.mode	adapted
+Keynote	Slides	Menu	View ▸ Slide Only	Somente Slide	-	Sidebar button, which hides it (F9)	head.sidebar	adapted
+Keynote	Slides	Menu	View ▸ Light Table	Mesa Luminosa	-	Main menu ▸ View ▸ Light table, in the document area	doc.light-table	adapted
+Keynote	Slides	Menu	View ▸ Show Rulers	Mostrar Réguas	Cmd+R	Main menu ▸ View	head.menu	adapted
+Keynote	Slides	Menu	View ▸ Hide Guides	Ocultar Guias	-	Main menu ▸ View	head.menu	adapted
+Keynote	Slides	Menu	View ▸ Show Presenter Notes	Mostrar Notas do Apresentador	-	Notes under the slide, and Main menu ▸ View ▸ Presenter notes	doc.notes	adapted
+Keynote	Slides	Menu	View ▸ Show Master Slides	Mostrar Slides Mestre	-	Sidebar, from its content switcher	side.mode	adapted
+Keynote	Slides	Menu	View ▸ Show Sticky Notes	Mostrar Notas Adesivas	-	Main menu ▸ View	head.menu	adapted
+Keynote	Slides	Menu	View ▸ Show Format Bar	Mostrar Barra de Formatos	Shift+Cmd+R	Does not apply: M+ has no format bar; its controls are in Inspector ▸ Format	-	out
+Keynote	Slides	Menu	View ▸ Zoom ▸ Zoom In	Ampliar	Cmd+>	Zoom control over the document	osd.zoom	adapted
+Keynote	Slides	Menu	View ▸ Zoom ▸ Zoom Out	Reduzir	Cmd+<	Zoom control over the document	osd.zoom	adapted
+Keynote	Slides	Menu	View ▸ Zoom ▸ Actual Size	Tamanho Real	-	Zoom control over the document	osd.zoom	adapted
+Keynote	Slides	Menu	View ▸ Zoom ▸ Fit in Window	Ajustar à Janela	-	Zoom control over the document	osd.zoom	adapted
+Keynote	Slides	Menu	View ▸ Show Inspector	Mostrar Inspetor	Opt+Cmd+I	Inspector button of the header bar	head.inspector	same
+Keynote	Slides	Menu	View ▸ New Inspector	Novo Inspetor	-	Does not apply: there is one Inspector	-	out
+Keynote	Slides	Menu	View ▸ Show Colors	Mostrar Cores	Shift+Cmd+C	Colors popover, from the color rows of Inspector ▸ Format	colors.popover	adapted
+Keynote	Slides	Menu	View ▸ Show Adjust Image	Mostrar Ajustar Imagem	-	Inspector ▸ Format ▸ Image ▸ Adjust image	insp.image.adjust	adapted
+Keynote	Slides	Menu	View ▸ Show Media Browser	Mostrar Navegador de Mídia	-	Media button of the header bar, which opens a popover	head.insert.media	adapted
+Keynote	Slides	Menu	View ▸ Show Document Warnings	Mostrar Avisos do Documento	-	Banner of warnings over the document	notice.banner	adapted
+Keynote	Slides	Menu	View ▸ Enter Full Screen	Entrar em Tela Cheia	Ctrl+Cmd+F	Main menu ▸ View ▸ Fullscreen (F11)	head.menu	adapted
+Keynote	Slides	Menu	View ▸ Hide Toolbar	Ocultar Barra de Ferramentas	Opt+Cmd+T	Does not apply: the header bar is not customizable	-	out
+Keynote	Slides	Menu	View ▸ Customize Toolbar…	Personalizar Barra de Ferramentas…	-	Does not apply: the header bar is not customizable	-	out
+Keynote	Slides	Menu	Play ▸ Play Slideshow	Reproduzir Apresentação de Slides	Opt+Cmd+P	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Menu	Play ▸ Record Slideshow	Gravar Apresentação de Slides	-	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Menu	Play ▸ Clear Recording	Limpar Gravação	-	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Menu	Play ▸ Rehearse Slideshow	Ensaiar Apresentação de Slides	-	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Menu	Play ▸ Customize Presenter Display...	Personalizar Tela do Apresentador...	-	Preferences ▸ Slideshow	dialog.preferences	adapted
+Keynote	Slides	Menu	Window ▸ Minimize	Minimizar	Cmd+M	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Keynote	Slides	Menu	Window ▸ Zoom Window	Ampliar/Reduzir	-	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Keynote	Slides	Menu	Window ▸ Bring All to Front	Trazer Todas para Frente	-	The system: GNOME takes care of the windows; the documents of an app are tabs of one window	tabs.documents	system
+Keynote	Slides	Menu	Share ▸ Share via iWork.com…	Compartilhar pelo iWork.com…	-	Out of scope: iWork.com was shut down	-	out
+Keynote	Slides	Menu	Share ▸ Show Shared Documents	Mostrar documentos compartilhados	-	Out of scope: iWork.com was shut down	-	out
+Keynote	Slides	Menu	Share ▸ No unread comments	Nenhum comentário não lido	-	Out of scope: iWork.com was shut down	-	out
+Keynote	Slides	Menu	Share ▸ Sign In…	Iniciar Sessão…	-	Out of scope: iWork.com was shut down	-	out
+Keynote	Slides	Menu	Share ▸ Send via Mail ▸ Keynote	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Send via Mail ▸ PowerPoint	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Send via Mail ▸ PDF	-	-	Main menu ▸ Export ▸ Send by email	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Send To ▸ iDVD…	-	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Menu	Share ▸ Send To ▸ iPhoto…	-	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Menu	Share ▸ Send To ▸ iTunes…	-	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Menu	Share ▸ Send To ▸ GarageBand…	-	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Menu	Share ▸ Send To ▸ YouTube…	-	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Menu	Share ▸ Export ▸ Quicktime…	-	-	Main menu ▸ Export	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Export ▸ PPT…	-	-	Main menu ▸ Export	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Export ▸ PDF…	-	-	Main menu ▸ Export	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Export ▸ Images…	Imagens…	-	Main menu ▸ Export	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Export ▸ HTML…	-	-	Main menu ▸ Export	head.menu	adapted
+Keynote	Slides	Menu	Share ▸ Export ▸ iPod…	-	-	Out of scope: an Apple device; the movie comes out of Export ▸ Movie	-	out
+Keynote	Slides	Menu	Help ▸ Keynote Help	Ajuda Keynote	Cmd+?	Main menu ▸ Help	head.menu	same
+Keynote	Slides	Menu	Help ▸ Welcome to Keynote	Bem-vindo ao Keynote	-	Out of scope: Apple material	-	out
+Keynote	Slides	Menu	Help ▸ Video Tutorials	Tutoriais de Vídeo	-	Out of scope: Apple material	-	out
+Keynote	Slides	Menu	Help ▸ iWork Resources	Recursos do iWork	-	Out of scope: Apple material	-	out
+Keynote	Slides	Menu	Help ▸ Keynote User Guide	Manual do Usuário do Keynote	-	Main menu ▸ Help	head.menu	same
+Keynote	Slides	Menu	Help ▸ Formulas and Functions Help	Ajuda de Fórmulas e Funções	-	Main menu ▸ Help	head.menu	same
+Keynote	Slides	Menu	Help ▸ Keyboard Shortcuts	Atalhos de Teclado	-	Main menu ▸ Keyboard Shortcuts	dialog.shortcuts	adapted
+Keynote	Slides	Menu	Help ▸ Service and Support	Serviço e Suporte	-	Out of scope: Apple material	-	out
+Keynote	Slides	Toolbar	New	Novo	-	The + button at the top of the sidebar	side.add	adapted
+Keynote	Slides	Toolbar	Delete	-	-	Delete key and context menu of the navigator	side.navigator	adapted
+Keynote	Slides	Toolbar	Skip	Ignorar	-	Context menu of the navigator and Inspector ▸ Format ▸ Slide	side.navigator	adapted
+Keynote	Slides	Toolbar	Play	Reproduzir	-	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Toolbar	Rehearse	Ensaiar	-	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Toolbar	Record	Gravar	-	Play button of the header bar and its menu	head.play	adapted
+Keynote	Slides	Toolbar	Mask	Máscara	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Keynote	Slides	Toolbar	Alpha	Alfa	-	Inspector ▸ Format ▸ Image	insp.image.mask	adapted
+Keynote	Slides	Toolbar	Share	Compartilhar	-	Out of scope: iWork.com was shut down	-	out
+Keynote	Slides	Toolbar	View	Visualizar	-	Sidebar button, and Main menu ▸ View	head.sidebar	adapted
+Keynote	Slides	Toolbar	Masters	Mestres	-	Inspector ▸ Format ▸ Slide ▸ Layout	insp.slide.master	adapted
+Keynote	Slides	Toolbar	Guides	Guias	-	Main menu ▸ View	head.menu	adapted
+Keynote	Slides	Toolbar	Edges On	Bordas Ativadas	-	Main menu ▸ View	head.menu	adapted
+Keynote	Slides	Toolbar	Columns	Colunas	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Keynote	Slides	Toolbar	Smart Builds	Composições Inteligentes	-	Insert menu	head.insert	adapted
+Keynote	Slides	Toolbar	Themes	Temas	-	Inspector ▸ Document ▸ Theme	insp.show.theme	adapted
+Keynote	Slides	Toolbar	Group	Agrupar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Ungroup	Desagrupar	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Text Box	Caixa de texto	-	Text button of the header bar	head.insert.text	same
+Keynote	Slides	Toolbar	Shapes	Formas	-	Shape button of the header bar	head.insert.shape	same
+Keynote	Slides	Toolbar	Table	Tabela	-	Table button of the header bar	head.insert.table	same
+Keynote	Slides	Toolbar	Charts	Gráficos	-	Chart button of the header bar	head.insert.chart	same
+Keynote	Slides	Toolbar	Comment	Comentário	-	Comment button of the header bar	head.insert.comment	same
+Keynote	Slides	Toolbar	Objects	Objetos	-	The object buttons of the header bar; below 720 px, the Insert menu	head.insert	adapted
+Keynote	Slides	Toolbar	Connect	Unir	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Front	Frente	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Keynote	Slides	Toolbar	Back	Fundo	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Keynote	Slides	Toolbar	Inspector	Inspetor	-	Inspector button of the header bar	head.inspector	same
+Keynote	Slides	Toolbar	Media	Mídia	-	Media button of the header bar	head.insert.media	same
+Keynote	Slides	Toolbar	Adjust	Ajustar	-	Inspector ▸ Format ▸ Image ▸ Adjust image	insp.image.adjust	adapted
+Keynote	Slides	Toolbar	Colors	Cores	-	Colors popover, from the color rows of Inspector ▸ Format	colors.popover	adapted
+Keynote	Slides	Toolbar	Fonts	Fontes	-	Fonts popover, from the family row of Inspector ▸ Format ▸ Style ▸ Font	fonts.popover	adapted
+Keynote	Slides	Toolbar	Copy Style	Copiar Estilo	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Toolbar	Paste Style	Colar Estilo	-	Shortcuts, context menu and Search Commands (Ctrl+/)	commands.dialog	adapted
+Keynote	Slides	Toolbar	Forward	Para Frente	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Keynote	Slides	Toolbar	Backward	Para Trás	-	Inspector ▸ Format ▸ Arrange	insp.arrange.order	adapted
+Keynote	Slides	Toolbar	Find	Buscar	-	Find button of the header bar	head.find	same
+Keynote	Slides	Toolbar	Smaller	Menor	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Keynote	Slides	Toolbar	Bigger	Maior	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Keynote	Slides	Toolbar	Subscript	Subscrito	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Keynote	Slides	Toolbar	Superscript	Sobrescrito	-	Inspector ▸ Format ▸ Style and Layout	insp.tabs	adapted
+Keynote	Slides	Toolbar	Lock	Bloquear	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Unlock	Desbloquear	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Flip Horizontally	Virar na Horizontal	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Flip Vertically	Virar na Vertical	-	Inspector ▸ Format ▸ Arrange and the context menu of the object	insp.arrange.group	adapted
+Keynote	Slides	Toolbar	Data Editor	Editor de Dados	-	Inspector ▸ Format ▸ Chart ▸ Edit data	insp.chart.options	adapted
+Keynote	Slides	Toolbar	Format Bar	Barra de Formatos	-	Does not apply: M+ has no format bar; its controls are in Inspector ▸ Format	-	out
+Keynote	Slides	Toolbar	Print	Imprimir	-	Main menu ▸ Print	head.menu	adapted
+Keynote	Slides	Toolbar	Send To	Enviar a	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Toolbar	Customize Toolbar	Personalizar Barra de Ferramentas	-	Does not apply: the header bar is not customizable	-	out
+Keynote	Slides	Format bar	graphic mode (16 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Keynote	Slides	Format bar	shape mode (16 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Keynote	Slides	Format bar	line mode (8 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Keynote	Slides	Format bar	image mode (8 controls)	-	-	Inspector ▸ Format ▸ Style, Image or Text, and Arrange (object)	insp.tabs	adapted
+Keynote	Slides	Format bar	table mode (13 controls)	-	-	Inspector ▸ Format ▸ Table, Cell, Text and Arrange, and the formula bar	insp.tabs	adapted
+Keynote	Slides	Format bar	pieChart mode (14 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	valueAxis mode (14 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	categoryAxis mode (12 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	series mode (9 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	columnBarSeries mode (7 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	pieLabel mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	dataLabels mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	columnBarLabel mode (10 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	errorBar mode (6 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	legend mode (13 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	chart mode (14 controls)	-	-	Inspector ▸ Format ▸ Chart, Axis, Series and Arrange	insp.tabs	adapted
+Keynote	Slides	Format bar	text mode (16 controls)	-	-	Inspector ▸ Format ▸ Style, Layout and More (text)	insp.tabs	adapted
+Keynote	Slides	Inspector	Document ▸ Document	Documento	-	Inspector ▸ Document ▸ Document	insp.show.options	adapted
+Keynote	Slides	Inspector	Document ▸ Audio	Áudio	-	Inspector ▸ Document ▸ Audio	insp.audio.soundtrack	same
+Keynote	Slides	Inspector	Document ▸ Spotlight	Spotlight	-	Inspector ▸ Document ▸ Info	insp.info.fields	adapted
+Keynote	Slides	Inspector	Slide ▸ Transition	Transição	-	Inspector ▸ Animation, with nothing selected	insp.transition.effect	adapted
+Keynote	Slides	Inspector	Slide ▸ Appearance	Aparência	-	Inspector ▸ Format ▸ Slide, with nothing selected	insp.slide.appearance	adapted
+Keynote	Slides	Inspector	Build ▸ Build In	Entrada	-	Inspector ▸ Animation ▸ Build In	insp.build-in.effect	adapted
+Keynote	Slides	Inspector	Build ▸ Build Out	Saída	-	Inspector ▸ Animation ▸ Build Out	insp.build-out.effect	adapted
+Keynote	Slides	Inspector	Build ▸ Action	Ação	-	Inspector ▸ Animation ▸ Action	insp.action.effect	adapted
+Keynote	Slides	Inspector	Build ▸ Build Order (drawer)	Ordem das composições	-	Inspector ▸ Animation: the order is at the foot of each tab	insp.build-in.order	adapted
+Keynote	Slides	Inspector	Text ▸ Text	Texto	-	Inspector ▸ Format ▸ Text	insp.text.spacing	adapted
+Keynote	Slides	Inspector	Text ▸ Columns	Colunas	-	Inspector ▸ Format ▸ Text	insp.layout.columns	adapted
+Keynote	Slides	Inspector	Text ▸ Bullets	Marcadores	-	Inspector ▸ Format ▸ Text ▸ Bullets and lists	insp.text.lists	adapted
+Keynote	Slides	Inspector	Graphic	Gráfico	-	Inspector ▸ Format ▸ Style, with an object selected	insp.style.stroke	adapted
+Keynote	Slides	Inspector	Metrics	Métricas	-	Inspector ▸ Format ▸ Arrange	insp.arrange.metrics	adapted
+Keynote	Slides	Inspector	Table ▸ Table	Tabela	-	Inspector ▸ Format ▸ Table	insp.table.headers	adapted
+Keynote	Slides	Inspector	Table ▸ Format	Formato	-	Inspector ▸ Format ▸ Cell	insp.cell.format	adapted
+Keynote	Slides	Inspector	Chart	Gráfico (dados)	-	Inspector ▸ Format ▸ Chart, Axis and Series	insp.chart.options	adapted
+Keynote	Slides	Inspector	Hyperlink	Hiperlink	-	Link popover, from Insert ▸ Link and the context menu	head.insert	adapted
+Keynote	Slides	Inspector	QuickTime	QuickTime	-	Inspector ▸ Format, with a sound or movie selected	insp.tabs	adapted
+Keynote	Slides	Preferences	General	Geral	-	Preferences ▸ General	dialog.preferences	same
+Keynote	Slides	Preferences	Rulers	Réguas	-	Preferences ▸ Rulers	dialog.preferences	same
+Keynote	Slides	Preferences	Slideshow	Apresentação de Slides	-	Preferences ▸ Slideshow	dialog.preferences	same
+Keynote	Slides	Preferences	Presenter Display	Monitor do Apresentador	-	Preferences ▸ Slideshow ▸ Presenter display	dialog.preferences	adapted
+Keynote	Slides	Preferences	Remote	Remoto	-	Out of scope: Keynote Remote was an iPhone app	-	out
+Keynote	Slides	Preferences	Auto-Correction	Correção Automática	-	Preferences ▸ Auto-Correction	dialog.preferences	same
+Keynote	Slides	Windows and sheets	Theme Chooser	Seletor de Temas	-	Template chooser inside the window	templates.window	adapted
+Keynote	Slides	Windows and sheets	Export	Exportar	-	Export dialog, from Main menu ▸ Export	head.menu	adapted
+Keynote	Slides	Windows and sheets	Send To	Enviar a	-	Out of scope: Apple services and programs	-	out
+Keynote	Slides	Windows and sheets	Print	Imprimir	-	Print dialog of GNOME, with the options for slides, notes and handouts	head.menu	adapted
+Keynote	Slides	Windows and sheets	Find & Replace	Buscar e Substituir	-	Find bar under the header bar	find.bar	adapted
+Keynote	Slides	Windows and sheets	Choose Theme and slide size	Escolher Tema	-	Inspector ▸ Document ▸ Theme and Slide size	insp.show.size	adapted
+Keynote	Slides	Windows and sheets	Save and passwords	-	-	File chooser of GNOME; the passwords are in Inspector ▸ Document	insp.show.options	adapted
+Keynote	Slides	Windows and sheets	Customize Presenter Display	Personalizar Monitor do Apresentador	-	Preferences ▸ Slideshow ▸ Presenter display	dialog.preferences	adapted
+Keynote	Slides	Windows and sheets	Running slideshow (Play, Rehearse, Record)	-	-	Slideshow window in full screen and the presenter display	head.play	adapted
+Keynote	Slides	Windows and sheets	Smart Builds and Magic Move	Composições Inteligentes e Movimento Mágico	-	Insert menu and Inspector ▸ Animation	insp.transition.effect	adapted
+Keynote	Slides	Windows and sheets	Light Table	Mesa de Luz	-	Main menu ▸ View ▸ Light table, in the document area	doc.light-table	adapted
+Keynote	Slides	Windows and sheets	Master Slides (list)	Slides Mestre	-	Sidebar ▸ Master slides	side.mode	adapted
+Keynote	Slides	Windows and sheets	Presenter Notes	Notas do Apresentador	-	Notes area under the slide	doc.notes	adapted
+Keynote	Slides	Windows and sheets	Automator actions	-	-	Out of scope: Automator	-	out
