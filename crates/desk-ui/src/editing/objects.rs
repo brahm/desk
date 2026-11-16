@@ -806,7 +806,7 @@ pub struct ObjectInfo {
 }
 
 /// The object styles of the kind of the first selected object that has
-/// any, as the format bar and the Inspector show them (MOD-04).
+/// any, as the Inspector shows them (MOD-04).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ObjectStylesInfo {
     /// The styles of the kind, in order.

@@ -3,9 +3,9 @@
 
 //! The window of Desk Tables in interface B (docs/interface): the sheets
 //! in the navigation sidebar (NINT-02, NINT-03), the header bar of the
-//! three apps (NINT-07), the format bar of the cells (NINT-08), the
-//! formula bar, the canvas of the sheet with its tables, the Inspector
-//! with Format, Data and Document (NINT-09), and the bottom bar with the
+//! three apps (NINT-07), the formula bar, the canvas of the sheet with its tables, the Inspector
+//! with Format, Data and Document (NINT-09), whose Format pane formats the
+//! cells (NINT-08), and the bottom bar with the
 //! zoom, the sheet in sight and the instant calculations (NINT-04,
 //! NGNM-13).
 //!
@@ -13,7 +13,7 @@
 //! look of Desk Writer, and keeps its own parts here, so that each app can
 //! grow without the other. The cells of the tables come from the table
 //! engine of `desk-table`; until then the window shows the outline of each
-//! table, and the format bar, the formula bar and the instant
+//! table, and the Cell and Text tabs, the formula bar and the instant
 //! calculations have their place in it and wait for their function.
 
 mod bars;
@@ -46,7 +46,6 @@ pub(crate) const ACCELS: &[(&str, &[&str])] = &[
     ("win.fullscreen", &["F11"]),
     ("win.inspector", &["<Control><Alt>i"]),
     ("win.sidebar", &["F9"]),
-    ("win.format-bar", &["<Control><Shift>r"]),
     ("win.formula-list", &["<Control><Shift>f"]),
     ("win.search", &["<Control><Alt>f"]),
     ("win.table-styles", &["<Control><Shift>t"]),

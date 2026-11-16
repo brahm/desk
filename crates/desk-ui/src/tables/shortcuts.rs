@@ -83,7 +83,6 @@ const SECTIONS: &[Section] = &[
             ),
             ("<Control><Shift>f", n_("Show the formula list")),
             ("<Control><Alt>i", n_("Inspector")),
-            ("<Control><Shift>r", n_("Show the format bar")),
             ("<Control>plus", n_("Zoom in")),
             ("<Control>minus", n_("Zoom out")),
             ("<Control>0", n_("Actual size")),

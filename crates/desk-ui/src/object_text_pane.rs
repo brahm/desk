@@ -8,6 +8,11 @@
 //! each selected shape and text box; with the text being edited, the
 //! Inspector shows the tabs of text instead.
 //!
+//! The same groups, made a second time, are the Font and Alignment groups
+//! of the Style tab of text in window M+ (step 2), where they take the
+//! place of the format bar of interface B; [`ObjectTextGroups::show_text`]
+//! shows them for selected text.
+//!
 //! The style and alignment toggles and the list run the actions of the
 //! window, which format the text of the selected objects as they format
 //! selected text; the rest calls the editor through `editor`.
@@ -59,6 +64,8 @@ pub struct ObjectTextGroups {
     family_label: gtk::Label,
     size: compact::SpinRow,
     color: gtk::ColorDialogButton,
+    /// The button of the Colors popover, which shows `color`.
+    colors: gtk::MenuButton,
     list: compact::ComboRow,
     updating: Cell<bool>,
 }
@@ -116,7 +123,9 @@ impl ObjectTextGroups {
         let color_row = compact::ActionRow::builder()
             .title(tr("Text Color"))
             .build();
-        color_row.add_suffix(&color);
+        // The Colors popover opens from the row (INT-16, step 2 of M+).
+        let colors = crate::color_popover::button(&color, &tr("Text Color"));
+        color_row.add_suffix(&colors);
         font.add(&color_row);
 
         let alignment = compact::Group::builder().title(tr("Alignment")).build();
@@ -139,7 +148,7 @@ impl ObjectTextGroups {
             .build();
         horizontal.add_suffix(&alignments);
         alignment.add(&horizontal);
-        let names: Vec<String> = crate::format_bar::LISTS
+        let names: Vec<String> = crate::format_pane::LISTS
             .iter()
             .map(|(_, name)| tr(name))
             .collect();
@@ -157,6 +166,7 @@ impl ObjectTextGroups {
             family_label,
             size,
             color,
+            colors,
             list,
             updating: Cell::new(false),
         });
@@ -201,7 +211,7 @@ impl ObjectTextGroups {
             if this.updating.get() {
                 return;
             }
-            let Some((target, _)) = crate::format_bar::LISTS.get(row.selected() as usize) else {
+            let Some((target, _)) = crate::format_pane::LISTS.get(row.selected() as usize) else {
                 return;
             };
             let _ = row.activate_action("win.list-style", Some(&target.to_variant()));
@@ -220,6 +230,18 @@ impl ObjectTextGroups {
         &self.family
     }
 
+    /// Leaves out the List row, where a pane of its own sets the list,
+    /// as the Format pane of text does (step 2 of window M+).
+    pub fn hide_list(&self) {
+        self.list.set_visible(false);
+    }
+
+    /// The button of the Colors popover of the text color, which
+    /// `win.colors` opens.
+    pub fn colors_button(&self) -> &gtk::MenuButton {
+        &self.colors
+    }
+
     /// Shows the formatting of the text of the selected object. A shape
     /// with no text has no characters to format yet, only its paragraph.
     pub fn show(&self, format: &Format, has_text: bool) {
@@ -234,6 +256,18 @@ impl ObjectTextGroups {
                 .as_deref(),
         );
         self.alignment.set_sensitive(editable);
+        self.show_characters(format);
+    }
+
+    /// Shows the formatting at selected text, in the Format pane of text
+    /// (step 2 of window M+), where these groups take the place of the
+    /// format bar of interface B.
+    pub fn show_text(&self, format: &Format) {
+        self.show_characters(format);
+    }
+
+    /// Shows the font, its size and color, and the list at the selection.
+    fn show_characters(&self, format: &Format) {
         self.updating.set(true);
         let character = &format.character;
         self.family_label.set_label(&character.font_family);
@@ -246,7 +280,7 @@ impl ObjectTextGroups {
             self.color.set_rgba(&color);
         }
         let list = crate::lists_pane::list_target(format.list.as_ref());
-        let index = crate::format_bar::LISTS
+        let index = crate::format_pane::LISTS
             .iter()
             .position(|(target, _)| *target == list)
             .unwrap_or(0) as u32;

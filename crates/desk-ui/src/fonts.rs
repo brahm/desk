@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The Fonts popover (INT-15), on the font button of the format bar, with
+//! The Fonts popover (INT-15), on the Family row of the Format pane, with
 //! what the Fonts panel that Pages opens with
 //! Show Fonts: collections, families, typefaces and sizes, a bar of
 //! effects (underline, strikethrough, text and paragraph colors and a
@@ -452,7 +452,12 @@ impl FontsWindow {
             .max_content_height(640)
             .propagate_natural_height(true)
             .build();
-        let window = gtk::Popover::builder().child(&scrolled).build();
+        // Beside the Format pane it opens from, over the document, as the
+        // plan of window M+ draws it (D-024).
+        let window = gtk::Popover::builder()
+            .child(&scrolled)
+            .position(gtk::PositionType::Left)
+            .build();
         labelled(&window, &tr("Fonts"));
         window.set_parent(parent);
         // Back to the text when the popover closes.
@@ -887,8 +892,8 @@ impl FontsSlot {
             .borrow_mut()
             .get_or_insert_with(|| FontsWindow::new(parent, editor))
             .clone();
-        // On the button it was asked from: that of the format bar, or the
-        // family of the Text tab of a shape (OBJ-13).
+        // On the button it was asked from: the Family row of text in the
+        // Format pane, or that of the Text tab of a shape (OBJ-13).
         let parent = parent.upcast_ref::<gtk::Widget>();
         if fonts.window.parent().as_ref() != Some(parent) {
             fonts.window.unparent();

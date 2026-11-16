@@ -3,7 +3,7 @@
 id	area	feature	in_iwork	target	rule	scope	status_in_desk	review	phase	note
 T001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	GNOME menus of interface B (NGNM-10); the Organize menu (sort, filter, categories) is missing and comes with phase 5
 T002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Header bar of interface B (NINT-07)
-T003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	Format bar for cells (NINT-08)
+T003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	What the format bar of the cells held is in the Cell and Text tabs of the Format pane (NINT-08, step 2 of M+)
 T004	3.1 Window, menus and panes	Formula bar	Only '09	'09, in the form of the 15	D-002	In	Partial	the window changes (D-008)	B1	The formula bar is in the window, but the cells have no content yet (NINT-10, phase 4)
 T005	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Inspector with Format, Data and Document (NINT-09)
 T006	3.1 Window, menus and panes	Sheets pane (sidebar)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	Sheets, tables and charts in the sidebar (NINT-03)

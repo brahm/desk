@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The actions of the slim format bar and its More menus (INT-12): the
-//! character style, the line spacing and the list of text; the shadow,
+//! The formatting actions that the format bar of interface B ran and the
+//! Format pane, the keyboard and Search Commands run now (INT-12, step 2
+//! of window M+): the character style, the line spacing and the list of
+//! text; the shadow,
 //! reflection, placement and wrap of objects; Instant Alpha; and Show in
 //! Inspector, which opens the Format level of the Inspector or one of its
 //! tabs (INT-13).
@@ -17,7 +19,7 @@ use super::DocumentWindow;
 use crate::editing::{Format, ObjectInfo, TextEditor};
 use crate::formatting;
 
-/// The actions of the format bar, which need a document.
+/// The formatting actions, which need a document.
 pub(super) const FORMAT_BAR_ACTIONS: [&str; 16] = [
     "character-style",
     "line-spacing",
@@ -77,7 +79,7 @@ fn spacing_name(spacing: LineSpacing) -> String {
 }
 
 impl DocumentWindow {
-    pub(super) fn add_format_bar_actions(self: &Rc<Self>) {
+    pub(super) fn add_text_format_actions(self: &Rc<Self>) {
         // A stateful action whose state follows the selection, and whose
         // change runs `apply` with the editor.
         fn stateful(
@@ -108,7 +110,7 @@ impl DocumentWindow {
             |this, editor, value| {
                 if let Some(style) = value
                     .get::<i32>()
-                    .and_then(|i| this.format_bar.character_style(i))
+                    .and_then(|i| this.inspector.text().character_style(i))
                 {
                     editor.set_character_style(style);
                     editor.focus();
@@ -267,24 +269,22 @@ impl DocumentWindow {
         self.actions.add_action(&alpha);
     }
 
-    /// Puts the format bar and the states of its actions in step with the
-    /// selection.
-    pub(super) fn show_format_bar(&self, editor: &TextEditor, format: &Format) {
-        self.format_bar.show(format);
+    /// Puts the styles of the Format pane and the states of the
+    /// formatting actions in step with the selection.
+    pub(super) fn show_format_states(&self, editor: &TextEditor, format: &Format) {
+        let character = editor.character_style();
+        self.inspector.text().show(format, character);
         let info: Option<ObjectInfo> = editor
             .has_selected_objects()
             .then(|| editor.object_info())
             .flatten();
-        self.format_bar.show_objects(info.as_ref());
-        if let Some(variant) = self.table_bars.show(editor) {
-            self.format_bar.show_variant(variant);
-        }
         let set =
             |name: &str, value: glib::Variant| formatting::set_state(&self.actions, name, value);
         set(
             "character-style",
-            self.format_bar
-                .character_index(editor.character_style())
+            self.inspector
+                .text()
+                .character_index(character)
                 .to_variant(),
         );
         set(
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn int_12_every_wrap_has_a_target() {
-        for (name, _) in crate::format_bar::WRAPS {
+        for (name, _) in crate::format_pane::WRAPS {
             assert_eq!(wrap_of(name).map(wrap_name), Some(name));
         }
     }

@@ -74,6 +74,7 @@ the generator, their id starts with `proprio.`.
 | Page and slide thumbnails | Yes | Yes | The same |
 | Table style and object style swatches in the Inspector | Yes | Yes | Whether a swatch gallery appears |
 | Instant calculation chips | Yes | Yes | Whether a chip widget appears |
+| Colors popover: the palette of the HIG, the eyedropper and Custom… (`crate::color_popover`) | No | Yes | Whether Libadwaita gains a color popover or palette; GTK's own `GtkColorChooser` is deprecated |
 
 The rest is native: `AdwHeaderBar`, `AdwTabView` and `AdwTabBar`,
 `AdwOverlaySplitView`, `AdwToolbarView`, `AdwSidebar`, `AdwToggleGroup`,

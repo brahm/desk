@@ -32,6 +32,8 @@ pub enum Context {
     Group,
     Table,
     Chart,
+    /// Nothing selected in Desk Slides: the slide itself (KINT-13).
+    Slide,
 }
 
 impl Context {
@@ -64,6 +66,7 @@ impl Context {
             Self::Group => trc("inspector title", "Group"),
             Self::Table => tr("Table"),
             Self::Chart => tr("Chart"),
+            Self::Slide => tr("Slide"),
         }
     }
 }
@@ -223,10 +226,15 @@ pub struct Levels {
     root: gtk::Box,
     level: adw::ToggleGroup,
     title: gtk::Label,
+    /// The place between the title and the tabs, where a kind of
+    /// selection may put what applies to all its tabs, such as the
+    /// paragraph style of text (step 2 of window M+).
+    header: gtk::Box,
+    headers: RefCell<HashMap<Context, gtk::Widget>>,
     format: Tabs,
     document: Tabs,
     /// The tabs of Format for each kind of selection.
-    contexts: HashMap<Context, Vec<Tab>>,
+    contexts: RefCell<HashMap<Context, Vec<Tab>>>,
     context: Cell<Option<Context>>,
     /// The tab last chosen for each kind of selection.
     chosen: RefCell<HashMap<Context, String>>,
@@ -265,7 +273,15 @@ impl Levels {
         let format_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .build();
+        let header = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .margin_start(12)
+            .margin_end(12)
+            .margin_top(4)
+            .visible(false)
+            .build();
         format_box.append(&title);
+        format_box.append(&header);
         format_box.append(&format.root);
         let levels = gtk::Stack::builder()
             .transition_type(gtk::StackTransitionType::Crossfade)
@@ -293,9 +309,11 @@ impl Levels {
             root,
             level,
             title,
+            header,
+            headers: RefCell::new(HashMap::new()),
             format,
             document: document_tabs,
-            contexts,
+            contexts: RefCell::new(contexts),
             context: Cell::new(None),
             chosen: RefCell::new(HashMap::new()),
         });
@@ -317,6 +335,7 @@ impl Levels {
         // A tab whose groups all hide says so.
         let groups: Vec<compact::Group> = this
             .contexts
+            .borrow()
             .values()
             .flatten()
             .chain(&document)
@@ -348,9 +367,44 @@ impl Levels {
         }
         self.context.set(Some(context));
         self.title.set_label(&context.title());
-        let tabs = self.contexts.get(&context).map_or(&[][..], Vec::as_slice);
+        while let Some(child) = self.header.first_child() {
+            self.header.remove(&child);
+        }
+        let header = self.headers.borrow().get(&context).cloned();
+        self.header.set_visible(header.is_some());
+        if let Some(header) = header {
+            self.header.append(&header);
+        }
+        let contexts = self.contexts.borrow();
+        let tabs = contexts.get(&context).map_or(&[][..], Vec::as_slice);
         let chosen = self.chosen.borrow().get(&context).cloned();
         self.format.set(tabs, chosen.as_deref());
+    }
+
+    /// Puts `header` between the title and the tabs while a kind of
+    /// selection shows.
+    pub fn set_header(&self, context: Context, header: &impl IsA<gtk::Widget>) {
+        self.headers
+            .borrow_mut()
+            .insert(context, header.clone().upcast());
+        if self.context.get() == Some(context) {
+            self.context.set(None);
+            self.show(context);
+        }
+    }
+
+    /// Adds the tabs of a kind of selection that only an app has, such as
+    /// the slide of Desk Slides (KINT-13).
+    pub fn add_context(self: &Rc<Self>, context: Context, tabs: Vec<Tab>) {
+        for group in tabs.iter().flat_map(|tab| tab.groups.iter()) {
+            let weak = Rc::downgrade(self);
+            group.connect_visible_notify(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.format.refresh_empty();
+                }
+            });
+        }
+        self.contexts.borrow_mut().insert(context, tabs);
     }
 
     /// Adds a level of an app before Document, such as Animation in
@@ -430,6 +484,7 @@ mod tests {
             Context::Group,
             Context::Table,
             Context::Chart,
+            Context::Slide,
         ] {
             assert!(!context.title().is_empty());
         }

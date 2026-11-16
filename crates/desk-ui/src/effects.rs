@@ -125,16 +125,21 @@ impl ColorRow {
             .build();
         labelled(&button, &format!("{title}: {}", tr("Color")));
         let row = compact::ActionRow::builder().title(title).build();
-        let picker = crate::eyedropper::button(&button);
-        // A color picked from the screen turns the color on.
+        // A color chosen in the Colors popover, or picked from the screen,
+        // turns the color on (INT-16, step 2 of M+).
         let on = switch.downgrade();
-        picker.connect_clicked(move |_| {
+        button.connect_rgba_notify(move |_| {
             if let Some(on) = on.upgrade() {
                 on.set_active(true);
             }
         });
-        row.add_suffix(&picker);
-        row.add_suffix(&button);
+        let colors = crate::color_popover::button(&button, &format!("{title}: {}", tr("Color")));
+        // The switch turns the color off; the button shows it off too.
+        switch
+            .bind_property("active", &colors, "sensitive")
+            .sync_create()
+            .build();
+        row.add_suffix(&colors);
         row.add_suffix(&switch);
         row.set_activatable_widget(Some(&switch));
         Self {

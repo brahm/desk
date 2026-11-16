@@ -3,11 +3,11 @@
 
 //! A window of Desk Tables (NINT-02): the navigation sidebar as high as the
 //! window at the start, with the sheets and the tables and charts of the
-//! sheet shown (NINT-03, NGNM-12); the header bar; the format bar and the
-//! formula bar; the canvas of the sheet; the Inspector at the end; and the
-//! bottom bar. Below about 1060 px the format bar leaves out its secondary
-//! controls; below 720 px the sidebar covers the canvas, and below 520 px
-//! the Inspector does too (NGNM-01).
+//! sheet shown (NINT-03, NGNM-12); the header bar; the formula bar; the
+//! canvas of the sheet; the Inspector at the end, whose Format pane holds
+//! what the format bar of interface B had (step 2 of window M+); and the
+//! bottom bar. Below 720 px the sidebar covers the canvas, and below 520
+//! px the Inspector does too (NGNM-01).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -16,7 +16,7 @@ use adw::prelude::*;
 use desk_model::workbook::{FIRST_TABLE_ORIGIN, Grid, ItemKind, SheetError, SheetItem, Workbook};
 use gtk::{gio, glib};
 
-use super::bars::{BottomBar, FormatBar, FormulaBar};
+use super::bars::{BottomBar, FormulaBar};
 use super::canvas::{self, Canvas, Selection};
 use super::header::{self, Header};
 use super::inspector::{self, Change, Inspector};
@@ -28,10 +28,7 @@ use crate::nav_sidebar::{self, NavSidebar};
 
 /// The width of the Inspector, in pixels, as in the mockups of interface B.
 const INSPECTOR_WIDTH: f64 = 332.0;
-/// The widths below which the window changes, in pixels (NGNM-01). The
-/// format bar of the cells needs more room than Desk Writer's, so it
-/// leaves out its secondary controls below about 1060 px.
-const COMPACT_FORMAT_BAR: f64 = 1060.0;
+/// The widths below which the window changes, in pixels (NGNM-01).
 const OVERLAY_SIDEBAR: f64 = 720.0;
 const OVERLAY_INSPECTOR: f64 = 520.0;
 /// The width of the sidebar while it shows the search results.
@@ -135,7 +132,6 @@ pub(super) struct TablesWindow {
     /// without anyone choosing.
     filling: Cell<bool>,
     canvas: Rc<Canvas>,
-    format_revealer: gtk::Revealer,
     formula: FormulaBar,
     formula_revealer: gtk::Revealer,
     bottom: BottomBar,
@@ -205,16 +201,6 @@ impl TablesWindow {
             .build();
         screen_banner.connect_button_clicked(|banner| banner.set_revealed(false));
 
-        let format_bar = Rc::new(FormatBar::new());
-        let format_scroller = gtk::ScrolledWindow::builder()
-            .child(&format_bar.bar)
-            .vscrollbar_policy(gtk::PolicyType::Never)
-            .propagate_natural_height(true)
-            .build();
-        let format_revealer = gtk::Revealer::builder()
-            .child(&format_scroller)
-            .reveal_child(true)
-            .build();
         let formula = FormulaBar::new();
         let formula_revealer = gtk::Revealer::builder()
             .child(&formula.bar)
@@ -283,7 +269,6 @@ impl TablesWindow {
                 .build(),
         );
         toolbar_view.add_top_bar(&screen_banner);
-        toolbar_view.add_top_bar(&format_revealer);
         toolbar_view.add_top_bar(&formula_revealer);
         toolbar_view.set_content(Some(&split));
         toolbar_view.add_bottom_bar(&bottom.bar);
@@ -307,7 +292,6 @@ impl TablesWindow {
         // last, so each one sets what the wider ones set too (NGNM-01).
         let mut breakpoints = Vec::new();
         for (width, collapsed) in [
-            (COMPACT_FORMAT_BAR, &[][..]),
             (OVERLAY_SIDEBAR, &[&nav_split][..]),
             (OVERLAY_INSPECTOR, &[&nav_split, &split][..]),
         ] {
@@ -328,10 +312,6 @@ impl TablesWindow {
                     Some(&header::insert_menu(true).to_value()),
                 );
             }
-            let bar = format_bar.clone();
-            breakpoint.connect_apply(move |_| bar.set_compact(true));
-            let bar = format_bar.clone();
-            breakpoint.connect_unapply(move |_| bar.set_compact(false));
             breakpoints.push(breakpoint);
         }
         for breakpoint in breakpoints {
@@ -368,7 +348,6 @@ impl TablesWindow {
             menu_target: Cell::new(None),
             filling: Cell::new(false),
             canvas,
-            format_revealer,
             formula,
             formula_revealer,
             bottom,
@@ -1038,7 +1017,6 @@ impl TablesWindow {
         for (name, initial) in [
             ("sidebar", true),
             ("inspector", false),
-            ("format-bar", true),
             ("formula-bar", true),
         ] {
             let action = gio::SimpleAction::new_stateful(name, None, &initial.to_variant());
@@ -1052,7 +1030,6 @@ impl TablesWindow {
                 match action.name().as_str() {
                     "sidebar" => this.nav_split.set_show_sidebar(on),
                     "inspector" => this.split.set_show_sidebar(on),
-                    "format-bar" => this.format_revealer.set_reveal_child(on),
                     _ => this.formula_revealer.set_reveal_child(on),
                 }
             });
