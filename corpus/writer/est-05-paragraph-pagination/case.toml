@@ -1,6 +1,6 @@
-title = "Paginação do parágrafo"
+title = "Paragraph pagination"
 rows = ["EST-05"]
-description = "Um título mantido com o parágrafo seguinte, um parágrafo de linhas mantidas juntas e o controle de viúvas e órfãs, cada um na virada de uma página."
+description = "A heading kept with the next paragraph, a paragraph with its lines kept together, and widow and orphan control, each at the turn of a page."
 
 [defaults]
 font = "Liberation Serif"

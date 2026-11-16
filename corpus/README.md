@@ -22,7 +22,7 @@ The reference corpus of Desk: what Desk must do the same as iWork '09.
   own rows of the inventory (`KVMI`, `NVMI`).
 - `vm-review.tsv` lists the rows whose interface was compared by eye with
   Pages 4.3 on the reference Mac OS X Lion; the parity report shows them
-  as "conferido na VM do Lion" when only tests check them otherwise.
+  as "reviewed on the Lion VM" when only tests check them otherwise.
 - Each folder under `writer/` is a case: `case.toml` describes a short
   document, and the reference virtual machine adds the `.pages` file that
   Pages builds from the same description and `reference.pdf`, the PDF that

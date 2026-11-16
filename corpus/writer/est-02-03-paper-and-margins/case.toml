@@ -1,6 +1,6 @@
-title = "Papel Carta em paisagem com margens próprias"
+title = "US Letter paper in landscape with its own margins"
 rows = ["EST-02", "EST-03"]
-description = "Carta deitado, com margens de 0,5 pol. em cima, 2 pol. embaixo, 1,5 pol. à esquerda e 0,75 pol. à direita."
+description = "Letter on its side, with margins of 0.5 in at the top, 2 in at the bottom, 1.5 in on the left and 0.75 in on the right."
 
 [page]
 size = "letter"

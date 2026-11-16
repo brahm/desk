@@ -1,6 +1,6 @@
-title = "Quebra de linha manual e espaço inseparável"
+title = "Manual line break and nonbreaking space"
 rows = ["EST-06", "TXT-08"]
-description = "Quebras de linha dentro de um parágrafo, e palavras ligadas por espaços inseparáveis que não se separam no fim da linha."
+description = "Line breaks within a paragraph, and words joined by nonbreaking spaces that do not split at the end of the line."
 
 [defaults]
 font = "Liberation Serif"

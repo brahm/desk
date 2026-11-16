@@ -11,9 +11,9 @@
 //! builds the Pages document from it.
 //!
 //! ```toml
-//! title = "Espaço entre parágrafos"
+//! title = "Space between paragraphs"
 //! rows = ["FMT-15"]
-//! description = "O maior entre o espaço depois e o espaço antes vale."
+//! description = "The larger of the space after and the space before counts."
 //!
 //! [page]
 //! size = "a4"
@@ -23,7 +23,7 @@
 //! size = 12
 //!
 //! [[paragraphs]]
-//! text = "Primeiro parágrafo."
+//! text = "First paragraph."
 //! space_after = 18
 //!
 //! [[paragraphs]]
@@ -32,7 +32,7 @@
 //! align = "justify"
 //!
 //! [[paragraphs]]
-//! runs = [{ text = "Texto em " }, { text = "negrito", bold = true }]
+//! runs = [{ text = "Text in " }, { text = "bold", bold = true }]
 //! ```
 //!
 //! Lengths are in points. A paragraph has `text`, `runs` or `filler`, a

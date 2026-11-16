@@ -154,15 +154,15 @@ mod tests {
     #[test]
     fn reads_rows_and_phases() {
         let text = "# comment\nid\tphase\tfeature\texpected\tpages\todf\tgnome\n\
-                    FMT-15\t1\tEspaço\tO maior vale\t72\tNativo\t\n\
-                    EXP-11\t-\tiWork.com\tFechado\t200\t-\tFora\n";
+                    FMT-15\t1\tSpace\tThe larger wins\t72\tNative\t\n\
+                    EXP-11\t-\tiWork.com\tShut down\t200\t-\tOut\n";
         let rows = parse(text).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].id, "FMT-15");
         assert_eq!(rows[0].phase, Some(1));
         assert_eq!(rows[1].phase, None);
         assert_eq!(rows[0].gnome, "");
-        assert_eq!(rows[1].gnome, "Fora");
+        assert_eq!(rows[1].gnome, "Out");
     }
 
     #[test]
@@ -191,24 +191,24 @@ mod tests {
         let gnome = |id: &str| &rows.iter().find(|r| r.id == id).unwrap().gnome;
         // The decisions of 2026-11-13: one Inspector, a header bar
         // without customization, no browser of versions.
-        assert!(gnome("INT-13").contains("Um Inspetor só"));
-        assert!(gnome("INT-11").contains("sem personalização"));
-        assert!(gnome("DOC-11").contains("Rascunho de recuperação"));
+        assert!(gnome("INT-13").contains("One Inspector"));
+        assert!(gnome("INT-11").contains("without customization"));
+        assert!(gnome("DOC-11").contains("Recovery draft"));
         // The interface chosen on 2026-11-14: the navigation sidebar,
         // the two levels of the Inspector and the slim format bar.
-        assert!(gnome("INT-13").contains("Formato e Documento"));
-        assert!(gnome("INT-12").contains("menu Mais"));
-        assert!(gnome("INT-18").contains("barra lateral de navegação"));
+        assert!(gnome("INT-13").contains("Format and Document"));
+        assert!(gnome("INT-12").contains("More menu"));
+        assert!(gnome("INT-18").contains("navigation sidebar"));
     }
 
     #[test]
     fn reads_the_shared_column() {
         let text = "id\tphase\tfeature\texpected\tpages\tshared\todf\tgnome\n\
-                    KSLD-04\t2\tGrupos\tRecolhe\t50\tSó Keynote\tExtensão\t\n";
+                    KSLD-04\t2\tGroups\tCollapses\t50\tKeynote only\tExtension\t\n";
         let rows = parse(text).unwrap();
         assert_eq!(rows[0].id, "KSLD-04");
-        assert_eq!(rows[0].shared, "Só Keynote");
-        assert_eq!(rows[0].odf, "Extensão");
+        assert_eq!(rows[0].shared, "Keynote only");
+        assert_eq!(rows[0].odf, "Extension");
         let six = "id\tphase\tfeature\texpected\tpages\tshared\todf\tgnome\n\
                    KSLD-04\t2\ta\tb\tc\td\te\n";
         assert_eq!(parse(six).unwrap_err().line, 2);
@@ -217,7 +217,7 @@ mod tests {
         assert!(is_app_id("NCEL-12"));
         assert!(!is_app_id("XCEL-12"));
         assert_eq!(
-            ids_in("INT-14 a INT-16, NDOC-02"),
+            ids_in("INT-14 to INT-16, NDOC-02"),
             ["INT-14", "INT-16", "NDOC-02"]
         );
     }
