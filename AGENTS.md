@@ -19,7 +19,7 @@ purpose and point to the full pages.
    `desk-model` with an inverse.
 4. **Interface.** Use a native Libadwaita widget when one exists. When
    none does, build one that follows the GNOME HIG and record it in the
-   component table of `docs/interface/propostas/README.md`, to be reviewed
+   component table of `docs/interface/proposals/README.md`, to be reviewed
    at each new Libadwaita.
 5. **Storage.** Standard ODF first; a `desk:` extension only when ODF has
    no place for the feature, documented in

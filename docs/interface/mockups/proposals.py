@@ -289,7 +289,11 @@ def writer_m(win, context='text', level=shell.FORMAT, objects=False):
     words = pill('26.171 palavras', 'osd.contagem', halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
                  margin_bottom=12)
     doc = writer.doc_view(context, rulers=False, overlays=(zoom_pill('125 %'), words))
-    body = shell.split(writer.inspector_b(context, level), doc, shell.INSPECTOR_W, Gtk.PackType.END)
+    if context == 'text':
+        insp, width = writer.inspector_b(context, level), shell.INSPECTOR_W
+    else:       # the three second-level names of an object need the wider pane
+        insp, width = wide(lambda: writer.inspector_b(context, level))
+    body = shell.split(insp, doc, width, Gtk.PackType.END)
     view, tabs = document_tabs(app, OTHER_DOCS[app], body)
     content = shell.toolbar_view(view, top=[header_m(app, objects=objects), tabs])
     win.set_content(shell.split(side, content, shell.SIDEBAR_W))
@@ -330,23 +334,23 @@ def slides_m(win, context='image', level=shell.FORMAT, objects=False):
 
 
 SCENES = [
-    Scene('writer-n', 'Desk Writer · N iWork atual', lambda w: writer_n(w), 'writer', 'N'),
-    Scene('writer-n-imagem', 'Writer N · imagem selecionada', lambda w: writer_n(w, context='image'),
+    Scene('writer-n', 'Desk Writer · N current iWork', lambda w: writer_n(w), 'writer', 'N'),
+    Scene('writer-n-image', 'Writer N · image selected', lambda w: writer_n(w, context='image'),
           'writer', 'N'),
-    Scene('writer-n-escuro', 'Writer N · estilo escuro', lambda w: writer_n(w), 'writer', 'N', dark=True),
-    Scene('tables-n', 'Desk Tables · N iWork atual', lambda w: tables_n(w), 'tables', 'N'),
-    Scene('slides-n', 'Desk Slides · N iWork atual', lambda w: slides_n(w), 'slides', 'N'),
-    Scene('slides-n-animar', 'Slides N · Animar', lambda w: slides_n(w, level=shell.ANIMATION), 'slides',
+    Scene('writer-n-dark', 'Writer N · dark style', lambda w: writer_n(w), 'writer', 'N', dark=True),
+    Scene('tables-n', 'Desk Tables · N current iWork', lambda w: tables_n(w), 'tables', 'N'),
+    Scene('slides-n', 'Desk Slides · N current iWork', lambda w: slides_n(w), 'slides', 'N'),
+    Scene('slides-n-animate', 'Slides N · Animate', lambda w: slides_n(w, level=shell.ANIMATION), 'slides',
           'N'),
-    Scene('writer-m', 'Desk Writer · M Mix com a HIG', lambda w: writer_m(w), 'writer', 'M'),
-    Scene('writer-m-imagem', 'Writer M · imagem selecionada', lambda w: writer_m(w, context='image'),
+    Scene('writer-m', 'Desk Writer · M mix with the HIG', lambda w: writer_m(w), 'writer', 'M'),
+    Scene('writer-m-image', 'Writer M · image selected', lambda w: writer_m(w, context='image'),
           'writer', 'M'),
-    Scene('writer-m-escuro', 'Writer M · estilo escuro', lambda w: writer_m(w), 'writer', 'M', dark=True),
-    Scene('tables-m', 'Desk Tables · M Mix com a HIG', lambda w: tables_m(w), 'tables', 'M'),
-    Scene('slides-m', 'Desk Slides · M Mix com a HIG', lambda w: slides_m(w), 'slides', 'M'),
-    Scene('writer-m-mais', 'Writer M+ · objetos no cabeçalho', lambda w: writer_m(w, objects=True), 'writer', 'M'),
-    Scene('tables-m-mais', 'Tables M+ · objetos no cabeçalho', lambda w: tables_m(w, objects=True), 'tables', 'M'),
-    Scene('slides-m-mais', 'Slides M+ · objetos no cabeçalho', lambda w: slides_m(w, objects=True), 'slides', 'M'),
-    Scene('slides-m-animar', 'Slides M · Animação', lambda w: slides_m(w, level=shell.ANIMATION), 'slides',
+    Scene('writer-m-dark', 'Writer M · dark style', lambda w: writer_m(w), 'writer', 'M', dark=True),
+    Scene('tables-m', 'Desk Tables · M mix with the HIG', lambda w: tables_m(w), 'tables', 'M'),
+    Scene('slides-m', 'Desk Slides · M mix with the HIG', lambda w: slides_m(w), 'slides', 'M'),
+    Scene('writer-m-plus', 'Writer M+ · objects in the header', lambda w: writer_m(w, objects=True), 'writer', 'M'),
+    Scene('tables-m-plus', 'Tables M+ · objects in the header', lambda w: tables_m(w, objects=True), 'tables', 'M'),
+    Scene('slides-m-plus', 'Slides M+ · objects in the header', lambda w: slides_m(w, objects=True), 'slides', 'M'),
+    Scene('slides-m-animate', 'Slides M · Animation', lambda w: slides_m(w, level=shell.ANIMATION), 'slides',
           'M'),
 ]

@@ -15,7 +15,7 @@ the project takes the decisions; the date is the day he took them.
 | D-005 | 2026-11-16 | Features tied to Apple platforms are "not applicable to GNOME" unless GNOME has an equivalent. | Current (assumed, not contested) |
 | D-006 | 2026-11-16 | The target version is 15.4; a new release of iWork is a review of the inventory. | Current (assumed, not contested) |
 | D-007 | 2026-11-16 | Native Libadwaita widgets wherever one exists; otherwise a widget of Desk that follows the HIG, marked for review at each new Libadwaita. | Current |
-| D-008 | 2026-11-16 | The window is proposal M+ of `docs/interface/propostas`: the mix with the HIG, with the six object buttons (Table, Chart, Text, Shape, Media, Comment) in the header bar beside Insert, so that no function shown in the toolbar of iWork is hidden. | Current |
+| D-008 | 2026-11-16 | The window is proposal M+ of `docs/interface/proposals`: the mix with the HIG, with the six object buttons (Table, Chart, Text, Shape, Media, Comment) in the header bar beside Insert, so that no function shown in the toolbar of iWork is hidden. | Current |
 | D-009 | 2026-11-16 | ODF stays the native format; every implemented feature that standard ODF cannot hold gets a documented extension. | Current |
 | D-010 | 2026-11-16 | Desk reads and imports: Desk ODF, iWork '09, current iWork, current Microsoft Office, current LibreOffice and OpenOffice. | Current |
 | D-011 | 2026-11-16 | The reader of current iWork files is permanent and is written under four rules: nothing is extracted from Apple's executables and no definition file taken from them is copied; it is written from public third-party documentation and from documents made by the project; no template, theme, font or image of Apple enters the repository; the names Pages, Numbers and Keynote are used only to say what Desk is compatible with. A lawyer should review the second rule before version 1.0; if the answer is no, the reader stays only as a parity checking tool and leaves the product. | Current, legal review pending |
@@ -25,7 +25,7 @@ the project takes the decisions; the date is the day he took them.
 | D-015 | 2026-11-16 | A register of what each set of tasks left undone, with the reason, and a backlog worked at the end of each phase. | Current |
 | D-016 | 2026-11-16 | Help uses the native GNOME shortcut. | Current |
 | D-017 | 2026-11-16 | Shortcuts: GNOME's own first, then the shortcut of iWork 15.4. | Current (assumed, not contested) |
-| D-018 | 2026-11-16 | Documentation and code comments are in English; matrices, inventories and reports to the owner are in Portuguese. | Current (assumed, not contested) |
+| D-018 | 2026-11-16 | Everything in the repository is in English: documentation, code comments, matrices, inventories and mockups. The Brazilian Portuguese translation of the apps and of the site stays, as a translation. Older material still in Portuguese is listed in backlog item B-009. | Current |
 | D-019 | 2026-11-16 | Export is limited to LibreOffice and OpenOffice (ODF), Microsoft Office, PDF and EPUB. The other exports of iWork (RTF, plain text, CSV and TSV, images, movie, animated GIF, HTML, the older Office formats) are out of scope and stay marked in the matrices. | Current |
 
 ## Replaced
