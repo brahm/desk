@@ -12,6 +12,14 @@ have one source. Open
 [Website workflow](../.github/workflows/pages.yml) builds it on every
 pull request that touches it and publishes it from `main`.
 
+## Progress dashboard
+
+`painel/index.html` is not in this directory: `ci/build-site.sh` generates
+it with `ci/dashboard.py` from the inventory, the roadmap and the backlog,
+so the published page is rebuilt whenever one of them changes on `main`.
+It is in Portuguese, and it is the one page with a script, which filters
+the list of features. See [docs/dashboard](../docs/dashboard/README.md).
+
 ## Translations
 
 The page is written in English at the root, and each translation is a

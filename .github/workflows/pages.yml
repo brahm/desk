@@ -9,6 +9,11 @@ on:
       - data/icons/hicolor/scalable/apps/**
       - docs/interface/janelas/**
       - ci/build-site.sh
+      - ci/dashboard.py
+      - corpus/inventory/**
+      - docs/roadmap.md
+      - docs/backlog/**
+      - docs/dashboard/**
       - .github/workflows/pages.yml
   pull_request:
     paths:
@@ -17,11 +22,18 @@ on:
       - data/icons/hicolor/scalable/apps/**
       - docs/interface/janelas/**
       - ci/build-site.sh
+      - ci/dashboard.py
+      - corpus/inventory/**
+      - docs/roadmap.md
+      - docs/backlog/**
+      - docs/dashboard/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
+# pull-requests: the dashboard lists the recent pull requests.
 permissions:
   contents: read
+  pull-requests: read
 
 # One deployment at a time, and never cancel one that has started.
 concurrency:
@@ -34,7 +46,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      # The dashboard asks GitHub for the recent pull requests.
       - name: Assemble the site
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ci/build-site.sh _site
       # The Flatpak repository joins the site: the Flatpak workflow keeps
       # the signed OSTree repository, its key and the .flatpakrepo and

@@ -35,9 +35,13 @@ purpose and point to the full pages.
    add a row to `docs/backlog/deferred.tsv` with the reason and the phase
    it moves to, and say so plainly in your report. Run
    `ci/check-backlog.py`.
-9. **Apple material.** Never extract anything from Apple software, and
+9. **Progress.** When a set of tasks ends, update the status of its rows
+   in `corpus/inventory` and of its phase in `docs/dashboard/phases.tsv`,
+   then update the dashboard as
+   [docs/dashboard/README.md](docs/dashboard/README.md) says.
+10. **Apple material.** Never extract anything from Apple software, and
    never add its templates, fonts, images or format definitions to the
    repository (D-011).
-10. **Decisions** belong to the project owner. When a task conflicts with
+11. **Decisions** belong to the project owner. When a task conflicts with
     [docs/decisions.md](docs/decisions.md), stop and ask; do not pick a
     side in code.
