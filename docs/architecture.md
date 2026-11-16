@@ -292,6 +292,6 @@ flowchart LR
 - What each feature must do: [`corpus/inventory`](../corpus/inventory/README.md)
   and the parity matrices in [`corpus`](../corpus/README.md).
 - Where each control sits in the window: [`interface`](interface/README.md)
-  and the chosen proposal in [`interface/propostas`](interface/propostas/README.md).
+  and the chosen proposal in [`interface/proposals`](interface/proposals/README.md).
 - How a feature is stored: [odf-extensions.md](odf-extensions.md).
 - What comes when: [roadmap.md](roadmap.md).

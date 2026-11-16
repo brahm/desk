@@ -5,6 +5,8 @@
 # Renders the mockups with the GTK and the Libadwaita of GNOME 51, off
 # screen, and joins them with the catalogue.
 # Usage: ./run.sh [output dir] [scene id prefix ...]
+# The scenes come out in English; DESK_MOCKUP_LANG=pt draws the Portuguese
+# they were written in.
 #
 # desk-gnome-51 is the wrapper that ci/setup-env.sh installs; it sees the
 # home and /tmp only, so the repository has to be under one of them. The
@@ -17,7 +19,7 @@ out=${1:-out}
 shift || true
 python3 make_icons.py
 desk-gnome-51 env GSETTINGS_BACKEND=memory GSK_RENDERER=cairo GDK_BACKEND=x11 GDK_SCALE=2 \
-    NO_AT_BRIDGE=1 LANG=pt_BR.UTF-8 LANGUAGE=pt_BR dbus-run-session -- \
+    NO_AT_BRIDGE=1 LANG=pt_BR.UTF-8 LANGUAGE=pt_BR DESK_MOCKUP_LANG="${DESK_MOCKUP_LANG:-en}" dbus-run-session -- \
     xvfb-run -a -s "-screen 0 3200x2200x24" python3 render.py "$out" "$@"
 if [ "$#" -eq 0 ]; then
     python3 inventory.py "$out" ../componentes.tsv "$out/data.json" B

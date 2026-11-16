@@ -10,7 +10,7 @@ and contribute to Desk, and for a coding agent working for that person.
 | [architecture.md](architecture.md) | The crates, the document model, the life of a document, with diagrams |
 | [roadmap.md](roadmap.md) | The phases, what each delivers and how a phase is run and closed |
 | [odf-extensions.md](odf-extensions.md) | How Desk stores what standard ODF cannot hold |
-| [interface](interface/README.md) | The window, its components, and the chosen proposal in [interface/propostas](interface/propostas/README.md) |
+| [interface](interface/README.md) | The window, its components, and the chosen proposal in [interface/proposals](interface/proposals/README.md) |
 | [backlog](backlog/README.md) | What was left undone, why, and when it comes back |
 | [dashboard](dashboard/README.md) | Where the project stands: the progress page, how its numbers are worked out and how to update it |
 | [`../corpus/inventory`](../corpus/inventory/README.md) | Every feature of the target, with its scope, status and phase |
@@ -18,6 +18,7 @@ and contribute to Desk, and for a coding agent working for that person.
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | How to build, test, comment code and send a change |
 | [`../AGENTS.md`](../AGENTS.md) | The same rules, stated for a coding agent |
 
-Languages: these pages and the code are in English. The matrices, the
-inventory and `interface` are in Portuguese, the language of the project
-owner (D-018).
+Language: everything is in English (D-018). The parity matrices and
+[`interface/README.md`](interface/README.md) with its component tables were
+written in Portuguese before that decision and are translated in phase B1
+(backlog item B-009).

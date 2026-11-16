@@ -1,177 +1,177 @@
 # SPDX-FileCopyrightText: 2026 Desk contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-id	area	recurso	no_iwork	alvo	regra	escopo	situacao_no_desk	revisar	fase	nota
-W001	3.1 Janela, menus e painéis	Barra de menus	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Menus do GNOME (Visualização no botão Barra lateral, Inserir, menu Mais) e busca de comandos (GNM-10); compartilhar fica fora por ser online
-W002	3.1 Janela, menus e painéis	Barra de ferramentas	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Barra de cabeçalho da interface B com botões de inserir e do Inspetor juntos (INT-11)
-W003	3.1 Janela, menus e painéis	Barra de formatação (Format Bar)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	B1	Barra de formatação enxuta e contextual da interface B (INT-12)
-W004	3.1 Janela, menus e painéis	Inspetor	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Um Inspetor só, na barra lateral direita, em dois níveis, que muda com a seleção (INT-13)
-W005	3.1 Janela, menus e painéis	Gaveta de estilos (Styles Drawer)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	B1	Página Estilos da barra lateral, com as três listas (INT-18)
-W006	3.1 Janela, menus e painéis	Media Browser 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Popover Mídia com busca e pastas (INT-14); Content Hub e Fotos ficam fora (online/assinatura); gravar áudio vai na linha Som e vídeo
-W007	3.1 Janela, menus e painéis	Janela Colors / Fonts	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Popover de fontes (Ctrl+T) e paleta de cores (INT-15, INT-16)
-W008	3.1 Janela, menus e painéis	Janela Adjust Image	Diferente	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Ajustar Imagem na aba Imagem do Inspetor (OBJ-07, etapa 4)
-W009	3.1 Janela, menus e painéis	Janela de avisos (Document Warnings)	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	B1	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 oferece direto do aviso
-W010	3.1 Janela, menus e painéis	Barra inferior	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	B1	Barra inferior com posição, Ir para página, Navegar por e contagem (etapa 6, GNM-13)
-W011	3.1 Janela, menus e painéis	Painel esquerdo	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou; a janela muda (D-008)	B1	Miniaturas, estilos e resultados da busca na barra lateral; falta o sumário vivo do 15 e a página Comentários só diz que não há (fase 8)
-W012	3.1 Janela, menus e painéis	Tela cheia	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou; a janela muda (D-008)	B1	Tela cheia por F11 (DOC-07); falta o Screen View do 15 (fluxo contínuo para escrever)
-W013	3.1 Janela, menus e painéis	Vários documentos	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	B1	Uma janela por documento; faltam abas (AdwTabView)
-W014	3.1 Janela, menus e painéis	Modo escuro	Só 15	15.4	D-001	Dentro	Pronto	a janela muda (D-008)	B1	Libadwaita segue o estilo claro/escuro do sistema
-W015	3.1 Janela, menus e painéis	Preferências	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	B1	Preferências (Geral, Réguas, Correção) com AdwPreferencesDialog
-W016	3.1 Janela, menus e painéis	Desfazer/refazer	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	B1	Desfazer e refazer ilimitados, com o nome da mudança (DOC-12)
-W017	3.2 Documentos, modelos e arquivos	Dois tipos de documento	Diferente	15.4	D-001	Dentro	Parcial	-	W5	Os dois tipos existem (INT-02, INT-03); falta converter de um para o outro
-W018	3.2 Documentos, modelos e arquivos	Seletor de modelos 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	W5	Galeria de modelos na janela vazia existe, mas o seletor completo (INT-01) é da fase 9; modelos premium e baixados ficam fora
-W019	3.2 Documentos, modelos e arquivos	Novo documento sempre do mesmo modelo	Igual	Igual nas duas	-	Dentro	Parcial	-	W5	Ctrl+N cria do modelo padrão; a preferência de escolher o modelo (DOC-02) é da fase 9
-W020	3.2 Documentos, modelos e arquivos	Salvar	Diferente	15.4	D-001	Dentro	Parcial	-	W5	Salvar manual e rascunho de recuperação a cada 2 min (caminho L); o alvo do 15 é salvamento automático contínuo, o que reabre a decisão de 13/11
-W021	3.2 Documentos, modelos e arquivos	Renomear pelo título da janela	Só 15	15.4	D-001	Dentro	Pronto	-	feito	Renomear com um clique no título (PR de 15/11)
-W022	3.2 Documentos, modelos e arquivos	Versões anteriores	Diferente	15.4	D-001	Dentro	Ausente	-	W5	Sem histórico de versões por decisão (caminho L); o alvo do 15 pede navegar e copiar trechos de versões
-W023	3.2 Documentos, modelos e arquivos	Salvar como modelo	Diferente	15.4	D-001	Dentro	Ausente	-	W5	Salvar como modelo e gerir modelos no app (DOC-13, fase 9)
-W024	3.2 Documentos, modelos e arquivos	Autoria de modelos	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W5	Padrões de caixa de texto, forma e imagem (MOD-04, MOD-07); faltam texto e mídia reservados, Capturar Páginas e o resto da fase 9
-W025	3.2 Documentos, modelos e arquivos	Pacote vs arquivo único	Diferente	15.4	D-001	Dentro	Pronto	-	feito	ODT é um arquivo único
-W026	3.2 Documentos, modelos e arquivos	Senha	Diferente	15.4	D-001	Dentro	Ausente	-	W5	Senha para abrir (DOC-08, fase 8), também nas cópias exportadas
-W027	3.2 Documentos, modelos e arquivos	Bloquear documento	Diferente	15.4	D-001	Dentro	Ausente	-	W5	Bloquear documento no app (DOC-17, fase 8)
-W028	3.2 Documentos, modelos e arquivos	Informações do documento (autor, título, palavras-chave, comentários)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	feito	Informações do documento no Inspetor (DOC-19)
-W029	3.2 Documentos, modelos e arquivos	Reduzir tamanho	Diferente	15.4	D-001	Dentro	Parcial	-	W5	Reduzir imagens e mídia como o '09 (OBJ-05, OBJ-20); faltam as opções de vídeo do 15 (H.264/HEVC, qualidade)
-W030	3.2 Documentos, modelos e arquivos	Abrir formatos	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W5	Abre ODT e Pages '09 (DOC-03, DOC-22); Word, RTF, texto e AppleWorks são da fase 10
-W031	3.2 Documentos, modelos e arquivos	Exportar	Diferente	15.4	D-001	Dentro	Parcial	D-019	W5	D-019: só ODF, Microsoft Office, PDF e EPUB. Só PDF pela linha de comando (desk-convert); exportar PDF, Word, RTF, texto e imagens pela janela é da fase 10
-W032	3.2 Documentos, modelos e arquivos	ePub	Diferente	15.4	D-001	Dentro	Ausente	-	W5	EPUB refluxível e fixo (fase 10)
-W033	3.2 Documentos, modelos e arquivos	Publicar no Apple Books 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Publicar no Apple Books (online)
-W034	3.2 Documentos, modelos e arquivos	Imprimir	Diferente	15.4	D-001	Dentro	Ausente	-	W5	Imprimir com intervalo, comentários e fundos (EXP-03, fase 10)
-W035	3.2 Documentos, modelos e arquivos	Envelopes	Igual	Igual nas duas	-	Dentro	Ausente	-	W5	Modelos de envelope (fase 9)
-W036	3.2 Documentos, modelos e arquivos	Enviar 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Enviar por Mail/Mensagens/AirDrop (online)
-W037	3.2 Documentos, modelos e arquivos	Arquivos recentes	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Abrir recente pelo RecentManager do GTK
-W038	3.3 Visualização e navegação	Zoom	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Zoom (INT-07)
-W039	3.3 Visualização e navegação	Duas páginas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Uma ou duas páginas (INT-08)
-W040	3.3 Visualização e navegação	Miniaturas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Miniaturas que reordenam seções (EST-17)
-W041	3.3 Visualização e navegação	Sumário de navegação lateral	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Sumário vivo na barra lateral
-W042	3.3 Visualização e navegação	Modo Esboço (Outline)	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	feito	Modo Estrutura de Tópicos (TXT-14)
-W043	3.3 Visualização e navegação	Screen View	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Screen View
-W044	3.3 Visualização e navegação	Invisíveis	Igual (15 escolhe a cor)	Igual nas duas	-	Dentro	Pronto	-	feito	Invisíveis (INT-10); a cor configurável do 15 não existe
-W045	3.3 Visualização e navegação	Marcas de leiaute	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Mostrar leiaute (INT-09)
-W046	3.3 Visualização e navegação	Réguas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Réguas e guias (INT-17)
-W047	3.3 Visualização e navegação	Ir para página	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	W1	Ir para página pela barra inferior (INT-19)
-W048	3.3 Visualização e navegação	Percorrer itens (página, seção, comentário, alteração, marcador, ocorrência)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	W1	Navegar por tipo de item pela barra inferior (INT-19)
-W049	3.4 Texto e caracteres	Seleção de texto	Diferente	15.4	D-001	Dentro	Pronto	-	feito	Seleção descontínua com Ctrl (TXT-03)
-W050	3.4 Texto e caracteres	Fonte, tamanho, negrito, itálico, sublinhado, tachado	Diferente (lugar)	15.4	D-001	Dentro	Pronto	-	feito	Barra de formatação e Inspetor (FMT-01, FMT-02, FMT-05)
-W051	3.4 Texto e caracteres	Fonte padrão	Diferente	15.4	D-001	Dentro	Parcial	-	W1	A fonte padrão vem do modelo; falta escolhê-la nas Preferências
-W052	3.4 Texto e caracteres	Cor do texto	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Cor sólida (FMT-11); falta gradiente e imagem no texto
-W053	3.4 Texto e caracteres	Contorno e sombra	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Contorno e sombra de texto (FMT-03, FMT-04)
-W054	3.4 Texto e caracteres	Maiúsculas	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Maiúsculas e versalete (FMT-07); faltam Título e Início de frase e as transformações do 15
-W055	3.4 Texto e caracteres	Sobrescrito/subscrito, deslocamento de linha de base	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Sobrescrito e linha de base (FMT-06)
-W056	3.4 Texto e caracteres	Espaçamento entre caracteres e ligaduras	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Espaçamento e ligaduras (FMT-09, FMT-10)
-W057	3.4 Texto e caracteres	Suavização de fontes	Só '09	'09, na forma do 15	D-002	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	Suavização de fontes é do sistema no GNOME
-W058	3.4 Texto e caracteres	Cor de fundo de caractere e de parágrafo	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Fundo de caractere e de parágrafo (FMT-20)
-W059	3.4 Texto e caracteres	Realce de revisão (highlight)	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Realce de revisão com comentário (fase 8)
-W060	3.4 Texto e caracteres	Capitular (drop cap)	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Capitular
-W061	3.4 Texto e caracteres	Frações automáticas	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Frações automáticas
-W062	3.4 Texto e caracteres	Aspas e travessões inteligentes	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Aspas inteligentes como o '09 (TXT-06); faltam escolher o estilo de aspas e converter as existentes
-W063	3.4 Texto e caracteres	Hifenização	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Hifenização (TXT-09)
-W064	3.4 Texto e caracteres	Substituição de texto	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Lista de substituição do próprio Desk (TXT-07); o GNOME não tem lista do sistema, então o alvo vale como lista comum aos três apps
-W065	3.4 Texto e caracteres	Caracteres especiais, acentos, emoji	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Seletor de emoji e símbolos do GTK (TXT-05)
-W066	3.4 Texto e caracteres	Data e hora	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Data e hora como campo (EST-27)
-W067	3.4 Texto e caracteres	Número e total de páginas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Número e total de páginas (EST-27)
-W068	3.4 Texto e caracteres	Ditado 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Ditado (IA)
-W069	3.4 Texto e caracteres	Previsão ao digitar 🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Previsão ao digitar (IA)
-W070	3.4 Texto e caracteres	Tradução 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Tradução (IA/online)
-W071	3.4 Texto e caracteres	Idiomas: bidirecional, vertical, guia fonético, ênfase CJK	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Texto bidirecional, vertical e guia fonético (GNM-08, fase 11)
-W072	3.4 Texto e caracteres	Formatação por idioma do documento	Só 15	15.4	D-001	Dentro	Parcial	-	W1	Idioma do texto por trecho (FMT-22); falta idioma e região por documento
-W073	3.5 Estilos	Estilos de parágrafo, caractere e lista	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	W1	Estilos sempre à vista na barra lateral (STY-01, STY-02)
-W074	3.5 Estilos	Indicar e atualizar substituições	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Sobreposições e atualizar (STY-06)
-W075	3.5 Estilos	Atalhos para estilos	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Atalhos de estilo Ctrl+1 a 8 (STY-04)
-W076	3.5 Estilos	Copiar e colar estilo	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Copiar e colar estilo (STY-08)
-W077	3.5 Estilos	Importar estilos de outro documento	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	feito	Importar estilos (STY-10)
-W078	3.5 Estilos	Localizar e substituir estilos	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	feito	Localizar e substituir estilos (STY-09)
-W079	3.5 Estilos	Mostrar só estilos usados	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	feito	Mostrar só estilos usados na página Estilos
-W080	3.5 Estilos	Estilos de objeto, tabela e gráfico	Só 15	15.4	D-001	Dentro	Parcial	-	W1	Estilos de objeto no Inspetor (PR de 15/11); faltam estilos de tabela e de gráfico
-W081	3.5 Estilos	Estilo padrão de caixa de texto	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Padrão de caixa de texto gravado no modelo (MOD-04); falta definir por documento
-W082	3.6 Parágrafo, listas e colunas	Alinhamento, espaçamento de linha e de parágrafo, recuos	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Alinhamento, espaçamento e recuos (FMT-12 a FMT-18)
-W083	3.6 Parágrafo, listas e colunas	Tabulações	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Tabulações (FMT-16)
-W084	3.6 Parágrafo, listas e colunas	Paginação (manter juntas, com a próxima, nova página, viúvas/órfãs)	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Paginação (EST-05)
-W085	3.6 Parágrafo, listas e colunas	Bordas e linhas de parágrafo	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Bordas e filetes (FMT-21)
-W086	3.6 Parágrafo, listas e colunas	Listas automáticas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Listas automáticas (LST-01)
-W087	3.6 Parágrafo, listas e colunas	Marcadores de texto, de imagem, números, níveis (Tiered Numbers)	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Marcadores e listas escalonadas (LST-03 a LST-05)
-W088	3.6 Parágrafo, listas e colunas	Reordenar itens de lista arrastando	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Reordenar no modo tópicos; falta arrastar pelo marcador direto no texto
-W089	3.6 Parágrafo, listas e colunas	Colunas	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W1	Colunas e quebras manuais do '09 (EST-07 a EST-10); faltam as colunas da seleção com quebras automáticas do 15
-W090	3.6 Parágrafo, listas e colunas	Quebra de coluna, de linha, de página, de seção	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Quebras de coluna, linha, página e seção (EST-04, EST-06, EST-08)
-W091	3.6 Parágrafo, listas e colunas	Caixas de texto encadeadas	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Caixas vinculadas e linhas de conexão (OBJ-15, VMI-03); faltam os fios numerados e coloridos e vários fios
-W092	3.7 Estrutura do documento	Tamanho, orientação, margens	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Papel e margens (EST-02, EST-03)
-W093	3.7 Estrutura do documento	Páginas espelhadas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Páginas espelhadas (EST-11)
-W094	3.7 Estrutura do documento	Seções	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W3	Seções (EST-16 a EST-19); falta reutilizar seções capturadas (EST-20, fase 9)
-W095	3.7 Estrutura do documento	Modelos de página (Page Templates)	Diferente	15.4	D-001	Dentro	Ausente	-	W3	Modelos de página com etiquetas
-W096	3.7 Estrutura do documento	Cabeçalho e rodapé	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W3	Cabeçalho livre do '09 (EST-12); faltam os três campos rápidos do 15
-W097	3.7 Estrutura do documento	Objetos mestres / de leiaute de seção (marca-d'água)	Igual (nome novo)	Igual nas duas	-	Dentro	Pronto	-	feito	Objetos mestres de seção (EST-21, INT-05)
-W098	3.7 Estrutura do documento	Fundo e borda de página	Diferente	15.4	D-001	Dentro	Ausente	-	W3	Fundo e borda de página por página, seção ou modelo
-W099	3.7 Estrutura do documento	Notas de rodapé e de fim	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Notas de rodapé e de fim (EST-13 a EST-15)
-W100	3.7 Estrutura do documento	Sumário (TOC) inserido	Diferente	15.4	D-001	Dentro	Parcial	-	W3	Vários sumários, cada um até o próximo (EST-22); falta o escopo por seção do 15
-W101	3.7 Estrutura do documento	Marcadores (bookmarks)	Diferente	15.4	D-001	Dentro	Parcial	-	W3	Marcadores (EST-26); faltam a aba própria e as sugestões a partir de estilos
-W102	3.7 Estrutura do documento	Links	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W3	Links do '09, inclusive para outro documento (EST-25, IOP-32); faltam telefone e link a partir de objetos
-W103	3.7 Estrutura do documento	Bibliografia 🧩 (nas duas)	Igual	Igual nas duas	-	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Bibliografia exige o EndNote, programa pago
-W104	3.7 Estrutura do documento	Equações 🧩 (no '09)	Diferente	15.4	D-001	Dentro	Ausente	-	W3	Equações LaTeX/MathML
-W105	3.7 Estrutura do documento	Mala direta	Diferente	15.4	D-001	Dentro	Ausente	-	W3	Mala direta com pré-visualização (MAL-01 a MAL-09, fase 9)
-W106	3.8 Objetos: imagens, formas, mídia	Objetos flutuantes e em linha	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Flutuante e em linha (OBJ-01); falta aninhar objetos dentro de caixas e formas
-W107	3.8 Objetos: imagens, formas, mídia	Contorno de texto	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	W4	Contorno com escolha de lado (OBJ-17)
-W108	3.8 Objetos: imagens, formas, mídia	Imagens 🌐💲 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	W4	PNG, JPEG, PDF, GIF (OBJ-02); faltam SVG e HEIC; Content Hub e iPhone ficam fora
-W109	3.8 Objetos: imagens, formas, mídia	Remover fundo 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	W4	O Remover Fundo do 15 usa IA; vale o Alfa Instantâneo manual do '09 (OBJ-06)
-W110	3.8 Objetos: imagens, formas, mídia	Ajustes de imagem	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Ajustar Imagem do '09 (OBJ-07); falta o Realçar automático e o painel enxuto do 15
-W111	3.8 Objetos: imagens, formas, mídia	Galeria de imagens	Só 15	15.4	D-001	Dentro	Ausente	-	W4	Galeria de imagens
-W112	3.8 Objetos: imagens, formas, mídia	IA para imagens **(assinatura)** 🤖🌐💲	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	IA para imagens (assinatura)
-W113	3.8 Objetos: imagens, formas, mídia	Formas 🤖💲 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Formas, caneta e paramétricas (OBJ-08 a OBJ-11); faltam a biblioteca pesquisável e combinar formas; gerar forma por IA fica fora
-W114	3.8 Objetos: imagens, formas, mídia	Editar pontos e curvas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Editar pontos (OBJ-10)
-W115	3.8 Objetos: imagens, formas, mídia	Linhas e conexões	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Linha de conexão (OBJ-31)
-W116	3.8 Objetos: imagens, formas, mídia	Objetos 3D (USDZ)	Só 15	15.4	D-001	Dentro	Ausente	-	W4	Objetos 3D (USDZ)
-W117	3.8 Objetos: imagens, formas, mídia	Desenhos (Apple Pencil)	Só 15	15.4	D-001	Dentro	Ausente	-	W4	Desenho à mão livre animável (o equivalente do Apple Pencil)
-W118	3.8 Objetos: imagens, formas, mídia	Som e vídeo 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Áudio e vídeo (OBJ-18, OBJ-19); faltam gravar áudio, aparar, capa e descrição; vídeo da web fica fora
-W119	3.8 Objetos: imagens, formas, mídia	Formatos de mídia	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Reduz mídia (OBJ-20); falta otimizar ao inserir
-W120	3.8 Objetos: imagens, formas, mídia	Bordas, molduras artísticas, sombra, reflexo, opacidade	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Bordas, molduras, sombra, reflexo e opacidade (OBJ-35 a OBJ-39)
-W121	3.8 Objetos: imagens, formas, mídia	Preenchimento	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Cor, gradiente e imagem (OBJ-40 a OBJ-42); faltam gradiente avançado e salvar preenchimento
-W122	3.8 Objetos: imagens, formas, mídia	Legenda e título de objeto	Só 15	15.4	D-001	Dentro	Ausente	-	W4	Legenda e título de objeto
-W123	3.8 Objetos: imagens, formas, mídia	Posição exata, alinhar e distribuir	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Posição, alinhar e distribuir (OBJ-26, OBJ-29)
-W124	3.8 Objetos: imagens, formas, mídia	Guias de alinhamento	Diferente	15.4	D-001	Dentro	Parcial	-	W4	Guias dinâmicas e fixas (OBJ-27, OBJ-28); falta a cor própria
-W125	3.8 Objetos: imagens, formas, mídia	Camadas, agrupar, travar	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Camadas, agrupar, travar (OBJ-24, OBJ-30, OBJ-32)
-W126	3.8 Objetos: imagens, formas, mídia	Redimensionar, girar, espelhar	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Redimensionar, girar, espelhar (OBJ-33, OBJ-34)
-W127	3.9 Tabelas	Inserir tabela	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Inserir tabela (TAB-01); faltam os estilos de tabela à vista
-W128	3.9 Tabelas	Linhas, colunas, cabeçalhos, rodapés, repetir cabeçalho	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Linhas, colunas, cabeçalhos e rodapés (TAB-10 a TAB-13)
-W129	3.9 Tabelas	Converter texto em tabela	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	-	feito	Converter texto em tabela (TAB-05)
-W130	3.9 Tabelas	Criar tabela a partir de células	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Criar tabela arrastando células para fora
-W131	3.9 Tabelas	Mesclar e dividir células	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou	W1	Mesclar e dividir (TAB-23, TAB-24)
-W132	3.9 Tabelas	Formatos de célula	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Parcial	o alvo mudou	W1	Formatos, fração e sistema numérico (TAB-28 a TAB-30); falta a janela de gerenciar formatos (TAB-31)
-W133	3.9 Tabelas	Fórmulas e funções 🌐 (no 15)	Diferente	15.4	D-001	Dentro	Parcial	-	W1	Navegador de funções e 94 funções; o 15 tem 250+; funções que buscam na internet ficam fora
-W134	3.9 Tabelas	Realce condicional	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Formatação condicional (TAB-21)
-W135	3.9 Tabelas	Ordenar	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Ordenar (TAB-15)
-W136	3.9 Tabelas	Preenchimento automático e autocompletar	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Preenchimento automático e sugestões da coluna (TAB-19)
-W137	3.9 Tabelas	Cores alternadas	Igual	Igual nas duas	-	Dentro	Pronto	-	feito	Cores alternadas (TAB-14)
-W138	3.9 Tabelas	Título da tabela	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Título da tabela
-W139	3.9 Tabelas	Direção da tabela (bidi)	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Tabela da direita para a esquerda
-W140	3.9 Tabelas	Travar tabela	Só 15	15.4	D-001	Dentro	Ausente	-	W1	Travar tabela
-W141	3.10 Gráficos	Tipos	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	W4	Onze tipos 2D e 3D (GRF-01); faltam rosca, radar, bolhas e interativo
-W142	3.10 Gráficos	Dados	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	W4	Editor de Dados (GRF-03, GRF-05); faltam compartilhar o eixo X e a amostragem
-W143	3.10 Gráficos	Eixos, rótulos, legendas	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	W4	Eixos, rótulos e legenda (GRF-07, GRF-10, GRF-12)
-W144	3.10 Gráficos	Barras de erro e linhas de tendência	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	W4	Barras de erro e tendência (GRF-13, GRF-14); faltam linhas de referência
-W145	3.10 Gráficos	Cantos arredondados, chanfro 3D, buraco da rosca	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	W4	Cantos arredondados, chanfro e furo da rosca
-W146	3.10 Gráficos	Cena 3D (luz, ângulo)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	W4	Cena 3D com luz (GRF-20)
-W147	3.10 Gráficos	Estilos de gráfico	Só 15	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	W4	Estilos de gráfico
-W148	3.11 Revisão e ferramentas de escrita	Controle de alterações	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Ausente	a janela muda (D-008)	W2	Controle de alterações (REV-01 a REV-07, fase 8)
-W149	3.11 Revisão e ferramentas de escrita	Comentários	Diferente	15.4	D-001	Dentro	Ausente	a janela muda (D-008)	W2	Comentários com respostas (REV-08, fase 8)
-W150	3.11 Revisão e ferramentas de escrita	Nome do autor e cor	Igual	Igual nas duas	-	Dentro	Ausente	a janela muda (D-008)	W2	Nome e cor do autor (fase 8)
-W151	3.11 Revisão e ferramentas de escrita	Verificação ortográfica e gramatical	Igual	Igual nas duas	-	Dentro	Pronto	a janela muda (D-008)	W2	Ortografia e gramática ao digitar (TXT-10)
-W152	3.11 Revisão e ferramentas de escrita	Proofreader (revisão de estilo e gramática do app) 🤖 (no 15)	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	W2	O Proofreader do 15 usa IA; vale o revisor próprio do '09 (TXT-11)
-W153	3.11 Revisão e ferramentas de escrita	Localizar e substituir	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	W2	Barra de busca ao vivo do 15 com as opções avançadas e estilos do '09 (TXT-12)
-W154	3.11 Revisão e ferramentas de escrita	Lista de todas as ocorrências	Só '09	'09, na forma do 15	D-002	Dentro	Pronto	a janela muda (D-008)	W2	Resultados da busca na barra lateral (TXT-13)
-W155	3.11 Revisão e ferramentas de escrita	Contagem de palavras	Diferente	15.4, mais o que o '09 fazia	D-001, D-003	Dentro	Pronto	o alvo mudou; a janela muda (D-008)	W2	Contagem sempre visível e estatísticas (DOC-20)
-W156	3.11 Revisão e ferramentas de escrita	Dicionário e pesquisa 🌐 (nas duas)	Diferente	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Dicionário e pesquisa (parte online)
-W157	3.11 Revisão e ferramentas de escrita	Writing Tools (IA) 🤖🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Writing Tools (IA)
-W158	3.12 Colaboração, nuvem, automação e acessibilidade	Colaboração em tempo real 🌐 (nas duas) 💲 (no 15)	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Colaboração pelo iCloud (online)
-W159	3.12 Colaboração, nuvem, automação e acessibilidade	iCloud Drive, Handoff, AirDrop, Pages para iCloud 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	iCloud, Handoff, AirDrop (online)
-W160	3.12 Colaboração, nuvem, automação e acessibilidade	AppleScript	Igual	Igual nas duas	-	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	AppleScript não existe no GNOME; o equivalente (D-Bus) não está pedido
-W161	3.12 Colaboração, nuvem, automação e acessibilidade	Atalhos (Shortcuts)	Só 15	15.4	D-001	Não se aplica ao GNOME (D-005)	Não se aplica	-	-	O app Atalhos não existe no GNOME
-W162	3.12 Colaboração, nuvem, automação e acessibilidade	Siri 🌐🤖	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Siri (IA/online)
-W163	3.12 Colaboração, nuvem, automação e acessibilidade	VoiceOver	Diferente	15.4	D-001	Dentro	Parcial	a janela muda (D-008)	W6	Leitor de tela no texto e nas células (Orca); faltam rotor de comentários e alterações e descrições de mídia
-W164	3.12 Colaboração, nuvem, automação e acessibilidade	Privacidade e análise 🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Privacidade e análise (online)
-W165	3.12 Colaboração, nuvem, automação e acessibilidade	Assinatura Creator Studio 💲🌐	Só 15	15.4	D-001	Fora: IA, online ou pago (D-004)	Fora do escopo	-	-	Assinatura
-W166	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do Desk, com as extensões	-	Decisão do projeto	D-009	Dentro	Pronto	-	feito	-
-W167	Compatibilidade de arquivos (D-010, D-019)	Abrir ODF do LibreOffice e do OpenOffice atuais	-	Decisão do projeto	D-010	Dentro	Parcial	-	W5	-
-W168	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork '09	-	Decisão do projeto	D-010	Dentro	Pronto	-	feito	-
-W169	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do iWork atual	-	Decisão do projeto	D-010, D-011	Dentro	Ausente	-	W5	-
-W170	Compatibilidade de arquivos (D-010, D-019)	Abrir arquivos do Microsoft Office atual	-	Decisão do projeto	D-010	Dentro	Ausente	-	W5	-
-W171	Compatibilidade de arquivos (D-010, D-019)	Salvar ODF com as extensões do Desk	-	Decisão do projeto	D-009	Dentro	Pronto	-	feito	-
-W172	Compatibilidade de arquivos (D-010, D-019)	Exportar para o Microsoft Office	-	Decisão do projeto	D-019	Dentro	Ausente	-	W5	-
-W173	Compatibilidade de arquivos (D-010, D-019)	Exportar PDF	-	Decisão do projeto	D-019	Dentro	Parcial	-	W5	-
-W174	Compatibilidade de arquivos (D-010, D-019)	Exportar EPUB	-	Decisão do projeto	D-019	Dentro	Ausente	-	W5	-
+id	area	feature	in_iwork	target	rule	scope	status_in_desk	review	phase	note
+W001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	GNOME menus (View on the Sidebar button, Insert, the More menu) and command search (GNM-10); sharing stays out because it is online
+W002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Header bar of interface B with the insert buttons and the Inspector button together (INT-11)
+W003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	Lean, contextual format bar of interface B (INT-12)
+W004	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	A single Inspector, in the right sidebar, in two levels, that changes with the selection (INT-13)
+W005	3.1 Window, menus and panes	Styles drawer	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	Styles page of the sidebar, with the three lists (INT-18)
+W006	3.1 Window, menus and panes	Media Browser 🌐💲 (in 15)	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Media popover with search and folders (INT-14); Content Hub and Photos stay out (online/subscription); recording audio is in the Sound and video row
+W007	3.1 Window, menus and panes	Colors / Fonts window	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Fonts popover (Ctrl+T) and color palette (INT-15, INT-16)
+W008	3.1 Window, menus and panes	Adjust Image window	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Adjust Image in the Image tab of the Inspector (OBJ-07, stage 4)
+W009	3.1 Window, menus and panes	Document Warnings window	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	Banner with View Warnings (INT-22) done; Replace Fonts, which the 15 offers right from the warning, is missing
+W010	3.1 Window, menus and panes	Bottom bar	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	Bottom bar with position, Go to Page, Navigate By and word count (stage 6, GNM-13)
+W011	3.1 Window, menus and panes	Left pane	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed; the window changes (D-008)	B1	Thumbnails, styles and search results in the sidebar; the live table of contents of the 15 is missing and the Comments page only says there are none (phase 8)
+W012	3.1 Window, menus and panes	Full screen	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed; the window changes (D-008)	B1	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
+W013	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	One window per document; tabs (AdwTabView) are missing
+W014	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	the window changes (D-008)	B1	Libadwaita follows the light/dark style of the system
+W015	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Preferences (General, Rulers, Correction) with AdwPreferencesDialog
+W016	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Unlimited undo and redo, with the name of the change (DOC-12)
+W017	3.2 Documents, templates and files	Two kinds of document	Different	15.4	D-001	In	Partial	-	W5	Both kinds exist (INT-02, INT-03); converting from one to the other is missing
+W018	3.2 Documents, templates and files	Template chooser 🌐💲 (in 15)	Different	15.4	D-001	In	Partial	-	W5	The template gallery in the empty window exists, but the full chooser (INT-01) belongs to phase 9; premium and downloaded templates stay out
+W019	3.2 Documents, templates and files	New document always from the same template	Equal	Equal in both	-	In	Partial	-	W5	Ctrl+N creates from the default template; the preference to choose the template (DOC-02) belongs to phase 9
+W020	3.2 Documents, templates and files	Save	Different	15.4	D-001	In	Partial	-	W5	Manual save and a recovery draft every 2 min (path L); the target of the 15 is continuous automatic saving, which reopens the decision of 13 Nov
+W021	3.2 Documents, templates and files	Rename from the window title	Only 15	15.4	D-001	In	Done	-	done	Rename with a click on the title (PR of 15 Nov)
+W022	3.2 Documents, templates and files	Earlier versions	Different	15.4	D-001	In	Missing	-	W5	No version history by decision (path L); the target of the 15 asks for browsing versions and copying parts of them
+W023	3.2 Documents, templates and files	Save as template	Different	15.4	D-001	In	Missing	-	W5	Save as template and manage templates in the app (DOC-13, phase 9)
+W024	3.2 Documents, templates and files	Template authoring	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W5	Defaults for text box, shape and image (MOD-04, MOD-07); placeholder text and media, Capture Pages and the rest of phase 9 are missing
+W025	3.2 Documents, templates and files	Package vs single file	Different	15.4	D-001	In	Done	-	done	ODT is a single file
+W026	3.2 Documents, templates and files	Password	Different	15.4	D-001	In	Missing	-	W5	Password to open (DOC-08, phase 8), also on exported copies
+W027	3.2 Documents, templates and files	Lock document	Different	15.4	D-001	In	Missing	-	W5	Lock document in the app (DOC-17, phase 8)
+W028	3.2 Documents, templates and files	Document information (author, title, keywords, comments)	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Document information in the Inspector (DOC-19)
+W029	3.2 Documents, templates and files	Reduce file size	Different	15.4	D-001	In	Partial	-	W5	Reduce images and media like the '09 (OBJ-05, OBJ-20); the video options of the 15 (H.264/HEVC, quality) are missing
+W030	3.2 Documents, templates and files	Open formats	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W5	Opens ODT and Pages '09 (DOC-03, DOC-22); Word, RTF, plain text and AppleWorks belong to phase 10
+W031	3.2 Documents, templates and files	Export	Different	15.4	D-001	In	Partial	D-019	W5	D-019: only ODF, Microsoft Office, PDF and EPUB. Only PDF from the command line (desk-convert); exporting PDF, Word, RTF, plain text and images from the window belongs to phase 10
+W032	3.2 Documents, templates and files	ePub	Different	15.4	D-001	In	Missing	-	W5	Reflowable and fixed EPUB (phase 10)
+W033	3.2 Documents, templates and files	Publish to Apple Books 🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Publish to Apple Books (online)
+W034	3.2 Documents, templates and files	Print	Different	15.4	D-001	In	Missing	-	W5	Print with range, comments and backgrounds (EXP-03, phase 10)
+W035	3.2 Documents, templates and files	Envelopes	Equal	Equal in both	-	In	Missing	-	W5	Envelope templates (phase 9)
+W036	3.2 Documents, templates and files	Send 🌐 (in both)	Different	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Send by Mail/Messages/AirDrop (online)
+W037	3.2 Documents, templates and files	Recent files	Equal	Equal in both	-	In	Done	-	done	Open Recent through the GTK RecentManager
+W038	3.3 View and navigation	Zoom	Equal	Equal in both	-	In	Done	-	done	Zoom (INT-07)
+W039	3.3 View and navigation	Two pages	Equal	Equal in both	-	In	Done	-	done	One or two pages (INT-08)
+W040	3.3 View and navigation	Thumbnails	Equal	Equal in both	-	In	Done	-	done	Thumbnails that reorder sections (EST-17)
+W041	3.3 View and navigation	Table of contents in the sidebar	Only 15	15.4	D-001	In	Missing	-	W1	Live table of contents in the sidebar
+W042	3.3 View and navigation	Outline mode	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Outline mode (TXT-14)
+W043	3.3 View and navigation	Screen View	Only 15	15.4	D-001	In	Missing	-	W1	Screen View
+W044	3.3 View and navigation	Invisibles	Equal (15 chooses the color)	Equal in both	-	In	Done	-	done	Invisibles (INT-10); the configurable color of the 15 does not exist
+W045	3.3 View and navigation	Layout marks	Equal	Equal in both	-	In	Done	-	done	Show Layout (INT-09)
+W046	3.3 View and navigation	Rulers	Equal	Equal in both	-	In	Done	-	done	Rulers and guides (INT-17)
+W047	3.3 View and navigation	Go to page	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Go to page from the bottom bar (INT-19)
+W048	3.3 View and navigation	Step through items (page, section, comment, change, bookmark, match)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Navigate by kind of item from the bottom bar (INT-19)
+W049	3.4 Text and characters	Text selection	Different	15.4	D-001	In	Done	-	done	Discontinuous selection with Ctrl (TXT-03)
+W050	3.4 Text and characters	Font, size, bold, italic, underline, strikethrough	Different (place)	15.4	D-001	In	Done	-	done	Format bar and Inspector (FMT-01, FMT-02, FMT-05)
+W051	3.4 Text and characters	Default font	Different	15.4	D-001	In	Partial	-	W1	The default font comes from the template; choosing it in Preferences is missing
+W052	3.4 Text and characters	Text color	Different	15.4	D-001	In	Partial	-	W1	Solid color (FMT-11); gradient and image in text are missing
+W053	3.4 Text and characters	Outline and shadow	Equal	Equal in both	-	In	Done	-	done	Text outline and shadow (FMT-03, FMT-04)
+W054	3.4 Text and characters	Capitalization	Different	15.4	D-001	In	Partial	-	W1	All caps and small caps (FMT-07); Title Case, Sentence case and the transformations of the 15 are missing
+W055	3.4 Text and characters	Superscript/subscript, baseline shift	Equal	Equal in both	-	In	Done	-	done	Superscript and baseline (FMT-06)
+W056	3.4 Text and characters	Character spacing and ligatures	Equal	Equal in both	-	In	Done	-	done	Spacing and ligatures (FMT-09, FMT-10)
+W057	3.4 Text and characters	Font smoothing	Only '09	'09, in the form of the 15	D-002	Not applicable to GNOME (D-005)	Not applicable	-	-	Font smoothing belongs to the system in GNOME
+W058	3.4 Text and characters	Character and paragraph background color	Equal	Equal in both	-	In	Done	-	done	Character and paragraph background (FMT-20)
+W059	3.4 Text and characters	Review highlight	Only 15	15.4	D-001	In	Missing	-	W1	Review highlight with a comment (phase 8)
+W060	3.4 Text and characters	Drop cap	Only 15	15.4	D-001	In	Missing	-	W1	Drop cap
+W061	3.4 Text and characters	Automatic fractions	Only 15	15.4	D-001	In	Missing	-	W1	Automatic fractions
+W062	3.4 Text and characters	Smart quotes and dashes	Different	15.4	D-001	In	Partial	-	W1	Smart quotes like the '09 (TXT-06); choosing the quote style and converting the existing ones are missing
+W063	3.4 Text and characters	Hyphenation	Equal	Equal in both	-	In	Done	-	done	Hyphenation (TXT-09)
+W064	3.4 Text and characters	Text replacement	Different	15.4	D-001	In	Partial	-	W1	Desk's own replacement list (TXT-07); GNOME has no system list, so the target holds as a list shared by the three apps
+W065	3.4 Text and characters	Special characters, accents, emoji	Equal	Equal in both	-	In	Done	-	done	GTK emoji and symbol chooser (TXT-05)
+W066	3.4 Text and characters	Date and time	Equal	Equal in both	-	In	Done	-	done	Date and time as a field (EST-27)
+W067	3.4 Text and characters	Page number and page count	Equal	Equal in both	-	In	Done	-	done	Page number and page count (EST-27)
+W068	3.4 Text and characters	Dictation 🤖🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Dictation (AI)
+W069	3.4 Text and characters	Predictive text 🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Predictive text (AI)
+W070	3.4 Text and characters	Translation 🌐🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Translation (AI/online)
+W071	3.4 Text and characters	Languages: bidirectional, vertical, phonetic guide, CJK emphasis	Only 15	15.4	D-001	In	Missing	-	W1	Bidirectional text, vertical text and phonetic guide (GNM-08, phase 11)
+W072	3.4 Text and characters	Formatting by document language	Only 15	15.4	D-001	In	Partial	-	W1	Text language per range (FMT-22); language and region per document are missing
+W073	3.5 Styles	Paragraph, character and list styles	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Styles always in view in the sidebar (STY-01, STY-02)
+W074	3.5 Styles	Show and update overrides	Equal	Equal in both	-	In	Done	-	done	Overrides and update (STY-06)
+W075	3.5 Styles	Shortcuts for styles	Equal	Equal in both	-	In	Done	-	done	Style shortcuts Ctrl+1 to 8 (STY-04)
+W076	3.5 Styles	Copy and paste style	Equal	Equal in both	-	In	Done	-	done	Copy and paste style (STY-08)
+W077	3.5 Styles	Import styles from another document	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Import styles (STY-10)
+W078	3.5 Styles	Find and replace styles	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Find and replace styles (STY-09)
+W079	3.5 Styles	Show only the styles in use	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Show only the styles in use on the Styles page
+W080	3.5 Styles	Object, table and chart styles	Only 15	15.4	D-001	In	Partial	-	W1	Object styles in the Inspector (PR of 15 Nov); table and chart styles are missing
+W081	3.5 Styles	Default text box style	Different	15.4	D-001	In	Partial	-	W1	Text box default stored in the template (MOD-04); setting it per document is missing
+W082	3.6 Paragraph, lists and columns	Alignment, line and paragraph spacing, indents	Equal	Equal in both	-	In	Done	-	done	Alignment, spacing and indents (FMT-12 to FMT-18)
+W083	3.6 Paragraph, lists and columns	Tabs	Equal	Equal in both	-	In	Done	-	done	Tabs (FMT-16)
+W084	3.6 Paragraph, lists and columns	Pagination (keep together, keep with next, new page, widows/orphans)	Equal	Equal in both	-	In	Done	-	done	Pagination (EST-05)
+W085	3.6 Paragraph, lists and columns	Paragraph borders and rules	Equal	Equal in both	-	In	Done	-	done	Borders and rules (FMT-21)
+W086	3.6 Paragraph, lists and columns	Automatic lists	Equal	Equal in both	-	In	Done	-	done	Automatic lists (LST-01)
+W087	3.6 Paragraph, lists and columns	Text bullets, image bullets, numbers, tiered numbers	Equal	Equal in both	-	In	Done	-	done	Bullets and tiered lists (LST-03 to LST-05)
+W088	3.6 Paragraph, lists and columns	Reorder list items by dragging	Different	15.4	D-001	In	Partial	-	W1	Reorder in outline mode; dragging by the bullet right in the text is missing
+W089	3.6 Paragraph, lists and columns	Columns	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W1	Columns and manual breaks of the '09 (EST-07 to EST-10); the columns on the selection with automatic breaks of the 15 are missing
+W090	3.6 Paragraph, lists and columns	Column, line, page and section breaks	Equal	Equal in both	-	In	Done	-	done	Column, line, page and section breaks (EST-04, EST-06, EST-08)
+W091	3.6 Paragraph, lists and columns	Linked text boxes	Different	15.4	D-001	In	Partial	-	W1	Linked boxes and connection lines (OBJ-15, VMI-03); the numbered and colored threads and several threads are missing
+W092	3.7 Document structure	Size, orientation, margins	Equal	Equal in both	-	In	Done	-	done	Paper and margins (EST-02, EST-03)
+W093	3.7 Document structure	Facing pages	Equal	Equal in both	-	In	Done	-	done	Facing pages (EST-11)
+W094	3.7 Document structure	Sections	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W3	Sections (EST-16 to EST-19); reusing captured sections is missing (EST-20, phase 9)
+W095	3.7 Document structure	Page templates	Different	15.4	D-001	In	Missing	-	W3	Page templates with tags
+W096	3.7 Document structure	Header and footer	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W3	Free header of the '09 (EST-12); the three quick fields of the 15 are missing
+W097	3.7 Document structure	Master / section layout objects (watermark)	Equal (new name)	Equal in both	-	In	Done	-	done	Section master objects (EST-21, INT-05)
+W098	3.7 Document structure	Page background and border	Different	15.4	D-001	In	Missing	-	W3	Page background and border per page, section or template
+W099	3.7 Document structure	Footnotes and endnotes	Equal	Equal in both	-	In	Done	-	done	Footnotes and endnotes (EST-13 to EST-15)
+W100	3.7 Document structure	Inserted table of contents	Different	15.4	D-001	In	Partial	-	W3	Several tables of contents, each up to the next one (EST-22); the per-section scope of the 15 is missing
+W101	3.7 Document structure	Bookmarks	Different	15.4	D-001	In	Partial	-	W3	Bookmarks (EST-26); their own tab and the suggestions from styles are missing
+W102	3.7 Document structure	Links	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W3	Links of the '09, including to another document (EST-25, IOP-32); phone links and links from objects are missing
+W103	3.7 Document structure	Bibliography 🧩 (in both)	Equal	Equal in both	-	Out: AI, online or paid (D-004)	Out of scope	-	-	Bibliography requires EndNote, a paid program
+W104	3.7 Document structure	Equations 🧩 (in '09)	Different	15.4	D-001	In	Missing	-	W3	LaTeX/MathML equations
+W105	3.7 Document structure	Mail merge	Different	15.4	D-001	In	Missing	-	W3	Mail merge with preview (MAL-01 to MAL-09, phase 9)
+W106	3.8 Objects: images, shapes, media	Floating and inline objects	Different	15.4	D-001	In	Partial	-	W4	Floating and inline (OBJ-01); nesting objects inside boxes and shapes is missing
+W107	3.8 Objects: images, shapes, media	Text wrap	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W4	Wrap with a choice of side (OBJ-17)
+W108	3.8 Objects: images, shapes, media	Images 🌐💲 (in 15)	Different	15.4	D-001	In	Partial	-	W4	PNG, JPEG, PDF, GIF (OBJ-02); SVG and HEIC are missing; Content Hub and iPhone stay out
+W109	3.8 Objects: images, shapes, media	Remove background 🤖 (in 15)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W4	The Remove Background of the 15 uses AI; the manual Instant Alpha of the '09 holds (OBJ-06)
+W110	3.8 Objects: images, shapes, media	Image adjustments	Different	15.4	D-001	In	Partial	-	W4	Adjust Image of the '09 (OBJ-07); the automatic Enhance and the lean panel of the 15 are missing
+W111	3.8 Objects: images, shapes, media	Image gallery	Only 15	15.4	D-001	In	Missing	-	W4	Image gallery
+W112	3.8 Objects: images, shapes, media	AI for images **(subscription)** 🤖🌐💲	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	AI for images (subscription)
+W113	3.8 Objects: images, shapes, media	Shapes 🤖💲 (in 15)	Different	15.4	D-001	In	Partial	-	W4	Shapes, pen and parametric shapes (OBJ-08 to OBJ-11); the searchable library and combining shapes are missing; generating a shape by AI stays out
+W114	3.8 Objects: images, shapes, media	Edit points and curves	Equal	Equal in both	-	In	Done	-	done	Edit points (OBJ-10)
+W115	3.8 Objects: images, shapes, media	Lines and connections	Equal	Equal in both	-	In	Done	-	done	Connection line (OBJ-31)
+W116	3.8 Objects: images, shapes, media	3D objects (USDZ)	Only 15	15.4	D-001	In	Missing	-	W4	3D objects (USDZ)
+W117	3.8 Objects: images, shapes, media	Drawings (Apple Pencil)	Only 15	15.4	D-001	In	Missing	-	W4	Animatable freehand drawing (the equivalent of the Apple Pencil)
+W118	3.8 Objects: images, shapes, media	Sound and video 🌐 (in 15)	Different	15.4	D-001	In	Partial	-	W4	Audio and video (OBJ-18, OBJ-19); recording audio, trimming, poster frame and description are missing; web video stays out
+W119	3.8 Objects: images, shapes, media	Media formats	Different	15.4	D-001	In	Partial	-	W4	Reduces media (OBJ-20); optimizing on insert is missing
+W120	3.8 Objects: images, shapes, media	Borders, picture frames, shadow, reflection, opacity	Equal	Equal in both	-	In	Done	-	done	Borders, picture frames, shadow, reflection and opacity (OBJ-35 to OBJ-39)
+W121	3.8 Objects: images, shapes, media	Fill	Different	15.4	D-001	In	Partial	-	W4	Color, gradient and image (OBJ-40 to OBJ-42); advanced gradient and saving a fill are missing
+W122	3.8 Objects: images, shapes, media	Object caption and title	Only 15	15.4	D-001	In	Missing	-	W4	Object caption and title
+W123	3.8 Objects: images, shapes, media	Exact position, align and distribute	Equal	Equal in both	-	In	Done	-	done	Position, align and distribute (OBJ-26, OBJ-29)
+W124	3.8 Objects: images, shapes, media	Alignment guides	Different	15.4	D-001	In	Partial	-	W4	Dynamic and fixed guides (OBJ-27, OBJ-28); their own color is missing
+W125	3.8 Objects: images, shapes, media	Layers, group, lock	Equal	Equal in both	-	In	Done	-	done	Layers, group, lock (OBJ-24, OBJ-30, OBJ-32)
+W126	3.8 Objects: images, shapes, media	Resize, rotate, flip	Equal	Equal in both	-	In	Done	-	done	Resize, rotate, flip (OBJ-33, OBJ-34)
+W127	3.9 Tables	Insert table	Different	15.4	D-001	In	Partial	-	W1	Insert table (TAB-01); the table styles in view are missing
+W128	3.9 Tables	Rows, columns, headers, footers, repeat header	Equal	Equal in both	-	In	Done	-	done	Rows, columns, headers and footers (TAB-10 to TAB-13)
+W129	3.9 Tables	Convert text to table	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Convert text to table (TAB-05)
+W130	3.9 Tables	Create a table from cells	Only 15	15.4	D-001	In	Missing	-	W1	Create a table by dragging cells out
+W131	3.9 Tables	Merge and split cells	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Merge and split (TAB-23, TAB-24)
+W132	3.9 Tables	Cell formats	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W1	Formats, fraction and numeral system (TAB-28 to TAB-30); the window to manage formats is missing (TAB-31)
+W133	3.9 Tables	Formulas and functions 🌐 (in 15)	Different	15.4	D-001	In	Partial	-	W1	Function browser and 94 functions; the 15 has 250+; functions that fetch from the internet stay out
+W134	3.9 Tables	Conditional highlighting	Equal	Equal in both	-	In	Done	-	done	Conditional formatting (TAB-21)
+W135	3.9 Tables	Sort	Equal	Equal in both	-	In	Done	-	done	Sort (TAB-15)
+W136	3.9 Tables	Autofill and autocomplete	Equal	Equal in both	-	In	Done	-	done	Autofill and suggestions from the column (TAB-19)
+W137	3.9 Tables	Alternating colors	Equal	Equal in both	-	In	Done	-	done	Alternating colors (TAB-14)
+W138	3.9 Tables	Table title	Only 15	15.4	D-001	In	Missing	-	W1	Table title
+W139	3.9 Tables	Table direction (bidi)	Only 15	15.4	D-001	In	Missing	-	W1	Right-to-left table
+W140	3.9 Tables	Lock table	Only 15	15.4	D-001	In	Missing	-	W1	Lock table
+W141	3.10 Charts	Types	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Eleven 2D and 3D types (GRF-01); donut, radar, bubble and interactive are missing
+W142	3.10 Charts	Data	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Data Editor (GRF-03, GRF-05); sharing the X axis and sampling are missing
+W143	3.10 Charts	Axes, labels, legends	Equal	Equal in both	-	In	Done	the window changes (D-008)	W4	Axes, labels and legend (GRF-07, GRF-10, GRF-12)
+W144	3.10 Charts	Error bars and trendlines	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Error bars and trendline (GRF-13, GRF-14); reference lines are missing
+W145	3.10 Charts	Rounded corners, 3D bevel, donut hole	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	W4	Rounded corners, bevel and donut hole
+W146	3.10 Charts	3D scene (light, angle)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	W4	3D scene with light (GRF-20)
+W147	3.10 Charts	Chart styles	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	W4	Chart styles
+W148	3.11 Review and writing tools	Change tracking	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	the window changes (D-008)	W2	Change tracking (REV-01 to REV-07, phase 8)
+W149	3.11 Review and writing tools	Comments	Different	15.4	D-001	In	Missing	the window changes (D-008)	W2	Comments with replies (REV-08, phase 8)
+W150	3.11 Review and writing tools	Author name and color	Equal	Equal in both	-	In	Missing	the window changes (D-008)	W2	Author name and color (phase 8)
+W151	3.11 Review and writing tools	Spelling and grammar check	Equal	Equal in both	-	In	Done	the window changes (D-008)	W2	Spelling and grammar as you type (TXT-10)
+W152	3.11 Review and writing tools	Proofreader (the app's style and grammar review) 🤖 (in 15)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	W2	The Proofreader of the 15 uses AI; the app's own proofreader of the '09 holds (TXT-11)
+W153	3.11 Review and writing tools	Find and replace	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	W2	Live search bar of the 15 with the advanced options and styles of the '09 (TXT-12)
+W154	3.11 Review and writing tools	List of all matches	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	W2	Search results in the sidebar (TXT-13)
+W155	3.11 Review and writing tools	Word count	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	W2	Word count always visible and statistics (DOC-20)
+W156	3.11 Review and writing tools	Dictionary and lookup 🌐 (in both)	Different	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Dictionary and lookup (online part)
+W157	3.11 Review and writing tools	Writing Tools (AI) 🤖🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Writing Tools (AI)
+W158	3.12 Collaboration, cloud, automation and accessibility	Real-time collaboration 🌐 (in both) 💲 (in 15)	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Collaboration through iCloud (online)
+W159	3.12 Collaboration, cloud, automation and accessibility	iCloud Drive, Handoff, AirDrop, Pages for iCloud 🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	iCloud, Handoff, AirDrop (online)
+W160	3.12 Collaboration, cloud, automation and accessibility	AppleScript	Equal	Equal in both	-	Not applicable to GNOME (D-005)	Not applicable	-	-	AppleScript does not exist in GNOME; the equivalent (D-Bus) is not requested
+W161	3.12 Collaboration, cloud, automation and accessibility	Shortcuts	Only 15	15.4	D-001	Not applicable to GNOME (D-005)	Not applicable	-	-	The Shortcuts app does not exist in GNOME
+W162	3.12 Collaboration, cloud, automation and accessibility	Siri 🌐🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Siri (AI/online)
+W163	3.12 Collaboration, cloud, automation and accessibility	VoiceOver	Different	15.4	D-001	In	Partial	the window changes (D-008)	W6	Screen reader in text and cells (Orca); the rotor for comments and changes and media descriptions are missing
+W164	3.12 Collaboration, cloud, automation and accessibility	Privacy and analytics 🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Privacy and analytics (online)
+W165	3.12 Collaboration, cloud, automation and accessibility	Creator Studio subscription 💲🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Subscription
+W166	File compatibility (D-010, D-019)	Open Desk ODF, with the extensions	-	Project decision	D-009	In	Done	-	done	-
+W167	File compatibility (D-010, D-019)	Open ODF from current LibreOffice and OpenOffice	-	Project decision	D-010	In	Partial	-	W5	-
+W168	File compatibility (D-010, D-019)	Open iWork '09 files	-	Project decision	D-010	In	Done	-	done	-
+W169	File compatibility (D-010, D-019)	Open current iWork files	-	Project decision	D-010, D-011	In	Missing	-	W5	-
+W170	File compatibility (D-010, D-019)	Open current Microsoft Office files	-	Project decision	D-010	In	Missing	-	W5	-
+W171	File compatibility (D-010, D-019)	Save ODF with the Desk extensions	-	Project decision	D-009	In	Done	-	done	-
+W172	File compatibility (D-010, D-019)	Export to Microsoft Office	-	Project decision	D-019	In	Missing	-	W5	-
+W173	File compatibility (D-010, D-019)	Export PDF	-	Project decision	D-019	In	Partial	-	W5	-
+W174	File compatibility (D-010, D-019)	Export EPUB	-	Project decision	D-019	In	Missing	-	W5	-

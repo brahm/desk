@@ -36,7 +36,7 @@ The window follows the look of the current iWork with native Libadwaita
 widgets wherever one exists. Where none exists, Desk builds one that
 follows the GNOME HIG and marks it for review at each new Libadwaita
 (D-007). The window is proposal M+ of
-[interface/propostas](interface/propostas/README.md) (D-008).
+[interface/proposals](interface/proposals/README.md) (D-008).
 
 ## Documents and compatibility
 

@@ -2,7 +2,7 @@
 
 The implementation plan for the target of [goals.md](goals.md), written on
 2026-11-16. It replaces the plan of phases 1 to 11 per app that aimed at
-iWork '09. The `fase` column of [`corpus/inventory`](../corpus/inventory/README.md)
+iWork '09. The `phase` column of [`corpus/inventory`](../corpus/inventory/README.md)
 gives every feature its phase; that first assignment is by area and is
 refined row by row when a phase starts.
 
@@ -46,7 +46,7 @@ them one after the other.
 | Phase | What it delivers | Inventory rows | Estimate (days) |
 | --- | --- | --- | --- |
 | **R** Replanning | Goals, decisions, backlog register, inventory, window proposals, ODF catalogue, architecture, this roadmap, contributor guides | - | In progress |
-| **B1** Common base | The M+ window in the three apps (the format bar and the bottom bar give way to the Format pane and overlays; documents in tabs; sheet switcher); automatic saving and versions in place of the recovery draft; the reference cases redone on iWork 15.4; the 20 rows left from the old Writer phase 7 (B-001); full definitions of the 43 existing extensions (B-008); the secondary scenes of the mockups (B-003); matrices and `docs/interface` rewritten for the new target (B-006); README, site and metainfo (B-007) | 51 | 7 |
+| **B1** Common base | The M+ window in the three apps (the format bar and the bottom bar give way to the Format pane and overlays; documents in tabs; sheet switcher); automatic saving and versions in place of the recovery draft; the reference cases redone on iWork 15.4; the 20 rows left from the old Writer phase 7 (B-001); full definitions of the 43 existing extensions (B-008); the secondary scenes of the mockups (B-003); matrices and `docs/interface` rewritten for the new target (B-006) and translated to English (B-009); README, site and metainfo (B-007) | 51 | 7 |
 | **W1** Writer: to the behaviour of 15 | Text, styles, paragraphs, view and table features that exist as in '09 and now follow 15.4, keeping what the '09 did (D-003) | 28 | 4 |
 | **W2** Writer: review | Comment threads with replies, tracking of changes including format and table cells, markup views, the review pane | 8 | 3 |
 | **W3** Writer: structure and templates | Page templates, placeholders, live table of contents, bookmarks, mail merge with preview, text and page layout documents | 9 | 3 |
