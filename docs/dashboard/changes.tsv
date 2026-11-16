@@ -6,3 +6,6 @@ date	kind	id	from	to
 2026-11-16	backlog	B-010	new	open
 2026-11-16	backlog	B-007	open	done
 2026-11-16	backlog	B-011	new	open
+2026-11-16	phase	R	in-progress	done
+2026-11-16	phase	B1	not-started	in-progress
+2026-11-16	backlog	B-008	open	done

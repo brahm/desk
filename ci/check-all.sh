@@ -32,6 +32,8 @@ step 'Dependency rules'
 ci/check-deps.sh
 step 'Backlog register'
 python3 ci/check-backlog.py
+step 'ODF extensions defined'
+python3 ci/check-extensions.py
 step 'Parity with Pages'
 cargo run --locked --quiet --package desk-testkit --bin desk-parity -- --check-readme
 step "Minimum Rust version ($msrv)"

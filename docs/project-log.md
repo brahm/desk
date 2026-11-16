@@ -280,6 +280,31 @@ matrix rows done on 9 November, before the change of target.
   screenshots of the Writer metainfo, which must be captures of the real
   app in the M+ window (B-011).
 
+### 16 November: phase B1 starts, with the ODF extensions defined
+
+- The owner approved starting phase B1, the common base, because the three
+  app tracks depend on it. The replanning (phase R) was closed: its
+  backlog rows had all moved to B1 or been settled. B1 is planned as a
+  series of small pull requests that can each be reviewed on its own: the
+  ODF extensions, the 20 rows left from Writer phase 7, the reference
+  documents with Apple media, the material translated to English, the M+
+  window in the three apps, automatic saving with versions, and the
+  secondary scenes and screenshots.
+- First of them: the 43 `desk:` extensions that Desk already writes are
+  now each defined in `docs/odf-extensions.md`, with the element they sit
+  on, the form of their value and its range, what the standard part of the
+  document says in their place, and the matrix rows they serve (backlog
+  B-008). Writing them down from the code, rather than from memory, showed
+  that every one already had a standard fallback except the purely visual
+  ones (tint, reflection, Instant Alpha, raised bullets), which other
+  programs simply do not show.
+- Why a check came with it: rule 5 of the catalogue says each extension is
+  documented before it is merged, but nothing enforced it, which is how 43
+  of them accumulated with one sentence each. `ci/check-extensions.py`
+  compares the names used in `crates/desk-odf/src` with the headings of the
+  catalogue and fails on either side's leftovers; it runs in
+  `ci/check-all.sh` and in the CI.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -663,8 +688,8 @@ with the layout of Pages. Desk Tables and Desk Slides have a window, and
 engines for tables, formulas, charts and animation that the apps do not
 use yet.
 
-Next is phase B1 of the [roadmap](roadmap.md), the common base: the M+
-window in the three apps, automatic saving with versions, the reference
+Phase B1 of the [roadmap](roadmap.md), the common base, started on 16
+November: the M+ window in the three apps, automatic saving with versions, the reference
 cases redone on iWork 15.4, and the backlog carried from the replanning.
 After it the three apps can advance side by side: six phases of Writer,
 five of Tables, five of Slides, and a last phase across the apps before
