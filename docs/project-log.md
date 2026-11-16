@@ -230,8 +230,9 @@ matrix rows done on 9 November, before the change of target.
   images of the virtual machines, the resources taken from the iWork '09
   apps for the inventory of 14 November, and old captures, about 7.5 GB.
   In the repository: the text engine experiment and 28 remote branches
-  (pull request 121). Both virtual machines stay, because the readers of
-  Numbers '09 and Keynote '09 still need documents made in iWork '09.
+  (pull request 121). Both virtual machines stay: the readers of Numbers '09 and
+  Keynote '09 still need documents made in iWork '09, and D-020 keeps the
+  Lion machine as the reference for the features only iWork '09 has.
   Left undone and moved to phase B1: three reference documents that carry
   media from Apple software are remade there (backlog item B-010).
 
@@ -355,7 +356,7 @@ machine before being copied.
 *Consequences:* justification stretches each space by at most half an em
 and then spaces the letters (pull request 91); Delete Page deletes the
 whole section; a long footnote was handled as the owner chose after seeing
-that Pages '09 moves it whole to the next page. Under D-012 these cases
+that Pages '09 moves it whole to the next page. Under D-020 these cases
 are checked again against iWork 15.4.
 
 **Every supported GNOME language, and no app is translated before it is
@@ -551,15 +552,22 @@ it, Microsoft Office, PDF and EPUB.
 HTML and the older Office formats are out of scope and marked. CSV in
 Tables was pointed out as the one worth reconsidering.
 
-**D-012: the reference is iWork 15.4 on a Mac, for everything.** (Replaces
-R-006.)
+**D-012, then D-020: where behaviour is checked.** D-012, in the
+replanning, made iWork 15.4 on a Mac the reference for everything
+(replacing R-006).
 *Why:* the target is the behaviour of the current versions, so the check
 has to be against them.
 *Consequences:* the reference cases made with Pages '09 are redone, and
 where 15.4 breaks lines differently the text engine is adjusted. The old
-cases remain only as tests of the reader of iWork '09 files. The virtual
-machines are no longer the reference, which is what the owner had
-foreseen on the first day.
+cases remain as tests of the reader of iWork '09 files. The same
+afternoon the owner refined it (D-020): validations, interface tests and
+parity documents are made on the Mac with the current iWork, but features
+that only iWork '09 has are tested, and their documents made and checked,
+on the Lion virtual machine that shows the screen, built for that purpose.
+The current iWork cannot show what it no longer has. So the Lion machine
+stays in use for as long as those features are being built; the Mojave
+machine, the first reference, is left with the fixtures of the iWork '09
+readers.
 
 **D-014 and D-018: documentation for contributors, all in English.**
 *Why:* the owner wants outside contributors, human or using coding agents,
@@ -595,6 +603,7 @@ documents kept up to date on the same day.
 | 14 Nov | Phone widths to a minimum of 1280 × 720 | The narrow layout of step 1 |
 | 16 Nov | iWork '09 to iWork 15.4 as the target | Roadmap, matrices, the recovery draft, one window per document, 30 features to look at again, all reference cases |
 | 16 Nov | Interface B to M+ | The format bar, the bottom bar, the sheets of Tables in the sidebar |
+| 16 Nov | One reference for checking (iWork 15.4) to two (D-020) | Nothing redone: the cases of features only iWork '09 has stay on the Lion virtual machine |
 | 16 Nov | Portuguese to English for everything in the repository | Matrices, `docs/interface`, mockup scripts |
 
 What did not change in seventeen days: Rust, GTK and Libadwaita; ODF with
