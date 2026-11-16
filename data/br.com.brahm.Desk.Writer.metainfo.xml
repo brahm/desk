@@ -6,33 +6,37 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Desk Writer</name>
-  <summary>Write documents laid out as in Pages</summary>
-  <summary xml:lang="pt-BR">Escreva documentos com a diagramação do Pages</summary>
+  <summary>Write and lay out documents</summary>
+  <summary xml:lang="pt-BR">Escreva e diagrame documentos</summary>
   <developer id="br.com.brahm">
     <name>Desk contributors</name>
   </developer>
   <description>
     <p>
-      Desk Writer is the word processor of Desk, an office suite for GNOME
-      that opens the documents of iWork ’09 and lays them out as Pages did,
-      and saves them as OpenDocument text.
+      Desk Writer is the word processor of Desk, an office suite of simple,
+      focused apps designed to work together and with GNOME. It does word
+      processing and page layout in one app, saves OpenDocument text, and
+      opens the documents of Pages ’09.
     </p>
     <p xml:lang="pt-BR">
       O Desk Writer é o processador de texto do Desk, uma suíte de escritório
-      para o GNOME que abre os documentos do iWork ’09, diagrama-os como o
-      Pages fazia e os salva como texto OpenDocument.
+      com aplicativos simples e focados, desenhados para funcionar juntos e com
+      o GNOME. Ele faz processamento de texto e diagramação no mesmo aplicativo,
+      salva texto OpenDocument e abre os documentos do Pages ’09.
     </p>
     <p>
       Desk Writer is in development. Text, styles, lists, sections, notes,
-      tables of contents, pictures, shapes, text boxes and media are done.
-      Tables, charts, change tracking, templates and printing are still to
-      come.
+      tables of contents, pictures, shapes, text boxes, media, tables and
+      charts are done. The new window with documents in tabs, automatic
+      saving with versions, comments and change tracking, templates, Word
+      files and printing are still to come.
     </p>
     <p xml:lang="pt-BR">
       O Desk Writer está em desenvolvimento. Texto, estilos, listas, seções,
-      notas, sumários, imagens, formas, caixas de texto e mídia estão prontos.
-      Tabelas, gráficos, controle de alterações, modelos e impressão ainda
-      estão por vir.
+      notas, sumários, imagens, formas, caixas de texto, mídia, tabelas e
+      gráficos estão prontos. A janela nova com documentos em abas, o
+      salvamento automático com versões, comentários e controle de alterações,
+      modelos, arquivos do Word e impressão ainda estão por vir.
     </p>
   </description>
   <screenshots>
@@ -54,7 +58,7 @@
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">br.com.brahm.Desk.Writer.desktop</launchable>
-  <url type="homepage">https://github.com/brahm/desk</url>
+  <url type="homepage">https://brahm.github.io/desk/</url>
   <url type="bugtracker">https://github.com/brahm/desk/issues</url>
   <url type="vcs-browser">https://github.com/brahm/desk</url>
   <content_rating type="oars-1.1"/>

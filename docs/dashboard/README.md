@@ -32,8 +32,9 @@ The website needs no step: it follows `main`.
 
 The same moment is when the set of tasks gets its entry in the
 [project log](../project-log.md): what was delivered, what was decided and
-why, and what was left undone. The log is not read by the dashboard, but
-the two are kept up to date together.
+why, and what was left undone, and its lines in
+[HISTORY.md](../../HISTORY.md). Neither is read by the dashboard, but the
+three are kept up to date together.
 
 ## The sources, and who changes them
 

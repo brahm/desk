@@ -106,8 +106,11 @@ h1, h2, h3 {
 
 .topbar nav {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   margin-left: auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 /* Language menu. Each page lists every translation, with hreflang, and
@@ -186,8 +189,10 @@ h1, h2, h3 {
   text-decoration: none;
   font-weight: 600;
   font-size: 0.9rem;
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 6px;
+  white-space: nowrap;
+  flex: none;
 }
 
 .topbar nav a:hover {
@@ -574,30 +579,27 @@ code {
   }
 }
 
-/* Mockups of the interface: a row of windows that scrolls sideways,
-   like the screenshots of an app page in GNOME Software. */
+/* The apps, each with its row and a mockup of its window under it. */
 
-.shots {
-  display: flex;
-  gap: 16px;
-  margin: 0 -16px;
-  padding: 4px 16px 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding: 0 16px;
+.app-showcase {
   list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 28px;
 }
 
-.shots li {
-  flex: 0 0 92%;
-  scroll-snap-align: start;
+.app-showcase .app-row {
+  display: flex;
+  align-items: center;
+  padding: 0 0 12px;
 }
 
-.shots figure {
+.app-showcase figure {
   margin: 0;
 }
 
-.shots img {
+.app-showcase figure img {
   display: block;
   width: 100%;
   height: auto;
@@ -605,14 +607,14 @@ code {
   box-shadow: var(--card-shadow);
 }
 
-.shots figcaption {
-  margin-top: 10px;
+.section-note {
+  margin: 16px 0 0;
   color: var(--dim);
   font-size: 0.9rem;
 }
 
-.shots figcaption strong {
-  color: var(--strong);
+.row-text span a {
+  color: var(--accent);
 }
 
 /* The symbols of the row icons: kept in the page, but out of the layout. */

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Desk, a suíte de escritório para o GNOME</title>
-  <meta name="description" content="Desk é uma suíte de escritório livre para o GNOME, com processador de texto, planilha e apresentações, feita em Rust, GTK 4 e Libadwaita, inspirada no iWork '09.">
+  <meta name="description" content="Desk é uma suíte de escritório livre, com aplicativos simples e focados feitos para o GNOME: processador de texto, planilha e apresentações, em Rust, GTK 4 e Libadwaita.">
   <meta name="color-scheme" content="light dark">
   <meta property="og:title" content="Desk, a suíte de escritório para o GNOME">
-  <meta property="og:description" content="Processador de texto, planilha e apresentações para o GNOME, inspirados no iWork '09.">
+  <meta property="og:description" content="Processador de texto, planilha e apresentações, simples, focados e feitos para o GNOME.">
   <meta property="og:image" content="https://brahm.github.io/desk/img/desk-logo.png">
   <meta property="og:type" content="website">
   <link rel="icon" href="../img/desk.svg" type="image/svg+xml">
@@ -30,6 +30,8 @@
     <symbol id="i-person" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zm0 1.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9c3.3 0 6 1.7 6 4v2H2v-2c0-2.3 2.7-4 6-4zm0 1.5c-2.6 0-4.5 1.3-4.5 2.5v.5h9V13c0-1.2-1.9-2.5-4.5-2.5z"/></symbol>
     <symbol id="i-arrow" viewBox="0 0 16 16"><path fill="currentColor" d="M5.5 2.5 11 8l-5.5 5.5-1-1L9 8 4.5 3.5z"/></symbol>
     <symbol id="i-check" viewBox="0 0 16 16"><path fill="currentColor" d="m13 3.5 1.1 1.1L6 12.6 1.9 8.5 3 7.4l3 3z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1 15 4.5 8 8 1 4.5zm0 1.7L4.4 4.5 8 6.3l3.6-1.8zM2.6 7.2 8 9.9l5.4-2.7L15 8l-7 3.5L1 8zm0 3.5L8 13.4l5.4-2.7L15 11.5 8 15l-7-3.5z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 16 16"><path fill="currentColor" d="M1 1h1.5v12.5H15V15H1zm3 7h2v4H4zm3.5-4h2v8h-2zM11 6h2v6h-2z"/></symbol>
   </svg>
 
   <header class="topbar">
@@ -37,10 +39,11 @@
       <a class="brand" href="#"><img src="../img/desk.svg" alt="" width="24" height="24"> Desk</a>
       <nav aria-label="Seções">
         <a href="#apps">Aplicativos</a>
-        <a href="#looks">Interface</a>
+        <a href="#about">Por quê</a>
+        <a href="#built">Arquitetura</a>
+        <a href="#roadmap">Plano</a>
         <a href="#contribute">Participe</a>
         <a href="../painel/">Andamento</a>
-        <a href="https://github.com/brahm/desk">GitHub</a>
       </nav>
       <details class="lang-menu">
         <summary aria-label="Idioma: Português (Brasil)"><svg aria-hidden="true"><use href="#i-lang"/></svg> <span>Português (Brasil)</span></summary>
@@ -73,103 +76,135 @@
       </ul>
     </section>
 
-    <section id="looks" aria-labelledby="looks-title">
-      <h2 id="looks-title">Como os aplicativos vão ficar</h2>
-      <p class="section-intro">Os três aplicativos terão a mesma janela, escolhida em novembro de 2026: uma barra lateral para andar pelo documento, uma barra de formatação enxuta que muda com a seleção e um Inspetor só, à direita. São mockups desenhados com os widgets de verdade do GTK 4 e da Libadwaita, em 1280 × 720, a menor tela para a qual o Desk é feito. O Desk Writer muda para esta janela na próxima etapa.</p>
-      <ul class="shots">
-        <li><figure><img src="../img/interface/writer-b.png" alt="Janela do Desk Writer: miniaturas das páginas na barra lateral, um relatório com imagem e tabela, e o Inspetor aberto no formato do texto" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Writer.</strong> Miniaturas das páginas na barra lateral, o formato do texto no Inspetor, e o zoom, a página e a contagem de palavras na barra inferior.</figcaption></figure></li>
-        <li><figure><img src="../img/interface/tables-b.png" alt="Janela do Desk Tables: planilhas na barra lateral, uma tabela de despesas com a barra de fórmulas, e o cálculo instantâneo na barra inferior" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Tables.</strong> Planilhas na barra lateral, várias tabelas numa planilha, a barra de fórmulas, e soma, média e contagem da seleção na barra inferior.</figcaption></figure></li>
-        <li><figure><img src="../img/interface/slides-b.png" alt="Janela do Desk Slides: navegador de slides na barra lateral, um slide com uma imagem selecionada, notas do apresentador embaixo e o botão Reproduzir na barra de cabeçalho" width="1280" height="720" loading="lazy"><figcaption><strong>Desk Slides.</strong> O navegador de slides na barra lateral, o botão Reproduzir na barra de cabeçalho, as notas do apresentador sob o slide e a aba Animação no Inspetor.</figcaption></figure></li>
-      </ul>
-    </section>
-
     <section id="apps" aria-labelledby="apps-title">
-      <h2 id="apps-title">Aplicativos da suíte</h2>
-      <ul class="boxed-list">
-        <li class="row app-row">
-          <img src="../img/br.com.brahm.Desk.Writer.svg" alt="" width="64" height="64">
-          <div class="row-text">
-            <h3>Desk Writer</h3>
-            <p>Processador de texto e layout de página, do trabalho da faculdade ao folheto da padaria.</p>
+      <h2 id="apps-title">Uma suíte de escritório feita para o GNOME</h2>
+      <p class="section-intro">O Desk é uma suíte de escritório livre com três aplicativos desenhados para funcionar como um só, entre si e com o ambiente GNOME. Eles compartilham o mesmo modelo de documento, a mesma janela e o mesmo jeito de fazer as coisas: uma tabela, um gráfico ou um bloco de texto se comporta igual nos três, e tudo tem a aparência e o comportamento do resto do seu desktop. Cada aplicativo é simples e focado no seu trabalho, sem abrir mão da força que o trabalho de verdade pede.</p>
+      <ul class="app-showcase">
+        <li>
+          <div class="app-row">
+            <img src="../img/br.com.brahm.Desk.Writer.svg" alt="" width="64" height="64">
+            <div class="row-text">
+              <h3>Desk Writer</h3>
+              <p>Processador de texto e diagramação no mesmo aplicativo, do TCC ao folheto da padaria: estilos, seções e colunas, notas de rodapé, sumários, e imagens e formas com o texto correndo em volta.</p>
+            </div>
           </div>
+          <figure><img src="img/writer-m-mais.png" alt="Janela do Desk Writer: miniaturas das páginas na barra lateral, um relatório com imagem e tabela, documentos em abas e o painel Formato aberto no estilo do texto" width="1280" height="720" loading="lazy"></figure>
         </li>
-        <li class="row app-row">
-          <img src="../img/br.com.brahm.Desk.Tables.svg" alt="" width="64" height="64">
-          <div class="row-text">
-            <h3>Desk Tables</h3>
-            <p>Planilhas com várias tabelas soltas numa mesma folha, fórmulas e gráficos bonitos.</p>
+        <li>
+          <div class="app-row">
+            <img src="../img/br.com.brahm.Desk.Tables.svg" alt="" width="64" height="64">
+            <div class="row-text">
+              <h3>Desk Tables</h3>
+              <p>Planilhas diagramadas como uma página: várias tabelas e gráficos soltos em cada folha, fórmulas fáceis de ler e gráficos bonitos. É para organizar e calcular, não uma ferramenta de BI nem um banco de dados.</p>
+            </div>
           </div>
+          <figure><img src="img/tables-m-mais.png" alt="Janela do Desk Tables: uma folha com uma tabela de despesas e um gráfico, a barra de fórmulas e a troca de folhas embaixo" width="1280" height="720" loading="lazy"></figure>
         </li>
-        <li class="row app-row">
-          <img src="../img/br.com.brahm.Desk.Slides.svg" alt="" width="64" height="64">
-          <div class="row-text">
-            <h3>Desk Slides</h3>
-            <p>Apresentações com transições e animações que fazem a plateia esquecer de olhar o celular.</p>
+        <li>
+          <div class="app-row">
+            <img src="../img/br.com.brahm.Desk.Slides.svg" alt="" width="64" height="64">
+            <div class="row-text">
+              <h3>Desk Slides</h3>
+              <p>Apresentações com temas, transições e animações que fazem a plateia esquecer de olhar o celular, e uma tela do apresentador com suas notas e o próximo slide.</p>
+            </div>
           </div>
+          <figure><img src="img/slides-m-mais.png" alt="Janela do Desk Slides: o navegador de slides na barra lateral, um slide com uma imagem selecionada, as notas do apresentador embaixo e o botão Reproduzir na barra de título" width="1280" height="720" loading="lazy"></figure>
         </li>
       </ul>
+      <p class="section-note">São maquetes da janela que os três aplicativos vão compartilhar, desenhadas com os widgets reais do GTK 4 e da Libadwaita em 1280 × 720, a menor tela para a qual o Desk é feito.</p>
     </section>
 
     <section class="description" id="about" aria-labelledby="about-title">
-      <h2 id="about-title">Sobre</h2>
-      <p>Na faculdade eu usava Linux. Mas a vida insistia em me mandar arquivos do Microsoft Office e pedir coisas no Photoshop, e por volta de 2008 eu me rendi e fui para o Mac. Foi lá que conheci o iWork, que vinha junto com o computador. Foi amor à primeira vista: em pouco tempo eu tinha abandonado o Microsoft Office por completo.</p>
-      <p>Os anos passaram, a Apple reescreveu o iWork para 64 bits e a versão nova chegou sem várias funções úteis que até hoje não voltaram. Fiquei com saudade do iWork '09, e nunca passou.</p>
-      <p>Agora o Linux voltou a ser o meu sistema principal, e eu resolvi fazer para ele o equivalente ao iWork que eu queria ter. O LibreOffice é um projeto admirável, mas nunca foi para mim: tem muita coisa que eu não uso e não conversa visualmente com o GNOME, que é o meu ambiente favorito. O Desk é a minha tentativa de juntar as duas coisas: a simplicidade do iWork '09 e a cara de um aplicativo GNOME de verdade.</p>
-      <p>Algumas coisas que você pode esperar:</p>
+      <h2 id="about-title">Por que o Desk</h2>
+      <p>O Desk não nasceu da falta de uma suíte de escritório no Linux. O LibreOffice e o ONLYOFFICE cumprem muito bem esse papel. Mas nenhum dos dois segue as diretrizes de interface do GNOME, e nenhum se sente em casa no desktop GNOME, que é onde eu passo os meus dias.</p>
+      <p>Tem também uma questão de gosto. Eu prefiro ferramentas simples, e simples não quer dizer fraco. Então, em vez de seguir na direção do Microsoft 365, para onde o LibreOffice tende hoje em dia (mesmo tendo origem no StarOffice, que era bem original na época), eu olhei para o outro lado: para o iWork da Apple.</p>
+      <p>Eu sempre fui fã do iWork '09, o de antes da colaboração online, da IA e da assinatura. Usava todo dia, e nunca superei de verdade a passagem de 32 para 64 bits, que quebrou a compatibilidade com os meus arquivos e levou embora vários recursos únicos e muito úteis. Para ser justo, o Pages, o Keynote e o Numbers de hoje já recuperaram muitos deles, alguns atrás de um paywall.</p>
+      <p>O Desk não é um clone do iWork. Eu uso o iWork como régua do que uma suíte simples e capaz consegue fazer, não como planta para copiar. O objetivo é um pacote de escritório com aplicativos mais simples, focados e perfeitamente integrados ao GNOME. O Desk Tables não tenta ser uma ferramenta de BI ou um banco de dados, por exemplo: ele é uma planilha, e uma boa planilha.</p>
+      <p>O que você pode esperar:</p>
       <ul class="features">
-        <li>Os três aplicativos compartilham o mesmo modelo de documento, então uma tabela, um gráfico ou um texto se comportam igual em qualquer um deles.</li>
-        <li>Feito com Rust, GTK 4 e Libadwaita, seguindo as diretrizes de interface do GNOME.</li>
-        <li>Documentos salvos em OpenDocument (ODF), e os arquivos antigos do iWork '09 abrindo também.</li>
-        <li>O motor dos documentos é separado da interface, em bibliotecas que outros projetos podem usar. Já existe até um conversor de linha de comando que funciona sem interface gráfica nenhuma.</li>
-        <li>E se a comunidade pedir muito, a gente porta para o Plasma. <span aria-label="sorriso">:)</span></li>
+        <li>Três aplicativos que compartilham o mesmo modelo de documento, a mesma janela e o mesmo Inspetor, então o que você aprende em um serve nos outros.</li>
+        <li>Feito com Rust, GTK 4 e Libadwaita, seguindo as diretrizes de interface do GNOME, com documentos em abas e salvamento automático com versões.</li>
+        <li>Os documentos são salvos em OpenDocument (ODF). Seus arquivos do iWork, antigos e novos, e do Microsoft Office também vão abrir.</li>
+        <li>Nada de IA, conta online ou assinatura para usar qualquer coisa.</li>
+        <li>E se a comunidade pedir com muito carinho, a gente porta para o Plasma. <span aria-label="sorriso">:)</span></li>
       </ul>
-      <p>O Desk está sendo feito por mim junto com o Claude, a IA da Anthropic. Isso não é desculpa para atalho: cada função do Pages, do Numbers e do Keynote '09 virou uma linha de uma matriz de paridade (são 629), cada mudança passa por revisão e por um CI que roda formatação, lint, testes e verificação de licenças, e o resultado é comparado, pixel a pixel, com PDFs gerados pelo iWork 9.3 de verdade numa máquina virtual.</p>
+    </section>
+
+    <section id="built" aria-labelledby="built-title">
+      <h2 id="built-title">Como o Desk é construído</h2>
+      <p class="section-intro">Algumas decisões dão forma a todo o Desk. Elas estão registradas, com seus motivos, nas páginas de <a href="https://github.com/brahm/desk/blob/main/docs/architecture.md">arquitetura</a> e de <a href="https://github.com/brahm/desk/blob/main/docs/decisions.md">decisões</a> do repositório, em inglês.</p>
+      <ul class="boxed-list">
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-layers"/></svg></span>
+          <span class="row-text"><strong>O motor fica separado da interface</strong><span>O modelo de documento, a composição do texto, a paginação, a renderização, as fórmulas, os gráficos e os formatos de arquivo são bibliotecas Rust sem nada de GTK. Só a biblioteca de interface e os três aplicativos usam GTK 4 e Libadwaita, e o CI confere isso a cada mudança. É assim que o desk-convert já gera PDF pela linha de comando, e é assim que outros projetos podem reaproveitar o motor.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-code"/></svg></span>
+          <span class="row-text"><strong>Bibliotecas de formato que qualquer um pode usar</strong><span>As bibliotecas de OpenDocument, do iWork e de fórmulas não dependem de nenhuma outra parte do Desk e têm licença MPL-2.0, para que outros programas, livres ou não, leiam e gravem os mesmos arquivos. Os aplicativos são GPL-3.0-or-later.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>
+          <span class="row-text"><strong>Um modelo de documento, um jeito de mudá-lo</strong><span>Os três aplicativos compartilham um só modelo, então um objeto copiado de um para outro continua sendo o mesmo objeto. Toda mudança é uma operação com inversa, o que dá o desfazer de graça, e o mesmo documento sempre gera as mesmas páginas na tela, no PDF e nos testes.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-license"/></svg></span>
+          <span class="row-text"><strong>OpenDocument em primeiro lugar</strong><span>Os documentos são ODF padrão. Quando o ODF não tem lugar para um recurso, o Desk acrescenta uma extensão documentada que outros programas podem ignorar sem risco. Arquivos do iWork e do Microsoft Office entram por filtros de importação, que avisam o que não conseguiram manter.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-desktop"/></svg></span>
+          <span class="row-text"><strong>GNOME nativo, nada emprestado</strong><span>Um widget da Libadwaita sempre que existe um. Quando não existe, o Desk constrói um que segue as diretrizes do GNOME e o revisa a cada nova Libadwaita. Ortografia, impressão, fontes, seletores de arquivo e leitor de tela vêm da plataforma.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-tools"/></svg></span>
+          <span class="row-text"><strong>Flatpak no GNOME 51, e nada online</strong><span>O Desk é distribuído como Flatpak sobre o runtime do GNOME 51, com GTK 4.24 e Libadwaita 1.10. Não tem servidor nem conta: tudo funciona offline.</span></span>
+        </li>
+        <li class="row">
+          <span class="row-icon"><svg aria-hidden="true"><use href="#i-check"/></svg></span>
+          <span class="row-text"><strong>Medido, não chutado</strong><span>Cada recurso é uma linha de um inventário, com sua fase e seus testes, e o resultado é comparado com documentos feitos pelo próprio iWork. Os testes de interface usam os aplicativos pela árvore de acessibilidade, como faz um leitor de tela.</span></span>
+        </li>
+      </ul>
+    </section>
+
+    <section id="status" aria-labelledby="status-title">
+      <h2 id="status-title">Onde o Desk está hoje</h2>
+      <div class="card">
+        <p class="card-intro">O Desk Writer veio primeiro, porque o motor de texto é a parte mais difícil e os outros dois aplicativos dependem dele. Ele já tem o motor de texto, estilos e estrutura do documento, ortografia e gramática, imagens, formas e mídia, tabelas e gráficos, e abre documentos do Pages '09 com a diagramação do Pages. Está em beta, ainda na janela antiga. O Desk Tables e o Desk Slides já têm sua janela e motores de tabelas, fórmulas, gráficos e animação, que os aplicativos ainda não usam.</p>
+        <p class="card-note">Em novembro de 2026 eu defini novos objetivos para o projeto: o Desk agora se mede pelos recursos do Pages, do Numbers e do Keynote atuais, mantendo o que o iWork '09 fazia e as versões novas perderam, e deixando de fora o que precisa de IA, de serviço online ou de pagamento. O Desk é feito por mim junto com o Claude, a IA da Anthropic, com o rigor que se espera de qualquer equipe: cada recurso é uma linha de um inventário, cada mudança passa por revisão e por um CI, e o resultado é comparado com documentos feitos pelo próprio iWork. O <a href="../painel/">painel de andamento</a> mostra cada recurso, fase e previsão, atualizado a cada mudança.</p>
+      </div>
     </section>
 
     <section id="roadmap" aria-labelledby="roadmap-title">
-      <h2 id="roadmap-title">O que vem por aí</h2>
+      <h2 id="roadmap-title">Próximos passos</h2>
       <div class="card">
-        <p class="card-intro">Começamos pelo Desk Writer, porque o motor de texto é a parte mais difícil e os outros dois apps dependem dele. As seis primeiras etapas dele estão prontas: as cinco primeiras você já pode experimentar no beta, e os objetos nas versões noturnas. O resto vai saindo aos poucos, conforme cada etapa fica pronta.</p>
+        <p class="card-intro">Depois de uma base comum, os três aplicativos podem avançar lado a lado. Contando um depois do outro, a previsão é chegar à paridade de recursos perto do fim de janeiro de 2027. É uma estimativa, não uma promessa, e ela é corrigida ao fim de cada fase.</p>
         <ol class="timeline">
           <li class="done">
-            <h3>Fundação <span class="tag done">pronto</span></h3>
-            <p>Estrutura do código, CI, licenças, ícones e uma máquina virtual com o iWork 9.3 que gera os documentos de referência.</p>
-          </li>
-          <li class="done">
-            <h3>Núcleo de texto <span class="tag done">pronto</span></h3>
-            <p>Modelo de documento, motor de texto e paginação, lendo e gravando ODT e gerando PDF pela linha de comando.</p>
-          </li>
-          <li class="done">
-            <h3>Leitor do iWork <span class="tag done">pronto</span></h3>
-            <p>Abrir os seus arquivos .pages antigos e medir, função por função, o quanto já estamos parecidos com o original.</p>
-          </li>
-          <li class="done">
-            <h3>Editor mínimo e versão de testes <span class="tag done">pronto</span></h3>
-            <p>Abrir, editar e salvar texto formatado no Desk Writer, inclusive com leitor de tela, distribuído como Flatpak noturno.</p>
-          </li>
-          <li class="done">
-            <h3>Estilos, listas e estrutura do documento <span class="tag done">beta</span></h3>
-            <p>Estilos, listas, ortografia e gramática, seções, colunas, cabeçalhos e rodapés, notas, sumário, miniaturas das páginas e estrutura de tópicos, lançados no primeiro beta.</p>
-          </li>
-          <li class="done">
-            <h3>Objetos <span class="tag done">noturna</span></h3>
-            <p>Imagens, formas, caixas de texto, filmes e sons, com máscaras, Alfa Instantâneo, efeitos e contorno de texto, diagramados página a página como o Pages faz. E também colar de outros programas.</p>
+            <h3>Desk Writer, primeira rodada <span class="tag done">beta</span></h3>
+            <p>Motor de texto, estilos, estrutura do documento, ferramentas de escrita, objetos, tabelas e gráficos, e abertura de documentos do Pages '09.</p>
           </li>
           <li class="current">
-            <h3>A janela nova <span class="tag current">a seguir</span></h3>
-            <p>O Desk Writer muda para a janela que os três aplicativos vão ter, mostrada acima, em sete etapas que deixam o aplicativo funcionando a cada passo.</p>
+            <h3>Novos objetivos <span class="tag current">agora</span></h3>
+            <p>Os objetivos, as decisões, o inventário de recursos, a janela escolhida e o plano que guiam tudo o que vem abaixo.</p>
           </li>
           <li>
-            <h3>Tabelas, fórmulas e gráficos</h3>
-            <p>O motor de tabelas e gráficos, que é a base do Desk Slides e do Desk Tables, cujas funções já estão mapeadas nas matrizes de paridade deles.</p>
+            <h3>Base comum</h3>
+            <p>A janela compartilhada nos três aplicativos, documentos em abas, salvamento automático com versões e os documentos de referência refeitos no iWork atual.</p>
           </li>
           <li>
-            <h3>Revisão, modelos, impressão e formatos</h3>
-            <p>Controle de alterações, comentários, modelos, mala direta, e exportação para PDF, Word, RTF e ePub.</p>
+            <h3>Desk Writer</h3>
+            <p>O comportamento do Pages atual, comentários e controle de alterações, modelos de página e mala direta, novos objetos e gráficos, arquivos do Word e do Pages, impressão e exportação.</p>
           </li>
           <li>
-            <h3>Desk Writer 1.0, e depois Slides e Tables</h3>
-            <p>Paridade com o Pages '09 e a versão 1.0. O Desk Slides e o Desk Tables começam assim que o motor de objetos e o de tabelas estiverem prontos.</p>
+            <h3>Desk Tables</h3>
+            <p>Arquivos próprios, células e fórmulas, ordenação, filtros, categorias e tabelas dinâmicas, gráficos, e arquivos do Excel e do Numbers.</p>
+          </li>
+          <li>
+            <h3>Desk Slides</h3>
+            <p>Temas e mestres, texto e mídia, transições e animações, apresentação com a tela do apresentador, e arquivos do PowerPoint e do Keynote.</p>
+          </li>
+          <li>
+            <h3>Entre os aplicativos, e a versão 1.0</h3>
+            <p>Gráficos e tabelas ligados entre documentos que se atualizam quando a origem muda, copiar e colar entre os aplicativos, e o relatório final de paridade.</p>
           </li>
         </ol>
       </div>
@@ -200,14 +235,14 @@ flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
         <li>
           <a class="row link-row" href="https://github.com/brahm/desk/issues/new">
             <span class="row-icon"><svg aria-hidden="true"><use href="#i-idea"/></svg></span>
-            <span class="row-text"><strong>Pedir uma funcionalidade</strong><span>Sente falta de alguma coisa do iWork '09? Peça.</span></span>
+            <span class="row-text"><strong>Pedir uma funcionalidade</strong><span>Sente falta de alguma coisa que você usa todo dia? Peça.</span></span>
             <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
           </a>
         </li>
         <li>
           <a class="row link-row" href="https://github.com/brahm/desk/issues/new">
             <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>
-            <span class="row-text"><strong>Enviar documentos antigos do iWork</strong><span>Arquivos do Pages, Numbers e Keynote '09 ajudam a testar a compatibilidade.</span></span>
+            <span class="row-text"><strong>Enviar documentos antigos do iWork</strong><span>Arquivos do Pages, do Numbers e do Keynote, principalmente do iWork '09, ajudam a testar a compatibilidade.</span></span>
             <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
           </a>
         </li>
@@ -222,6 +257,13 @@ flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
           <a class="row link-row" href="https://github.com/brahm/desk/tree/main/po">
             <span class="row-icon"><svg aria-hidden="true"><use href="#i-lang"/></svg></span>
             <span class="row-text"><strong>Traduzir</strong><span>A interface está em inglês e em português do Brasil. Acrescente o seu idioma com um editor de PO, como o Gtranslator ou o Poedit.</span></span>
+            <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
+          </a>
+        </li>
+        <li>
+          <a class="row link-row" href="../painel/">
+            <span class="row-icon"><svg aria-hidden="true"><use href="#i-chart"/></svg></span>
+            <span class="row-text"><strong>Acompanhar o andamento</strong><span>O painel mostra cada recurso, fase, pendência e a previsão, atualizado a cada mudança.</span></span>
             <svg class="chevron" aria-hidden="true"><use href="#i-arrow"/></svg>
           </a>
         </li>
@@ -253,7 +295,7 @@ flatpak install desk br.com.brahm.Desk.Writer//beta</code></pre>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-doc"/></svg></span>
-          <span class="row-text"><strong>Formatos</strong><span>OpenDocument (ODF), e leitura do iWork '09</span></span>
+          <span class="row-text"><strong>Formatos</strong><span>OpenDocument (ODF); já abre o Pages '09, e os outros arquivos do iWork e do Microsoft Office estão no plano</span></span>
         </li>
         <li class="row">
           <span class="row-icon"><svg aria-hidden="true"><use href="#i-person"/></svg></span>

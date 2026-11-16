@@ -1,0 +1,120 @@
+# Desk history
+
+A short record of what is being done in Desk, newest first, for anyone
+visiting the repository. Each line is one change; the reasons and the
+details are in the [project log](docs/project-log.md), the
+[decisions](docs/decisions.md) and the pull requests, and the current state
+is on the [progress dashboard](https://brahm.github.io/desk/painel/).
+
+## Changes since 0.7.0 (unreleased)
+
+* Changed: The README and the website start with what Desk is and what each
+  app does, shown with mockups of the chosen window (M+) in the language of
+  the page; then the story and the reasons behind Desk, its architecture,
+  where it stands, a high-level roadmap, how to help and a link to the
+  progress dashboard. They no longer say parity with iWork '09, and they
+  say that Desk is not a clone of iWork.
+* Added: This history file, kept up to date at the end of each set of
+  tasks.
+* Changed: The Flatpak metainfo of Desk Writer describes the new goals.
+* Added: The project log, the long history of the project with each
+  decision and its reason (#120, #122).
+* Removed: The text engine experiment and 28 stale remote branches; the
+  reference documents that carry media from Apple software are listed to
+  be remade (#121).
+* Added: The progress dashboard, generated from the repository and
+  published at brahm.github.io/desk/painel (#118).
+* Changed: New target: feature parity with the current Pages, Numbers and
+  Keynote (15.4), keeping what iWork '09 did and the newer versions lost,
+  and leaving out what needs AI, an online service or a payment (#117).
+* Added: Goals, twenty decisions, an inventory of 566 features, the M+
+  window, a catalogue of the ODF extensions, the architecture, a roadmap
+  of nineteen phases with parity forecast for the end of January 2027,
+  a register of what is left undone, and guides for contributors and
+  their coding agents (#117).
+* Changed: Checking has two references: iWork 15.4 on a Mac, and
+  iWork 9.3 on a Lion virtual machine for what only iWork '09 has (#120).
+* Removed: The legal review of the reader of current iWork files (#119).
+* Added: Desk Writer tables and charts, phase 7, with 56 of its 76 matrix
+  rows tested; the rest moved to phase B1 (#116).
+* Added: The Desk Tables window: sheets, several tables on a sheet, the
+  formula bar and instant calculations (#115).
+* Added: The Desk Slides window: slide navigator, outline, light table and
+  presenter notes (#114).
+* Added: Object styles and the Text tab of shapes in the Inspector (#113).
+* Changed: Ten names and shortcuts approved by the owner; documents can be
+  renamed from the title (#112).
+* Changed: Desk Writer moved to the interface B window in seven steps: the
+  window, header bar and menus, slim format bar, two-level Inspector,
+  sidebar pages, bottom bar, and the commands and shortcuts of the
+  inventory (#104, #106 to #111).
+
+## Changes in 0.7.0 (14 Nov 2026)
+
+* Added: An inventory of 933 interface items of Pages, Numbers and Keynote
+  '09 placed in Desk, and mockups of three windows drawn with the real
+  GTK widgets; interface B chosen (#102, #103).
+* Changed: The minimum screen is 1280 × 720, after display scaling (#105).
+* Changed: GNOME 51, GTK 4.24, Libadwaita 1.10 and Rust 1.100, with the
+  plan to bring the interface in line with the GNOME HIG (#100).
+* Fixed: The gaps of the sixth review, with the matrices and roadmaps
+  aligned to the decisions of 13 November (#101).
+
+## Changes in 0.6.0 (13 Nov 2026)
+
+* Added: A second reference machine, OS X Lion with iWork 9.3, to compare
+  the interface with Pages 4.3.
+* Added: Metric-compatible substitutes for the 41 fonts of the Pages
+  templates, and formatted copy (#97).
+* Changed: Undo names the change; Alt-arrow copies; Free Form; the outline
+  prints as Pages does (#98, #99).
+* Added: Desk Writer objects, phase 6: shapes, text boxes, pictures and
+  groups; move, resize, turn and arrange; linked text boxes; text in
+  shapes; inline objects; gradients, line ends, shadows and reflections;
+  masks, Instant Alpha and Adjust Image; the pen and connection lines;
+  movies and sounds; the Media Browser; master objects; page layout
+  documents (#49 to #95).
+* Added: Desk Neue, a free font with the widths and kerning of Helvetica
+  Neue, so that lines break where Pages breaks them (#95).
+* Fixed: A long document came out with 72 pages against 62 in Pages; line
+  metrics, blank pages at section starts and the justification rule now
+  match (#87, #88, #91).
+* Added: The parity matrices of Desk Tables and Desk Slides (#95).
+
+## Changes in 0.5.0 (4 Nov 2026), the first beta
+
+* Added: Sections, columns and facing pages; headers, footers and fields;
+  footnotes and endnotes; table of contents, hyperlinks and bookmarks;
+  outline mode, thumbnails and page modes (#34 to #48).
+* Added: Tab stops and rulers, character and paragraph effects, styles,
+  lists, Find & Replace, auto-correction, hyphenation, spelling and the
+  proofreader (#25 to #30).
+* Added: The editor: open, edit and save, the format bar, the Inspector,
+  invisibles, screen reader support and the Portuguese translation
+  (#21 to #24).
+* Added: The reader of Pages '09 documents, substitutes for missing fonts,
+  a log of what an import leaves out, and one Pages document per row of the
+  parity matrix (#13 to #20).
+* Added: The signed Flatpak repository, with nightly and beta channels.
+* Added: The language policy (#50).
+* Fixed: 23 items found by the first gap review (#31 to #33).
+* Removed: The Pages '08 format.
+
+## Changes on 31 Oct 2026, the first day of code
+
+* Added: The document model with undo and redo, the text engine,
+  pagination, PDF output, the ODT reader and writer, validation against
+  the ODF schemas and fuzzing of the reader (#3 to #10).
+* Added: App and document icons and the suite logo (#4).
+* Added: The website and the README, in English and Brazilian Portuguese
+  (#11).
+* Added: Layout parity with twelve reference documents made in Pages '09
+  (#12).
+* Added: The licences, GPL-3.0-or-later for the apps and MPL-2.0 for the
+  file format libraries, the Cargo workspace and the CI (#1, #2).
+
+## Planning on 30 Oct 2026
+
+* Added: Feature inventories of Pages, Numbers and Keynote '09, the
+  architecture and the first roadmap.
+* Added: A reference virtual machine with iWork 9.3.
