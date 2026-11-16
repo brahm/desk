@@ -16,7 +16,7 @@ const APP: AppInfo = AppInfo {
 };
 
 fn main() -> glib::ExitCode {
-    desk_ui::run(APP, None)
+    desk_ui::run_tables(APP)
 }
 
 #[cfg(test)]

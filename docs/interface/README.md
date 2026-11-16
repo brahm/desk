@@ -488,7 +488,11 @@ Depois disso:
   lateral (NINT-02 a NINT-04, NINT-06 a NINT-09, NINT-14, NGNM-01,
   NGNM-12 a NGNM-14). A barra de fórmulas e o cálculo instantâneo já têm lugar nela
   e ganham função na fase 4 (NINT-10, NINT-13), e a aba Dados e os estilos
-  de tabela, na fase 5 (NTAB-24 a NTAB-30, NINT-12).
+  de tabela, na fase 5 (NTAB-24 a NTAB-30, NINT-12). Feita em 16/11/2026,
+  com as planilhas criadas, renomeadas, apagadas e reordenadas pelos menus
+  (NTAB-02, NTAB-03). As tabelas mostram a grade e o tamanho que têm, e as
+  células ganham conteúdo quando o Tables passar a usar o `desk-table` da
+  fase 7 do Writer.
 - A fase 2 do Slides monta a mesma janela com o navegador na barra lateral
   e as notas do apresentador (KINT-05 a KINT-13, KINT-15, KGNM-01,
   KGNM-13 a KGNM-15). O botão Reproduzir e a aba Animação já têm lugar nela e
@@ -519,14 +523,14 @@ está aplicado:
 | Decisão | Situação |
 |---|---|
 | Aba Info do Inspetor | No Writer, com as informações do documento |
-| Aba Dados do Inspetor | Espera o Tables |
+| Aba Dados do Inspetor | No Tables (fase 2), com Ordem, Filtro e Categorias ainda inativos até a fase 5 |
 | Ctrl+/ para a busca de comandos | No Writer (etapa 7) |
 | F5 para reproduzir | Espera o Slides |
 | Ctrl+M para novo slide | Espera o Slides |
 | Ctrl+Shift+H para pular o slide | Espera o Slides |
 | Ctrl+Shift+M para a máscara | No Writer (etapa 7) |
-| Alt e as setas no Tables | Espera o Tables |
-| Ctrl+Shift+F para a lista de fórmulas | Espera o Tables |
+| Alt e as setas no Tables | No Tables (fase 2) |
+| Ctrl+Shift+F para a lista de fórmulas | No Tables (fase 2): abre a lista na barra lateral, vazia até a fase 4 |
 | Clique no título renomeia | No Writer: um popover renomeia o arquivo na pasta, com a mesma extensão, ou o nome que Salvar propõe para um documento novo; também em Mais ▸ Renomear… e na busca de comandos |
 
 ## Refazer os mockups

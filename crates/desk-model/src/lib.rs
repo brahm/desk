@@ -75,6 +75,7 @@ mod text;
 mod toc;
 mod transaction;
 mod units;
+pub mod workbook;
 
 pub use arrange::SectionsClip;
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};

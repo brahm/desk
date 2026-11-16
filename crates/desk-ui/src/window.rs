@@ -36,7 +36,7 @@ use crate::{AppInfo, Opener};
 
 pub(crate) use objects::OBJECT_ACCELS;
 
-mod command_search;
+pub(crate) mod command_search;
 mod format_actions;
 mod header;
 mod objects;

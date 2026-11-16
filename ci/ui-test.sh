@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-cargo build --locked --quiet --package desk-writer --package desk-convert
+cargo build --locked --quiet --package desk-writer --package desk-tables --package desk-convert
 
 # A Python of the system whose PyGObject reads the AT-SPI typelib.
 python=

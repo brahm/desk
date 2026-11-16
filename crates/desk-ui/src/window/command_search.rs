@@ -101,7 +101,7 @@ fn enabled(window: &adw::ApplicationWindow, action: &str) -> bool {
 
 /// Shows the search over `window`, with the commands of `menus`: each a
 /// menu and the name of where it is.
-pub(super) fn present(window: &adw::ApplicationWindow, menus: &[(String, gio::MenuModel)]) {
+pub(crate) fn present(window: &adw::ApplicationWindow, menus: &[(String, gio::MenuModel)]) {
     let mut found = Vec::new();
     for (path, menu) in menus {
         commands(menu, path, &mut found);
