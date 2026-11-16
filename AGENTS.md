@@ -40,9 +40,11 @@ purpose and point to the full pages.
    then run `python3 ci/dashboard.py --record`, which writes the log of
    what changed (`docs/dashboard/changes.tsv`) and the history, and
    publish the dashboard as
-   [docs/dashboard/README.md](docs/dashboard/README.md) says. The log is
-   one of the documents kept current for the whole project, like the
-   inventory, the roadmap, the backlog and the decisions.
+   [docs/dashboard/README.md](docs/dashboard/README.md) says. Also add
+   to the project log, `docs/project-log.md`, what the set decided, why
+   and with what consequences. Both are kept current for the whole
+   project, like the inventory, the roadmap, the backlog and the
+   decisions.
 10. **Apple material.** Never extract anything from Apple software, and
    never add its templates, fonts, images or format definitions to the
    repository (D-011).
