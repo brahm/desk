@@ -10,7 +10,6 @@ publish.workspace = true
 
 [dependencies]
 desk-formula.workspace = true
-desk-model.workspace = true
 
 [lints]
 workspace = true
