@@ -9,7 +9,9 @@ Usage: ci/dashboard.py [--out FILE] [--artifact FILE] [--record]
   --out FILE       write the page as a whole HTML document (the website)
   --artifact FILE  write it as a fragment without <html>, <head> and
                    <body>, the form a claude.ai Artifact is published in
-  --record         add or replace today's row of docs/dashboard/history.tsv
+  --record         add or replace today's row of docs/dashboard/history.tsv,
+                   log what changed status since the last record in
+                   changes.tsv, and renew snapshot.tsv
   --date           the day the page is generated for (default: today in
                    America/Sao_Paulo); for tests
   --no-prs         do not ask GitHub for the pull requests; read the
@@ -22,6 +24,8 @@ Every number on the page is read from a file of the repository:
   docs/dashboard/phases.tsv     which phases started and ended
   docs/dashboard/forecast.tsv   the estimate of the plan, in days
   docs/dashboard/history.tsv    one row per day the dashboard was recorded
+  docs/dashboard/snapshot.tsv   the status of everything at the last record
+  docs/dashboard/changes.tsv    what changed status between two records
   docs/backlog/deferred.tsv     what was left undone
 
 and the recent pull requests come from GitHub (`gh api search/issues`), or
@@ -216,18 +220,74 @@ def forecast(phases, today):
     }
 
 
+def current_snapshot(features, phases, backlog):
+    """The status of every feature, phase and backlog item, keyed by kind and id."""
+    snap = {('feature', f['id']): f['state'] for f in features}
+    snap.update({('phase', p['id']): p['status'] for p in phases})
+    snap.update({('backlog', b['id']): b['status'] for b in backlog})
+    return snap
+
+
+def load_changes(snap, today):
+    """The log of status changes, plus the ones not recorded yet.
+
+    changes.tsv holds what earlier records found. What differs between
+    snapshot.tsv and the files as they are now happened since the last
+    record, and is dated today. An empty snapshot is the first record:
+    it is the starting point, and nothing counts as a change. Returns
+    (all the changes, the ones still to record).
+    """
+    logged = read_tsv(HERE / 'changes.tsv')
+    old = {(r['kind'], r['id']): r['state'] for r in read_tsv(HERE / 'snapshot.tsv')}
+    pending = []
+    if old:
+        for (kind, key), state in snap.items():
+            before = old.get((kind, key), 'new')
+            if before != state:
+                pending.append({'date': today.isoformat(), 'kind': kind, 'id': key, 'from': before, 'to': state})
+    return logged + pending, pending
+
+
+def write_tsv(path, columns, rows):
+    """Rewrites a TSV file of docs/dashboard, keeping its `#` header lines."""
+    head = [line for line in path.read_text(encoding='utf-8').splitlines(keepends=True)
+            if line.startswith('#')]
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        f.writelines(head)
+        w = csv.DictWriter(f, columns, delimiter='\t', quoting=csv.QUOTE_NONE, lineterminator='\n')
+        w.writeheader()
+        w.writerows(rows)
+
+
 def record_history(row):
     """Adds the row of today to history.tsv, replacing one of the same day."""
     path = HERE / 'history.tsv'
-    head = [line for line in path.read_text(encoding='utf-8').splitlines(keepends=True)
-            if line.startswith('#')]
     rows = [r for r in read_tsv(path) if r['date'] != row['date']] + [row]
-    rows.sort(key=lambda r: r['date'])
-    with open(path, 'w', newline='', encoding='utf-8') as f:
-        f.writelines(head)
-        w = csv.DictWriter(f, HISTORY_COLUMNS, delimiter='\t', quoting=csv.QUOTE_NONE, lineterminator='\n')
-        w.writeheader()
-        w.writerows(rows)
+    write_tsv(path, HISTORY_COLUMNS, sorted(rows, key=lambda r: r['date']))
+
+
+def next_phases(phases):
+    """The phases to work on next, after the ones in progress.
+
+    The roadmap runs R and B1 first, then the three app tracks, which may
+    run side by side, then X1. So the next phases are the first one not
+    started of the preparation; once that is over, the first one not
+    started of each app track; and X1 when the tracks are over.
+    """
+    def first(ids):
+        group = [p for p in phases if ids(p['id'])]
+        todo = [p for p in group if p['status'] == 'not-started']
+        return todo[:1], all(p['status'] == 'done' for p in group)
+
+    prep, prep_over = first(lambda i: i in ('R', 'B1'))
+    if prep or not prep_over:
+        return prep
+    found, over = [], True
+    for letter in 'WTS':
+        todo, track_over = first(lambda i, c=letter: i.startswith(c))
+        found += todo
+        over = over and track_over
+    return found if not over or found else first(lambda i: i.startswith('X'))[0]
 
 
 # ---------------------------------------------------------------- the page
@@ -317,6 +377,93 @@ def sparkline(history):
             f'aria-label="Recursos prontos de {day(pts[0][0])} a {day(pts[-1][0])}: de {pts[0][1]} para {pts[-1][1]}">'
             f'<polyline points="{line}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>{dots}</svg>'
             f'<div class="spark-ends"><span>{day(pts[0][0])}: {pts[0][1]}</span><span>{day(pts[-1][0])}: {pts[-1][1]}</span></div>')
+
+
+def just_done(features, phases, backlog, prs, changes, history):
+    """The section with what changed status in the last set of tasks."""
+    names = {f['id']: f for f in features}
+    items = {b['id']: b for b in backlog}
+    phase_names = {p['id']: p['name'] for p in phases}
+    o = ['<section class="card" id="feito"><h2>Acabou de ser feito</h2>']
+    dates = sorted({c['date'] for c in changes})
+    if not dates:
+        start = day(datetime.date.fromisoformat(history[0]['date']))
+        o.append(f'<p class="intro">Nenhum recurso, fase ou pendência mudou de situação desde o primeiro registro do painel, em {start}. '
+                 'A partir do próximo conjunto de atividades, o que ele entregar aparece aqui.</p>')
+    else:
+        last = [c for c in changes if c['date'] == dates[-1]]
+        o.append(f'<p class="intro">O que mudou de situação no último conjunto de atividades, registrado em {day(datetime.date.fromisoformat(dates[-1]))}.</p>')
+        ph = [c for c in last if c['kind'] == 'phase']
+        if ph:
+            o.append('<h3>Fases</h3><ul class="plain">' + ''.join(
+                f'<li><b>{esc(c["id"])}</b> {esc(phase_names.get(c["id"], ""))}: '
+                f'{PHASE_STATUS.get(c["from"], "nova").lower()} → <b>{PHASE_STATUS.get(c["to"], esc(c["to"])).lower()}</b></li>' for c in ph) + '</ul>')
+        ft = [c for c in last if c['kind'] == 'feature']
+        if ft:
+            finished = sum(1 for c in ft if c['to'] == 'done')
+            o.append(f'<h3>Recursos ({len(ft)} mudaram, {finished} ficaram prontos)</h3><div class="scroll box"><table><thead><tr><th>Id</th><th>Recurso</th>'
+                     '<th>Aplicativo</th><th>Antes</th><th>Agora</th></tr></thead><tbody>')
+            for c in sorted(ft, key=lambda c: (c['to'] != 'done', c['id'])):
+                f = names.get(c['id'], {})
+                o.append(f'<tr><td class="id">{esc(c["id"])}</td><td class="wide">{esc(f.get("recurso", ""))}</td>'
+                         f'<td>{esc(dict(APPS).get(f.get("app"), ""))}</td><td>{esc(STATE_LABEL.get(c["from"], "Novo"))}</td>'
+                         f'<td><span class="pill"><span class="key s-{esc(c["to"])}"></span>{esc(STATE_LABEL.get(c["to"], c["to"]))}</span></td></tr>')
+            o.append('</tbody></table></div>')
+        bl = [c for c in last if c['kind'] == 'backlog']
+        if bl:
+            words = {'open': 'aberta', 'done': 'feita', 'dropped': 'descartada', 'new': 'nova'}
+            o.append('<h3>Pendências</h3><ul class="plain">' + ''.join(
+                f'<li><b>{esc(c["id"])}</b> {esc(items.get(c["id"], {}).get("item", ""))}: '
+                f'{words.get(c["from"], esc(c["from"]))} → <b>{words.get(c["to"], esc(c["to"]))}</b></li>' for c in bl) + '</ul>')
+        if len(dates) > 1:
+            o.append('<details><summary>Conjuntos anteriores</summary><ul>')
+            for d in reversed(dates[:-1]):
+                cs = [c for c in changes if c['date'] == d]
+                o.append(f'<li>{day(datetime.date.fromisoformat(d))}: '
+                         f'{sum(1 for c in cs if c["kind"] == "feature" and c["to"] == "done")} recursos prontos, '
+                         f'{sum(1 for c in cs if c["kind"] == "phase" and c["to"] == "done")} fases concluídas, '
+                         f'{sum(1 for c in cs if c["kind"] == "backlog" and c["to"] == "done")} pendências feitas</li>')
+            o.append('</ul></details>')
+    merged = [pr for pr in prs if pr['state'] == 'merged'][:5]
+    if merged:
+        o.append('<h3>Últimos pull requests integrados</h3><ul class="plain">' + ''.join(
+            f'<li><a href="{esc(pr["url"])}">#{pr["number"]}</a> {esc(pr["title"])} <span class="dim">({day(datetime.date.fromisoformat(pr["date"]))})</span></li>'
+            for pr in merged) + '</ul>')
+    o.append('</section>')
+    return ''.join(o)
+
+
+def coming_next(features, phases, open_items):
+    """The section with the phases in progress and the next ones, row by row."""
+    o = ['<section class="card" id="a-seguir"><h2>A seguir</h2>'
+         '<p class="intro">As fases em andamento e as próximas pelo roadmap, com cada recurso que falta e as pendências que voltam nelas.</p>']
+    shown = [(p, 'Em andamento') for p in phases if p['status'] == 'in-progress'] + [(p, 'Próxima') for p in next_phases(phases)]
+    if not shown:
+        o.append('<p>Todas as fases do roadmap estão concluídas.</p>')
+    for p, tag in shown:
+        todo = [f for f in features if f['fase'] == p['id'] and f['state'] in dict(STATES) and f['state'] != 'done']
+        back = [b for b in open_items if b['to_phase'] == p['id']]
+        o.append(f'<div class="next"><h3><span class="pill {p["status"]}">{tag}</span> {esc(p["id"])} {esc(p["name"])}'
+                 + (f' <span class="dim">· {p["days"]} dias estimados</span>' if p['days'] else '') + '</h3>'
+                 f'<p class="dim">{esc(p["delivers"])}</p>')
+        if todo:
+            o.append(f'<h4>{len(todo)} recursos a implementar ou conferir</h4><div class="scroll box"><table><thead><tr><th>Id</th><th>Recurso</th>'
+                     '<th>Aplicativo</th><th>Situação hoje</th></tr></thead><tbody>')
+            for f in todo:
+                note = f'<div class="sub">{esc(f["nota"])}</div>' if f['nota'] not in ('', '-') else ''
+                o.append(f'<tr><td class="id">{esc(f["id"])}</td><td class="wide">{esc(f["recurso"])}{note}</td><td>{esc(dict(APPS)[f["app"]])}</td>'
+                         f'<td><span class="pill"><span class="key s-{f["state"]}"></span>{esc(STATE_LABEL[f["state"]])}</span></td></tr>')
+            o.append('</tbody></table></div>')
+        elif p['total']:
+            o.append('<p>Todos os recursos desta fase estão prontos.</p>')
+        else:
+            o.append('<p class="dim">Esta fase não tem linhas no inventário; o que ela entrega está na descrição acima.</p>')
+        if back:
+            o.append(f'<h4>{len(back)} pendências que voltam nesta fase</h4><ul class="plain">'
+                     + ''.join(f'<li><b>{esc(b["id"])}</b> {esc(b["item"])}</li>' for b in back) + '</ul>')
+        o.append('</div>')
+    o.append('</section>')
+    return ''.join(o)
 
 
 CSS = """
@@ -419,6 +566,11 @@ body { background: var(--window); color: var(--fg); font: 15px/1.5 var(--sans); 
 .spark { width: 100%; height: 120px; display: block; margin-top: 8px; }
 .spark-ends { display: flex; justify-content: space-between; font-size: 13px; color: var(--dim); }
 .foot { color: var(--dim); font-size: 13px; }
+.dk h3 { font-size: 15px; margin: 14px 0 6px; color: var(--strong); }
+.dk h4 { font-size: 13px; margin: 12px 0 6px; color: var(--dim); font-weight: 600; }
+.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.box { max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.next + .next { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 4px; }
 """
 
 JS = """
@@ -457,7 +609,7 @@ JS = """
 """
 
 
-def render(features, phases, backlog, prs, prs_source, history, fc, today, commit):
+def render(features, phases, backlog, prs, prs_source, history, changes, fc, today, commit):
     """The content of the page, shared by the website and the Artifact."""
     scope = [f for f in features if f['state'] in dict(STATES)]
     totals = collections.Counter(f['state'] for f in scope)
@@ -500,6 +652,9 @@ def render(features, phases, backlog, prs, prs_source, history, fc, today, commi
     w(f'<div class="card kpi"><div class="label">Previsão de paridade</div><div class="value">{day(fc["now"]["likely"])}</div>'
       f'<div class="note">entre {day(fc["now"]["low"])} e {day(fc["now"]["high"])}</div></div>')
     w('</section>')
+
+    w(just_done(features, phases, backlog, prs, changes, history))
+    w(coming_next(features, phases, open_items))
 
     # Forecast.
     w('<section class="card" id="previsao"><h2>Previsão</h2>')
@@ -673,12 +828,17 @@ def main():
            'backlog_open': sum(1 for b in backlog if b['status'] == 'open'),
            'forecast': fc['now']['likely'].isoformat()}
     row = {k: str(v) for k, v in row.items()}
+    snap = current_snapshot(features, phases, backlog)
+    changes, pending = load_changes(snap, today)
     if args.record:
         record_history(row)
+        write_tsv(HERE / 'changes.tsv', ['date', 'kind', 'id', 'from', 'to'], changes)
+        write_tsv(HERE / 'snapshot.tsv', ['kind', 'id', 'state'],
+                  [{'kind': k, 'id': i, 'state': v} for (k, i), v in sorted(snap.items())])
     # The page always shows today as the last point, recorded or not.
     history = [r for r in read_tsv(HERE / 'history.tsv') if r['date'] < row['date']] + [row]
 
-    content = render(features, phases, backlog, prs, prs_source, history, fc, today, commit)
+    content = render(features, phases, backlog, prs, prs_source, history, changes, fc, today, commit)
     head = f'<title>{TITLE}</title>\n<style>{CSS}</style>'
     if args.out:
         path = pathlib.Path(args.out)

@@ -20,8 +20,9 @@ last commit:
 
 1. Bring the sources up to date (next section).
 2. Run `python3 ci/dashboard.py --record --artifact /tmp/desk-painel.html`.
-   `--record` writes today's row in [`history.tsv`](history.tsv); commit
-   it with the rest of the change.
+   `--record` writes today's row in [`history.tsv`](history.tsv), the
+   changes of status in `changes.tsv` and the new `snapshot.tsv`; commit
+   the three with the rest of the change.
 3. Publish `/tmp/desk-painel.html` to the Artifact above, at the same
    address: with the Artifact tool, read that address first, then publish
    the file with `url` set to it. Never publish without `url`, which would
@@ -39,10 +40,25 @@ The website needs no step: it follows `main`.
 | [`forecast.tsv`](forecast.tsv) | The estimate of the plan: its day and the least, likely and most days | When the roadmap corrects its estimate |
 | [`../backlog/deferred.tsv`](../backlog/README.md) | What was left undone, and the phase it moved to | By the rules of the backlog |
 | [`history.tsv`](history.tsv) | One row per day the dashboard was recorded | Only through `--record` |
+| [`snapshot.tsv`](snapshot.tsv), [`changes.tsv`](changes.tsv) | The status of every feature, phase and backlog item at the last record, and what changed between records | Only through `--record` |
 
 The pull requests come from GitHub (`gh api search/issues`). Where `gh`
 cannot answer, the page lists the merges of the local git history and says
 so.
+
+## What was just done, and what comes next
+
+"Acabou de ser feito" lists what changed status since the last record: the
+script compares the files as they are with `snapshot.tsv`, and `--record`
+writes the differences in `changes.tsv` with the day. So a set of tasks
+shows on the page only if it updated the inventory, `phases.tsv` and the
+backlog before `--record` ran. The section also lists the last pull
+requests merged.
+
+"A seguir" lists the phases in progress and the next ones by the roadmap
+(the first not started of R and B1; then the first not started of each app
+track; then X1), each with every feature still to do and the backlog items
+that come back in it.
 
 ## How a feature counts as done
 
