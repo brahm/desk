@@ -218,7 +218,6 @@ dependencies = [
 name = "desk-chart"
 version = "0.1.0"
 dependencies = [
- "desk-render",
  "desk-table",
 ]
 
@@ -289,6 +288,8 @@ dependencies = [
 name = "desk-model"
 version = "0.1.0"
 dependencies = [
+ "desk-chart",
+ "desk-table",
  "imbl",
  "proptest",
  "unicode-segmentation",
@@ -329,7 +330,6 @@ name = "desk-table"
 version = "0.1.0"
 dependencies = [
  "desk-formula",
- "desk-model",
 ]
 
 [[package]]

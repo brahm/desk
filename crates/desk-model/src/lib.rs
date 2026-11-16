@@ -126,3 +126,11 @@ pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
 pub use toc::{TocEntry, TocLevel, TocSettings, tables_of_contents};
 pub use transaction::{Edit, Editor, Transaction};
 pub use units::{Length, Rgba};
+
+/// A table of a document: the table model shared by the apps, with the
+/// text of each cell as plain text that takes the formatting of its cell
+/// (TAB-01, IOP-01).
+pub type Table = desk_table::Table<String>;
+
+pub use desk_chart::{self as chart, Chart};
+pub use desk_table as table;
