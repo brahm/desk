@@ -1,0 +1,663 @@
+# Project log
+
+The history of Desk from its first day, written to be read on its own: what
+was done, each decision with its reason, and what each decision led to. It
+is the source for posts about the project and for the project page, and it
+is the long form of [decisions.md](decisions.md), which keeps one row per
+decision.
+
+**This is a living document.** Whoever closes a set of tasks adds an entry
+to [the timeline](#timeline) and, when a decision was taken or replaced, to
+[the decisions](#decisions-with-their-reasons-and-consequences). See
+[Keeping this log](#keeping-this-log).
+
+Dates are the owner's local dates (Brazil, UTC−3). Pull request numbers
+refer to <https://github.com/brahm/desk>.
+
+## Desk in one paragraph
+
+Desk is a free office suite for GNOME: Desk Writer, Desk Tables and Desk
+Slides, written in Rust with GTK 4 and Libadwaita, with OpenDocument as
+its native format. It began on 30 October 2026 as a "retro clone" of Apple
+iWork '09 (version 9.3) and, since 16 November 2026, aims at feature
+parity with the current Pages, Numbers and Keynote (15.4), keeping what
+iWork '09 did and the current versions lost. It is developed by its owner, Brahm,
+who supervises, decides and approves, together with Claude, an AI model
+made by Anthropic, which writes the code, the tests and the documentation.
+
+## Why the project exists
+
+In the owner's words, from the text he wrote for the website on
+31 October 2026: he used Linux at university, moved to the Mac around 2008
+because he needed Microsoft Office and Photoshop, met iWork there and
+dropped Microsoft Office for it. Years later Apple rewrote iWork for
+64 bits and released it without several useful features, some of which
+never came back. Back on Linux as his main system, he decided to build an
+equivalent of iWork for it, because LibreOffice has much that he does not
+use and does not look like a GNOME application, and GNOME is his favourite
+desktop.
+
+Two more intentions were stated on the same day and still hold: the engine
+is built apart from the interface so that the libraries can be used by
+other projects, and the project is open about being written by one person
+with an AI model, under ordinary software engineering discipline: a
+feature inventory, parity matrices, tests named after matrix rows,
+reference documents and continuous integration.
+
+## The seventeen days in numbers
+
+Read on 16 November 2026, at the merge of pull request 117:
+
+| | |
+| --- | --- |
+| Days since the first commit | 17 |
+| Pull requests merged | 117 |
+| Commits on `main` | 280 |
+| Rust in `crates/` | about 92,000 lines |
+| Beta releases on the Flatpak beta channel | 3 (0.5.0, 0.6.0, 0.7.0) |
+| Features of the new target in scope | 494 |
+| Of those, done and needing no second look | 62 (12.6 %) |
+| Forecast of full parity | end of January 2027 |
+
+The last three rows come from the inventory and the roadmap written on
+16 November. By the older target (iWork '09) Desk Writer had 158 of 304
+matrix rows done on 9 November, before the change of target.
+
+## Timeline
+
+### 30 October: planning
+
+- The owner opened the project with the three iWork '09 manuals and asked
+  for a plan. His brief: an architecture document built from a feature
+  inventory, a shared base for the three apps so that what the manuals
+  describe across them works (a Numbers table in Pages, for example),
+  Pages first, everything developed remotely, parity of features and
+  behaviour plus document compatibility, and ODF as the native format with
+  the extensions needed.
+- Feature inventories were written from the manuals: Pages '09 (260
+  features, 69 of them needing an ODF extension), then Numbers '09 and
+  Keynote '09. An architecture document and an implementation roadmap for
+  Desk Writer in eleven phases followed.
+- The apps were named Desk Writer, Desk Tables and Desk Slides. The
+  working name "Gnome Desk" was dropped the same day.
+- The licences were chosen (pull request 1), the Cargo workspace and the
+  continuous integration were created (pull request 2), and the namespace
+  of the ODF extensions was fixed.
+- A reference virtual machine was built on the owner's PC ("Defiant"):
+  macOS Mojave with iWork '09 updated to 9.3, driven over SSH and
+  AppleScript.
+
+### 31 October: development starts, icons, logo, website
+
+- Phase 1 of Writer in one day (pull requests 3 to 10): the document model
+  with undo and redo, the text engine, pagination, PDF output, the ODT
+  reader and writer, validation of the written ODF against the schemas,
+  and fuzzing of the reader.
+- A proof of concept decided the text engine (pull request 5).
+- Application and document icons and the suite logo, in the Adwaita style
+  and inspired by the iWork '09 originals (pull request 4).
+- The landing page and the README, in English with a Brazilian Portuguese
+  version, published with GitHub Pages at <https://brahm.github.io/desk/>
+  (pull request 11).
+- The owner set the distribution: Flatpak from the project's own
+  repository hosted on GitHub, targeting the newest GNOME 51.
+- First layout parity: twelve reference documents made in Pages '09 lay
+  out the same in Desk (pull request 12), and the `.pages` reader began
+  (pull request 13).
+
+### 1 to 4 November: Writer phases 2 to 5
+
+- **Phase 2, Pages documents** (pull requests 13 to 20): the reader of
+  Pages '09 files, free substitutes for missing fonts, a log of what an
+  import leaves out, one Pages document for each row of the parity matrix
+  (114 documents), and validation of the ODT written from each of them.
+  The older Pages '08 format was dropped.
+- **Phase 3, the editor** (pull requests 21 to 24): open, edit and save;
+  the format bar, the Inspector and invisibles; screen reader support, the
+  Portuguese translation and a nightly Flatpak.
+- **Phase 4, text** (pull requests 25 to 30): tab stops and rulers,
+  character and paragraph effects, styles, lists, Find & Replace,
+  auto-correction, hyphenation, spelling and the proofreader.
+- **The first gap review.** Before phase 5 the owner asked to make sure
+  nothing had been left behind without a later phase to do it, naming
+  shadows in ODF as an example. The review found 23 items, 7 of them ODF
+  extensions; they were closed in pull requests 31 to 33.
+- **Phase 5, structure** (pull requests 34 to 48): sections, columns and
+  facing pages; headers, footers and fields; footnotes and endnotes; table
+  of contents, hyperlinks and bookmarks; outline mode, thumbnails and page
+  modes. Three more gap reviews ran inside the phase.
+- The Flatpak repository got its signed nightly and beta channels, and the
+  first beta, 0.5.0, was published on 4 November.
+- A side question from the owner (how many languages GNOME 51 supports)
+  became the language policy and pull request 50.
+
+### 4 to 9 November: Writer phase 6, objects
+
+- More than forty pull requests (49 to 95): shapes, text boxes, pictures and
+  groups; selection, move, resize, rotate and arrange; linked text boxes;
+  text in shapes; inline objects; gradients, line ends, shadows and
+  reflections; image fills, masks, Instant Alpha and Adjust Image;
+  parametric shapes, the pen and connection lines; movies and sounds; the
+  Media Browser; masters and background objects; page layout documents;
+  and the same objects read from Pages files.
+- From 7 November the gap reviews ran in a thread of their own. They found
+  that Tables and Slides had no roadmap (written on 9 November), that no
+  object was being compared with the PDF that Pages produces, and that a
+  long real document came out with 72 pages in Desk against 62 in Pages.
+- Closing that last difference took four findings: the line metrics of
+  each face of Helvetica Neue (pull request 87), blank pages at section
+  starts (pull request 88), the justification rule of Pages (pull request
+  91) and a metric-compatible substitute font, Desk Neue (pull request
+  95). At the end every compared line of every reference document was in
+  the same place as in Pages.
+
+### 9 to 13 November: review before phase 7, and a new machine
+
+- On 9 November the owner asked what was missing for full parity of
+  Writer: phases 7 to 11, 146 of 304 rows, estimated at 16 to 26 days.
+- A survey before phase 7 listed six points to solve and two decisions for
+  the owner: build a second virtual machine to see the interface of iWork,
+  and whether to read the older iWork formats (left out of scope).
+- On 11 November the owner reinstalled Defiant, moving from Ubuntu 26.04
+  to Fedora 45. The project folder, the worktrees and the virtual machine
+  were checked and repaired, and the build environment was rebuilt.
+- On 13 November the second virtual machine was ready: OS X Lion 10.7.5
+  with iWork 9.3, which draws the documents on screen. With it the
+  interface of Desk was compared with Pages 4.3, and metric-compatible
+  substitutes were made for the 41 fonts of the Pages templates (pull
+  requests 97 to 99). The second beta, 0.6.0, was published.
+
+### 13 and 14 November: the interface question
+
+- The owner asked where Pages conflicts with the GNOME Human Interface
+  Guidelines and for a middle way where they diverge a lot. The answer was
+  a document with 24 conflicts, 7 of them structural, each with a proposed
+  middle way. His answers that day are "the decisions of 13 November".
+- He ordered the project moved to the newest stable libraries: GTK 4.24,
+  Libadwaita 1.10, Rust 1.100 and the GNOME 51 runtime (pull request 100,
+  which also applied the interface plan to Writer).
+- A sixth gap review (pull request 101) aligned the matrices and the
+  roadmaps with those decisions and settled the shortcut rule. The third
+  beta, 0.7.0, was published on 14 November.
+- On 14 November the owner asked for a new inventory of features and
+  interface items from the manuals and from what the Lion machine shows,
+  and for mockups of three versions of the window for the three apps. The
+  inventory read the resources of the apps and placed 933 items of Pages
+  4.3, Numbers 2.3 and Keynote 5.3 in Desk. The mockups were drawn with
+  the real GTK and Libadwaita widgets. **Version B was chosen**, and the
+  plan of the whole suite was rewritten on it (pull requests 102 and 103).
+- The minimum screen was set to 1280 × 720 (pull request 105).
+
+### 14 to 16 November: interface B, Tables, Slides, Writer phase 7
+
+- Writer moved to the interface B window in seven steps (pull requests
+  104, 106 to 111): the window skeleton, the header bar and menus, the
+  slim format bar, the two-level Inspector, the sidebar pages, the bottom
+  bar, and the commands and shortcuts found by the inventory.
+- The ten names and shortcuts proposed by the plan were approved on
+  15 November (pull request 112), and the two gaps left by the migration,
+  object styles and the Text tab of shapes, were closed (pull request
+  113).
+- On 15 November the owner set a standing rule: tell him whenever a task
+  is left undone or moved to a later phase.
+- Three tracks ran in parallel and landed on 16 November: the Desk Slides
+  window (pull request 114), the Desk Tables window (pull request 115) and
+  phase 7 of Writer, tables and charts (pull request 116, with 56 of its
+  76 matrix rows tested).
+
+### 16 November: comparison with the current iWork, and the new target
+
+- In the morning the owner asked for an inventory of the newest Pages and
+  of Pages '09 from manuals and documentation, a comparison between them,
+  and then the same for Keynote and Numbers, marking for each feature
+  which version is better, which is closer to the GNOME guidelines, and
+  which features need an online service, AI or a paid subscription.
+- He then asked what Desk already had by the rule "the better version of
+  each feature, the newer one on a tie", and how long full parity would
+  take without the online, AI and paid features.
+- The pending checks were made on a real Mac with iWork 15.4.
+- In the afternoon he rewrote the goals of the project. The replanning
+  (pull request 117) recorded nineteen decisions, a new inventory of 566
+  features, three window proposals with M+ chosen, a catalogue of ODF
+  extensions, the architecture with diagrams, a roadmap of nineteen
+  phases, a register of what is left undone, and guides for contributors
+  and their coding agents.
+- He asked for a progress dashboard kept up to date and published on the
+  website (pull request 118), and for this log.
+- He asked for a cleanup of the repository and of the project folder on
+  Defiant, and approved the list of candidates. On the PC: five worktrees
+  and eleven local branches whose work is on `main`, the two installer
+  images of the virtual machines, the resources taken from the iWork '09
+  apps for the inventory of 14 November, and old captures, about 7.5 GB.
+  In the repository: the text engine experiment and 28 remote branches
+  (pull request 121). Both virtual machines stay: the readers of Numbers '09 and
+  Keynote '09 still need documents made in iWork '09, and D-020 keeps the
+  Lion machine as the reference for the features only iWork '09 has.
+  Left undone and moved to phase B1: three reference documents that carry
+  media from Apple software are remade there (backlog item B-010).
+
+## Decisions, with their reasons and consequences
+
+Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
+Decisions older than that file have no id.
+
+### Foundations (30 and 31 October)
+
+**A shared base for the three apps, Writer first.**
+*Why:* the cases the manuals describe across apps (a table or a chart of
+Numbers inside Pages or Keynote) only work if the apps share the document
+model, the text engine, tables, formulas and charts.
+*Consequences:* the workspace is split into engine crates without GTK and
+a thin interface layer. When Tables and Slides started on 15 November
+they reused what Writer had; by the inventory of 16 November much of what
+they lack reuses engines that already work in Writer.
+
+**ODF as the native format, with documented extensions.** (Kept as D-009.)
+*Why:* the owner wanted an open standard as the default format and noted
+that ODF allows extensions for what it cannot hold.
+*Consequences:* about a quarter of the Pages '09 features needed an
+extension. The extensions live in one namespace, written files are
+validated against the ODF schemas in the continuous integration, and
+every gap review looked for features that were implemented but not saved.
+On 16 November there were 43 extensions and 25 more features of the new
+target that need one.
+
+**The extension namespace is `https://brahm.com.br/ns/desk/1.0`.**
+*Why:* a namespace URI must be unique, stable and versioned, and can never
+change once documents exist. The owner first asked whether he could change
+it later, since he needed time to set up a domain; the answer was that a
+change is only free before the first public release, and that owning the
+domain is enough, with no hosting needed. He then gave his own domain.
+*Consequences:* the application ids follow the same domain
+(`br.com.brahm.Desk.Writer`, `.Tables`, `.Slides`).
+
+**No "GNOME" in the names.**
+*Why:* the owner had not asked for permission to use the GNOME trademark.
+*Consequences:* the suite is Desk, and the apps are Desk Writer, Desk
+Tables and Desk Slides.
+
+**GPL-3.0-or-later for the apps, MPL-2.0 for the format libraries.**
+*Why:* the owner asked for the best free software licence for the project.
+The repository had started with GPL-2.0, which, kept as "version 2 only",
+is incompatible with the Apache-2.0 and GPL-3.0 libraries common in Rust.
+GPL-3.0-or-later keeps the apps and their forks free. MPL-2.0, a
+file-level copyleft, lets other programs link `desk-odf`, `desk-iwork`
+and `desk-formula` to read and write these formats while changes to the
+library files stay open.
+*Consequences:* the format crates may not depend on any other Desk crate,
+which became a layering rule of the architecture.
+
+**A virtual machine with the real iWork as the reference.**
+*Why:* parity of behaviour needs the original to compare with. The owner
+holds the licences, none of his Macs can run a system old enough for
+iWork '09, and he took responsibility for running macOS on a PC. He also
+said the machine was temporary: needed only until Desk reached parity and
+its ODF could save everything one to one.
+*Consequences:* reference documents are made in Pages by script and
+exported to PDF, and Desk's layout is compared with them line by line.
+The first machine (Mojave) showed a blank document area and could not be
+used to look at the interface; a first attempt at a Lion machine was
+abandoned on 31 October; a patch made the Mojave one usable on 1 November;
+and a working Lion machine was finally built on 13 November. The rule
+that nothing of Apple's enters the repository (no screenshots of iWork,
+no resources, no fonts) comes from this period and was made explicit in
+D-011.
+
+**The text engine builds on Parley, and Desk decides where lines break.**
+*Why:* a proof of concept laid out a justified, hyphenated paragraph
+wrapped around a circle in three ways. Parley's own line breaker left some
+lines too narrow because it has no hyphenation; taking Parley's shaped
+text and deciding the breaks in Desk gave exactly the lines of a
+hand-written engine, with Parley still doing shaping, bidirectional text
+and glyph placement.
+*Consequences:* line breaking, hyphenation, wrapping around objects and
+the line spacing rules of Pages are Desk's own code, which is what later
+made it possible to match Pages line by line.
+
+**Flatpak from the project's own repository, on the newest GNOME.**
+(Kept as D-013.)
+*Why:* the owner's decision on 31 October, replacing the Flathub release
+the first plan assumed. On 13 November he added that Desk is officially
+distributed only as a Flatpak on the GNOME 51 runtime, and that whoever
+packages it for a distribution must meet the requirements or fork.
+*Consequences:* a signed Flatpak repository on GitHub Pages with nightly
+and beta channels; the freedom to require GTK 4.24 and Libadwaita 1.10;
+building outside Flatpak needs Fedora 45, Ubuntu 26.10 or Arch Linux.
+
+### Scope of compatibility (1 to 9 November)
+
+**Only iWork '09 files; Pages '08 and older are out.**
+*Why:* the target was iWork '09 alone, and the reader had no code that
+existed only for the '08 format (pull request 18). The question came back
+on 8 and 9 November for the '05, '06 and '08 formats and the answer was
+the same.
+*Consequences:* the matrix row for older versions is out of scope, and the
+'08 copies of three reference documents survive only on a side branch.
+
+**An import says what it left out.**
+*Why:* a reader that silently drops content cannot be trusted with real
+documents.
+*Consequences:* a log of what an import leaves out since phase 2, later
+shown in the window as a banner with a list of document warnings. The
+fifth gap review found the same silence when opening ODT written by other
+programs, and it was fixed in the closing of phase 6.
+
+**Missing fonts are replaced by substitutes with the same metrics.**
+*Why:* documents made on a Mac use Apple's fonts, which cannot be
+distributed, and a substitute with other widths moves every line break.
+*Consequences:* a table of substitutes; the measured metrics of each face
+of Helvetica Neue; Desk Neue, a substitute built to those metrics, when
+one line of one caption still differed; and substitutes for the 41 fonts
+of the Pages templates, placing words within 0.6 pt of Pages.
+
+**Desk follows Pages where Pages differs from the textbook.**
+*Why:* parity of behaviour. Each case was confirmed on the reference
+machine before being copied.
+*Consequences:* justification stretches each space by at most half an em
+and then spaces the letters (pull request 91); Delete Page deletes the
+whole section; a long footnote was handled as the owner chose after seeing
+that Pages '09 moves it whole to the next page. Under D-020 these cases
+are checked again against iWork 15.4.
+
+**Every supported GNOME language, and no app is translated before it is
+complete.**
+*Why:* the owner asked how many languages GNOME 51 officially supports.
+The rule that followed: Desk supports each of them that has a spelling
+dictionary it can use, and an app is translated only when it has all of
+its features, so that translators do not chase moving text.
+*Consequences:* dictionaries and hyphenation patterns for 37 languages in
+the Flatpak (pull request 50) and the policy in `po/LANGUAGES.md`.
+Brazilian Portuguese is the one translation kept during development.
+
+### The habit of looking for what was left behind (2 to 15 November)
+
+**A gap review before each new phase.**
+*Why:* the owner's instruction of 2 November, repeated in almost the same
+words at least eight times: check that nothing was left undone that is not
+mapped to a later phase.
+*Consequences:* each review found something. Among the finds: 23 items
+after phase 4; phase 5 announced as closed while outline mode, thumbnails
+and the beta channel were missing; the Flatpak still on GNOME 50; no
+roadmap for Tables and Slides; no object compared with Pages; matrix rows
+with no test carrying their id; and matrices that still asked for the
+opposite of a decision already applied. The reviews are the reason tests
+are named after matrix rows and the reason the parity report exists.
+
+**Tell the owner whenever a task is not done or is moved.**
+*Why:* his instruction of 15 November, after asking twice in one evening
+whether anything had been left undone.
+*Consequences:* a standing project instruction; every report since ends
+with what was left undone and where it went; and, on 16 November, the
+register `docs/backlog/deferred.tsv` with a check that refuses to close a
+phase with open items (D-015).
+
+### The interface (13 to 15 November)
+
+**Parity is of features, not of interface.**
+*Why:* the owner's words of 13 November: the aim is a functional copy of
+iWork for GNOME, using Libadwaita and as faithful to the GNOME guidelines
+as possible, without hurting the familiarity of someone who comes from
+iWork. A few minutes later he sharpened it: the interface of iWork has to
+be carried to GNOME, adaptations are necessary, familiarity must not
+break even where that costs something against the guidelines, and the
+answer is the middle way. On 14 November he added the tie-breaker: where
+a middle way is needed, look at the modern Pages, Keynote and Numbers,
+which are already close to Libadwaita applications.
+*Consequences:* the parity matrices gained a column saying how each row is
+adapted to GNOME; the customizable toolbar, the several floating
+Inspector windows and the version browser left the plan; and, two days
+later, the same reasoning taken one step further became the new target.
+
+**The decisions of 13 November.** One Inspector in a sidebar and popovers
+instead of floating windows; menus in the header bar; the GNOME dialog on
+closing ("Save changes?" with Cancel, Discard, Save); sentence-case labels
+with the GNOME glossary; manual saving with a recovery draft every two
+minutes (R-002); one window per document (R-003).
+*Why:* each resolved a conflict between Pages '09 and the guidelines.
+Floating palettes cannot be positioned or kept above the document under
+Wayland, which settled the Inspector.
+*Consequences:* applied to Writer in pull request 100 and to the plans of
+Tables and Slides. R-002 and R-003 lasted three days: the current iWork
+saves automatically with versions and opens documents in tabs, so D-001
+replaced them.
+
+**The newest libraries.**
+*Why:* three proposals of the interface plan needed widgets that the
+versions then in use (Libadwaita 1.5, GTK 4.14) did not have. Since Desk
+ships only as a Flatpak, the owner chose to move to the newest stable
+versions and use them fully.
+*Consequences:* GTK 4.24, Libadwaita 1.10, Rust 1.100, the GNOME 51
+runtime, and an Ubuntu 26.10 container in the continuous integration.
+
+**GNOME's shortcuts first.** (Kept as D-017; D-016 for Help.)
+*Why:* the owner's rule of 13 November: native GNOME shortcuts have
+priority, and the iWork ones are adapted so as not to collide.
+*Consequences:* paragraph styles moved from F1 to F8 to Ctrl+1 to Ctrl+8,
+since F1 is Help and F9 and F10 belong to the window; list levels left
+Alt+Tab; F11 is full screen. On 16 November the second half of the rule
+changed from "the iWork '09 shortcut" to "the iWork 15.4 shortcut".
+
+**Interface B.** (R-004.)
+*Why:* of three mockups (Classic, Balanced, Lean) drawn with real widgets,
+B balanced the familiarity of iWork with the guidelines: a navigation
+sidebar, a header bar with the insert buttons, a slim format bar that
+changes with the selection, an Inspector in two levels and a bottom bar.
+*Consequences:* seven steps of migration in Writer, and Tables and Slides
+born in that window. It was replaced by M+ two days later (D-008). The
+move from B to M+ is smaller than a new window: the format bar and the
+bottom bar give way to the Format pane and overlays, and documents open in
+tabs.
+
+**A minimum screen of 1280 × 720.**
+*Why:* the owner's decision of 14 November: Desk is for desktops, laptops
+and tablets. Phones and smaller screens are not supported, but nothing is
+blocked: the apps warn at start that the screen is below the minimum.
+*Consequences:* the phone layout planned in step 1 was removed; every
+mockup scene was measured against the minimum; a banner warns on smaller
+screens; the README, the site and the metainfo say what Desk needs.
+
+### The new target (16 November)
+
+**How it came about.** The three comparisons showed that the current iWork
+is not simply iWork '09 with features missing:
+
+| | Features compared | Same | Different | Only in '09 | Only in 15 | 15 better | '09 better | 15 closer to the GNOME guidelines |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Pages | 165 | 49 | 74 | 10 | 32 | 57 | 15 | 51 |
+| Keynote | 187 | - | - | - | - | 77 | 6 | 56 |
+| Numbers | 187 | - | - | - | - | 54 | 7 | 63 |
+
+A dash is a count the summary of that comparison did not give. In no
+feature of Pages was iWork '09 closer to the guidelines than the current
+version. iWork '09 wins where the owner had felt it: long documents in
+Pages (outline mode, the styles drawer, the list of search results,
+tracking of format changes, document statistics), Smart Builds in Keynote,
+and the formula bar, the formula list, split cells and reusable tables in
+Numbers. The check on a Mac changed no verdict and added facts: Numbers
+15.4 has 355 functions, the 262 of '09 and 93 new ones of which 4 need the
+network; Keynote 15 removed 7 transitions of '09.
+
+**D-001 to D-003: the target is the current iWork, and nothing '09 did is
+lost.** Shared features behave as in 15.4; features only '09 has are kept,
+presented as the current iWork would present them, including features
+without interface such as charts and tables that update when their source
+document changes; what the current iWork lost inside a shared feature, or
+does only with AI, is kept the same way (wrap direction, split cells, the
+3D chart scene, tracking of format changes, Instant Alpha, the
+Proofreader).
+*Why:* it gives the owner what moved him in the first place, the features
+Apple removed, in the form that is both the better one in most cases and
+the one closest to GNOME. The first rule he tried that morning, "the
+better version of each feature" (R-005), needed a judgement per feature;
+this one does not.
+*Consequences:* R-001, R-002, R-003 and R-005 were replaced. Of the work
+done, 62 of 494 features in scope count as finished without a second
+look, and 30 that were done or had a base need to be looked at again. The
+old phases 8 to 11 of Writer and all but phase 2 of Tables and Slides
+stopped, and a new roadmap replaced them. The estimate grew from about 50
+working days (5 January) to about 70 (end of January, between 10 January
+and 15 February).
+
+**D-004 and D-005: out of scope, never erased.** Features that need AI, an
+online service or a payment stay in the matrices with their mark and
+reason, and the architecture must not rule them out. Features tied to
+Apple platforms are "not applicable to GNOME" unless GNOME has an
+equivalent.
+*Why:* the owner asked for them to be marked out of scope "but not
+discarded".
+*Consequences:* 72 of the 566 inventory rows are out of the phases.
+Taking one back is a new decision.
+
+**D-007 and D-008: native widgets, and the M+ window.**
+*Why:* the owner asked for two mockups: N, the look of the current iWork
+with native Libadwaita widgets, and M, a mix that conflicts least with the
+guidelines. N needed one widget of Desk's own (a toolbar item with a
+caption) and conflicted with the guidelines in six points; M had neither.
+Before choosing, he asked where in M the functions that N shows in the
+toolbar would be, because he did not want a user to miss a function for
+not knowing how to reach it. In M the six object buttons were one click
+further, inside Insert. M+ puts them back in the header bar as icons.
+*Consequences:* M+ is the window of the three apps. Where Libadwaita has
+no widget, Desk builds one by the guidelines and marks it for review at
+each new Libadwaita. The secondary scenes (popovers, menus, dialogs,
+narrow window) were not drawn and are backlog item B-003.
+
+**D-010 and D-011: five families of files, and a clean-room reader.**
+*Why:* the owner listed what Desk must read: its own ODF, iWork '09,
+current iWork, current Microsoft Office, and current LibreOffice and
+OpenOffice. On the current iWork files he asked first that it be checked
+against Apple's copyright and terms, and said that if it infringed, the
+reader would exist only to check parity and be discarded at the end. The
+assessment (technical, not legal advice) was that reading a user's own
+document copies no code of Apple's, that the delicate point is that
+public documentation of the format originates in Apple's executables,
+which is a matter of the licence agreement more than of copyright, and
+that the laws differ.
+*Consequences:* four rules: nothing is extracted from Apple's executables;
+the reader is written from public third-party documentation and from
+documents made by the project; no template, theme, font or image of Apple
+enters the repository; the product names are used only to say what Desk
+is compatible with. The first record of the decision asked for a lawyer's
+review of the second rule before version 1.0 (backlog item B-004). Later
+the same day the owner decided that the project follows the practice of
+LibreOffice, whose import filter for these files (libetonyek, under
+MPL-2.0) was written from the file format and has been distributed for
+years, and that no legal review is required; B-004 was dropped (pull
+request 119). The readers of Numbers '09 and Keynote '09 became new work.
+
+**D-019: four export targets.** ODF as LibreOffice and OpenOffice read
+it, Microsoft Office, PDF and EPUB.
+*Why:* the owner's decision when the plan assumed more.
+*Consequences:* RTF, plain text, CSV and TSV, images, movie, animated GIF,
+HTML and the older Office formats are out of scope and marked. CSV in
+Tables was pointed out as the one worth reconsidering.
+
+**D-012, then D-020: where behaviour is checked.** D-012, in the
+replanning, made iWork 15.4 on a Mac the reference for everything
+(replacing R-006).
+*Why:* the target is the behaviour of the current versions, so the check
+has to be against them.
+*Consequences:* the reference cases made with Pages '09 are redone, and
+where 15.4 breaks lines differently the text engine is adjusted. The old
+cases remain as tests of the reader of iWork '09 files. The same
+afternoon the owner refined it (D-020): validations, interface tests and
+parity documents are made on the Mac with the current iWork, but features
+that only iWork '09 has are tested, and their documents made and checked,
+on the Lion virtual machine that shows the screen, built for that purpose.
+The current iWork cannot show what it no longer has. So the Lion machine
+stays in use for as long as those features are being built; the Mojave
+machine, the first reference, is left with the fixtures of the iWork '09
+readers.
+
+**D-014 and D-018: documentation for contributors, all in English.**
+*Why:* the owner wants outside contributors, human or using coding agents,
+to be able to understand the project from the repository: architecture,
+definitions, roadmap, diagrams, and source files commented to be
+understood on their own. When the first version of the replanning came
+with documentation in English and matrices in Portuguese, he ordered
+everything kept in English, the mockups included.
+*Consequences:* `docs/`, `CONTRIBUTING.md` and `AGENTS.md`; the older
+material in Portuguese is translated in phase B1 (backlog item B-009);
+bringing the comments of the existing code to the new standard is in
+phase X1.
+
+**D-015: nothing is dropped silently.** See "The habit of looking for what
+was left behind".
+
+**A dashboard that is always current.**
+*Why:* the owner asked to follow the progress on a page, kept up to date
+after each set of tasks, with status, backlog and forecast, and published
+on the website.
+*Consequences:* a dashboard generated from the repository (pull request
+118), and a standing instruction to update it. This log joined the list of
+documents kept up to date on the same day.
+
+## What changed direction, and what it cost
+
+| Date | Change | What was redone or set aside |
+| --- | --- | --- |
+| 31 Oct | Flathub to the project's own Flatpak repository | The release steps of the plan |
+| 1 Nov | Pages '08 dropped | Three reference documents |
+| 13 Nov | Interface copied from Pages '09 to a middle way with the GNOME guidelines | Inspector windows, Fonts and Colors windows, Find & Replace window, style shortcuts |
+| 14 Nov | First adaptation (pull request 100) to interface B | Seven migration steps in Writer |
+| 14 Nov | Phone widths to a minimum of 1280 × 720 | The narrow layout of step 1 |
+| 16 Nov | iWork '09 to iWork 15.4 as the target | Roadmap, matrices, the recovery draft, one window per document, 30 features to look at again, all reference cases |
+| 16 Nov | Interface B to M+ | The format bar, the bottom bar, the sheets of Tables in the sidebar |
+| 16 Nov | One reference for checking (iWork 15.4) to two (D-020) | Nothing redone: the cases of features only iWork '09 has stay on the Lion virtual machine |
+| 16 Nov | Portuguese to English for everything in the repository | Matrices, `docs/interface`, mockup scripts |
+
+What did not change in seventeen days: Rust, GTK and Libadwaita; ODF with
+extensions as the native format; the shared engine under three apps; the
+licences; Flatpak; tests tied to an inventory; and a real iWork as the
+judge of behaviour.
+
+## Where the project stands, and what comes next
+
+On 16 November 2026 Desk Writer has its text engine, document structure,
+writing tools, objects, tables and charts, and reads Pages '09 documents
+with the layout of Pages. Desk Tables and Desk Slides have a window, and
+engines for tables, formulas, charts and animation that the apps do not
+use yet.
+
+Next is phase B1 of the [roadmap](roadmap.md), the common base: the M+
+window in the three apps, automatic saving with versions, the reference
+cases redone on iWork 15.4, and the backlog carried from the replanning.
+After it the three apps can advance side by side: six phases of Writer,
+five of Tables, five of Slides, and a last phase across the apps before
+version 1.0.
+
+Open questions that this log should close when they are answered:
+
+- Whether CSV export comes back into scope for Tables.
+- How close the estimate was, phase by phase.
+
+## Sources
+
+- The repository history and its pull requests 1 to 121.
+- [decisions.md](decisions.md), [goals.md](goals.md),
+  [roadmap.md](roadmap.md) and [backlog](backlog/README.md).
+- The project conversations between the owner and Claude from 30 October
+  to 16 November 2026, from which the owner's reasons are taken. They are
+  paraphrased from Portuguese.
+- The reports kept with the project and not in the repository: the feature
+  surveys of Pages, Numbers and Keynote '09; the comparison of Pages with
+  the GNOME guidelines; the six gap reviews; the comparisons of each
+  iWork '09 app with its 15.4 version; the check on the Mac; and the
+  inventory and estimate of 16 November.
+
+## Keeping this log
+
+This log is one of the documents updated throughout the project, with the
+inventory, the backlog register and the dashboard.
+
+1. At the end of each set of tasks, add an entry to the timeline: the
+   date, what was delivered with its pull requests, and what was left
+   undone and where it went.
+2. When the owner takes a decision, or one is replaced, add it to
+   [decisions.md](decisions.md) first, then here with its reason, in his
+   words where they exist, and its consequences. Never rewrite an old
+   entry to fit a new decision: add the new one and say what it replaced.
+3. When a consequence only shows later (an estimate missed, a decision
+   that cost rework), add it to the decision it belongs to and to "What
+   changed direction".
+4. Keep the numbers dated. A count without its date is wrong the next day.

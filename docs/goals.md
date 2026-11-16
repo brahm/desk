@@ -63,9 +63,13 @@ follows the GNOME HIG and marks it for review at each new Libadwaita
 
 ## Verification
 
-Layout and behaviour are checked against iWork 15.4 on a Mac. The cases
-made with Pages '09 on the Lion virtual machine are redone there, and they
-remain only as tests of the reader of iWork '09 files (D-012).
+Checking has two references (D-020). Validations, interface tests and the
+documents made to compare parity are made on a Mac with iWork 15.4; the
+cases made with Pages '09 for features that both versions have are redone
+there, and the old ones remain as tests of the reader of iWork '09 files.
+Features that only iWork '09 has are tested, and their parity documents
+made and checked, on the Lion virtual machine with iWork 9.3, the one that
+shows the screen.
 
 ## Technology and distribution
 

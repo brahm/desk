@@ -19,7 +19,6 @@ the project takes the decisions; the date is the day he took them.
 | D-009 | 2026-11-16 | ODF stays the native format; every implemented feature that standard ODF cannot hold gets a documented extension. | Current |
 | D-010 | 2026-11-16 | Desk reads and imports: Desk ODF, iWork '09, current iWork, current Microsoft Office, current LibreOffice and OpenOffice. | Current |
 | D-011 | 2026-11-16 | The reader of current iWork files is permanent and is written under four rules: nothing is extracted from Apple's executables and no definition file taken from them is copied; it is written from public third-party documentation and from documents made by the project; no template, theme, font or image of Apple enters the repository; the names Pages, Numbers and Keynote are used only to say what Desk is compatible with. The project follows the practice of LibreOffice, whose import filter for these files (libetonyek, MPL 2.0) was written from the file format and has been distributed for years; that filter may be used as a reference under its licence. No legal review is required before version 1.0 (decided by the owner on 2026-11-16; backlog item B-004 dropped). | Current |
-| D-012 | 2026-11-16 | The reference for checking layout and behaviour is iWork 15.4 on a Mac, for everything. | Current |
 | D-013 | 2026-11-16 | Technology and distribution are unchanged: Rust, GTK 4, Libadwaita, Flatpak first, GNOME 51 as the minimum. | Current |
 | D-014 | 2026-11-16 | Documentation for outside contributors and their agents, diagrams of the design, and source files commented to be understood on their own. | Current |
 | D-015 | 2026-11-16 | A register of what each set of tasks left undone, with the reason, and a backlog worked at the end of each phase. | Current |
@@ -27,6 +26,7 @@ the project takes the decisions; the date is the day he took them.
 | D-017 | 2026-11-16 | Shortcuts: GNOME's own first, then the shortcut of iWork 15.4. | Current (assumed, not contested) |
 | D-018 | 2026-11-16 | Everything in the repository is in English: documentation, code comments, matrices, inventories and mockups. The Brazilian Portuguese translation of the apps and of the site stays, as a translation. Older material still in Portuguese is listed in backlog item B-009. | Current |
 | D-019 | 2026-11-16 | Export is limited to LibreOffice and OpenOffice (ODF), Microsoft Office, PDF and EPUB. The other exports of iWork (RTF, plain text, CSV and TSV, images, movie, animated GIF, HTML, the older Office formats) are out of scope and stay marked in the matrices. | Current |
+| D-020 | 2026-11-16 | Checking has two references. Validations, interface tests and the documents made to compare parity are made on the Mac with the current iWork (15.4). Features that only iWork '09 has are tested, and their parity documents made and checked, on the Lion virtual machine that shows the screen, built for this purpose. | Current |
 
 ## Replaced
 
@@ -37,4 +37,5 @@ the project takes the decisions; the date is the day he took them.
 | R-003 | 2026-11-13 | One window per document. | Replaced by D-001 (documents in tabs) |
 | R-004 | 2026-11-14 | Interface B, with the sheets of Tables in the sidebar, a format bar and a bottom bar. | Replaced by D-008 |
 | R-005 | 2026-11-16 | In each feature, the better version according to the comparison reports. | Replaced by D-001 to D-003 |
-| R-006 | 2026-10-30 | Layout compared with PDFs of Pages '09 on the Lion virtual machine. | Replaced by D-012 |
+| R-006 | 2026-10-30 | Layout compared with PDFs of Pages '09 on the Lion virtual machine. | Replaced by D-012, then D-020 |
+| D-012 | 2026-11-16 | The reference for checking layout and behaviour is iWork 15.4 on a Mac, for everything. | Replaced by D-020 (features only iWork '09 has are checked on the Lion virtual machine) |
