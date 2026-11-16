@@ -36,10 +36,15 @@ by name once their prefix is added to the icon theme.
     <file>scalable/actions/desk-crop-symbolic.svg</file>
     <file>scalable/actions/desk-wand-symbolic.svg</file>
     <file>scalable/actions/desk-image-adjust-symbolic.svg</file>
+    <file>scalable/actions/desk-sheet-symbolic.svg</file>
+    <file>scalable/actions/desk-function-symbolic.svg</file>
+    <file>scalable/actions/desk-number-format-symbolic.svg</file>
+    <file>scalable/actions/desk-fill-symbolic.svg</file>
+    <file>scalable/actions/desk-borders-symbolic.svg</file>
+    <file>scalable/actions/desk-text-color-symbolic.svg</file>
     <file>scalable/actions/desk-notes-symbolic.svg</file>
     <file>scalable/actions/desk-skip-slide-symbolic.svg</file>
     <file>scalable/actions/desk-slide-layout-symbolic.svg</file>
     <file>scalable/actions/desk-animate-symbolic.svg</file>
-    <file>scalable/actions/desk-fill-symbolic.svg</file>
   </gresource>
 </gresources>

@@ -63,6 +63,7 @@ mod styles_drawer;
 mod tab_stops;
 mod table_bars;
 mod table_pane;
+mod tables;
 pub mod text_nav;
 mod thumbnails;
 mod undo_names;
@@ -314,6 +315,8 @@ pub fn substitution(choice: &FontChoice) -> String {
         .replace("{requested}", &choice.requested)
         .replace("{used}", &choice.used)
 }
+
+pub use tables::run as run_tables;
 
 /// Runs the app until its last window closes, and returns its exit code.
 /// An app that opens documents passes how it does.
