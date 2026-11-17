@@ -92,19 +92,63 @@ fn parse_bbox(html: &str) -> Vec<Vec<Word>> {
                 .and_then(|(_, t)| t.strip_suffix("</word>"))
                 .map(unescape)
                 .unwrap_or_default();
-            if let (Some(page), Some(x), Some(top), Some(y)) =
-                (pages.last_mut(), attr("xMin"), attr("yMin"), attr("yMax"))
-            {
-                page.push(Word {
-                    text,
-                    x,
-                    y,
-                    height: y - top,
-                });
+            if let (Some(page), Some(x), Some(right), Some(top), Some(y)) = (
+                pages.last_mut(),
+                attr("xMin"),
+                attr("xMax"),
+                attr("yMin"),
+                attr("yMax"),
+            ) {
+                page.push((
+                    Word {
+                        text,
+                        x,
+                        y,
+                        height: y - top,
+                    },
+                    right,
+                ));
             }
         }
     }
-    pages
+    pages.into_iter().map(rejoin_ligatures).collect()
+}
+
+/// Puts back into their words the ligatures that Pages 15.4 draws apart,
+/// each in a span of its own that names its letters (DOC-05): Poppler
+/// reads such a glyph without the move to the start of its line, so it
+/// lands at the top of the page with no height, as far right of the page
+/// edge as it stands right of the start of its line, and leaves its word
+/// in two. Its word is the one whose first part ends where the glyph
+/// begins, from the start of the lines: the left of the text.
+fn rejoin_ligatures(page: Vec<(Word, f64)>) -> Vec<Word> {
+    const LIGATURES: [&str; 5] = ["ff", "fi", "fl", "ffi", "ffl"];
+    let (stray, mut words): (Vec<_>, Vec<_>) = page
+        .into_iter()
+        .partition(|(w, _)| w.height == 0.0 && LIGATURES.contains(&w.text.as_str()));
+    let left = words.iter().map(|(w, _)| w.x).fold(f64::INFINITY, f64::min);
+    for (glyph, _) in stray {
+        let at = glyph.x + left;
+        // The nearest such end: another word may end a little apart.
+        let split = (0..words.len().saturating_sub(1))
+            .filter(|&i| {
+                let (a, a_right) = &words[i];
+                let (b, _) = &words[i + 1];
+                (a_right - at).abs() < 0.05 && (a.y - b.y).abs() < 0.05 && b.x > *a_right
+            })
+            .min_by(|&i, &j| (words[i].1 - at).abs().total_cmp(&(words[j].1 - at).abs()));
+        match split {
+            Some(i) => {
+                let (b, b_right) = words.remove(i + 1);
+                let (a, a_right) = &mut words[i];
+                a.text = format!("{}{}{}", a.text, glyph.text, b.text);
+                *a_right = b_right;
+            }
+            // Not a ligature of Pages: left where Poppler put it.
+            None => words.push((glyph, at)),
+        }
+    }
+    words.into_iter().map(|(w, _)| w).collect()
 }
 
 /// The text of a word, with a ligature as its letters: a PDF names the
@@ -400,6 +444,26 @@ mod tests {
                 vec![]
             ]
         );
+    }
+
+    #[test]
+    fn doc_05_a_ligature_drawn_apart_goes_back_into_its_word() {
+        // As Poppler reads Pages 15.4: "of" and "cia" around a gap, and the
+        // "fi" between them at the top of the page, from the left of the
+        // line at 72.
+        let html = r#"<doc>
+  <page width="595.000000" height="842.000000">
+    <word xMin="72.0" yMin="156.0" xMax="110.0" yMax="168.0">Occaecat</word>
+    <word xMin="113.0" yMin="156.0" xMax="123.0" yMax="168.0">of</word>
+    <word xMin="129.7" yMin="156.0" xMax="143.0" yMax="168.0">cia</word>
+    <word xMin="146.0" yMin="156.0" xMax="170.0" yMax="168.0">ipsum</word>
+    <word xMin="72.0" yMin="170.0" xMax="123.04" yMax="182.0">Nulla</word>
+    <word xMin="126.0" yMin="170.0" xMax="160.0" yMax="182.0">proident</word>
+    <word xMin="51.0" yMin="842.0" xMax="52.0" yMax="842.0">fi</word>
+  </page>
+</doc>"#;
+        let words: Vec<_> = parse_bbox(html)[0].iter().map(|w| w.text.clone()).collect();
+        assert_eq!(words, ["Occaecat", "officia", "ipsum", "Nulla", "proident"]);
     }
 
     #[test]

@@ -329,12 +329,15 @@ fn fmt_14_six_line_spacing_modes() {
             baseline + shift
         );
     };
+    // A multiple scales the line but for the 0.39 pt of leading under the
+    // text, unrounded, as Pages 15.4 laid out Liberation Sans at 12 pt
+    // on the owner's Mac; Pages '09 made these 21 and 28.
     check(
         layout(&mut system, LineSpacing::Multiple { percent: 150 }),
-        21.0,
+        20.8037,
         0.0,
     );
-    check(layout(&mut system, LineSpacing::DOUBLE), 28.0, 0.0);
+    check(layout(&mut system, LineSpacing::DOUBLE), 27.6074, 0.0);
     let pt = Length::from_points;
     check(layout(&mut system, LineSpacing::AtLeast(pt(30))), 30.0, 0.0);
     check(layout(&mut system, LineSpacing::AtLeast(pt(5))), 14.0, 0.0);
@@ -828,14 +831,19 @@ fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
         assert_eq!(lines[1].top - lines[0].top, pitch, "{weight} at {size} pt");
     }
 
-    // A multiple of the line rounds to a whole point: 130% of the 11 pt
-    // line of Light at 9 pt is 14 pt, as in Pages.
-    let spaced = ParaFormat {
-        line_spacing: LineSpacing::Multiple { percent: 130 },
-        ..ParaFormat::default()
-    };
-    let layout = lay(&mut system, spaced, &[(text, neue(300, 9))]);
-    assert_eq!(layout.lines[1].top - layout.lines[0].top, 14.0);
+    // A multiple scales the 11 pt line of Light at 9 pt but for the
+    // 0.26 pt of leading under its text, unrounded: Pages 15.4 made it
+    // 16.37 at 150% and 21.74 at 200% on the owner's Mac, where Pages '09
+    // rounded 130% to 14 pt.
+    for (percent, pitch) in [(150, 16.3694), (200, 21.7389)] {
+        let spaced = ParaFormat {
+            line_spacing: LineSpacing::Multiple { percent },
+            ..ParaFormat::default()
+        };
+        let layout = lay(&mut system, spaced, &[(text, neue(300, 9))]);
+        let measured = layout.lines[1].top - layout.lines[0].top;
+        assert!((measured - pitch).abs() < 0.01, "{percent}%: {measured}");
+    }
 
     // Its letters are spaced so that a line is as wide as in Pages, where
     // this one is 310.75 pt in Regular and 301.45 pt in Light.

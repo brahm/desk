@@ -333,6 +333,8 @@ impl ParagraphText {
         let mut model_offset = 0;
         let mut transformed = false;
         let mut previous: Option<char> = None;
+        // Whether a word came before, for title case (FMT-07).
+        let mut first_word = true;
         let hyphenate = out.paragraph.hyphenate && settings.hyphenation;
         for (text, mut format) in runs {
             // A document without ligatures has none anywhere (FMT-09).
@@ -414,13 +416,30 @@ impl ParagraphText {
                     continue;
                 }
                 let word_start = !previous.is_some_and(char::is_alphanumeric);
-                // As in Pages (FMT-07), everything but capitals is drawn
-                // small, spaces included.
-                let small = format.capitalization == Capitalization::SmallCaps && !c.is_uppercase();
+                // Title case leaves the short words that join others in
+                // lower case, but for the first word (FMT-07).
+                let minor = format.capitalization == Capitalization::Title
+                    && word_start
+                    && c.is_alphanumeric()
+                    && !first_word
+                    && {
+                        let word: String = std::iter::once(c)
+                            .chain(chars.clone().take_while(|c| c.is_alphanumeric()))
+                            .collect();
+                        is_minor_word(&word, format.language.tag())
+                    };
+                if c.is_alphanumeric() {
+                    first_word = false;
+                }
+                // As in Pages 15.4 (FMT-07), everything but capitals and
+                // spaces is drawn small: a space keeps the size of the text.
+                let small = format.capitalization == Capitalization::SmallCaps
+                    && !c.is_uppercase()
+                    && !c.is_whitespace();
                 let upper = match format.capitalization {
                     Capitalization::None => false,
                     Capitalization::AllCaps | Capitalization::SmallCaps => true,
-                    Capitalization::Title => word_start,
+                    Capitalization::Title => word_start && !minor,
                 };
                 if upper && c.is_lowercase() {
                     out.text.extend(c.to_uppercase());
@@ -499,6 +518,31 @@ impl ParagraphText {
     }
 }
 
+/// Whether title case leaves `word` in lower case in `language`, a BCP 47
+/// tag: an article, a short preposition or a conjunction, as Pages 15.4
+/// leaves them (FMT-07). Pages tells them by the grammar of the sentence;
+/// Desk by these lists, of Portuguese and English, both when the language
+/// is neither.
+fn is_minor_word(word: &str, language: &str) -> bool {
+    const PORTUGUESE: &[&str] = &[
+        "a", "à", "ao", "aos", "as", "às", "com", "da", "das", "de", "do", "dos", "e", "em", "na",
+        "nas", "nem", "no", "nos", "o", "os", "ou", "pela", "pelas", "pelo", "pelos", "por", "sem",
+        "um", "uma", "umas", "uns",
+    ];
+    const ENGLISH: &[&str] = &[
+        "a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or", "per",
+        "the", "to", "via", "vs",
+    ];
+    let word = word.to_lowercase();
+    let primary = language.split(['-', '_']).next().unwrap_or("");
+    let lists: &[&[&str]] = match primary {
+        "pt" => &[PORTUGUESE],
+        "en" => &[ENGLISH],
+        _ => &[PORTUGUESE, ENGLISH],
+    };
+    lists.iter().any(|list| list.contains(&word.as_str()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,6 +552,37 @@ mod tests {
             capitalization,
             ..CharFormat::default()
         }
+    }
+
+    #[test]
+    fn fmt_07_title_case_leaves_short_joining_words_in_lower_case() {
+        let title = |text: &str, language: &str| {
+            let format = CharFormat {
+                capitalization: Capitalization::Title,
+                language: desk_model::Language::new(language),
+                ..CharFormat::default()
+            };
+            ParagraphText::from_runs(
+                ParaFormat::default(),
+                CharFormat::default(),
+                [(text, format)],
+            )
+            .text()
+            .to_owned()
+        };
+        // As Pages 15.4 wrote them.
+        assert_eq!(
+            title("o livro de receitas da avó e os segredos do mar", "pt-BR"),
+            "O Livro de Receitas da Avó e os Segredos do Mar"
+        );
+        assert_eq!(
+            title("the return of the king and a tale of two cities", "en-US"),
+            "The Return of the King and a Tale of Two Cities"
+        );
+        // English has no "do" to leave small, and an undetermined language
+        // takes both lists.
+        assert_eq!(title("what we do", "en"), "What We Do");
+        assert_eq!(title("cidade do porto", "und"), "Cidade do Porto");
     }
 
     #[test]

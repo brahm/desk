@@ -10,3 +10,6 @@ size = 12
 filler = 140
 repeat = 8
 space_after = 6
+# As in Pages by default: the first line of the fifth paragraph alone
+# would end the first page, so the paragraph begins the second.
+widow_control = true

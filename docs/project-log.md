@@ -631,6 +631,52 @@ matrix rows done on 9 November, before the change of target.
   Desk Tables and Desk Slides do not save files yet; they take the same
   saving when they do (phase 1 of each).
 
+### 17 November: the reference cases redone on Pages 15.4
+
+- The 13 cases of `corpus/writer` have their `reference.pdf` exported
+  again, by Pages 15.4 on the owner's Mac (macOS 26.7), from the same
+  `case.pages` files that Pages '09 built. Pages 15.4 opened them without
+  converting them and with the Liberation fonts installed. The work was
+  done by controlling the screen of the Mac from the project, after a
+  session on the Mac could not reach it.
+- Against the new references, 9 cases were the same and 4 differed. Each
+  difference is a change of Pages 15.4, and Desk now follows it:
+  - *Line spacing in multiples (FMT-14):* Pages 15.4 scales the line
+    with the leading under the text as the font has it and does not
+    round: double spacing of Liberation Serif at 12 points is 29.49
+    points, where Pages '09 made it 29.
+  - *The bottom of the page (EST-05, INT-02):* a line fits on a page only
+    when all of it fits, the leading below its text included; Pages '09
+    let that leading stick out. The case of text across pages now says
+    that its paragraphs have widow control, as the Pages document has,
+    since the difference only shows with it.
+  - *Title Case (FMT-07):* a document of '09 with Title capitals opens in
+    Pages 15.4 with Title Case, which leaves the short words that join
+    others in lower case ("Inicial de Cada Palavra em Maiúscula"). Pages
+    tells those words by the grammar of the sentence, as two sentences
+    tried on the Mac showed; Desk uses lists of articles, short
+    prepositions and conjunctions of Portuguese and English, by the
+    language of the text.
+  - *Small caps (FMT-07):* Pages 15.4 keeps the spaces at the size of the
+    text; Pages '09 made them small too.
+  - *Ligatures in the PDF (DOC-05):* Pages 15.4 draws a ligature apart,
+    in a span that names its letters, and Poppler reads it out of place,
+    which split "officia" in two. The comparison puts the letters back
+    into their word; the layout of Desk was already the same.
+- *Why:* the target is the current iWork (D-001); the cases measured
+  Desk against Pages '09 until now.
+- *Consequences:* all 13 cases match Pages 15.4. Of the documents of
+  `corpus/fixtures/pages`, with the PDFs of Pages '09, only the one of
+  capitals disagreed, on the spaces of small caps: its PDF was exported
+  again by Pages 15.4. Two tests of the text engine held the multiples
+  that Pages '09 rounded; they now hold what Pages 15.4 laid out on the
+  Mac with Liberation Sans and Helvetica Neue Light. The other documents
+  stay on Pages '09 for now; whether to export all their PDFs again on
+  Pages 15.4 is an open question for the owner.
+- The check of advisories found a new one in the zlib that the font
+  library builds with (RUSTSEC-2026-0544); `libz-sys` went from 1.1.31
+  to 1.1.33, which fixes it.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -1024,6 +1070,8 @@ version 1.0.
 
 Open questions that this log should close when they are answered:
 
+- Whether the documents of `corpus/fixtures/pages` get PDFs of Pages
+  15.4 as the cases did.
 - Whether CSV export comes back into scope for Tables.
 - How close the estimate was, phase by phase.
 
