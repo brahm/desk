@@ -803,6 +803,34 @@ matrix rows done on 9 November, before the change of target.
   than none.
 - *Consequences:* B-011 is closed. AppStream validation passes.
 
+### 17 November: Final validation of B1 on the Mac
+
+- The owner asked for the final validation of B1 on his Mac with iWork
+  15.4, after the screenshots, and then for the checks left out of it,
+  with the apps in front.
+- *What was done:* the 32 rows of B1 that are done (15 of Writer, 8 of
+  Tables, 9 of Slides) were compared with Pages, Numbers and Keynote
+  15.4: their menus, toolbars, Format panes, settings, tabs, dark
+  appearance, zoom and navigation, the name of the change in Undo, and
+  what closing a new document asks. The verdicts are in
+  corpus/mac-review.tsv: 18 rows the same, 10 in another form that a
+  decision sets (mostly D-008, the GNOME window), and 4 with a gap.
+- *The gaps:* Zoom to Selection, which the Zoom menu of the three apps
+  has (and Auto-Center and Zoom to Fit Content in Keynote), became B-027;
+  First Page and Last Page in the Go To menu of Pages became B-028; the
+  name of the change in Undo and Redo, which Numbers shows and Desk
+  Tables does not, became B-029. All three stay in B1.
+- *The 21 rows not finished:* for each, the file records what iWork 15.4
+  does (the table of contents in the sidebar, Screen View, the Organize
+  pane, instant calculations, the Functions browser, Build Order, the
+  Arrange and Adjust Image windows, the settings of Keynote), so that the
+  second round, when Desk finishes them, only has to look at Desk.
+- *How:* first with the apps in the background, so the owner could keep
+  using the Mac; the name in Undo and the menus of the toolbar need the
+  app in front, which the owner then allowed.
+- *Why the captures are not in the repository:* they show Apple's
+  interface, which D-011 keeps out; they are in the project files.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
