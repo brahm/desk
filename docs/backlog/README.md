@@ -34,3 +34,14 @@ here, with the reason, and comes back at the end of the phase.
    reason on every row, and `closed_by` on every row that is not open.
    With `--phase NAME` it fails while that phase has open rows, which is
    the check that closes a phase.
+5. Every `TODO`, `FIXME`, `XXX` or `HACK` in the code cites the id of an
+   open row, as in `TODO(B-012)`, and the change that marks the row `done`
+   or `dropped` removes all of its notes. `ci/check-backlog.py` checks this
+   too, in `ci/check-all.sh` and in the CI: it fails on a note that cites
+   no row, a row that is not in the register, or a row that is no longer
+   open. Markdown files, the register and the script itself are not
+   scanned, since they name the markers in prose.
+6. A note, a `TODO` or a problem met while working on something else is
+   information, not a task. Check that its row is still open before
+   trusting it. Work outside the task becomes a row here and a line in the
+   report to the owner, not part of the change, unless the task needs it.

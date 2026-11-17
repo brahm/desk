@@ -30,7 +30,7 @@ step 'Documentation'
 RUSTDOCFLAGS='--deny warnings' cargo doc --workspace --no-deps --locked
 step 'Dependency rules'
 ci/check-deps.sh
-step 'Backlog register'
+step 'Backlog register and notes in the code'
 python3 ci/check-backlog.py
 step 'ODF extensions defined'
 python3 ci/check-extensions.py

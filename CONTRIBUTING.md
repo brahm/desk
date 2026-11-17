@@ -60,6 +60,10 @@ that file.
   the comment points to the page and section of `docs`.
 - Comments are full sentences in English. No commented-out code, and no
   notes about the history of a change: that belongs in the commit message.
+- **A `TODO`, `FIXME`, `XXX` or `HACK` cites its open row** of
+  [the backlog](docs/backlog/README.md), as in `TODO(B-012)`, and is
+  removed in the change that closes the row. A note without a row is not
+  accepted: `ci/check-backlog.py` fails on it.
 
 The CI builds the documentation with warnings as errors, so a public item
 without a doc comment fails.
