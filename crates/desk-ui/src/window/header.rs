@@ -265,7 +265,6 @@ pub(super) fn view_menu() -> gio::Menu {
     panes.append(Some(&tr("Spe_lling and Grammar")), Some("win.spelling"));
     let document = gio::Menu::new();
     document.append(Some(&tr("_Ruler")), Some("win.ruler"));
-    document.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
     document.append(Some(&tr("_Layout")), Some("win.show-layout"));
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
     let window = gio::Menu::new();

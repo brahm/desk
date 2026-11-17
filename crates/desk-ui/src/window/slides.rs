@@ -10,7 +10,7 @@
 //! navigation sidebar; the presenter notes under the slide; the light
 //! table in the place of the slide; the position as "Slide 3 of 12" with
 //! the Notes button in the bottom bar; the Play button in the header bar;
-//! the format bar of the slide when nothing is selected; and the Animation
+//! the Slide tab of the Format pane when nothing is selected; and the Animation
 //! level of the Inspector. Play, the master slides, transitions and builds
 //! have their places here and work in later phases of Desk Slides.
 
@@ -82,8 +82,9 @@ pub(super) struct Slides {
     pub topics: Rc<Topics>,
     /// The light table, in the place of the slide (KINT-09).
     pub light_table: Rc<LightTable>,
-    /// The format bar of the slide, with nothing selected (KINT-13).
-    pub variant: gtk::Box,
+    /// The Slide group of the Format pane, with nothing selected
+    /// (KINT-13).
+    pub slide_group: crate::compact::Group,
     /// The size of the slides of the light table, in the bottom bar.
     pub size: gtk::Scale,
 }
@@ -137,7 +138,7 @@ impl Slides {
         size.set_visible(false);
         size.set_tooltip_text(Some(&tr("Slide Size")));
         formatting::labelled(&size, &tr("Slide Size"));
-        let (variant, _) = slide_variant();
+        let slide_group = slide_group();
         let this = Rc::new(Self {
             notes_revealer,
             notes,
@@ -146,7 +147,7 @@ impl Slides {
             notes_due: Cell::new(false),
             topics: Topics::new(editor.clone()),
             light_table: LightTable::new(editor),
-            variant,
+            slide_group,
             size,
         });
         let light_table = Rc::downgrade(&this.light_table);
@@ -255,7 +256,6 @@ pub(super) fn view_menu() -> gio::Menu {
     slides.append(Some(&tr("Presenter _Notes")), Some("win.presenter-notes"));
     let document = gio::Menu::new();
     document.append(Some(&tr("_Ruler")), Some("win.ruler"));
-    document.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
     let window = gio::Menu::new();
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
@@ -313,7 +313,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
 }
 
 /// The menu of a slide: in the navigator, on the light table and under
-/// More in the format bar of the slide (KINT-07, KINT-09, KGNM-10).
+/// Search Commands (KINT-07, KINT-09, KGNM-10).
 pub(super) fn slide_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     let add = gio::Menu::new();
@@ -327,66 +327,36 @@ pub(super) fn slide_menu() -> gio::Menu {
     menu
 }
 
-/// The format bar of the slide, with nothing selected (KINT-13): its
-/// master slide, its background, its transition, Skip This Slide and
-/// More. The master slides come in phase 3, the background of a slide
-/// with the rest of phase 1 and the transitions in phase 4, so their
-/// buttons are off until then.
-fn slide_variant() -> (gtk::Box, gtk::ToggleButton) {
-    let bar = gtk::Box::builder().spacing(4).build();
-    let master_label = adw::ButtonContent::builder()
-        .icon_name("desk-slide-layout-symbolic")
-        .label(tr("Blank"))
+/// The Slide group of the Format pane, with nothing selected (KINT-13):
+/// its master slide, its background, its transition and Skip This Slide,
+/// as the format bar of the slide had them in interface B. The master
+/// slides come in phase 3, the background of a slide with the rest of
+/// phase 1 and the transitions in phase 4, so their rows are off until
+/// then; the Slide menu stays for Search Commands.
+fn slide_group() -> crate::compact::Group {
+    let group = crate::compact::Group::builder().title(tr("Slide")).build();
+    for (title, value) in [
+        (tr("Master Slide"), tr("Blank")),
+        (tr("Slide Background"), tr("None")),
+        (tr("Transition"), trc("transition", "None")),
+    ] {
+        let row = crate::compact::ActionRow::builder().title(title).build();
+        row.add_suffix(
+            &gtk::Label::builder()
+                .label(value)
+                .css_classes(["dimmed"])
+                .build(),
+        );
+        row.set_sensitive(false);
+        group.add(&row);
+    }
+    let skip = crate::compact::SwitchRow::builder()
+        .title(tr("Skip This Slide"))
+        .subtitle(tr("Leaves it out of the slideshow"))
         .build();
-    let master = gtk::MenuButton::builder()
-        .child(&master_label)
-        .tooltip_text(tr("Master Slide"))
-        .sensitive(false)
-        .css_classes(["flat"])
-        .build();
-    formatting::labelled(&master, &tr("Master Slide"));
-    bar.append(&master);
-    bar.append(&gtk::Separator::new(gtk::Orientation::Vertical));
-    let background = gtk::MenuButton::builder()
-        .icon_name("desk-fill-symbolic")
-        .tooltip_text(tr("Slide Background"))
-        .sensitive(false)
-        .css_classes(["flat"])
-        .build();
-    formatting::labelled(&background, &tr("Slide Background"));
-    bar.append(&background);
-    bar.append(&gtk::Separator::new(gtk::Orientation::Vertical));
-    let transition_label = adw::ButtonContent::builder()
-        .icon_name("desk-animate-symbolic")
-        .label(trc("transition", "None"))
-        .build();
-    let transition = gtk::MenuButton::builder()
-        .child(&transition_label)
-        .tooltip_text(tr("Transition"))
-        .sensitive(false)
-        .css_classes(["flat"])
-        .build();
-    formatting::labelled(&transition, &tr("Transition"));
-    bar.append(&transition);
-    let skip = gtk::ToggleButton::builder()
-        .icon_name("desk-skip-slide-symbolic")
-        .action_name("win.skip-slide")
-        .tooltip_text(tr("Skip This Slide"))
-        .css_classes(["flat"])
-        .build();
-    formatting::labelled(&skip, &tr("Skip This Slide"));
-    bar.append(&skip);
-    let spring = gtk::Box::builder().hexpand(true).build();
-    bar.append(&spring);
-    let more = gtk::MenuButton::builder()
-        .icon_name("view-more-horizontal-symbolic")
-        .menu_model(&slide_menu())
-        .tooltip_text(tr("More"))
-        .css_classes(["flat"])
-        .build();
-    formatting::labelled(&more, &tr("More"));
-    bar.append(&more);
-    (bar, skip)
+    skip.set_action_name(Some("win.skip-slide"));
+    group.add(&skip);
+    group
 }
 
 /// The outline of the presentation, a page of the navigation sidebar
@@ -881,8 +851,8 @@ impl DocumentWindow {
             self.actions.add_action(&action);
         }
 
-        // Skip This Slide (KSLD-06), in the format bar of the slide and
-        // the menu of a slide.
+        // Skip This Slide (KSLD-06), in the Slide tab of the Format pane
+        // and the menu of a slide.
         let skip = gio::SimpleAction::new_stateful("skip-slide", None, &false.to_variant());
         let weak = Rc::downgrade(self);
         skip.connect_change_state(move |action, value| {
@@ -1039,8 +1009,6 @@ impl DocumentWindow {
         }
         slides.size.set_visible(on);
         self.bottom.zoom.set_visible(!on);
-        self.format_revealer
-            .set_reveal_child(!on && self.action_state("format-bar"));
         slides.notes_revealer.set_visible(!on);
     }
 
@@ -1073,14 +1041,15 @@ impl DocumentWindow {
             .show_slide_position(slide + 1, editor.slide_count().max(1));
     }
 
-    /// Shows the format bar of the slide when nothing is selected
+    /// Shows the Slide tab of the Format pane when nothing is selected
     /// (KINT-13).
     pub(super) fn show_slide_format(&self, editor: &TextEditor) {
         if self.slides.is_none() {
             return;
         }
         if editor.nothing_selected() {
-            self.format_bar.show_variant("slide");
+            self.inspector
+                .show_context(crate::inspector::Context::Slide);
         }
         self.show_slide();
     }

@@ -429,11 +429,11 @@ feature	iCloud Drive, Keynote para iCloud, Handoff, AirDrop 🌐	iCloud Drive, K
 feature	Automator	Automator
 note	Menus do GNOME (Inserir, o menu principal com Visualização, menu Mais) e busca de comandos (GNM-10); compartilhar fica fora por ser online	GNOME menus (Insert, the main menu with View, the More menu) and command search (GNM-10); sharing stays out because it is online
 note	Barra de cabeçalho da interface B com botões de inserir e do Inspetor juntos (INT-11)	Header bar of interface B with the insert buttons and the Inspector button together (INT-11)
-note	Barra de formatação enxuta e contextual da interface B (INT-12)	Lean, contextual format bar of interface B (INT-12)
+note	O que a barra de formatação tinha está no painel Formatar do Inspetor (INT-12, passo 2 da M+)	What the format bar held is in the Format pane of the Inspector (INT-12, step 2 of M+)
 note	Um Inspetor só, na barra lateral direita, em dois níveis, que muda com a seleção (INT-13)	A single Inspector, in the right sidebar, in two levels, that changes with the selection (INT-13)
 note	Página Estilos da barra lateral, com as três listas (INT-18)	Styles page of the sidebar, with the three lists (INT-18)
 note	Popover Mídia com busca e pastas (INT-14); Content Hub e Fotos ficam fora (online/assinatura); gravar áudio vai na linha Som e vídeo	Media popover with search and folders (INT-14); Content Hub and Photos stay out (online/subscription); recording audio is in the Sound and video row
-note	Popover de fontes (Ctrl+T) e paleta de cores (INT-15, INT-16)	Fonts popover (Ctrl+T) and color palette (INT-15, INT-16)
+note	Popover de fontes a partir da linha Família do painel Formatar, e o seletor de cores a partir da linha Cor do texto (INT-15, INT-16, D-024)	Fonts popover from the Family row of the Format pane, and the color chooser from the Text Color row (INT-15, INT-16, D-024)
 note	Ajustar Imagem na aba Imagem do Inspetor (OBJ-07, etapa 4)	Adjust Image in the Image tab of the Inspector (OBJ-07, stage 4)
 note	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 oferece direto do aviso	Banner with View Warnings (INT-22) done; Replace Fonts, which the 15 offers right from the warning, is missing
 note	Barra inferior com posição, Ir para página, Navegar por e contagem (etapa 6, GNM-13)	Bottom bar with position, Go to Page, Navigate By and word count (stage 6, GNM-13)
@@ -476,7 +476,7 @@ note	Réguas e guias (INT-17)	Rulers and guides (INT-17)
 note	Ir para página pela barra inferior (INT-19)	Go to page from the bottom bar (INT-19)
 note	Navegar por tipo de item pela barra inferior (INT-19)	Navigate by kind of item from the bottom bar (INT-19)
 note	Seleção descontínua com Ctrl (TXT-03)	Discontinuous selection with Ctrl (TXT-03)
-note	Barra de formatação e Inspetor (FMT-01, FMT-02, FMT-05)	Format bar and Inspector (FMT-01, FMT-02, FMT-05)
+note	Grupo Fonte do painel Formatar (FMT-01, FMT-02, FMT-05)	Font group of the Format pane (FMT-01, FMT-02, FMT-05)
 note	A fonte padrão vem do modelo; falta escolhê-la nas Preferências	The default font comes from the template; choosing it in Preferences is missing
 note	Cor sólida (FMT-11); falta gradiente e imagem no texto	Solid color (FMT-11); gradient and image in text are missing
 note	Contorno e sombra de texto (FMT-03, FMT-04)	Text outline and shadow (FMT-03, FMT-04)
@@ -594,7 +594,7 @@ note	Privacidade e análise (online)	Privacy and analytics (online)
 note	Assinatura	Subscription
 note	Menus do GNOME da interface B (NGNM-10); falta o menu Organizar (ordenar, filtrar, categorias), que vem com a fase 5	GNOME menus of interface B (NGNM-10); the Organize menu (sort, filter, categories) is missing and comes with phase 5
 note	Barra de cabeçalho da interface B (NINT-07)	Header bar of interface B (NINT-07)
-note	Barra de formatação das células (NINT-08)	Format bar for cells (NINT-08)
+note	O que a barra de formatação das células tinha está nas abas Célula e Texto do painel Formatar (NINT-08, passo 2 da M+)	What the format bar of the cells held is in the Cell and Text tabs of the Format pane (NINT-08, step 2 of M+)
 note	A barra de fórmulas está na janela, mas as células ainda não têm conteúdo (NINT-10, fase 4)	The formula bar is in the window, but the cells have no content yet (NINT-10, phase 4)
 note	Inspetor com Formato, Dados e Documento (NINT-09)	Inspector with Format, Data and Document (NINT-09)
 note	Planilhas, tabelas e gráficos na barra lateral (NINT-03)	Sheets, tables and charts in the sidebar (NINT-03)
@@ -774,7 +774,7 @@ note	Leitor de tela do Writer nas células; falta nas Tables (NGNM-04)	Screen re
 note	Privacidade e análise	Privacy and analytics
 note	Menus do GNOME e busca de comandos da interface B (KGNM-10)	GNOME menus and command search of interface B (KGNM-10)
 note	Barra de cabeçalho com Reproduzir e inserir (KINT-12)	Header bar with Play and insert (KINT-12)
-note	Barra de formatação do slide e da seleção (KINT-13)	Format bar for the slide and the selection (KINT-13)
+note	A aba Slide do painel Formatar quando nada está selecionado, e as abas da seleção (KINT-13, passo 2 da M+)	The Slide tab of the Format pane when nothing is selected, and the tabs of the selection (KINT-13, step 2 of M+)
 note	Inspetor contextual com o nível Animação (KINT-14 no que cabe à fase 2)	Contextual Inspector with the Animation level (KINT-14 as far as phase 2 goes)
 note	Ordem das composições (fase 5)	Build order (phase 5)
 note	Popover Mídia do Writer, sem verificação nas Slides	Media popover of Writer, not checked in Slides

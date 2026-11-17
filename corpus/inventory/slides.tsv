@@ -3,7 +3,7 @@
 id	area	feature	in_iwork	target	rule	scope	status_in_desk	review	phase	note
 S001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	GNOME menus and command search of interface B (KGNM-10)
 S002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Header bar with Play and insert (KINT-12)
-S003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	Format bar for the slide and the selection (KINT-13)
+S003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	The Slide tab of the Format pane when nothing is selected, and the tabs of the selection (KINT-13, step 2 of M+)
 S004	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Contextual Inspector with the Animation level (KINT-14 as far as phase 2 goes)
 S005	3.1 Window, menus and panes	Build Order drawer	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Build order (phase 5)
 S006	3.1 Window, menus and panes	Media Browser 🌐💲 (in 15)	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	B1	Media popover of Writer, not checked in Slides

@@ -169,7 +169,6 @@ pub(super) fn view_menu() -> gio::Menu {
     panes.append(Some(&tr("Search _Results")), Some("win.search"));
     panes.append(Some(&tr("Formula _List")), Some("win.formula-list"));
     let bars = gio::Menu::new();
-    bars.append(Some(&tr("_Format Bar")), Some("win.format-bar"));
     bars.append(Some(&tr("For_mula Bar")), Some("win.formula-bar"));
     let window = gio::Menu::new();
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));

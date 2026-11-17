@@ -112,7 +112,6 @@ const SECTIONS: &[Section] = &[
             ),
             ("<Control>r", n_("Show ruler")),
             ("<Control><Shift>l", n_("Show layout")),
-            ("<Control><Shift>r", n_("Show the format bar")),
         ],
     ),
     (

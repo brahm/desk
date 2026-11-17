@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The object styles of the selected object, in the Style popover of the
-//! format bar and at the top of the Style tab of the Inspector (MOD-04,
+//! The object styles of the selected object, at the top of the Style tab
+//! of the Inspector (MOD-04,
 //! MOD-07): a preview of each style of the object's kind, which applies
 //! it, and the commands that update, make, rename and delete styles and
 //! make one the default.
@@ -324,38 +324,4 @@ impl StylesGroup {
         self.group
             .set_sensitive(info.is_some_and(|i| !i.object.locked));
     }
-}
-
-/// The Style button of the format bar of an object, with the previews and
-/// the commands in its popover.
-pub fn format_bar_button() -> (gtk::MenuButton, Rc<StylePicker>) {
-    let picker = StylePicker::new();
-    let menu = gio::Menu::new();
-    let previews = gio::MenuItem::new(None, None);
-    previews.set_attribute_value("custom", Some(&"previews".to_variant()));
-    let section = gio::Menu::new();
-    section.append_item(&previews);
-    menu.append_section(None, &section);
-    let commands = commands_menu();
-    for i in 0..commands.n_items() {
-        if let Some(part) = commands.item_link(i, "section") {
-            menu.append_section(None, &part);
-        }
-    }
-    let popover = gtk::PopoverMenu::from_model(Some(&menu));
-    let holder = gtk::Box::builder()
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(6)
-        .margin_end(6)
-        .build();
-    holder.append(picker.widget());
-    popover.add_child(&holder, "previews");
-    let button = gtk::MenuButton::builder()
-        .icon_name("desk-styles-symbolic")
-        .popover(&popover)
-        .tooltip_text(tr("Object Styles"))
-        .build();
-    labelled(&button, &tr("Object Styles"));
-    (button, picker)
 }

@@ -92,8 +92,7 @@ impl Kind {
     }
 }
 
-/// Makes the selection a list of the kind that the List menu of the
-/// format bar names (`none`, `bullets`, `numbers` or `tiered`), with the
+/// Makes the selection a list of the kind that the List menu names (`none`, `bullets`, `numbers` or `tiered`), with the
 /// list style of Pages for it (INT-12).
 /// The target of the List menu (`none`, `bullets`, `numbers` or
 /// `tiered`) that a list style's first level is.

@@ -22,7 +22,7 @@ use gtk::{gdk, gio, glib};
 use crate::editing::{BreakKind, FieldKind, TextEditor};
 use crate::find::{self, FindWindow, Search, SearchSidebar};
 use crate::fonts::FontsSlot;
-use crate::formatting::{self, EditorOf, FormatBar, Inspector};
+use crate::formatting::{self, EditorOf, Inspector};
 use crate::geometry;
 use crate::i18n::{n_, tr, trc};
 use crate::nav_sidebar::{self, NavSidebar};
@@ -68,10 +68,9 @@ const NAV_PAGES: [(&str, &str); 4] = [
 ];
 
 /// The widths below which the window changes, in pixels (GNM-01): the
-/// format bar leaves out its secondary controls, the navigation sidebar
-/// covers the pages, and the Inspector covers them too. Desk asks for a
-/// screen of 1280 × 720 at least, and a window can take half of one.
-const COMPACT_FORMAT_BAR: f64 = 1000.0;
+/// navigation sidebar covers the pages, and the Inspector covers them
+/// too. Desk asks for a screen of 1280 × 720 at least, and a window can
+/// take half of one.
 const OVERLAY_SIDEBAR: f64 = 720.0;
 const OVERLAY_INSPECTOR: f64 = 520.0;
 
@@ -113,9 +112,6 @@ pub struct DocumentWindow {
     name: RefCell<String>,
     warnings: RefCell<Vec<crate::Warning>>,
     editor: Rc<RefCell<Option<TextEditor>>>,
-    format_bar: Rc<FormatBar>,
-    /// The variants of the format bar for cells and charts (INT-12).
-    table_bars: Rc<crate::table_bars::TableBars>,
     inspector: Rc<Inspector>,
     /// The styles, a page of the navigation sidebar (INT-18).
     drawer: Rc<StylesDrawer>,
@@ -145,7 +141,6 @@ pub struct DocumentWindow {
     media_button: gtk::MenuButton,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
-    format_revealer: gtk::Revealer,
     ruler: Ruler,
     vertical_ruler: Ruler,
     /// The corner where the rulers meet.
@@ -165,12 +160,11 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 69] = [
+const DOCUMENT_ACTIONS: [&str; 68] = [
     "outline",
     "sidebar",
     "comments",
     "colors",
-    "format-bar",
     "navigate",
     "thumbnails",
     "delete-page",
@@ -243,7 +237,8 @@ thread_local! {
     static COPIED_STYLE: RefCell<Option<desk_model::CopiedStyle>> = const { RefCell::new(None) };
 }
 
-/// The character toggles of the format bar: an action and what it sets.
+/// The character toggles of the Format pane and the keyboard: an action
+/// and what it sets.
 const TOGGLES: [(&str, &str); 4] = [
     ("bold", "Bold"),
     ("italic", "Italic"),
@@ -366,12 +361,7 @@ impl DocumentWindow {
             let cell = editor.clone();
             Rc::new(move || cell.borrow().clone())
         };
-        let format_bar = FormatBar::new(editor_of());
         let inspector = Inspector::new(editor_of());
-        format_bar.set_link_popover(inspector.link_popover());
-        let table_bars = crate::table_bars::TableBars::new(editor_of());
-        format_bar.add_variant(crate::table_bars::CELLS, table_bars.cells());
-        format_bar.add_variant(crate::table_bars::CHART, table_bars.chart());
         let drawer = StylesDrawer::new(editor_of());
         let search = Rc::new(Search::default());
         let search_sidebar = SearchSidebar::new(editor_of(), search.clone());
@@ -407,16 +397,6 @@ impl DocumentWindow {
         // The document as an outline (TXT-14).
         let outline = crate::outline_view::OutlineView::new(editor_of());
         stack.add_named(outline.widget(), Some("outline"));
-        // The format bar scrolls when the window is narrower than it.
-        let format_scroller = gtk::ScrolledWindow::builder()
-            .child(format_bar.widget())
-            .vscrollbar_policy(gtk::PolicyType::Never)
-            .propagate_natural_height(true)
-            .build();
-        let format_revealer = gtk::Revealer::builder()
-            .child(&format_scroller)
-            .reveal_child(false)
-            .build();
         // The page thumbnails, in the navigation sidebar (INT-19, EST-17,
         // GNM-12).
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
@@ -470,10 +450,18 @@ impl DocumentWindow {
             search_sidebar.widget(),
         );
         if slides.is_some() {
-            // The format bar of the slide (KINT-13) and the Animation
-            // level of the Inspector (KINT-14).
+            // The Slide tab of the Format pane when nothing is selected
+            // (KINT-13), and the Animation level of the Inspector
+            // (KINT-14).
             if let Some(slides) = &slides {
-                format_bar.add_variant("slide", &slides.variant);
+                inspector.add_context(
+                    crate::inspector::Context::Slide,
+                    vec![crate::inspector::Tab::new(
+                        "slide",
+                        n_("Slide"),
+                        &[&slides.slide_group],
+                    )],
+                );
             }
             inspector.add_level(
                 slides::ANIMATION,
@@ -506,7 +494,6 @@ impl DocumentWindow {
         );
         toolbar_view.add_top_bar(&screen_banner);
         toolbar_view.add_top_bar(&warnings_banner);
-        toolbar_view.add_top_bar(&format_revealer);
         let find = FindWindow::new(editor_of(), search.clone());
         toolbar_view.add_top_bar(find.widget());
         toolbar_view.set_content(Some(&split));
@@ -532,15 +519,13 @@ impl DocumentWindow {
 
         // The breakpoints belong to the tab, which is as wide as the window.
         // Of the breakpoints that match, the bin applies the one added
-        // last, so each one sets what the wider ones set too. Below about
-        // a thousand pixels the format bar leaves out its secondary
-        // controls; below 720, as when the window takes half of a screen
+        // last, so each one sets what the wider ones set too. Below 720,
+        // as when the window takes half of a screen
         // of 1280 × 720, the smallest Desk supports, the sidebars cover the
         // pages instead of pushing them; below 520 the Inspector covers
         // them too, so that the pages keep some room (GNM-01).
         let mut breakpoints = Vec::new();
         for (width, collapsed) in [
-            (COMPACT_FORMAT_BAR, &[][..]),
             (OVERLAY_SIDEBAR, &[&nav_split][..]),
             (OVERLAY_INSPECTOR, &[&nav_split, &split][..]),
         ] {
@@ -563,10 +548,6 @@ impl DocumentWindow {
                 };
                 breakpoint.add_setter(&insert_button, "menu-model", Some(&menu.to_value()));
             }
-            let bar = format_bar.clone();
-            breakpoint.connect_apply(move |_| bar.set_compact(true));
-            let bar = format_bar.clone();
-            breakpoint.connect_unapply(move |_| bar.set_compact(false));
             breakpoints.push(breakpoint);
         }
         for breakpoint in breakpoints {
@@ -593,8 +574,6 @@ impl DocumentWindow {
             name: RefCell::new(String::new()),
             warnings: RefCell::new(Vec::new()),
             editor,
-            format_bar,
-            table_bars,
             inspector,
             drawer,
             fonts: FontsSlot::default(),
@@ -611,7 +590,6 @@ impl DocumentWindow {
             spelling: std::cell::OnceCell::new(),
             media_button,
             media_browser: std::cell::OnceCell::new(),
-            format_revealer,
             ruler,
             vertical_ruler,
             ruler_corner,
@@ -620,7 +598,7 @@ impl DocumentWindow {
             slides,
         });
         this.add_actions();
-        this.add_format_bar_actions();
+        this.add_text_format_actions();
         this.connect_header(&find_toggle);
         this.add_rename();
         this.add_slides_actions();
@@ -959,20 +937,26 @@ impl DocumentWindow {
                 }
             });
         }
-        self.format_revealer
-            .set_reveal_child(self.action_state("format-bar"));
         self.refresh();
         self.show_format();
     }
 
-    /// Shows the formatting at the selection in the format bar, the
-    /// Inspector and the states of the toggles.
+    /// Shows the Inspector at a tab of its Format pane, for a command
+    /// whose control lives there, such as Fonts and Colors (D-024).
+    fn reveal_format(&self, tab: &str) {
+        self.actions
+            .change_action_state("inspector", &true.to_variant());
+        self.inspector.show_tab(tab);
+    }
+
+    /// Shows the formatting at the selection in the Inspector and the
+    /// states of the toggles.
     fn show_format(&self) {
         let Some(editor) = self.editor() else { return };
         let format = editor.format();
-        self.show_format_bar(&editor, &format);
-        self.show_slide_format(&editor);
+        self.show_format_states(&editor, &format);
         self.inspector.show(&format);
+        self.show_slide_format(&editor);
         if self.nav_shows("styles") {
             self.drawer.show(&editor);
         }
@@ -1130,10 +1114,9 @@ impl DocumentWindow {
         let path = self.path.borrow().clone();
         let name = self.name.borrow().clone();
         if let Some(editor) = &editor {
-            let paragraphs = self.format_bar.set_styles(&editor.paragraph_styles());
-            let characters = self
-                .format_bar
-                .set_character_styles(&editor.character_styles());
+            let text = self.inspector.text();
+            let paragraphs = text.set_styles(&editor.paragraph_styles());
+            let characters = text.set_character_styles(&editor.character_styles());
             if paragraphs || characters {
                 self.show_format();
             }
@@ -1957,7 +1940,8 @@ impl DocumentWindow {
             ]
             .into_iter()
             .map(|(name, menu)| (name, menu.upcast()))
-            .chain(this.format_bar.more_menus())
+            .chain(this.inspector.text().search_menus())
+            .chain([(tr("Objects"), crate::format_pane::object_menu().upcast())])
             .collect();
             if this.slides.is_some() {
                 menus.push((tr("Slide"), slides::slide_menu().upcast()));
@@ -2080,7 +2064,7 @@ impl DocumentWindow {
         self.refresh();
     }
 
-    /// The toggles of the format bar, Show Invisibles and the Inspector,
+    /// The toggles of the Format pane, Show Invisibles and the Inspector,
     /// whose states follow the selection.
     fn add_format_actions(self: &Rc<Self>) {
         for (name, label) in TOGGLES {
@@ -2363,44 +2347,40 @@ impl DocumentWindow {
             let Some(editor) = this.editor() else { return };
             let cell = this.editor.clone();
             let editor_of: crate::formatting::EditorOf = Rc::new(move || cell.borrow().clone());
-            let window = match this.inspector.object_font_button() {
-                // The family of a selected shape's text (OBJ-13).
-                Some(button) if editor.has_selected_objects() => {
-                    this.fonts.present(button, editor_of)
-                }
-                _ => {
-                    this.format_revealer.set_reveal_child(true);
-                    this.fonts.present(this.format_bar.font_button(), editor_of)
-                }
+            // The family of a selected shape's text (OBJ-13), in its Text
+            // tab, or of selected text, in the Style tab of the Format pane
+            // (step 2 of window M+): the pane shows first, so that the
+            // popover has its row to open on.
+            let object = editor.has_selected_objects();
+            this.reveal_format(if object { "text" } else { "style" });
+            let button = if object {
+                this.inspector.object_font_button()
+            } else {
+                this.inspector.text_font_button()
             };
-            let format = editor.format();
-            window.show(&format.character, &format.paragraph);
+            let weak = Rc::downgrade(&this);
+            when_shown(button, move |button| {
+                let Some(this) = weak.upgrade() else { return };
+                let Some(editor) = this.editor() else { return };
+                let window = this.fonts.present(button, editor_of);
+                let format = editor.format();
+                window.show(&format.character, &format.paragraph);
+            });
         });
         self.actions.add_action(&fonts);
         let colors = gio::SimpleAction::new("colors", None);
         let weak = Rc::downgrade(self);
         colors.connect_activate(move |_, _| {
-            if let Some(this) = weak.upgrade() {
-                this.format_bar.choose_color();
-            }
+            let Some(this) = weak.upgrade() else { return };
+            let object = this
+                .editor()
+                .is_some_and(|editor| editor.has_selected_objects());
+            this.reveal_format(if object { "text" } else { "style" });
+            when_shown(this.inspector.text_color_button(object), |button| {
+                button.popup()
+            });
         });
         self.actions.add_action(&colors);
-        // The format bar can be hidden for more room (Ctrl+Shift+R).
-        let format_bar = gio::SimpleAction::new_stateful("format-bar", None, &true.to_variant());
-        let revealer = self.format_revealer.downgrade();
-        let stack = self.stack.downgrade();
-        format_bar.connect_change_state(move |action, value| {
-            let (Some(revealer), Some(stack), Some(on)) = (
-                revealer.upgrade(),
-                stack.upgrade(),
-                value.and_then(|v| v.get::<bool>()),
-            ) else {
-                return;
-            };
-            action.set_state(&on.to_variant());
-            revealer.set_reveal_child(on && stack.visible_child_name().as_deref() != Some("empty"));
-        });
-        self.actions.add_action(&format_bar);
 
         // Pages copies the style of the paragraph and that of the
         // characters apart, and pastes only what was copied (STY-08).
@@ -3057,6 +3037,38 @@ impl FramePage for DocumentWindow {
     }
 }
 
+/// Runs `f` on `widget` once it shows: at once on an idle if it is mapped,
+/// else when it maps, as a row of the Format pane does after the pane or
+/// its tab opens. A popover can only open on a widget that shows.
+fn when_shown<W: IsA<gtk::Widget> + Clone>(widget: &W, f: impl FnOnce(&W) + 'static) {
+    let later = {
+        let widget = widget.clone();
+        move || {
+            glib::idle_add_local_once(move || f(&widget));
+        }
+    };
+    if widget.is_mapped() {
+        later();
+        return;
+    }
+    let later = std::cell::Cell::new(Some(later));
+    let handler: Rc<std::cell::Cell<Option<glib::SignalHandlerId>>> = Rc::default();
+    let id = {
+        let handler = handler.clone();
+        widget
+            .upcast_ref::<gtk::Widget>()
+            .connect_map(move |widget| {
+                if let Some(id) = handler.take() {
+                    widget.disconnect(id);
+                }
+                if let Some(later) = later.take() {
+                    later();
+                }
+            })
+    };
+    handler.set(Some(id));
+}
+
 fn fill_undo(menu: &gio::Menu, editor: Option<&TextEditor>) {
     menu.remove_all();
     let undo = editor.and_then(TextEditor::undo_name);
@@ -3302,8 +3314,8 @@ fn add_page_menu() -> gio::Menu {
     menu
 }
 
-/// The Format menu at the end of the format bar: fonts, colors and
-/// styles.
+/// The Format menu that Search Commands finds and the context menu
+/// shows: fonts, colors and styles.
 pub(crate) fn format_menu() -> gio::Menu {
     let fonts = gio::Menu::new();
     fonts.append(Some(&tr("_Fonts…")), Some("win.fonts"));

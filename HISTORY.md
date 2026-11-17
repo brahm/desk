@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The format bar is gone; its controls are in the Format pane
+  of the Inspector, with the paragraph style over the tabs. Slides has a
+  Slide tab, and Tables has Cell and Text tabs.
+* Added: A Colors popover with the GNOME palette, the eyedropper and a
+  custom color, on every color row.
 * Added: Documents open as tabs of one window, with an overview of the
   open documents; Ctrl+T opens a new document in a tab. The Sidebar button
   only shows the sidebar, and View is in the main menu.

@@ -21,6 +21,7 @@ mod bottom_bar;
 mod bullet_pictures;
 mod chart_data;
 mod chart_pane;
+mod color_popover;
 mod compact;
 mod editing;
 mod effects;
@@ -28,7 +29,7 @@ mod eyedropper;
 mod fields;
 mod find;
 mod fonts;
-mod format_bar;
+mod format_pane;
 mod formatting;
 mod function_browser;
 pub mod geometry;
@@ -61,7 +62,6 @@ mod spelling;
 mod spelling_window;
 mod styles_drawer;
 mod tab_stops;
-mod table_bars;
 mod table_pane;
 mod tables;
 mod tabs;
@@ -401,7 +401,6 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.jump-to-selection", &["<Control>j"]),
             ("win.search", &["<Control><Alt>f"]),
             ("win.colors", &["<Control><Shift>c"]),
-            ("win.format-bar", &["<Control><Shift>r"]),
             ("win.check-spelling", &["<Control>semicolon"]),
             ("win.spelling", &["<Control>colon"]),
             ("win.shortcuts", &["<Control>question"]),

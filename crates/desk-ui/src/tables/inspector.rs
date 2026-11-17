@@ -187,7 +187,14 @@ impl Inspector {
         table_page.append(&name_group);
         table_page.append(&headers);
         table_page.append(&size);
-        let (table, _) = tabs(&[("table", n_("Table"), table_page.upcast())]);
+        // Cell and Text hold what the format bar of the cells had in
+        // interface B (step 2 of window M+).
+        let cells = super::bars::CellPanes::new();
+        let (table, _) = tabs(&[
+            ("table", n_("Table"), table_page.upcast()),
+            ("cell", n_("Cell"), cells.cell.upcast()),
+            ("text", n_("Text"), cells.text.upcast()),
+        ]);
         let format = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .build();

@@ -49,8 +49,10 @@ def fail(message):
 
 
 def walk(node, depth=0):
+    # The popovers of the Format pane hang from its rows, deep in the
+    # Inspector: the Collections of the Fonts popover are 44 levels down.
     yield node
-    if depth > 40:
+    if depth > 60:
         return
     for i in range(node.get_child_count()):
         child = node.get_child_at_index(i)
@@ -175,14 +177,29 @@ def main():
             (selection.start_offset, selection.end_offset) == (0, len("US Letter, landscape ação")),
         )
 
-        press("ctrl+b")
-        bold = find(app, Atspi.Role.TOGGLE_BUTTON, "Bold")
+        # Bold is in the Font group of the Format pane (step 2 of M+).
+        press("ctrl+alt+i")
+        bold = wait_for(
+            "the Bold button of the Format pane",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.TOGGLE_BUTTON
+                    and n.get_name() == "Bold"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
         check("the Bold button is named", bold is not None)
+        press("ctrl+b")
         wait_for("Bold to turn on", lambda: bold.get_state_set().contains(Atspi.StateType.PRESSED))
         check("Ctrl+B turns Bold on for the selection", True)
         press("ctrl+z")
         wait_for("Bold to turn off", lambda: not bold.get_state_set().contains(Atspi.StateType.PRESSED))
         check("Undo takes Bold back", True)
+        press("ctrl+alt+i")
 
         press("End", "ctrl+z")
         wait_for(
@@ -268,7 +285,7 @@ def main():
             "Styles to Include",
         ):
             wait_for(f"{name} in the Inspector", lambda: inspector_node(app, name))
-        wait_for("the Link popover of the format bar", lambda: link_node(app, "Make Links Inactive"))
+        wait_for("the Link popover of the More tab", lambda: link_node(app, "Make Links Inactive"))
         press("Escape")
         check("the Inspector shows spacing, hyphenation, borders and rules", True)
         check("the Inspector shows the headers and footers (EST-01)", True)
@@ -499,7 +516,7 @@ def main():
     bottom_bar(work)
     inventory_commands(work)
     header_and_menus(work)
-    slim_format_bar(work)
+    format_pane(work)
     object_styles(work)
     text_of_a_shape(work)
     small_screen(work)
@@ -593,15 +610,25 @@ def selections_and_colors(work):
         check("Ctrl and a click add the next word", selected() == (start, start + len("landscape")))
         press("ctrl+b")
 
-        # The eyedropper of the format bar colors the selection.
+        # The eyedropper of the text color, in the Colors popover of the
+        # Style tab of the Format pane, colors the selection (step 2 of
+        # M+); win.colors opens the pane and the popover.
         click(first, line, count=2)
-        picker = next(
-            n
-            for n in walk(app)
-            if n.get_role() == Atspi.Role.PUSH_BUTTON
-            and n.get_name() == "Pick a Color from the Screen"
-            and showing(n)
+        activate("colors")
+        picker = wait_for(
+            "the Colors popover",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.PUSH_BUTTON
+                    and n.get_name() == "Pick a Color from the Screen"
+                    and showing(n)
+                ),
+                None,
+            ),
         )
+        check("win.colors opens the Colors popover of the text (INT-16)", showing_named(app, "Blue 3") is not None)
         Atspi.Action.do_action(picker, 0)
         time.sleep(1)
         press("ctrl+s")
@@ -622,8 +649,7 @@ def selections_and_colors(work):
             styled(content, span_style(content, "landscape"), 'fo:font-weight="bold"'),
         )
         check("the word between is not", span_style(content, "Letter,") is None)
-        # The first eyedropper of the bar is that of the color behind the
-        # text, or of the text.
+        # The first eyedropper of the Style tab is that of the text color.
         check("the eyedropper colors the selection", styled(content, us, '="#ff0000"'))
     finally:
         if writer is not None:
@@ -1362,19 +1388,12 @@ def tab_shown(app, tab, name):
 
 
 def link_node(app, name):
-    """The showing node of a name in the Link popover of the format bar,
-    which the Link button opens (INT-13)."""
+    """The showing node of a name in the Link popover, which the Link row
+    of the More tab of text opens (INT-13)."""
     found = showing_named(app, name)
     if found is not None:
         return found
-    button = next(
-        (
-            n
-            for n in walk(app)
-            if n.get_name() == "Link" and n.get_role() == Atspi.Role.TOGGLE_BUTTON and showing(n)
-        ),
-        None,
-    )
+    button = inspector_node(app, "Link", lambda n: n.get_role() == Atspi.Role.TOGGLE_BUTTON)
     if button is not None:
         Atspi.Action.do_action(button, 0)
         time.sleep(0.5)
@@ -2283,12 +2302,6 @@ def mask_from_the_menu(work):
 
 
 
-def alignments(app):
-    """The alignments in the format bar, if they show: a narrow window
-    puts them under More."""
-    return showing_named(app, "Align Left")
-
-
 def extents(node):
     """Where a node is in its window."""
     return Atspi.Component.get_extents(node, Atspi.CoordType.WINDOW)
@@ -2312,7 +2325,7 @@ def gnome_window(work):
     """The window as the decisions of 13/11 adapt it to GNOME: a header bar
     without customization and the main menu (INT-11), the shortcuts
     dialog of Libadwaita (GNM-11), Ctrl+H for Replace (TXT-12), the
-    character styles in the format bar (STY-02), the language of the text
+    character styles in the Format pane (STY-02), the language of the text
     in the Inspector (TXT-10), Favorites in the Fonts popover (INT-15),
     and a narrow window that keeps what matters most (GNM-01); and the
     skeleton of interface B: the navigation sidebar as high as the window
@@ -2349,8 +2362,6 @@ def gnome_window(work):
         check("Ctrl+H shows Find & Replace with the replacement (TXT-12)", True)
         press("Escape")
 
-        wait_for("the alignments in the format bar", lambda: alignments(app))
-
         press("ctrl+alt+i")
         check(
             "the Inspector sets the language of the text (TXT-10)",
@@ -2362,6 +2373,11 @@ def gnome_window(work):
         wait_for("the Fonts popover", lambda: showing_named(app, "Favorites"))
         check("the Fonts popover has Favorites and its star (INT-15)", showing_named(app, "Favorite") is not None)
         press("Escape")
+        # The popover opens on the Family row of the Format pane, which
+        # stays open after it (step 2 of M+).
+        check("win.fonts opens the Format pane", inspector_node(app, "Font Family") is not None)
+        press("ctrl+alt+i")
+        wait_for("the Inspector to close", lambda: inspector_node(app, "Font Family") is None)
 
         document = find(app, Atspi.Role.TEXT, name)
         start = extents(document).x
@@ -2383,10 +2399,6 @@ def gnome_window(work):
         subprocess.run(
             ["xdotool", "search", "--name", name, "windowsize", "640", "600"],
             check=True,
-        )
-        wait_for(
-            "the format bar to leave out the alignments",
-            lambda: alignments(app) is None,
         )
         wait_for("the main menu in the narrow window", lambda: showing_named(app, "Main Menu"))
         check("a narrow window keeps the main controls (GNM-01)", True)
@@ -2547,12 +2559,11 @@ def header_and_menus(work):
         writer.wait(timeout=10)
 
 
-# What the text variant of the format bar shows, and what it leaves for
-# More (INT-12).
-TEXT_BAR = ("Font Size", "Bold", "Italic", "Underline", "Text Color",
-            "Align Left", "Line Spacing", "List", "Link", "More")
-OBJECT_BAR = ("Line", "Shadow", "Reflection", "Opacity", "Wrap", "Bring to Front",
-              "Send to Back", "Arrange", "More")
+# What the Format pane of text shows in its Style tab, and what the Arrange
+# tab of an object shows, in place of the format bar (step 2 of M+).
+TEXT_PANE = ("Paragraph Style", "Font Family", "Size", "Bold", "Italic", "Underline",
+             "Strikethrough", "Text Color", "Character Style", "Align Left")
+ARRANGE_PANE = ("Bring to Front", "Send to Back", "Arrange")
 
 
 def action_state(name):
@@ -2756,14 +2767,15 @@ def search_commands(app, query):
     type_text(query)
 
 
-def slim_format_bar(work):
-    """The slim format bar of interface B: for text, the paragraph style,
-    the font and size, bold, italic and underline, the color, the
-    alignment, the line spacing and the list, with the rest under More,
-    where the character styles are (INT-12, STY-02); for an object, its
-    line, shadow, reflection and opacity, how it sits in the text, and
-    the Arrange commands (INT-12)."""
-    name = "Slim.odt"
+def format_pane(work):
+    """The Format pane of window M+ in place of the format bar (step 2,
+    INT-12, INT-13): for text, the paragraph style over the tabs, and in the
+    Style tab the font, its size, bold, italic, underline and
+    strikethrough, the color, the character style (STY-02) and the
+    alignment; for an object, the Arrange tab with its order and the menu
+    of aligning, distributing and flipping. Search Commands still finds
+    what the menus of the bar had."""
+    name = "Pane.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
     writer = subprocess.Popen([str(WRITER), str(letter)])
@@ -2774,20 +2786,17 @@ def slim_format_bar(work):
             ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
             check=True,
         )
-        wait_for("the text variant of the format bar", lambda: showing_named(app, "Line Spacing"))
-        missing = [b for b in TEXT_BAR if showing_named(app, b) is None]
+        check("there is no format bar (INT-12)", showing_named(app, "More Formatting") is None)
+        press("ctrl+alt+i")
+        wait_for("the Format pane of text", lambda: showing_named(app, "Paragraph Style"))
+        missing = [b for b in TEXT_PANE if showing_named(app, b) is None]
         check(
-            "the format bar of text has the style, font, size, B I U, color, alignment, spacing, list, Link and More (INT-12)",
+            "the Format pane of text has the style, the font, its size and style, the color, the character style and the alignment (INT-12)",
             not missing,
         )
-        check(
-            "strikethrough and the character styles leave the bar for More (INT-12)",
-            showing_named(app, "Strikethrough") is None
-            and showing_named(app, "Character Style") is None,
-        )
         search_commands(app, "character style none")
-        wait_for("the character styles under More", lambda: showing_named(app, "None"))
-        check("the More menu has the character styles (STY-02)", True)
+        wait_for("the character styles in Search Commands", lambda: showing_named(app, "None"))
+        check("Search Commands finds the character styles (STY-02)", True)
         press("Escape")
         wait_for("the command search to close", lambda: showing_named(app, "Search Commands") is None)
 
@@ -2796,31 +2805,29 @@ def slim_format_bar(work):
         time.sleep(1)
         press("ctrl+s")
         wait_for("the saved line spacing", lambda: saved_content(letter, r'fo:line-height="200%"'))
-        check("the line spacing of the bar is saved (INT-12)", True)
+        check("the line spacing is saved (INT-12)", True)
         wait_for("the saved list", lambda: saved_content(letter, r"<text:list "))
-        check("the list of the bar is saved (INT-12)", True)
+        check("the list is saved (INT-12)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)
 
-    writer, app, letter = open_with_a_shape(work, "SlimShape.odt")
+    writer, app, letter = open_with_a_shape(work, "PaneShape.odt")
     try:
-        wait_for("the object variant of the format bar", lambda: showing_named(app, "Reflection"))
-        missing = [b for b in OBJECT_BAR if showing_named(app, b) is None]
+        if showing_named(app, "Document") is None:
+            press("ctrl+alt+i")
+        activate("inspector-tab", "arrange")
+        wait_for("the Arrange tab", lambda: showing_named(app, "Bring to Front"))
+        missing = [b for b in ARRANGE_PANE if showing_named(app, b) is None]
         check(
-            "a selected object turns the bar to its line, effects, wrap and Arrange (INT-12)",
-            not missing and showing_named(app, "Font Size") is None,
+            "a selected object has its order and the Arrange menu in the Arrange tab (INT-12)",
+            not missing,
         )
-        reflection = next(
-            n
-            for n in walk(app)
-            if n.get_name() == "Reflection" and n.get_role() == Atspi.Role.TOGGLE_BUTTON and showing(n)
-        )
-        Atspi.Action.do_action(reflection, 0)
+        activate("object-reflection")
         time.sleep(1)
         press("ctrl+s")
         wait_for("the saved reflection", lambda: saved_content(letter, r'desk:reflection="50%"'))
-        check("Reflection in the bar reflects the shape (INT-12)", True)
+        check("Reflection reflects the shape (INT-12)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

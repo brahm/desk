@@ -526,6 +526,36 @@ matrix rows done on 9 November, before the change of target.
   The matrix rows of the menus (GNM-10, NGNM-10, KGNM-10) were brought in
   line with M+, where View is in the main menu.
 
+### 16 November: step 2 of window M+, the Format pane
+
+- The format bar is gone from the three apps. Its controls moved to the
+  Format pane of the Inspector, as in the iWork of today: the paragraph
+  style sits over the tabs; the Style tab of text has the Font group
+  (family, size, bold, italic, underline, strikethrough, text color and
+  character style), alignment, spacing, lists and shadow; the More tab
+  has the links; the Arrange tab has Bring to Front, Send to Back and a
+  menu to align, distribute and flip. The Format Bar item and its
+  shortcut (Ctrl+Shift+R) are gone.
+- Slides shows a Slide tab when nothing is selected (skip the slide; the
+  master, background and transition rows are placeholders until the
+  phases that make them). Tables shows Cell and Text tabs in place of its
+  two format bars.
+- The color rows open a new Colors popover in place of the Colors window
+  of iWork: the palette of the GNOME guidelines, the eyedropper and
+  Custom…, which opens the color chooser of GTK. Libadwaita has no color
+  popover, so it is a custom widget, recorded in the component table.
+  Fonts and Colors open the Format pane first, on the tab of the
+  selection, and then their popover on its row.
+- *Why:* M+ moves every format control to the pane (INT-16), and with
+  D-022 the pane follows the look of GNOME's own settings: groups of
+  rows, a popover instead of a floating window.
+- *Left for later:* the row of the document's own colors in the Colors
+  popover, and the Typeface row and the advanced options of the Font
+  group, are in the backlog as B-019, still in phase B1.
+- *Consequences:* the UI tests open the Inspector before they look for a
+  control that the format bar used to show, and the command search finds
+  the Format menu and the Objects menu of the pane.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

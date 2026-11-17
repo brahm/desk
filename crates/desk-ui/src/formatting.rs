@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The format bar under the header bar and the Inspector at the side of a
-//! window, as in Pages: they show the formatting at the selection and
-//! change it.
+//! The Inspector at the side of a window, as in Pages: it shows the
+//! formatting at the selection and changes it. Its Format pane holds what
+//! the format bar of interface B had (step 2 of window M+).
 //!
-//! The toggles of the format bar (bold, italic, underline, strikethrough
+//! The toggles of the Format pane (bold, italic, underline, strikethrough
 //! and alignment) are actions of the window, which the keyboard shortcuts
 //! also run; the rest calls the editor through `editor`.
 
@@ -72,8 +72,6 @@ pub fn from_gdk(color: &gdk::RGBA) -> Rgba {
     }
 }
 
-pub use crate::format_bar::FormatBar;
-
 /// The Inspector: Format, with the tabs of what is selected, and Document
 /// (INT-13).
 pub struct Inspector {
@@ -82,8 +80,12 @@ pub struct Inspector {
     levels: Rc<Levels>,
     /// The counts of the Info tab of Document.
     statistics: InfoRows,
-    /// The hyperlink and the bookmarks, which the format bar shows.
-    link_popover: gtk::Popover,
+    /// What the format bar of interface B held for text: the paragraph
+    /// style over the tabs, the character style and the link (step 2 of
+    /// window M+).
+    text: Rc<crate::format_pane::TextFormat>,
+    /// The font and alignment of selected text, in its Style tab.
+    text_font: Rc<crate::object_text_pane::ObjectTextGroups>,
     editor: EditorOf,
     line_spacing: compact::SpinRow,
     before: compact::SpinRow,
@@ -202,6 +204,13 @@ impl Inspector {
         let toc = crate::links_pane::TocGroup::new(editor.clone());
         let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
         let object_text = crate::object_text_pane::ObjectTextGroups::new(editor.clone());
+        let text = crate::format_pane::TextFormat::new(editor.clone());
+        let text_font = crate::object_text_pane::ObjectTextGroups::new(editor.clone());
+        // Lists has a group of its own in the Style tab of text.
+        text_font.hide_list();
+        let [text_family, text_alignment] = text_font.groups();
+        text_family.add(text.character_row());
+        let arrange_group = crate::format_pane::arrange_group();
         let object_styles = crate::object_styles_pane::StylesGroup::new();
         let table = crate::table_pane::TableGroups::new(editor.clone());
         let chart = crate::chart_pane::ChartGroups::new(editor.clone());
@@ -243,7 +252,7 @@ impl Inspector {
         let [character, text_shadow, borders] = effects.groups();
         let [page, layout, section] = layouts.groups();
         let [link, bookmarks] = links.groups();
-        let arrange = || Tab::new("arrange", n_("Arrange"), &[metrics, wrap]);
+        let arrange = || Tab::new("arrange", n_("Arrange"), &[&arrange_group, metrics, wrap]);
         let styles = object_styles.group();
         let style = || Tab::new("style", n_("Style"), &[styles, graphic, shape]);
         let mut contexts = HashMap::new();
@@ -253,14 +262,21 @@ impl Inspector {
                 Tab::new(
                     "style",
                     n_("Style"),
-                    &[character, text_shadow, &spacing, lists.widget()],
+                    &[
+                        text_family,
+                        text_alignment,
+                        &spacing,
+                        lists.widget(),
+                        character,
+                        text_shadow,
+                    ],
                 ),
                 Tab::new(
                     "layout",
                     n_("Layout"),
                     &[&indents, tabs.widget(), layout, borders],
                 ),
-                Tab::new("more", n_("More"), &[&hyphenation]),
+                Tab::new("more", n_("More"), &[text.link_group(), &hyphenation]),
             ],
         );
         contexts.insert(
@@ -329,14 +345,17 @@ impl Inspector {
             Tab::new("info", n_("Info"), &[&statistics.group]),
         ];
         let levels = Levels::new(contexts, document_tabs);
+        levels.set_header(Context::Text, text.header().widget());
         let link_popover = link_popover(&[link, bookmarks]);
+        text.set_link_popover(&link_popover);
         let root = levels.widget().clone();
 
         let this = Rc::new(Self {
             root,
             levels,
             statistics,
-            link_popover,
+            text,
+            text_font,
             editor: editor.clone(),
             line_spacing,
             before,
@@ -459,17 +478,45 @@ impl Inspector {
         &self.root
     }
 
-    /// The popover of the hyperlink and the bookmarks at the selection,
-    /// which the Link button of the format bar opens.
-    pub fn link_popover(&self) -> &gtk::Popover {
-        &self.link_popover
+    /// The paragraph and character styles and the link of text.
+    pub fn text(&self) -> &Rc<crate::format_pane::TextFormat> {
+        &self.text
+    }
+
+    /// The button of the font family of selected text, in the Style tab,
+    /// which the Fonts popover opens on (D-024).
+    pub fn text_font_button(&self) -> &gtk::Button {
+        self.text_font.family_button()
+    }
+
+    /// The button of the Colors popover of the text color: that of a
+    /// selected shape's text (in its Text tab), else that of selected
+    /// text (in the Style tab).
+    pub fn text_color_button(&self, object: bool) -> &gtk::MenuButton {
+        if object {
+            self.object_text.colors_button()
+        } else {
+            self.text_font.colors_button()
+        }
+    }
+
+    /// Adds the tabs of a kind of selection that only an app has, such as
+    /// the slide of Desk Slides (KINT-13).
+    pub fn add_context(&self, context: Context, tabs: Vec<Tab>) {
+        self.levels.add_context(context, tabs);
+    }
+
+    /// Shows the tabs of a kind of selection in place of those the
+    /// selection chose, such as the slide when nothing is selected in
+    /// Desk Slides.
+    pub fn show_context(&self, context: Context) {
+        self.levels.show(context);
     }
 
     /// The button of the font family in the Text tab of a selected shape,
-    /// which the Fonts popover opens on while it shows.
-    pub fn object_font_button(&self) -> Option<&gtk::Button> {
-        let button = self.object_text.family_button();
-        button.is_mapped().then_some(button)
+    /// which the Fonts popover opens on.
+    pub fn object_font_button(&self) -> &gtk::Button {
+        self.object_text.family_button()
     }
 
     /// Shows a tab, by its name: "style", "image", "arrange", "document"…
@@ -524,6 +571,7 @@ impl Inspector {
         *self.shown.borrow_mut() = Some(format.clone());
         self.objects.show_format(format);
         self.object_text.show(format, format.object_text);
+        self.text_font.show_text(format);
         self.object_styles.show(format.object.as_ref());
         let context = Context::of(format.object.as_ref());
         if let Some(editor) = (self.editor)() {

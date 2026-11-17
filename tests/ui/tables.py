@@ -179,8 +179,11 @@ def main():
             "the header bar has nothing to customize it (NINT-07)",
             showing_named(app, "Customize Toolbar") is None,
         )
-        for bar in ("Format Bar", "Formula Bar"):
-            check(f"the window has the {bar.lower()} (NINT-08, NINT-02)", showing_named(app, bar))
+        check("the window has the formula bar (NINT-02)", showing_named(app, "Formula Bar"))
+        check(
+            "and no format bar: its controls are in the Format pane (NINT-08, step 2 of M+)",
+            showing_named(app, "Format Bar") is None,
+        )
         check(
             "the bottom bar has the zoom and the instant calculations (NINT-04, NGNM-13)",
             showing_named(app, "Zoom") and showing_named(app, "Instant Calculations"),
@@ -230,6 +233,10 @@ def main():
         wait_for("the Inspector", lambda: showing_named(app, "Show Table Name"))
         for level in ("Format", "Data", "Document"):
             check(f"the Inspector has the level {level} (NINT-09)", showing_named(app, level))
+        check(
+            "the Format pane of a table has the tabs Cell and Text, with what the format bar had (NINT-08)",
+            showing_named(app, "Cell") and showing_named(app, "Text"),
+        )
         press("ctrl+alt+i")
 
         # Sheets are added, shown, renamed and deleted (NTAB-02, NTAB-04).
@@ -313,7 +320,6 @@ def main():
         wait_for("the header bar to settle", lambda: all(showing_named(app, b) for b in HEADER))
         missing = [b for b in HEADER if showing_named(app, b) is None]
         check("below 720 px the header bar keeps Insert and leaves out the objects (NGNM-01)", not missing)
-        check("and the format bar leaves out its secondary controls (NGNM-01)", showing_named(app, "Fewer Decimals") is None)
     finally:
         tables.terminate()
         tables.wait(timeout=10)

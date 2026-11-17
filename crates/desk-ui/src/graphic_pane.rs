@@ -124,8 +124,7 @@ fn color_row(title: &str) -> (compact::ActionRow, gtk::ColorDialogButton) {
         .build();
     labelled(&button, title);
     let row = compact::ActionRow::builder().title(title).build();
-    row.add_suffix(&crate::eyedropper::button(&button));
-    row.add_suffix(&button);
+    row.add_suffix(&crate::color_popover::button(&button, title));
     (row, button)
 }
 
