@@ -70,13 +70,41 @@ const DEPTH_SLACK: f64 = 0.07;
 
 /// The words of each page of a PDF.
 pub fn words(pdf: &Path) -> Result<Vec<Vec<Word>>, CompareError> {
-    let output = run(Command::new("pdftotext").arg("-bbox").arg(pdf).arg("-"))?;
-    Ok(parse_bbox(&output))
+    let pages = parse_bbox(&run(Command::new("pdftotext")
+        .arg("-bbox")
+        .arg(pdf)
+        .arg("-"))?);
+    if !pages.iter().flatten().any(is_ligature_drawn_apart) {
+        return Ok(pages);
+    }
+    // Drawn again by Cairo, the glyph is written with its place and its
+    // letters, as any other.
+    let name = pdf.file_name().unwrap_or_default().to_string_lossy();
+    let redrawn = std::env::temp_dir().join(format!("desk-{}-{name}", std::process::id()));
+    run(Command::new("pdftocairo")
+        .arg("-pdf")
+        .arg(pdf)
+        .arg(&redrawn))?;
+    let output = run(Command::new("pdftotext")
+        .arg("-bbox")
+        .arg(&redrawn)
+        .arg("-"));
+    let _ = std::fs::remove_file(&redrawn);
+    Ok(parse_bbox(&output?))
+}
+
+/// Whether a word is a ligature that Pages 15.4 drew in a span of its own
+/// that names its letters (DOC-05): Poppler reads such a glyph without the
+/// move to the start of its line, so it lands at the top of the page with
+/// no height, and leaves its word in two.
+fn is_ligature_drawn_apart(word: &Word) -> bool {
+    const LIGATURES: [&str; 5] = ["ff", "fi", "fl", "ffi", "ffl"];
+    word.height == 0.0 && LIGATURES.contains(&word.text.as_str())
 }
 
 /// Reads the output of `pdftotext -bbox`.
 fn parse_bbox(html: &str) -> Vec<Vec<Word>> {
-    let mut pages = Vec::new();
+    let mut pages: Vec<Vec<(Word, f64)>> = Vec::new();
     for line in html.lines() {
         let line = line.trim();
         if line.starts_with("<page ") {
@@ -99,6 +127,16 @@ fn parse_bbox(html: &str) -> Vec<Vec<Word>> {
                 attr("yMin"),
                 attr("yMax"),
             ) {
+                // A word drawn in two runs that touch, as Pages 15.4 draws
+                // one around a field (EST-16): Poppler leaves it in two.
+                if let Some((last, last_right)) = page.last_mut()
+                    && (x - *last_right).abs() < 0.01
+                    && (y - last.y).abs() < 0.05
+                {
+                    last.text.push_str(&text);
+                    *last_right = right;
+                    continue;
+                }
                 page.push((
                     Word {
                         text,
@@ -111,44 +149,10 @@ fn parse_bbox(html: &str) -> Vec<Vec<Word>> {
             }
         }
     }
-    pages.into_iter().map(rejoin_ligatures).collect()
-}
-
-/// Puts back into their words the ligatures that Pages 15.4 draws apart,
-/// each in a span of its own that names its letters (DOC-05): Poppler
-/// reads such a glyph without the move to the start of its line, so it
-/// lands at the top of the page with no height, as far right of the page
-/// edge as it stands right of the start of its line, and leaves its word
-/// in two. Its word is the one whose first part ends where the glyph
-/// begins, from the start of the lines: the left of the text.
-fn rejoin_ligatures(page: Vec<(Word, f64)>) -> Vec<Word> {
-    const LIGATURES: [&str; 5] = ["ff", "fi", "fl", "ffi", "ffl"];
-    let (stray, mut words): (Vec<_>, Vec<_>) = page
+    pages
         .into_iter()
-        .partition(|(w, _)| w.height == 0.0 && LIGATURES.contains(&w.text.as_str()));
-    let left = words.iter().map(|(w, _)| w.x).fold(f64::INFINITY, f64::min);
-    for (glyph, _) in stray {
-        let at = glyph.x + left;
-        // The nearest such end: another word may end a little apart.
-        let split = (0..words.len().saturating_sub(1))
-            .filter(|&i| {
-                let (a, a_right) = &words[i];
-                let (b, _) = &words[i + 1];
-                (a_right - at).abs() < 0.05 && (a.y - b.y).abs() < 0.05 && b.x > *a_right
-            })
-            .min_by(|&i, &j| (words[i].1 - at).abs().total_cmp(&(words[j].1 - at).abs()));
-        match split {
-            Some(i) => {
-                let (b, b_right) = words.remove(i + 1);
-                let (a, a_right) = &mut words[i];
-                a.text = format!("{}{}{}", a.text, glyph.text, b.text);
-                *a_right = b_right;
-            }
-            // Not a ligature of Pages: left where Poppler put it.
-            None => words.push((glyph, at)),
-        }
-    }
-    words.into_iter().map(|(w, _)| w).collect()
+        .map(|page| page.into_iter().map(|(word, _)| word).collect())
+        .collect()
 }
 
 /// The text of a word, with a ligature as its letters: a PDF names the
@@ -447,23 +451,51 @@ mod tests {
     }
 
     #[test]
-    fn doc_05_a_ligature_drawn_apart_goes_back_into_its_word() {
+    fn doc_05_a_ligature_drawn_apart_is_found() {
         // As Poppler reads Pages 15.4: "of" and "cia" around a gap, and the
-        // "fi" between them at the top of the page, from the left of the
-        // line at 72.
+        // "fi" between them at the top of the page.
         let html = r#"<doc>
   <page width="595.000000" height="842.000000">
-    <word xMin="72.0" yMin="156.0" xMax="110.0" yMax="168.0">Occaecat</word>
     <word xMin="113.0" yMin="156.0" xMax="123.0" yMax="168.0">of</word>
     <word xMin="129.7" yMin="156.0" xMax="143.0" yMax="168.0">cia</word>
-    <word xMin="146.0" yMin="156.0" xMax="170.0" yMax="168.0">ipsum</word>
-    <word xMin="72.0" yMin="170.0" xMax="123.04" yMax="182.0">Nulla</word>
-    <word xMin="126.0" yMin="170.0" xMax="160.0" yMax="182.0">proident</word>
     <word xMin="51.0" yMin="842.0" xMax="52.0" yMax="842.0">fi</word>
   </page>
 </doc>"#;
+        let found: Vec<_> = parse_bbox(html)[0]
+            .iter()
+            .map(is_ligature_drawn_apart)
+            .collect();
+        assert_eq!(found, [false, false, true]);
+    }
+
+    #[test]
+    fn est_16_a_word_drawn_in_two_touching_runs_is_one_word() {
+        // As Poppler reads Pages 15.4: "sectio", the number of a page
+        // field, and "n", each in a run of its own that touches the last.
+        let html = r#"<doc>
+  <page width="595.000000" height="842.000000">
+    <word xMin="56.69" yMin="100.69" xMax="97.39" yMax="112.69">Second</word>
+    <word xMin="100.728" yMin="100.69" xMax="132.0745" yMax="112.69">sectio</word>
+    <word xMin="132.0738" yMin="100.69" xMax="138.7458" yMax="112.69">5</word>
+    <word xMin="138.7476" yMin="100.69" xMax="145.4196" yMax="112.69">n</word>
+    <word xMin="148.75" yMin="100.69" xMax="178.09" yMax="112.69">starts</word>
+  </page>
+</doc>"#;
         let words: Vec<_> = parse_bbox(html)[0].iter().map(|w| w.text.clone()).collect();
-        assert_eq!(words, ["Occaecat", "officia", "ipsum", "Nulla", "proident"]);
+        assert_eq!(words, ["Second", "sectio5n", "starts"]);
+    }
+
+    /// Cairo writes the glyph again with its place: the word is whole.
+    #[test]
+    fn doc_05_a_ligature_drawn_apart_is_read_in_its_word() {
+        let pdf = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../corpus/fixtures/pages/fmt-09-ligatures.pdf");
+        let text: Vec<_> = words(&pdf).unwrap()[0]
+            .iter()
+            .map(|w| w.text.clone())
+            .collect();
+        assert!(text.contains(&"office".to_owned()), "{text:?}");
+        assert!(text.contains(&"fifty".to_owned()), "{text:?}");
     }
 
     #[test]

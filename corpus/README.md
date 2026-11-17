@@ -100,10 +100,19 @@ rows about the application alone or what the reference machine cannot
 do. Desk reads only the format of Pages '09, so there are no documents
 saved in the format of Pages '08.
 
-Their PDFs are of Pages '09, but where Pages 15.4 lays a document out
-otherwise and Desk follows it: there the PDF was exported again by Pages
-15.4 from the same document, and the manifest says so. That is the case
-of `fmt-07-capitalization`, since 17 November 2026.
+Since 17 November 2026 their PDFs are those that Pages 15.4 exports from
+the same documents on the owner's Mac (D-020), which opens them as they
+are. Two kinds keep the PDF of Pages '09, and the manifest says so on
+their rows: features that only Pages '09 has, such as the outline, and
+documents that Pages 15.4 lays out otherwise where Desk does not follow
+it yet, each with its row of the backlog (B-020 to B-025). `mod-12-template`
+is a template package, which this export left out, and keeps its PDF of
+Pages '09 too.
+
+Pages 15.4 draws each ligature in a span of its own that names its
+letters, which Poppler reads in the wrong place; the tests read such a
+PDF after Cairo writes it again (`pdftocairo`), where the ligature stands
+in its word.
 
 `long-document.pages` is a long document of 41 pages, with sections,
 headers and footers, a table of contents, footnotes, pictures, columns
