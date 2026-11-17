@@ -68,6 +68,7 @@ mod tabs;
 pub mod text_nav;
 mod thumbnails;
 mod undo_names;
+mod versions;
 mod view;
 mod warnings;
 mod window;

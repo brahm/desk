@@ -599,6 +599,38 @@ matrix rows done on 9 November, before the change of target.
   from the switcher, and chooses a sheet through the action of its
   toggle.
 
+### 17 November: step 5 of window M+, automatic saving and versions
+
+- A document of Desk Writer with an ODT file saves itself two seconds
+  after the editing pauses, and when its tab closes, without asking; its
+  title no longer shows unsaved changes. Ctrl+S saves at once and keeps a
+  version, as Cmd-S of iWork 15 does.
+- Versions are kept the first time the document saves after it opens
+  (the file as it was opened), every hour while it is edited, with
+  Ctrl+S, and before an older version takes the place of the document.
+  Old ones are thinned as macOS thins them: all of the last day, one a
+  day for a month, one a week after.
+- Browse Versions, in the main menu after Save As, lists them by day.
+  Each can be restored, which keeps the current state as a version first,
+  or opened as an untitled copy beside the document, to take parts from
+  it. Revert to Saved became Revert to Last Opened, in the command
+  search.
+- New documents, and files of another kind such as Pages documents, have
+  no file to save themselves to: they keep the recovery draft of path L
+  and the question on closing until Save As.
+- *Decision D-025:* the owner chose to keep the versions in the data
+  folder of Desk (`~/.local/share/desk/versions`), outside the file.
+- *Why:* iWork 15 saves by itself and keeps versions (D-001, DOC-11).
+  macOS keeps them outside the file, and so does Desk: the ODF file stays
+  standard and the same size, and nothing of its past goes along when it
+  is sent. GNOME has no timeline of versions, so they are a list of
+  Libadwaita rows.
+- *Consequences:* the versions do not follow a file copied to another
+  computer, as on macOS. They follow a rename made in Desk. The UI tests
+  that save with Ctrl+S still pass, since Ctrl+S still writes the file.
+  Desk Tables and Desk Slides do not save files yet; they take the same
+  saving when they do (phase 1 of each).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

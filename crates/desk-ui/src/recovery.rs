@@ -5,7 +5,9 @@
 //! a copy of its document in the data folder of the app, and drops it
 //! when the document is saved or the window closes. Drafts that remain
 //! when the app starts are from a crash, and the app offers them back.
-//! There is no browser of versions, as GNOME apps keep none.
+//! Only documents that cannot save themselves keep drafts: new ones, and
+//! files of another kind; a document with a file of the kind the app
+//! saves saves itself and keeps versions instead (DOC-11, `versions`).
 
 use std::cell::Cell;
 use std::path::{Path, PathBuf};

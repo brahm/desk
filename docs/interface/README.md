@@ -172,6 +172,19 @@ main menu. So the main menu has no Save item, and the subtitle of the
 window shows the folder alone, with no Edited state. This replaces path L
 of interface B, a recovery draft every two minutes (R-002).
 
+A document with a file of the kind the app saves saves itself two
+seconds after the editing pauses, and when its tab closes, without
+asking. A version of the file is kept the first time it saves after it
+opens, every hour while it is edited, with Ctrl+S, and before an older
+version takes its place; old versions are thinned to one a day after a
+day and one a week after a month. The versions live in the data folder of
+Desk, outside the file (D-025). Browse Versions lists them by day, and
+each can be restored or opened as an untitled copy; Revert to Last Opened,
+in the command search, goes back to the first of the session. A new
+document, or one of another kind such as a Pages document, has nowhere to
+save itself: it asks on closing, and keeps a recovery draft every two
+minutes until Save As.
+
 ### Narrower windows
 
 The minimum screen is 1280 × 720, but a window can be narrower than the
@@ -430,7 +443,7 @@ request each:
 | 2. Format pane in place of the format bar (done) | What the format bar held moves to the Format pane, with Fonts and Colors as popovers from its rows, and Arrange becomes a tab | INT-12, INT-13 |
 | 3. Controls over the document (done) | The zoom control and the word count overlaid, in place of the bottom bar of Writer and Slides | GNM-13, KGNM-14, INT-07, INT-19, DOC-20 |
 | 4. Bottom bar of Tables (done) | The sheet switcher and the + button with the instant calculations; the sidebar shows the tables and charts of the sheet | NGNM-12, NGNM-13 |
-| 5. Automatic saving and versions | In place of the recovery draft of path L | DOC-11 |
+| 5. Automatic saving and versions (done) | In place of the recovery draft of path L | DOC-11 |
 
 Each step changes the tests with the code. The rows that a step reshapes
 stay open until it is done, and the parity report keeps counting them as

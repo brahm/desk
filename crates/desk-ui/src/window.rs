@@ -45,6 +45,7 @@ mod objects;
 mod rename;
 mod slides;
 mod tables;
+mod versions;
 
 pub(crate) use objects::arrange_menu;
 
@@ -151,7 +152,15 @@ pub struct DocumentWindow {
     slides: Option<Rc<slides::Slides>>,
     /// Whether the document changed since the last draft.
     draft_due: Cell<bool>,
+    /// The save that waits for a pause in the editing (DOC-11).
+    autosave_source: RefCell<Option<glib::SourceId>>,
+    /// Whether the file as it was opened is kept as a version yet.
+    opened_kept: Cell<bool>,
 }
+
+/// How long a pause in the editing is before the document saves itself
+/// (DOC-11).
+const AUTOSAVE_SECONDS: u32 = 2;
 
 thread_local! {
     /// The open windows, so that a file opened from outside goes to an
@@ -604,6 +613,8 @@ impl DocumentWindow {
             ruler_corner,
             draft: RefCell::new(None),
             draft_due: Cell::new(false),
+            autosave_source: RefCell::new(None),
+            opened_kept: Cell::new(false),
             slides,
         });
         this.add_actions();
@@ -811,19 +822,112 @@ impl DocumentWindow {
     }
 
     /// Whether closing would lose something: changes since the document
-    /// was saved, or a document that has never been saved.
+    /// was saved, or a document that has never been saved. A document
+    /// that saves itself loses nothing (DOC-11).
     fn needs_saving(&self) -> bool {
         // Desk Slides saves presentations with phase 1 of its plan.
         self.opener.is_some()
+            && !self.autosaves()
             && self
                 .editor()
                 .is_some_and(|e| e.is_modified() || self.path.borrow().is_none())
+    }
+
+    /// Whether the document saves itself: it has a file of the kind the
+    /// app saves (DOC-11, D-001). A new document, or one of another kind
+    /// such as a Pages document, waits for Save As, and keeps a recovery
+    /// draft until then.
+    fn autosaves(&self) -> bool {
+        self.opener.is_some()
+            && self
+                .path
+                .borrow()
+                .as_deref()
+                .is_some_and(|p| self.saves_in_place(p))
+    }
+
+    /// Saves the document a moment after the editing pauses (DOC-11).
+    fn schedule_autosave(self: &Rc<Self>) {
+        if !self.autosaves() {
+            return;
+        }
+        if let Some(source) = self.autosave_source.borrow_mut().take() {
+            source.remove();
+        }
+        let weak = Rc::downgrade(self);
+        let source = glib::timeout_add_seconds_local_once(AUTOSAVE_SECONDS, move || {
+            if let Some(this) = weak.upgrade() {
+                // The source has run: forget it before saving.
+                this.autosave_source.borrow_mut().take();
+                this.autosave();
+            }
+        });
+        *self.autosave_source.borrow_mut() = Some(source);
+    }
+
+    /// Saves the changes of a document that saves itself, keeping a
+    /// version of the file first when one is due, and says whether the
+    /// file holds the document now.
+    fn autosave(&self) -> bool {
+        if let Some(source) = self.autosave_source.borrow_mut().take() {
+            source.remove();
+        }
+        let Some(path) = self.path.borrow().clone() else {
+            return false;
+        };
+        if !self.autosaves() {
+            return false;
+        }
+        if !self.editor().is_some_and(|e| e.is_modified()) {
+            return true;
+        }
+        self.keep_version_before_writing(&path);
+        if !self.write_to(&path) {
+            return false;
+        }
+        if let Some(editor) = self.editor() {
+            editor.mark_saved();
+        }
+        self.refresh();
+        true
+    }
+
+    /// Keeps the file as it is as a version before it is written over:
+    /// the first time after the document opened, then once an hour, and
+    /// thins the old versions (DOC-11).
+    fn keep_version_before_writing(&self, path: &Path) {
+        if !path.exists() {
+            return;
+        }
+        let store = crate::versions::Store::for_document(path);
+        let now = crate::versions::now();
+        let kind = if !self.opened_kept.get() {
+            Some(crate::versions::Kind::Opened)
+        } else if store
+            .latest()
+            .is_none_or(|v| now - v.time >= crate::versions::HOURLY_SECONDS)
+        {
+            Some(crate::versions::Kind::Automatic)
+        } else {
+            None
+        };
+        if let Some(kind) = kind
+            && store.keep(path, kind, now).is_ok()
+            && kind == crate::versions::Kind::Opened
+        {
+            self.opened_kept.set(true);
+        }
+        store.thin(now, crate::versions::local_offset());
     }
 
     /// Opens a document in this window, or says why it cannot.
     pub fn load(self: &Rc<Self>, opener: &Opener, path: &Path) {
         match crate::open_document(opener, path) {
             Ok(shown) => {
+                if let Some(source) = self.autosave_source.borrow_mut().take() {
+                    source.remove();
+                }
+                self.opened_kept.set(false);
                 *self.path.borrow_mut() = Some(path.to_owned());
                 *self.name.borrow_mut() = display_name(path);
                 self.show_document(shown.document);
@@ -896,6 +1000,7 @@ impl DocumentWindow {
         editor.connect_changed(move || {
             if let Some(this) = weak.upgrade() {
                 this.draft_due.set(true);
+                this.schedule_autosave();
                 this.refresh();
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
@@ -1149,7 +1254,11 @@ impl DocumentWindow {
                 "redo",
                 free && editor.as_ref().is_some_and(TextEditor::can_redo),
             ),
-            ("revert", path.is_some() && modified),
+            (
+                "revert",
+                self.autosaves() && (modified || self.opened_kept.get()),
+            ),
+            ("versions", self.autosaves()),
             ("properties", path.is_some()),
         ] {
             self.enable(action, enabled);
@@ -1266,13 +1375,22 @@ impl DocumentWindow {
     /// Saves the document to its file, or asks where when it has none
     /// that it can save over (DOC-09). Then runs `done` with whether it
     /// was saved.
+    ///
+    /// A document that saves itself saves its changes now and keeps a
+    /// version of what it holds, as Cmd-S of iWork does (DOC-11).
     fn save(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
         let path = self.path.borrow().clone();
         match path {
-            Some(path) if self.saves_in_place(&path) => {
-                let saved = self.write_to(&path);
+            Some(path) if self.autosaves() => {
+                let saved = self.autosave();
                 if saved {
-                    self.saved_as(&path);
+                    let _ = crate::versions::Store::for_document(&path).keep(
+                        &path,
+                        crate::versions::Kind::Saved,
+                        crate::versions::now(),
+                    );
+                    self.drop_draft();
+                    remember_recent(&path);
                 }
                 done(saved);
             }
@@ -1315,7 +1433,8 @@ impl DocumentWindow {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return;
         };
-        if !self.draft_due.get() || !editor.is_modified() {
+        // A document that saves itself needs no draft (DOC-11).
+        if self.autosaves() || !self.draft_due.get() || !editor.is_modified() {
             return;
         }
         let draft = self
@@ -1376,6 +1495,8 @@ impl DocumentWindow {
 
     fn saved_as(&self, path: &Path) {
         self.drop_draft();
+        // The file is new: its first version is what was saved now.
+        self.opened_kept.set(false);
         *self.path.borrow_mut() = Some(path.to_owned());
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {
@@ -1725,39 +1846,92 @@ impl DocumentWindow {
         );
     }
 
-    /// Goes back to the document as it was last saved, after asking
-    /// (DOC-12).
+    /// Goes back to the document as it was when it opened, as Revert To
+    /// ▸ Last Opened of iWork 15 (DOC-11, DOC-12). Nothing is lost: what
+    /// the document holds now is kept as a version first.
     fn revert(self: &Rc<Self>) {
         let (Some(opener), Some(path)) = (self.opener, self.path.borrow().clone()) else {
             return;
         };
-        let dialog = adw::AlertDialog::new(
-            Some(&tr("Revert to Saved?")),
-            Some(
-                &tr("The changes made to “{name}” since it was last saved will be lost.")
-                    .replace("{name}", &self.name.borrow()),
-            ),
-        );
-        dialog.add_response("cancel", &tr("_Cancel"));
-        dialog.add_response("revert", &tr("_Revert"));
-        dialog.set_response_appearance("revert", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        let weak = Rc::downgrade(self);
-        dialog.choose(
-            Some(&self.window),
-            gio::Cancellable::NONE,
-            move |response| {
-                if let (Some(this), "revert") = (weak.upgrade(), response.as_str()) {
-                    this.load(opener, &path);
+        if !self.opened_kept.get() {
+            // The file is still as it was opened.
+            self.load(opener, &path);
+            return;
+        }
+        let opened = crate::versions::Store::for_document(&path)
+            .list()
+            .into_iter()
+            .find(|v| v.kind == crate::versions::Kind::Opened);
+        if let Some(version) = opened {
+            self.restore(&version);
+        }
+    }
+
+    /// Puts an older version in place of the document, keeping what the
+    /// document holds now as a version first (DOC-11).
+    pub(crate) fn restore(self: &Rc<Self>, version: &crate::versions::Version) {
+        let (Some(opener), Some(path)) = (self.opener, self.path.borrow().clone()) else {
+            return;
+        };
+        if !self.autosave() {
+            return;
+        }
+        let store = crate::versions::Store::for_document(&path);
+        if path.exists() {
+            let _ = store.keep(
+                &path,
+                crate::versions::Kind::Automatic,
+                crate::versions::now(),
+            );
+        }
+        match crate::open_document(opener, &version.path) {
+            Ok(shown) => {
+                self.show_document(shown.document);
+                if self.write_to(&path)
+                    && let Some(editor) = self.editor()
+                {
+                    editor.mark_saved();
                 }
-            },
-        );
+                self.refresh();
+            }
+            Err(message) => self.alert(&tr("Cannot Restore the Version"), &message),
+        }
+    }
+
+    /// Opens an older version in a new window, as an untitled copy, to
+    /// take what is needed from it (DOC-11).
+    pub(crate) fn open_version_copy(&self, version: &crate::versions::Version, name: String) {
+        let (Some(opener), Some(app)) = (
+            self.opener,
+            self.window
+                .application()
+                .and_then(|a| a.downcast::<adw::Application>().ok()),
+        ) else {
+            return;
+        };
+        match crate::open_document(opener, &version.path) {
+            Ok(shown) => {
+                let copy = DocumentWindow::new(&app, self.info, self.opener);
+                copy.load_untitled(shown.document, name);
+                copy.window.present();
+            }
+            Err(message) => self.alert(&tr("Cannot Open the Version"), &message),
+        }
     }
 
     /// Asks to save the changes before the tab closes (DOC-18), and says
     /// through `done` whether it closes.
     fn ask_to_close(self: &Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+        // A document that saves itself saves what is left, and closes
+        // without asking (DOC-11).
+        if self.autosaves() {
+            let saved = self.autosave();
+            if saved {
+                self.drop_draft();
+            }
+            done(saved);
+            return;
+        }
         if !self.needs_saving() {
             self.drop_draft();
             done(true);
@@ -1961,8 +2135,9 @@ impl DocumentWindow {
     }
 
     fn add_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 10] = [
+        let simple: [(&str, WindowAction); 11] = [
             ("warnings", |this| this.show_warnings()),
+            ("versions", |this| this.browse_versions()),
             ("save", |this| this.save(|_| {})),
             ("save-as", |this| this.save_as(|_| {})),
             ("save-copy", Self::save_copy),

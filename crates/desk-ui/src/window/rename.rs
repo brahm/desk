@@ -126,7 +126,9 @@ impl DocumentWindow {
                             &tr("A file named {name} is already in the folder.")
                                 .replace("{name}", &display_name(&new)),
                         ),
-                        Some(new) => match std::fs::rename(&path, &new) {
+                        Some(new) => match crate::versions::Store::for_document(&path)
+                            .renaming(&path, &new)
+                        {
                             Ok(()) => {
                                 popover.popdown();
                                 this.renamed_to(&new);
