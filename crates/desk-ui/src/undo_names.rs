@@ -81,6 +81,18 @@ const NAMES: &[&str] = &[
     n_("Text"),
     n_("Typing"),
     n_("Unmerge Cells"),
+    n_("Add Sheet"),
+    n_("Change Table"),
+    n_("Delete Sheet"),
+    n_("Duplicate Sheet"),
+    n_("Move Sheet"),
+    n_("Rename Sheet"),
+    n_("Rename Table"),
+    n_("Show Table Name"),
+    n_("Add Row Above"),
+    n_("Add Row Below"),
+    n_("Add Column Before"),
+    n_("Add Column After"),
 ];
 
 /// The name of a change in the language of the interface, if it has one

@@ -839,6 +839,19 @@ impl ObjectStylesInfo {
 }
 
 impl TextEditor {
+    /// The box around the objects of a page, in points, which may reach
+    /// beyond the page (Zoom to Fit Content, B-027).
+    pub fn objects_bounds(&self, page: usize) -> Option<(f64, f64, f64, f64)> {
+        let state = self.state.borrow();
+        let page_layout = state.layout.pages.get(page)?;
+        crate::geometry::bounds(
+            page_layout
+                .objects
+                .iter()
+                .flat_map(|placed| mark(page, placed).outline),
+        )
+    }
+
     /// The objects selected, from back to front.
     pub fn selected_objects(&self) -> Vec<NodeId> {
         self.state.borrow().objects.clone()

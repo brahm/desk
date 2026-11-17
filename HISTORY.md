@@ -10,6 +10,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: Every TODO, FIXME, XXX or HACK in the code cites an open backlog
   row, and a check in the CI fails on one that does not (D-026).
+* Added: Zoom to Selection in the Zoom menus of Desk Writer, Desk Tables
+  and Desk Slides, and Zoom to Fit Content and Auto-Center in Desk Slides.
+* Added: First Page and Last Page in the View menu of Desk Writer.
+* Fixed: Undo and Redo in the context menu of Desk Tables name the change.
 * Added: The 32 finished rows of the common base were compared with
   Pages, Numbers and Keynote 15.4 on a Mac, and the other 21 have the
   reference of iWork 15.4; three gaps went to the backlog.

@@ -831,6 +831,31 @@ matrix rows done on 9 November, before the change of target.
 - *Why the captures are not in the repository:* they show Apple's
   interface, which D-011 keeps out; they are in the project files.
 
+### 17 November: The gaps of the B1 validation (B-027 to B-029)
+
+- The owner asked for the three gaps that the validation on the Mac found
+  to be done in one pull request.
+- *Zoom to Selection (B-027):* in the Zoom menus of the three apps, as
+  Pages, Numbers and Keynote 15.4 have it. It zooms so that the selected
+  objects, or else the selected text, or in Desk Tables the selected cells
+  or table, fill the view, and puts them in its middle; with nothing
+  selected it rings the bell. The zoom is free, not one of the levels,
+  as in iWork, between 25 % and 400 %.
+- *Zoom to Fit Content and Auto-Center (B-027):* in Desk Slides, as in
+  Keynote. Fit Content zooms to the slide and to whatever of its objects
+  reaches beyond it. Auto-Center keeps the slide in the middle of the
+  view when the zoom changes; it is on by default, as in Keynote.
+- *First Page and Last Page (B-028):* in the navigation of the View menu
+  of Desk Writer, beside the previous and the next place, as in the Go To
+  menu of Pages; they put the cursor at the start of the page, as Go to
+  Page does.
+- *Undo names the change in Desk Tables (B-029):* the context menu of a
+  table now says Undo Rename Table or Redo Add Row Below, as Numbers
+  does; the names of the changes of Desk Tables joined the list of names
+  that Desk translates.
+- *Consequences:* the three items are closed; the gaps in
+  corpus/mac-review.tsv stay as the record of the validation.
+
 ### 17 November: rules against distraction by notes in the code (D-026)
 
 - The owner asked to adopt a set of rules against the distraction of

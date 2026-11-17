@@ -141,6 +141,8 @@ pub(super) struct TablesWindow {
     bottom: BottomBar,
     inspector: Rc<Inspector>,
     context_menu: gtk::PopoverMenu,
+    /// The Undo and Redo of the context menu, named before it opens.
+    history: gio::Menu,
 }
 
 thread_local! {
@@ -328,8 +330,9 @@ impl TablesWindow {
             root.add_breakpoint(breakpoint);
         }
 
+        let history = gio::Menu::new();
         let context_menu = gtk::PopoverMenu::builder()
-            .menu_model(&header::table_menu())
+            .menu_model(&header::table_menu(&history))
             .has_arrow(false)
             .halign(gtk::Align::Start)
             .build();
@@ -362,6 +365,7 @@ impl TablesWindow {
             bottom,
             inspector,
             context_menu,
+            history,
         });
         *inspector_slot.borrow_mut() = Some(Rc::downgrade(&this));
         this.add_actions();
@@ -563,6 +567,13 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         self.canvas.connect_context_menu(move |x, y| {
             if let Some(this) = weak.upgrade() {
+                let name =
+                    |stack: &RefCell<Vec<Snapshot>>| stack.borrow().last().map(|s| s.name.clone());
+                header::fill_history(
+                    &this.history,
+                    name(&this.undo).as_deref(),
+                    name(&this.redo).as_deref(),
+                );
                 this.context_menu
                     .set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
                 this.context_menu.popup();
@@ -1054,6 +1065,16 @@ impl TablesWindow {
                 return;
             };
             let level = match value.as_str() {
+                // Zoom to Selection (B-027).
+                "selection" => {
+                    match this.canvas.zoom_to_selection() {
+                        Some(zoom) => {
+                            crate::document_controls::show_zoom(&this.bottom.zoom, zoom);
+                        }
+                        None => this.window.error_bell(),
+                    }
+                    return;
+                }
                 "in" => geometry::zoom_in(this.canvas.zoom()),
                 "out" => geometry::zoom_out(this.canvas.zoom()),
                 level => level.parse().unwrap_or(geometry::DEFAULT_ZOOM),
@@ -1151,7 +1172,7 @@ impl TablesWindow {
                 (tr("Add Sheet"), header::add_sheet_menu()),
                 (tr("Insert"), header::insert_menu(true)),
                 (tr("Sheet"), header::sheet_menu()),
-                (tr("Table"), header::table_menu()),
+                (tr("Table"), header::table_menu(&gio::Menu::new())),
             ]
             .into_iter()
             .map(|(name, menu)| (name, menu.upcast()))
