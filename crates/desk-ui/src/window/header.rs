@@ -162,9 +162,9 @@ fn object_button(icon: &str, label: &str, action: &str) -> gtk::Button {
 
 /// The main menu: what belongs to the file and to the app (GNM-10), and
 /// `view`, the View menu, as a submenu. What the menu bar of iWork had and
-/// is not here, the command search finds. Save is not in it: saving
-/// becomes automatic in phase B1 (D-001), and until then Ctrl+S and the
-/// command search save.
+/// is not here, the command search finds. Save is not in it: a document
+/// saves itself, and its versions are browsed from here (D-001, DOC-11);
+/// Ctrl+S keeps a version.
 pub(super) fn main_menu(info: AppInfo, opens: bool, view: &gio::Menu) -> gio::Menu {
     let menu = gio::Menu::new();
     let file = gio::Menu::new();
@@ -179,6 +179,7 @@ pub(super) fn main_menu(info: AppInfo, opens: bool, view: &gio::Menu) -> gio::Me
     if opens {
         let save = gio::Menu::new();
         save.append(Some(&tr("Save _As…")), Some("win.save-as"));
+        save.append(Some(&tr("_Browse Versions…")), Some("win.versions"));
         menu.append_section(None, &save);
     }
     let shown = gio::Menu::new();
@@ -209,7 +210,7 @@ pub(super) fn more_commands(opens: bool) -> gio::Menu {
         menu.append(Some(&tr("Save a _Copy…")), Some("win.save-copy"));
         menu.append(Some(&tr("_Duplicate")), Some("win.duplicate"));
         menu.append(Some(&tr("Re_name…")), Some("win.rename"));
-        menu.append(Some(&tr("_Revert to Saved")), Some("win.revert"));
+        menu.append(Some(&tr("Revert to _Last Opened")), Some("win.revert"));
         menu.append(Some(&tr("Document _Info")), Some("win.properties"));
         menu.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
         menu.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));

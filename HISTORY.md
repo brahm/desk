@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Writer saves documents by itself as they are edited and
+  closes them without asking; Ctrl+S keeps a version.
+* Added: Browse Versions in the main menu, to restore an older version of
+  a document or open it as a copy.
 * Changed: Tables shows its sheets as tabs in the bottom bar, with a +
   button to add one; the sidebar shows the tables and charts of the
   sheet in view, and the zoom floats over the sheet.

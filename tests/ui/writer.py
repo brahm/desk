@@ -12,6 +12,7 @@ and types with xdotool.
 
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -467,7 +468,8 @@ def main():
         )
         check("Duplicate opens a copy (DOC-14)", True)
 
-        # Close All asks to save each document with changes (DOC-18).
+        # Close All saves the documents that have a file, and asks to save
+        # each new one with changes, here the copy (DOC-11, DOC-18).
         press("ctrl+alt+w")
         wait_for(
             "the question to save",
@@ -521,6 +523,7 @@ def main():
     text_of_a_shape(work)
     small_screen(work)
     tables_and_charts(work)
+    automatic_saving(work)
     print("All UI tests passed.")
 
 
@@ -2537,8 +2540,8 @@ def header_and_menus(work):
         check("Ctrl+Page Up shows the tab before, and the window takes its title (D-023)", True)
         press("ctrl+Page_Down")
         wait_for("the new tab", lambda: window_named("Untitled"))
-        # Until saving is automatic (step 5 of M+), a new document asks
-        # to be saved when its tab closes.
+        # A new document has no file to save itself to, so it asks to be
+        # saved when its tab closes (DOC-11, DOC-18).
         press("ctrl+w")
         wait_for("the question to save", lambda: showing_named(app, "Save Changes?"))
         Atspi.Action.do_action(showing_named(app, "Discard"), 0)
@@ -3163,6 +3166,72 @@ def tables_and_charts(work):
         writer.terminate()
         writer.wait(timeout=10)
 
+
+
+def versions_of(work):
+    """The versions that Desk keeps, by why they were kept: the end of
+    their file names, as "opened" (DOC-11)."""
+    root = Path(os.environ["XDG_DATA_HOME"]) / "desk" / "versions"
+    return sorted(p.stem.split("-", 2)[2] for p in root.glob("*/*") if p.is_file())
+
+
+def automatic_saving(work):
+    """A document with a file saves itself as it is edited, keeps the
+    file as it was opened as a version, keeps one more with Ctrl+S, goes
+    back to an older one from Browse Versions, and closes without asking
+    (DOC-11, D-001, step 5 of window M+)."""
+    root = Path(os.environ["XDG_DATA_HOME"]) / "desk" / "versions"
+    shutil.rmtree(root, ignore_errors=True)
+    name = "Saving.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+End")
+        type_text(" autosaved")
+        wait_for("the document to save itself", lambda: saved_content(letter, "autosaved"))
+        check("a document with a file saves itself as it is edited, without Ctrl+S (DOC-11)", True)
+        check("and its title shows no unsaved changes (DOC-11)", not window_named("•"))
+        check("the file as it was opened is kept as a version (DOC-11)", versions_of(work) == ["opened"])
+        press("ctrl+s")
+        wait_for("a version kept", lambda: versions_of(work) == ["opened", "saved"])
+        check("Ctrl+S keeps a version, as Cmd-S of iWork (DOC-11)", True)
+
+        activate("versions")
+        wait_for("the versions", lambda: showing_named(app, "When the document was opened"))
+        check("Browse Versions lists the versions (DOC-11)", showing_named(app, "Kept with Save"))
+        restore = sorted(
+            (
+                n
+                for n in walk(app)
+                if n.get_role() == Atspi.Role.BUTTON and n.get_name() == "Restore" and showing(n)
+            ),
+            key=lambda n: extents(n).y,
+        )
+        # The oldest is the last: the file as it was opened.
+        Atspi.Action.do_action(restore[-1], 0)
+        wait_for("the document as it was opened", lambda: not saved_content(letter, "autosaved"))
+        check("Restore puts an older version in place of the document (DOC-11)", True)
+        check(
+            "and keeps what it held as a version first (DOC-11)",
+            versions_of(work) == ["auto", "opened", "saved"],
+        )
+
+        press("ctrl+End")
+        type_text(" again")
+        press("ctrl+w")
+        wait_for("the window to close", lambda: writer.poll() is not None or not window_named(name))
+        check("the tab of a document that saves itself closes without asking (DOC-11)", True)
+        check("and what was typed last is in the file", saved_content(letter, "again"))
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
 
 if __name__ == "__main__":
     main()
