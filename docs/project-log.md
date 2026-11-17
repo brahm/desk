@@ -782,6 +782,27 @@ matrix rows done on 9 November, before the change of target.
   characters on, takes it away with None, and checks that the popover of
   the text color has no None.
 
+### 17 November: Screenshots of the new window in the metainfo (B-011)
+
+- The owner asked for the screenshots only, leaving the final validation
+  on the Mac for later.
+- *What was done:* four captures of Desk Writer in the M+ window replace
+  the two old ones in data/screenshots: a report with the Format pane
+  (the default), the Fonts popover opened from the Family row, Find in
+  the header bar, and the same window in the dark style. Each has a
+  caption in English and in Brazilian Portuguese. The description of the
+  metainfo now says the window with tabs, the Format pane and automatic
+  saving with versions are done, and that comments and change tracking,
+  templates, Word files and printing are still to come.
+- *How:* the app ran in the GNOME 51 chroot on an X server without a
+  window manager, with the accent forced to blue, and was driven by its
+  own actions over D-Bus and by the keyboard; the sample document was
+  made for the purpose and has no Apple material.
+- *Why there is no Colors capture:* without a window manager its popover
+  falls outside the window, and a capture of half a popover is worse
+  than none.
+- *Consequences:* B-011 is closed. AppStream validation passes.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

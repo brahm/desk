@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The screenshots of Desk Writer in its metainfo show the new
+  window, with the Format pane, Fonts, Find and the dark style.
 * Added: None in the Colors popover takes away a background, a fill, a
   line or a shadow.
 * Added: The Colors popover shows the colors the document already
