@@ -159,6 +159,14 @@ jobs:
           path: fuzz/artifacts
           if-no-files-found: ignore
 
+  backlog:
+    name: Backlog register and notes in the code
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the register and that every note in the code cites an open row
+        run: python3 ci/check-backlog.py
+
   deny:
     name: Licenses and advisories of dependencies
     runs-on: ubuntu-24.04

@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Every TODO, FIXME, XXX or HACK in the code cites an open backlog
+  row, and a check in the CI fails on one that does not (D-026).
 * Added: The 32 finished rows of the common base were compared with
   Pages, Numbers and Keynote 15.4 on a Mac, and the other 21 have the
   reference of iWork 15.4; three gaps went to the backlog.
