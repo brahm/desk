@@ -27,34 +27,39 @@
     <p>
       Desk Writer is in development. Text, styles, lists, sections, notes,
       tables of contents, pictures, shapes, text boxes, media, tables and
-      charts are done. The new window with documents in tabs, automatic
-      saving with versions, comments and change tracking, templates, Word
-      files and printing are still to come.
+      charts are done, in a window with documents in tabs, the Format pane
+      beside them, and automatic saving with versions. Comments and change
+      tracking, templates, Word files and printing are still to come.
     </p>
     <p xml:lang="pt-BR">
       O Desk Writer está em desenvolvimento. Texto, estilos, listas, seções,
       notas, sumários, imagens, formas, caixas de texto, mídia, tabelas e
-      gráficos estão prontos. A janela nova com documentos em abas, o
-      salvamento automático com versões, comentários e controle de alterações,
-      modelos, arquivos do Word e impressão ainda estão por vir.
+      gráficos estão prontos, numa janela com documentos em abas, o painel
+      Formatar ao lado e salvamento automático com versões. Comentários e
+      controle de alterações, modelos, arquivos do Word e impressão ainda
+      estão por vir.
     </p>
   </description>
   <screenshots>
     <screenshot type="default">
-      <caption>A document with its styles in the format bar</caption>
+      <caption>A report with the Format pane beside it</caption>
+      <caption xml:lang="pt-BR">Um relatório com o painel Formatar ao lado</caption>
       <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-window.png</image>
     </screenshot>
     <screenshot>
-      <caption>The Inspector in the sidebar</caption>
-      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-inspector.png</image>
+      <caption>The Fonts popover, from the Family row</caption>
+      <caption xml:lang="pt-BR">O popover de Fontes, aberto pela linha Família</caption>
+      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-fonts.png</image>
     </screenshot>
     <screenshot>
-      <caption>The Styles drawer</caption>
-      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-styles.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Find and Replace</caption>
+      <caption>Find, in the header bar</caption>
+      <caption xml:lang="pt-BR">Buscar, na barra de título</caption>
       <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-find.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The same window in the dark style</caption>
+      <caption xml:lang="pt-BR">A mesma janela no estilo escuro</caption>
+      <image>https://raw.githubusercontent.com/brahm/desk/main/data/screenshots/writer-dark.png</image>
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">br.com.brahm.Desk.Writer.desktop</launchable>
