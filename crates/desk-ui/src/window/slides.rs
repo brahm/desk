@@ -259,6 +259,8 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     let document = gio::Menu::new();
     document.append(Some(&tr("_Ruler")), Some("win.ruler"));
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
+    // Show Warnings, as the View menu of Keynote 15.4 has it (S010).
+    document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
     let window = gio::Menu::new();
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
     window.append_submenu(

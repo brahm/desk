@@ -856,6 +856,60 @@ matrix rows done on 9 November, before the change of target.
 - *Consequences:* the three items are closed; the gaps in
   corpus/mac-review.tsv stay as the record of the validation.
 
+### 17 November: The remaining rows of B1 (B-030 to B-038)
+
+- The validation on the Mac left 21 rows of B1 not finished. The owner
+  asked why; the answer was that nobody had worked on them yet, and that
+  most looked like features of Desk Writer still to be connected to Desk
+  Tables and Desk Slides. He agreed to do those and to move the seven
+  that depend on the engines to later phases.
+- *What reading the code changed:* the cells of Desk Tables have no
+  content, editing or format yet, and its window inserts no pictures or
+  objects. So four of its rows were not a matter of connecting: the
+  Functions browser on typing "=" and the fonts and colors of the cells
+  need the cells of T2, the Media button needs the objects of T4, and
+  the warnings need the files of other apps of T5. Screen View in Desk
+  Writer, the text in one flow without pages, changes the layout engine.
+  The owner chose to move these five rows too rather than bring that work
+  into B1, which would have added days before closing the phase.
+- *The phases:* the first answer had named T4, T5 and S5 for the seven,
+  after the old notes of the inventory, which used the numbers of the old
+  phases. The roadmap gives each a better place, and they went there:
+  - the Organize menu and pane (T001, T009) to T3, sort and filter (B-030);
+  - the formula in the cell and the choice of instant calculations
+    (T004, T008) to T2, cells and formulas (B-031);
+  - table styles (T007) to T1, beside row T068 (B-032);
+  - Build Order (S005) to S3, animation (B-033);
+  - the Slideshow and Remote preferences (S015) to S4, presenting
+    (B-034);
+  - the Functions browser and the fonts and colors of the cells (T010,
+    T012) to T2 (B-035);
+  - the Media button of Desk Tables (T011) to T4 (B-036);
+  - the warnings of Desk Tables (T013) to T5 (B-037);
+  - Screen View (W012) to W1 (B-038).
+- *Done in B1:*
+  - The table of contents in the sidebar of Desk Writer (W011), as Pages
+    15.4 has it: a page of the sidebar, also in the View menu, that lists
+    the headings by level; a click goes to the heading, Edit opens the
+    Table of Contents group of the Inspector and Insert puts a table in
+    the text. It lists the styles that the tables of contents list, or
+    the Heading styles when the document chose none.
+  - Document Warnings in the View menu of Desk Writer and Desk Slides
+    (W009, S010), as Show Warnings in Pages and Keynote. Replace Fonts
+    was already in the Warnings window, one font at a time.
+  - Preferences in the main menu of Desk Tables (T018), the same dialog
+    as Desk Writer without automatic lists, the word count and the color
+    of invisibles.
+  - Checked with the app open: the Media button, the font pop-ups, Adjust
+    Image and Arrange in Desk Slides (S006 to S009), which come from the
+    window of Desk Writer, and Fullscreen in Desk Tables (T015). The test
+    display has no window manager, so the screen of Fullscreen itself was
+    read from the code, which is the same as in Desk Writer.
+- *Consequences:* corpus/mac-review.tsv has a new verdict, "moved", for
+  the twelve rows. With these nine, every row of the inventory that B1
+  owns is done and no backlog item is open for B1, so the phase can be
+  closed when the owner decides.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

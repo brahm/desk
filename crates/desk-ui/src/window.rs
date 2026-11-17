@@ -61,8 +61,9 @@ const STYLES_WIDTH: f64 = 220.0;
 /// The width of the sidebar while it shows the search results (TXT-13).
 const SEARCH_WIDTH: f64 = 260.0;
 /// The pages of the navigation sidebar, and the actions that show them.
-const NAV_PAGES: [(&str, &str); 4] = [
+const NAV_PAGES: [(&str, &str); 5] = [
     ("pages", "thumbnails"),
+    ("contents", "contents"),
     ("styles", "styles-drawer"),
     ("comments", "comments"),
     ("search", "search"),
@@ -126,6 +127,8 @@ pub struct DocumentWindow {
     /// The search results, a page of the navigation sidebar (TXT-13).
     search_sidebar: Rc<SearchSidebar>,
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
+    /// The table of contents in the sidebar of Desk Writer (W011).
+    contents: Rc<crate::contents_page::ContentsPage>,
     outline: Rc<crate::outline_view::OutlineView>,
     /// The navigation sidebar, with the page thumbnails (GNM-12).
     nav: Rc<NavSidebar>,
@@ -169,8 +172,10 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 69] = [
+const DOCUMENT_ACTIONS: [&str; 71] = [
     "outline",
+    "contents",
+    "edit-toc",
     "go-to-page-end",
     "sidebar",
     "comments",
@@ -415,6 +420,7 @@ impl DocumentWindow {
         // The page thumbnails, in the navigation sidebar (INT-19, EST-17,
         // GNM-12).
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
+        let contents = crate::contents_page::ContentsPage::new(editor_of());
         let nav = if let Some(slides) = &slides {
             // The navigator, the outline and the master slides of Keynote
             // (KINT-07, KINT-08, KGNM-13).
@@ -445,6 +451,12 @@ impl DocumentWindow {
                 &tr("Pages"),
                 nav_sidebar::WIDTH,
                 thumbnails.widget(),
+            );
+            nav.add_page(
+                "contents",
+                &tr("Table of Contents"),
+                STYLES_WIDTH,
+                contents.widget(),
             );
             nav.add_page("styles", &tr("Styles"), STYLES_WIDTH, drawer.widget());
             nav
@@ -601,6 +613,7 @@ impl DocumentWindow {
             find,
             search_sidebar,
             thumbnails,
+            contents,
             outline,
             nav,
             nav_split,
@@ -1005,6 +1018,7 @@ impl DocumentWindow {
                 this.refresh();
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
+                this.contents.refresh();
                 this.outline.document_changed();
                 this.slides_changed();
             }
@@ -1151,6 +1165,7 @@ impl DocumentWindow {
                         editor.focus();
                     }
                 }
+                "contents" => self.contents.set_shown(on),
                 "styles" => self.show_format(),
                 "topics" => {
                     if let Some(slides) = &self.slides {
@@ -2136,8 +2151,15 @@ impl DocumentWindow {
     }
 
     fn add_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 11] = [
+        let simple: [(&str, WindowAction); 12] = [
             ("warnings", |this| this.show_warnings()),
+            // Edit in the table of contents of the sidebar: the styles it
+            // lists are in the Document tab of the Inspector (W011).
+            ("edit-toc", |this| {
+                this.actions
+                    .change_action_state("inspector", &true.to_variant());
+                this.inspector.show_toc_settings();
+            }),
             ("versions", |this| this.browse_versions()),
             ("save", |this| this.save(|_| {})),
             ("save-as", |this| this.save_as(|_| {})),

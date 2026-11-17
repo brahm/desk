@@ -212,7 +212,6 @@ pub(super) fn more_commands(opens: bool) -> gio::Menu {
         menu.append(Some(&tr("Re_name…")), Some("win.rename"));
         menu.append(Some(&tr("Revert to _Last Opened")), Some("win.revert"));
         menu.append(Some(&tr("Document _Info")), Some("win.properties"));
-        menu.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
         menu.append(Some(&tr("_Import Styles…")), Some("win.import-styles"));
     }
     menu.append(Some(&tr("C_lose")), Some("win.close"));
@@ -264,6 +263,7 @@ pub(super) fn fill_recent(menu: &gio::Menu) {
 pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     let panes = gio::Menu::new();
     panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
+    panes.append(Some(&tr("Table of C_ontents")), Some("win.contents"));
     panes.append(Some(&tr("_Styles")), Some("win.styles-drawer"));
     panes.append(Some(&tr("_Comments")), Some("win.comments"));
     panes.append(Some(&tr("Search _Results")), Some("win.search"));
@@ -272,6 +272,8 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     document.append(Some(&tr("_Ruler")), Some("win.ruler"));
     document.append(Some(&tr("_Layout")), Some("win.show-layout"));
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
+    // Show Warnings, as the View menu of Pages 15.4 has it (W009).
+    document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
     let window = gio::Menu::new();
     window.append(Some(&tr("As _Outline")), Some("win.outline"));
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));

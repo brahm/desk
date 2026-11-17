@@ -22,6 +22,7 @@ mod chart_data;
 mod chart_pane;
 mod color_popover;
 mod compact;
+mod contents_page;
 mod document_controls;
 mod editing;
 mod effects;

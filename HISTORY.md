@@ -8,6 +8,15 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: The table of contents in the sidebar of Desk Writer, with Edit
+  and Insert.
+* Added: Document Warnings in the View menu of Desk Writer and Desk
+  Slides.
+* Added: Preferences in the main menu of Desk Tables.
+* Changed: Twelve rows of the common base moved to the phases that build
+  their engines: the cells and organizing of Desk Tables, its media and
+  warnings, Build Order and the slideshow preferences of Desk Slides, and
+  Screen View of Desk Writer.
 * Added: Zoom to Selection in the Zoom menus of Desk Writer, Desk Tables
   and Desk Slides, and Zoom to Fit Content and Auto-Center in Desk Slides.
 * Added: First Page and Last Page in the View menu of Desk Writer.

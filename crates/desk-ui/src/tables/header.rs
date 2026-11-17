@@ -134,6 +134,7 @@ pub(super) fn main_menu(info: AppInfo) -> gio::Menu {
     commands.append(Some(&tr("Search _Commands…")), Some("win.command-search"));
     menu.append_section(None, &commands);
     let help = gio::Menu::new();
+    help.append(Some(&tr("_Preferences")), Some("app.preferences"));
     help.append(Some(&tr("_Keyboard Shortcuts")), Some("win.shortcuts"));
     help.append(
         Some(&tr("_About {app}").replace("{app}", info.name)),
