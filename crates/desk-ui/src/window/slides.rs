@@ -38,7 +38,7 @@ pub(super) const NAV_PAGES: [(&str, &str); 5] = [
 ];
 
 /// The actions of Desk Slides that need a presentation.
-pub(super) const ACTIONS: [&str; 10] = [
+pub(super) const ACTIONS: [&str; 11] = [
     "new-slide",
     "duplicate-slide",
     "delete-slide",
@@ -49,6 +49,7 @@ pub(super) const ACTIONS: [&str; 10] = [
     "slide-outline",
     "masters",
     "edit-notes",
+    "auto-center",
 ];
 
 /// The width of the outline in the sidebar, in pixels.
@@ -260,7 +261,10 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
     let window = gio::Menu::new();
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
-    window.append_submenu(Some(&tr("_Zoom")), &crate::document_controls::zoom_menu());
+    window.append_submenu(
+        Some(&tr("_Zoom")),
+        &crate::document_controls::zoom_menu(true),
+    );
     let menu = gio::Menu::new();
     menu.append_section(Some(&tr("Sidebar")), &panes);
     menu.append_section(None, &slides);
@@ -946,6 +950,19 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&go_to);
+
+        // Auto-Center: a change of zoom keeps the slide in the middle of
+        // the view, on as in Keynote 15.4 (B-027).
+        let auto_center = gio::SimpleAction::new_stateful("auto-center", None, &true.to_variant());
+        let weak = Rc::downgrade(self);
+        auto_center.connect_change_state(move |action, value| {
+            if let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>())) {
+                action.set_state(&on.to_variant());
+                this.view.set_auto_center(on);
+            }
+        });
+        self.actions.add_action(&auto_center);
+        self.view.set_auto_center(true);
 
         // The notes go into the document a moment after the last key, as
         // one action of the history for each slide.

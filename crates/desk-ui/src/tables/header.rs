@@ -188,6 +188,12 @@ pub(super) fn zoom_menu() -> gio::Menu {
         item.set_action_and_target_value(Some("win.zoom"), Some(&level.to_string().to_variant()));
         menu.append_item(&item);
     }
+    let fit = gio::Menu::new();
+    fit.append(
+        Some(&tr("Zoom to _Selection")),
+        Some("win.zoom('selection')"),
+    );
+    menu.append_section(None, &fit);
     menu
 }
 
@@ -283,14 +289,23 @@ pub(super) fn item_menu() -> gio::Menu {
     menu
 }
 
+/// Fills `history` with Undo and Redo, each with the name of the change
+/// it takes back or brings back, as Numbers 15.4 shows it (NDOC-08).
+pub(super) fn fill_history(history: &gio::Menu, undo: Option<&str>, redo: Option<&str>) {
+    history.remove_all();
+    history.append(Some(&crate::undo_names::undo_label(undo)), Some("win.undo"));
+    history.append(Some(&crate::undo_names::redo_label(redo)), Some("win.redo"));
+}
+
 /// The context menu of a table on the canvas (NINT-16): undo, the rows
-/// and columns, and the table itself.
-pub(super) fn table_menu() -> gio::Menu {
+/// and columns, and the table itself. `history` is the section of Undo
+/// and Redo, which the window fills before the menu opens.
+pub(super) fn table_menu(history: &gio::Menu) -> gio::Menu {
     let menu = gio::Menu::new();
-    let history = gio::Menu::new();
-    history.append(Some(&tr("_Undo")), Some("win.undo"));
-    history.append(Some(&tr("_Redo")), Some("win.redo"));
-    menu.append_section(None, &history);
+    if history.n_items() == 0 {
+        fill_history(history, None, None);
+    }
+    menu.append_section(None, history);
     let rows = gio::Menu::new();
     rows.append(Some(&tr("Add Row _Above")), Some("win.add-row-above"));
     rows.append(Some(&tr("Add Row _Below")), Some("win.add-row-below"));
@@ -326,5 +341,24 @@ mod tests {
         assert!(!is_small_screen(1280, 720));
         assert!(is_small_screen(1024, 600));
         assert!(is_small_screen(800, 1280));
+    }
+
+    #[test]
+    fn ndoc_08_undo_and_redo_name_the_change() {
+        let history = gio::Menu::new();
+        fill_history(&history, Some("Rename Table"), None);
+        let label = |index| {
+            history
+                .item_attribute_value(index, "label", None)
+                .and_then(|v| v.get::<String>())
+                .unwrap_or_default()
+        };
+        assert_eq!(label(0), "_Undo Rename Table");
+        assert_eq!(label(1), "_Redo");
+        // Filling again replaces the two items.
+        fill_history(&history, None, Some("Typing"));
+        assert_eq!(history.n_items(), 2);
+        assert_eq!(label(0), "_Undo");
+        assert_eq!(label(1), "_Redo Typing");
     }
 }

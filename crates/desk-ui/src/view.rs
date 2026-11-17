@@ -28,6 +28,9 @@ struct State {
     book: bool,
     /// Whether the zoom follows the size of the window (INT-08).
     fit: Option<geometry::Fit>,
+    /// Whether a change of zoom keeps the page in sight in the middle of
+    /// the view, as Auto-Center of Keynote does (B-027).
+    auto_center: bool,
     painter: Option<Painter>,
     on_zoom: Vec<Box<dyn Fn(f64)>>,
     on_pages: Vec<Box<dyn Fn()>>,
@@ -197,6 +200,7 @@ impl DocumentView {
             columns: 1,
             book: false,
             fit: None,
+            auto_center: false,
             painter: Painter::new().ok(),
             on_zoom: Vec::new(),
             on_pages: Vec::new(),
@@ -573,6 +577,87 @@ impl DocumentView {
         self.apply_zoom(zoom);
     }
 
+    /// The box around what is selected, on its page, in points: the
+    /// selected objects, or else the selected text (B-027).
+    pub fn selection_bounds(&self) -> Option<(usize, (f64, f64, f64, f64))> {
+        let state = self.state.borrow();
+        if let Some(page) = state.objects.first().map(|o| o.page) {
+            let points = state
+                .objects
+                .iter()
+                .filter(|o| o.page == page)
+                .flat_map(|o| o.outline.iter().copied());
+            return geometry::bounds(points).map(|b| (page, b));
+        }
+        let page = state.selection.first()?.page;
+        let points = state
+            .selection
+            .iter()
+            .filter(|s| s.page == page)
+            .flat_map(|s| [(s.x0, s.y0), (s.x1, s.y1)]);
+        geometry::bounds(points).map(|b| (page, b))
+    }
+
+    /// Zooms so that a box of a page fills the view, and scrolls it to the
+    /// middle (Zoom to Selection, Zoom to Fit Content). The zoom no longer
+    /// follows the window.
+    pub fn zoom_to_box(&self, page: usize, (x0, y0, x1, y1): (f64, f64, f64, f64)) {
+        let zoom = geometry::fit_box(
+            x1 - x0,
+            y1 - y0,
+            f64::from(self.scrolled.width()),
+            f64::from(self.scrolled.height()),
+        );
+        self.state.borrow_mut().fit = None;
+        self.apply_zoom(zoom);
+        self.center_on(page, (x0 + x1) / 2.0, (y0 + y1) / 2.0);
+    }
+
+    /// Zooms so that a page and whatever reaches beyond it, `beyond`, fill
+    /// the view (Zoom to Fit Content, B-027).
+    pub fn zoom_to_content(&self, page: usize, beyond: Option<(f64, f64, f64, f64)>) {
+        let Some((width, height)) = self.sizes().get(page).copied() else {
+            return;
+        };
+        let corners = [(0.0, 0.0), (width, height)];
+        let more = beyond.map(|(x0, y0, x1, y1)| [(x0, y0), (x1, y1)]);
+        if let Some(bounds) =
+            geometry::bounds(corners.into_iter().chain(more.into_iter().flatten()))
+        {
+            self.zoom_to_box(page, bounds);
+        }
+    }
+
+    /// Whether a change of zoom keeps the page in sight in the middle of
+    /// the view (Auto-Center, B-027).
+    pub fn set_auto_center(&self, on: bool) {
+        self.state.borrow_mut().auto_center = on;
+        if on && let Some(page) = self.current_page() {
+            self.center_page(page);
+        }
+    }
+
+    /// Scrolls so that a point of a page is in the middle of the view.
+    fn center_on(&self, page: usize, x: f64, y: f64) {
+        let (rects, width, height) = self.layout(f64::from(self.area.width()));
+        let Some(rect) = rects.get(page) else { return };
+        let scale = self.scale();
+        let (hadj, vadj) = (self.scrolled.hadjustment(), self.scrolled.vadjustment());
+        // The adjustments learn the new size of the area only when GTK
+        // lays it out again, so they are told now.
+        hadj.set_upper(hadj.upper().max(width));
+        vadj.set_upper(vadj.upper().max(height));
+        hadj.set_value(rect.x + x * scale - hadj.page_size() / 2.0);
+        vadj.set_value(rect.y + y * scale - vadj.page_size() / 2.0);
+    }
+
+    fn center_page(&self, page: usize) {
+        let Some((width, height)) = self.sizes().get(page).copied() else {
+            return;
+        };
+        self.center_on(page, width / 2.0, height / 2.0);
+    }
+
     /// Makes the zoom fit the window, and follow it, or not.
     pub fn set_fit(&self, fit: Option<geometry::Fit>) {
         self.state.borrow_mut().fit = fit;
@@ -627,9 +712,18 @@ impl DocumentView {
         }
         let vadj = self.scrolled.vadjustment();
         let middle = (vadj.value() + vadj.page_size() / 2.0) / old;
+        let centered = self
+            .state
+            .borrow()
+            .auto_center
+            .then(|| self.current_page())
+            .flatten();
         self.state.borrow_mut().zoom = zoom;
         self.resize();
-        vadj.set_value(middle * zoom - vadj.page_size() / 2.0);
+        match centered {
+            Some(page) => self.center_page(page),
+            None => vadj.set_value(middle * zoom - vadj.page_size() / 2.0),
+        }
         // The callbacks may read the view, so they run without the borrow.
         let callbacks = std::mem::take(&mut self.state.borrow_mut().on_zoom);
         for callback in &callbacks {

@@ -182,7 +182,7 @@ fn step_labels(kind: Navigate) -> (String, String) {
 
 /// The navigation section of the View menu (INT-19, KINT-11): Go to Page,
 /// a field held by the item `go-to-page`, the previous and the next place,
-/// and Navigate By; in Desk Slides Go to Slide, the previous and the next
+/// the first and the last page, and Navigate By; in Desk Slides Go to Slide, the previous and the next
 /// slide, and the first and the last.
 fn navigation_menu(slides: bool, steps: &gio::Menu) -> gio::Menu {
     let menu = gio::Menu::new();
@@ -199,6 +199,15 @@ fn navigation_menu(slides: bool, steps: &gio::Menu) -> gio::Menu {
         menu.append_section(None, &ends);
         return menu;
     }
+    // First Page and Last Page, as the Go To menu of Pages 15.4 has them
+    // (B-028).
+    let ends = gio::Menu::new();
+    ends.append(
+        Some(&tr("_First Page")),
+        Some("win.go-to-page-end('first')"),
+    );
+    ends.append(Some(&tr("_Last Page")), Some("win.go-to-page-end('last')"));
+    menu.append_section(None, &ends);
     let by = gio::Menu::new();
     for kind in Navigate::ALL {
         let item = gio::MenuItem::new(Some(&navigate_label(kind)), None);
@@ -227,8 +236,10 @@ fn count_menu() -> gio::Menu {
     menu
 }
 
-/// The zoom menu, at the bottom and in the View menu (INT-07).
-pub fn zoom_menu() -> gio::Menu {
+/// The zoom menu, at the bottom and in the View menu (INT-07), with Zoom
+/// to Selection; in Desk Slides also Zoom to Fit Content and Auto-Center,
+/// as Keynote 15.4 has them (B-027).
+pub fn zoom_menu(slides: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     let levels = gio::Menu::new();
     for level in geometry::ZOOM_LEVELS {
@@ -247,6 +258,19 @@ pub fn zoom_menu() -> gio::Menu {
         fit.append_item(&item);
     }
     menu.append_section(None, &fit);
+    let to = gio::Menu::new();
+    to.append(
+        Some(&tr("Zoom to _Selection")),
+        Some("win.zoom('selection')"),
+    );
+    if slides {
+        to.append(
+            Some(&tr("Zoom to Fit _Content")),
+            Some("win.zoom('content')"),
+        );
+        to.append(Some(&tr("_Auto-Center")), Some("win.auto-center"));
+    }
+    menu.append_section(None, &to);
     let layout = gio::Menu::new();
     for (label, target) in [(tr("_One Page"), "one"), (tr("_Two Pages"), "two")] {
         let item = gio::MenuItem::new(Some(&label), None);
@@ -347,7 +371,7 @@ impl Controls {
     /// The controls of Desk Writer, or with `slides` those of Desk Slides,
     /// which have no count and go to slides (KGNM-14).
     pub fn new_for(slides: bool) -> Self {
-        let (zoom_pill, zoom, zoom_parts) = zoom_pill(&zoom_menu());
+        let (zoom_pill, zoom, zoom_parts) = zoom_pill(&zoom_menu(slides));
         zoom_pill.set_visible(false);
 
         let count_label = gtk::Label::builder()
@@ -557,8 +581,13 @@ mod tests {
         let steps = gio::Menu::new();
         fill_steps(&steps, false, Navigate::Section);
         assert_eq!(steps.n_items(), 2);
+        // Go to Page, the steps, First and Last Page (B-028), Navigate By.
         let menu = navigation_menu(false, &steps);
-        assert_eq!(menu.n_items(), 3);
+        assert_eq!(menu.n_items(), 4);
+        let ends = menu
+            .item_link(2, "section")
+            .expect("the first and the last page");
+        assert_eq!(ends.n_items(), 2);
         let slides = navigation_menu(true, &steps);
         assert_eq!(slides.n_items(), 3);
     }
