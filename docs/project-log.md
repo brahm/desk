@@ -753,7 +753,8 @@ matrix rows done on 9 November, before the change of target.
   and the automatic superscript of ordinal suffixes set them.
 - *Left out:* the None button that the scene draws beside Custom… is
   not part of B-019, and the text color always has a color; the rows
-  whose color can be off keep their switch.
+  whose color can be off keep their switch. The owner asked for a row of
+  the backlog for it: B-026, still in phase B1.
 - *Consequences:* B-019 is closed; components.tsv counts the colors of
   the document as existing (91 existing, 28 new). The UI tests open the
   Advanced Options and look for its rows, and check that the Colors
