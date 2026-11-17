@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! A window of Desk Tables (NINT-02): the navigation sidebar as high as the
-//! window at the start, with the sheets and the tables and charts of the
-//! sheet shown (NINT-03, NGNM-12); the header bar; the formula bar; the
-//! canvas of the sheet; the Inspector at the end, whose Format pane holds
-//! what the format bar of interface B had (step 2 of window M+); and the
-//! bottom bar. Below 720 px the sidebar covers the canvas, and below 520
+//! window at the start, with the tables and charts of the sheet shown
+//! (NINT-03, NGNM-12, step 4 of window M+); the header bar; the formula
+//! bar; the canvas of the sheet, with the zoom over it; the Inspector at
+//! the end, whose Format pane holds what the format bar of interface B had
+//! (step 2 of window M+); and the bottom bar, with the sheet switcher. Below 720 px the sidebar covers the canvas, and below 520
 //! px the Inspector does too (NGNM-01).
 
 use std::cell::{Cell, RefCell};
@@ -39,7 +39,12 @@ const STYLES_WIDTH: f64 = 220.0;
 /// The pages of the navigation sidebar, the actions that show them, and
 /// their titles and widths.
 const NAV_PAGES: [(&str, &str, &str, f64); 5] = [
-    ("sheets", "sheets", n_("Sheets"), nav_sidebar::WIDTH),
+    (
+        "sheets",
+        "sheets",
+        n_("Tables and Charts"),
+        nav_sidebar::WIDTH,
+    ),
     (
         "table-styles",
         "table-styles",
@@ -125,7 +130,6 @@ pub(super) struct TablesWindow {
     split: adw::OverlaySplitView,
     /// The sheets and the items of the sheet shown (NINT-03).
     sidebar: adw::Sidebar,
-    sheets_section: adw::SidebarSection,
     items_section: adw::SidebarSection,
     menu_target: Cell<Option<MenuTarget>>,
     /// Whether the sidebar is being filled, when its selection changes
@@ -211,13 +215,16 @@ impl TablesWindow {
 
         // The sheets, and the tables and charts of the sheet shown.
         let sidebar = adw::Sidebar::new();
-        let sheets_section = adw::SidebarSection::new();
-        sheets_section.set_menu_model(Some(&header::sheet_menu()));
+        // In window M+ the sheets are in the switcher of the bottom bar,
+        // and the sidebar lists the tables and charts of the sheet in sight
+        // (NGNM-12, NINT-03).
         let items_section = adw::SidebarSection::new();
         items_section.set_menu_model(Some(&header::item_menu()));
-        sidebar.append(sheets_section.clone());
         sidebar.append(items_section.clone());
-        let nav = NavSidebar::new(&tr("Add Sheet"), header::add_sheet_menu().upcast_ref());
+        let nav = NavSidebar::new(
+            &tr("Add Table or Chart"),
+            header::add_item_menu().upcast_ref(),
+        );
         for (name, _, title, width) in NAV_PAGES {
             let child: gtk::Widget = match name {
                 "sheets" => sidebar.clone().upcast(),
@@ -251,8 +258,11 @@ impl TablesWindow {
                 }
             })
         };
+        // The zoom floats over the sheet (NINT-04).
+        let canvas_overlay = gtk::Overlay::builder().child(canvas.widget()).build();
+        canvas_overlay.add_overlay(&bottom.zoom_pill);
         let split = adw::OverlaySplitView::builder()
-            .content(canvas.widget())
+            .content(&canvas_overlay)
             .sidebar(inspector.widget())
             .min_sidebar_width(INSPECTOR_WIDTH)
             .max_sidebar_width(INSPECTOR_WIDTH)
@@ -343,7 +353,6 @@ impl TablesWindow {
             nav_split,
             split,
             sidebar,
-            sheets_section,
             items_section,
             menu_target: Cell::new(None),
             filling: Cell::new(false),
@@ -403,7 +412,6 @@ impl TablesWindow {
         self.canvas.show(sheet, selection);
         self.fill_sidebar(&book, current);
         self.inspector.show(&book, sheet, item);
-        self.bottom.show_position(&sheet.name, current, book.len());
         self.bottom.show_count(selection.cells());
         // The cell in focus, or the table, in the formula bar.
         let reference = match (selection, item) {
@@ -434,15 +442,12 @@ impl TablesWindow {
     /// under its name (NINT-03).
     fn fill_sidebar(&self, book: &Workbook, current: usize) {
         self.filling.set(true);
-        self.sheets_section.remove_all();
-        for sheet in book.sheets() {
-            self.sheets_section.append(
-                adw::SidebarItem::builder()
-                    .title(&sheet.name)
-                    .icon_name("desk-sheet-symbolic")
-                    .build(),
-            );
-        }
+        let names: Vec<String> = book
+            .sheets()
+            .iter()
+            .map(|sheet| sheet.name.clone())
+            .collect();
+        self.bottom.show_sheets(&names, current);
         self.items_section.remove_all();
         let sheet = book.sheet(current).expect("the sheet shown exists");
         self.items_section
@@ -459,12 +464,13 @@ impl TablesWindow {
                     .build(),
             );
         }
-        // The item selected is lit, or else the sheet shown.
-        let selected = match self.selection.get().item() {
-            Some(item) => book.len() + item,
-            None => current,
-        };
-        self.sidebar.set_selected(selected as u32);
+        // The item selected is lit.
+        self.sidebar.set_selected(
+            self.selection
+                .get()
+                .item()
+                .map_or(gtk::INVALID_LIST_POSITION, |item| item as u32),
+        );
         self.filling.set(false);
     }
 
@@ -475,18 +481,64 @@ impl TablesWindow {
             if this.filling.get() {
                 return;
             }
-            let index = index as usize;
-            let sheets = this.book.borrow().len();
-            if index < sheets {
+            // Choosing a table or a chart selects it and shows it.
+            let item = index as usize;
+            this.select(Selection::Item(item));
+            this.canvas.scroll_to(item);
+            this.canvas.focus();
+        });
+        // The switcher of the sheets shows the sheet chosen (NGNM-13).
+        let weak = Rc::downgrade(self);
+        self.bottom.sheets.connect_active_name_notify(move |group| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.filling.get() {
+                return;
+            }
+            if let Some(index) = group.active_name().and_then(|n| n.parse::<usize>().ok())
+                && index != this.current.get()
+            {
                 this.show_sheet(index);
-            } else {
-                // Choosing a table or a chart selects it and shows it.
-                let item = index - sheets;
-                this.select(Selection::Item(item));
-                this.canvas.scroll_to(item);
-                this.canvas.focus();
             }
         });
+        // A secondary click on a sheet opens its menu (NINT-16).
+        let menu = gtk::PopoverMenu::from_model(Some(&header::sheet_menu()));
+        menu.set_parent(&self.bottom.sheets);
+        menu.set_has_arrow(false);
+        menu.set_position(gtk::PositionType::Top);
+        let click = gtk::GestureClick::builder()
+            .button(gtk::gdk::BUTTON_SECONDARY)
+            .build();
+        let weak = Rc::downgrade(self);
+        click.connect_pressed(move |gesture, _, x, y| {
+            let Some(this) = weak.upgrade() else { return };
+            let group = &this.bottom.sheets;
+            // The toggle under the pointer is a child of the group, in the
+            // order of the sheets, with a separator between two toggles.
+            let mut picked = group.pick(x, y, gtk::PickFlags::DEFAULT);
+            while let Some(widget) = picked.clone() {
+                if widget.parent().as_ref() == Some(group.upcast_ref()) {
+                    break;
+                }
+                picked = widget.parent();
+            }
+            let Some(picked) = picked else { return };
+            let mut index = 0;
+            let mut child = group.first_child();
+            while let Some(widget) = child {
+                if widget == picked {
+                    break;
+                }
+                if !widget.is::<gtk::Separator>() && !widget.is::<gtk::Popover>() {
+                    index += 1;
+                }
+                child = widget.next_sibling();
+            }
+            this.menu_target.set(Some(MenuTarget::Sheet(index)));
+            menu.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+            menu.popup();
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+        });
+        self.bottom.sheets.add_controller(click);
         let weak = Rc::downgrade(self);
         self.sidebar.connect_setup_menu(move |_, item| {
             let Some(this) = weak.upgrade() else { return };
@@ -494,9 +546,7 @@ impl TablesWindow {
                 let position = |section: &adw::SidebarSection| {
                     (0..section.items().n_items()).find(|&i| section.item(i).as_ref() == Some(item))
                 };
-                position(&this.sheets_section)
-                    .map(|i| MenuTarget::Sheet(i as usize))
-                    .or_else(|| position(&this.items_section).map(|i| MenuTarget::Item(i as usize)))
+                position(&this.items_section).map(|i| MenuTarget::Item(i as usize))
             });
             this.menu_target.set(target);
         });
@@ -1009,7 +1059,7 @@ impl TablesWindow {
                 level => level.parse().unwrap_or(geometry::DEFAULT_ZOOM),
             };
             this.canvas.set_zoom(level);
-            this.bottom.zoom.set_label(&geometry::zoom_label(level));
+            crate::document_controls::show_zoom(&this.bottom.zoom, level);
         });
         self.actions.add_action(&zoom);
 

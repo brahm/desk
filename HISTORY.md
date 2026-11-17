@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Tables shows its sheets as tabs in the bottom bar, with a +
+  button to add one; the sidebar shows the tables and charts of the
+  sheet in view, and the zoom floats over the sheet.
 * Changed: Writer and Slides have no bottom bar: the zoom and the word
   count float over the document, and Go to Page and Navigate By are in
   the View menu.

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-17 00:01+0000\n"
+"POT-Creation-Date: 2026-11-17 01:24+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -110,7 +110,7 @@ msgstr ""
 #: crates/desk-ui/src/styles_drawer.rs:687
 #: crates/desk-ui/src/styles_drawer.rs:824
 #: crates/desk-ui/src/styles_drawer.rs:897
-#: crates/desk-ui/src/tables/window.rs:693 crates/desk-ui/src/thumbnails.rs:395
+#: crates/desk-ui/src/tables/window.rs:743 crates/desk-ui/src/thumbnails.rs:395
 #: crates/desk-ui/src/window.rs:1546 crates/desk-ui/src/window.rs:1709
 #: crates/desk-ui/src/window.rs:1741 crates/desk-ui/src/window.rs:1778
 #: crates/desk-ui/src/window/format_actions.rs:370
@@ -263,7 +263,7 @@ msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:43
 #: crates/desk-ui/src/object_styles_pane.rs:38
-#: crates/desk-ui/src/tables/window.rs:59
+#: crates/desk-ui/src/tables/window.rs:64
 msgid "Gray"
 msgstr ""
 
@@ -548,7 +548,7 @@ msgstr ""
 
 #: crates/desk-ui/src/color_popover.rs:29
 #: crates/desk-ui/src/object_styles_pane.rs:34
-#: crates/desk-ui/src/tables/window.rs:64
+#: crates/desk-ui/src/tables/window.rs:69
 msgid "Blue"
 msgstr ""
 
@@ -846,42 +846,41 @@ msgstr ""
 msgid "_Two Pages"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:307
-#: crates/desk-ui/src/document_controls.rs:309
+#: crates/desk-ui/src/document_controls.rs:282
+#: crates/desk-ui/src/document_controls.rs:284
 msgid "Zoom Out"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:314
-#: crates/desk-ui/src/document_controls.rs:316
+#: crates/desk-ui/src/document_controls.rs:289
+#: crates/desk-ui/src/document_controls.rs:291
 msgid "Zoom In"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:326
-#: crates/desk-ui/src/tables/bars.rs:344 crates/desk-ui/src/tables/bars.rs:347
+#: crates/desk-ui/src/document_controls.rs:301
 msgid "Zoom"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:343
+#: crates/desk-ui/src/document_controls.rs:361
 msgid "Word Count"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:357
+#: crates/desk-ui/src/document_controls.rs:375
 msgid "Go to Slide"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:357
+#: crates/desk-ui/src/document_controls.rs:375
 msgid "_Go to Slide"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:359
+#: crates/desk-ui/src/document_controls.rs:377
 msgid "Go to Page"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:359
+#: crates/desk-ui/src/document_controls.rs:377
 msgid "_Go to Page"
 msgstr ""
 
-#: crates/desk-ui/src/document_controls.rs:452
+#: crates/desk-ui/src/document_controls.rs:470
 msgid "of {count}"
 msgstr ""
 
@@ -907,10 +906,10 @@ msgstr ""
 #: crates/desk-ui/src/table_pane.rs:244 crates/desk-ui/src/tables/header.rs:53
 #: crates/desk-ui/src/tables/inspector.rs:194
 #: crates/desk-ui/src/tables/inspector.rs:400
-#: crates/desk-ui/src/tables/window.rs:177
-#: crates/desk-ui/src/tables/window.rs:758
-#: crates/desk-ui/src/tables/window.rs:840
-#: crates/desk-ui/src/tables/window.rs:1104
+#: crates/desk-ui/src/tables/window.rs:181
+#: crates/desk-ui/src/tables/window.rs:808
+#: crates/desk-ui/src/tables/window.rs:890
+#: crates/desk-ui/src/tables/window.rs:1154
 #: crates/desk-ui/src/window/header.rs:73
 msgid "Table"
 msgstr ""
@@ -1199,7 +1198,7 @@ msgstr ""
 msgid "Recent Searches"
 msgstr ""
 
-#: crates/desk-ui/src/find.rs:593 crates/desk-ui/src/tables/window.rs:50
+#: crates/desk-ui/src/find.rs:593 crates/desk-ui/src/tables/window.rs:55
 #: crates/desk-ui/src/window.rs:453
 msgid "Search Results"
 msgstr ""
@@ -1800,7 +1799,7 @@ msgstr ""
 
 #: crates/desk-ui/src/function_browser.rs:139
 #: crates/desk-ui/src/tables/header.rs:49
-#: crates/desk-ui/src/tables/window.rs:1102 crates/desk-ui/src/window.rs:1945
+#: crates/desk-ui/src/tables/window.rs:1152 crates/desk-ui/src/window.rs:1945
 #: crates/desk-ui/src/window/header.rs:64
 msgid "Insert"
 msgstr ""
@@ -2269,7 +2268,7 @@ msgid ""
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:618 crates/desk-ui/src/tables/window.rs:418
+#: crates/desk-ui/src/lib.rs:618 crates/desk-ui/src/tables/window.rs:426
 #: crates/desk-ui/src/window.rs:1362 crates/desk-ui/src/window.rs:1993
 msgid "Untitled"
 msgstr ""
@@ -2667,7 +2666,7 @@ msgid "Insert ▸ Footnote adds a note at the cursor. Its text is edited here."
 msgstr ""
 
 #: crates/desk-ui/src/object_styles_pane.rs:33
-#: crates/desk-ui/src/tables/window.rs:57
+#: crates/desk-ui/src/tables/window.rs:62
 msgid "Basic"
 msgstr ""
 
@@ -3277,7 +3276,7 @@ msgstr ""
 #: crates/desk-ui/src/styles_drawer.rs:684 crates/desk-ui/src/table_pane.rs:225
 #: crates/desk-ui/src/tables/inspector.rs:161
 #: crates/desk-ui/src/tables/inspector.rs:244
-#: crates/desk-ui/src/tables/window.rs:691
+#: crates/desk-ui/src/tables/window.rs:741
 #: crates/desk-ui/src/window/format_actions.rs:364
 #: crates/desk-ui/src/window/rename.rs:40
 msgid "Name"
@@ -3673,7 +3672,7 @@ msgstr ""
 
 #: crates/desk-ui/src/shortcuts.rs:154
 #: crates/desk-ui/src/tables/shortcuts.rs:73
-#: crates/desk-ui/src/tables/window.rs:1100 crates/desk-ui/src/window.rs:1944
+#: crates/desk-ui/src/tables/window.rs:1150 crates/desk-ui/src/window.rs:1944
 msgid "View"
 msgstr ""
 
@@ -3876,7 +3875,7 @@ msgid "Another style is already named “{name}”."
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:573
-#: crates/desk-ui/src/tables/window.rs:200 crates/desk-ui/src/window.rs:326
+#: crates/desk-ui/src/tables/window.rs:204 crates/desk-ui/src/window.rs:326
 #: crates/desk-ui/src/window.rs:1223
 #: crates/desk-ui/src/window/format_actions.rs:392
 msgid "_Close"
@@ -3922,7 +3921,7 @@ msgid "Rename Style"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:688
-#: crates/desk-ui/src/tables/window.rs:694
+#: crates/desk-ui/src/tables/window.rs:744
 #: crates/desk-ui/src/window/format_actions.rs:371
 #: crates/desk-ui/src/window/rename.rs:42
 msgid "_Rename"
@@ -4375,12 +4374,12 @@ msgid "_Paste Style"
 msgstr ""
 
 #: crates/desk-ui/src/tables/bars.rs:243
-#: crates/desk-ui/src/tables/header.rs:294
+#: crates/desk-ui/src/tables/header.rs:304
 msgid "Show Table _Name"
 msgstr ""
 
 #: crates/desk-ui/src/tables/bars.rs:245
-#: crates/desk-ui/src/tables/header.rs:296
+#: crates/desk-ui/src/tables/header.rs:306
 msgid "Show in _Inspector"
 msgstr ""
 
@@ -4448,23 +4447,26 @@ msgstr ""
 msgid "SUM"
 msgstr ""
 
-#: crates/desk-ui/src/tables/bars.rs:352 crates/desk-ui/src/tables/bars.rs:355
-msgid "Previous Sheet"
+#: crates/desk-ui/src/tables/bars.rs:349 crates/desk-ui/src/tables/bars.rs:352
+#: crates/desk-ui/src/tables/window.rs:891
+#: crates/desk-ui/src/tables/window.rs:1151
+msgid "Add Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/bars.rs:359 crates/desk-ui/src/tables/bars.rs:362
-msgid "Next Sheet"
+#: crates/desk-ui/src/tables/bars.rs:359
+#: crates/desk-ui/src/tables/inspector.rs:256
+msgid "Sheets"
 msgstr ""
 
-#: crates/desk-ui/src/tables/bars.rs:377
+#: crates/desk-ui/src/tables/bars.rs:373
 msgid "Instant Calculations"
 msgstr ""
 
-#: crates/desk-ui/src/tables/bars.rs:434
+#: crates/desk-ui/src/tables/bars.rs:449
 msgid "{name} ({n} of {count})"
 msgstr ""
 
-#: crates/desk-ui/src/tables/bars.rs:442
+#: crates/desk-ui/src/tables/bars.rs:457
 msgid "{n} cell"
 msgid_plural "{n} cells"
 msgstr[0] ""
@@ -4474,9 +4476,9 @@ msgstr[1] ""
 #: crates/desk-ui/src/tables/inspector.rs:247
 #: crates/desk-ui/src/tables/inspector.rs:268
 #: crates/desk-ui/src/tables/inspector.rs:402
-#: crates/desk-ui/src/tables/window.rs:177
-#: crates/desk-ui/src/tables/window.rs:840
-#: crates/desk-ui/src/tables/window.rs:1103
+#: crates/desk-ui/src/tables/window.rs:181
+#: crates/desk-ui/src/tables/window.rs:890
+#: crates/desk-ui/src/tables/window.rs:1153
 msgid "Sheet"
 msgstr ""
 
@@ -4496,8 +4498,8 @@ msgstr ""
 
 #: crates/desk-ui/src/tables/header.rs:82
 #: crates/desk-ui/src/tables/header.rs:84
-#: crates/desk-ui/src/tables/window.rs:1098
-#: crates/desk-ui/src/tables/window.rs:1099 crates/desk-ui/src/window.rs:1940
+#: crates/desk-ui/src/tables/window.rs:1148
+#: crates/desk-ui/src/tables/window.rs:1149 crates/desk-ui/src/window.rs:1940
 #: crates/desk-ui/src/window.rs:1943 crates/desk-ui/src/window/header.rs:106
 #: crates/desk-ui/src/window/header.rs:108
 msgid "Main Menu"
@@ -4516,7 +4518,7 @@ msgid "_New Document"
 msgstr ""
 
 #: crates/desk-ui/src/tables/header.rs:127
-#: crates/desk-ui/src/tables/header.rs:241
+#: crates/desk-ui/src/tables/header.rs:251
 #: crates/desk-ui/src/window/header.rs:210
 msgid "_Duplicate"
 msgstr ""
@@ -4548,12 +4550,12 @@ msgid "_New Window"
 msgstr ""
 
 #: crates/desk-ui/src/tables/header.rs:151
-#: crates/desk-ui/src/tables/header.rs:281 crates/desk-ui/src/undo_names.rs:117
+#: crates/desk-ui/src/tables/header.rs:291 crates/desk-ui/src/undo_names.rs:117
 msgid "_Undo"
 msgstr ""
 
 #: crates/desk-ui/src/tables/header.rs:152
-#: crates/desk-ui/src/tables/header.rs:282 crates/desk-ui/src/undo_names.rs:125
+#: crates/desk-ui/src/tables/header.rs:292 crates/desk-ui/src/undo_names.rs:125
 msgid "_Redo"
 msgstr ""
 
@@ -4626,12 +4628,14 @@ msgid "_Zoom"
 msgstr ""
 
 #: crates/desk-ui/src/tables/header.rs:201
+#: crates/desk-ui/src/tables/header.rs:240
 #: crates/desk-ui/src/window/header.rs:295
 #: crates/desk-ui/src/window/slides.rs:280
 msgid "_Table"
 msgstr ""
 
 #: crates/desk-ui/src/tables/header.rs:202
+#: crates/desk-ui/src/tables/header.rs:241
 #: crates/desk-ui/src/window/header.rs:296
 #: crates/desk-ui/src/window/slides.rs:281
 msgid "C_hart"
@@ -4693,52 +4697,58 @@ msgstr ""
 msgid "_Duplicate Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:240
+#: crates/desk-ui/src/tables/header.rs:250
 #: crates/desk-ui/src/window/header.rs:211
 msgid "Re_name…"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:244
-#: crates/desk-ui/src/tables/header.rs:257
-msgid "Move _Up"
+#: crates/desk-ui/src/tables/header.rs:254
+msgid "Move _Left"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:245
+#: crates/desk-ui/src/tables/header.rs:255
+msgid "Move _Right"
+msgstr ""
+
 #: crates/desk-ui/src/tables/header.rs:258
-msgid "Move Do_wn"
-msgstr ""
-
-#: crates/desk-ui/src/tables/header.rs:248
-#: crates/desk-ui/src/tables/header.rs:271 crates/desk-ui/src/thumbnails.rs:396
+#: crates/desk-ui/src/tables/header.rs:281 crates/desk-ui/src/thumbnails.rs:396
 #: crates/desk-ui/src/thumbnails.rs:493 crates/desk-ui/src/window.rs:1710
 msgid "_Delete"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:262
+#: crates/desk-ui/src/tables/header.rs:267
+msgid "Move _Up"
+msgstr ""
+
+#: crates/desk-ui/src/tables/header.rs:268
+msgid "Move Do_wn"
+msgstr ""
+
+#: crates/desk-ui/src/tables/header.rs:272
 msgid "Move to the _Previous Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:266
+#: crates/desk-ui/src/tables/header.rs:276
 msgid "Move to the _Next Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:285
+#: crates/desk-ui/src/tables/header.rs:295
 msgid "Add Row _Above"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:286
+#: crates/desk-ui/src/tables/header.rs:296
 msgid "Add Row _Below"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:288
+#: crates/desk-ui/src/tables/header.rs:298
 msgid "Add Column B_efore"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:291
+#: crates/desk-ui/src/tables/header.rs:301
 msgid "Add Column A_fter"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:299
+#: crates/desk-ui/src/tables/header.rs:309
 msgid "_Delete Table"
 msgstr ""
 
@@ -4751,7 +4761,7 @@ msgid "Select a table to see its format."
 msgstr ""
 
 #: crates/desk-ui/src/tables/inspector.rs:165
-#: crates/desk-ui/src/tables/window.rs:671
+#: crates/desk-ui/src/tables/window.rs:721
 msgid "Show Table Name"
 msgstr ""
 
@@ -4781,11 +4791,6 @@ msgstr ""
 
 #: crates/desk-ui/src/tables/inspector.rs:232
 msgid "Select a table to sort, filter and categorize it."
-msgstr ""
-
-#: crates/desk-ui/src/tables/inspector.rs:256
-#: crates/desk-ui/src/tables/window.rs:42
-msgid "Sheets"
 msgstr ""
 
 #: crates/desk-ui/src/tables/inspector.rs:257
@@ -4856,151 +4861,153 @@ msgstr ""
 msgid "Show the formula list"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:46
-#: crates/desk-ui/src/tables/window.rs:1256
-msgid "Table Styles"
-msgstr ""
-
-#: crates/desk-ui/src/tables/window.rs:49 crates/desk-ui/src/window.rs:447
-msgid "Comments"
+#: crates/desk-ui/src/tables/window.rs:45
+msgid "Tables and Charts"
 msgstr ""
 
 #: crates/desk-ui/src/tables/window.rs:51
+#: crates/desk-ui/src/tables/window.rs:1306
+msgid "Table Styles"
+msgstr ""
+
+#: crates/desk-ui/src/tables/window.rs:54 crates/desk-ui/src/window.rs:447
+msgid "Comments"
+msgstr ""
+
+#: crates/desk-ui/src/tables/window.rs:56
 msgid "Formula List"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:58
+#: crates/desk-ui/src/tables/window.rs:63
 msgid "Basic (No Grid)"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:60
+#: crates/desk-ui/src/tables/window.rs:65
 msgid "Gray Headers"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:61
+#: crates/desk-ui/src/tables/window.rs:66
 msgid "Gray Fill"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:62
+#: crates/desk-ui/src/tables/window.rs:67
 msgid "Beige"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:63
+#: crates/desk-ui/src/tables/window.rs:68
 msgid "Ledger"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:65
+#: crates/desk-ui/src/tables/window.rs:70
 msgid "Blue Headers"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:66
+#: crates/desk-ui/src/tables/window.rs:71
 msgid "Blue Fill"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:190
-#: crates/desk-ui/src/tables/window.rs:194 crates/desk-ui/src/window.rs:304
+#: crates/desk-ui/src/tables/window.rs:194
+#: crates/desk-ui/src/tables/window.rs:198 crates/desk-ui/src/window.rs:304
 #: crates/desk-ui/src/window.rs:308
 msgid "Leave Fullscreen"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:198 crates/desk-ui/src/window.rs:324
+#: crates/desk-ui/src/tables/window.rs:202 crates/desk-ui/src/window.rs:324
 msgid ""
 "The screen is smaller than 1280 × 720, so parts of the window might not fit"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:220
-#: crates/desk-ui/src/tables/window.rs:841
-#: crates/desk-ui/src/tables/window.rs:1101
-msgid "Add Sheet"
+#: crates/desk-ui/src/tables/window.rs:225
+msgid "Add Table or Chart"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:227 crates/desk-ui/src/window.rs:3311
+#: crates/desk-ui/src/tables/window.rs:234 crates/desk-ui/src/window.rs:3311
 msgid "No Comments"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:228
+#: crates/desk-ui/src/tables/window.rs:235
 msgid "Comments on the cells and the objects of the sheets show here."
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:232
+#: crates/desk-ui/src/tables/window.rs:239
 msgid "No Results"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:233
+#: crates/desk-ui/src/tables/window.rs:240
 msgid "What a search finds in the sheets shows here."
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:237
+#: crates/desk-ui/src/tables/window.rs:244
 msgid "No Formulas"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:238
+#: crates/desk-ui/src/tables/window.rs:245
 msgid "The formulas of the document show here, with their results."
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:421
+#: crates/desk-ui/src/tables/window.rs:429
 msgid "Edited"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:449
+#: crates/desk-ui/src/tables/window.rs:454
 msgid "In “{sheet}”"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:628
+#: crates/desk-ui/src/tables/window.rs:678
 msgid "Rename Table"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:638
+#: crates/desk-ui/src/tables/window.rs:688
 msgid "Change Table"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:664
-#: crates/desk-ui/src/tables/window.rs:686
+#: crates/desk-ui/src/tables/window.rs:714
+#: crates/desk-ui/src/tables/window.rs:736
 msgid "Rename Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:716
+#: crates/desk-ui/src/tables/window.rs:766
 msgid "Add Row Above"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:717
+#: crates/desk-ui/src/tables/window.rs:767
 msgid "Add Row Below"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:718
+#: crates/desk-ui/src/tables/window.rs:768
 msgid "Add Column Before"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:719
+#: crates/desk-ui/src/tables/window.rs:769
 msgid "Add Column After"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:759 crates/desk-ui/src/undo_names.rs:47
+#: crates/desk-ui/src/tables/window.rs:809 crates/desk-ui/src/undo_names.rs:47
 msgid "Insert Table"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:848
+#: crates/desk-ui/src/tables/window.rs:898
 msgid "(copy)"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:849
+#: crates/desk-ui/src/tables/window.rs:899
 msgid "Duplicate Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:856
+#: crates/desk-ui/src/tables/window.rs:906
 msgid "Delete Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:873 crates/desk-ui/src/undo_names.rs:21
+#: crates/desk-ui/src/tables/window.rs:923 crates/desk-ui/src/undo_names.rs:21
 #: crates/desk-ui/src/window.rs:3113
 msgid "Delete"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:935
+#: crates/desk-ui/src/tables/window.rs:985
 msgid "Move Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:962 crates/desk-ui/src/undo_names.rs:59
+#: crates/desk-ui/src/tables/window.rs:1012 crates/desk-ui/src/undo_names.rs:59
 msgid "Move"
 msgstr ""
 

@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The window of Desk Tables in interface B (docs/interface): the sheets
-//! in the navigation sidebar (NINT-02, NINT-03), the header bar of the
-//! three apps (NINT-07), the formula bar, the canvas of the sheet with its tables, the Inspector
-//! with Format, Data and Document (NINT-09), whose Format pane formats the
-//! cells (NINT-08), and the bottom bar with the
-//! zoom, the sheet in sight and the instant calculations (NINT-04,
-//! NGNM-13).
+//! The window of Desk Tables in interface B (docs/interface): the tables
+//! and charts of the sheet in the navigation sidebar (NINT-02, NINT-03),
+//! the header bar of the three apps (NINT-07), the formula bar, the canvas
+//! of the sheet with its tables and the zoom over it, the Inspector with
+//! Format, Data and Document (NINT-09), whose Format pane formats the
+//! cells (NINT-08), and the bottom bar with the sheet switcher and the
+//! instant calculations (NINT-04, NGNM-13, step 4 of window M+).
 //!
 //! The window shares the navigation sidebar, the command search and the
 //! look of Desk Writer, and keeps its own parts here, so that each app can

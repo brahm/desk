@@ -6,7 +6,7 @@ T002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window
 T003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	What the format bar of the cells held is in the Cell and Text tabs of the Format pane (NINT-08, step 2 of M+)
 T004	3.1 Window, menus and panes	Formula bar	Only '09	'09, in the form of the 15	D-002	In	Partial	the window changes (D-008)	B1	The formula bar is in the window, but the cells have no content yet (NINT-10, phase 4)
 T005	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Inspector with Format, Data and Document (NINT-09)
-T006	3.1 Window, menus and panes	Sheets pane (sidebar)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	Sheets, tables and charts in the sidebar (NINT-03)
+T006	3.1 Window, menus and panes	Sheets pane (sidebar)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	The tables and charts of the sheet in view in the sidebar, the sheets in the switcher of the bottom bar (NINT-03, NGNM-13, step 4 of window M+)
 T007	3.1 Window, menus and panes	Styles pane (sidebar)	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Table styles with thumbnails (phase 5)
 T008	3.1 Window, menus and panes	Instant calculations	Different	15.4	D-001	In	Partial	the window changes (D-008)	B1	Calculations in the bottom bar (NGNM-13); choosing the functions is missing and the cells have no values yet
 T009	3.1 Window, menus and panes	Reorganize	Different	15.4	D-001	In	Missing	the window changes (D-008)	B1	Organize (sort, filter) in a sidebar (phase 5)
@@ -38,7 +38,7 @@ T034	3.2 Spreadsheets, templates and files	Address Book data	Only '09	'09, in th
 T035	3.2 Spreadsheets, templates and files	Print	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	-	T5	Print and Print Preview (phase 7)
 T036	3.2 Spreadsheets, templates and files	Send 🌐 (in both)	Different	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Send (online)
 T037	3.2 Spreadsheets, templates and files	Recent files	Equal	Equal in both	-	In	Engine ready	-	T5	GTK recent files in Writer
-T038	3.3 Sheets and pages	Several sheets per spreadsheet	Different (place)	15.4	D-001	In	Partial	-	T1	Several sheets exist, in the sidebar (decision of interface B); the 15 shows them as tabs
+T038	3.3 Sheets and pages	Several sheets per spreadsheet	Different (place)	15.4	D-001	In	Partial	-	T1	Several sheets exist, in the switcher of the bottom bar (step 4 of window M+), as the tabs of the 15
 T039	3.3 Sheets and pages	Rename, duplicate, delete, reorder sheets	Equal	Equal in both	-	In	Done	-	done	Rename, duplicate, delete and reorder sheets (NTAB-02 to NTAB-04)
 T040	3.3 Sheets and pages	Tab color	Only 15	15.4	D-001	In	Missing	-	T1	Tab color
 T041	3.3 Sheets and pages	Hide sheet	Only 15	15.4	D-001	In	Missing	-	T1	Hide sheet

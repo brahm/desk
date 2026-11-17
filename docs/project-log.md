@@ -576,6 +576,29 @@ matrix rows done on 9 November, before the change of target.
   became that of the controls, and opens Go to Page by the mnemonics of
   the menu.
 
+### 17 November: step 4 of window M+, the bottom bar of Tables
+
+- The sheets of Desk Tables left the sidebar for a switcher in the bottom
+  bar, as the tabs of Numbers 15: a toggle group of Libadwaita, one toggle
+  per sheet, with the + button before it, which adds a sheet from the
+  same menu as before. A secondary click on a sheet opens its menu,
+  whose Move items now say Left and Right. The instant calculations and
+  the count of the cells stay at the end of the bar.
+- The sidebar now shows only the tables and charts of the sheet in
+  view, under "In “Sheet 1”", with "Tables and Charts" as its heading
+  and Add Table or Chart as its + button.
+- The zoom left the bar and floats over the sheet in the same pill as in
+  Writer and Slides; the pill is now one shared function.
+- *Why:* the M+ mockup puts the sheets in the bottom bar (NGNM-13) and the
+  objects of the sheet in the sidebar (NGNM-12), as Numbers 15 does; a
+  sidebar with every sheet and every table grew long, while the tabs keep
+  the sheets in sight beside the cells.
+- *Consequences:* the position "Sheet 1 (1 of 2)" is no longer a label of
+  the bar; each toggle carries it as its tooltip and its description, so
+  a screen reader still hears it. The UI test reads the sheet in view
+  from the switcher, and chooses a sheet through the action of its
+  toggle.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
