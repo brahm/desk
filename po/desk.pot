@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-17 15:44+0000\n"
+"POT-Creation-Date: 2026-11-17 17:32+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -151,7 +151,7 @@ msgid "Blue Square"
 msgstr ""
 
 #: crates/desk-ui/src/bullet_pictures.rs:44
-#: crates/desk-ui/src/graphic_pane.rs:149
+#: crates/desk-ui/src/graphic_pane.rs:151
 #: crates/desk-ui/src/picture_pane.rs:110
 msgid "Arrow"
 msgstr ""
@@ -214,7 +214,7 @@ msgstr ""
 msgid "Stacked Column"
 msgstr ""
 
-#: crates/desk-ui/src/chart_pane.rs:29 crates/desk-ui/src/graphic_pane.rs:153
+#: crates/desk-ui/src/chart_pane.rs:29 crates/desk-ui/src/graphic_pane.rs:155
 #: crates/desk-ui/src/window/tables.rs:148
 msgid "Bar"
 msgstr ""
@@ -276,13 +276,13 @@ msgid "Textures"
 msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:49 crates/desk-ui/src/chart_pane.rs:59
-#: crates/desk-ui/src/chart_pane.rs:267 crates/desk-ui/src/effects.rs:54
-#: crates/desk-ui/src/effects.rs:120 crates/desk-ui/src/fonts.rs:187
-#: crates/desk-ui/src/format_pane.rs:39 crates/desk-ui/src/format_pane.rs:111
-#: crates/desk-ui/src/format_pane.rs:224 crates/desk-ui/src/format_pane.rs:272
-#: crates/desk-ui/src/graphic_pane.rs:148
-#: crates/desk-ui/src/graphic_pane.rs:167
-#: crates/desk-ui/src/graphic_pane.rs:222 crates/desk-ui/src/lists_pane.rs:59
+#: crates/desk-ui/src/chart_pane.rs:267 crates/desk-ui/src/color_popover.rs:160
+#: crates/desk-ui/src/effects.rs:54 crates/desk-ui/src/effects.rs:120
+#: crates/desk-ui/src/fonts.rs:187 crates/desk-ui/src/format_pane.rs:39
+#: crates/desk-ui/src/format_pane.rs:111 crates/desk-ui/src/format_pane.rs:224
+#: crates/desk-ui/src/format_pane.rs:272 crates/desk-ui/src/graphic_pane.rs:150
+#: crates/desk-ui/src/graphic_pane.rs:169
+#: crates/desk-ui/src/graphic_pane.rs:224 crates/desk-ui/src/lists_pane.rs:59
 #: crates/desk-ui/src/media_pane.rs:87 crates/desk-ui/src/styles_drawer.rs:871
 #: crates/desk-ui/src/styles_drawer.rs:1029
 #: crates/desk-ui/src/styles_drawer.rs:1034
@@ -292,7 +292,7 @@ msgid "None"
 msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:50 crates/desk-ui/src/chart_pane.rs:218
-#: crates/desk-ui/src/graphic_pane.rs:190
+#: crates/desk-ui/src/graphic_pane.rs:192
 msgid "Linear"
 msgstr ""
 
@@ -363,15 +363,15 @@ msgid "Gap Between Bars"
 msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:179 crates/desk-ui/src/chart_pane.rs:202
-#: crates/desk-ui/src/compact.rs:46 crates/desk-ui/src/effects.rs:246
-#: crates/desk-ui/src/effects.rs:320 crates/desk-ui/src/fonts.rs:395
-#: crates/desk-ui/src/graphic_pane.rs:212
-#: crates/desk-ui/src/graphic_pane.rs:216
+#: crates/desk-ui/src/compact.rs:46 crates/desk-ui/src/effects.rs:261
+#: crates/desk-ui/src/effects.rs:335 crates/desk-ui/src/fonts.rs:395
+#: crates/desk-ui/src/graphic_pane.rs:214
 #: crates/desk-ui/src/graphic_pane.rs:218
-#: crates/desk-ui/src/graphic_pane.rs:235
-#: crates/desk-ui/src/graphic_pane.rs:252
-#: crates/desk-ui/src/graphic_pane.rs:258
-#: crates/desk-ui/src/graphic_pane.rs:260 crates/desk-ui/src/lists_pane.rs:260
+#: crates/desk-ui/src/graphic_pane.rs:220
+#: crates/desk-ui/src/graphic_pane.rs:237
+#: crates/desk-ui/src/graphic_pane.rs:254
+#: crates/desk-ui/src/graphic_pane.rs:260
+#: crates/desk-ui/src/graphic_pane.rs:262 crates/desk-ui/src/lists_pane.rs:260
 #: crates/desk-ui/src/media_pane.rs:95
 msgid "Percent"
 msgstr ""
@@ -508,7 +508,7 @@ msgstr ""
 msgid "Data Symbol"
 msgstr ""
 
-#: crates/desk-ui/src/chart_pane.rs:268 crates/desk-ui/src/graphic_pane.rs:151
+#: crates/desk-ui/src/chart_pane.rs:268 crates/desk-ui/src/graphic_pane.rs:153
 msgid "Circle"
 msgstr ""
 
@@ -516,7 +516,7 @@ msgstr ""
 msgid "Triangle"
 msgstr ""
 
-#: crates/desk-ui/src/chart_pane.rs:270 crates/desk-ui/src/graphic_pane.rs:152
+#: crates/desk-ui/src/chart_pane.rs:270 crates/desk-ui/src/graphic_pane.rs:154
 msgid "Square"
 msgstr ""
 
@@ -548,71 +548,71 @@ msgstr ""
 msgid "Amount"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:39
+#: crates/desk-ui/src/color_popover.rs:43
 #: crates/desk-ui/src/object_styles_pane.rs:34
 #: crates/desk-ui/src/tables/window.rs:69
 msgid "Blue"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:43
+#: crates/desk-ui/src/color_popover.rs:47
 #: crates/desk-ui/src/object_styles_pane.rs:35
 msgid "Green"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:47
+#: crates/desk-ui/src/color_popover.rs:51
 #: crates/desk-ui/src/object_styles_pane.rs:45
 msgid "Yellow"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:51
+#: crates/desk-ui/src/color_popover.rs:55
 #: crates/desk-ui/src/object_styles_pane.rs:36
 msgid "Orange"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:55
+#: crates/desk-ui/src/color_popover.rs:59
 #: crates/desk-ui/src/object_styles_pane.rs:42
 msgid "Red"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:59
+#: crates/desk-ui/src/color_popover.rs:63
 msgid "Purple"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:63
+#: crates/desk-ui/src/color_popover.rs:67
 msgid "Brown"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:67
+#: crates/desk-ui/src/color_popover.rs:71
 msgid "Light Gray"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:71
+#: crates/desk-ui/src/color_popover.rs:75
 msgid "Dark Gray"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:233
+#: crates/desk-ui/src/color_popover.rs:257
 msgid "From the Document"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:245
+#: crates/desk-ui/src/color_popover.rs:269
 msgid "Colors of the Document"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:265
+#: crates/desk-ui/src/color_popover.rs:289
 msgid "Document Color"
 msgstr ""
 
-#: crates/desk-ui/src/color_popover.rs:289
+#: crates/desk-ui/src/color_popover.rs:313
 msgid "Custom…"
 msgstr ""
 
-#: crates/desk-ui/src/compact.rs:42 crates/desk-ui/src/effects.rs:257
-#: crates/desk-ui/src/effects.rs:291 crates/desk-ui/src/effects.rs:318
-#: crates/desk-ui/src/effects.rs:319 crates/desk-ui/src/fonts.rs:396
+#: crates/desk-ui/src/compact.rs:42 crates/desk-ui/src/effects.rs:272
+#: crates/desk-ui/src/effects.rs:306 crates/desk-ui/src/effects.rs:333
+#: crates/desk-ui/src/effects.rs:334 crates/desk-ui/src/fonts.rs:396
 #: crates/desk-ui/src/fonts.rs:397 crates/desk-ui/src/formatting.rs:191
-#: crates/desk-ui/src/formatting.rs:192 crates/desk-ui/src/graphic_pane.rs:239
-#: crates/desk-ui/src/graphic_pane.rs:248
+#: crates/desk-ui/src/formatting.rs:192 crates/desk-ui/src/graphic_pane.rs:241
 #: crates/desk-ui/src/graphic_pane.rs:250
+#: crates/desk-ui/src/graphic_pane.rs:252
 #: crates/desk-ui/src/object_text_pane.rs:111
 #: crates/desk-ui/src/preferences.rs:67 crates/desk-ui/src/shape_pane.rs:110
 #: crates/desk-ui/src/table_pane.rs:233 crates/desk-ui/src/table_pane.rs:293
@@ -1034,124 +1034,124 @@ msgstr ""
 msgid "Border Around"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:130 crates/desk-ui/src/graphic_pane.rs:223
+#: crates/desk-ui/src/effects.rs:130 crates/desk-ui/src/graphic_pane.rs:225
 msgid "Solid"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:131 crates/desk-ui/src/graphic_pane.rs:224
+#: crates/desk-ui/src/effects.rs:131 crates/desk-ui/src/graphic_pane.rs:226
 #: crates/desk-ui/src/object_styles_pane.rs:40
 msgid "Dashed"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:132 crates/desk-ui/src/graphic_pane.rs:225
+#: crates/desk-ui/src/effects.rs:132 crates/desk-ui/src/graphic_pane.rs:227
 #: crates/desk-ui/src/object_styles_pane.rs:41
 msgid "Dotted"
 msgstr ""
 
 #: crates/desk-ui/src/effects.rs:156 crates/desk-ui/src/effects.rs:166
-#: crates/desk-ui/src/graphic_pane.rs:676
+#: crates/desk-ui/src/graphic_pane.rs:699
 msgid "Color"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:245
+#: crates/desk-ui/src/effects.rs:260
 msgid "Character Spacing"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:248 crates/desk-ui/src/fonts.rs:411
+#: crates/desk-ui/src/effects.rs:263 crates/desk-ui/src/fonts.rs:411
 #: crates/desk-ui/src/undo_names.rs:52
 msgid "Ligatures"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:252
+#: crates/desk-ui/src/effects.rs:267
 msgid "Baseline"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:256
+#: crates/desk-ui/src/effects.rs:271
 msgid "Baseline Shift"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:260
+#: crates/desk-ui/src/effects.rs:275
 msgid "Capitalization"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:263
+#: crates/desk-ui/src/effects.rs:278
 #: crates/desk-ui/src/object_styles_pane.rs:44
 #: crates/desk-ui/src/outline_view.rs:125
 msgid "Outline"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:264
+#: crates/desk-ui/src/effects.rs:279
 msgid "Character Background"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:268 crates/desk-ui/src/formatting.rs:673
+#: crates/desk-ui/src/effects.rs:283 crates/desk-ui/src/formatting.rs:673
 #: crates/desk-ui/src/writing_tools.rs:74
 msgid "Characters"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:274 crates/desk-ui/src/undo_names.rs:51
+#: crates/desk-ui/src/effects.rs:289 crates/desk-ui/src/undo_names.rs:51
 msgid "Language"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:280 crates/desk-ui/src/fonts.rs:387
+#: crates/desk-ui/src/effects.rs:295 crates/desk-ui/src/fonts.rs:387
 msgid "Paragraph Background"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:282
+#: crates/desk-ui/src/effects.rs:297
 msgid "Borders and Rules"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:286
+#: crates/desk-ui/src/effects.rs:301
 msgid "Line Style"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:290
+#: crates/desk-ui/src/effects.rs:305
 msgid "Line Width"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:293
+#: crates/desk-ui/src/effects.rs:308
 msgid "Line Color"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:297
+#: crates/desk-ui/src/effects.rs:312
 msgid "Offset"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:298
+#: crates/desk-ui/src/effects.rs:313
 msgid "Points from the text"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:301
+#: crates/desk-ui/src/effects.rs:316
 msgid "Background and Borders"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:310 crates/desk-ui/src/effects.rs:321
+#: crates/desk-ui/src/effects.rs:325 crates/desk-ui/src/effects.rs:336
 msgid "Text Shadow"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:317 crates/desk-ui/src/graphic_pane.rs:189
-#: crates/desk-ui/src/graphic_pane.rs:246
+#: crates/desk-ui/src/effects.rs:332 crates/desk-ui/src/graphic_pane.rs:191
+#: crates/desk-ui/src/graphic_pane.rs:248
 #: crates/desk-ui/src/objects_pane.rs:206
 msgid "Degrees, counterclockwise"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:317 crates/desk-ui/src/fonts.rs:398
-#: crates/desk-ui/src/graphic_pane.rs:245
+#: crates/desk-ui/src/effects.rs:332 crates/desk-ui/src/fonts.rs:398
+#: crates/desk-ui/src/graphic_pane.rs:247
 msgid "Shadow Angle"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:318 crates/desk-ui/src/fonts.rs:397
-#: crates/desk-ui/src/graphic_pane.rs:247
+#: crates/desk-ui/src/effects.rs:333 crates/desk-ui/src/fonts.rs:397
+#: crates/desk-ui/src/graphic_pane.rs:249
 msgid "Shadow Offset"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:319 crates/desk-ui/src/fonts.rs:396
-#: crates/desk-ui/src/graphic_pane.rs:249
+#: crates/desk-ui/src/effects.rs:334 crates/desk-ui/src/fonts.rs:396
+#: crates/desk-ui/src/graphic_pane.rs:251
 msgid "Shadow Blur"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:320 crates/desk-ui/src/fonts.rs:395
-#: crates/desk-ui/src/graphic_pane.rs:251
+#: crates/desk-ui/src/effects.rs:335 crates/desk-ui/src/fonts.rs:395
+#: crates/desk-ui/src/graphic_pane.rs:253
 msgid "Shadow Opacity"
 msgstr ""
 
@@ -1476,7 +1476,7 @@ msgstr ""
 msgid "Strikethrough Color"
 msgstr ""
 
-#: crates/desk-ui/src/fonts.rs:388 crates/desk-ui/src/graphic_pane.rs:243
+#: crates/desk-ui/src/fonts.rs:388 crates/desk-ui/src/graphic_pane.rs:245
 #: crates/desk-ui/src/object_styles_pane.rs:49
 msgid "Shadow"
 msgstr ""
@@ -1753,7 +1753,7 @@ msgstr ""
 msgid "More"
 msgstr ""
 
-#: crates/desk-ui/src/formatting.rs:292 crates/desk-ui/src/graphic_pane.rs:182
+#: crates/desk-ui/src/formatting.rs:292 crates/desk-ui/src/graphic_pane.rs:184
 #: crates/desk-ui/src/inspector.rs:60 crates/desk-ui/src/lists_pane.rs:242
 #: crates/desk-ui/src/picture_pane.rs:176
 msgid "Image"
@@ -1851,7 +1851,7 @@ msgstr ""
 msgid "Function Browser"
 msgstr ""
 
-#: crates/desk-ui/src/gradient_bar.rs:47 crates/desk-ui/src/graphic_pane.rs:193
+#: crates/desk-ui/src/gradient_bar.rs:47 crates/desk-ui/src/graphic_pane.rs:195
 msgid "Gradient Colors"
 msgstr ""
 
@@ -1897,150 +1897,150 @@ msgstr ""
 msgid "Tape"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:150
+#: crates/desk-ui/src/graphic_pane.rs:152
 msgid "Open Arrow"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:165 crates/desk-ui/src/table_pane.rs:271
+#: crates/desk-ui/src/graphic_pane.rs:167 crates/desk-ui/src/table_pane.rs:271
 #: crates/desk-ui/src/table_pane.rs:284 crates/desk-ui/src/undo_names.rs:34
 msgid "Fill"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:168
+#: crates/desk-ui/src/graphic_pane.rs:170
 msgid "Color Fill"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:169
+#: crates/desk-ui/src/graphic_pane.rs:171
 msgid "Gradient Fill"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:170
+#: crates/desk-ui/src/graphic_pane.rs:172
 msgid "Image Fill"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:172
+#: crates/desk-ui/src/graphic_pane.rs:174
 msgid "Tinted Image Fill"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:175
+#: crates/desk-ui/src/graphic_pane.rs:177
 msgid "Advanced Gradient Fill"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:179
+#: crates/desk-ui/src/graphic_pane.rs:181
 msgid "Choose…"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:185
+#: crates/desk-ui/src/graphic_pane.rs:187
 msgid "Image Size"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:186
-#: crates/desk-ui/src/graphic_pane.rs:678
+#: crates/desk-ui/src/graphic_pane.rs:188
+#: crates/desk-ui/src/graphic_pane.rs:701
 msgid "Fill Color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:187
+#: crates/desk-ui/src/graphic_pane.rs:189
 msgid "Gradient End Color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:188
+#: crates/desk-ui/src/graphic_pane.rs:190
 msgid "Gradient Angle"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:190
+#: crates/desk-ui/src/graphic_pane.rs:192
 msgid "Gradient Type"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:190
+#: crates/desk-ui/src/graphic_pane.rs:192
 msgid "Radial"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:194
+#: crates/desk-ui/src/graphic_pane.rs:196
 msgid "Click to add a color, drag to move it"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:206
+#: crates/desk-ui/src/graphic_pane.rs:208
 msgid "Add Color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:207
+#: crates/desk-ui/src/graphic_pane.rs:209
 msgid "Remove Color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:211
+#: crates/desk-ui/src/graphic_pane.rs:213
 msgid "Color Position"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:213
+#: crates/desk-ui/src/graphic_pane.rs:215
 msgid "Blend Point"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:214
+#: crates/desk-ui/src/graphic_pane.rs:216
 msgid "Percent of the way to the next color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:215
+#: crates/desk-ui/src/graphic_pane.rs:217
 msgid "Horizontal Center"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:217
+#: crates/desk-ui/src/graphic_pane.rs:219
 msgid "Vertical Center"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:220
+#: crates/desk-ui/src/graphic_pane.rs:222
 msgid "Stroke"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:226
+#: crates/desk-ui/src/graphic_pane.rs:228
 msgid "Picture Frame"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:233
+#: crates/desk-ui/src/graphic_pane.rs:235
 msgid "Frame"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:234
+#: crates/desk-ui/src/graphic_pane.rs:236
 msgid "Frame Thickness"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:236
+#: crates/desk-ui/src/graphic_pane.rs:238
 msgid "Stroke Color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:237
+#: crates/desk-ui/src/graphic_pane.rs:239
 msgid "Stroke Width"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:241
+#: crates/desk-ui/src/graphic_pane.rs:243
 msgid "Start of the Line"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:242
+#: crates/desk-ui/src/graphic_pane.rs:244
 msgid "End of the Line"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:244
+#: crates/desk-ui/src/graphic_pane.rs:246
 msgid "Shadow Color"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:255
+#: crates/desk-ui/src/graphic_pane.rs:257
 #: crates/desk-ui/src/object_styles_pane.rs:50
 msgid "Reflection"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:257
+#: crates/desk-ui/src/graphic_pane.rs:259
 msgid "Reflection Opacity"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:259
+#: crates/desk-ui/src/graphic_pane.rs:261
 msgid "Opacity"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:261
+#: crates/desk-ui/src/graphic_pane.rs:263
 msgid "Graphic"
 msgstr ""
 
-#: crates/desk-ui/src/graphic_pane.rs:527
+#: crates/desk-ui/src/graphic_pane.rs:550
 msgid "Choose an Image to Fill With"
 msgstr ""
 

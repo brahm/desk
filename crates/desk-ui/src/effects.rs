@@ -169,6 +169,21 @@ impl ColorRow {
             .bind_property("active", &colors, "sensitive")
             .sync_create()
             .build();
+        // None turns the color off, as the switch does (B-026); a row
+        // whose color is always on hides its switch, and None with it.
+        if let Some(none) = crate::color_popover::add_none(&colors, {
+            let switch = switch.downgrade();
+            move || {
+                if let Some(switch) = switch.upgrade() {
+                    switch.set_active(false);
+                }
+            }
+        }) {
+            switch
+                .bind_property("visible", &none, "visible")
+                .sync_create()
+                .build();
+        }
         row.add_suffix(&colors);
         row.add_suffix(&switch);
         row.set_activatable_widget(Some(&switch));

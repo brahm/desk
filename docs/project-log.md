@@ -760,6 +760,28 @@ matrix rows done on 9 November, before the change of target.
   Advanced Options and look for its rows, and check that the Colors
   popover shows the colors of the document.
 
+### 17 November: None in the Colors popover (B-026)
+
+- The owner asked for the None button of the Colors popover, which the
+  scene of window M+ draws beside Custom…, first as a row of the backlog
+  (B-026) and then to do it.
+- *Where it shows:* only where the row can have no color. The rows with a
+  switch (the backgrounds of characters and paragraphs, the shadow of
+  the text, the colors of underline and strikethrough in the Fonts
+  popover, the color of a list label) turn the switch off. In the Graphic
+  group of objects, None on the fill takes the fill away, or only the
+  tint of a tinted picture; on the line it chooses None in the Stroke
+  list; on the shadow it turns the Shadow switch off. The text color, the
+  line of a paragraph border, whose switch is hidden, and the end of a
+  gradient always have a color, so their popovers have no None.
+- *Why this way:* each row keeps one way to say "no color" (its switch or
+  its list), and None only sets it, so undo, the model and the files are
+  unchanged.
+- *Consequences:* B-026 is closed; components.tsv counts None as existing
+  (92 existing, 27 new). The UI test turns the background of the
+  characters on, takes it away with None, and checks that the popover of
+  the text color has no None.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

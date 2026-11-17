@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: None in the Colors popover takes away a background, a fill, a
+  line or a shadow.
 * Added: The Colors popover shows the colors the document already
   uses, under the palette.
 * Added: The Font group of the Inspector has a Typeface row and Advanced
