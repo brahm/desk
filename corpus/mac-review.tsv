@@ -5,8 +5,9 @@
 # Numbers and Keynote 15.4 on the owner's Mac, with the date. verdict is
 # "same" when Desk does what iWork 15.4 does, "by decision" when Desk does
 # it in another form that a decision sets (the decision is in the note),
-# and "gap" when iWork 15.4 has something Desk lacks (the backlog item is
-# in the note). The captures stay outside the repository (D-011).
+# "gap" when iWork 15.4 has something Desk lacks (the backlog item is in
+# the note), and "not finished" for a row Desk has not finished yet, where
+# the row records what iWork 15.4 does for the second round. The captures stay outside the repository (D-011).
 id	date	iwork_15_4	verdict	note
 W001	2026-11-17	File, Edit, Insert, Format, Arrange, View, Window and Help in the macOS menu bar	by decision	D-008: the same commands in the Insert menu, the main menu and command search; Share, Content Hub and the generated images stay out (online or AI)
 W002	2026-11-17	Toolbar with View, Insert, Table, Chart, Text, Shape, Media, Comment, Zoom, Format and Document	by decision	D-008: header bar with the same insert buttons, Inspector and Find
@@ -20,7 +21,7 @@ W010	2026-11-17	No bottom bar; zoom in the toolbar; Show Word Count puts a count
 W013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	Tabs of AdwTabView with the tab overview
 W014	2026-11-17	Follows the light and dark appearance of macOS	same	-
 W015	2026-11-17	Settings with General, Rulers and Auto-Correction	same	Preferences with General, Rulers and Correction
-W016	2026-11-17	Undo and Redo in the Edit menu	same	The name of the change could not be read with the app in the background
+W016	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing, Undo Bold, Undo Add Page)	same	-
 W020	2026-11-17	A saved document saves itself; closing a new document asks to keep it, with name, folder, Delete and Save in one sheet	by decision	D-008: Save Changes? with Discard and Save, as GNOME asks
 W022	2026-11-17	Revert To with Last Opened and Browse All Versions, once the document has a file	same	-
 T002	2026-11-17	Toolbar with View, Insert, Table, Chart, Text, Shape, Media, Comment, Zoom, Format and Organize	by decision	D-008: header bar
@@ -30,7 +31,7 @@ T006	2026-11-17	No sheets pane; sheet tabs under the toolbar with a + button; Sh
 T014	2026-11-17	Zoom with Zoom In, Zoom Out, Actual Size and Zoom to Selection	gap	No Zoom to Selection (B-027)
 T016	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
 T017	2026-11-17	Follows the light and dark appearance of macOS	same	-
-T019	2026-11-17	Undo and Redo in the Edit menu	same	-
+T019	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing)	gap	Desk Tables undoes and redoes, but its menus say only Undo and Redo (B-029)
 S001	2026-11-17	Keynote, File, Edit, Insert, Slide, Format, Arrange, View, Play, Window and Help in the macOS menu bar	by decision	D-008: GNOME menus and command search
 S002	2026-11-17	Toolbar with View, Play, Add Slide, insert buttons, Comment, Zoom, Format, Animate and Document	by decision	D-008: header bar with Play and the insert buttons
 S003	2026-11-17	No format bar; the Slide tab with layout, appearance and background when nothing is selected	same	-
@@ -39,4 +40,25 @@ S011	2026-11-17	No bottom bar; Go To in the Slide menu with Next, Previous, Firs
 S012	2026-11-17	Enter Full Screen and Slide Only in the View menu	same	-
 S013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
 S014	2026-11-17	Follows the light and dark appearance of macOS	same	-
-S016	2026-11-17	Undo and Redo in the Edit menu	same	-
+S016	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Add Build Effect)	same	The name comes from the editor of Desk Slides
+W009	2026-11-17	Show Warnings in the View menu; Replace Fonts from the warning of a missing font	not finished	Partial: Replace Fonts is missing
+W011	2026-11-17	Page Thumbnails, Table of Contents and Document Only in the View button; the table of contents in the sidebar has Edit and Insert Table of Contents; the comments pane is apart	not finished	Partial: the table of contents in the sidebar is missing
+W012	2026-11-17	Enter Screen View: one continuous flow, zoom Auto, a notice "Screen View is on"; Enter Full Screen	not finished	Partial: Screen View is missing
+T001	2026-11-17	An Organize menu with sort, filter, categories and pivot tables, and a Table menu	not finished	Partial: Organize comes with phase 5
+T004	2026-11-17	No formula bar: the formula editor opens in the cell on typing "="	not finished	Partial: phase 4
+T007	2026-11-17	Table styles as thumbnails at the top of the Table tab of the Format pane	not finished	Missing: phase 5
+T008	2026-11-17	SUM, AVERAGE, MIN, MAX and COUNTA at the foot of the window for the selected cells, with a gear to choose them	not finished	Partial: choosing the functions is missing
+T009	2026-11-17	Organize button: a pane with Categories, Sort and Filter tabs	not finished	Missing: phase 5
+T010	2026-11-17	Typing "=" puts the Functions browser in the sidebar, with categories, search, a description and Insert Function	not finished	Engine ready
+T011	2026-11-17	Media button: Choose Photo or Video, Choose Music, Image Gallery, Web Video, Record Audio, Choose File, and the iPhone camera	not finished	Engine ready
+T012	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	not finished	Engine ready
+T013	2026-11-17	Show Warnings in the View menu	not finished	Engine ready
+T015	2026-11-17	Enter Full Screen in the View menu	not finished	Engine ready
+T018	2026-11-17	Settings with General, Rulers and Auto-Correction	not finished	Engine ready
+S005	2026-11-17	Build Order: a floating window with the builds of the slide, Start, Delay and Preview, from the foot of the Animate tab	not finished	Missing: phase 5
+S006	2026-11-17	Media button, as in Pages	not finished	Engine ready
+S007	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	not finished	Engine ready
+S008	2026-11-17	Show Adjust Image opens a window with levels, exposure, contrast, saturation, highlights, shadows, sharpness, de-noise, temperature and tint	not finished	Engine ready
+S009	2026-11-17	Show Arrange Tools opens a window with Back, Front, Backward, Forward, size, position, rotation, lock and group	not finished	Engine ready
+S010	2026-11-17	Show Warnings in the View menu	not finished	Engine ready
+S015	2026-11-17	Settings with General, Slideshow, Rulers, Remote and Auto-Correction	not finished	Partial: Slideshow and Remote are missing

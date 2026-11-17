@@ -9,7 +9,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 ## Changes since 0.7.0 (unreleased)
 
 * Added: The 32 finished rows of the common base were compared with
-  Pages, Numbers and Keynote 15.4 on a Mac; two gaps went to the backlog.
+  Pages, Numbers and Keynote 15.4 on a Mac, and the other 21 have the
+  reference of iWork 15.4; three gaps went to the backlog.
 * Changed: The screenshots of Desk Writer in its metainfo show the new
   window, with the Format pane, Fonts, Find and the dark style.
 * Added: None in the Colors popover takes away a background, a fill, a
