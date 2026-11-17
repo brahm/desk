@@ -276,8 +276,18 @@ def main():
         press("Return")
         wait_for("the list to end", lambda: not showing(find_named(app, "Indent Level")))
         check("Return on an empty item ends the list", True)
+        # The Font group has the Typeface row, and its Advanced Options
+        # hold character spacing, the baseline and capitalization (B-019).
+        advanced = wait_for(
+            "the Advanced Options of the Font group",
+            lambda: inspector_node(app, "Advanced Options", has_action),
+        )
+        Atspi.Action.do_action(advanced, 0)
         for name in (
+            "Typeface",
             "Character Spacing",
+            "Baseline Shift",
+            "Capitalization",
             "Borders and Rules",
             "Hyphenate Words",
             "Hyphenate the Document",
@@ -632,6 +642,8 @@ def selections_and_colors(work):
             ),
         )
         check("win.colors opens the Colors popover of the text (INT-16)", showing_named(app, "Blue 3") is not None)
+        wait_for("the colors of the document in it (B-019)", lambda: showing_named(app, "Document Color 1"))
+        check("it shows the colors the document uses (B-019)", True)
         Atspi.Action.do_action(picker, 0)
         time.sleep(1)
         press("ctrl+s")
@@ -1339,6 +1351,14 @@ def toggles_named(app, names, role=Atspi.Role.RADIO_BUTTON):
 def tab_toggles(app):
     """The showing toggles of the tabs of the Inspector."""
     return toggles_named(app, TABS, Atspi.Role.PAGE_TAB)
+
+
+def has_action(node):
+    """Whether a node can be clicked through the accessibility tree."""
+    try:
+        return Atspi.Action.get_n_actions(node) > 0
+    except (GLib.GError, TypeError, NotImplementedError):
+        return False
 
 
 def inspector_node(app, name, accept=None):

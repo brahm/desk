@@ -14,8 +14,8 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{
-    BorderSides, BorderStyle, CharAttrs, CharFormat, Language, Length, Ligatures, ParaAttrs,
-    ParaBorder, ParaFormat, Rgba, Shadow,
+    Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat, Language, Length,
+    Ligatures, ParaAttrs, ParaBorder, ParaFormat, Rgba, Shadow,
 };
 
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
@@ -27,6 +27,36 @@ use crate::tab_stops::string_list;
 
 /// The ligatures in the order of their menu.
 pub const LIGATURES: [Ligatures; 3] = [Ligatures::Default, Ligatures::None, Ligatures::All];
+
+/// The baselines in the order of their menu (FMT-06).
+const BASELINES: [Baseline; 3] = [Baseline::Normal, Baseline::Superscript, Baseline::Subscript];
+
+/// The capitalizations in the order of their menu (FMT-07).
+const CAPITALIZATIONS: [Capitalization; 4] = [
+    Capitalization::None,
+    Capitalization::AllCaps,
+    Capitalization::SmallCaps,
+    Capitalization::Title,
+];
+
+/// The name of a baseline in its menu.
+fn baseline_name(baseline: Baseline) -> String {
+    match baseline {
+        Baseline::Normal => tr("Default"),
+        Baseline::Superscript => tr("Superscript"),
+        Baseline::Subscript => tr("Subscript"),
+    }
+}
+
+/// The name of a capitalization in its menu.
+fn capitalization_name(capitalization: Capitalization) -> String {
+    match capitalization {
+        Capitalization::None => tr("None"),
+        Capitalization::AllCaps => tr("All Caps"),
+        Capitalization::SmallCaps => tr("Small Caps"),
+        Capitalization::Title => tr("Title"),
+    }
+}
 
 /// The name of a language in the menu of languages: its name for the
 /// usual ones, and its tag for the others (TXT-10).
@@ -181,6 +211,9 @@ pub struct Effects {
     character: compact::Group,
     paragraph: compact::Group,
     tracking: compact::SpinRow,
+    baseline: compact::ComboRow,
+    baseline_shift: compact::SpinRow,
+    capitalization: compact::ComboRow,
     ligatures: compact::ComboRow,
     outline: compact::SwitchRow,
     language: compact::ComboRow,
@@ -215,13 +248,25 @@ impl Effects {
             .title(tr("Ligatures"))
             .model(&string_list(LIGATURES.map(ligatures_name)))
             .build();
+        let baseline = compact::ComboRow::builder()
+            .title(tr("Baseline"))
+            .model(&string_list(BASELINES.map(baseline_name)))
+            .build();
+        let baseline_shift = compact::SpinRow::with_range(-1000.0, 1000.0, 0.5);
+        baseline_shift.set_title(&tr("Baseline Shift"));
+        baseline_shift.set_subtitle(&tr("Points"));
+        baseline_shift.set_digits(1);
+        let capitalization = compact::ComboRow::builder()
+            .title(tr("Capitalization"))
+            .model(&string_list(CAPITALIZATIONS.map(capitalization_name)))
+            .build();
         let outline = compact::SwitchRow::builder().title(tr("Outline")).build();
         let text_background = ColorRow::new(&tr("Character Background"), Rgba::rgb(255, 255, 0));
+        // Character spacing, the baseline, capitalization, ligatures and
+        // the background go in the Advanced Options of the Font group
+        // ([`Effects::advanced_rows`], B-019); the rest stays here.
         let character = compact::Group::builder().title(tr("Characters")).build();
-        character.add(&tracking);
-        character.add(&ligatures);
         character.add(&outline);
-        character.add(&text_background.row);
         // The language of the text, which chooses its dictionaries, as in
         // the Text inspector of Pages (TXT-10).
         let languages = language_tags(None);
@@ -283,6 +328,9 @@ impl Effects {
             character,
             paragraph,
             tracking,
+            baseline,
+            baseline_shift,
+            capitalization,
             ligatures,
             outline,
             language,
@@ -336,6 +384,49 @@ impl Effects {
             }),
         );
         self.tracking.connect_value_notify(move |_| changed());
+        let changed = with(
+            self,
+            Rc::new(|this, editor| {
+                let baseline = BASELINES[(this.baseline.selected() as usize).min(2)];
+                editor.set_character_attrs(
+                    "Baseline",
+                    &CharAttrs {
+                        baseline: Some(baseline),
+                        ..CharAttrs::default()
+                    },
+                );
+            }),
+        );
+        self.baseline.connect_selected_notify(move |_| changed());
+        let changed = with(
+            self,
+            Rc::new(|this, editor| {
+                editor.set_character_attrs(
+                    "Baseline Shift",
+                    &CharAttrs {
+                        baseline_shift: Some(Length::from_pt(this.baseline_shift.value())),
+                        ..CharAttrs::default()
+                    },
+                );
+            }),
+        );
+        self.baseline_shift.connect_value_notify(move |_| changed());
+        let changed = with(
+            self,
+            Rc::new(|this, editor| {
+                let capitalization =
+                    CAPITALIZATIONS[(this.capitalization.selected() as usize).min(3)];
+                editor.set_character_attrs(
+                    "Capitalization",
+                    &CharAttrs {
+                        capitalization: Some(capitalization),
+                        ..CharAttrs::default()
+                    },
+                );
+            }),
+        );
+        self.capitalization
+            .connect_selected_notify(move |_| changed());
         let changed = with(
             self,
             Rc::new(|this, editor| {
@@ -486,6 +577,21 @@ impl Effects {
         [&self.character, &self.shadow_group, &self.paragraph]
     }
 
+    /// The rows of the Advanced Options of the Font group, as the scene of
+    /// window M+ draws them: character spacing, the baseline and its
+    /// shift, capitalization, ligatures and the background of the
+    /// characters (FMT-06, FMT-07, FMT-09, FMT-10, FMT-20, B-019).
+    pub fn advanced_rows(&self) -> [&dyn compact::Row; 6] {
+        [
+            &self.tracking,
+            &self.baseline,
+            &self.baseline_shift,
+            &self.capitalization,
+            &self.ligatures,
+            &self.text_background.row,
+        ]
+    }
+
     /// The details of the shadow only matter when there is one.
     fn show_shadow_rows(&self, on: bool) {
         self.shadow.button.set_sensitive(on);
@@ -525,6 +631,18 @@ impl Effects {
             self.tracking.set_value(tracking);
         }
         let index = |i: Option<usize>| i.unwrap_or(0) as u32;
+        self.baseline.set_selected(index(
+            BASELINES.iter().position(|b| *b == character.baseline),
+        ));
+        let shift = character.baseline_shift.to_pt();
+        if (self.baseline_shift.value() - shift).abs() > 0.01 {
+            self.baseline_shift.set_value(shift);
+        }
+        self.capitalization.set_selected(index(
+            CAPITALIZATIONS
+                .iter()
+                .position(|c| *c == character.capitalization),
+        ));
         self.ligatures.set_selected(index(
             LIGATURES.iter().position(|l| *l == character.ligatures),
         ));

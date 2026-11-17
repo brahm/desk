@@ -725,6 +725,40 @@ matrix rows done on 9 November, before the change of target.
   on each row. A test of the comparison reads `fmt-09-ligatures` and
   checks that its ligatures stay in their words.
 
+### 17 November: the colors of the document and the advanced options of the Font group (B-019)
+
+- The owner asked to do B-019 now, the part of step 2 of window M+ that
+  had stayed in the backlog: the row of the document's own colors in the
+  Colors popover, and the Typeface row and the Advanced Options of the
+  Font group, as the scenes of M+ draw them.
+- *Colors of the document:* the model gives the colors a document uses
+  (`Document::colors`), each once, in the order they first appear: the
+  color, background and custom line colors of its text, the backgrounds
+  and rules of its paragraphs, in the body and in its objects, then the
+  fills and lines of its objects. The popover asks for them each time it
+  opens, since the document changes while it is closed, and shows up to
+  two rows of the palette under it, as "From the Document". Each tab of
+  the window has its own document, so the Inspector of the tab, not the
+  window, says where the colors come from.
+- *Typeface:* a row under Family lists the faces of the family, as the
+  Fonts popover does, and chooses the face nearest to the weight and
+  slant of the selection; choosing one sets both. Shapes and text boxes
+  get it too, since they share the Font group.
+- *Advanced Options:* an expander at the end of the Font group holds
+  character spacing, the baseline (superscript and subscript) and its
+  shift in points, capitalization, ligatures and the background of the
+  characters. These rows moved from the Characters group, which keeps
+  the outline and the language. Baseline, its shift and capitalization
+  had no control in the interface before: only the model, the formats
+  and the automatic superscript of ordinal suffixes set them.
+- *Left out:* the None button that the scene draws beside Custom… is
+  not part of B-019, and the text color always has a color; the rows
+  whose color can be off keep their switch.
+- *Consequences:* B-019 is closed; components.tsv counts the colors of
+  the document as existing (91 existing, 28 new). The UI tests open the
+  Advanced Options and look for its rows, and check that the Colors
+  popover shows the colors of the document.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

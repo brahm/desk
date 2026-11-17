@@ -12,14 +12,24 @@
 //! `docs/interface/proposals/README.md`, to be reviewed at each new
 //! Libadwaita (AGENTS.md, item 4).
 //!
+//! Under the palette, a row shows the colors that the document already
+//! uses ([`desk_model::Document::colors`]), as the scene of the popover
+//! draws it (B-019): the Inspector of each document says where they come
+//! from with [`set_document_colors`], and the popover asks each time it
+//! opens.
+//!
 //! A row keeps its `gtk::ColorDialogButton` as the holder of the color:
 //! the panes read it, set it and follow its changes as before, and the
 //! popover button takes its place in the row.
 
-use adw::prelude::*;
-use gtk::{gdk, gio};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::formatting::labelled;
+use adw::prelude::*;
+use desk_model::Rgba;
+use gtk::{gdk, gio, glib};
+
+use crate::formatting::{labelled, to_gdk};
 use crate::i18n::{n_, tr};
 
 /// The palette of the GNOME HIG: for each hue its name and five shades,
@@ -63,6 +73,49 @@ const PALETTE: [(&str, [&str; 5]); 9] = [
     ),
 ];
 
+/// The most colors of the document that the popover shows: two rows of
+/// the palette.
+const MAX_DOCUMENT_COLORS: usize = 18;
+
+/// Where the colors of a document come from.
+type Source = Rc<dyn Fn() -> Vec<Rgba>>;
+
+thread_local! {
+    /// The widgets that hold the panes of a document, such as its
+    /// Inspector, with where the colors of that document come from.
+    static SOURCES: RefCell<Vec<(glib::WeakRef<gtk::Widget>, Source)>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+/// Says where the colors of the document come from for the color rows
+/// inside `holder`: the Colors popovers of those rows show what `colors`
+/// gives when they open. A tab of the window has its own document, so the
+/// holder is its Inspector rather than the window.
+pub fn set_document_colors(
+    holder: &impl IsA<gtk::Widget>,
+    colors: impl Fn() -> Vec<Rgba> + 'static,
+) {
+    SOURCES.with(|sources| {
+        let mut sources = sources.borrow_mut();
+        sources.retain(|(widget, _)| widget.upgrade().is_some());
+        sources.push((
+            holder.upcast_ref::<gtk::Widget>().downgrade(),
+            Rc::new(colors),
+        ));
+    });
+}
+
+/// The colors of the document that `widget` is in, if one says them.
+fn document_colors(widget: &gtk::Widget) -> Vec<Rgba> {
+    let source = SOURCES.with(|sources| {
+        sources.borrow().iter().find_map(|(holder, source)| {
+            let holder = holder.upgrade()?;
+            (widget == &holder || widget.is_ancestor(&holder)).then(|| source.clone())
+        })
+    });
+    source.map(|colors| colors()).unwrap_or_default()
+}
+
 /// A square that shows a color.
 fn swatch(color: gdk::RGBA, size: i32) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::builder()
@@ -90,6 +143,33 @@ fn set_swatch(area: &gtk::DrawingArea, color: gdk::RGBA) {
         let _ = cr.stroke();
     });
     area.queue_draw();
+}
+
+/// A swatch to choose in the popover, named `name`: it puts its color in
+/// `holder` and closes the popover.
+fn choice(
+    color: gdk::RGBA,
+    name: &str,
+    holder: &gtk::ColorDialogButton,
+    popover: &gtk::Popover,
+) -> gtk::Button {
+    let choice = gtk::Button::builder()
+        .child(&swatch(color, 22))
+        .css_classes(["flat"])
+        .tooltip_text(name)
+        .build();
+    labelled(&choice, name);
+    let holder = holder.downgrade();
+    let popover = popover.downgrade();
+    choice.connect_clicked(move |_| {
+        if let Some(holder) = holder.upgrade() {
+            holder.set_rgba(&color);
+        }
+        if let Some(popover) = popover.upgrade() {
+            popover.popdown();
+        }
+    });
+    choice
 }
 
 /// The button that takes the place of `holder` in a row: it shows the
@@ -140,26 +220,56 @@ pub fn button(holder: &gtk::ColorDialogButton, name: &str) -> gtk::MenuButton {
             let Ok(color) = gdk::RGBA::parse(*hex) else {
                 continue;
             };
-            let choice = gtk::Button::builder()
-                .child(&swatch(color, 22))
-                .css_classes(["flat"])
-                .tooltip_text(format!("{} {}", tr(hue), row + 1))
-                .build();
-            labelled(&choice, &format!("{} {}", tr(hue), row + 1));
-            let holder = holder.downgrade();
-            let popover = popover.downgrade();
-            choice.connect_clicked(move |_| {
-                if let Some(holder) = holder.upgrade() {
-                    holder.set_rgba(&color);
-                }
-                if let Some(popover) = popover.upgrade() {
-                    popover.popdown();
-                }
-            });
+            let name = format!("{} {}", tr(hue), row + 1);
+            let choice = choice(color, &name, holder, &popover);
             grid.attach(&choice, column as i32, row as i32, 1, 1);
         }
     }
     content.append(&grid);
+
+    // The colors the document already uses, filled each time the popover
+    // opens, since the document changes while it is closed (B-019).
+    let from_document = gtk::Label::builder()
+        .label(tr("From the Document"))
+        .xalign(0.0)
+        .css_classes(["caption", "dim-label"])
+        .build();
+    let document_row = gtk::FlowBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .max_children_per_line(PALETTE.len() as u32)
+        .min_children_per_line(PALETTE.len() as u32)
+        .row_spacing(4)
+        .column_spacing(4)
+        .homogeneous(true)
+        .build();
+    labelled(&document_row, &tr("Colors of the Document"));
+    content.append(&from_document);
+    content.append(&document_row);
+    {
+        let holder = holder.downgrade();
+        let button = button.downgrade();
+        let from_document = from_document.downgrade();
+        let document_row = document_row.downgrade();
+        popover.connect_show(move |popover| {
+            let (Some(holder), Some(button), Some(label), Some(row)) = (
+                holder.upgrade(),
+                button.upgrade(),
+                from_document.upgrade(),
+                document_row.upgrade(),
+            ) else {
+                return;
+            };
+            row.remove_all();
+            let colors = document_colors(button.upcast_ref());
+            for (index, color) in colors.into_iter().take(MAX_DOCUMENT_COLORS).enumerate() {
+                let name = format!("{} {}", tr("Document Color"), index + 1);
+                row.append(&choice(to_gdk(color), &name, &holder, popover));
+            }
+            let any = row.first_child().is_some();
+            label.set_visible(any);
+            row.set_visible(any);
+        });
+    }
 
     let actions = gtk::Box::builder().spacing(6).build();
     let picker = crate::eyedropper::button(holder);

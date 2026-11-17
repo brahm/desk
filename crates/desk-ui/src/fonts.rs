@@ -48,7 +48,7 @@ const MAX_SIZE: f64 = 1638.0;
 const LINES: [LineStyle; 3] = [LineStyle::None, LineStyle::Single, LineStyle::Double];
 
 /// A face of a family: its weight and whether it is italic (INT-15).
-type Face = (FontWeight, bool);
+pub(crate) type Face = (FontWeight, bool);
 
 /// The faces offered for a family that is not installed.
 const FACES: [Face; 4] = [
@@ -60,7 +60,7 @@ const FACES: [Face; 4] = [
 
 /// The faces of an installed family, lightest first, or the four basic
 /// faces when the family is not installed.
-fn family_faces(context: &gtk::pango::Context, family: &str) -> Vec<Face> {
+pub(crate) fn family_faces(context: &gtk::pango::Context, family: &str) -> Vec<Face> {
     let mut faces: Vec<Face> = context
         .list_families()
         .iter()
@@ -101,7 +101,7 @@ fn weight_value(weight: gtk::pango::Weight) -> u16 {
 }
 
 /// The face of a family nearest to a weight and slant.
-fn nearest_face(faces: &[Face], wanted: Face) -> usize {
+pub(crate) fn nearest_face(faces: &[Face], wanted: Face) -> usize {
     faces
         .iter()
         .enumerate()
@@ -159,7 +159,7 @@ fn collection_name(collection: Collection) -> String {
     }
 }
 
-fn face_name((weight, italic): Face) -> String {
+pub(crate) fn face_name((weight, italic): Face) -> String {
     match (weight.value(), italic) {
         (..=150, false) => tr("Thin"),
         (..=150, true) => tr("Thin Italic"),

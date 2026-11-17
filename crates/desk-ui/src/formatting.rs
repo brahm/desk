@@ -210,6 +210,12 @@ impl Inspector {
         text_font.hide_list();
         let [text_family, text_alignment] = text_font.groups();
         text_family.add(text.character_row());
+        // Character spacing, the baseline, capitalization, ligatures and
+        // the background of characters, in the Advanced Options of the
+        // Font group (B-019).
+        for row in effects.advanced_rows() {
+            text_font.add_advanced(row);
+        }
         let arrange_group = crate::format_pane::arrange_group();
         let object_styles = crate::object_styles_pane::StylesGroup::new();
         let table = crate::table_pane::TableGroups::new(editor.clone());
@@ -349,6 +355,14 @@ impl Inspector {
         let link_popover = link_popover(&[link, bookmarks]);
         text.set_link_popover(&link_popover);
         let root = levels.widget().clone();
+        {
+            // The Colors popovers of the Inspector show the colors that
+            // its document already uses (INT-16, B-019).
+            let editor = editor.clone();
+            crate::color_popover::set_document_colors(&root, move || {
+                editor().map(|e| e.document().colors()).unwrap_or_default()
+            });
+        }
 
         let this = Rc::new(Self {
             root,

@@ -1041,7 +1041,7 @@ impl ExpanderRow {
     }
 
     /// Adds a row inside.
-    pub fn add_row(&self, row: &impl Row) {
+    pub fn add_row(&self, row: &(impl Row + ?Sized)) {
         let widget = row.row_widget();
         widget.set_margin_start(0);
         widget.set_margin_end(0);
@@ -1118,6 +1118,9 @@ impl ExpanderRowBuilder {
         let row = ExpanderRow::new();
         if let Some(title) = self.title {
             row.set_title(&title);
+            // The expander is the button that opens the row, and is named
+            // by its title for the accessibility tree.
+            crate::formatting::labelled(&row.expander, &title);
         }
         if let Some(subtitle) = self.subtitle {
             row.set_subtitle(&subtitle);
