@@ -635,6 +635,56 @@ impl Document {
         statistics
     }
 
+    /// The colors that the document uses, each once, in the order they
+    /// first appear: those of its text, of the backgrounds and the rules
+    /// of its paragraphs, in the body and then in its objects, and the
+    /// fills and lines of its objects. The Colors popover shows them under
+    /// the palette, as the scene of window M+ draws it (INT-16, B-019).
+    /// Transparent colors are left out, since a swatch would not show them.
+    pub fn colors(&self) -> Vec<crate::Rgba> {
+        let mut colors = Vec::new();
+        let mut add = |color: crate::Rgba| {
+            if color.a > 0 && !colors.contains(&color) {
+                colors.push(color);
+            }
+        };
+        let styles = self.styles();
+        let paragraphs = self
+            .body()
+            .iter()
+            .chain(self.objects().iter().flat_map(Object::paragraphs));
+        for paragraph in paragraphs {
+            for run in paragraph.runs() {
+                let character = styles.resolve_character(paragraph.style(), run.style, &run.attrs);
+                add(character.color);
+                if let Some(color) = character.background {
+                    add(color);
+                }
+                for (line, color) in [
+                    (character.underline, character.underline_color),
+                    (character.strikethrough, character.strikethrough_color),
+                ] {
+                    if let (true, crate::LineColor::Custom(color)) =
+                        (line != crate::LineStyle::None, color)
+                    {
+                        add(color);
+                    }
+                }
+            }
+            let format = styles.resolve_paragraph(paragraph.style(), paragraph.attrs());
+            if let Some(color) = format.background {
+                add(color);
+            }
+            if format.border.sides != crate::BorderSides::None {
+                add(format.border.color);
+            }
+        }
+        for object in self.objects().iter() {
+            object_colors(object, &mut add);
+        }
+        colors
+    }
+
     /// Counts the text between two positions, such as a selection.
     pub fn statistics_between(
         &self,
@@ -938,5 +988,35 @@ impl Document {
 impl Default for Document {
     fn default() -> Self {
         Self::new_word_processing()
+    }
+}
+
+/// Adds the colors of the fill and the line of an object, and of the
+/// objects of a group, to the colors of a document.
+fn object_colors(object: &Object, add: &mut impl FnMut(crate::Rgba)) {
+    use crate::object::{Fill, ObjectKind};
+    match &object.style.fill {
+        Some(Fill::Color(color)) => add(*color),
+        Some(Fill::Gradient { from, to, .. }) => {
+            add(*from);
+            add(*to);
+        }
+        Some(Fill::Advanced(gradient)) => {
+            for stop in &gradient.stops {
+                add(stop.color);
+            }
+        }
+        Some(Fill::Image {
+            tint: Some(tint), ..
+        }) => add(*tint),
+        Some(Fill::Image { .. }) | None => {}
+    }
+    if let Some(stroke) = &object.style.stroke {
+        add(stroke.color);
+    }
+    if let ObjectKind::Group(objects) = &object.kind {
+        for object in objects.iter() {
+            object_colors(object, add);
+        }
     }
 }

@@ -416,3 +416,33 @@ fn snapshots_do_not_see_later_edits() {
     let worker = std::thread::spawn(move || snapshot.statistics().words);
     assert_eq!(worker.join().unwrap(), 1);
 }
+
+#[test]
+fn int_16_the_colors_of_the_document_each_once_in_order() {
+    let mut editor = editor_with("black red black\nyellow");
+    let first = first_paragraph(&editor).id();
+    let second = editor.document().body().get(1).unwrap().id();
+    let red = Rgba::rgb(200, 0, 0);
+    let yellow = Rgba::rgb(255, 255, 117);
+    editor
+        .edit("Format", |edit| {
+            edit.set_character_attrs(
+                Position::new(first, 6),
+                Position::new(first, 9),
+                &CharAttrs {
+                    color: Some(red),
+                    ..CharAttrs::default()
+                },
+            )?;
+            edit.set_paragraph_attrs(
+                Position::new(second, 0),
+                Position::new(second, 0),
+                &ParaAttrs {
+                    background: Some(Some(yellow)),
+                    ..ParaAttrs::default()
+                },
+            )
+        })
+        .unwrap();
+    assert_eq!(editor.document().colors(), [Rgba::BLACK, red, yellow]);
+}

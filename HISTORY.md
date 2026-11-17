@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: The Colors popover shows the colors the document already
+  uses, under the palette.
+* Added: The Font group of the Inspector has a Typeface row and Advanced
+  Options with character spacing, baseline, capitalization, ligatures
+  and the background of the characters.
 * Changed: The documents of Pages in the corpus are compared with PDFs
   of Pages 15.4, except 20 that keep those of Pages '09 for now.
 * Changed: The reference cases of Writer are measured against Pages

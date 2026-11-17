@@ -126,7 +126,7 @@ commands.field	Find, notices and commands	Command field	-	GtkSearchEntry	Typing 
 commands.list	Find, notices and commands	Command list	-	GtkListBox	Name of the command, the menu it came from and the shortcut (AdwShortcutLabel)	-	-	new	Enter runs it	writer, tables, slides	common-m-plus-commands	no
 colors.popover	Popovers	Colors	Colors	GtkPopover	Popover in place of the Colors window	Colors window	Color well with a palette	exists	Ctrl+Shift+C	writer	writer-m-plus-colors	no
 colors.palette	Popovers	Palette	Palette	GtkGrid	The GNOME palette, five shades of nine colors	Tabs of the Colors window	Palette of the theme	changes	-	writer	writer-m-plus-colors	no
-colors.document	Popovers	Document colors	Document Colors	GtkBox	The colors already used	Wells of saved colors	-	new	-	writer	writer-m-plus-colors	no
+colors.document	Popovers	Document colors	Document Colors	GtkFlowBox	The colors already used, filled each time the popover opens (B-019)	Wells of saved colors	-	exists	-	writer	writer-m-plus-colors	no
 colors.eyedropper	Popovers	Eyedropper	Eyedropper	GtkButton	Picks a color from the screen through the portal	Magnifier of the Colors window	Eyedropper	exists	-	writer	writer-m-plus-colors	no
 colors.custom	Popovers	Custom	Custom	GtkButton	Opens the full color chooser	Colors window	Color wheel	exists	-	writer	writer-m-plus-colors	no
 colors.none	Popovers	None	None	GtkButton	Removes the color	-	No fill	new	-	writer	writer-m-plus-colors	no

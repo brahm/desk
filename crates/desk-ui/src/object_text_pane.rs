@@ -13,15 +13,22 @@
 //! place of the format bar of interface B; [`ObjectTextGroups::show_text`]
 //! shows them for selected text.
 //!
+//! The Font group has the Typeface row under Family, which lists the faces
+//! of the family, and, in the Format pane of text, the Advanced Options
+//! that the Inspector fills ([`ObjectTextGroups::add_advanced`]), as the
+//! scene of window M+ draws them (INT-15, B-019).
+//!
 //! The style and alignment toggles and the list run the actions of the
 //! window, which format the text of the selected objects as they format
 //! selected text; the rest calls the editor through `editor`.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{CharAttrs, Length};
+
+use crate::fonts::{Face, face_name, family_faces, nearest_face};
 
 use crate::compact;
 use crate::editing::Format;
@@ -62,7 +69,13 @@ pub struct ObjectTextGroups {
     /// The family, on the button that opens the Fonts popover.
     family: gtk::Button,
     family_label: gtk::Label,
+    /// The faces of the family shown.
+    typeface: compact::ComboRow,
+    /// The family whose faces `typeface` lists, and those faces.
+    faces: RefCell<(String, Vec<Face>)>,
     size: compact::SpinRow,
+    /// The Advanced Options, hidden until rows go in.
+    advanced: compact::ExpanderRow,
     color: gtk::ColorDialogButton,
     /// The button of the Colors popover, which shows `color`.
     colors: gtk::MenuButton,
@@ -87,6 +100,11 @@ impl ObjectTextGroups {
         let family_row = compact::ActionRow::builder().title(tr("Family")).build();
         family_row.add_suffix(&family);
         font.add(&family_row);
+        let typeface = compact::ComboRow::builder()
+            .title(tr("Typeface"))
+            .model(&gtk::StringList::new(&[]))
+            .build();
+        font.add(&typeface);
 
         let size = compact::SpinRow::with_range(1.0, MAX_FONT_SIZE, 1.0);
         size.set_title(&tr("Size"));
@@ -127,6 +145,11 @@ impl ObjectTextGroups {
         let colors = crate::color_popover::button(&color, &tr("Text Color"));
         color_row.add_suffix(&colors);
         font.add(&color_row);
+        let advanced = compact::ExpanderRow::builder()
+            .title(tr("Advanced Options"))
+            .build();
+        advanced.set_visible(false);
+        font.add(&advanced);
 
         let alignment = compact::Group::builder().title(tr("Alignment")).build();
         let alignments = gtk::Box::builder()
@@ -164,13 +187,39 @@ impl ObjectTextGroups {
             alignment,
             family,
             family_label,
+            typeface,
+            faces: RefCell::new((String::new(), Vec::new())),
             size,
+            advanced,
             color,
             colors,
             list,
             updating: Cell::new(false),
         });
 
+        let weak = Rc::downgrade(&this);
+        let of = editor.clone();
+        this.typeface.connect_selected_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            let Some((weight, italic)) =
+                this.faces.borrow().1.get(row.selected() as usize).copied()
+            else {
+                return;
+            };
+            if let Some(editor) = of() {
+                editor.set_character_attrs(
+                    "Typeface",
+                    &CharAttrs {
+                        weight: Some(weight),
+                        italic: Some(italic),
+                        ..CharAttrs::default()
+                    },
+                );
+            }
+        });
         let weak = Rc::downgrade(&this);
         let of = editor.clone();
         this.size.connect_value_notify(move |row| {
@@ -236,6 +285,13 @@ impl ObjectTextGroups {
         self.list.set_visible(false);
     }
 
+    /// Puts a row in the Advanced Options of the Font group, and shows
+    /// them.
+    pub fn add_advanced(&self, row: &dyn compact::Row) {
+        self.advanced.add_row(row);
+        self.advanced.set_visible(true);
+    }
+
     /// The button of the Colors popover of the text color, which
     /// `win.colors` opens.
     pub fn colors_button(&self) -> &gtk::MenuButton {
@@ -266,11 +322,29 @@ impl ObjectTextGroups {
         self.show_characters(format);
     }
 
+    /// Lists the faces of the family at the selection, and chooses the one
+    /// nearest to its weight and slant, as the Fonts popover does.
+    fn show_typeface(&self, character: &desk_model::CharFormat) {
+        let family = &*character.font_family;
+        if self.faces.borrow().0 != family {
+            let faces = family_faces(&self.font.widget().pango_context(), family);
+            let names: Vec<String> = faces.iter().copied().map(face_name).collect();
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            *self.faces.borrow_mut() = (family.to_owned(), faces);
+            self.typeface.set_model(Some(&gtk::StringList::new(&names)));
+        }
+        let index = nearest_face(&self.faces.borrow().1, (character.weight, character.italic));
+        if self.typeface.selected() != index as u32 {
+            self.typeface.set_selected(index as u32);
+        }
+    }
+
     /// Shows the font, its size and color, and the list at the selection.
     fn show_characters(&self, format: &Format) {
         self.updating.set(true);
         let character = &format.character;
         self.family_label.set_label(&character.font_family);
+        self.show_typeface(character);
         let size = character.font_size.to_pt();
         if (self.size.value() - size).abs() > 0.01 {
             self.size.set_value(size);
