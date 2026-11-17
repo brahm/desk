@@ -233,7 +233,17 @@ pub(super) fn add_sheet_menu() -> gio::Menu {
     menu
 }
 
-/// The menu of a sheet in the sidebar (NINT-16, NTAB-02, NTAB-03).
+/// What the + button of the sidebar adds to the sheet in sight: a table or
+/// a chart (NGNM-12).
+pub(super) fn add_item_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&tr("_Table")), Some("win.insert-table"));
+    menu.append(Some(&tr("C_hart")), Some("win.insert-chart"));
+    menu
+}
+
+/// The menu of a sheet in the switcher of the bottom bar (NINT-16,
+/// NTAB-02, NTAB-03).
 pub(super) fn sheet_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     let edit = gio::Menu::new();
@@ -241,8 +251,8 @@ pub(super) fn sheet_menu() -> gio::Menu {
     edit.append(Some(&tr("_Duplicate")), Some("win.duplicate-sheet"));
     menu.append_section(None, &edit);
     let order = gio::Menu::new();
-    order.append(Some(&tr("Move _Up")), Some("win.move-sheet('up')"));
-    order.append(Some(&tr("Move Do_wn")), Some("win.move-sheet('down')"));
+    order.append(Some(&tr("Move _Left")), Some("win.move-sheet('up')"));
+    order.append(Some(&tr("Move _Right")), Some("win.move-sheet('down')"));
     menu.append_section(None, &order);
     let delete = gio::Menu::new();
     delete.append(Some(&tr("_Delete")), Some("win.delete-sheet"));

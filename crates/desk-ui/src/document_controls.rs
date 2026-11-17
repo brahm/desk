@@ -271,6 +271,53 @@ fn pill(halign: gtk::Align) -> gtk::Box {
         .build()
 }
 
+/// The zoom in a pill over the end corner of a document, between Zoom
+/// Out and Zoom In, with `menu` on the percentage (INT-07, NINT-04): the
+/// pill, the button of the percentage, and the three parts.
+pub fn zoom_pill(menu: &gio::Menu) -> (gtk::Box, gtk::MenuButton, [gtk::Widget; 3]) {
+    let zoom_out = gtk::Button::builder()
+        .icon_name("zoom-out-symbolic")
+        .action_name("win.zoom")
+        .action_target(&"out".to_variant())
+        .tooltip_text(tr("Zoom Out"))
+        .build();
+    crate::formatting::labelled(&zoom_out, &tr("Zoom Out"));
+    let zoom_in = gtk::Button::builder()
+        .icon_name("zoom-in-symbolic")
+        .action_name("win.zoom")
+        .action_target(&"in".to_variant())
+        .tooltip_text(tr("Zoom In"))
+        .build();
+    crate::formatting::labelled(&zoom_in, &tr("Zoom In"));
+    // A label as the child, so that no arrow shows beside it.
+    let zoom_label = gtk::Label::builder()
+        .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
+        .css_classes(["numeric"])
+        .build();
+    let zoom = gtk::MenuButton::builder()
+        .child(&zoom_label)
+        .menu_model(menu)
+        .direction(gtk::ArrowType::Up)
+        .tooltip_text(tr("Zoom"))
+        .css_classes(["flat"])
+        .build();
+    let pill = pill(gtk::Align::End);
+    pill.append(&zoom_out);
+    pill.append(&zoom);
+    pill.append(&zoom_in);
+    let parts = [zoom_out.upcast(), zoom.clone().upcast(), zoom_in.upcast()];
+    (pill, zoom, parts)
+}
+
+/// Shows a zoom on the button of its percentage.
+pub fn show_zoom(button: &gtk::MenuButton, zoom: f64) {
+    if let Some(label) = button.child().and_downcast::<gtk::Label>() {
+        let text = geometry::zoom_label(zoom);
+        label.set_label(&text);
+        crate::formatting::labelled(button, &text);
+    }
+}
+
 /// The controls over the document.
 pub struct Controls {
     /// The zoom, between Zoom Out and Zoom In, over the end corner.
@@ -300,37 +347,8 @@ impl Controls {
     /// The controls of Desk Writer, or with `slides` those of Desk Slides,
     /// which have no count and go to slides (KGNM-14).
     pub fn new_for(slides: bool) -> Self {
-        let zoom_out = gtk::Button::builder()
-            .icon_name("zoom-out-symbolic")
-            .action_name("win.zoom")
-            .action_target(&"out".to_variant())
-            .tooltip_text(tr("Zoom Out"))
-            .build();
-        crate::formatting::labelled(&zoom_out, &tr("Zoom Out"));
-        let zoom_in = gtk::Button::builder()
-            .icon_name("zoom-in-symbolic")
-            .action_name("win.zoom")
-            .action_target(&"in".to_variant())
-            .tooltip_text(tr("Zoom In"))
-            .build();
-        crate::formatting::labelled(&zoom_in, &tr("Zoom In"));
-        // A label as the child, so that no arrow shows beside it.
-        let zoom_label = gtk::Label::builder()
-            .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
-            .css_classes(["numeric"])
-            .build();
-        let zoom = gtk::MenuButton::builder()
-            .child(&zoom_label)
-            .menu_model(&zoom_menu())
-            .direction(gtk::ArrowType::Up)
-            .tooltip_text(tr("Zoom"))
-            .css_classes(["flat"])
-            .build();
-        let zoom_pill = pill(gtk::Align::End);
+        let (zoom_pill, zoom, zoom_parts) = zoom_pill(&zoom_menu());
         zoom_pill.set_visible(false);
-        zoom_pill.append(&zoom_out);
-        zoom_pill.append(&zoom);
-        zoom_pill.append(&zoom_in);
 
         let count_label = gtk::Label::builder()
             .ellipsize(gtk::pango::EllipsizeMode::End)
@@ -387,7 +405,7 @@ impl Controls {
             slides,
             shown: std::cell::Cell::new(false),
             counted: std::cell::Cell::new(true),
-            zoom_parts: [zoom_out.upcast(), zoom.clone().upcast(), zoom_in.upcast()],
+            zoom_parts,
             zoom,
             zoom_pill,
             count,
@@ -463,11 +481,7 @@ impl Controls {
 
     /// Shows the zoom.
     pub fn show_zoom(&self, zoom: f64) {
-        if let Some(label) = self.zoom.child().and_downcast::<gtk::Label>() {
-            let text = geometry::zoom_label(zoom);
-            label.set_label(&text);
-            crate::formatting::labelled(&self.zoom, &text);
-        }
+        show_zoom(&self.zoom, zoom);
     }
 
     /// Shows the count.

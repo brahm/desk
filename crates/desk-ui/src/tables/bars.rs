@@ -4,8 +4,9 @@
 //! The bars of Desk Tables around the canvas and what the cells format
 //! with: the Cell and Text tabs of the Format pane, which hold what the
 //! format bar of interface B had (NINT-08, step 2 of window M+), the
-//! formula bar under the header bar, and the bottom bar with the zoom, the
-//! sheet in sight and the instant calculations (NINT-04, NGNM-13).
+//! formula bar under the header bar, the bottom bar with the sheet
+//! switcher, the button that adds a sheet and the instant calculations
+//! (NINT-04, NGNM-13, step 4 of window M+), and the zoom over the canvas.
 //!
 //! The controls that set the format of cells, the content of the formula
 //! bar and the results of the instant calculations work on the cells of
@@ -16,7 +17,6 @@ use adw::prelude::*;
 use gtk::gio;
 
 use crate::formatting;
-use crate::geometry;
 use crate::i18n::{tr, trn};
 
 /// What the format bar of the cells held in interface B (NINT-08), as the
@@ -322,13 +322,17 @@ fn calculation_names() -> [String; 5] {
     [tr("SUM"), tr("AVERAGE"), tr("MIN"), tr("MAX"), tr("COUNT")]
 }
 
-/// The bar at the bottom: the zoom at the start, the sheet in sight between
-/// arrows in the middle, and at the end the instant calculations and the
-/// count of the cells selected (NINT-04, NINT-13, NGNM-13).
+/// The bar at the bottom of window M+ (NGNM-13, step 4 of M+): the +
+/// button and the switcher of the sheets at the start, and at the end the
+/// instant calculations and the count of the cells selected (NINT-13). The
+/// zoom floats over the sheet, as in Desk Writer (NINT-04).
 pub(super) struct BottomBar {
     pub bar: gtk::ActionBar,
+    /// The zoom, in its pill over the sheet.
     pub zoom: gtk::MenuButton,
-    pub position: gtk::Label,
+    pub zoom_pill: gtk::Box,
+    /// The sheets, one toggle each, named by their index.
+    pub sheets: adw::ToggleGroup,
     /// The instant calculations of the cells selected.
     pub calculations: gtk::Box,
     pub count: gtk::Label,
@@ -337,38 +341,30 @@ pub(super) struct BottomBar {
 impl BottomBar {
     pub fn new() -> Self {
         let bar = gtk::ActionBar::new();
-        let zoom = gtk::MenuButton::builder()
-            .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
-            .menu_model(&super::header::zoom_menu())
+        let (zoom_pill, zoom, _) = crate::document_controls::zoom_pill(&super::header::zoom_menu());
+        let add = gtk::MenuButton::builder()
+            .icon_name("list-add-symbolic")
+            .menu_model(&super::header::add_sheet_menu())
             .direction(gtk::ArrowType::Up)
-            .tooltip_text(tr("Zoom"))
+            .tooltip_text(tr("Add Sheet"))
             .css_classes(["flat"])
             .build();
-        formatting::labelled(&zoom, &tr("Zoom"));
-        bar.pack_start(&zoom);
-        let previous = gtk::Button::builder()
-            .icon_name("go-previous-symbolic")
-            .action_name("win.previous-sheet")
-            .tooltip_text(tr("Previous Sheet"))
-            .css_classes(["flat"])
+        formatting::labelled(&add, &tr("Add Sheet"));
+        bar.pack_start(&add);
+        let sheets = adw::ToggleGroup::builder()
+            .can_shrink(true)
+            .homogeneous(false)
+            .halign(gtk::Align::Start)
             .build();
-        formatting::labelled(&previous, &tr("Previous Sheet"));
-        let next = gtk::Button::builder()
-            .icon_name("go-next-symbolic")
-            .action_name("win.next-sheet")
-            .tooltip_text(tr("Next Sheet"))
-            .css_classes(["flat"])
+        formatting::labelled(sheets.upcast_ref::<gtk::Widget>(), &tr("Sheets"));
+        let scroller = gtk::ScrolledWindow::builder()
+            .child(&sheets)
+            .hscrollbar_policy(gtk::PolicyType::External)
+            .vscrollbar_policy(gtk::PolicyType::Never)
+            .propagate_natural_width(true)
+            .hexpand(true)
             .build();
-        formatting::labelled(&next, &tr("Next Sheet"));
-        let position = gtk::Label::builder()
-            .css_classes(["numeric"])
-            .ellipsize(gtk::pango::EllipsizeMode::End)
-            .build();
-        let center = gtk::Box::builder().spacing(6).build();
-        center.append(&previous);
-        center.append(&position);
-        center.append(&next);
-        bar.set_center_widget(Some(&center));
+        bar.pack_start(&scroller);
         let calculations = gtk::Box::builder()
             .spacing(6)
             .sensitive(false)
@@ -395,7 +391,7 @@ impl BottomBar {
             calculations.append(&chip);
         }
         let count = gtk::Label::builder()
-            .css_classes(["numeric", "heading"])
+            .css_classes(["numeric", "caption", "dim-label"])
             .margin_start(6)
             .margin_end(6)
             .build();
@@ -406,17 +402,36 @@ impl BottomBar {
         Self {
             bar,
             zoom,
-            position,
+            zoom_pill,
+            sheets,
             calculations,
             count,
         }
     }
 
-    /// Shows the sheet in sight: its name, and where it is among them.
-    pub fn show_position(&self, name: &str, index: usize, count: usize) {
-        let text = position_label(name, index, count);
-        self.position.set_label(&text);
-        formatting::labelled(&self.position, &text);
+    /// Shows the sheets in the switcher, with the one in sight chosen. The
+    /// tooltip of each says where it is among them.
+    pub fn show_sheets(&self, names: &[String], current: usize) {
+        let shown: Vec<String> = (0..self.sheets.n_toggles())
+            .filter_map(|i| self.sheets.toggle(i))
+            .map(|t| t.label().map(|l| l.to_string()).unwrap_or_default())
+            .collect();
+        if shown != names {
+            self.sheets.remove_all();
+            for (index, name) in names.iter().enumerate() {
+                self.sheets.add(
+                    adw::Toggle::builder()
+                        .name(index.to_string())
+                        .label(name)
+                        .tooltip(position_label(name, index, names.len()))
+                        .build(),
+                );
+            }
+        }
+        let current = current.to_string();
+        if self.sheets.active_name().as_deref() != Some(current.as_str()) {
+            self.sheets.set_active_name(Some(&current));
+        }
     }
 
     /// Shows how many cells are selected, or nothing.
@@ -448,7 +463,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ngnm_13_the_bottom_bar_names_the_sheet_and_the_cells() {
+    fn ngnm_13_the_switcher_places_the_sheet_and_the_bar_counts_the_cells() {
         assert_eq!(position_label("Despesas", 1, 4), "Despesas (2 of 4)");
         assert_eq!(cells_label(1), "1 cell");
         assert_eq!(cells_label(6), "6 cells");

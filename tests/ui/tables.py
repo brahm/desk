@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Drives Desk Tables and checks its window of interface B through the
-accessibility tree, as a screen reader sees it: the sheets in the
-sidebar, the header bar, the formula bar, the cell in focus, the bottom
-bar, the Inspector, and the shortcuts decided for Desk Tables.
+accessibility tree, as a screen reader sees it: the tables and charts
+in the sidebar, the header bar, the formula bar, the cell in focus, the
+bottom bar with the sheet switcher, the zoom over the sheet, the
+Inspector, and the shortcuts decided for Desk Tables.
 
 Run it with ci/ui-test.sh, which starts a display and the accessibility
 bus. It reads with PyGObject and the AT-SPI typelib (gir1.2-atspi-2.0)
@@ -143,6 +144,20 @@ def resize(width, height):
     )
 
 
+def sheet_in_view(app):
+    """The sheet chosen in the switcher of the bottom bar, as its toggle
+    describes it: "Sheet 1 (1 of 2)" (NGNM-13, step 4 of window M+)."""
+    try:
+        switcher = next(n for n in walk(app) if n.get_name() == "Sheets" and showing(n))
+    except (StopIteration, GLib.GError):
+        return None
+    for i in range(switcher.get_child_count()):
+        toggle = switcher.get_child_at_index(i)
+        if toggle is not None and toggle.get_state_set().contains(Atspi.StateType.CHECKED):
+            return toggle.get_description()
+    return None
+
+
 def table_size(app):
     """The rows and columns of the table selected, as the sheet describes
     it to a screen reader: "Table 1, 45 rows by 13 columns"."""
@@ -185,15 +200,20 @@ def main():
             showing_named(app, "Format Bar") is None,
         )
         check(
-            "the bottom bar has the zoom and the instant calculations (NINT-04, NGNM-13)",
-            showing_named(app, "Zoom") and showing_named(app, "Instant Calculations"),
+            "the bottom bar has the button that adds a sheet and the switcher of the sheets (step 4 of M+)",
+            showing_named(app, "Add Sheet") and showing_named(app, "Sheets"),
+        )
+        zoom = showing_named(app, "Zoom In")
+        check(
+            "the zoom floats over the sheet, above the bottom bar (NINT-04, step 4 of M+)",
+            zoom and extents(zoom).y + extents(zoom).height <= extents(showing_named(app, "Add Sheet")).y,
         )
 
-        # The sheets in the sidebar, with the tables of the sheet shown
-        # (NINT-03, NGNM-12).
-        check("the sidebar shows the sheet of a new document (NINT-03)", showing_named(app, "Sheet 1"))
-        check("and its table under it (NINT-03)", showing_named(app, "Table 1"))
-        add = showing_named(app, "Add Sheet")
+        # The tables and charts of the sheet in the sidebar (NINT-03,
+        # NGNM-12, step 4 of M+).
+        check("the sidebar shows the table of the sheet in view (NINT-03)", showing_named(app, "Table 1"))
+        check("under the name of the sheet (NINT-03)", showing_named(app, "In “Sheet 1”"))
+        add = showing_named(app, "Add Table or Chart")
         check(
             "the sidebar is as high as the window, beside the header bar (NGNM-12)",
             add and abs(extents(add).y - extents(showing_named(app, "Main Menu")).y) < 12,
@@ -203,8 +223,12 @@ def main():
         # (NTAB-07).
         wait_for("the cell in focus in the formula bar", lambda: showing_named(app, "A1"))
         check("a new document starts in the first cell of its table", True)
-        check("the bottom bar names the sheet (NGNM-13)", showing_named(app, "Sheet 1 (1 of 1)"))
-        check("and counts the cells selected (NGNM-13)", showing_named(app, "1 cell"))
+        check("the switcher shows the sheet in view (NGNM-13)", sheet_in_view(app) == "Sheet 1 (1 of 1)")
+        check("the bottom bar counts the cells selected (NGNM-13)", showing_named(app, "1 cell"))
+        check(
+            "and has the instant calculations for them (NINT-13)",
+            showing_named(app, "Instant Calculations"),
+        )
         press("Right")
         wait_for("B1 in the formula bar", lambda: showing_named(app, "B1"))
         press("shift+Down", "shift+Down")
@@ -241,26 +265,38 @@ def main():
 
         # Sheets are added, shown, renamed and deleted (NTAB-02, NTAB-04).
         activate("add-sheet")
-        wait_for("the new sheet", lambda: showing_named(app, "Sheet 2 (2 of 2)"))
-        check("the Add button adds a sheet with a table after the one shown (NTAB-02)", showing_named(app, "Sheet 2"))
+        wait_for("the new sheet", lambda: sheet_in_view(app) == "Sheet 2 (2 of 2)")
+        check(
+            "the Add button adds a sheet with a table after the one shown (NTAB-02)",
+            showing_named(app, "In “Sheet 2”") and showing_named(app, "Table 1"),
+        )
+        first = next(
+            n for n in walk(app) if n.get_role() == Atspi.Role.RADIO_BUTTON and n.get_name() == "Sheet 1"
+        )
+        # A screen reader clicks it as its action does.
+        Atspi.Action.do_action(first, 0)
+        wait_for("the first sheet", lambda: sheet_in_view(app) == "Sheet 1 (1 of 2)")
+        check("a sheet chosen in the switcher shows (NGNM-13, step 4 of M+)", showing_named(app, "In “Sheet 1”"))
+        press("alt+Page_Down")
+        wait_for("the second sheet", lambda: sheet_in_view(app) == "Sheet 2 (2 of 2)")
         press("alt+Page_Up")
-        wait_for("the first sheet", lambda: showing_named(app, "Sheet 1 (1 of 2)"))
-        check("Alt+Page Up shows the sheet before (NGNM-13, D-023)", True)
+        wait_for("the first sheet again", lambda: sheet_in_view(app) == "Sheet 1 (1 of 2)")
+        check("Alt+Page Down and Alt+Page Up show the sheet after and before (NGNM-13, D-023)", True)
         activate("rename-sheet")
         wait_for("the dialog", lambda: showing_named(app, "Rename Sheet"))
         press("ctrl+a")
         type_text("Receitas")
         press("Return")
-        wait_for("the new name", lambda: showing_named(app, "Receitas (1 of 2)"))
+        wait_for("the new name", lambda: sheet_in_view(app) == "Receitas (1 of 2)")
         check("a sheet takes a new name (NTAB-04)", showing_named(app, "In “Receitas”"))
         activate("duplicate-sheet")
-        wait_for("the copy", lambda: showing_named(app, "Receitas (copy) (2 of 3)"))
+        wait_for("the copy", lambda: sheet_in_view(app) == "Receitas (copy) (2 of 3)")
         check("Duplicate Sheet puts a copy after the sheet (NTAB-02)", True)
         activate("move-sheet", "up")
-        wait_for("the copy moved up", lambda: showing_named(app, "Receitas (copy) (1 of 3)"))
+        wait_for("the copy moved up", lambda: sheet_in_view(app) == "Receitas (copy) (1 of 3)")
         check("a sheet moves up in the list (NTAB-03)", True)
         activate("delete-sheet")
-        wait_for("the copy deleted", lambda: showing_named(app, "Receitas (1 of 2)"))
+        wait_for("the copy deleted", lambda: sheet_in_view(app) == "Receitas (1 of 2)")
         check("Delete takes the sheet away (NTAB-02)", showing_named(app, "Receitas (copy)") is None)
         press("ctrl+z")
         wait_for("the copy back", lambda: showing_named(app, "Receitas (copy)"))
@@ -284,10 +320,10 @@ def main():
         wait_for("the table styles", lambda: showing_named(app, "Basic (No Grid)"))
         check("Ctrl+Shift+T shows the table styles (NINT-02)", True)
         press("F9")
-        wait_for("the sidebar to hide", lambda: showing_named(app, "Add Sheet") is None)
+        wait_for("the sidebar to hide", lambda: showing_named(app, "Add Table or Chart") is None)
         check("F9 hides the sidebar (NGNM-12)", action_state("sidebar") == "false")
         press("F9")
-        wait_for("the sidebar back", lambda: showing_named(app, "Add Sheet"))
+        wait_for("the sidebar back", lambda: showing_named(app, "Add Table or Chart"))
 
         # Ctrl+/ searches the commands (NGNM-10).
         press("ctrl+slash")
@@ -296,7 +332,7 @@ def main():
         wait_for("Blank Sheet in the search", lambda: showing_named(app, "Blank Sheet"))
         press("Return")
         wait_for("the command search to close", lambda: showing_named(app, "Search Commands") is None)
-        wait_for("the sheet it added", lambda: showing_named(app, "Sheet 1 (2 of 4)"))
+        wait_for("the sheet it added", lambda: sheet_in_view(app) == "Sheet 1 (2 of 4)")
         check("Search Commands finds a command and runs it (NGNM-10)", True)
 
         # Ctrl+? shows the shortcuts of Desk Tables (NINT-16).
