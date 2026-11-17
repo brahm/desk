@@ -227,6 +227,50 @@ impl Canvas {
             .set_content_height(((height + 2.0 * MARGIN) * scale).ceil() as i32);
     }
 
+    /// The box of what is selected, in points of the sheet: the range of
+    /// cells, or the whole item (B-027).
+    fn selection_box(&self) -> Option<(f64, f64, f64, f64)> {
+        let sheet = self.sheet.borrow();
+        let selection = self.selection.get();
+        let item = sheet.items.get(selection.item()?)?;
+        let (left, top) = item.origin;
+        if let Some(((r0, c0), (r1, c1))) = selection.range() {
+            return Some((
+                left + f64::from(c0) * COLUMN_WIDTH,
+                top + f64::from(r0) * ROW_HEIGHT,
+                left + f64::from(c1 + 1) * COLUMN_WIDTH,
+                top + f64::from(r1 + 1) * ROW_HEIGHT,
+            ));
+        }
+        let (width, height) = item.size();
+        Some((left, top, left + width, top + height))
+    }
+
+    /// Zooms so that what is selected fills the view, in its middle, and
+    /// returns the new zoom; nothing when nothing is selected (Zoom to
+    /// Selection, B-027).
+    pub fn zoom_to_selection(&self) -> Option<f64> {
+        let (x0, y0, x1, y1) = self.selection_box()?;
+        let zoom = crate::geometry::fit_box(
+            x1 - x0,
+            y1 - y0,
+            f64::from(self.scroller.width()),
+            f64::from(self.scroller.height()),
+        );
+        self.set_zoom(zoom);
+        let scale = self.scale();
+        let x = ((x0 + x1) / 2.0 + MARGIN) * scale;
+        let y = ((y0 + y1) / 2.0 + MARGIN) * scale;
+        let h = self.scroller.hadjustment();
+        let v = self.scroller.vadjustment();
+        // Once the canvas has the size of the new zoom.
+        glib::idle_add_local_once(move || {
+            h.set_value(x - h.page_size() / 2.0);
+            v.set_value(y - v.page_size() / 2.0);
+        });
+        Some(zoom)
+    }
+
     /// Brings the item into sight.
     pub fn scroll_to(&self, item: usize) {
         let Some(origin) = self.sheet.borrow().items.get(item).map(|i| i.origin) else {

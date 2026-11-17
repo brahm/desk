@@ -70,6 +70,25 @@ pub fn fit_page(page_width: f64, page_height: f64, width: f64, height: f64, colu
         .max(ZOOM_LEVELS[0])
 }
 
+/// The zoom at which a box of `box_width` by `box_height` points fills
+/// `width` by `height` logical pixels with the gap around it, as Zoom to
+/// Selection and Zoom to Fit Content set it; it is not one of the levels.
+pub fn fit_box(box_width: f64, box_height: f64, width: f64, height: f64) -> f64 {
+    let wide = (width - 2.0 * PAGE_GAP).max(1.0) / (box_width.max(1.0) * PIXELS_PER_POINT);
+    let tall = (height - 2.0 * PAGE_GAP).max(1.0) / (box_height.max(1.0) * PIXELS_PER_POINT);
+    wide.min(tall).clamp(ZOOM_LEVELS[0], ZOOM_LEVELS[8])
+}
+
+/// The box around `points`, as its left, top, right and bottom edges.
+pub fn bounds(points: impl IntoIterator<Item = (f64, f64)>) -> Option<(f64, f64, f64, f64)> {
+    points.into_iter().fold(None, |bounds, (x, y)| {
+        Some(match bounds {
+            None => (x, y, x, y),
+            Some((x0, y0, x1, y1)) => (x0.min(x), y0.min(y), x1.max(x), y1.max(y)),
+        })
+    })
+}
+
 /// A page placed in the document area, in logical pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PageRect {
@@ -207,5 +226,21 @@ mod tests {
         assert_eq!(rects[1].y, rects[2].y);
         assert!(rects[1].y > rects[0].y);
         assert_eq!(rects[1].x, PAGE_GAP);
+    }
+
+    #[test]
+    fn zoom_to_selection_fits_the_box_in_the_view() {
+        // A box of 300 by 100 points in a view of 848 by 448 pixels: the
+        // width decides, 800 / 400 pixels.
+        let zoom = fit_box(300.0, 100.0, 848.0, 448.0);
+        assert!((zoom - 2.0).abs() < 1e-9);
+        // A tiny box stops at the largest level, a huge one at the smallest.
+        assert_eq!(fit_box(1.0, 1.0, 848.0, 448.0), ZOOM_LEVELS[8]);
+        assert_eq!(fit_box(1e5, 1e5, 848.0, 448.0), ZOOM_LEVELS[0]);
+        assert_eq!(
+            bounds([(10.0, 40.0), (30.0, 5.0), (20.0, 20.0)]),
+            Some((10.0, 5.0, 30.0, 40.0))
+        );
+        assert_eq!(bounds([]), None);
     }
 }

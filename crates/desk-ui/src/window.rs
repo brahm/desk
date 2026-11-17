@@ -169,8 +169,9 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 68] = [
+const DOCUMENT_ACTIONS: [&str; 69] = [
     "outline",
+    "go-to-page-end",
     "sidebar",
     "comments",
     "colors",
@@ -2195,6 +2196,21 @@ impl DocumentWindow {
                 // The zoom then follows the window (INT-08).
                 "fit-width" => return view.set_fit(Some(geometry::Fit::Width)),
                 "fit-page" => return view.set_fit(Some(geometry::Fit::Page)),
+                // Zoom to Selection and Zoom to Fit Content (B-027).
+                "selection" => {
+                    match view.selection_bounds() {
+                        Some((page, bounds)) => view.zoom_to_box(page, bounds),
+                        None => this.window.error_bell(),
+                    }
+                    return;
+                }
+                "content" => {
+                    if let Some(page) = view.current_page() {
+                        let beyond = this.editor().and_then(|e| e.objects_bounds(page));
+                        view.zoom_to_content(page, beyond);
+                    }
+                    return;
+                }
                 level => level.parse().unwrap_or(geometry::DEFAULT_ZOOM),
             };
             view.set_zoom(zoom);
@@ -2448,6 +2464,25 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&navigate);
+        // First Page and Last Page (B-028).
+        let ends = gio::SimpleAction::new("go-to-page-end", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        ends.connect_activate(move |_, parameter| {
+            let (Some(this), Some(end)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+            else {
+                return;
+            };
+            if let Some(editor) = this.editor() {
+                let page = match end.as_str() {
+                    "first" => 0,
+                    _ => this.view.page_count().saturating_sub(1),
+                };
+                editor.go_to_page(page);
+                editor.focus();
+            }
+        });
+        self.actions.add_action(&ends);
 
         // The sidebar, with the page it shows (GNM-12), and its pages:
         // the page thumbnails (INT-19), the styles (INT-18), the comments
