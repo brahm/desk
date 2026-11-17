@@ -677,6 +677,54 @@ matrix rows done on 9 November, before the change of target.
   library builds with (RUSTSEC-2026-0544); `libz-sys` went from 1.1.31
   to 1.1.33, which fixes it.
 
+### 17 November: the PDFs of the Pages documents redone on Pages 15.4
+
+- The owner answered the open question of the last entry: export the
+  PDFs of every document of `corpus/fixtures/pages` again on Pages 15.4.
+  The 136 documents besides `fmt-07-capitalization`, which already had
+  one, were exported on the owner's Mac by controlling its screen, in
+  about an hour, with File > Export To > PDF and the options Pages
+  offers. One document, `mal-01-07-08-fields`, brought up a system alert
+  in front of Pages; the export went on around it, without granting
+  anything.
+- *What the comparison found:* with the new PDFs, 28 tests of
+  `desk-testkit` failed. Two causes were in the comparison, not in Desk:
+  - *Ligatures at the start or the end of a word:* the fix of the last
+    entry only put back a ligature inside a word, by guessing where its
+    line starts. Poppler loses the move to the start of the run, which
+    is the origin of the line, of the text box or of the list item, so
+    the guess failed in lists and text boxes. The tests now read such a
+    PDF after Cairo writes it again (`pdftocairo -pdf`), which puts each
+    glyph in its place with its letters. That fixed ten documents.
+  - *A word in two runs (EST-16):* Pages 15.4 draws the text around a
+    page number field in separate runs that touch, which Poppler reads as
+    separate words ("sectio", "5", "n"). Words whose boxes touch on the
+    same line are now one word, as Desk's own PDF has them.
+- *Where Pages 15.4 differs and Desk keeps the PDF of '09:*
+  - Features that only Pages '09 has (D-020): the outline (six
+    documents, which Pages 15.4 prints as body text); Never Hyphenate,
+    which lives in the hyphenation exceptions of the '09 machine and not
+    in the document, so Pages 15.4 hyphenates the word; and a date field
+    that updates on open, whose PDF of 15.4 holds the day of the export.
+  - Behaviour of Pages 15.4 that Desk does not follow yet, each moved to
+    phase W1 with its row of the backlog: lines placed without rounding
+    the top margin and the ascent, so glyphs sit a fraction of a point
+    higher (B-020, the pixel tests of two documents); the metrics of
+    Baskerville and Didot on the current macOS (B-021); the table of
+    contents as Pages 15.4 rebuilds it (B-022); justification and
+    hyphenation (B-023); text inside an oval (B-024); and the box of an
+    inline sound (B-025).
+  - Leaving the rounding out of the layout was tried: it broke 35 tests,
+    so the rule of 15.4 is not that simple and has to be measured.
+- *Why:* the target is the current iWork (D-001), and parity documents
+  are made on Pages 15.4 except for what only '09 has (D-020).
+- *Consequences:* 116 PDFs of the fixtures are now from Pages 15.4, and
+  Desk matches all the documents that the tests compare with them. 20
+  keep the PDF of Pages '09, 8 because the feature is only in '09 and 12
+  until the backlog rows B-020 to B-025 are done; the manifest says so
+  on each row. A test of the comparison reads `fmt-09-ligatures` and
+  checks that its ligatures stay in their words.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

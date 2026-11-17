@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The documents of Pages in the corpus are compared with PDFs
+  of Pages 15.4, except 20 that keep those of Pages '09 for now.
 * Changed: The reference cases of Writer are measured against Pages
   15.4 instead of Pages '09, and all 13 match.
 * Changed: Writer lays out line spacing in multiples, the bottom of the
