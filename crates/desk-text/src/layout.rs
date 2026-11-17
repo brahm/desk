@@ -128,8 +128,7 @@ pub struct Line {
     /// The baseline.
     pub baseline: f32,
     /// The bottom of the text: the baseline plus the descent, without the
-    /// leading or any extra space below. Pages fits a line on a page when
-    /// this fits (EST-05).
+    /// leading or any extra space below.
     pub text_bottom: f32,
     /// How much of the ascent of its text Pages rounded off the line box:
     /// it draws the background of a paragraph that much higher (FMT-20).
@@ -236,7 +235,8 @@ struct RunBox {
     leading: f32,
     /// The part of the leading that a multiple of line spacing leaves as
     /// it is: all of it under the text, none of it over the text, which
-    /// Pages scales with the line (FMT-14).
+    /// Pages scales with the line, as the font has it, before it is
+    /// rounded to a whole point (FMT-14).
     fixed: f32,
     descent: f32,
     /// How much of the ascent the rounding took off, at most.
@@ -726,9 +726,12 @@ impl TextSystem {
                 // text sits at the top of the line and any extra space goes
                 // below it, except with exact spacing, where the text sits
                 // on the bottom less its descent and leading. A multiple
-                // scales the line to a whole point: with the leading over
-                // the text, as 1.5 makes the 14 points of Helvetica at 12
-                // points 21, and without the leading under it (FMT-14).
+                // scales the line with the leading over the text, as 1.5
+                // makes the 14 points of Helvetica at 12 points 21, and
+                // without the leading under it, unrounded: Pages 15.4 makes
+                // the 15 points of Liberation Serif at 12 points, with 0.51
+                // of leading under the text, 29.49 when doubled, where
+                // Pages '09 rounded the leading and the line to 29 (FMT-14).
                 let fixed = line_box
                     .or_else(|| boxes.first().copied())
                     .map_or(0.0, |b| b.fixed);
@@ -738,9 +741,10 @@ impl TextSystem {
                     // makes it taller above its baseline, as Pages lays
                     // out a picture as tall as the page (DOC-05).
                     LineSpacing::Multiple { percent } => {
-                        let scale = |h: f32, fixed: f32| {
-                            ((h - fixed) * percent as f32 / 100.0 + fixed).round()
-                        };
+                        // The height and what the multiple adds to it, so
+                        // that single spacing keeps the height as it is.
+                        let scale =
+                            |h: f32, fixed: f32| h + (h - fixed) * (percent as f32 - 100.0) / 100.0;
                         let cs = span(pos, line_end);
                         let object_over = cs
                             .iter()
@@ -1499,8 +1503,8 @@ fn vertical_metrics(
 /// and the leading each to a whole point. A shift of the baseline moves
 /// the box.
 fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> RunBox {
-    let (exact, descent, leading, place) = vertical_metrics(format, size, metrics);
-    let (ascent, descent, leading) = (exact.round(), descent.round(), leading.round());
+    let (exact, descent, exact_leading, place) = vertical_metrics(format, size, metrics);
+    let (ascent, descent, leading) = (exact.round(), descent.round(), exact_leading.round());
     let over = match place {
         LeadingPlace::Above => ascent + leading,
         LeadingPlace::Below => ascent,
@@ -1513,7 +1517,7 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
         leading,
         fixed: match place {
             LeadingPlace::Above => 0.0,
-            LeadingPlace::Below | LeadingPlace::Around => leading,
+            LeadingPlace::Below | LeadingPlace::Around => exact_leading,
         },
         descent,
         rise: (exact - ascent).max(0.0),

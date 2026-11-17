@@ -30,12 +30,17 @@ the inventory in [`inventory/`](inventory).
   as "reviewed on the Lion VM" when only tests check them otherwise.
 - Each folder under `writer/` is a case: `case.toml` describes a short
   document, and the reference virtual machine adds the `.pages` file that
-  Pages builds from the same description and `reference.pdf`, the PDF that
-  Pages exports.
+  Pages '09 builds from the same description. `reference.pdf` is the PDF
+  that Pages 15.4 exports from that file, on the owner's Mac with
+  macOS 26.7, since 17 November 2026: the target is the current Pages
+  (D-001), which opens the file of '09 as it is. Before, the PDF came
+  from Pages '09.
 
 The cases use the blank template and free fonts, such as Liberation,
-DejaVu and Noto, that are installed on the virtual machine as well, so
-that the comparison measures the layout and not a change of font.
+DejaVu and Noto, that are installed on the virtual machine and on the
+Mac as well, so that the comparison measures the layout and not a change
+of font. The case of missing fonts (DOC-05) uses the fonts of the Mac,
+which Desk replaces.
 
 ## A case
 
@@ -94,6 +99,11 @@ which document shows each row, and why the others have none, such as
 rows about the application alone or what the reference machine cannot
 do. Desk reads only the format of Pages '09, so there are no documents
 saved in the format of Pages '08.
+
+Their PDFs are of Pages '09, but where Pages 15.4 lays a document out
+otherwise and Desk follows it: there the PDF was exported again by Pages
+15.4 from the same document, and the manifest says so. That is the case
+of `fmt-07-capitalization`, since 17 November 2026.
 
 `long-document.pages` is a long document of 41 pages, with sections,
 headers and footers, a table of contents, footnotes, pictures, columns

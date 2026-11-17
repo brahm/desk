@@ -4,11 +4,11 @@
 //! The cases of the corpus.
 //!
 //! A case is a folder with a `case.toml` that describes a short document,
-//! and, once the reference virtual machine has made them, the `.pages`
-//! file that Pages built from the same description and the PDF it
-//! exported, `reference.pdf`. The description is the source of both: Desk
-//! builds its document from it, and the script of the virtual machine
-//! builds the Pages document from it.
+//! and, once the reference virtual machine has made it, the `.pages` file
+//! that Pages '09 built from the same description, with the PDF that
+//! Pages 15.4 exports from it, `reference.pdf`. The description is the
+//! source of both: Desk builds its document from it, and the script of
+//! the virtual machine builds the Pages document from it.
 //!
 //! ```toml
 //! title = "Space between paragraphs"

@@ -650,11 +650,13 @@ impl Block {
         last.top + last.height - base
     }
 
-    /// How many lines from `a` on fit in `room` below `base`: as in Pages,
-    /// a line fits when its text does, without the leading below it.
+    /// How many lines from `a` on fit in `room` below `base`: as in Pages
+    /// 15.4, a line fits when all of it does, the leading below its text
+    /// included, where Pages '09 let that leading stick out (EST-05,
+    /// INT-02).
     fn fitting(&self, a: usize, base: f32, room: f32) -> usize {
         (a..self.lines.len())
-            .take_while(|&b| self.lines[b].text_bottom - base <= room + TOLERANCE)
+            .take_while(|&b| self.lines[b].top + self.lines[b].height - base <= room + TOLERANCE)
             .count()
     }
 }

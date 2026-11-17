@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The reference cases of Writer are measured against Pages
+  15.4 instead of Pages '09, and all 13 match.
+* Changed: Writer lays out line spacing in multiples, the bottom of the
+  page, Title Case and the spaces of small caps as Pages 15.4 does.
 * Changed: Writer saves documents by itself as they are edited and
   closes them without asking; Ctrl+S keeps a version.
 * Added: Browse Versions in the main menu, to restore an older version of
