@@ -27,19 +27,21 @@ pub(super) struct Header {
     pub media_button: gtk::MenuButton,
     /// Find, in step with the find bar.
     pub find_toggle: gtk::ToggleButton,
+    /// The main menu, whose View submenu holds Go to Page.
+    pub menu_button: gtk::MenuButton,
 }
 
 impl Header {
-    pub fn new(info: AppInfo, opens: bool) -> Self {
+    pub fn new(info: AppInfo, opens: bool, navigation: &gio::Menu) -> Self {
         let title = adw::WindowTitle::new(info.name, "");
         let slides = crate::is_slides(info);
         let (view, insert) = if slides {
             (
-                super::slides::view_menu(),
+                super::slides::view_menu(navigation),
                 super::slides::insert_menu(false),
             )
         } else {
-            (view_menu(), insert_menu(false))
+            (view_menu(navigation), insert_menu(false))
         };
         let header = adw::HeaderBar::builder().title_widget(&title).build();
 
@@ -142,6 +144,7 @@ impl Header {
             objects,
             media_button,
             find_toggle,
+            menu_button,
         }
     }
 }
@@ -254,9 +257,10 @@ pub(super) fn fill_recent(menu: &gio::Menu) {
     }
 }
 
-/// The View menu, under the arrow of the Sidebar button (GNM-10): the
-/// pages of the sidebar, what the window shows, and the zoom.
-pub(super) fn view_menu() -> gio::Menu {
+/// The View menu, a submenu of the main menu (GNM-10): the pages of the
+/// sidebar, what the window shows, the zoom, and `navigation`, Go to Page
+/// and the places to go to (INT-19).
+pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     let panes = gio::Menu::new();
     panes.append(Some(&tr("Page _Thumbnails")), Some("win.thumbnails"));
     panes.append(Some(&tr("_Styles")), Some("win.styles-drawer"));
@@ -270,11 +274,12 @@ pub(super) fn view_menu() -> gio::Menu {
     let window = gio::Menu::new();
     window.append(Some(&tr("As _Outline")), Some("win.outline"));
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
-    window.append_submenu(Some(&tr("_Zoom")), &crate::bottom_bar::zoom_menu());
+    window.append_submenu(Some(&tr("_Zoom")), &crate::document_controls::zoom_menu());
     let menu = gio::Menu::new();
     menu.append_section(Some(&tr("Sidebar")), &panes);
     menu.append_section(None, &document);
     menu.append_section(None, &window);
+    menu.append_section(None, navigation);
     menu
 }
 

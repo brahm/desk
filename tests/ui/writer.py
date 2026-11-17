@@ -513,7 +513,7 @@ def main():
     gnome_window(work)
     two_level_inspector(work)
     sidebar_pages(work)
-    bottom_bar(work)
+    document_controls(work)
     inventory_commands(work)
     header_and_menus(work)
     format_pane(work)
@@ -2402,6 +2402,13 @@ def gnome_window(work):
         )
         wait_for("the main menu in the narrow window", lambda: showing_named(app, "Main Menu"))
         check("a narrow window keeps the main controls (GNM-01)", True)
+        zoom, _ = wait_for("the zoom", lambda: named_like(app, r"\d+%"))
+        count, _ = wait_for("the count", lambda: named_like(app, r"[\d,]+ words?"))
+        check(
+            "in a narrow window the count sits over the zoom (GNM-13)",
+            extents(count).y + extents(count).height <= extents(zoom).y
+            and abs(right_of(count) - right_of(showing_named(app, "Zoom In"))) < 40,
+        )
 
         start = extents(document).x
         press("F9")
@@ -2512,11 +2519,11 @@ def header_and_menus(work):
         )
         press("Return")
         wait_for("the command search to close", lambda: showing_named(app, "Search Commands") is None)
-        wait_for(
-            "the page break",
-            lambda: next((n for n in walk(app) if (n.get_name() or "").endswith(" of 2")), None),
-        )
+        # The count over the document counts the pages, now two.
+        activate("count", "pages")
+        wait_for("the page break", lambda: showing_named(app, "2 pages"))
         check("a command found runs with Enter (GNM-10)", True)
+        activate("count", "words")
 
         # Documents open as tabs of the window (W013, D-023, D-024): the
         # tab bar shows from the second tab, Ctrl+Page Up goes back,
@@ -2674,66 +2681,93 @@ def open_menu_button(node):
     fail(f"{node.get_name()} has nothing to press")
 
 
-def bottom_bar(work):
-    """The bottom bar of interface B: the zoom at the start, the position
-    in the middle between the arrows, whose menu has Go to Page and
-    Navigate By, and at the end the count of the document, or of the
-    selection when text is selected, whose menu chooses what it counts and
-    shows the statistics (GNM-13, INT-07, INT-19, DOC-20)."""
+def go_to_page_field(app):
+    """Opens Go to Page in the View menu of the main menu, by the keys of
+    its mnemonics, and gives its field."""
+    press("F10")
+    wait_for("the main menu", lambda: showing_named(app, "Main Menu"))
+    time.sleep(0.5)
+    press("v")
+    return wait_for(
+        "Go to Page",
+        lambda: next(
+            (
+                n
+                for n in walk(app)
+                if n.get_role() == Atspi.Role.TEXT and n.get_name() == "Go to Page" and showing(n)
+            ),
+            None,
+        ),
+    )
+
+
+def document_controls(work):
+    """The controls over the document of window M+, in place of the bottom
+    bar (step 3): the zoom between Zoom Out and Zoom In over the end
+    corner, the count over the foot of the document, of the document or
+    of the selection when text is selected, whose menu chooses what it
+    counts and shows the statistics; Go to Page and Navigate By in the
+    View menu (GNM-13, INT-07, INT-19, DOC-20)."""
     name = "Long.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(LONG_DOCUMENT), str(letter)], check=True)
     writer = subprocess.Popen([str(WRITER), str(letter)])
     try:
         app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
-        wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        document = wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
         subprocess.run(
             ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
             check=True,
         )
         zoom, _ = wait_for("the zoom", lambda: named_like(app, r"\d+%"))
-        position, found = wait_for(
-            "the position", lambda: named_like(app, r"Page 1 of (\d+)")
-        )
-        pages = int(found.group(1))
         count, found = wait_for("the count", lambda: named_like(app, r"([\d,]+) words"))
         words = int(found.group(1).replace(",", ""))
+        pages = scroll_pane_of(document)
         check(
-            "the bottom bar has the zoom, the position in the middle and the count (GNM-13)",
-            pages > 1
-            and words > 1000
-            and right_of(zoom) < extents(position).x
-            and right_of(position) < extents(count).x,
+            "the zoom and the count sit over the document, the zoom at the end and the count in the middle (GNM-13)",
+            words > 1000
+            and showing_named(app, "Zoom Out") is not None
+            and showing_named(app, "Zoom In") is not None
+            and right_of(count) < extents(zoom).x
+            and extents(pages).x < extents(count).x
+            and right_of(zoom) <= right_of(pages)
+            and extents(zoom).y + extents(zoom).height <= extents(pages).y + extents(pages).height,
         )
+        check("there is no bottom bar (GNM-13)", named_like(app, r"Page \d+ of \d+") is None)
         activate("zoom", "1.5")
         wait_for("the zoom to change", lambda: showing_named(app, "150%"))
-        check("the zoom of the bottom bar shows the zoom chosen (INT-07)", True)
+        check("the zoom over the document shows the zoom chosen (INT-07)", True)
+        Atspi.Action.do_action(showing_named(app, "Zoom In"), 0)
+        wait_for("the zoom to grow", lambda: named_like(app, r"(1[6-9]\d|[2-9]\d\d)%"))
+        check("Zoom In of the pill makes the pages bigger (INT-07)", True)
 
-        open_menu_button(position)
-        wait_for(
-            "Go to Page",
-            lambda: any(
-                n.get_role() == Atspi.Role.TEXT and n.get_name() == "Go to Page" and showing(n)
-                for n in walk(app)
-            ),
-        )
-        check(
-            "the menu of the position has Go to Page and Navigate By (INT-19)",
-            showing_named(app, "Navigate By") is not None,
-        )
+        field = go_to_page_field(app)
+        check("Go to Page is in the View menu (INT-19)", text_of(field) == "1")
+        # Its label takes the focus to it by its mnemonic, G.
+        press("g")
+        wait_for("the focus in Go to Page", lambda: field.get_state_set().contains(Atspi.StateType.FOCUSED))
         press("ctrl+a")
         type_text("6")
         press("Return")
-        wait_for("page 6", lambda: named_like(app, rf"Page 6 of {pages}"))
-        check("Go to Page shows the page typed (INT-19)", True)
+        wait_for("the menu to close", lambda: showing_named(app, "Go to Page") is None)
+        field = go_to_page_field(app)
+        check("Go to Page shows the page typed (INT-19)", text_of(field) == "6")
+        press("Escape")
+        press("Escape")
         activate("navigate", True)
-        wait_for("page 7", lambda: named_like(app, rf"Page 7 of {pages}"))
-        check("the arrow goes to the next page and the position follows (INT-19)", True)
+        time.sleep(0.5)
+        field = go_to_page_field(app)
+        check("Next Page goes to the next page (INT-19)", text_of(field) == "7")
+        press("Escape")
+        press("Escape")
         activate("navigate-by", "section")
-        wait_for("the arrows to sections", lambda: showing_named(app, "Next Section"))
-        check("Navigate By turns the arrows to another kind of place (INT-19)", True)
+        check("Navigate By turns the steps to another kind of place (INT-19)", action_state("navigate-by") == "'section'")
         activate("navigate-by", "page")
 
+        # The main menu gave the focus back to its button: a click puts it
+        # in the text again.
+        area = extents(scroll_pane_of(document))
+        click(area.x + area.width // 2, area.y + area.height // 3)
         press("ctrl+a")
         wait_for(
             "the count of the selection",

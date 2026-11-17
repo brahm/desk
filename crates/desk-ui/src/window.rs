@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! A document window: the header bar, the document area, and the zoom
-//! menu and counts at the bottom, as in Pages. It saves the document, asks
+//! and the count over the document (window M+). It saves the document, asks
 //! to save it before it closes, and shows it full screen.
 //!
 //! The window has the skeleton of interface B (docs/interface): the
@@ -100,7 +100,7 @@ pub struct DocumentWindow {
     stack: gtk::Stack,
     view: DocumentView,
     /// Zoom, the position and the count (GNM-13).
-    bottom: crate::bottom_bar::BottomBar,
+    controls: crate::document_controls::Controls,
     /// The counts of the document as it last changed, which a change of
     /// the selection does not count again.
     counted: Cell<Option<desk_model::Statistics>>,
@@ -285,6 +285,10 @@ impl DocumentWindow {
 
     /// A new, empty document in a new tab of `frame`.
     fn new_in(frame: &Rc<Frame>, info: AppInfo, opener: Option<&'static Opener>) -> Rc<Self> {
+        let is_slides = crate::is_slides(info);
+        // The controls over the document, and Go to Page in the View menu
+        // (step 3 of M+).
+        let controls = crate::document_controls::Controls::new_for(is_slides);
         let header::Header {
             header,
             title,
@@ -293,8 +297,8 @@ impl DocumentWindow {
             objects: object_buttons,
             media_button,
             find_toggle,
-        } = header::Header::new(info, opener.is_some());
-        let is_slides = crate::is_slides(info);
+            menu_button,
+        } = header::Header::new(info, opener.is_some(), &controls.navigation);
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -353,8 +357,9 @@ impl DocumentWindow {
         let stack = gtk::Stack::builder().hhomogeneous(false).build();
         stack.add_named(&status, Some("empty"));
 
-        let bottom = crate::bottom_bar::BottomBar::new_for(is_slides);
-        let bottom_bar = bottom.bar.clone();
+        if let Some(popover) = menu_button.popover().and_downcast::<gtk::PopoverMenu>() {
+            popover.add_child(&controls.go_to, "go-to-page");
+        }
 
         let editor: Rc<RefCell<Option<TextEditor>>> = Rc::new(RefCell::new(None));
         let editor_of = || -> EditorOf {
@@ -390,7 +395,7 @@ impl DocumentWindow {
             column.append(&slides.notes_revealer);
             stack.add_named(&column, Some("document"));
             stack.add_named(slides.light_table.widget(), Some("light-table"));
-            bottom.bar.pack_start(&slides.size);
+            controls.add_to_zoom(&slides.size);
         } else {
             stack.add_named(&pages, Some("document"));
         }
@@ -474,8 +479,11 @@ impl DocumentWindow {
             .build();
         side.add_named(inspector.widget(), Some("inspector"));
         // The Inspector is a utility pane of a fixed width at the end.
+        // The zoom and the count float over the document (GNM-13).
+        let document_overlay = gtk::Overlay::builder().child(&stack).build();
+        controls.attach(&document_overlay);
         let split = adw::OverlaySplitView::builder()
-            .content(&stack)
+            .content(&document_overlay)
             .sidebar(&side)
             .min_sidebar_width(INSPECTOR_WIDTH)
             .max_sidebar_width(INSPECTOR_WIDTH)
@@ -497,7 +505,6 @@ impl DocumentWindow {
         let find = FindWindow::new(editor_of(), search.clone());
         toolbar_view.add_top_bar(find.widget());
         toolbar_view.set_content(Some(&split));
-        toolbar_view.add_bottom_bar(&bottom_bar);
 
         // The navigation sidebar is as high as the window, beside the
         // header bar and not under it.
@@ -547,6 +554,8 @@ impl DocumentWindow {
                     header::insert_menu(true)
                 };
                 breakpoint.add_setter(&insert_button, "menu-model", Some(&menu.to_value()));
+                // The count goes over the zoom, at the end.
+                controls.stack_in(&breakpoint);
             }
             breakpoints.push(breakpoint);
         }
@@ -567,7 +576,7 @@ impl DocumentWindow {
             header,
             stack,
             view,
-            bottom,
+            controls,
             counted: Cell::new(None),
             warnings_banner,
             path: RefCell::new(None),
@@ -607,9 +616,7 @@ impl DocumentWindow {
         {
             let current = preferences::get();
             this.view.set_zoom(f64::from(current.zoom) / 100.0);
-            this.bottom
-                .zoom
-                .set_label(&geometry::zoom_label(this.view.zoom()));
+            this.controls.show_zoom(this.view.zoom());
             this.show_window_preferences(&current);
         }
         let weak = Rc::downgrade(&this);
@@ -633,10 +640,10 @@ impl DocumentWindow {
             }
         });
         {
-            let label = this.bottom.zoom.downgrade();
+            let weak = Rc::downgrade(&this);
             this.view.connect_zoom_changed(move |zoom| {
-                if let Some(label) = label.upgrade() {
-                    label.set_label(&geometry::zoom_label(zoom));
+                if let Some(this) = weak.upgrade() {
+                    this.controls.show_zoom(zoom);
                 }
             });
         }
@@ -649,7 +656,7 @@ impl DocumentWindow {
                 }
             });
             let weak = Rc::downgrade(&this);
-            this.bottom.page_entry.connect_activate(move |entry| {
+            this.controls.page_entry.connect_activate(move |entry| {
                 let Some(this) = weak.upgrade() else {
                     return;
                 };
@@ -658,35 +665,35 @@ impl DocumentWindow {
                     (entry.text().trim().parse::<usize>(), this.editor())
                     && (1..=count).contains(&page)
                 {
-                    this.bottom.position.popdown();
+                    if let Some(popover) = entry
+                        .ancestor(gtk::Popover::static_type())
+                        .and_downcast::<gtk::Popover>()
+                    {
+                        popover.popdown();
+                    }
                     editor.go_to_page(page - 1);
                     editor.focus();
                 } else {
                     this.window.error_bell();
                 }
             });
-            // Go to Page opens with the page in sight, ready to be typed
-            // over.
+            // Go to Page shows the page in sight, ready to be typed over.
             let weak = Rc::downgrade(&this);
-            if let Some(popover) = this.bottom.position.popover() {
-                popover.connect_show(move |_| {
-                    if let Some(this) = weak.upgrade() {
-                        let entry = &this.bottom.page_entry;
-                        if let Some(page) = this.view.current_page() {
-                            entry.set_text(&(page + 1).to_string());
-                        }
-                        entry.grab_focus();
-                        entry.select_region(0, -1);
+            this.controls.page_entry.connect_map(move |entry| {
+                if let Some(this) = weak.upgrade() {
+                    if let Some(page) = this.view.current_page() {
+                        entry.set_text(&(page + 1).to_string());
                     }
-                });
-            }
+                    entry.select_region(0, -1);
+                }
+            });
         }
         {
-            let bar = bottom_bar.downgrade();
+            let weak = Rc::downgrade(&this);
             this.stack.connect_visible_child_name_notify(move |stack| {
                 let document = stack.visible_child_name().as_deref() != Some("empty");
-                if let Some(bar) = bar.upgrade() {
-                    bar.set_revealed(document);
+                if let Some(this) = weak.upgrade() {
+                    this.controls.set_shown(document);
                 }
                 for button in &document_buttons {
                     button.set_visible(document);
@@ -988,14 +995,11 @@ impl DocumentWindow {
         );
     }
 
-    /// Shows what the preferences say about the window: the counts at
-    /// the bottom, the color of invisibles and that of the guides.
+    /// Shows what the preferences say about the window: the count over
+    /// the document, the color of invisibles and that of the guides.
     fn show_window_preferences(&self, preferences: &preferences::Preferences) {
-        // Desk Slides has the Notes button there (KGNM-14).
-        self.bottom
-            .count
-            .set_visible(preferences.show_counts && self.slides.is_none());
-        let count = crate::bottom_bar::Count::from_name(&preferences.count);
+        self.controls.set_counted(preferences.show_counts);
+        let count = crate::document_controls::Count::from_name(&preferences.count);
         formatting::set_state(&self.actions, "count", count.name().to_variant());
         self.show_count();
         self.view.set_invisibles_color(preferences.invisibles_color);
@@ -1052,8 +1056,8 @@ impl DocumentWindow {
         }
     }
 
-    /// Shows at the end of the bottom bar the count of the document, or of
-    /// the selection when text is selected (DOC-20).
+    /// Shows over the foot of the document the count of the document, or
+    /// of the selection when text is selected (DOC-20).
     fn show_count(&self) {
         let Some(editor) = self.editor() else {
             return;
@@ -1063,20 +1067,21 @@ impl DocumentWindow {
             .lookup_action("count")
             .and_then(|a| a.state())
             .and_then(|s| s.get::<String>())
-            .map_or(crate::bottom_bar::Count::Words, |n| {
-                crate::bottom_bar::Count::from_name(&n)
+            .map_or(crate::document_controls::Count::Words, |n| {
+                crate::document_controls::Count::from_name(&n)
             });
         let all = self.counted.get().unwrap_or_else(|| {
             let all = editor.main_statistics();
             self.counted.set(Some(all));
             all
         });
-        self.bottom.show_count(&crate::bottom_bar::count_label(
-            kind,
-            &all,
-            editor.selection_statistics().as_ref(),
-            self.view.page_count(),
-        ));
+        self.controls
+            .show_count(&crate::document_controls::count_label(
+                kind,
+                &all,
+                editor.selection_statistics().as_ref(),
+                self.view.page_count(),
+            ));
     }
 
     /// The pages of the navigation sidebar, and the actions that show
@@ -1089,15 +1094,13 @@ impl DocumentWindow {
         }
     }
 
-    /// Shows in the middle of the bottom bar the page in sight (INT-19).
+    /// Shows the number of pages after Go to Page (INT-19).
     fn show_position(&self) {
         if self.slides.is_some() {
             self.show_slide();
             return;
         }
-        let count = self.view.page_count().max(1);
-        let page = self.view.current_page().map_or(1, |p| p + 1).min(count);
-        self.bottom.show_position(page, count);
+        self.controls.show_page_count(self.view.page_count().max(1));
     }
 
     fn action_state(&self, name: &str) -> bool {
@@ -1107,8 +1110,8 @@ impl DocumentWindow {
             .is_some_and(|a| formatting::state_of(&a))
     }
 
-    /// Shows the name, whether the document has changes, the counts at the
-    /// bottom, and which actions apply now.
+    /// Shows the name, whether the document has changes, the count over
+    /// the document, and which actions apply now.
     fn refresh(&self) {
         let editor = self.editor();
         let path = self.path.borrow().clone();
@@ -1809,7 +1812,7 @@ impl DocumentWindow {
     }
 
     /// Full screen hides the header bar until the pointer reaches the top
-    /// of the screen; the counts stay at the bottom, and Esc leaves it
+    /// of the screen; the zoom and the count stay over the document, and Esc leaves it
     /// (DOC-07). A window always opens in the normal mode.
     fn connect_fullscreen(self: &Rc<Self>, leave: &gtk::Button, backdrop: &gtk::ColorDialogButton) {
         let weak = Rc::downgrade(self);
@@ -1922,9 +1925,15 @@ impl DocumentWindow {
             let Some(this) = weak.upgrade() else { return };
             let opens = this.opener.is_some();
             let (view, insert) = if this.slides.is_some() {
-                (slides::view_menu(), slides::insert_menu(true))
+                (
+                    slides::view_menu(&this.controls.navigation),
+                    slides::insert_menu(true),
+                )
             } else {
-                (header::view_menu(), header::insert_menu(true))
+                (
+                    header::view_menu(&this.controls.navigation),
+                    header::insert_menu(true),
+                )
             };
             let mut menus: Vec<(String, gio::MenuModel)> = [
                 (
@@ -2198,7 +2207,8 @@ impl DocumentWindow {
         });
         self.actions.add_action(&ruler);
 
-        // The arrows at the bottom, and what they go to (INT-19).
+        // The previous and the next place, in the View menu, and what
+        // they go to (INT-19).
         let navigate_by = gio::SimpleAction::new_stateful(
             "navigate-by",
             Some(glib::VariantTy::STRING),
@@ -2213,10 +2223,10 @@ impl DocumentWindow {
             };
             action.set_state(&value.to_variant());
             let kind = crate::editing::Navigate::from_name(&value);
-            this.bottom.show_navigate(kind);
+            this.controls.show_navigate(kind);
         });
         self.actions.add_action(&navigate_by);
-        // What the count at the bottom counts (DOC-20), kept in the
+        // What the count over the document counts (DOC-20), kept in the
         // preferences for every window.
         let count = gio::SimpleAction::new_stateful(
             "count",
@@ -2230,7 +2240,7 @@ impl DocumentWindow {
             else {
                 return;
             };
-            let kind = crate::bottom_bar::Count::from_name(&value);
+            let kind = crate::document_controls::Count::from_name(&value);
             action.set_state(&kind.name().to_variant());
             this.show_count();
             let mut current = preferences::get();

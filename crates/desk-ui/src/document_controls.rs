@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The bar at the bottom of the window of interface B (GNM-13): the zoom
-//! at the start (INT-07), the position in the middle between the arrows,
-//! with Go to Page and Navigate By in its menu (INT-19), and at the end
-//! the count of the document, or of the selection when text is selected
-//! (DOC-20).
+//! The controls over the document of window M+, in place of the bottom
+//! bar of interface B (GNM-13, step 3 of M+): the zoom between Zoom Out
+//! and Zoom In over the end corner (INT-07), and over the foot the count
+//! of the document, or of the selection when text is selected (DOC-20).
+//! Go to Page and Navigate By, which the bar had in the menu of its
+//! position, are in the View menu (INT-19); the arrows of the bar went
+//! with it, and their keys stay.
 
 use adw::prelude::*;
 use desk_model::Statistics;
@@ -137,21 +139,7 @@ fn plural_of(kind: Count, selection: bool, n: usize) -> String {
     }
 }
 
-/// The position in the middle of the bar.
-pub fn position_label(page: usize, count: usize) -> String {
-    tr("Page {page} of {count}")
-        .replace("{page}", &grouped(page))
-        .replace("{count}", &grouped(count))
-}
-
-/// The position in the middle of the bar of Desk Slides (KGNM-14).
-pub fn slide_position_label(slide: usize, count: usize) -> String {
-    tr("Slide {slide} of {count}")
-        .replace("{slide}", &grouped(slide))
-        .replace("{count}", &grouped(count))
-}
-
-/// The name of what the arrows go to, in the Navigate By menu.
+/// The name of a kind of place, in the Navigate By menu.
 fn navigate_label(kind: Navigate) -> String {
     match kind {
         Navigate::Page => tr("Page"),
@@ -163,50 +151,63 @@ fn navigate_label(kind: Navigate) -> String {
     }
 }
 
-/// The tooltips of the arrows, which say where they go.
-pub fn arrow_tooltips(kind: Navigate) -> (String, String) {
+/// Fills the items that go to the previous and the next place, named
+/// after where they go.
+fn fill_steps(steps: &gio::Menu, slides: bool, kind: Navigate) {
+    let (previous, next) = if slides {
+        (tr("_Previous Slide"), tr("_Next Slide"))
+    } else {
+        step_labels(kind)
+    };
+    steps.remove_all();
+    steps.append(Some(&previous), Some("win.navigate(false)"));
+    steps.append(Some(&next), Some("win.navigate(true)"));
+}
+
+/// The items of the View menu that go to the previous and the next place
+/// of a kind.
+fn step_labels(kind: Navigate) -> (String, String) {
     match kind {
-        Navigate::Page => (tr("Previous Page"), tr("Next Page")),
-        Navigate::Section => (tr("Previous Section"), tr("Next Section")),
-        Navigate::Note => (tr("Previous Note"), tr("Next Note")),
-        Navigate::Link => (tr("Previous Link"), tr("Next Link")),
-        Navigate::Bookmark => (tr("Previous Bookmark"), tr("Next Bookmark")),
+        Navigate::Page => (tr("_Previous Page"), tr("_Next Page")),
+        Navigate::Section => (tr("_Previous Section"), tr("_Next Section")),
+        Navigate::Note => (tr("_Previous Note"), tr("_Next Note")),
+        Navigate::Link => (tr("_Previous Link"), tr("_Next Link")),
+        Navigate::Bookmark => (tr("_Previous Bookmark"), tr("_Next Bookmark")),
         Navigate::Style => (
-            tr("Previous Paragraph of the Style"),
-            tr("Next Paragraph of the Style"),
+            tr("_Previous Paragraph of the Style"),
+            tr("_Next Paragraph of the Style"),
         ),
     }
 }
 
-/// The menu of the position: Go to Page, a field held by the item
-/// `go-to-page`, and Navigate By (INT-19).
-fn position_menu(slides: bool) -> gio::Menu {
+/// The navigation section of the View menu (INT-19, KINT-11): Go to Page,
+/// a field held by the item `go-to-page`, the previous and the next place,
+/// and Navigate By; in Desk Slides Go to Slide, the previous and the next
+/// slide, and the first and the last.
+fn navigation_menu(slides: bool, steps: &gio::Menu) -> gio::Menu {
     let menu = gio::Menu::new();
+    let go = gio::Menu::new();
+    let item = gio::MenuItem::new(None, None);
+    item.set_attribute_value("custom", Some(&"go-to-page".to_variant()));
+    go.append_item(&item);
+    menu.append_section(None, &go);
+    menu.append_section(None, steps);
     if slides {
-        // Go To of the Slide menu of Keynote (KINT-11).
-        let go = gio::Menu::new();
-        let item = gio::MenuItem::new(None, None);
-        item.set_attribute_value("custom", Some(&"go-to-page".to_variant()));
-        go.append_item(&item);
-        menu.append_section(None, &go);
         let ends = gio::Menu::new();
         ends.append(Some(&tr("_First Slide")), Some("win.go-to-slide('first')"));
         ends.append(Some(&tr("_Last Slide")), Some("win.go-to-slide('last')"));
         menu.append_section(None, &ends);
         return menu;
     }
-    let go = gio::Menu::new();
-    let item = gio::MenuItem::new(None, None);
-    item.set_attribute_value("custom", Some(&"go-to-page".to_variant()));
-    go.append_item(&item);
-    menu.append_section(None, &go);
     let by = gio::Menu::new();
     for kind in Navigate::ALL {
         let item = gio::MenuItem::new(Some(&navigate_label(kind)), None);
         item.set_action_and_target_value(Some("win.navigate-by"), Some(&kind.name().to_variant()));
         by.append_item(&item);
     }
-    menu.append_section(Some(&tr("Navigate By")), &by);
+    let submenu = gio::Menu::new();
+    submenu.append_submenu(Some(&tr("Navigate _By")), &by);
+    menu.append_section(None, &submenu);
     menu
 }
 
@@ -256,177 +257,228 @@ pub fn zoom_menu() -> gio::Menu {
     menu
 }
 
-/// A flat menu button that opens upward, with a label that can give way.
-fn menu_button(tooltip: &str) -> (gtk::MenuButton, gtk::Label) {
-    let label = gtk::Label::builder()
-        .ellipsize(gtk::pango::EllipsizeMode::End)
-        .css_classes(["numeric"])
-        .build();
-    let button = gtk::MenuButton::builder()
-        .child(&label)
-        .direction(gtk::ArrowType::Up)
-        .tooltip_text(tooltip)
-        .css_classes(["flat"])
-        .build();
-    (button, label)
+/// A pill of the osd style of GNOME, over a corner or the foot of the
+/// document (GNM-13).
+fn pill(halign: gtk::Align) -> gtk::Box {
+    gtk::Box::builder()
+        .spacing(2)
+        .halign(halign)
+        .valign(gtk::Align::End)
+        .margin_start(12)
+        .margin_end(12)
+        .margin_bottom(12)
+        .css_classes(["osd", "toolbar", "desk-osd-pill"])
+        .build()
 }
 
-/// The widgets of the bar.
-pub struct BottomBar {
-    pub bar: gtk::ActionBar,
+/// The controls over the document.
+pub struct Controls {
+    /// The zoom, between Zoom Out and Zoom In, over the end corner.
     pub zoom: gtk::MenuButton,
-    pub previous: gtk::Button,
-    pub next: gtk::Button,
-    pub position: gtk::MenuButton,
-    position_label: gtk::Label,
-    /// Go to Page, in the menu of the position.
-    pub page_entry: gtk::Entry,
+    zoom_pill: gtk::Box,
+    zoom_parts: [gtk::Widget; 3],
+    /// The count, over the foot of the document.
     pub count: gtk::MenuButton,
-    count_label: gtk::Label,
+    count_pill: gtk::Box,
+    /// Go to Page, the item `go-to-page` of the View menu.
+    pub go_to: gtk::Box,
+    /// The field of Go to Page.
+    pub page_entry: gtk::Entry,
+    /// "of 41", after the field.
+    page_count: gtk::Label,
+    /// The navigation section of the View menu.
+    pub navigation: gio::Menu,
+    steps: gio::Menu,
+    slides: bool,
+    /// Whether a document shows, and whether the preferences show the
+    /// count.
+    shown: std::cell::Cell<bool>,
+    counted: std::cell::Cell<bool>,
 }
 
-impl BottomBar {
-    /// The bar of Desk Writer, or with `slides` that of Desk Slides: the
-    /// position counts slides, and the button of the presenter notes takes
-    /// the place of the count (KGNM-14).
+impl Controls {
+    /// The controls of Desk Writer, or with `slides` those of Desk Slides,
+    /// which have no count and go to slides (KGNM-14).
     pub fn new_for(slides: bool) -> Self {
-        let zoom = gtk::MenuButton::builder()
+        let zoom_out = gtk::Button::builder()
+            .icon_name("zoom-out-symbolic")
+            .action_name("win.zoom")
+            .action_target(&"out".to_variant())
+            .tooltip_text(tr("Zoom Out"))
+            .build();
+        crate::formatting::labelled(&zoom_out, &tr("Zoom Out"));
+        let zoom_in = gtk::Button::builder()
+            .icon_name("zoom-in-symbolic")
+            .action_name("win.zoom")
+            .action_target(&"in".to_variant())
+            .tooltip_text(tr("Zoom In"))
+            .build();
+        crate::formatting::labelled(&zoom_in, &tr("Zoom In"));
+        // A label as the child, so that no arrow shows beside it.
+        let zoom_label = gtk::Label::builder()
             .label(geometry::zoom_label(geometry::DEFAULT_ZOOM))
+            .css_classes(["numeric"])
+            .build();
+        let zoom = gtk::MenuButton::builder()
+            .child(&zoom_label)
             .menu_model(&zoom_menu())
             .direction(gtk::ArrowType::Up)
             .tooltip_text(tr("Zoom"))
             .css_classes(["flat"])
             .build();
-        let (previous_tip, next_tip) = if slides {
-            (tr("Previous Slide"), tr("Next Slide"))
-        } else {
-            arrow_tooltips(Navigate::Page)
-        };
-        let previous = gtk::Button::builder()
-            .icon_name("go-up-symbolic")
-            .tooltip_text(previous_tip)
-            .action_name("win.navigate")
-            .action_target(&false.to_variant())
+        let zoom_pill = pill(gtk::Align::End);
+        zoom_pill.set_visible(false);
+        zoom_pill.append(&zoom_out);
+        zoom_pill.append(&zoom);
+        zoom_pill.append(&zoom_in);
+
+        let count_label = gtk::Label::builder()
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["numeric"])
+            .build();
+        let count = gtk::MenuButton::builder()
+            .child(&count_label)
+            .menu_model(&count_menu())
+            .direction(gtk::ArrowType::Up)
+            .tooltip_text(tr("Word Count"))
             .css_classes(["flat"])
             .build();
-        let next = gtk::Button::builder()
-            .icon_name("go-down-symbolic")
-            .tooltip_text(next_tip)
-            .action_name("win.navigate")
-            .action_target(&true.to_variant())
-            .css_classes(["flat"])
-            .build();
-        let (position, position_label) = menu_button(&if slides {
-            tr("Go To")
-        } else {
-            tr("Go To and Navigate By")
-        });
+        let count_pill = pill(gtk::Align::Center);
+        count_pill.append(&count);
+        count_pill.set_visible(false);
+
         let page_entry = gtk::Entry::builder()
             .width_chars(4)
             .max_width_chars(5)
             .input_purpose(gtk::InputPurpose::Digits)
             .xalign(0.5)
             .build();
-        let go_to = if slides {
+        let names = if slides {
             (tr("Go to Slide"), tr("_Go to Slide"))
         } else {
             (tr("Go to Page"), tr("_Go to Page"))
         };
-        crate::formatting::labelled(&page_entry, &go_to.0);
+        crate::formatting::labelled(&page_entry, &names.0);
         let go_label = gtk::Label::builder()
-            .label(go_to.1)
+            .label(names.1)
             .use_underline(true)
             .mnemonic_widget(&page_entry)
             .xalign(0.0)
             .hexpand(true)
             .build();
-        let go = gtk::Box::builder()
-            .spacing(12)
+        let page_count = gtk::Label::builder()
+            .css_classes(["numeric", "dim-label"])
+            .build();
+        let go_to = gtk::Box::builder()
+            .spacing(6)
             .margin_start(12)
             .margin_end(6)
             .margin_top(3)
             .margin_bottom(3)
             .build();
-        go.append(&go_label);
-        go.append(&page_entry);
-        let popover = gtk::PopoverMenu::from_model(Some(&position_menu(slides)));
-        popover.add_child(&go, "go-to-page");
-        position.set_popover(Some(&popover));
-        let center = gtk::Box::builder().spacing(2).build();
-        center.append(&previous);
-        center.append(&position);
-        center.append(&next);
-        let (count, count_label) = menu_button(&tr("Word Count"));
-        count.set_menu_model(Some(&count_menu()));
-        // The menus at the ends open toward the middle of the window.
-        if let Some(popover) = count.popover() {
-            popover.set_halign(gtk::Align::End);
-        }
-        if let Some(popover) = zoom.popover() {
-            popover.set_halign(gtk::Align::Start);
-        }
-        // Presenter Notes, at the end of the bar of Desk Slides in place
-        // of the count (KGNM-14).
-        let notes = gtk::ToggleButton::builder()
-            .icon_name("desk-notes-symbolic")
-            .action_name("win.presenter-notes")
-            .tooltip_text(tr("Presenter Notes"))
-            .css_classes(["flat"])
-            .visible(slides)
-            .build();
-        crate::formatting::labelled(&notes, &tr("Presenter Notes"));
-        let bar = gtk::ActionBar::new();
-        bar.pack_start(&zoom);
-        bar.set_center_widget(Some(&center));
-        bar.pack_end(&count);
-        bar.pack_end(&notes);
-        count.set_visible(!slides);
-        bar.set_revealed(false);
+        go_to.append(&go_label);
+        go_to.append(&page_entry);
+        go_to.append(&page_count);
+        let steps = gio::Menu::new();
+        fill_steps(&steps, slides, Navigate::Page);
         Self {
-            bar,
+            navigation: navigation_menu(slides, &steps),
+            steps,
+            slides,
+            shown: std::cell::Cell::new(false),
+            counted: std::cell::Cell::new(true),
+            zoom_parts: [zoom_out.upcast(), zoom.clone().upcast(), zoom_in.upcast()],
             zoom,
-            previous,
-            next,
-            position,
-            position_label,
-            page_entry,
+            zoom_pill,
             count,
-            count_label,
+            count_pill,
+            go_to,
+            page_entry,
+            page_count,
         }
     }
 
-    /// Shows a position of the bar of Desk Slides: the slide in sight and
-    /// the number of slides (KGNM-14).
-    pub fn show_slide_position(&self, slide: usize, count: usize) {
-        let text = slide_position_label(slide, count);
-        if self.position_label.label() != text {
-            self.position_label.set_label(&text);
-            crate::formatting::labelled(&self.position, &text);
+    /// Puts the controls over the document, in `overlay`.
+    pub fn attach(&self, overlay: &gtk::Overlay) {
+        overlay.add_overlay(&self.count_pill);
+        overlay.add_overlay(&self.zoom_pill);
+    }
+
+    /// Shows or hides the controls, which show only with a document.
+    pub fn set_shown(&self, shown: bool) {
+        self.shown.set(shown);
+        self.zoom_pill.set_visible(shown);
+        self.show_count_pill();
+    }
+
+    /// Shows the count or not, as the preferences say (DOC-20).
+    pub fn set_counted(&self, counted: bool) {
+        self.counted.set(counted);
+        self.show_count_pill();
+    }
+
+    /// Desk Slides has no count (KGNM-14).
+    fn show_count_pill(&self) {
+        self.count_pill
+            .set_visible(self.shown.get() && self.counted.get() && !self.slides);
+    }
+
+    /// Puts `widget` in the pill of the zoom, as the size of the slides
+    /// of the light table (KINT-09).
+    pub fn add_to_zoom(&self, widget: &impl IsA<gtk::Widget>) {
+        self.zoom_pill.append(widget);
+    }
+
+    /// Shows the zoom, or leaves in its pill only what was added to it.
+    pub fn set_zoom_visible(&self, visible: bool) {
+        for part in &self.zoom_parts {
+            part.set_visible(visible);
         }
     }
 
-    /// Shows the page in sight and the number of pages.
-    pub fn show_position(&self, page: usize, count: usize) {
-        let text = position_label(page, count);
-        if self.position_label.label() != text {
-            self.position_label.set_label(&text);
-            crate::formatting::labelled(&self.position, &text);
+    /// Puts the count over the zoom, at the end, while `breakpoint`
+    /// applies: in a window too narrow for the two side by side.
+    pub fn stack_in(&self, breakpoint: &adw::Breakpoint) {
+        breakpoint.add_setter(
+            &self.count_pill,
+            "halign",
+            Some(&gtk::Align::End.to_value()),
+        );
+        breakpoint.add_setter(&self.count_pill, "margin-bottom", Some(&60.to_value()));
+    }
+
+    /// Shows the number of pages or slides after the field of Go to Page.
+    pub fn show_page_count(&self, count: usize) {
+        let text = tr("of {count}").replace("{count}", &grouped(count));
+        if self.page_count.label() != text {
+            self.page_count.set_label(&text);
+        }
+    }
+
+    /// Names the items that go to the previous and the next place after
+    /// what they go to.
+    pub fn show_navigate(&self, kind: Navigate) {
+        fill_steps(&self.steps, self.slides, kind);
+    }
+
+    /// Shows the zoom.
+    pub fn show_zoom(&self, zoom: f64) {
+        if let Some(label) = self.zoom.child().and_downcast::<gtk::Label>() {
+            let text = geometry::zoom_label(zoom);
+            label.set_label(&text);
+            crate::formatting::labelled(&self.zoom, &text);
         }
     }
 
     /// Shows the count.
     pub fn show_count(&self, text: &str) {
-        if self.count_label.label() != text {
-            self.count_label.set_label(text);
+        let Some(label) = self.count.child().and_downcast::<gtk::Label>() else {
+            return;
+        };
+        if label.label() != text {
+            label.set_label(text);
             crate::formatting::labelled(&self.count, text);
         }
-    }
-
-    /// Says on the arrows where they go.
-    pub fn show_navigate(&self, kind: Navigate) {
-        let (previous, next) = arrow_tooltips(kind);
-        self.previous.set_tooltip_text(Some(&previous));
-        self.next.set_tooltip_text(Some(&next));
     }
 }
 
@@ -474,27 +526,26 @@ mod tests {
     }
 
     #[test]
-    fn doc_07_the_bar_names_the_words_and_the_pages() {
-        // The bar stays in full screen, with the words and the pages.
+    fn doc_07_the_count_names_the_words_and_the_pages() {
+        // The count stays in full screen, with the words and the pages.
         let all = statistics(1, 4);
         assert_eq!(count_label(Count::Words, &all, None, 3), "1 word");
-        assert_eq!(position_label(1, 3), "Page 1 of 3");
         assert_eq!(count_label(Count::Pages, &all, None, 1), "1 page");
     }
 
     #[test]
-    fn kgnm_14_the_position_of_slides_names_the_slide() {
-        assert_eq!(slide_position_label(3, 12), "Slide 3 of 12");
-        assert_eq!(slide_position_label(1, 1_200), "Slide 1 of 1,200");
-    }
-
-    #[test]
-    fn int_19_the_position_names_the_page_and_the_pages() {
-        assert_eq!(position_label(6, 41), "Page 6 of 41");
+    fn int_19_the_view_menu_goes_to_the_places_of_each_kind() {
         for kind in Navigate::ALL {
-            let (previous, next) = arrow_tooltips(kind);
+            let (previous, next) = step_labels(kind);
             assert_ne!(previous, next);
             assert!(!navigate_label(kind).is_empty());
         }
+        let steps = gio::Menu::new();
+        fill_steps(&steps, false, Navigate::Section);
+        assert_eq!(steps.n_items(), 2);
+        let menu = navigation_menu(false, &steps);
+        assert_eq!(menu.n_items(), 3);
+        let slides = navigation_menu(true, &steps);
+        assert_eq!(slides.n_items(), 3);
     }
 }
