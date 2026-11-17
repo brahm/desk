@@ -389,9 +389,9 @@ there in another form or place; `new` is still to be written.
 | Inspector of Slides | | | 7 |
 | Bottom bar and controls over the view | | 3 | 3 |
 | Find, notices and commands | 9 | 1 | 4 |
-| Popovers | 7 | 1 | 2 |
+| Popovers | 8 | 1 | 1 |
 | Template chooser and dialogs | 6 | 6 | 1 |
-| **Total** | **91** | **19** | **28** |
+| **Total** | **92** | **19** | **27** |
 
 Writer uses 105 of them, Tables 75 and Slides 64 (the dialogs and the
 template chooser count for the three); everything common to the

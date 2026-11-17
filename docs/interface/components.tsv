@@ -129,7 +129,7 @@ colors.palette	Popovers	Palette	Palette	GtkGrid	The GNOME palette, five shades o
 colors.document	Popovers	Document colors	Document Colors	GtkFlowBox	The colors already used, filled each time the popover opens (B-019)	Wells of saved colors	-	exists	-	writer	writer-m-plus-colors	no
 colors.eyedropper	Popovers	Eyedropper	Eyedropper	GtkButton	Picks a color from the screen through the portal	Magnifier of the Colors window	Eyedropper	exists	-	writer	writer-m-plus-colors	no
 colors.custom	Popovers	Custom	Custom	GtkButton	Opens the full color chooser	Colors window	Color wheel	exists	-	writer	writer-m-plus-colors	no
-colors.none	Popovers	None	None	GtkButton	Removes the color	-	No fill	new	-	writer	writer-m-plus-colors	no
+colors.none	Popovers	None	None	GtkButton	Removes the color where the row can have none: backgrounds, the shadow of text, fills, lines and shadows of objects; the text color has no None (B-026)	-	No fill	exists	-	writer	writer-m-plus-colors	no
 fonts.popover	Popovers	Fonts	Fonts	GtkPopover	Popover in place of the Fonts window	Fonts window	List of fonts	exists	Ctrl+T	writer	writer-m-plus-fonts	no
 fonts.find	Popovers	Search fonts	Search Fonts	GtkSearchEntry	Filters the list	Search of the Fonts window	Search	exists	-	writer	writer-m-plus-fonts	no
 fonts.list	Popovers	List of fonts	-	GtkScrolledWindow	Those of the document and the recent ones first, each written in itself	Collections and families	List of fonts	exists	-	writer	writer-m-plus-fonts	no

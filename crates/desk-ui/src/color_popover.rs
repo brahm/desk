@@ -18,6 +18,10 @@
 //! from with [`set_document_colors`], and the popover asks each time it
 //! opens.
 //!
+//! A row whose color can be taken away, such as a background, a fill or a
+//! line, adds None beside Custom… with [`add_none`] (B-026); the text
+//! color always has one, so its popover has no None.
+//!
 //! A row keeps its `gtk::ColorDialogButton` as the holder of the color:
 //! the panes read it, set it and follow its changes as before, and the
 //! popover button takes its place in the row.
@@ -143,6 +147,26 @@ fn set_swatch(area: &gtk::DrawingArea, color: gdk::RGBA) {
         let _ = cr.stroke();
     });
     area.queue_draw();
+}
+
+/// Adds None to the Colors popover of `button`, after Custom…: it runs
+/// `none`, which takes the color away from what the row colors, and closes
+/// the popover (B-026). The button is returned so that the row can hide it
+/// when its color cannot be taken away.
+pub fn add_none(button: &gtk::MenuButton, none: impl Fn() + 'static) -> Option<gtk::Button> {
+    let popover = button.popover()?;
+    // The buttons of the popover are in the last box of its content.
+    let actions = popover.child()?.last_child().and_downcast::<gtk::Box>()?;
+    let choice = gtk::Button::builder().label(tr("None")).build();
+    let popover = popover.downgrade();
+    choice.connect_clicked(move |_| {
+        if let Some(popover) = popover.upgrade() {
+            popover.popdown();
+        }
+        none();
+    });
+    actions.append(&choice);
+    Some(choice)
 }
 
 /// A swatch to choose in the popover, named `name`: it puts its color in

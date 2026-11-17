@@ -283,6 +283,24 @@ def main():
             lambda: inspector_node(app, "Advanced Options", has_action),
         )
         Atspi.Action.do_action(advanced, 0)
+        # None in the Colors popover of a color that can be off turns it
+        # off, as its switch does (B-026).
+        toggle_switch_row(app, "Character Background", "the background of the characters")
+
+        def background_switch():
+            node = inspector_node(app, "Character Background", lambda n: n.get_role() in SWITCHES)
+            return node if node is not None and checked(node) else None
+
+        switch = wait_for("the background of the characters to turn on", background_switch)
+        colors = wait_for(
+            "the Colors popover of the background",
+            lambda: inspector_node(app, "Character Background: Color", has_action),
+        )
+        open_menu_button(colors)
+        none = wait_for("None in the Colors popover", lambda: popover_button(app, "None"))
+        Atspi.Action.do_action(none, 0)
+        wait_for("None to turn the background off", lambda: not checked(switch) or None)
+        check("None takes the background of the characters away (B-026)", True)
         for name in (
             "Typeface",
             "Character Spacing",
@@ -644,6 +662,10 @@ def selections_and_colors(work):
         check("win.colors opens the Colors popover of the text (INT-16)", showing_named(app, "Blue 3") is not None)
         wait_for("the colors of the document in it (B-019)", lambda: showing_named(app, "Document Color 1"))
         check("it shows the colors the document uses (B-019)", True)
+        check(
+            "the text color, which is never off, has no None (B-026)",
+            popover_button(app, "None") is None,
+        )
         Atspi.Action.do_action(picker, 0)
         time.sleep(1)
         press("ctrl+s")
@@ -1351,6 +1373,28 @@ def toggles_named(app, names, role=Atspi.Role.RADIO_BUTTON):
 def tab_toggles(app):
     """The showing toggles of the tabs of the Inspector."""
     return toggles_named(app, TABS, Atspi.Role.PAGE_TAB)
+
+
+def popover_button(app, name):
+    """The showing push button of a name, such as one of a popover."""
+    try:
+        return next(
+            (
+                n
+                for n in walk(app)
+                if n.get_name() == name
+                and n.get_role() == Atspi.Role.PUSH_BUTTON
+                and showing(n)
+            ),
+            None,
+        )
+    except GLib.GError:
+        return None
+
+
+def checked(node):
+    """Whether a switch or a toggle is on."""
+    return node.get_state_set().contains(Atspi.StateType.CHECKED)
 
 
 def has_action(node):

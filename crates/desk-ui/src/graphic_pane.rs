@@ -116,16 +116,18 @@ pub struct GraphicGroup {
     updating: Cell<bool>,
 }
 
-/// A row with a color button at its end.
-fn color_row(title: &str) -> (compact::ActionRow, gtk::ColorDialogButton) {
+/// A row with a color button at its end: the row, the holder of the color
+/// and the button of the Colors popover.
+fn color_row(title: &str) -> (compact::ActionRow, gtk::ColorDialogButton, gtk::MenuButton) {
     let button = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::builder().title(title).build())
         .valign(gtk::Align::Center)
         .build();
     labelled(&button, title);
     let row = compact::ActionRow::builder().title(title).build();
-    row.add_suffix(&crate::color_popover::button(&button, title));
-    (row, button)
+    let colors = crate::color_popover::button(&button, title);
+    row.add_suffix(&colors);
+    (row, button, colors)
 }
 
 fn spin(title: &str, min: f64, max: f64, step: f64) -> compact::SpinRow {
@@ -183,8 +185,8 @@ impl GraphicGroup {
         image_row.add_suffix(&image_button);
         let modes: Vec<String> = IMAGE_FILLS.iter().map(|m| image_fill_name(*m)).collect();
         let image_mode = combo(&tr("Image Size"), &modes);
-        let (fill_color_row, fill_color) = color_row(&tr("Fill Color"));
-        let (gradient_end_row, gradient_end) = color_row(&tr("Gradient End Color"));
+        let (fill_color_row, fill_color, fill_colors) = color_row(&tr("Fill Color"));
+        let (gradient_end_row, gradient_end, _) = color_row(&tr("Gradient End Color"));
         let gradient_angle = spin(&tr("Gradient Angle"), 0.0, 359.0, 1.0);
         gradient_angle.set_subtitle(&tr("Degrees, counterclockwise"));
         let gradient_kind = combo(&tr("Gradient Type"), &[tr("Linear"), tr("Radial")]);
@@ -233,7 +235,7 @@ impl GraphicGroup {
         let frame_style = combo(&tr("Frame"), &frames);
         let frame_scale = spin(&tr("Frame Thickness"), 10.0, 400.0, 5.0);
         frame_scale.set_subtitle(&tr("Percent"));
-        let (stroke_color_row, stroke_color) = color_row(&tr("Stroke Color"));
+        let (stroke_color_row, stroke_color, stroke_colors) = color_row(&tr("Stroke Color"));
         let stroke_width = spin(&tr("Stroke Width"), 0.5, 100.0, 0.5);
         stroke_width.set_digits(1);
         stroke_width.set_subtitle(&tr("Points"));
@@ -241,7 +243,7 @@ impl GraphicGroup {
         let start = combo(&tr("Start of the Line"), &ends);
         let end = combo(&tr("End of the Line"), &ends);
         let shadow = compact::SwitchRow::builder().title(tr("Shadow")).build();
-        let (shadow_color_row, shadow_color) = color_row(&tr("Shadow Color"));
+        let (shadow_color_row, shadow_color, shadow_colors) = color_row(&tr("Shadow Color"));
         let shadow_angle = spin(&tr("Shadow Angle"), 0.0, 359.0, 1.0);
         shadow_angle.set_subtitle(&tr("Degrees, counterclockwise"));
         let shadow_offset = spin(&tr("Shadow Offset"), 0.0, 100.0, 1.0);
@@ -389,6 +391,27 @@ impl GraphicGroup {
                 this.show_rows();
             }
         };
+        // None in the Colors popovers takes the fill, the line or the
+        // shadow away, as None in their lists and the Shadow switch do; on
+        // a tinted picture it takes the tint away and keeps the picture
+        // (B-026).
+        let none = |f: fn(&Self)| {
+            let weak = Rc::downgrade(&this);
+            move || {
+                if let Some(this) = weak.upgrade() {
+                    f(&this);
+                }
+            }
+        };
+        crate::color_popover::add_none(
+            &fill_colors,
+            none(|this| {
+                let untinted = if this.fill.selected() == 4 { 3 } else { 0 };
+                this.fill.set_selected(untinted);
+            }),
+        );
+        crate::color_popover::add_none(&stroke_colors, none(|this| this.stroke.set_selected(0)));
+        crate::color_popover::add_none(&shadow_colors, none(|this| this.shadow.set_active(false)));
         let on = changed.clone();
         let weak = Rc::downgrade(&this);
         this.fill.connect_selected_notify(move |row| {
