@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Writer and Slides have no bottom bar: the zoom and the word
+  count float over the document, and Go to Page and Navigate By are in
+  the View menu.
 * Changed: The format bar is gone; its controls are in the Format pane
   of the Inspector, with the paragraph style over the tabs. Slides has a
   Slide tab, and Tables has Cell and Text tabs.

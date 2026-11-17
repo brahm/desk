@@ -17,12 +17,12 @@ pub use gtk;
 mod access;
 mod area;
 mod auto_numbers;
-mod bottom_bar;
 mod bullet_pictures;
 mod chart_data;
 mod chart_pane;
 mod color_popover;
 mod compact;
+mod document_controls;
 mod editing;
 mod effects;
 mod eyedropper;
@@ -462,7 +462,8 @@ fn load_css() {
         // The colors are the named ones of Adwaita, which follow the
         // accent, the dark style and high contrast. The section chosen in
         // the thumbnails has a thin outline and no fill, as in Pages
-        // (EST-17), in the accent color in place of its yellow.
+        // (EST-17), in the accent color in place of its yellow. The
+        // controls over the document are pills of the osd style (GNM-13).
         ".desk-document { background-color: color-mix(in srgb, var(--window-fg-color) 10%, transparent); }\n\
          .desk-ruler { background-color: var(--headerbar-bg-color); \
          box-shadow: inset 0 -1px color-mix(in srgb, var(--window-fg-color) 15%, transparent); }\n\
@@ -474,6 +475,7 @@ fn load_css() {
          .desk-inspector-tabs indicatorbin { padding: 0; margin: 0; }\n\
          .desk-compact-row spinbutton, .desk-compact-row dropdown > button, \
          .desk-compact-row entry { min-height: 26px; }\n\
+         .desk-osd-pill { border-radius: 999px; padding: 2px 6px; }\n\
          .desk-template { padding: 9px; }\n\
          .desk-template-page { background-color: white; border-radius: 3px; \
          box-shadow: 0 1px 3px 1px color-mix(in srgb, black 20%, transparent); }\n\

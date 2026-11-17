@@ -8,8 +8,8 @@
 //! the window of Desk Writer shows it with what Keynote adds: the slide
 //! navigator, the outline and the master slides as pages of the
 //! navigation sidebar; the presenter notes under the slide; the light
-//! table in the place of the slide; the position as "Slide 3 of 12" with
-//! the Notes button in the bottom bar; the Play button in the header bar;
+//! table in the place of the slide, with the size of its slides in the
+//! pill of the zoom; Go to Slide in the View menu; the Play button in the header bar;
 //! the Slide tab of the Format pane when nothing is selected; and the Animation
 //! level of the Inspector. Play, the master slides, transitions and builds
 //! have their places here and work in later phases of Desk Slides.
@@ -85,7 +85,8 @@ pub(super) struct Slides {
     /// The Slide group of the Format pane, with nothing selected
     /// (KINT-13).
     pub slide_group: crate::compact::Group,
-    /// The size of the slides of the light table, in the bottom bar.
+    /// The size of the slides of the light table, in the pill of the zoom
+    /// over the document.
     pub size: gtk::Scale,
 }
 
@@ -243,7 +244,7 @@ pub(super) fn play_button() -> adw::SplitButton {
 /// The View menu of Desk Slides, under the arrow of the Sidebar button
 /// (KINT-05, KGNM-10): the pages of the sidebar, the light table, what the
 /// window shows, and the zoom.
-pub(super) fn view_menu() -> gio::Menu {
+pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     let panes = gio::Menu::new();
     panes.append(Some(&tr("_Navigator")), Some("win.thumbnails"));
     panes.append(Some(&tr("_Outline")), Some("win.slide-outline"));
@@ -259,10 +260,11 @@ pub(super) fn view_menu() -> gio::Menu {
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
     let window = gio::Menu::new();
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
-    window.append_submenu(Some(&tr("_Zoom")), &crate::bottom_bar::zoom_menu());
+    window.append_submenu(Some(&tr("_Zoom")), &crate::document_controls::zoom_menu());
     let menu = gio::Menu::new();
     menu.append_section(Some(&tr("Sidebar")), &panes);
     menu.append_section(None, &slides);
+    menu.append_section(None, navigation);
     menu.append_section(None, &document);
     menu.append_section(None, &window);
     menu
@@ -1008,7 +1010,7 @@ impl DocumentWindow {
             self.stack.set_visible_child_name("document");
         }
         slides.size.set_visible(on);
-        self.bottom.zoom.set_visible(!on);
+        self.controls.set_zoom_visible(!on);
         slides.notes_revealer.set_visible(!on);
     }
 
@@ -1037,8 +1039,7 @@ impl DocumentWindow {
         slides.notes_slide.set(Some(slide));
         let skipped = editor.slide_skipped(self.chosen_slide(&editor));
         formatting::set_state(&self.actions, "skip-slide", skipped.to_variant());
-        self.bottom
-            .show_slide_position(slide + 1, editor.slide_count().max(1));
+        self.controls.show_page_count(editor.slide_count().max(1));
     }
 
     /// Shows the Slide tab of the Format pane when nothing is selected

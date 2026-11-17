@@ -439,7 +439,8 @@ pub(super) fn position_label(name: &str, index: usize, count: usize) -> String {
 
 /// "6 células".
 pub(super) fn cells_label(cells: u64) -> String {
-    trn("{n} cell", "{n} cells", cells).replace("{n}", &crate::bottom_bar::grouped(cells as usize))
+    trn("{n} cell", "{n} cells", cells)
+        .replace("{n}", &crate::document_controls::grouped(cells as usize))
 }
 
 #[cfg(test)]

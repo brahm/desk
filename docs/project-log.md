@@ -556,6 +556,26 @@ matrix rows done on 9 November, before the change of target.
   control that the format bar used to show, and the command search finds
   the Format menu and the Objects menu of the pane.
 
+### 17 November: step 3 of window M+, the controls over the document
+
+- Writer and Slides lost their bottom bar. The zoom sits in a pill of
+  GNOME's osd style over the end corner of the document, between Zoom Out
+  and Zoom In, with its menu on the percentage; the count of Writer sits
+  in a pill over the foot of the document, with the same menu as before.
+  In a window narrower than 720 px the count moves over the zoom. In the
+  light table of Slides the pill holds the size of the slides instead.
+- Go to Page (Go to Slide) moved to the View menu, as a field with "of
+  41" after it, with the previous and the next place, named after what
+  Navigate By chose ("Next Section"), and Navigate By as a submenu.
+- *Why:* M+ has no bottom bar (GNM-13, KGNM-14), and the matrices
+  already put Go to Page and Navigate By in the View menu (INT-19). The
+  position "Page 6 of 41" had no place left on the screen; the field of
+  Go to Page shows the page in sight when it opens.
+- *Consequences:* the arrows of the bar are gone, so the previous and the
+  next place are items of the View menu. The UI test of the bottom bar
+  became that of the controls, and opens Go to Page by the mnemonics of
+  the menu.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

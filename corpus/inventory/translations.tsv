@@ -436,7 +436,7 @@ note	Popover Mídia com busca e pastas (INT-14); Content Hub e Fotos ficam fora 
 note	Popover de fontes a partir da linha Família do painel Formatar, e o seletor de cores a partir da linha Cor do texto (INT-15, INT-16, D-024)	Fonts popover from the Family row of the Format pane, and the color chooser from the Text Color row (INT-15, INT-16, D-024)
 note	Ajustar Imagem na aba Imagem do Inspetor (OBJ-07, etapa 4)	Adjust Image in the Image tab of the Inspector (OBJ-07, stage 4)
 note	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 oferece direto do aviso	Banner with View Warnings (INT-22) done; Replace Fonts, which the 15 offers right from the warning, is missing
-note	Barra inferior com posição, Ir para página, Navegar por e contagem (etapa 6, GNM-13)	Bottom bar with position, Go to Page, Navigate By and word count (stage 6, GNM-13)
+note	Zoom e contagem de palavras sobre o documento; Ir para a Página, o lugar anterior e o próximo e Navegar Por no menu Visualização (GNM-13, INT-19, passo 3 da M+)	Zoom and word count over the document; Go to Page, the previous and the next place and Navigate By in the View menu (GNM-13, INT-19, step 3 of M+)
 note	Miniaturas, estilos e resultados da busca na barra lateral; falta o sumário vivo do 15 e a página Comentários só diz que não há (fase 8)	Thumbnails, styles and search results in the sidebar; the live table of contents of the 15 is missing and the Comments page only says there are none (phase 8)
 note	Tela cheia por F11 (DOC-07); falta o Screen View do 15 (fluxo contínuo para escrever)	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
 note	Documentos em abas de uma janela, com a visão geral das abas (AdwTabView, passo 1 da M+)	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
@@ -782,7 +782,7 @@ note	Popovers de fontes e cores do Writer	Fonts and colors popovers of Writer
 note	Ajustar Imagem no Inspetor do Writer	Adjust Image in the Inspector of Writer
 note	Organizar no Inspetor do Writer	Arrange in the Inspector of Writer
 note	Banner de avisos do Writer	Warnings banner of Writer
-note	Barra inferior com "Slide 3 de 12" e Notas (KGNM-14)	Bottom bar with "Slide 3 of 12" and Notes (KGNM-14)
+note	Zoom sobre o slide; Ir para o Slide no menu Visualização, e as notas do apresentador pelo menu Visualização (KGNM-14, passo 3 da M+)	Zoom over the slide; Go to Slide in the View menu, and the presenter notes from the View menu (KGNM-14, step 3 of M+)
 note	Tela cheia e só o slide (KINT-10)	Full screen and slide only (KINT-10)
 note	Preferências do Writer; faltam Apresentação e Controle remoto	Preferences of Writer; Presentation and Remote control are missing
 note	Desfazer e refazer	Undo and redo

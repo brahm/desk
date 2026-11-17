@@ -426,7 +426,7 @@ impl Inspector {
             (&self.tables, tables),
             (&self.charts, charts),
         ] {
-            row.set_subtitle(&crate::bottom_bar::grouped(n));
+            row.set_subtitle(&crate::document_controls::grouped(n));
         }
         self.updating.set(false);
     }
