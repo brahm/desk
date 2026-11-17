@@ -28,6 +28,10 @@ the inventory in [`inventory/`](inventory).
 - `vm-review.tsv` lists the rows whose interface was compared by eye with
   Pages 4.3 on the reference Mac OS X Lion; the parity report shows them
   as "reviewed on the Lion VM" when only tests check them otherwise.
+- `mac-review.tsv` lists the rows of the inventory whose interface was
+  compared by eye with Pages, Numbers and Keynote 15.4 on the owner's Mac,
+  with a verdict: the same, another form set by a decision, or a gap with
+  its backlog item.
 - Each folder under `writer/` is a case: `case.toml` describes a short
   document, and the reference virtual machine adds the `.pages` file that
   Pages '09 builds from the same description. `reference.pdf` is the PDF

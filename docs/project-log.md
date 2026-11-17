@@ -803,6 +803,29 @@ matrix rows done on 9 November, before the change of target.
   than none.
 - *Consequences:* B-011 is closed. AppStream validation passes.
 
+### 17 November: Final validation of B1 on the Mac
+
+- The owner asked for the final validation of B1 on his Mac with iWork
+  15.4, after the screenshots.
+- *What was done:* the 32 rows of B1 that are done (15 of Writer, 8 of
+  Tables, 9 of Slides) were compared with Pages, Numbers and Keynote
+  15.4: their menus, toolbars, Format panes, settings, tabs, dark
+  appearance, zoom and navigation, and what closing a new document asks.
+  The apps were driven in the background, so the owner could keep using
+  the Mac. The verdicts are in corpus/mac-review.tsv: 19 rows the same,
+  10 in another form that a decision sets (mostly D-008, the GNOME
+  window), and 3 with a gap.
+- *The gaps:* Zoom to Selection, which the Zoom menu of the three apps
+  has (and Auto-Center and Zoom to Fit Content in Keynote), became B-027;
+  First Page and Last Page in the Go To menu of Pages became B-028. Both
+  stay in B1.
+- *What could not be checked:* the name of the change in Undo, because
+  the menu titles of an app in the background are not refreshed.
+- *Not validated:* the 21 rows of B1 that are not finished (Partial,
+  Engine ready or Missing); they need a second round when they are done.
+- *Why the captures are not in the repository:* they show Apple's
+  interface, which D-011 keeps out; they are in the project files.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
