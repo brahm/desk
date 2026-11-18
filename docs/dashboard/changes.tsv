@@ -102,3 +102,7 @@ date	kind	id	from	to
 2026-11-17	feature	S016	review	done
 2026-11-17	phase	B1	in-progress	done
 2026-11-17	phase	W1	not-started	in-progress
+2026-11-17	backlog	B-039	new	open
+2026-11-17	backlog	B-040	new	open
+2026-11-17	backlog	B-041	new	open
+2026-11-17	backlog	B-042	new	open

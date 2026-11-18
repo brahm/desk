@@ -9,6 +9,7 @@ and contribute to Desk, and for a coding agent working for that person.
 | [decisions.md](decisions.md) | Every decision of the project, and the ones each replaced |
 | [architecture.md](architecture.md) | The crates, the document model, the life of a document, with diagrams |
 | [roadmap.md](roadmap.md) | The phases, what each delivers and how a phase is run and closed |
+| [phases](phases) | The plan of each phase when it starts: its rows, how each is checked and the order of the pull requests |
 | [odf-extensions.md](odf-extensions.md) | How Desk stores what standard ODF cannot hold |
 | [interface](interface/README.md) | The window, its components, and the chosen proposal in [interface/proposals](interface/proposals/README.md) |
 | [backlog](backlog/README.md) | What was left undone, why, and when it comes back |

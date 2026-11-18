@@ -59,7 +59,7 @@ W055	3.4 Text and characters	Superscript/subscript, baseline shift	Equal	Equal i
 W056	3.4 Text and characters	Character spacing and ligatures	Equal	Equal in both	-	In	Done	-	done	Spacing and ligatures (FMT-09, FMT-10)
 W057	3.4 Text and characters	Font smoothing	Only '09	'09, in the form of the 15	D-002	Not applicable to GNOME (D-005)	Not applicable	-	-	Font smoothing belongs to the system in GNOME
 W058	3.4 Text and characters	Character and paragraph background color	Equal	Equal in both	-	In	Done	-	done	Character and paragraph background (FMT-20)
-W059	3.4 Text and characters	Review highlight	Only 15	15.4	D-001	In	Missing	-	W1	Review highlight with a comment (phase 8)
+W059	3.4 Text and characters	Review highlight	Only 15	15.4	D-001	In	Missing	-	W2	Review highlight with a comment (phase 8)
 W060	3.4 Text and characters	Drop cap	Only 15	15.4	D-001	In	Missing	-	W1	Drop cap
 W061	3.4 Text and characters	Automatic fractions	Only 15	15.4	D-001	In	Missing	-	W1	Automatic fractions
 W062	3.4 Text and characters	Smart quotes and dashes	Different	15.4	D-001	In	Partial	-	W1	Smart quotes like the '09 (TXT-06); choosing the quote style and converting the existing ones are missing
@@ -71,7 +71,7 @@ W067	3.4 Text and characters	Page number and page count	Equal	Equal in both	-	In
 W068	3.4 Text and characters	Dictation 🤖🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Dictation (AI)
 W069	3.4 Text and characters	Predictive text 🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Predictive text (AI)
 W070	3.4 Text and characters	Translation 🌐🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Translation (AI/online)
-W071	3.4 Text and characters	Languages: bidirectional, vertical, phonetic guide, CJK emphasis	Only 15	15.4	D-001	In	Missing	-	W1	Bidirectional text, vertical text and phonetic guide (GNM-08, phase 11)
+W071	3.4 Text and characters	Languages: bidirectional, vertical, phonetic guide, CJK emphasis	Only 15	15.4	D-001	In	Missing	-	W6	Bidirectional text, vertical text and phonetic guide (GNM-08, phase 11)
 W072	3.4 Text and characters	Formatting by document language	Only 15	15.4	D-001	In	Partial	-	W1	Text language per range (FMT-22); language and region per document are missing
 W073	3.5 Styles	Paragraph, character and list styles	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Styles always in view in the sidebar (STY-01, STY-02)
 W074	3.5 Styles	Show and update overrides	Equal	Equal in both	-	In	Done	-	done	Overrides and update (STY-06)
@@ -133,13 +133,13 @@ W129	3.9 Tables	Convert text to table	Only '09	'09, in the form of the 15	D-002	
 W130	3.9 Tables	Create a table from cells	Only 15	15.4	D-001	In	Missing	-	W1	Create a table by dragging cells out
 W131	3.9 Tables	Merge and split cells	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Merge and split (TAB-23, TAB-24)
 W132	3.9 Tables	Cell formats	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W1	Formats, fraction and numeral system (TAB-28 to TAB-30); the window to manage formats is missing (TAB-31)
-W133	3.9 Tables	Formulas and functions 🌐 (in 15)	Different	15.4	D-001	In	Partial	-	W1	Function browser and 94 functions; the 15 has 250+; functions that fetch from the internet stay out
+W133	3.9 Tables	Formulas and functions 🌐 (in 15)	Different	15.4	D-001	In	Partial	-	T2	Function browser and 94 functions; the 15 has 250+; functions that fetch from the internet stay out
 W134	3.9 Tables	Conditional highlighting	Equal	Equal in both	-	In	Done	-	done	Conditional formatting (TAB-21)
 W135	3.9 Tables	Sort	Equal	Equal in both	-	In	Done	-	done	Sort (TAB-15)
 W136	3.9 Tables	Autofill and autocomplete	Equal	Equal in both	-	In	Done	-	done	Autofill and suggestions from the column (TAB-19)
 W137	3.9 Tables	Alternating colors	Equal	Equal in both	-	In	Done	-	done	Alternating colors (TAB-14)
 W138	3.9 Tables	Table title	Only 15	15.4	D-001	In	Missing	-	W1	Table title
-W139	3.9 Tables	Table direction (bidi)	Only 15	15.4	D-001	In	Missing	-	W1	Right-to-left table
+W139	3.9 Tables	Table direction (bidi)	Only 15	15.4	D-001	In	Missing	-	W6	Right-to-left table
 W140	3.9 Tables	Lock table	Only 15	15.4	D-001	In	Missing	-	W1	Lock table
 W141	3.10 Charts	Types	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Eleven 2D and 3D types (GRF-01); donut, radar, bubble and interactive are missing
 W142	3.10 Charts	Data	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Data Editor (GRF-03, GRF-05); sharing the X axis and sampling are missing
