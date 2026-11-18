@@ -613,6 +613,9 @@ fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
 
 fn write_properties(w: &mut Writer, properties: &Properties) {
     crate::table::write_table_properties(w, &properties.table, &border_value);
+    // ODF orders the graphic properties before those of the paragraph and
+    // the text, in a graphic style.
+    crate::draw::write_graphic_properties(w, &properties.graphic);
     if properties.paragraph != ParagraphProperties::default() {
         w.start("style:paragraph-properties");
         paragraph_attrs(w, &properties.paragraph);
@@ -624,7 +627,6 @@ fn write_properties(w: &mut Writer, properties: &Properties) {
         text_attrs(w, &properties.text);
         w.end();
     }
-    crate::draw::write_graphic_properties(w, &properties.graphic);
 }
 
 /// The value of a side of `fo:border`.
