@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK};
 use crate::text::{
-    Background, Border, BorderLine, Break, Column, Columns, Family, Field, HeaderFooter,
+    Background, Border, BorderLine, Break, Column, Columns, DropCap, Family, Field, HeaderFooter,
     HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
     ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration, PageLayout,
     Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
@@ -592,6 +592,18 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
         padding_bottom: side("padding", "bottom").and_then(Length::parse),
         padding_left: side("padding", "left").and_then(Length::parse),
         padding_right: side("padding", "right").and_then(Length::parse),
+        drop_cap: e.child(STYLE, "drop-cap").map(|d| DropCap {
+            length: match d.attr(STYLE, "length") {
+                Some("word") => 0,
+                Some(n) => n.trim().parse().unwrap_or(1),
+                None => 1,
+            },
+            lines: d
+                .attr(STYLE, "lines")
+                .and_then(|n| n.trim().parse().ok())
+                .unwrap_or(1),
+            distance: length(d, STYLE, "distance"),
+        }),
     }
 }
 

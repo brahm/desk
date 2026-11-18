@@ -552,6 +552,8 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
         list_level: None,
         list_start: None,
         list_override: None,
+        // Pages '09 drop caps are left out, with a warning.
+        drop_cap: None,
     }
 }
 

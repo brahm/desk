@@ -24,6 +24,7 @@ mod color_popover;
 mod compact;
 mod contents_page;
 mod document_controls;
+mod drop_cap_pane;
 mod editing;
 mod effects;
 mod eyedropper;

@@ -359,7 +359,7 @@ impl TextSystem {
         out
     }
 
-    fn build(&mut self, text: &ParagraphText) -> Layout<u32> {
+    pub(crate) fn build(&mut self, text: &ParagraphText) -> Layout<u32> {
         let formats = text.formats();
         let families: Vec<Arc<str>> = formats
             .iter()
@@ -415,6 +415,13 @@ impl TextSystem {
         space: &dyn LineSpace,
         top: f32,
     ) -> ParagraphLayout {
+        // A drop cap, which a list item does not have (PXV-06).
+        if let Some(cap) = text.paragraph().drop_cap
+            && text.label().is_none()
+            && let Some(laid) = self.layout_drop_cap(text, cap, space, top)
+        {
+            return laid;
+        }
         let mut format = text.paragraph().clone();
         // The label of a list item, laid out on its own: the text of the
         // item starts after it, on every line (LST-02).

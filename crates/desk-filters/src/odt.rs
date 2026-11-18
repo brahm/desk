@@ -14,7 +14,7 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, FontFeature, FontFeatures, FontWeight,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, FontFeature, FontFeatures, FontWeight,
     LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle,
     ListLabel, ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs,
     ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style,
@@ -485,6 +485,15 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
             .filter(|l| l.millipoints() > 0),
         background: p.background.map(background),
         border: para_border(p),
+        // One line or none is no drop cap, which takes away that of the
+        // style (PXV-06). The first word counts as its first character.
+        drop_cap: p.drop_cap.map(|d| {
+            (d.lines >= 2).then(|| DropCap {
+                lines: d.lines.min(u32::from(u8::MAX)) as u8,
+                characters: d.length.clamp(1, u32::from(u8::MAX)) as u8,
+                distance: d.distance.map_or(Length::ZERO, length),
+            })
+        }),
         // Lists come from the list elements and list styles.
         list_style: None,
         list_level: None,
@@ -661,6 +670,18 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
             .map(|stops| stops.stops().iter().map(odf_tab_stop).collect()),
         tab_stop_distance: a.default_tab_interval.map(odf_length),
         background: a.background.map(odf_background),
+        drop_cap: a.drop_cap.map(|cap| match cap {
+            Some(cap) => odf::DropCap {
+                length: u32::from(cap.characters),
+                lines: u32::from(cap.lines),
+                distance: Some(odf_length(cap.distance)),
+            },
+            None => odf::DropCap {
+                length: 1,
+                lines: 1,
+                distance: None,
+            },
+        }),
         ..odf::ParagraphProperties::default()
     };
     if let Some(border) = &a.border {

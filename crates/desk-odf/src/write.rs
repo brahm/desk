@@ -750,6 +750,22 @@ fn write_background(w: &mut Writer, background: Option<Background>) {
 
 /// The children of `style:paragraph-properties`, after its attributes.
 fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
+    tab_stops(w, p);
+    if let Some(cap) = p.drop_cap {
+        w.start("style:drop-cap");
+        if cap.length == 0 {
+            w.attr("style:length", "word");
+        } else {
+            w.attr("style:length", &cap.length.to_string());
+        }
+        w.attr("style:lines", &cap.lines.to_string());
+        len(w, "style:distance", cap.distance);
+        w.end();
+    }
+}
+
+/// `style:tab-stops`, the first child of `style:paragraph-properties`.
+fn tab_stops(w: &mut Writer, p: &ParagraphProperties) {
     let Some(stops) = &p.tab_stops else { return };
     w.start("style:tab-stops");
     for stop in stops {

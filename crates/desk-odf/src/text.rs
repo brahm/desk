@@ -745,6 +745,21 @@ pub struct ParagraphProperties {
     pub padding_left: Option<Length>,
     /// `fo:padding-right`, or `fo:padding`.
     pub padding_right: Option<Length>,
+    /// `style:drop-cap`.
+    pub drop_cap: Option<DropCap>,
+}
+
+/// `style:drop-cap`: the first characters of a paragraph made as tall as
+/// some of its lines.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DropCap {
+    /// `style:length`: how many characters, or 0 for `word`, the first
+    /// word.
+    pub length: u32,
+    /// `style:lines`: how many lines tall; 1 or less is no drop cap.
+    pub lines: u32,
+    /// `style:distance`: the space between the characters and the text.
+    pub distance: Option<Length>,
 }
 
 /// `style:type` of a tab stop.
