@@ -97,6 +97,11 @@ Pages '09 templates use, into one folder per family in the same format:
 `didot/`, `cochin/`, `american-typewriter/` and `marker-felt/`. The fonts
 below are built from them.
 
+On 2026-11-18 Baskerville and Didot were measured again on the owner's
+Mac, with macOS 26.7.3 and Pages 15.4 (B-021): the widths, the vertical
+metrics and the kerning are the same, except that Didot Bold no longer
+kerns any pair, and `didot/bold.tsv` is that measure.
+
 ## The fonts that stand for those of the Pages templates
 
 No free font has the widths of these families either, so
@@ -134,17 +139,19 @@ and their widths. Every width measured was the width drawn, but for four
 things that the measures could not show, which `make-substitutes.py`
 and `originals.tsv` now record:
 
-- Pages joins no letters in Baskerville and in Marker Felt Wide, though
-  they have the glyphs of fi and fl.
+- Pages joins no letters in Marker Felt Wide, though it has the glyphs
+  of fi and fl. Pages '09 did not join them in Baskerville either; Pages
+  15.4 does, and Desk follows it (B-021).
 - Hoefler Text joins ff, ffi and ffl too.
 - The figures of Didot are its lining ones, all of one width.
 - A line of Hoefler Text, of Didot and its bold, and of the bold of
   Futura gets a fifth of its height above the text.
 
-Those documents also showed that Pages keeps on a line the space that a
-font kerns with the character before it, as Gill Sans and Didot do after
-a comma or a period: a line that ends there must have room for the
-space. `desk-text` breaks its lines the same way.
+Those documents also showed that Pages '09 kept on a line the space that
+a font kerns with the character before it, as Gill Sans and Didot do
+after a comma or a period. Pages 15.4 lets that space hang past the end
+of the line like any other, and `desk-text` breaks its lines that way
+(B-021).
 
 The outlines are not those of the originals: a page looks different, but
 its lines and pages break where they did on the Mac. A weight that the

@@ -452,8 +452,6 @@ impl TextSystem {
         let mut objects: Vec<bool> = Vec::new();
         let mut text_boxes: Vec<RunBox> = Vec::new();
         let mut clusters: Vec<Cluster> = Vec::new();
-        // The space added after each letter of each run.
-        let mut spacings: Vec<f32> = Vec::new();
         for line in layout.lines() {
             for item in line.items() {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
@@ -466,14 +464,6 @@ impl TextSystem {
                         0.0
                     } else {
                         format.tracking as f32 / 1000.0 * run.font_size()
-                    });
-                    spacings.push(if object {
-                        0.0
-                    } else {
-                        let pages =
-                            pages_font(&format.font_family, format.weight.value(), format.italic);
-                        (format.tracking as f32 / 1000.0 + pages.map_or(0.0, |f| f.spacing))
-                            * run.font_size()
                     });
                     objects.push(object);
                     text_boxes.push(if object {
@@ -515,47 +505,10 @@ impl TextSystem {
         }
         clusters.sort_by_key(|c| c.start);
         clusters.dedup_by_key(|c| c.start);
-        // The width that each cluster holds on a line that ends before it:
-        // that of a space that the font kerns with the character before
-        // it, and nothing otherwise. As Pages measured on the reference
-        // machine with Gill Sans, which kerns a space after a comma or a
-        // period, such a space does not hang past the end of a line: the
-        // line must hold it, as wide as it is alone (DOC-05).
-        let held_spaces: Vec<f32> = {
-            let mut nominal: HashMap<(usize, char), Option<f32>> = HashMap::new();
-            let mut advance = |run: usize, letter: char| {
-                *nominal.entry((run, letter)).or_insert_with(|| {
-                    let (font, size) = &runs[run];
-                    char_glyph(font, *size, letter).map(|(_, advance)| advance)
-                })
-            };
-            (0..clusters.len())
-                .map(|i| {
-                    let (Some(before), space) =
-                        (i.checked_sub(1).map(|b| &clusters[b]), &clusters[i])
-                    else {
-                        return 0.0;
-                    };
-                    let mut letters = source[before.start..space.start].chars();
-                    let (Some(letter), None) = (letters.next(), letters.next()) else {
-                        return 0.0;
-                    };
-                    if !source[space.start..].starts_with(' ')
-                        || letter.is_whitespace()
-                        || objects[before.run]
-                    {
-                        return 0.0;
-                    }
-                    let kerned = advance(before.run, letter).is_some_and(|alone| {
-                        (before.advance - spacings[before.run] - alone).abs() > 0.01
-                    });
-                    match advance(space.run, ' ') {
-                        Some(alone) if kerned => alone + spacings[space.run],
-                        _ => 0.0,
-                    }
-                })
-                .collect()
-        };
+        // Pages '09 kept on a line the space that a font kerns with the
+        // character before it, as Gill Sans does after a comma; Pages 15.4
+        // lets it hang past the end of the line like any other space, so a
+        // line only has to hold its text (DOC-05, B-021).
         let mut breaks: Vec<usize> = LineSegmenter::new_auto(LineBreakOptions::default())
             .segment_str(source)
             .filter(|&b| b > 0)
@@ -595,16 +548,8 @@ impl TextSystem {
         // `limit`, and how much wider its tabs are than as shaped.
         let natural = |a: usize, b: usize, x: f32, limit: f32| -> (f32, f32) {
             let end = trim(a, b);
-            let after = clusters.partition_point(|c| c.start < end);
-            // A kerned space at the end stays on the line; like a hyphen,
-            // it adds to the width of the text.
-            let held = if end < b {
-                held_spaces.get(after).copied().unwrap_or(0.0)
-            } else {
-                0.0
-            };
             let clusters = span(a, end);
-            let hyphen = hyphen_at(b).map_or(0.0, |h| h.3) + held;
+            let hyphen = hyphen_at(b).map_or(0.0, |h| h.3);
             if !has_tabs {
                 return (
                     clusters.iter().map(|c| c.advance).sum::<f32>() + hyphen,

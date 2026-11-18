@@ -837,7 +837,10 @@ fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
         );
         let lines = &layout.lines;
         let measured = lines[0].baseline;
-        assert!((measured - baseline).abs() < 0.01, "{weight} at {size} pt: {measured}");
+        assert!(
+            (measured - baseline).abs() < 0.01,
+            "{weight} at {size} pt: {measured}"
+        );
         assert_eq!(lines[1].top - lines[0].top, pitch, "{weight} at {size} pt");
     }
 
