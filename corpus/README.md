@@ -112,7 +112,7 @@ the same documents on the owner's Mac (D-020), which opens them as they
 are. Two kinds keep the PDF of Pages '09, and the manifest says so on
 their rows: features that only Pages '09 has, such as the outline, and
 documents that Pages 15.4 lays out otherwise where Desk does not follow
-it yet, each with its row of the backlog (B-020 to B-025). `mod-12-template`
+it yet, each with its row of the backlog (B-022 to B-025). `mod-12-template`
 is a template package, which this export left out, and keeps its PDF of
 Pages '09 too.
 

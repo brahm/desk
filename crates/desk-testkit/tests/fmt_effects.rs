@@ -145,10 +145,11 @@ fn fmt_20_backgrounds_fall_where_pages_drew_them() {
             _ => None,
         })
         .collect();
-    // From the PDF of Pages: the paragraph from margin to margin over its
-    // line, and the characters over theirs, on whole points.
-    let paragraph = (56.69, 70.76, 538.31, 84.76);
-    let characters = (56.69, 57.0, 175.43, 71.0);
+    // From the PDF of Pages 15.4: the paragraph from margin to margin over
+    // its line, and the characters over theirs, from the top margin,
+    // which Pages 15.4 does not round (B-020).
+    let paragraph = (56.69, 70.69, 538.31, 84.69);
+    let characters = (56.69, 56.69, 175.43, 70.69);
     for (x0, y0, x1, y1) in [paragraph, characters] {
         assert!(
             rects.iter().any(|r| (r.0 - x0).abs() < 0.1

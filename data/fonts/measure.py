@@ -12,6 +12,9 @@
 #
 #     /usr/bin/python measure.py "FAMILY NAME" OUTPUT_DIR
 #
+# On a current macOS, whose Python has no PyObjC, run it from a virtual
+# environment with pyobjc-framework-CoreText installed, as for B-021.
+#
 # for example `measure.py "Gill Sans" gill-sans`. It exits with status 2
 # when no face of the family is installed. For Helvetica Neue it also
 # prints the width of a check string set in Helvetica Neue Italic 9 pt, to

@@ -374,10 +374,10 @@ impl DisplayList {
         let list = self;
         for placed in lines {
             let (dx, dy) = placed.origin;
-            // The backgrounds of runs span the height of the line, with
-            // edges on whole points, as Pages draws them (FMT-20).
-            let top = placed.top().round();
-            let bottom = placed.bottom().round();
+            // The backgrounds of runs span the height of the line, as
+            // Pages 15.4 draws them (FMT-20, B-020).
+            let top = placed.top();
+            let bottom = placed.bottom();
             for run in &placed.line.runs {
                 if let Some(color) = run.background {
                     list.items.push(Item::Rect {
@@ -471,8 +471,8 @@ impl DisplayList {
         } else {
             0.0
         };
-        let top = block.text_top - block.rise.0 - if block.first { inset } else { 0.0 };
-        let bottom = block.text_bottom - block.rise.1 + if block.last { inset } else { 0.0 };
+        let top = block.text_top - if block.first { inset } else { 0.0 };
+        let bottom = block.text_bottom + if block.last { inset } else { 0.0 };
         self.items.push(Item::Rect {
             x: block.left - inset,
             y: top,

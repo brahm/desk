@@ -1039,6 +1039,32 @@ matrix rows done on 9 November, before the change of target.
   environment under `/tmp`; the measuring of Baskerville and Didot waits
   for that.
 
+### 18 November: the parity rows of the 15, and the layout of 15.4
+
+- *The matrix (pull request 146, step 2 of W1):* the notes of the Mac
+  session became 18 rows of `corpus/matrix.tsv`, `PXV-01` to `PXV-18`,
+  one per feature of Pages 15 that W1 builds. The phase column of the
+  matrix now also takes the ids of the roadmap (`W1`), so the rows of the
+  surveys of '09 keep their old numbers and the new ones name the phase
+  of today. W048 keeps the steps by kind of the '09, since 15.4 only
+  steps by page (D-003).
+- *B-020, lines on the page:* measured from the PDFs of 15.4. Pages 15.4
+  starts the body on the unrounded top margin and puts the baseline at
+  the top of the line plus its rounded height, less the exact descent and
+  the exact leading under the text; Helvetica 12 pt sits 0.24 pt higher
+  than in Pages '09. Backgrounds are the unrounded line box.
+- *B-021, the Apple fonts:* the owner approved PyObjC in a throwaway
+  environment on the Mac, and Baskerville and Didot were measured again on
+  macOS 26.7.3. Their widths and kerning are those of Lion, except Didot
+  Bold, which kerns nothing now: that alone moved a line break. The PDFs
+  showed two more changes of Pages 15.4: it joins fi and fl in Baskerville,
+  and it lets the space after a comma hang past the end of a line, where
+  Pages '09 kept it on the line. Desk follows all three.
+- *A detour:* B-020 was done first, but one of its tests needed B-021,
+  which needed the Mac. The owner chose to do both together; the commit of
+  B-020 was reverted on the branch so that the matrix could go first, and
+  came back with B-021 in the next pull request.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -277,7 +277,7 @@ DRAWN = {
 
 # The faces in which Pages joins no letters, though they have the glyphs
 # of fi and fl: every face of a folder, or one of them.
-NO_LIGATURES = {("baskerville", None), ("marker-felt", "wide")}
+NO_LIGATURES = {("marker-felt", "wide")}
 
 
 def measured(path):

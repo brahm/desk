@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Desk Writer places lines on the page as Pages 15.4 does, a
+  fraction of a point higher than Pages '09.
+* Changed: Baskerville joins fi and fl, Didot Bold is no longer kerned,
+  and a space after a comma may hang past the end of a line, as in
+  Pages 15.4.
 * Added: 18 rows of the parity matrix of Desk Writer for the features of
   Pages 15, seen in Pages 15.4 on the Mac, under the phase W1.
 * Changed: Pages 15.4 was studied on the Mac for phase W1: drop cap,

@@ -130,9 +130,6 @@ pub struct Line {
     /// The bottom of the text: the baseline plus the descent, without the
     /// leading or any extra space below.
     pub text_bottom: f32,
-    /// How much of the ascent of its text Pages rounded off the line box:
-    /// it draws the background of a paragraph that much higher (FMT-20).
-    pub rise: f32,
     /// The glyphs, in runs.
     pub runs: Vec<GlyphRun>,
     /// Underlines and strikethroughs.
@@ -239,7 +236,10 @@ struct RunBox {
     /// rounded to a whole point (FMT-14).
     fixed: f32,
     descent: f32,
-    /// How much of the ascent the rounding took off, at most.
+    /// How much lower than `over` Pages 15.4 puts the baseline: it keeps
+    /// the box of the line on whole points, but sets the text on the
+    /// bottom of the box with the unrounded descent and leading under it
+    /// (B-020). It can be negative.
     rise: f32,
 }
 
@@ -251,7 +251,14 @@ impl RunBox {
             leading: self.leading.max(other.leading),
             fixed: self.fixed.max(other.fixed),
             descent: self.descent.max(other.descent),
-            rise: self.rise.max(other.rise),
+            // The rise of the run whose ascent sets the baseline.
+            rise: if other.over > self.over {
+                other.rise
+            } else if self.over > other.over {
+                self.rise
+            } else {
+                self.rise.max(other.rise)
+            },
         }
     }
 }
@@ -445,8 +452,6 @@ impl TextSystem {
         let mut objects: Vec<bool> = Vec::new();
         let mut text_boxes: Vec<RunBox> = Vec::new();
         let mut clusters: Vec<Cluster> = Vec::new();
-        // The space added after each letter of each run.
-        let mut spacings: Vec<f32> = Vec::new();
         for line in layout.lines() {
             for item in line.items() {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
@@ -459,14 +464,6 @@ impl TextSystem {
                         0.0
                     } else {
                         format.tracking as f32 / 1000.0 * run.font_size()
-                    });
-                    spacings.push(if object {
-                        0.0
-                    } else {
-                        let pages =
-                            pages_font(&format.font_family, format.weight.value(), format.italic);
-                        (format.tracking as f32 / 1000.0 + pages.map_or(0.0, |f| f.spacing))
-                            * run.font_size()
                     });
                     objects.push(object);
                     text_boxes.push(if object {
@@ -508,47 +505,10 @@ impl TextSystem {
         }
         clusters.sort_by_key(|c| c.start);
         clusters.dedup_by_key(|c| c.start);
-        // The width that each cluster holds on a line that ends before it:
-        // that of a space that the font kerns with the character before
-        // it, and nothing otherwise. As Pages measured on the reference
-        // machine with Gill Sans, which kerns a space after a comma or a
-        // period, such a space does not hang past the end of a line: the
-        // line must hold it, as wide as it is alone (DOC-05).
-        let held_spaces: Vec<f32> = {
-            let mut nominal: HashMap<(usize, char), Option<f32>> = HashMap::new();
-            let mut advance = |run: usize, letter: char| {
-                *nominal.entry((run, letter)).or_insert_with(|| {
-                    let (font, size) = &runs[run];
-                    char_glyph(font, *size, letter).map(|(_, advance)| advance)
-                })
-            };
-            (0..clusters.len())
-                .map(|i| {
-                    let (Some(before), space) =
-                        (i.checked_sub(1).map(|b| &clusters[b]), &clusters[i])
-                    else {
-                        return 0.0;
-                    };
-                    let mut letters = source[before.start..space.start].chars();
-                    let (Some(letter), None) = (letters.next(), letters.next()) else {
-                        return 0.0;
-                    };
-                    if !source[space.start..].starts_with(' ')
-                        || letter.is_whitespace()
-                        || objects[before.run]
-                    {
-                        return 0.0;
-                    }
-                    let kerned = advance(before.run, letter).is_some_and(|alone| {
-                        (before.advance - spacings[before.run] - alone).abs() > 0.01
-                    });
-                    match advance(space.run, ' ') {
-                        Some(alone) if kerned => alone + spacings[space.run],
-                        _ => 0.0,
-                    }
-                })
-                .collect()
-        };
+        // Pages '09 kept on a line the space that a font kerns with the
+        // character before it, as Gill Sans does after a comma; Pages 15.4
+        // lets it hang past the end of the line like any other space, so a
+        // line only has to hold its text (DOC-05, B-021).
         let mut breaks: Vec<usize> = LineSegmenter::new_auto(LineBreakOptions::default())
             .segment_str(source)
             .filter(|&b| b > 0)
@@ -588,16 +548,8 @@ impl TextSystem {
         // `limit`, and how much wider its tabs are than as shaped.
         let natural = |a: usize, b: usize, x: f32, limit: f32| -> (f32, f32) {
             let end = trim(a, b);
-            let after = clusters.partition_point(|c| c.start < end);
-            // A kerned space at the end stays on the line; like a hyphen,
-            // it adds to the width of the text.
-            let held = if end < b {
-                held_spaces.get(after).copied().unwrap_or(0.0)
-            } else {
-                0.0
-            };
             let clusters = span(a, end);
-            let hyphen = hyphen_at(b).map_or(0.0, |h| h.3) + held;
+            let hyphen = hyphen_at(b).map_or(0.0, |h| h.3);
             if !has_tabs {
                 return (
                     clusters.iter().map(|c| c.advance).sum::<f32>() + hyphen,
@@ -820,11 +772,13 @@ impl TextSystem {
         let mut lines = Vec::with_capacity(placed.len());
         for (line, place) in layout.lines().zip(&placed) {
             let metrics = line.metrics();
-            // Where Pages puts the baseline, and how far that moves what
-            // Parley laid out.
+            // Where Pages puts the baseline: the rounded box of the line
+            // plus the part of the ascent the rounding took off, as Pages
+            // 15.4 does (B-020); and how far that moves what Parley laid
+            // out.
             let baseline = place
                 .line_box
-                .map_or(metrics.baseline, |b| place.text_top + b.over);
+                .map_or(metrics.baseline, |b| place.text_top + b.over + b.rise);
             let delta = baseline - metrics.baseline;
             let mut glyph_runs = Vec::new();
             let mut decorations = Vec::new();
@@ -1083,8 +1037,11 @@ impl TextSystem {
                 top: place.top,
                 height: place.height,
                 baseline,
-                text_bottom: descent.map_or(place.top + place.height, |d| baseline + d),
-                rise: place.line_box.map_or(0.0, |b| b.rise),
+                // On whole points, where the rounded box puts it, so that
+                // what fits on a page stays as it was (B-020).
+                text_bottom: descent.map_or(place.top + place.height, |d| {
+                    baseline - place.line_box.map_or(0.0, |b| b.rise) + d
+                }),
                 runs: glyph_runs,
                 decorations,
                 hyphenated: place.hyphenated,
@@ -1503,8 +1460,8 @@ fn vertical_metrics(
 /// and the leading each to a whole point. A shift of the baseline moves
 /// the box.
 fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> RunBox {
-    let (exact, descent, exact_leading, place) = vertical_metrics(format, size, metrics);
-    let (ascent, descent, leading) = (exact.round(), descent.round(), exact_leading.round());
+    let (exact, exact_descent, exact_leading, place) = vertical_metrics(format, size, metrics);
+    let (ascent, descent, leading) = (exact.round(), exact_descent.round(), exact_leading.round());
     let over = match place {
         LeadingPlace::Above => ascent + leading,
         LeadingPlace::Below => ascent,
@@ -1520,7 +1477,16 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
             LeadingPlace::Below | LeadingPlace::Around => exact_leading,
         },
         descent,
-        rise: (exact - ascent).max(0.0),
+        // Pages 15.4 sets the text on the bottom of the rounded box: the
+        // unrounded descent, and the unrounded leading when some of it is
+        // under the text, up from the bottom (B-020).
+        rise: ascent + descent + leading
+            - exact_descent
+            - match place {
+                LeadingPlace::Above => 0.0,
+                LeadingPlace::Below | LeadingPlace::Around => exact_leading,
+            }
+            - over,
     }
 }
 
