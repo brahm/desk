@@ -157,8 +157,12 @@ pub enum Capitalization {
     AllCaps,
     /// Lower-case letters drawn as small capitals.
     SmallCaps,
-    /// The first letter of each word in upper case.
+    /// The first letter of each word in upper case but for the short
+    /// words that join others, as Title Case of Pages 15.4 does (FMT-07).
     Title,
+    /// The first letter of every word in upper case: Start Case of Pages
+    /// 15.4 (W054).
+    Start,
 }
 
 /// A language, as a BCP 47 tag such as `pt-BR` (FMT-22).

@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Start Case in the capitalization of Desk Writer, and Make Upper
+  Case, Make Lower Case and Capitalize, which change the characters.
 * Changed: Desk Writer places lines on the page as Pages 15.4 does, a
   fraction of a point higher than Pages '09.
 * Changed: Baskerville joins fi and fl, Didot Bold is no longer kerned,

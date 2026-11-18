@@ -372,6 +372,18 @@ These sit on the `style:graphic-properties` of the graphic style of a
   programs do not hyphenate a document that Desk shows without hyphens.
   When the document hyphenates, Desk writes `fo:hyphenate` alone.
 
+#### `desk:title-case`
+
+- **Feature:** Title Case, which leaves the short words that join others
+  in lower case, beside Start Case, which capitalizes every word (FMT-07,
+  W054, PXV-05).
+- **Value:** a boolean, written beside `fo:text-transform="capitalize"`:
+  `true` for Title Case, `false` for Start Case.
+- **Fallback:** `fo:text-transform="capitalize"`, which capitalizes every
+  word. Without `desk:title-case`, Desk reads `capitalize` as Start Case,
+  as other programs mean it; a document that an older Desk saved with
+  Title Case reads as Start Case.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

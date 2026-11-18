@@ -574,6 +574,10 @@ pub struct TextProperties {
     /// size, as Pages measures it, beside the length of
     /// `fo:letter-spacing` that other programs read.
     pub tracking: Option<i32>,
+    /// `desk:title-case`: whether `fo:text-transform="capitalize"` leaves
+    /// the short words that join others in lower case, as Title Case of
+    /// Pages does, rather than capitalizing every word (FMT-07, W054).
+    pub title_case: Option<bool>,
 }
 
 /// `fo:text-shadow`.

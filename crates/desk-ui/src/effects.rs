@@ -32,11 +32,12 @@ pub const LIGATURES: [Ligatures; 3] = [Ligatures::Default, Ligatures::None, Liga
 const BASELINES: [Baseline; 3] = [Baseline::Normal, Baseline::Superscript, Baseline::Subscript];
 
 /// The capitalizations in the order of their menu (FMT-07).
-const CAPITALIZATIONS: [Capitalization; 4] = [
+const CAPITALIZATIONS: [Capitalization; 5] = [
     Capitalization::None,
     Capitalization::AllCaps,
     Capitalization::SmallCaps,
     Capitalization::Title,
+    Capitalization::Start,
 ];
 
 /// The name of a baseline in its menu.
@@ -54,7 +55,8 @@ fn capitalization_name(capitalization: Capitalization) -> String {
         Capitalization::None => tr("None"),
         Capitalization::AllCaps => tr("All Caps"),
         Capitalization::SmallCaps => tr("Small Caps"),
-        Capitalization::Title => tr("Title"),
+        Capitalization::Title => tr("Title Case"),
+        Capitalization::Start => tr("Start Case"),
     }
 }
 

@@ -877,6 +877,9 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
     if let Some(tracking) = t.tracking {
         w.attr("desk:tracking", &tracking.to_string());
     }
+    if let Some(title) = t.title_case {
+        w.attr("desk:title-case", if title { "true" } else { "false" });
+    }
     if let Some(opacity) = t.shadow_opacity {
         w.attr("desk:shadow-opacity", &format!("{}%", decimal(opacity)));
     }

@@ -267,6 +267,16 @@ fn sample() -> Document {
                         ..CharAttrs::default()
                     },
                 ),
+                // Start Case is fo:text-transform="capitalize"; Title Case
+                // adds desk:title-case (PXV-05).
+                Run::with_attrs(
+                    " and start case",
+                    None,
+                    CharAttrs {
+                        capitalization: Some(Capitalization::Start),
+                        ..CharAttrs::default()
+                    },
+                ),
             ],
         ),
         (
@@ -569,6 +579,39 @@ fn fmt_files_from_other_programs_map_to_styles_and_direct_formatting() {
         .by_name(desk_model::StyleFamily::Character, "B")
         .unwrap();
     assert!(a.parent().is_none() || b.parent().is_none());
+}
+
+#[test]
+fn pxv_05_capitalize_of_other_programs_is_start_case() {
+    // LibreOffice writes fo:text-transform="capitalize", which capitalizes
+    // every word: Start Case. Desk adds desk:title-case for Title Case.
+    let mut odf = foreign();
+    for (name, title) in [("Capitalized", None), ("Titled", Some(true))] {
+        odf.styles.push(odf::Style {
+            name: name.into(),
+            family: odf::Family::Text,
+            properties: odf::Properties {
+                text: odf::TextProperties {
+                    transform: Some(odf::TextTransform::Capitalize),
+                    title_case: title,
+                    ..odf::TextProperties::default()
+                },
+                ..odf::Properties::default()
+            },
+            ..odf::Style::default()
+        });
+    }
+    let document = import(&odf).unwrap();
+    let styles = document.styles();
+    let capitalization = |name: &str| {
+        let id = styles
+            .by_name(desk_model::StyleFamily::Character, name)
+            .unwrap()
+            .id();
+        styles.character(id).unwrap().character.capitalization
+    };
+    assert_eq!(capitalization("Capitalized"), Some(Capitalization::Start));
+    assert_eq!(capitalization("Titled"), Some(Capitalization::Title));
 }
 
 #[test]

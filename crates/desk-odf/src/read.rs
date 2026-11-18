@@ -384,6 +384,7 @@ impl Reader {
                 .attr(DESK, "tracking")
                 .and_then(|v| v.trim().parse::<i32>().ok())
                 .map(|t| t.clamp(-1000, 10_000)),
+            title_case: e.attr(DESK, "title-case").map(|v| v == "true"),
         }
     }
 }
