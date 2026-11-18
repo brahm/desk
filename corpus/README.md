@@ -7,13 +7,16 @@ cases here were written from iWork '09, whose features Desk keeps
 the Lion virtual machine (D-020). The matrices of the current iWork are
 the inventory in [`inventory/`](inventory).
 
-- `matrix.tsv` is the parity matrix of Desk Writer, 311 rows, each with
-  the phase of the roadmap that completes it: the 260 rows of the survey
+- `matrix.tsv` is the parity matrix of Desk Writer, 329 rows, each with
+  the phase that completes it: the 260 rows of the survey
   of Pages '09, the 33 cases of integration among the three apps of the
   surveys of Pages, Numbers and Keynote (`IOP`), 14 rows for what the
   GNOME HIG and the desktop ask of the apps (`GNM`), and 4 commands that
   the inventory of Pages 4.3 on the reference virtual machine added to
-  the survey (`VMI`). Its last column, `gnome`, says how Desk adapts a
+  the survey (`VMI`), with the numbered phases of the old plan, and 18
+  features of Pages 15 seen in Pages 15.4 on the owner's Mac on
+  2026-11-18 (`PXV`, D-020), whose phase is the id of the roadmap, such
+  as `W1`. Its last column, `gnome`, says how Desk adapts a
   row to GNOME where the decisions of 2026-11-13, 2026-11-14 and
   2026-11-16 changed its form (one Inspector, a header bar without
   customization, popovers for Fonts and Colors, shortcuts that leave

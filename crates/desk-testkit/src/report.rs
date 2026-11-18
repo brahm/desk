@@ -20,7 +20,7 @@ use desk_model::Document;
 
 use crate::case::{Case, DEFAULT_POSITION_TOLERANCE};
 use crate::compare::{LayoutDiff, PixelDiff, compare_pixels, compare_words, words};
-use crate::matrix::Row;
+use crate::matrix::{Phase, Row};
 
 /// What became of a case.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -417,20 +417,19 @@ impl Report {
         md.push_str(&"---:|".repeat(Status::ALL.len() + 1));
         md.push('\n');
         // Out of scope last.
-        let mut phases: BTreeMap<u16, Vec<&RowReport>> = BTreeMap::new();
+        let mut phases: BTreeMap<(bool, Option<&Phase>), Vec<&RowReport>> = BTreeMap::new();
         for row in &self.rows {
-            let key = row.row.phase.map_or(u16::MAX, u16::from);
-            phases.entry(key).or_default().push(row);
+            let phase = row.row.phase.as_ref();
+            phases
+                .entry((phase.is_none(), phase))
+                .or_default()
+                .push(row);
         }
         let count =
             |rows: &[&RowReport], status| rows.iter().filter(|r| r.status == status).count();
         let all: Vec<&RowReport> = self.rows.iter().collect();
-        for (&phase, rows) in &phases {
-            let name = if phase == u16::MAX {
-                "out of scope".to_owned()
-            } else {
-                phase.to_string()
-            };
+        for (&(_, phase), rows) in &phases {
+            let name = phase.map_or("out of scope".to_owned(), Phase::to_string);
             let _ = write!(md, "| {name} |");
             for status in Status::ALL {
                 let _ = write!(md, " {} |", count(rows, status));
@@ -485,7 +484,10 @@ impl Report {
                 md,
                 "| {} | {} | {} | {} | {} | {} | {} |",
                 row.row.id,
-                row.row.phase.map_or("-".to_owned(), |p| p.to_string()),
+                row.row
+                    .phase
+                    .as_ref()
+                    .map_or("-".to_owned(), Phase::to_string),
                 row.row.feature.replace('|', "\\|"),
                 row.status.label(),
                 row.cases.join(", "),

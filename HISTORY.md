@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: 18 rows of the parity matrix of Desk Writer for the features of
+  Pages 15, seen in Pages 15.4 on the Mac, under the phase W1.
 * Changed: Pages 15.4 was studied on the Mac for phase W1: drop cap,
   automatic fractions, Screen View, table title and lock, and the
   missing parts of eleven partial rows of Desk Writer.

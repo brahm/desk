@@ -16,9 +16,9 @@ pub struct Row {
     /// The ID, such as `FMT-15`, or `KSLD-04` in the matrices of Desk
     /// Slides and Desk Tables.
     pub id: String,
-    /// The phase of the roadmap that completes the row, or `None` when the
-    /// row is out of scope.
-    pub phase: Option<u8>,
+    /// The phase that completes the row, or `None` when the row is out of
+    /// scope.
+    pub phase: Option<Phase>,
     /// The feature.
     pub feature: String,
     /// What Pages does.
@@ -35,6 +35,44 @@ pub struct Row {
     /// 2026-11-13 and 2026-11-14 changed its form, or empty when Desk does
     /// it as the iWork app does.
     pub gnome: String,
+}
+
+/// The phase that completes a row: a number of the old plan, from 1 to
+/// 11, for the rows of the surveys of '09, or the id of a phase of the
+/// current roadmap, such as `W1`, for the rows written from iWork 15.4.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(untagged)]
+pub enum Phase {
+    /// A phase of the old plan.
+    Old(u8),
+    /// A phase of `docs/roadmap.md`, such as `W1` or `T2`.
+    Roadmap(String),
+}
+
+impl Phase {
+    /// The phase of the old plan, if it is one.
+    pub fn old(&self) -> Option<u8> {
+        match self {
+            Self::Old(n) => Some(*n),
+            Self::Roadmap(_) => None,
+        }
+    }
+}
+
+impl fmt::Display for Phase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Old(n) => write!(f, "{n}"),
+            Self::Roadmap(id) => f.write_str(id),
+        }
+    }
+}
+
+/// Whether a text is the id of a phase of the roadmap: a capital and a
+/// digit, such as `W1`.
+fn is_roadmap_phase(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.len() == 2 && bytes[0].is_ascii_uppercase() && bytes[1].is_ascii_digit()
 }
 
 /// Why the matrix could not be read.
@@ -105,10 +143,11 @@ pub fn parse(text: &str) -> Result<Vec<Row>, MatrixError> {
         }
         let phase = match phase {
             "-" => None,
-            p => Some(
+            p if is_roadmap_phase(p) => Some(Phase::Roadmap(p.into())),
+            p => Some(Phase::Old(
                 p.parse()
                     .map_err(|_| error(format!("{p:?} is not a phase")))?,
-            ),
+            )),
         };
         rows.push(Row {
             id: id.into(),
@@ -155,12 +194,17 @@ mod tests {
     fn reads_rows_and_phases() {
         let text = "# comment\nid\tphase\tfeature\texpected\tpages\todf\tgnome\n\
                     FMT-15\t1\tSpace\tThe larger wins\t72\tNative\t\n\
-                    EXP-11\t-\tiWork.com\tShut down\t200\t-\tOut\n";
+                    EXP-11\t-\tiWork.com\tShut down\t200\t-\tOut\n\
+                    PXV-06\tW1\tDrop cap\t3 lines\t15.4\tNative\t\n";
         let rows = parse(text).unwrap();
-        assert_eq!(rows.len(), 2);
+        assert_eq!(rows.len(), 3);
         assert_eq!(rows[0].id, "FMT-15");
-        assert_eq!(rows[0].phase, Some(1));
+        assert_eq!(rows[0].phase, Some(Phase::Old(1)));
         assert_eq!(rows[1].phase, None);
+        assert_eq!(rows[2].phase, Some(Phase::Roadmap("W1".into())));
+        assert_eq!(rows[2].phase.as_ref().unwrap().to_string(), "W1");
+        // The old phases sort before those of the roadmap.
+        assert!(Phase::Old(11) < Phase::Roadmap("B1".into()));
         assert_eq!(rows[0].gnome, "");
         assert_eq!(rows[1].gnome, "Out");
     }
@@ -173,6 +217,10 @@ mod tests {
         assert_eq!(parse(&short).unwrap_err().line, 2);
         let twice = format!("{header}FMT-15\t1\ta\tb\tc\td\t\nFMT-15\t1\ta\tb\tc\td\t\n");
         assert_eq!(parse(&twice).unwrap_err().line, 3);
+        for phase in ["W", "W12", "w1", "1W"] {
+            let bad = format!("{header}FMT-15\t{phase}\ta\tb\tc\td\t\n");
+            assert_eq!(parse(&bad).unwrap_err().line, 2, "{phase}");
+        }
         assert!(!is_id("FMT-1"));
         assert!(!is_id("fmt-15"));
     }
@@ -181,13 +229,30 @@ mod tests {
     fn the_matrix_of_the_corpus_reads() {
         let text = include_str!("../../../corpus/matrix.tsv");
         let rows = parse(text).unwrap();
-        assert_eq!(rows.len(), 311);
+        assert_eq!(rows.len(), 329);
         let count = |prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         assert_eq!(count("IOP"), 33);
         assert_eq!(count("GNM"), 14);
         assert_eq!(count("VMI"), 4);
-        assert_eq!(rows.len() - count("IOP") - count("GNM") - count("VMI"), 260);
-        assert!(rows.iter().all(|r| r.phase.is_none_or(|p| p <= 11)));
+        // The features of Pages 15, written from Pages 15.4 (D-020).
+        assert_eq!(count("PXV"), 18);
+        let survey = rows.len() - count("IOP") - count("GNM") - count("VMI") - count("PXV");
+        assert_eq!(survey, 260);
+        let roadmap = include_str!("../../../docs/roadmap.md");
+        for row in &rows {
+            match &row.phase {
+                Some(Phase::Old(p)) => assert!(*p <= 11, "{}", row.id),
+                Some(Phase::Roadmap(id)) => {
+                    assert!(row.id.starts_with("PXV"), "{}", row.id);
+                    assert!(
+                        roadmap.contains(&format!("| **{id}** ")),
+                        "{} names {id}",
+                        row.id
+                    );
+                }
+                None => {}
+            }
+        }
         let gnome = |id: &str| &rows.iter().find(|r| r.id == id).unwrap().gnome;
         // The decisions of 2026-11-13 that still stand: one Inspector and a
         // header bar without customization.
@@ -271,7 +336,12 @@ mod tests {
         }
         let all: Vec<&Row> = writer.iter().chain(&slides).chain(&tables).collect();
         for row in slides.iter().chain(&tables) {
-            assert!(row.phase.is_none_or(|p| (1..=9).contains(&p)), "{}", row.id);
+            let old = row.phase.as_ref().map(|p| p.old());
+            assert!(
+                old.is_none_or(|p| p.is_some_and(|p| (1..=9).contains(&p))),
+                "{}",
+                row.id
+            );
             assert!(!row.shared.is_empty(), "{}", row.id);
             for id in ids_in(&row.shared) {
                 assert!(all.iter().any(|r| r.id == id), "{} names {id}", row.id);
