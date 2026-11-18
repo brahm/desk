@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Corrections made while typing (TXT-06, TXT-07): smart quotes, capitals
-//! at the start of sentences, raised ordinal suffixes, and a table of
-//! replacements such as "(c)" for "©".
+//! at the start of sentences, raised ordinal suffixes, fractions such as
+//! "1/2" for "½" (PXV-07), and a table of replacements such as "(c)" for
+//! "©".
 //!
 //! The functions here look at the text before the cursor and say what to
 //! change; the editor makes the change as part of the typing.
@@ -78,6 +79,10 @@ pub struct AutoCorrect {
     pub capitalization: bool,
     /// Ordinal suffixes raised, as 1st and 2nd.
     pub ordinals: bool,
+    /// Fractions typed with a slash made into the fraction characters of
+    /// Unicode, as "Automatically format fractions" of Pages 15.4 does
+    /// (PXV-07).
+    pub fractions: bool,
     /// The table of replacements, used when `replace` is on.
     pub replacements: Vec<Replacement>,
     /// Whether the table is used.
@@ -91,11 +96,36 @@ impl Default for AutoCorrect {
         Self {
             capitalization: false,
             ordinals: false,
+            fractions: false,
             replacements: Replacement::defaults(),
             replace: false,
         }
     }
 }
+
+/// The fractions that Unicode has a character of their own for, the only
+/// ones that Pages 15.4 formats: 13/16 and 2/4 stay as typed.
+const FRACTIONS: &[(&str, char)] = &[
+    ("1/2", '\u{bd}'),
+    ("1/3", '\u{2153}'),
+    ("2/3", '\u{2154}'),
+    ("1/4", '\u{bc}'),
+    ("3/4", '\u{be}'),
+    ("1/5", '\u{2155}'),
+    ("2/5", '\u{2156}'),
+    ("3/5", '\u{2157}'),
+    ("4/5", '\u{2158}'),
+    ("1/6", '\u{2159}'),
+    ("5/6", '\u{215a}'),
+    ("1/7", '\u{2150}'),
+    ("1/8", '\u{215b}'),
+    ("3/8", '\u{215c}'),
+    ("5/8", '\u{215d}'),
+    ("7/8", '\u{215e}'),
+    ("1/9", '\u{2151}'),
+    ("1/10", '\u{2152}'),
+    ("0/3", '\u{2189}'),
+];
 
 /// A change to the text before the cursor.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -181,6 +211,11 @@ impl AutoCorrect {
                 superscript: None,
             });
         }
+        if self.fractions
+            && let Some(correction) = Self::fraction(before)
+        {
+            return Some(correction);
+        }
         if self.ordinals
             && let Some(correction) = Self::ordinal(word)
         {
@@ -202,6 +237,33 @@ impl AutoCorrect {
     /// or its end for text without letters or digits, as "...".
     fn ends_with(word: &str, from: &str) -> bool {
         word == from || (word.ends_with(from) && !from.chars().any(char::is_alphanumeric))
+    }
+
+    /// The fraction character for the fraction that ends the text, when
+    /// it stands apart: after a letter or another digit, as in "x1/2" or
+    /// "11/2", it stays (PXV-07).
+    fn fraction(before: &str) -> Option<Correction> {
+        let digits = |s: &str| s.len() - s.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+        let denominator = digits(before);
+        let rest = before[..before.len() - denominator].strip_suffix('/')?;
+        let numerator = digits(rest);
+        let start = rest.len() - numerator;
+        if denominator == 0
+            || numerator == 0
+            || rest[..start]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_alphanumeric() || c == '/')
+        {
+            return None;
+        }
+        let typed = &before[start..];
+        let (_, character) = FRACTIONS.iter().find(|(f, _)| *f == typed)?;
+        Some(Correction {
+            range: start..before.len(),
+            text: character.to_string(),
+            superscript: None,
+        })
     }
 
     /// 1st, 2nd, 3rd and 4th with the suffix raised.
@@ -250,6 +312,7 @@ mod tests {
         AutoCorrect {
             capitalization: true,
             ordinals: true,
+            fractions: true,
             replacements: Replacement::defaults(),
             replace: true,
         }
@@ -304,10 +367,33 @@ mod tests {
         assert_eq!(apply("Desk TM").as_deref(), Some("Desk ™"));
         assert_eq!(apply("teh").as_deref(), Some("the"));
         // The fractions are in the table but off, as in Pages.
-        assert_eq!(apply("1/2"), None);
+        let mut table = all();
+        table.fractions = false;
+        assert!(table.correct("1/2").is_none());
         let mut off = all();
         off.replacements[0].enabled = false;
         assert!(off.correct("(c)").is_none());
+    }
+
+    #[test]
+    fn pxv_07_fractions_become_their_characters() {
+        assert_eq!(apply("1/2").as_deref(), Some("½"));
+        assert_eq!(apply("add 5/8").as_deref(), Some("add ⅝"));
+        assert_eq!(apply("0/3").as_deref(), Some("↉"));
+        assert_eq!(apply("1/10").as_deref(), Some("⅒"));
+        // Before a dot and inside parentheses, as the dot or the bracket
+        // is typed.
+        assert_eq!(apply("(1/2").as_deref(), Some("(½"));
+        // Without a character of their own, inside a word or after
+        // another digit, they stay.
+        assert_eq!(apply("13/16"), None);
+        assert_eq!(apply("2/4"), None);
+        assert_eq!(apply("x1/2"), None);
+        assert_eq!(apply("11/2"), None);
+        assert_eq!(apply("1/2/3"), None);
+        let mut off = all();
+        off.fractions = false;
+        assert!(off.correct("1/2").is_none());
     }
 
     #[test]
@@ -316,5 +402,6 @@ mod tests {
         assert!(fresh.correct("hello").is_none());
         assert!(fresh.correct("1st").is_none());
         assert!(fresh.correct("(c)").is_none());
+        assert!(fresh.correct("1/2").is_none());
     }
 }
