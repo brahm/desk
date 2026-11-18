@@ -144,33 +144,165 @@ pub fn ends_word(c: char) -> bool {
     c.is_whitespace() || matches!(c, '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}')
 }
 
-/// Whether a quote after a character opens: at the start, after spaces and
-/// after opening brackets, dashes and other quotes.
-fn opens_after(before: Option<char>) -> bool {
-    match before {
-        None => true,
-        Some(c) => {
-            c.is_whitespace()
-                || matches!(
-                    c,
-                    '(' | '[' | '{' | '\u{2014}' | '\u{2013}' | '-' | '/' | '\u{201c}' | '\u{2018}'
-                )
+/// A pair of quotes, the one that opens and the one that closes, as the
+/// lists of Double Quotes and Single Quotes of Pages 15.4 offer them
+/// (PXV-08).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Quotes {
+    /// The quote that opens.
+    pub open: char,
+    /// The quote that closes.
+    pub close: char,
+}
+
+impl Quotes {
+    /// A pair of quotes.
+    pub const fn new(open: char, close: char) -> Self {
+        Self { open, close }
+    }
+
+    /// The double quotes to choose from, “abc” first, as most languages
+    /// write them: „abc“ in German, „abc” in Polish, ”abc” in Swedish,
+    /// «abc» in French and Portuguese of Portugal, »abc« in Danish.
+    pub const DOUBLE: [Self; 6] = [
+        Self::new('\u{201c}', '\u{201d}'),
+        Self::new('\u{201e}', '\u{201c}'),
+        Self::new('\u{201e}', '\u{201d}'),
+        Self::new('\u{201d}', '\u{201d}'),
+        Self::new('\u{ab}', '\u{bb}'),
+        Self::new('\u{bb}', '\u{ab}'),
+    ];
+
+    /// The single quotes to choose from, ‘abc’ first, in the same order
+    /// as the double ones.
+    pub const SINGLE: [Self; 6] = [
+        Self::new('\u{2018}', '\u{2019}'),
+        Self::new('\u{201a}', '\u{2018}'),
+        Self::new('\u{201a}', '\u{2019}'),
+        Self::new('\u{2019}', '\u{2019}'),
+        Self::new('\u{2039}', '\u{203a}'),
+        Self::new('\u{203a}', '\u{2039}'),
+    ];
+
+    /// The pair as it is shown and kept: the quotes around "abc".
+    pub fn sample(self) -> String {
+        format!("{}abc{}", self.open, self.close)
+    }
+
+    /// The pair that a sample such as "“abc”" names, among `choices`.
+    pub fn from_sample(sample: &str, choices: &[Self]) -> Option<Self> {
+        choices.iter().copied().find(|q| q.sample() == sample)
+    }
+}
+
+/// The quotes that smart quotes put in place of straight ones (TXT-06,
+/// PXV-08).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct QuoteStyle {
+    /// The double quotes.
+    pub double: Quotes,
+    /// The single quotes.
+    pub single: Quotes,
+}
+
+impl Default for QuoteStyle {
+    /// “abc” and ‘abc’, as Pages has them on a new install.
+    fn default() -> Self {
+        Self {
+            double: Quotes::DOUBLE[0],
+            single: Quotes::SINGLE[0],
         }
     }
 }
 
-/// The curly quote that a straight quote becomes after a character, or
-/// the character itself when it is not a straight quote (TXT-06).
-pub fn smart_quote(before: Option<char>, quote: char) -> char {
-    let opens = opens_after(before);
-    match (quote, opens) {
-        ('"', true) => '\u{201c}',
-        ('"', false) => '\u{201d}',
-        ('\'', true) => '\u{2018}',
-        // Closing quotes and apostrophes, as in "don't", are the same.
-        ('\'', false) => '\u{2019}',
-        (other, _) => other,
+/// The apostrophe, which a single quote inside a word always becomes.
+const APOSTROPHE: char = '\u{2019}';
+
+/// Whether a character is a quote that smart quotes make or replace.
+pub fn is_quote(c: char) -> bool {
+    matches!(c, '"' | '\'')
+        || Quotes::DOUBLE
+            .iter()
+            .chain(&Quotes::SINGLE)
+            .any(|q| q.open == c || q.close == c)
+}
+
+impl QuoteStyle {
+    /// Whether a quote after a character opens: at the start, after spaces
+    /// and after opening brackets, dashes and other opening quotes.
+    fn opens_after(self, before: Option<char>) -> bool {
+        match before {
+            None => true,
+            Some(c) => {
+                c.is_whitespace()
+                    || matches!(c, '(' | '[' | '{' | '\u{2014}' | '\u{2013}' | '-' | '/')
+                    || (c == self.double.open && c != self.double.close)
+                    || (c == self.single.open && c != self.single.close)
+            }
+        }
     }
+
+    /// The curly quote that a straight quote becomes after the text
+    /// `before`, or the character itself when it is not a straight quote
+    /// (TXT-06). A single quote that does not open is an apostrophe, as in
+    /// "don’t", unless a single quote of the style is open before it.
+    pub fn smart_quote(self, before: &str, quote: char) -> char {
+        let opens = self.opens_after(before.chars().next_back());
+        match quote {
+            '"' if opens => self.double.open,
+            '"' => self.double.close,
+            '\'' if opens => self.single.open,
+            '\'' if self.single.close == APOSTROPHE || !self.single_open(before) => APOSTROPHE,
+            '\'' => self.single.close,
+            other => other,
+        }
+    }
+
+    /// Whether a single quote of the style opened in the text and is not
+    /// closed yet.
+    fn single_open(self, text: &str) -> bool {
+        let mut depth = 0usize;
+        for c in text.chars() {
+            if c == self.single.open {
+                depth += 1;
+            } else if c == self.single.close {
+                depth = depth.saturating_sub(1);
+            }
+        }
+        depth > 0
+    }
+
+    /// The text with its quotes, straight or curly, made again in this
+    /// style, given the text before it (PXV-08).
+    pub fn convert(self, before: &str, text: &str) -> String {
+        let mut context = before.to_owned();
+        let start = context.len();
+        for c in text.chars() {
+            let straight = match c {
+                '"' | '\'' => Some(c),
+                _ if Quotes::DOUBLE.iter().any(|q| q.open == c || q.close == c) => Some('"'),
+                _ if Quotes::SINGLE.iter().any(|q| q.open == c || q.close == c) => Some('\''),
+                _ => None,
+            };
+            let made = straight.map_or(c, |q| self.smart_quote(&context, q));
+            context.push(made);
+        }
+        context.split_off(start)
+    }
+}
+
+/// Whether a hyphen typed after the text makes, with the hyphen before
+/// it, an em dash, as the smart dashes of Pages 15.4 do with "--".
+pub fn smart_dash(before: &str, typed: char) -> bool {
+    typed == '-' && before.ends_with('-')
+}
+
+/// The curly quote that a straight quote becomes after a character, in
+/// the quotes of a new install, or the character itself when it is not a
+/// straight quote (TXT-06).
+pub fn smart_quote(before: Option<char>, quote: char) -> char {
+    let before = before.map(String::from).unwrap_or_default();
+    QuoteStyle::default().smart_quote(&before, quote)
 }
 
 /// The suffix of an English ordinal number, as "st" for 21.
@@ -333,6 +465,55 @@ mod tests {
         assert_eq!(smart_quote(Some('n'), '\''), '’');
         assert_eq!(smart_quote(Some('('), '\''), '‘');
         assert_eq!(smart_quote(Some('a'), 'x'), 'x');
+    }
+
+    #[test]
+    fn pxv_08_the_quotes_follow_the_style() {
+        let german = QuoteStyle {
+            double: Quotes::DOUBLE[1],
+            single: Quotes::SINGLE[1],
+        };
+        assert_eq!(german.smart_quote("", '"'), '„');
+        assert_eq!(german.smart_quote("„Ja", '"'), '“');
+        assert_eq!(german.smart_quote("sagt ", '\''), '‚');
+        assert_eq!(german.smart_quote("sagt ‚ja", '\''), '‘');
+        // Inside a word, it is an apostrophe.
+        assert_eq!(german.smart_quote("Rock", '\''), '’');
+        let french = QuoteStyle {
+            double: Quotes::DOUBLE[4],
+            single: Quotes::SINGLE[4],
+        };
+        assert_eq!(french.smart_quote("«", '\''), '‹');
+        assert_eq!(french.smart_quote("l", '\''), '’');
+        assert_eq!(Quotes::DOUBLE[5].sample(), "»abc«");
+        assert_eq!(
+            Quotes::from_sample("„abc“", &Quotes::DOUBLE),
+            Some(Quotes::DOUBLE[1])
+        );
+        assert!(is_quote('»') && is_quote('"') && !is_quote('a'));
+    }
+
+    #[test]
+    fn pxv_08_two_hyphens_make_a_dash() {
+        assert!(smart_dash("wait-", '-'));
+        assert!(!smart_dash("wait", '-'));
+        assert!(!smart_dash("wait-", 'a'));
+    }
+
+    #[test]
+    fn pxv_08_quotes_already_typed_are_converted() {
+        let style = QuoteStyle::default();
+        assert_eq!(
+            style.convert("", "\"Don't,\" she said 'twice'."),
+            "“Don’t,” she said ‘twice’."
+        );
+        // From one style to another, with the text before it.
+        let french = QuoteStyle {
+            double: Quotes::DOUBLE[4],
+            single: Quotes::SINGLE[4],
+        };
+        assert_eq!(french.convert("Il dit ", "“l’eau”"), "«l’eau»");
+        assert_eq!(style.convert("“", "abc\""), "abc”");
     }
 
     #[test]

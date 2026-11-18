@@ -1095,6 +1095,30 @@ matrix rows done on 9 November, before the change of target.
 - Undoing a fraction just after it is made is still to be seen on the
   Mac, in the last session of W1.
 
+### 18 November: quotes, dashes and replacements (W062 and W064, step 5 of W1)
+
+- Smart quotes now make the quotes chosen in two new lists of the
+  preferences, Double Quotes and Single Quotes, as in Pages 15.4: “abc”
+  and ‘abc’ first, then the quotes of German, Polish, Swedish, French and
+  Danish. A single quote inside a word stays an apostrophe (’) whatever
+  the style. Two hyphens make an em dash, the smart dashes that the same
+  setting of Pages turns on, so the setting is now Use Smart Quotes and
+  Dashes.
+- Pages converts the quotes already typed with Replace All or Replace in
+  Selection of the substitutions panel of macOS. GNOME has no such panel,
+  so Desk has Convert Quotes, in the Substitutions of the context menu
+  and in the command search: on the selection, or on the whole text when
+  nothing is selected, one step of Undo.
+- W064 asked for one replacement list for the three apps. The list was
+  already in the preferences that they share; what was missing was the
+  cells of tables, which now take the corrections of typing too (smart
+  quotes and dashes, the list, capitals and fractions; not the raised
+  ordinals, which a cell cannot show). Desk Tables types in its own cells
+  in T1, and its rows of quotes and replacements stay in T4 (T144,
+  T145), as the inventory already had them.
+- Converting quotes on the Mac (only the panel was found) stays for the
+  last Mac session of W1.
+
 
 ## Decisions, with their reasons and consequences
 

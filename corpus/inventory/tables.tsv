@@ -144,8 +144,8 @@ T140	3.9 Text and styles	Alignment, spacing, indents, tabs	Equal	Equal in both	-
 T141	3.9 Text and styles	Lists with bullets, numbers, levels	Equal	Equal in both	-	In	Engine ready	-	T4	Lists of Writer
 T142	3.9 Text and styles	Columns in a text box	Equal	Equal in both	-	In	Engine ready	-	T4	Columns in boxes of Writer
 T143	3.9 Text and styles	Drop cap, automatic fractions, review highlight	Only 15	15.4	D-001	In	Missing	-	T4	Drop cap, automatic fractions, highlight
-T144	3.9 Text and styles	Smart quotes and dashes	Different	15.4	D-001	In	Engine ready	-	T4	Quotes of the '09 in Writer
-T145	3.9 Text and styles	Text replacement	Different	15.4	D-001	In	Engine ready	-	T4	Replacement of Writer
+T144	3.9 Text and styles	Smart quotes and dashes	Different	15.4	D-001	In	Engine ready	-	T4	Quotes and dashes of Writer, in the style chosen in the preferences; Writer tables already take them in their cells
+T145	3.9 Text and styles	Text replacement	Different	15.4	D-001	In	Engine ready	-	T4	Replacement of Writer, from the list the three apps share; Writer tables already take it in their cells
 T146	3.9 Text and styles	Special characters, accents	Equal	Equal in both	-	In	Engine ready	-	T4	GTK special characters
 T147	3.9 Text and styles	Date, file name, page number	Different	15.4, plus what the '09 did	D-001, D-003	In	Engine ready	the target changed	T4	Date and page fields in Writer; the file name is missing
 T148	3.9 Text and styles	Languages: bidirectional, vertical, phonetic guide, CJK	Only 15	15.4	D-001	In	Missing	-	T4	Bidi, vertical, phonetic

@@ -1168,12 +1168,18 @@ impl TextEditor {
                 };
                 let before = edit.document().paragraph(at.paragraph)?.text();
                 let before = before.get(..at.offset).unwrap_or_default();
-                // Smart quotes (TXT-06).
+                // Smart quotes and dashes (TXT-06, PXV-08).
+                let mut at = at;
                 let quoted;
                 let text = match typed {
                     Some(c @ ('"' | '\'')) if preferences.smart_quotes => {
-                        quoted = desk_model::smart_quote(before.chars().next_back(), c).to_string();
+                        quoted = preferences.quotes.smart_quote(before, c).to_string();
                         quoted.as_str()
+                    }
+                    Some(c) if preferences.smart_quotes && desk_model::smart_dash(before, c) => {
+                        let hyphen = desk_model::Position::new(at.paragraph, at.offset - 1);
+                        at = edit.delete(hyphen, at)?;
+                        "\u{2014}"
                     }
                     _ => text,
                 };
@@ -2764,6 +2770,30 @@ impl TextEditor {
         };
         self.format_ranges(name, |edit, from, to| {
             edit.change_case(from, to, case).map(|_| ())
+        });
+    }
+
+    /// Makes the quotes of the selection, or of the whole text when
+    /// nothing is selected, those of the preferences, straight or curly,
+    /// as one action of the history (PXV-08). It is what Replace in
+    /// Selection and Replace All of the substitutions of macOS do with
+    /// smart quotes for Pages 15.4.
+    pub fn convert_quotes(&self) {
+        let style = crate::preferences::get().quotes;
+        let name = "Convert Quotes";
+        // Inside a text box with nothing selected, as with a selection:
+        // the whole text is that of the body.
+        if !self.selection().is_empty() || self.has_selected_objects() || self.story().is_some() {
+            self.format_ranges(name, |edit, from, to| edit.convert_quotes(from, to, style));
+            return;
+        }
+        let document = self.state.borrow().editor.snapshot();
+        let end = text_nav::document_edge(&document, true);
+        self.format_edit(name, move |edit| {
+            let document = edit.document();
+            let from = at_spot(document, Spot::default())?;
+            let to = at_spot(document, end)?;
+            edit.convert_quotes(from, to, style)
         });
     }
 
