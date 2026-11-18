@@ -72,7 +72,7 @@ W068	3.4 Text and characters	Dictation 🤖🌐	Only 15	15.4	D-001	Out: AI, onli
 W069	3.4 Text and characters	Predictive text 🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Predictive text (AI)
 W070	3.4 Text and characters	Translation 🌐🤖	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Translation (AI/online)
 W071	3.4 Text and characters	Languages: bidirectional, vertical, phonetic guide, CJK emphasis	Only 15	15.4	D-001	In	Missing	-	W6	Bidirectional text, vertical text and phonetic guide (GNM-08, phase 11)
-W072	3.4 Text and characters	Formatting by document language	Only 15	15.4	D-001	In	Partial	-	W1	Text language per range (FMT-22); language and region per document are missing
+W072	3.4 Text and characters	Formatting by document language	Only 15	15.4	D-001	In	Done	-	W1	Language and Region, in the main menu, sets the language and region of the document, System by default, with a preview of a date, a time, a number and an amount: the language gives the words of dates and where the currency symbol goes, the region the separators, the short date and the currency, in tables and date fields; kept as the language of the default paragraph style (PXV-09). Text language per range (FMT-22). Dates and numbers have the words of English and Portuguese; the other languages go to W6 (B-043)
 W073	3.5 Styles	Paragraph, character and list styles	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Styles always in view in the sidebar (STY-01, STY-02)
 W074	3.5 Styles	Show and update overrides	Equal	Equal in both	-	In	Done	-	done	Overrides and update (STY-06)
 W075	3.5 Styles	Shortcuts for styles	Equal	Equal in both	-	In	Done	-	done	Style shortcuts Ctrl+1 to 8 (STY-04)

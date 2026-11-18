@@ -1377,12 +1377,29 @@ impl TextEditor {
         self.state.borrow().file_name.clone()
     }
 
+    /// The language and region of the document (PXV-09).
+    pub fn document_language(&self) -> desk_model::Language {
+        self.state.borrow().editor.document().language()
+    }
+
+    /// Sets the language and region of the document, and writes the dates
+    /// that update on open again in them (PXV-09).
+    pub fn set_document_language(&self, language: desk_model::Language) {
+        let file = self.file_name();
+        self.format_edit("Change Language and Region", move |edit| {
+            edit.set_document_language(language)?;
+            let locale = desk_layout::document_locale(edit.document());
+            let date = |pattern: &str| crate::fields::format_date(pattern, &locale);
+            edit.refresh_fields(&file, Some(&date))
+        });
+    }
+
     /// A field of the file name, or of today's date, as Insert makes them.
     pub fn new_field(&self, kind: FieldKind) -> Field {
         match kind {
             FieldKind::PageNumber => Field::PAGE_NUMBER,
             FieldKind::PageCount => Field::PAGE_COUNT,
-            FieldKind::Date => today(),
+            FieldKind::Date => today(&self.locale()),
             FieldKind::FileName => Field::FileName {
                 shown: desk_model::file_shown(&self.file_name(), false, true).into(),
                 path: false,
@@ -1455,9 +1472,9 @@ impl TextEditor {
         }
         let file = self.file_name();
         // A new format of a file name or date shows at once.
-        let field = field
-            .refreshed(&file, Some(&crate::fields::format_date))
-            .unwrap_or(field);
+        let locale = self.locale();
+        let date = |pattern: &str| crate::fields::format_date(pattern, &locale);
+        let field = field.refreshed(&file, Some(&date)).unwrap_or(field);
         self.format_edit("Field Format", move |edit| {
             let at = at_spot(edit.document(), spot)?;
             let end =

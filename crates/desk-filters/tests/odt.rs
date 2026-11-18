@@ -3551,3 +3551,20 @@ fn mod_04_the_styles_of_the_library_come_back_as_they_were() {
     let foreign = import(&foreign()).unwrap();
     assert_eq!(foreign.object_styles().iter().count(), 24);
 }
+
+#[test]
+fn pxv_09_the_language_and_region_of_the_document_are_kept() {
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Language and Region", |edit| {
+            edit.set_document_language(Language::new("en-BR"))
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-document-language.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.language(), Language::new("en-BR"));
+    // A document that follows the system still does.
+    let plain = read_odt(&write_odt(&Document::new_word_processing()).unwrap()).unwrap();
+    assert_eq!(plain.language(), Language::undetermined());
+}

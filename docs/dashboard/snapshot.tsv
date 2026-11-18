@@ -43,6 +43,7 @@ backlog	B-039	open
 backlog	B-040	open
 backlog	B-041	open
 backlog	B-042	open
+backlog	B-043	open
 feature	S001	done
 feature	S002	done
 feature	S003	done
@@ -506,7 +507,7 @@ feature	W068	out
 feature	W069	out
 feature	W070	out
 feature	W071	missing
-feature	W072	partial
+feature	W072	done
 feature	W073	review
 feature	W074	done
 feature	W075	done

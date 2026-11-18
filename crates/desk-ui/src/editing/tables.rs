@@ -148,8 +148,9 @@ impl TextEditor {
         }
     }
 
-    /// The language that tables write numbers in.
-    pub fn table_locale(&self) -> Locale {
+    /// The language and region that tables and date fields write numbers
+    /// and dates in (PXV-09).
+    pub fn locale(&self) -> Locale {
         desk_layout::document_locale(self.state.borrow().editor.document())
     }
 
@@ -534,7 +535,7 @@ impl TextEditor {
     /// the cell, and an announcement of it.
     pub(super) fn describe_table_or_chart(&self) {
         let text = if let Some((table, area)) = self.table_selection() {
-            let locale = self.table_locale();
+            let locale = self.locale();
             let values = table.values(desk_layout::today());
             match self.selected_cells() {
                 Some(cells) => {
@@ -779,7 +780,7 @@ impl TextEditor {
         let scale = self.view.scale();
         let text = match typed {
             Some(t) => t.to_owned(),
-            None => table.source_text(r, c, &self.table_locale()),
+            None => table.source_text(r, c, &self.locale()),
         };
         self.ensure_cell_editor();
         let state = self.state.borrow();
@@ -977,7 +978,7 @@ impl TextEditor {
         if self.selected_objects() != [id] {
             return;
         }
-        let locale = self.table_locale();
+        let locale = self.locale();
         let before = self
             .table_selection()
             .map(|(t, _)| t.source_text(r, c, &locale))
@@ -1033,7 +1034,7 @@ impl TextEditor {
         };
         let parent = self.view.area().root().and_downcast::<gtk::Window>();
         let weak = self.downgrade();
-        let locale = self.table_locale();
+        let locale = self.locale();
         crate::chart_data::open(
             parent.as_ref(),
             &chart,
@@ -1056,7 +1057,7 @@ impl TextEditor {
         let (table, area) = self.table_selection()?;
         self.selected_cells()?;
         let values = table.values(desk_layout::today());
-        Some(table.area_text(area, &values, &self.table_locale()))
+        Some(table.area_text(area, &values, &self.locale()))
     }
 
     /// Pastes text of tabs and lines into the cells from the focused one,
@@ -1065,7 +1066,7 @@ impl TextEditor {
         let Some(cells) = self.selected_cells() else {
             return false;
         };
-        let locale = self.table_locale();
+        let locale = self.locale();
         let text = text.to_owned();
         self.change_table("Paste", |table, sel| {
             let area = table.paste_text(cells.focus, &text, &locale);

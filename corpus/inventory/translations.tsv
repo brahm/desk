@@ -498,7 +498,7 @@ note	Ditado (IA)	Dictation (AI)
 note	Previsão ao digitar (IA)	Predictive text (AI)
 note	Tradução (IA/online)	Translation (AI/online)
 note	Texto bidirecional, vertical e guia fonético (GNM-08, fase 11)	Bidirectional text, vertical text and phonetic guide (GNM-08, phase 11)
-note	Idioma do texto por trecho (FMT-22); falta idioma e região por documento	Text language per range (FMT-22); language and region per document are missing
+note	Idioma e Região, no menu principal, define o idioma e a região do documento, Sistema por padrão, com uma prévia de data, hora, número e valor: o idioma dá as palavras das datas e o lugar do símbolo da moeda, a região os separadores, a data curta e a moeda, nas tabelas e nos campos de data; guardado como o idioma do estilo de parágrafo padrão (PXV-09). Idioma do texto por trecho (FMT-22). Datas e números têm as palavras de inglês e português; os outros idiomas vão para a W6 (B-043)	Language and Region, in the main menu, sets the language and region of the document, System by default, with a preview of a date, a time, a number and an amount: the language gives the words of dates and where the currency symbol goes, the region the separators, the short date and the currency, in tables and date fields; kept as the language of the default paragraph style (PXV-09). Text language per range (FMT-22). Dates and numbers have the words of English and Portuguese; the other languages go to W6 (B-043)
 note	Estilos sempre à vista na barra lateral (STY-01, STY-02)	Styles always in view in the sidebar (STY-01, STY-02)
 note	Sobreposições e atualizar (STY-06)	Overrides and update (STY-06)
 note	Atalhos de estilo Ctrl+1 a 8 (STY-04)	Style shortcuts Ctrl+1 to 8 (STY-04)

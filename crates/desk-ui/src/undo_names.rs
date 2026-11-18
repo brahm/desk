@@ -16,6 +16,7 @@ const NAMES: &[&str] = &[
     n_("Add Row"),
     n_("Breaks"),
     n_("Capitalize"),
+    n_("Change Language and Region"),
     n_("Character Style"),
     n_("Columns"),
     n_("Convert Quotes"),

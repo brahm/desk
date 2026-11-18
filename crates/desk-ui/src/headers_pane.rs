@@ -95,7 +95,8 @@ pub fn paragraphs(
             .filter_map(|r| r.attrs.field.clone().flatten())
             .find(|f| token(f) == kind)
     };
-    let date = kept("{date}").unwrap_or_else(crate::editing::today);
+    let locale = desk_layout::document_locale(edit.document());
+    let date = kept("{date}").unwrap_or_else(|| crate::editing::today(&locale));
     let file = kept("{file}").unwrap_or_else(|| Field::FileName {
         shown: desk_model::file_shown(file_name, false, true).into(),
         path: false,

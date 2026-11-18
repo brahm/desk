@@ -180,6 +180,10 @@ pub(super) fn main_menu(info: AppInfo, opens: bool, view: &gio::Menu) -> gio::Me
         let save = gio::Menu::new();
         save.append(Some(&tr("Save _As…")), Some("win.save-as"));
         save.append(Some(&tr("_Browse Versions…")), Some("win.versions"));
+        save.append(
+            Some(&tr("_Language and Region…")),
+            Some("win.language-region"),
+        );
         menu.append_section(None, &save);
     }
     let shown = gio::Menu::new();

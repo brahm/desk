@@ -1152,6 +1152,23 @@ matrix rows done on 9 November, before the change of target.
   found. Using it there stays for the last Mac session of W1, as the plan
   already says.
 
+### 18 November: the language and region of the document (W072, step 7 of W1)
+
+- Language and Region, in the main menu, sets the language of a document
+  and its region, as File > Advanced > Language & Region does in Pages
+  15.4. The document follows the system until it is set, and a preview
+  shows a date, a time, a number and an amount as they will be written.
+- The language gives the words: the names of months and days, true and
+  false, and where the currency symbol goes. The region gives the decimal
+  and thousands separators, the order and separator of the short date and
+  the currency, for thirteen regions. Both drive the tables and, now, the
+  date fields of the text, which used to follow the system.
+- In the file it is standard ODF: the language and country of the default
+  paragraph style, which the text also takes for its dictionaries.
+- Moved to W6 (B-043): dates and numbers in the words of languages other
+  than English and Portuguese, the two Desk is translated into. W6 brings
+  the translations.
+
 
 ## Decisions, with their reasons and consequences
 

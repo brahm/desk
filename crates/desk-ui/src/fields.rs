@@ -50,107 +50,36 @@ pub fn number_format(name: &str) -> NumberFormat {
         .map_or(NumberFormat::Decimal, |(f, _, _)| *f)
 }
 
-/// A pattern of LDML in the symbols of `g_date_time_format`. Letters of
-/// LDML it does not know stay as they are, and text in quotes is kept.
-pub fn strftime(pattern: &str) -> String {
-    let chars: Vec<char> = pattern.chars().collect();
-    let mut out = String::new();
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        if c == '\'' {
-            // Quoted text, where '' is a quote.
-            let mut j = i + 1;
-            if chars.get(j) == Some(&'\'') {
-                out.push('\'');
-                i += 2;
-                continue;
-            }
-            while j < chars.len() {
-                if chars[j] == '\'' {
-                    if chars.get(j + 1) == Some(&'\'') {
-                        out.push('\'');
-                        j += 2;
-                        continue;
-                    }
-                    break;
-                }
-                if chars[j] == '%' {
-                    out.push('%');
-                }
-                out.push(chars[j]);
-                j += 1;
-            }
-            i = j + 1;
-            continue;
-        }
-        if !c.is_ascii_alphabetic() {
-            if c == '%' {
-                out.push('%');
-            }
-            out.push(c);
-            i += 1;
-            continue;
-        }
-        let mut n = 1;
-        while chars.get(i + n) == Some(&c) {
-            n += 1;
-        }
-        let symbol = match (c, n) {
-            ('y', 2) => "%y",
-            ('y', _) => "%Y",
-            ('M', 1) => "%-m",
-            ('M', 2) => "%m",
-            ('M', 3) => "%b",
-            ('M', _) => "%B",
-            ('d', 1) => "%-d",
-            ('d', _) => "%d",
-            ('E', 4..) => "%A",
-            ('E', _) => "%a",
-            ('H', 1) => "%-H",
-            ('H', _) => "%H",
-            ('h', 1) => "%-I",
-            ('h', _) => "%I",
-            ('m', 1) => "%-M",
-            ('m', _) => "%M",
-            ('s', 1) => "%-S",
-            ('s', _) => "%S",
-            ('a', _) => "%p",
-            _ => {
-                out.extend(std::iter::repeat_n(c, n));
-                i += n;
-                continue;
-            }
-        };
-        out.push_str(symbol);
-        i += n;
-    }
-    out
+/// Now, in days from 30 December 1899, in the time of the system.
+pub fn now() -> Option<f64> {
+    let now = glib::DateTime::now_local().ok()?;
+    let seconds = now.to_unix() as f64 + now.utc_offset().as_seconds() as f64;
+    Some(25_569.0 + seconds / 86_400.0)
 }
 
-/// Today's date written in a pattern of LDML.
-pub fn format_date(pattern: &str) -> Option<String> {
-    glib::DateTime::now_local()
-        .ok()?
-        .format(&strftime(pattern))
-        .ok()
-        .map(|s| s.to_string())
+/// Today's date written in a pattern of LDML, in the language and region
+/// of a document (PXV-09).
+pub fn format_date(pattern: &str, locale: &desk_model::table::Locale) -> Option<String> {
+    Some(locale.date(now()?, pattern))
 }
 
-/// A field of today's date, as Insert puts it.
-pub fn today() -> Field {
+/// A field of today's date, as Insert puts it in a document of a locale.
+pub fn today(locale: &desk_model::table::Locale) -> Field {
     Field::DateTime {
         pattern: DATE_PATTERN.into(),
-        shown: format_date(DATE_PATTERN).unwrap_or_default().into(),
+        shown: format_date(DATE_PATTERN, locale).unwrap_or_default().into(),
         update: false,
     }
 }
 
 /// A document as it opens from a file: its fields of the file name show
-/// that file, and its dates that update on open show today (EST-27).
+/// that file, and its dates that update on open show today (EST-27), in
+/// the language and region of the document (PXV-09).
 pub fn opened(document: desk_model::Document, file: &str) -> desk_model::Document {
+    let locale = desk_layout::document_locale(&document);
     let mut editor = desk_model::Editor::new(document);
-    let refreshed = editor.edit("Open", |edit| edit.refresh_fields(file, Some(&format_date)));
+    let date = |pattern: &str| format_date(pattern, &locale);
+    let refreshed = editor.edit("Open", |edit| edit.refresh_fields(file, Some(&date)));
     if let Err(error) = refreshed {
         glib::g_warning!("desk", "cannot update the fields: {error}");
     }
@@ -172,12 +101,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn est_27_patterns_of_unicode_become_those_of_glib() {
-        assert_eq!(strftime("EEEE, d MMMM y"), "%A, %-d %B %Y");
-        assert_eq!(strftime("dd/MM/yy HH:mm"), "%d/%m/%y %H:%M");
-        assert_eq!(strftime("h:mm a"), "%-I:%M %p");
-        assert_eq!(strftime("d 'de' MMMM"), "%-d de %B");
-        assert_eq!(strftime("'o''clock' 100%"), "o'clock 100%%");
+    fn est_27_patterns_of_unicode_write_dates() {
+        // Wednesday 18 November 2026, at 14:05.
+        let day = 46_344.0 + (14.0 * 60.0 + 5.0) / 1440.0;
+        let en = desk_model::table::Locale::en_us();
+        let pt = desk_model::table::Locale::pt_br();
+        assert_eq!(
+            en.date(day, "EEEE, d MMMM y"),
+            "Wednesday, 18 November 2026"
+        );
+        assert_eq!(en.date(day, "dd/MM/yy HH:mm"), "18/11/26 14:05");
+        assert_eq!(en.date(day, "h:mm a"), "2:05 PM");
+        assert_eq!(pt.date(day, "d 'de' MMMM"), "18 de novembro");
+        assert_eq!(en.date(day, "'o''clock' 100%"), "o'clock 100%");
+        for pattern in DATE_FORMATS {
+            assert!(!pt.date(day, pattern).is_empty());
+        }
     }
 
     #[test]
