@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: The plan of phase W1 of Desk Writer, which brings its text,
+  styles, view and tables to the behaviour of Pages 15.4.
 * Changed: The 39 finished rows of the common base that the validation
   on the Mac checked count as done on the dashboard.
 * Added: The table of contents in the sidebar of Desk Writer, with Edit

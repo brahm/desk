@@ -960,6 +960,33 @@ matrix rows done on 9 November, before the change of target.
 - *Consequences:* a note can no longer outlive the work it names, and the
   register is the one place where pending work is written down.
 
+### 18 November: phase W1 starts, with its plan
+
+- The owner closed phase B1 and chose W1, Writer brought to the behaviour
+  of Pages 15.4, as the next phase. Its first pull request is the plan the
+  roadmap asks for when a phase starts,
+  [docs/phases/W1.md](phases/W1.md): the 28 rows and 8 backlog items of
+  the phase, the parity rows that test each one, what is missing, what has
+  to be seen on the Mac, the ODF each needs, and the order of 19 small
+  pull requests.
+- *What reading the rows showed:* the table of contents in the sidebar
+  (W041) was built in B1 with W011 and only has to be checked as live;
+  four rows marked done (W047, W048, W073, W131) only need the check of
+  the new target; 12 rows exist only in Pages 15 and have no parity row
+  yet, so they are written from what Pages 15.4 does on the Mac.
+- *Proposed, not yet moved:* the review highlight (W059) to W2, which
+  builds the comments it hangs on; bidirectional and vertical text (W071)
+  and the right-to-left table (W139) to W6, where the roadmap already puts
+  right-to-left and vertical text; the missing functions (W133) to T2,
+  since `desk-formula` is shared and T2 brings the functions of 15.4. They
+  move only when the owner agrees.
+- *How the Mac is used:* one session at the start, announced to the owner
+  first, to see the features of the 15 and check the rows whose target
+  changed, and one at the end. The layout items of the backlog (B-020,
+  B-022 to B-025) are studied from the PDFs of Pages 15.4 already in the
+  corpus, without the Mac; only the metrics of the Apple fonts (B-021) are
+  measured there.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
