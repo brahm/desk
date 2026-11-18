@@ -6,10 +6,11 @@
 //! content button in the middle of that header bar chooses what the pane
 //! shows, and the Add button at its end adds a page, a sheet or a slide.
 //!
-//! The three apps share it. Desk Writer shows four pages in it, each an
-//! entry of the content button: the page thumbnails, the styles that were
-//! the Styles drawer of Pages (INT-18), the comments, and the search
-//! results that were its search sidebar (TXT-13).
+//! The three apps share it. Desk Writer shows five pages in it, each an
+//! entry of the content button: the page thumbnails, the table of contents
+//! of Pages 15.4 (W011), the styles that were the Styles drawer of Pages
+//! (INT-18), the comments, and the search results that were its search
+//! sidebar (TXT-13).
 
 use std::cell::RefCell;
 use std::rc::Rc;

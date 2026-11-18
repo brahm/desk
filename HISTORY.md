@@ -8,6 +8,17 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The 39 finished rows of the common base that the validation
+  on the Mac checked count as done on the dashboard.
+* Added: The table of contents in the sidebar of Desk Writer, with Edit
+  and Insert.
+* Added: Document Warnings in the View menu of Desk Writer and Desk
+  Slides.
+* Added: Preferences in the main menu of Desk Tables.
+* Changed: Twelve rows of the common base moved to the phases that build
+  their engines: the cells and organizing of Desk Tables, its media and
+  warnings, Build Order and the slideshow preferences of Desk Slides, and
+  Screen View of Desk Writer.
 * Added: Every TODO, FIXME, XXX or HACK in the code cites an open backlog
   row, and a check in the CI fails on one that does not (D-026).
 * Added: Zoom to Selection in the Zoom menus of Desk Writer, Desk Tables

@@ -137,7 +137,22 @@ fn add_actions(app: &adw::Application, info: AppInfo) {
             TablesWindow::new(app, info).show();
         })
         .build();
-    app.add_action_entries([about, quit, close_windows, new_window, new_document]);
+    // The preferences that Desk Tables shares with the other apps (T018).
+    let preferences = gio::ActionEntry::builder("preferences")
+        .activate(move |app: &adw::Application, _, _| {
+            if let Some(window) = app.active_window() {
+                crate::preferences::show_for(&window, true);
+            }
+        })
+        .build();
+    app.add_action_entries([
+        about,
+        quit,
+        close_windows,
+        new_window,
+        new_document,
+        preferences,
+    ]);
 }
 
 #[cfg(test)]

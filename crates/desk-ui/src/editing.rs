@@ -1905,6 +1905,22 @@ impl TextEditor {
         }
     }
 
+    /// Puts the cursor at the start of paragraph `index` of the body, as a
+    /// click on a heading of the table of contents in the sidebar does
+    /// (W011), and gives the keyboard back to the document.
+    pub fn go_to_paragraph(&self, index: usize) {
+        let last = self
+            .state
+            .borrow()
+            .editor
+            .document()
+            .body()
+            .len()
+            .saturating_sub(1);
+        self.move_to(Spot::new(index.min(last), 0), false, false);
+        self.focus();
+    }
+
     /// Renames a bookmark, and the links to it; an empty name takes the
     /// bookmark away, and leaves its links.
     pub fn rename_bookmark(&self, old: &str, new: &str) {

@@ -538,6 +538,31 @@ impl Inspector {
         self.levels.show_tab(name)
     }
 
+    /// Shows the Table of Contents group of the Document tab, for Edit in
+    /// the table of contents of the sidebar (W011): the tab shows, and
+    /// the group takes the focus and its title goes to the top.
+    pub fn show_toc_settings(&self) {
+        self.levels.show_tab("document");
+        let group = self.toc.widget().widget().clone();
+        gtk::glib::idle_add_local_once(move || {
+            group.child_focus(gtk::DirectionType::TabForward);
+            // The focus only brings the group into view; its title goes
+            // to the top of the tab.
+            let Some(scrolled) = group
+                .ancestor(gtk::ScrolledWindow::static_type())
+                .and_downcast::<gtk::ScrolledWindow>()
+            else {
+                return;
+            };
+            if let Some(content) = scrolled.child()
+                && let Some(point) =
+                    group.compute_point(&content, &gtk::graphene::Point::new(0.0, 0.0))
+            {
+                scrolled.vadjustment().set_value(f64::from(point.y()));
+            }
+        });
+    }
+
     /// Adds a level of an app before Document, such as Animation in
     /// Desk Slides (KINT-14).
     pub fn add_level(&self, name: &str, label: &str, child: &impl IsA<gtk::Widget>) {

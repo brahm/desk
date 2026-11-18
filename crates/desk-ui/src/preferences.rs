@@ -510,6 +510,15 @@ fn switch(
 
 /// Shows the preferences over a window.
 pub fn show(parent: &impl IsA<gtk::Widget>) {
+    show_for(parent, false);
+}
+
+/// Shows the preferences over a window of Desk Tables, or, when `tables`
+/// is false, of Desk Writer and Desk Slides. Desk Tables leaves out what
+/// only text documents have: automatic lists, the word count and the
+/// color of invisibles (T018, as the Settings of Numbers 15.4 have
+/// General, Rulers and Auto-Correction).
+pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
     let current = get();
     let units = adw::ComboRow::builder()
         .title(tr("Ruler Units"))
@@ -625,12 +634,14 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
     ));
     correction.add(&replacements_row(&current.autocorrect));
     let window = adw::PreferencesGroup::builder().title(tr("Window")).build();
-    window.add(&switch(
-        &tr("Show Word and Page Count"),
-        &tr("At the bottom of the window"),
-        current.show_counts,
-        |p, on| p.show_counts = on,
-    ));
+    if !tables {
+        window.add(&switch(
+            &tr("Show Word and Page Count"),
+            &tr("At the bottom of the window"),
+            current.show_counts,
+            |p, on| p.show_counts = on,
+        ));
+    }
     window.add(&switch(
         &tr("Show Document Warnings"),
         &tr("When a document opens with problems"),
@@ -652,7 +663,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         .build();
     invisibles.add_suffix(&color);
     invisibles.set_activatable_widget(Some(&color));
-    window.add(&invisibles);
+    if !tables {
+        window.add(&invisibles);
+    }
     window.add(&switch(
         &tr("Include Preview in Document"),
         &tr("A picture of the first page, which file managers show"),
@@ -702,7 +715,9 @@ pub fn show(parent: &impl IsA<gtk::Widget>) {
         .icon_name("preferences-system-symbolic")
         .build();
     page.add(&rulers);
-    page.add(&editing);
+    if !tables {
+        page.add(&editing);
+    }
     page.add(&correction);
     page.add(&objects);
     page.add(&window);

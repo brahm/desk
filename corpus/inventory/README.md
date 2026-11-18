@@ -17,7 +17,7 @@ of each area, feature and note, which `build.py` applies.
 | `rule` | The decision of [docs/decisions.md](../../docs/decisions.md) that sets the target |
 | `scope` | In scope; out of scope and kept (AI, online or paid; unsupported export); or not applicable |
 | `status_in_desk` | Done, Partial, Engine ready (the engine exists but the app does not use it yet) or Missing, as read on 2026-11-16 at commit `a0e5ca5` |
-| `review` | Why the status has to be checked again: the target changed, or the window changes with decision D-008 |
+| `review` | Why the status has to be checked again: the target changed, or the window changes with decision D-008; `-` once it was checked, as the validation on the Mac ([`../mac-review.tsv`](../mac-review.tsv)) did for the rows of B1 |
 | `phase` | The phase of [docs/roadmap.md](../../docs/roadmap.md) that owns the row; `done` when Desk already does it; `-` when it is out of scope |
 | `note` | How Desk does it today, or what is missing |
 
