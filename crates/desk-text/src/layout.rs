@@ -130,6 +130,9 @@ pub struct Line {
     /// The bottom of the text: the baseline plus the descent, without the
     /// leading or any extra space below.
     pub text_bottom: f32,
+    /// How much of the ascent of its text Pages rounded off the line box:
+    /// it draws the background of a paragraph that much higher (FMT-20).
+    pub rise: f32,
     /// The glyphs, in runs.
     pub runs: Vec<GlyphRun>,
     /// Underlines and strikethroughs.
@@ -236,10 +239,7 @@ struct RunBox {
     /// rounded to a whole point (FMT-14).
     fixed: f32,
     descent: f32,
-    /// How much lower than `over` Pages 15.4 puts the baseline: it keeps
-    /// the box of the line on whole points, but sets the text on the
-    /// bottom of the box with the unrounded descent and leading under it
-    /// (B-020). It can be negative.
+    /// How much of the ascent the rounding took off, at most.
     rise: f32,
 }
 
@@ -251,14 +251,7 @@ impl RunBox {
             leading: self.leading.max(other.leading),
             fixed: self.fixed.max(other.fixed),
             descent: self.descent.max(other.descent),
-            // The rise of the run whose ascent sets the baseline.
-            rise: if other.over > self.over {
-                other.rise
-            } else if self.over > other.over {
-                self.rise
-            } else {
-                self.rise.max(other.rise)
-            },
+            rise: self.rise.max(other.rise),
         }
     }
 }
@@ -827,13 +820,11 @@ impl TextSystem {
         let mut lines = Vec::with_capacity(placed.len());
         for (line, place) in layout.lines().zip(&placed) {
             let metrics = line.metrics();
-            // Where Pages puts the baseline: the rounded box of the line
-            // plus the part of the ascent the rounding took off, as Pages
-            // 15.4 does (B-020); and how far that moves what Parley laid
-            // out.
+            // Where Pages puts the baseline, and how far that moves what
+            // Parley laid out.
             let baseline = place
                 .line_box
-                .map_or(metrics.baseline, |b| place.text_top + b.over + b.rise);
+                .map_or(metrics.baseline, |b| place.text_top + b.over);
             let delta = baseline - metrics.baseline;
             let mut glyph_runs = Vec::new();
             let mut decorations = Vec::new();
@@ -1092,11 +1083,8 @@ impl TextSystem {
                 top: place.top,
                 height: place.height,
                 baseline,
-                // On whole points, where the rounded box puts it, so that
-                // what fits on a page stays as it was (B-020).
-                text_bottom: descent.map_or(place.top + place.height, |d| {
-                    baseline - place.line_box.map_or(0.0, |b| b.rise) + d
-                }),
+                text_bottom: descent.map_or(place.top + place.height, |d| baseline + d),
+                rise: place.line_box.map_or(0.0, |b| b.rise),
                 runs: glyph_runs,
                 decorations,
                 hyphenated: place.hyphenated,
@@ -1515,8 +1503,8 @@ fn vertical_metrics(
 /// and the leading each to a whole point. A shift of the baseline moves
 /// the box.
 fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> RunBox {
-    let (exact, exact_descent, exact_leading, place) = vertical_metrics(format, size, metrics);
-    let (ascent, descent, leading) = (exact.round(), exact_descent.round(), exact_leading.round());
+    let (exact, descent, exact_leading, place) = vertical_metrics(format, size, metrics);
+    let (ascent, descent, leading) = (exact.round(), descent.round(), exact_leading.round());
     let over = match place {
         LeadingPlace::Above => ascent + leading,
         LeadingPlace::Below => ascent,
@@ -1532,16 +1520,7 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
             LeadingPlace::Below | LeadingPlace::Around => exact_leading,
         },
         descent,
-        // Pages 15.4 sets the text on the bottom of the rounded box: the
-        // unrounded descent, and the unrounded leading when some of it is
-        // under the text, up from the bottom (B-020).
-        rise: ascent + descent + leading
-            - exact_descent
-            - match place {
-                LeadingPlace::Above => 0.0,
-                LeadingPlace::Below | LeadingPlace::Around => exact_leading,
-            }
-            - over,
+        rise: (exact - ascent).max(0.0),
     }
 }
 

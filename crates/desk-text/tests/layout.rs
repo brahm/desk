@@ -675,9 +675,6 @@ fn indents_wider_than_the_column_overflow_instead_of_hanging() {
 fn int_02_the_text_of_a_line_ends_above_its_leading() {
     // Liberation Serif at 12 pt, as Pages rounds it: 11 pt above the
     // baseline, 3 below and 1 of leading, which a page need not hold.
-    // Pages 15.4 sets the text on the bottom of that box, with the
-    // unrounded descent and leading under it: its baseline is 11.90 pt
-    // down in the PDF of est-27-auto-page-numbers (B-020).
     let mut system = TextSystem::new();
     let serif = CharFormat {
         font_family: Arc::from("Liberation Serif"),
@@ -686,8 +683,7 @@ fn int_02_the_text_of_a_line_ends_above_its_leading() {
     let layout = lay(&mut system, ParaFormat::default(), &[("Lorem", serif)]);
     let line = &layout.lines[0];
     assert_eq!(line.height, 15.0);
-    let baseline = line.baseline - line.top;
-    assert!((baseline - 11.895).abs() < 0.01, "{baseline}");
+    assert_eq!(line.baseline - line.top, 11.0);
     assert_eq!(line.text_bottom - line.top, 14.0);
 }
 
@@ -741,10 +737,8 @@ fn doc_05_fonts_of_the_mac_keep_the_lines_and_ligatures_of_pages() {
     };
     // As Pages measured on the reference machine: Helvetica at 12 pt has
     // lines 14 pt tall, with the leading over the text, and Palatino 16 pt,
-    // whatever font stands for them. Pages 15.4 puts the baseline where
-    // the unrounded descent leaves it, 11.24 pt down for Helvetica as in
-    // the PDF of int-02-word-processing (B-020).
-    for (family, height, baseline) in [("Helvetica", 14.0, 11.24), ("Palatino", 16.0, 12.672)] {
+    // whatever font stands for them.
+    for (family, height, baseline) in [("Helvetica", 14.0, 11.0), ("Palatino", 16.0, 13.0)] {
         let layout = lay(
             &mut system,
             ParaFormat::default(),
@@ -752,8 +746,7 @@ fn doc_05_fonts_of_the_mac_keep_the_lines_and_ligatures_of_pages() {
         );
         let line = &layout.lines[0];
         assert_eq!(line.height, height, "{family}");
-        let measured = line.baseline - line.top;
-        assert!((measured - baseline).abs() < 0.01, "{family}: {measured}");
+        assert_eq!(line.baseline - line.top, baseline, "{family}");
     }
     // Pages joins fi and fl in Palatino, and nothing else: the ligature
     // draws the letters it joins, and offsets stay those of the model.
@@ -810,9 +803,7 @@ fn doc_05_a_ligature_of_the_font_reads_as_the_letters_it_joins() {
 fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
     // As measured on the reference machine: Pages rounds the ascent, the
     // descent and the line gap of each face to whole points, and puts the
-    // gap below the text. Pages 15.4 sets the text on the bottom of that
-    // box, with the unrounded descent and gap under it (B-020), as the
-    // Bold at 36 pt of phase6-newsletter shows.
+    // gap below the text.
     let mut system = TextSystem::new();
     let neue = |weight: u16, size: i32| CharFormat {
         font_family: Arc::from("Helvetica Neue"),
@@ -822,13 +813,13 @@ fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
     };
     let text = "Line one\u{2028}Line two\u{2028}Line three";
     for (weight, size, baseline, pitch) in [
-        (400, 12, 11.108, 14.0),
-        (300, 12, 12.096, 15.0),
-        (100, 12, 11.12, 14.0),
-        (500, 12, 12.048, 15.0),
-        (700, 12, 12.048, 15.0),
+        (400, 12, 11.0, 14.0),
+        (300, 12, 12.0, 15.0),
+        (100, 12, 11.0, 14.0),
+        (500, 12, 12.0, 15.0),
+        (700, 12, 12.0, 15.0),
         // At 72 pt the gap rounds to 2 pt, all of it under the text.
-        (400, 72, 68.648, 69.0 + 15.0 + 2.0),
+        (400, 72, 69.0, 69.0 + 15.0 + 2.0),
     ] {
         let layout = lay(
             &mut system,
@@ -836,8 +827,7 @@ fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
             &[(text, neue(weight, size))],
         );
         let lines = &layout.lines;
-        let measured = lines[0].baseline;
-        assert!((measured - baseline).abs() < 0.01, "{weight} at {size} pt: {measured}");
+        assert_eq!(lines[0].baseline, baseline, "{weight} at {size} pt");
         assert_eq!(lines[1].top - lines[0].top, pitch, "{weight} at {size} pt");
     }
 
@@ -1038,9 +1028,7 @@ fn obj_01_an_object_in_the_text_takes_its_room_in_the_line() {
     assert!((line.advance - without.advance - 50.0).abs() < 0.1);
     // As tall: the object stands on the baseline.
     assert!((line.baseline - line.top - 40.0).abs() < 0.01, "{line:?}");
-    // The part of the line of text under its baseline, in whole points:
-    // Pages 15.4 sets the baseline a fraction off them (B-020).
-    let under = (without.height - (without.baseline - without.top)).round();
+    let under = without.height - (without.baseline - without.top);
     assert!((line.height - 40.0 - under).abs() < 0.01, "{}", line.height);
 }
 
