@@ -974,12 +974,12 @@ matrix rows done on 9 November, before the change of target.
   four rows marked done (W047, W048, W073, W131) only need the check of
   the new target; 12 rows exist only in Pages 15 and have no parity row
   yet, so they are written from what Pages 15.4 does on the Mac.
-- *Proposed, not yet moved:* the review highlight (W059) to W2, which
-  builds the comments it hangs on; bidirectional and vertical text (W071)
-  and the right-to-left table (W139) to W6, where the roadmap already puts
-  right-to-left and vertical text; the missing functions (W133) to T2,
-  since `desk-formula` is shared and T2 brings the functions of 15.4. They
-  move only when the owner agrees.
+- *Moved, by the owner's choice:* the review highlight (W059) to W2,
+  which builds the comments it hangs on (B-039); bidirectional and
+  vertical text (W071) and the right-to-left table (W139) to W6, where the
+  roadmap already puts right-to-left and vertical text (B-040, B-041); the
+  missing functions (W133) to T2, since `desk-formula` is shared and T2
+  brings the functions of 15.4 (B-042). W1 keeps 24 rows.
 - *How the Mac is used:* one session at the start, announced to the owner
   first, to see the features of the 15 and check the rows whose target
   changed, and one at the end. The layout items of the backlog (B-020,

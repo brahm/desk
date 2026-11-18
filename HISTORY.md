@@ -10,6 +10,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: The plan of phase W1 of Desk Writer, which brings its text,
   styles, view and tables to the behaviour of Pages 15.4.
+* Changed: Four rows of Desk Writer moved out of W1: the review
+  highlight to W2, right-to-left and vertical text and right-to-left
+  tables to W6, and the missing functions to T2.
 * Changed: The 39 finished rows of the common base that the validation
   on the Mac checked count as done on the dashboard.
 * Added: The table of contents in the sidebar of Desk Writer, with Edit
