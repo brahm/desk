@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-18 15:57+0000\n"
+"POT-Creation-Date: 2026-11-18 16:38+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -3052,7 +3052,7 @@ msgstr "Mostrar ou ocultar os subtópicos"
 msgid "Topic, level {n}"
 msgstr "Tópico, nível {n}"
 
-#: crates/desk-ui/src/outline_view.rs:599 crates/desk-ui/src/preferences.rs:677
+#: crates/desk-ui/src/outline_view.rs:599 crates/desk-ui/src/preferences.rs:685
 #: crates/desk-ui/src/window.rs:2146
 msgid "Objects"
 msgstr "Objetos"
@@ -3183,171 +3183,179 @@ msgstr "Reduzir tamanho do arquivo"
 msgid "Keeps only the part of the picture that shows, at the size it is shown"
 msgstr "Mantém só a parte visível da imagem, no tamanho em que aparece"
 
-#: crates/desk-ui/src/preferences.rs:524
+#: crates/desk-ui/src/preferences.rs:526
 msgid "Ruler Units"
 msgstr "Unidades da régua"
 
-#: crates/desk-ui/src/preferences.rs:547
+#: crates/desk-ui/src/preferences.rs:549
 msgid "Rulers"
 msgstr "Réguas"
 
-#: crates/desk-ui/src/preferences.rs:548
+#: crates/desk-ui/src/preferences.rs:550
 msgid "For every document"
 msgstr "Valem para todos os documentos"
 
-#: crates/desk-ui/src/preferences.rs:552
+#: crates/desk-ui/src/preferences.rs:554
 msgid "Show Units as Percentage"
 msgstr "Mostrar unidades em porcentagem"
 
-#: crates/desk-ui/src/preferences.rs:553
+#: crates/desk-ui/src/preferences.rs:555
 msgid "Rulers count in percentages of the width of the text"
 msgstr "As réguas contam em porcentagens da largura do texto"
 
-#: crates/desk-ui/src/preferences.rs:558
+#: crates/desk-ui/src/preferences.rs:560
 msgid "Place Origin at Center"
 msgstr "Origem no centro"
 
-#: crates/desk-ui/src/preferences.rs:559
+#: crates/desk-ui/src/preferences.rs:561
 msgid "Rulers count from the middle of the text"
 msgstr "As réguas contam a partir do meio do texto"
 
-#: crates/desk-ui/src/preferences.rs:564
+#: crates/desk-ui/src/preferences.rs:566
 msgid "Show Vertical Ruler"
 msgstr "Mostrar régua vertical"
 
-#: crates/desk-ui/src/preferences.rs:565
+#: crates/desk-ui/src/preferences.rs:567
 msgid "Along with the horizontal ruler"
 msgstr "Junto com a régua horizontal"
 
-#: crates/desk-ui/src/preferences.rs:574
+#: crates/desk-ui/src/preferences.rs:576
 msgid "Default Zoom"
 msgstr "Zoom padrão"
 
-#: crates/desk-ui/src/preferences.rs:575
+#: crates/desk-ui/src/preferences.rs:577
 msgid "Of new windows"
 msgstr "Das janelas novas"
 
-#: crates/desk-ui/src/preferences.rs:593 crates/desk-ui/src/shortcuts.rs:48
+#: crates/desk-ui/src/preferences.rs:595 crates/desk-ui/src/shortcuts.rs:48
 #: crates/desk-ui/src/tables/shortcuts.rs:45
 msgid "Editing"
 msgstr "Edição"
 
-#: crates/desk-ui/src/preferences.rs:596
+#: crates/desk-ui/src/preferences.rs:598
 msgid "Automatically Detect Lists"
 msgstr "Detectar listas automaticamente"
 
-#: crates/desk-ui/src/preferences.rs:597
+#: crates/desk-ui/src/preferences.rs:599
 msgid "“1.”, “a.”, “I.”, “•”, “-” or “*” and a space start a list on Return"
 msgstr ""
 "“1.”, “a.”, “I.”, “•”, “-” ou “*” e um espaço começam uma lista ao "
 "pressionar Return"
 
-#: crates/desk-ui/src/preferences.rs:602
+#: crates/desk-ui/src/preferences.rs:604
 msgid "Auto-Correction"
 msgstr "Correção automática"
 
-#: crates/desk-ui/src/preferences.rs:603
+#: crates/desk-ui/src/preferences.rs:605
 msgid "While typing, in every document"
 msgstr "Ao digitar, em todos os documentos"
 
-#: crates/desk-ui/src/preferences.rs:606
+#: crates/desk-ui/src/preferences.rs:608
 msgid "Use Smart Quotes"
 msgstr "Usar aspas inteligentes"
 
-#: crates/desk-ui/src/preferences.rs:607
+#: crates/desk-ui/src/preferences.rs:609
 msgid "Straight quotes become curly quotes"
 msgstr "Aspas retas viram aspas curvas"
 
-#: crates/desk-ui/src/preferences.rs:612
+#: crates/desk-ui/src/preferences.rs:614
 msgid "Fix Capitalization"
 msgstr "Corrigir maiúsculas"
 
-#: crates/desk-ui/src/preferences.rs:613
+#: crates/desk-ui/src/preferences.rs:615
 msgid "Sentences start with a capital"
 msgstr "As frases começam com letra maiúscula"
 
-#: crates/desk-ui/src/preferences.rs:618
+#: crates/desk-ui/src/preferences.rs:620
 msgid "Superscript Numerical Suffixes"
 msgstr "Sufixos numéricos sobrescritos"
 
-#: crates/desk-ui/src/preferences.rs:619
+#: crates/desk-ui/src/preferences.rs:621
 msgid "As in 1st and 2nd"
 msgstr "Como em 1st e 2nd"
 
-#: crates/desk-ui/src/preferences.rs:624
+#: crates/desk-ui/src/preferences.rs:626
+msgid "Format Fractions Automatically"
+msgstr "Formatar frações automaticamente"
+
+#: crates/desk-ui/src/preferences.rs:627
+msgid "1/2 becomes ½, where there is such a character"
+msgstr "1/2 vira ½, onde existe esse caractere"
+
+#: crates/desk-ui/src/preferences.rs:632
 msgid "Detect Email and Web Addresses"
 msgstr "Detectar endereços de e-mail e da web"
 
-#: crates/desk-ui/src/preferences.rs:625
+#: crates/desk-ui/src/preferences.rs:633
 msgid "They become links as they are typed"
 msgstr "Viram links ao serem digitados"
 
-#: crates/desk-ui/src/preferences.rs:630
+#: crates/desk-ui/src/preferences.rs:638
 msgid "Use Spelling Suggestion"
 msgstr "Usar a sugestão do corretor"
 
-#: crates/desk-ui/src/preferences.rs:631
+#: crates/desk-ui/src/preferences.rs:639
 msgid "A misspelled word with one suggestion is corrected"
 msgstr "Uma palavra errada com uma só sugestão é corrigida"
 
-#: crates/desk-ui/src/preferences.rs:636
+#: crates/desk-ui/src/preferences.rs:644
 msgid "Window"
 msgstr "Janela"
 
-#: crates/desk-ui/src/preferences.rs:639
+#: crates/desk-ui/src/preferences.rs:647
 msgid "Show Word and Page Count"
 msgstr "Mostrar a contagem de palavras e páginas"
 
-#: crates/desk-ui/src/preferences.rs:640
+#: crates/desk-ui/src/preferences.rs:648
 msgid "At the bottom of the window"
 msgstr "Na parte de baixo da janela"
 
-#: crates/desk-ui/src/preferences.rs:646
+#: crates/desk-ui/src/preferences.rs:654
 msgid "Show Document Warnings"
 msgstr "Mostrar avisos do documento"
 
-#: crates/desk-ui/src/preferences.rs:647
+#: crates/desk-ui/src/preferences.rs:655
 msgid "When a document opens with problems"
 msgstr "Quando um documento abre com problemas"
 
-#: crates/desk-ui/src/preferences.rs:661
+#: crates/desk-ui/src/preferences.rs:669
 msgid "Invisibles Color"
 msgstr "Cor dos invisíveis"
 
-#: crates/desk-ui/src/preferences.rs:662
+#: crates/desk-ui/src/preferences.rs:670
 msgid "Of spaces, tabs and breaks when they are shown"
 msgstr "Dos espaços, tabulações e quebras quando aparecem"
 
-#: crates/desk-ui/src/preferences.rs:670
+#: crates/desk-ui/src/preferences.rs:678
 msgid "Include Preview in Document"
 msgstr "Incluir prévia no documento"
 
-#: crates/desk-ui/src/preferences.rs:671
+#: crates/desk-ui/src/preferences.rs:679
 msgid "A picture of the first page, which file managers show"
 msgstr ""
 "Uma imagem da primeira página, que os gerenciadores de arquivos mostram"
 
-#: crates/desk-ui/src/preferences.rs:689
+#: crates/desk-ui/src/preferences.rs:697
 msgid "Alignment Guides Color"
 msgstr "Cor das guias de alinhamento"
 
-#: crates/desk-ui/src/preferences.rs:690
+#: crates/desk-ui/src/preferences.rs:698
 msgid "Of the guides that show while objects are dragged"
 msgstr "Das guias que aparecem ao arrastar objetos"
 
-#: crates/desk-ui/src/preferences.rs:696
+#: crates/desk-ui/src/preferences.rs:704
 msgid "Show Guides at Object Center"
 msgstr "Mostrar guias no centro do objeto"
 
-#: crates/desk-ui/src/preferences.rs:697
+#: crates/desk-ui/src/preferences.rs:705
 msgid "A dragged object snaps to the middles of the page and of other objects"
 msgstr "Um objeto arrastado se alinha ao meio da página e dos outros objetos"
 
-#: crates/desk-ui/src/preferences.rs:702
+#: crates/desk-ui/src/preferences.rs:710
 msgid "Show Guides at Object Edges"
 msgstr "Mostrar guias nas bordas do objeto"
 
-#: crates/desk-ui/src/preferences.rs:703
+#: crates/desk-ui/src/preferences.rs:711
 msgid ""
 "A dragged object snaps to the edges of the page, its margins and other "
 "objects"
@@ -3355,35 +3363,35 @@ msgstr ""
 "Um objeto arrastado se alinha às bordas da página, às margens e aos outros "
 "objetos"
 
-#: crates/desk-ui/src/preferences.rs:708
+#: crates/desk-ui/src/preferences.rs:716
 msgid "Show Size and Position When Moving Objects"
 msgstr "Mostrar tamanho e posição ao mover objetos"
 
-#: crates/desk-ui/src/preferences.rs:709
+#: crates/desk-ui/src/preferences.rs:717
 msgid "Next to the pointer, while an object is dragged"
 msgstr "Junto ao ponteiro, enquanto um objeto é arrastado"
 
-#: crates/desk-ui/src/preferences.rs:714
+#: crates/desk-ui/src/preferences.rs:722
 msgid "General"
 msgstr "Geral"
 
-#: crates/desk-ui/src/preferences.rs:725 crates/desk-ui/src/shortcuts.rs:41
+#: crates/desk-ui/src/preferences.rs:733 crates/desk-ui/src/shortcuts.rs:41
 msgid "Preferences"
 msgstr "Preferências"
 
-#: crates/desk-ui/src/preferences.rs:736
+#: crates/desk-ui/src/preferences.rs:744
 msgid "Symbol and Text Substitution"
 msgstr "Substituição de símbolos e textos"
 
-#: crates/desk-ui/src/preferences.rs:737
+#: crates/desk-ui/src/preferences.rs:745
 msgid "Such as “(c)” for “©”, when typed as a word"
 msgstr "Como “(c)” por “©”, quando digitado como uma palavra"
 
-#: crates/desk-ui/src/preferences.rs:783 crates/desk-ui/src/preferences.rs:787
+#: crates/desk-ui/src/preferences.rs:791 crates/desk-ui/src/preferences.rs:795
 msgid "Remove"
 msgstr "Remover"
 
-#: crates/desk-ui/src/preferences.rs:802
+#: crates/desk-ui/src/preferences.rs:810
 msgid "Add: text, a space and its replacement"
 msgstr "Adicionar: texto, um espaço e o substituto"
 

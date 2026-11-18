@@ -61,7 +61,7 @@ W057	3.4 Text and characters	Font smoothing	Only '09	'09, in the form of the 15	
 W058	3.4 Text and characters	Character and paragraph background color	Equal	Equal in both	-	In	Done	-	done	Character and paragraph background (FMT-20)
 W059	3.4 Text and characters	Review highlight	Only 15	15.4	D-001	In	Missing	-	W2	Review highlight with a comment (phase 8)
 W060	3.4 Text and characters	Drop cap	Only 15	15.4	D-001	In	Missing	-	W1	Drop cap
-W061	3.4 Text and characters	Automatic fractions	Only 15	15.4	D-001	In	Missing	-	W1	Automatic fractions
+W061	3.4 Text and characters	Automatic fractions	Only 15	15.4	D-001	In	Done	-	W1	Format Fractions Automatically in the preferences, off as in Pages 15.4: a fraction that stands apart becomes its Unicode character as the space or punctuation after it is typed (1/2 gives ½, 0/3 gives ↉); 13/16, 2/4, x1/2 and 11/2 stay as typed (PXV-07). The fractions of the replacement table of the '09 stay (D-003)
 W062	3.4 Text and characters	Smart quotes and dashes	Different	15.4	D-001	In	Partial	-	W1	Smart quotes like the '09 (TXT-06); choosing the quote style and converting the existing ones are missing
 W063	3.4 Text and characters	Hyphenation	Equal	Equal in both	-	In	Done	-	done	Hyphenation (TXT-09)
 W064	3.4 Text and characters	Text replacement	Different	15.4	D-001	In	Partial	-	W1	Desk's own replacement list (TXT-07); GNOME has no system list, so the target holds as a list shared by the three apps

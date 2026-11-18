@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Format Fractions Automatically in the preferences, which makes
+  1/2 into ½ while typing.
 * Added: Start Case in the capitalization of Desk Writer, and Make Upper
   Case, Make Lower Case and Capitalize, which change the characters.
 * Changed: Desk Writer places lines on the page as Pages 15.4 does, a

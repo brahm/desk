@@ -1080,6 +1080,21 @@ matrix rows done on 9 November, before the change of target.
   context menu of the text and in the command search. Pages 15.4 has no
   Sentence case, which the inventory had listed.
 
+### 18 November: automatic fractions (W061, step 4 of W1)
+
+- Format Fractions Automatically joins the Auto-Correction preferences,
+  off as in Pages 15.4. When it is on, a fraction that stands apart
+  becomes its Unicode character as the space or punctuation after it is
+  typed: 1/2 gives ½, 1/10 gives ⅒, 0/3 gives ↉. A fraction without a
+  character of its own (13/16, 2/4), inside a word (x1/2) or after
+  another digit (11/2) stays as typed, as in Pages 15.4, so Desk needs
+  no built-up fraction. The setting belongs to the computer, as in
+  Pages, so no ODF extension was needed.
+- The fractions of the replacement table of Pages '09 stay in the table,
+  off, as they were (D-003).
+- Undoing a fraction just after it is made is still to be seen on the
+  Mac, in the last session of W1.
+
 
 ## Decisions, with their reasons and consequences
 

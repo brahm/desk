@@ -330,6 +330,7 @@ impl Preferences {
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
+        correct.fractions = editing("format-fractions", correct.fractions);
         correct.replace = editing("replace-text", correct.replace);
         if let Ok(list) = file.string(EDITING, "replacements") {
             correct.replacements = list
@@ -392,6 +393,7 @@ impl Preferences {
         let correct = &self.autocorrect;
         file.set_boolean(EDITING, "fix-capitalization", correct.capitalization);
         file.set_boolean(EDITING, "superscript-ordinals", correct.ordinals);
+        file.set_boolean(EDITING, "format-fractions", correct.fractions);
         file.set_boolean(EDITING, "replace-text", correct.replace);
         let list: Vec<String> = correct
             .replacements
@@ -621,6 +623,12 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         |p, on| p.autocorrect.ordinals = on,
     ));
     correction.add(&switch(
+        &tr("Format Fractions Automatically"),
+        &tr("1/2 becomes ½, where there is such a character"),
+        current.autocorrect.fractions,
+        |p, on| p.autocorrect.fractions = on,
+    ));
+    correction.add(&switch(
         &tr("Detect Email and Web Addresses"),
         &tr("They become links as they are typed"),
         current.detect_links,
@@ -834,6 +842,7 @@ mod tests {
             proofread: true,
             autocorrect: AutoCorrect {
                 ordinals: false,
+                fractions: true,
                 replacements: vec![
                     Replacement::new("(c)", "©"),
                     Replacement {
