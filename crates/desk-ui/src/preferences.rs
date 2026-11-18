@@ -175,6 +175,15 @@ pub struct Preferences {
     /// Whether a saved document holds a picture of its first page, which
     /// file managers show (DOC-09).
     pub include_preview: bool,
+    /// Whether new documents of the Blank templates take the font and
+    /// size below, as "Set font and size for new Basic documents" of
+    /// Pages 15.4 (PXV-03).
+    pub set_default_font: bool,
+    /// The font family of new documents, when `set_default_font` is on.
+    pub default_font: String,
+    /// The font size of new documents, in points, when
+    /// `set_default_font` is on.
+    pub default_font_size: desk_model::Length,
     /// The color of the guides that a drag of objects snaps to (OBJ-27).
     pub guide_color: Rgba,
     /// Whether a drag of objects snaps their middles to the middles of the
@@ -229,6 +238,10 @@ impl Default for Preferences {
             show_warnings: true,
             font_favorites: Vec::new(),
             include_preview: true,
+            // What the sheet of Pages 15.4 offers first.
+            set_default_font: false,
+            default_font: "Helvetica Neue".into(),
+            default_font_size: desk_model::Length::from_pt(11.0),
             guide_color: GUIDE_COLOR,
             // As in Pages: at the middles, and not at the edges.
             guides_at_center: true,
@@ -319,6 +332,15 @@ impl Preferences {
         out.show_warnings = file
             .boolean(WINDOW, "show-warnings")
             .unwrap_or(out.show_warnings);
+        out.set_default_font = editing("set-default-font", out.set_default_font);
+        if let Ok(font) = file.string(EDITING, "default-font")
+            && !font.is_empty()
+        {
+            out.default_font = font.to_string();
+        }
+        if let Ok(size) = file.double(EDITING, "default-font-size") {
+            out.default_font_size = desk_model::Length::from_pt(size.clamp(1.0, 1638.0));
+        }
         if let Ok(favorites) = file.string(FONTS, "favorites") {
             out.font_favorites = favorites
                 .split(';')
@@ -396,6 +418,9 @@ impl Preferences {
             .collect();
         file.set_string(FONTS, "favorites", &favorites);
         file.set_boolean(SAVING, "include-preview", self.include_preview);
+        file.set_boolean(EDITING, "set-default-font", self.set_default_font);
+        file.set_string(EDITING, "default-font", &self.default_font);
+        file.set_double(EDITING, "default-font-size", self.default_font_size.to_pt());
         file.set_string(EDITING, "guide-color", &color_key(self.guide_color));
         file.set_boolean(EDITING, "guides-at-center", self.guides_at_center);
         file.set_boolean(EDITING, "guides-at-edges", self.guides_at_edges);
@@ -614,6 +639,9 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         current.automatic_lists,
         |p, on| p.automatic_lists = on,
     ));
+    if !tables {
+        editing.add(&default_font_row(&current));
+    }
     let correction = adw::PreferencesGroup::builder()
         .title(tr("Auto-Correction"))
         .description(tr("While typing, in every document"))
@@ -760,6 +788,50 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         .build();
     dialog.add(&page);
     dialog.present(Some(parent));
+}
+
+/// Default Font: whether new documents of the Blank templates take a font
+/// and size of their own, as the General settings of Pages 15.4 have it
+/// (PXV-03).
+fn default_font_row(current: &Preferences) -> adw::ExpanderRow {
+    let expander = adw::ExpanderRow::builder()
+        .title(tr("Default Font"))
+        .subtitle(tr("Of new documents from the Blank templates"))
+        .show_enable_switch(true)
+        .enable_expansion(current.set_default_font)
+        .build();
+    expander.connect_enable_expansion_notify(|row| {
+        let on = row.enables_expansion();
+        change(|p| p.set_default_font = on);
+    });
+    let font = gtk::FontDialogButton::builder()
+        .dialog(&gtk::FontDialog::new())
+        .level(gtk::FontLevel::Family)
+        .font_desc(&gtk::pango::FontDescription::from_string(
+            &current.default_font,
+        ))
+        .valign(gtk::Align::Center)
+        .build();
+    font.connect_font_desc_notify(|button| {
+        if let Some(family) = button.font_desc().and_then(|d| d.family()) {
+            let family = family.to_string();
+            change(|p| p.default_font = family);
+        }
+    });
+    let family = adw::ActionRow::builder().title(tr("Font")).build();
+    family.add_suffix(&font);
+    family.set_activatable_widget(Some(&font));
+    expander.add_row(&family);
+    let size = adw::SpinRow::with_range(1.0, 1638.0, 1.0);
+    size.set_title(&tr("Font Size"));
+    size.set_digits(1);
+    size.set_value(current.default_font_size.to_pt());
+    size.connect_value_notify(|row| {
+        let value = row.value();
+        change(|p| p.default_font_size = desk_model::Length::from_pt(value));
+    });
+    expander.add_row(&size);
+    expander
 }
 
 /// A list of the quotes that smart quotes can make (PXV-08).
@@ -919,6 +991,9 @@ mod tests {
             show_warnings: false,
             font_favorites: vec!["Liberation Serif".into(), "DejaVu Sans".into()],
             include_preview: false,
+            set_default_font: true,
+            default_font: "Georgia".into(),
+            default_font_size: desk_model::Length::from_pt(13.5),
             guide_color: Rgba::rgb(10, 200, 30),
             guides_at_center: false,
             guides_at_edges: true,
