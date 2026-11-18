@@ -936,6 +936,30 @@ matrix rows done on 9 November, before the change of target.
     warnings, which come with the files of S5;
   - Fullscreen in Desk Tables was checked in the code, not on screen.
 
+### 17 November: rules against distraction by notes in the code (D-026)
+
+- The owner asked to adopt a set of rules against the distraction of
+  coding agents, taken from Google's article "Agent distraction" and the
+  kit those rules came from: an agent reads every `TODO` it meets and
+  sometimes acts on it unasked; in Google's measures about 41% of those
+  detours chased bugs already closed, and each cost about 70% more steps
+  and 77% more tokens.
+- *What was done:* `AGENTS.md` gained rules 12 ("Work lean, on the task")
+  and 13 ("No stale notes"); `CONTRIBUTING.md` says how a note cites the
+  backlog; `docs/backlog/README.md` gained rules 5 and 6.
+  `ci/check-backlog.py` now also reads every file git tracks and fails on
+  a `TODO`, `FIXME`, `XXX` or `HACK` that cites no row, a row that is not
+  in the register, or a row that is no longer open. It already ran in
+  `ci/check-all.sh`; it now runs in the CI as well, in a job of its own,
+  which it did not before.
+- *Old notes:* the repository had none. A search of every tracked text
+  file found no `TODO`, `FIXME`, `XXX` or `HACK`, so nothing had to be
+  turned into a backlog row or removed.
+- *What is not scanned:* Markdown, the register itself and the script,
+  which name the markers in prose.
+- *Consequences:* a note can no longer outlive the work it names, and the
+  register is the one place where pending work is written down.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -1284,6 +1308,17 @@ phase X1.
 
 **D-015: nothing is dropped silently.** See "The habit of looking for what
 was left behind".
+
+**D-026: notes in the code cite an open backlog row (17 November).**
+*Why:* the owner adopted rules written against the distraction of coding
+agents: a `TODO` met while reading pulls an agent away from its task,
+often after a bug that is already fixed, and costs steps and tokens.
+Tying each note to a row of the register lets the agent check whether
+the work is still pending, and closing the row removes the note.
+*Consequences:* rules 12 and 13 of `AGENTS.md`, rules 5 and 6 of the
+backlog; `ci/check-backlog.py` checks the notes, before each pull request
+and in the CI. Problems noticed outside a task go to the register and to
+the report, not into the change.
 
 **A dashboard that is always current.**
 *Why:* the owner asked to follow the progress on a page, kept up to date

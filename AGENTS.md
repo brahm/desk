@@ -55,3 +55,13 @@ purpose and point to the full pages.
 11. **Decisions** belong to the project owner. When a task conflicts with
     [docs/decisions.md](docs/decisions.md), stop and ask; do not pick a
     side in code.
+12. **Work lean, on the task.** A `TODO`, a note or a problem met while
+    reading is information, not a task: check its backlog row before
+    trusting it, and leave what is outside the task to a backlog row and a
+    line in the report.
+13. **No stale notes.** A `TODO`, `FIXME`, `XXX` or `HACK` cites its open
+    backlog row, `TODO(B-012)`, and goes away in the change that closes the
+    row. A clean-up or a bug noticed on the way is a backlog row and a line
+    in the report, not part of the change, unless the task needs it.
+    `ci/check-backlog.py` fails on a note without a row, or whose row is
+    unknown or no longer open.

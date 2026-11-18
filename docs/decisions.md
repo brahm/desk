@@ -31,6 +31,7 @@ the project takes the decisions; the date is the day he took them.
 | D-023 | 2026-11-16 | Under D-022, the document tabs take GNOME's shortcuts in the three apps: Ctrl+PageUp and Ctrl+PageDown (and Ctrl+Tab, Ctrl+Shift+Tab), Alt+1 to Alt+9, Ctrl+Shift+PageUp and Ctrl+Shift+PageDown to move a tab. The sheets of Tables, an iWork command that collides, move to Alt+PageUp and Alt+PageDown (rule 3 of D-017). Ctrl+Home and Ctrl+End stay with the text and the cells. | Current |
 | D-024 | 2026-11-16 | Under D-022, Ctrl+T opens a new document in a tab, as in GNOME. Fonts, which had Ctrl+T as in iWork, has no shortcut of its own: it opens from the Font row of the Format pane and from Search Commands. | Current |
 | D-025 | 2026-11-16 | The versions of a document that saves itself (DOC-11, D-001) are kept in the data folder of Desk (`~/.local/share/desk/versions`), outside the file, as macOS keeps those of iWork: the ODF file stays standard and the same size, and carries no past versions when it is sent. | Current |
+| D-026 | 2026-11-17 | Notes in the code are information, not tasks. Every `TODO`, `FIXME`, `XXX` or `HACK` cites an open row of the backlog, as in `TODO(B-012)`, and is removed in the change that closes the row; work noticed outside the task becomes a backlog row and a line in the report, not part of the change. `ci/check-backlog.py` enforces it in `ci/check-all.sh` and in the CI (rules 5 and 6 of `docs/backlog/README.md`, rules 12 and 13 of `AGENTS.md`). | Current |
 
 ## Replaced
 

@@ -19,6 +19,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   their engines: the cells and organizing of Desk Tables, its media and
   warnings, Build Order and the slideshow preferences of Desk Slides, and
   Screen View of Desk Writer.
+* Added: Every TODO, FIXME, XXX or HACK in the code cites an open backlog
+  row, and a check in the CI fails on one that does not (D-026).
 * Added: Zoom to Selection in the Zoom menus of Desk Writer, Desk Tables
   and Desk Slides, and Zoom to Fit Content and Auto-Center in Desk Slides.
 * Added: First Page and Last Page in the View menu of Desk Writer.
