@@ -28,8 +28,8 @@ pub use cell::{
 pub use conditional::{Condition, Operand, Rule, RuleStyle};
 pub use eval::{Values, header_range};
 pub use format::{
-    CustomFormat, DateStyle, DurationStyle, Format, FractionPrecision, Locale, Negative, Shown,
-    TimeStyle, parse_date, parse_input, parse_number,
+    CustomFormat, DateStyle, DurationStyle, Format, FractionPrecision, LANGUAGES, Locale, Negative,
+    REGIONS, Shown, TimeStyle, parse_date, parse_input, parse_number,
 };
 pub use nav::{Landing, Step};
 pub use ops::{FillDirection, Split};

@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Language and Region in the main menu, which sets how the tables
+  and date fields of a document write dates and numbers.
 * Added: Set as Default Text Box Appearance, which makes a text box, with
   its text, the look of the new text boxes of a document.
 * Added: Default Font in the preferences, the font and size of new

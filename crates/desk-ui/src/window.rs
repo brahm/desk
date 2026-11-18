@@ -172,7 +172,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 75] = [
+const DOCUMENT_ACTIONS: [&str; 76] = [
     "outline",
     "contents",
     "edit-toc",
@@ -188,6 +188,7 @@ const DOCUMENT_ACTIONS: [&str; 75] = [
     "make-lower-case",
     "capitalize",
     "convert-quotes",
+    "language-region",
     "save",
     "save-as",
     "save-copy",
@@ -2155,7 +2156,7 @@ impl DocumentWindow {
     }
 
     fn add_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 12] = [
+        let simple: [(&str, WindowAction); 13] = [
             ("warnings", |this| this.show_warnings()),
             // Edit in the table of contents of the sidebar: the styles it
             // lists are in the Document tab of the Inspector (W011).
@@ -2173,6 +2174,11 @@ impl DocumentWindow {
             ("properties", |this| {
                 if let Some(path) = this.path.borrow().as_deref() {
                     crate::properties::show(&this.window, path);
+                }
+            }),
+            ("language-region", |this| {
+                if let Some(editor) = this.editor() {
+                    crate::language_region::present(&this.window, &editor);
                 }
             }),
             ("fullscreen", |this| {
@@ -2887,10 +2893,13 @@ impl DocumentWindow {
             let (Some(this), Some(pattern)) = (weak.upgrade(), value.and_then(|v| v.str())) else {
                 return;
             };
+            let Some(locale) = this.editor().map(|editor| editor.locale()) else {
+                return;
+            };
             change(&this, &|field| match field {
                 Field::DateTime { update, .. } => Field::DateTime {
                     pattern: pattern.into(),
-                    shown: crate::fields::format_date(pattern)
+                    shown: crate::fields::format_date(pattern, &locale)
                         .unwrap_or_default()
                         .into(),
                     update,
@@ -3431,8 +3440,10 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
             state("field-date-format", pattern.to_variant());
             state("field-date-update", update.to_variant());
             let formats = gio::Menu::new();
+            let locale = editor.map(TextEditor::locale).unwrap_or_default();
             for pattern in crate::fields::DATE_FORMATS {
-                let shown = crate::fields::format_date(pattern).unwrap_or_else(|| pattern.into());
+                let shown =
+                    crate::fields::format_date(pattern, &locale).unwrap_or_else(|| pattern.into());
                 let item = gio::MenuItem::new(Some(&shown.replace('_', "__")), None);
                 item.set_action_and_target_value(
                     Some("win.field-date-format"),

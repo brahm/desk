@@ -179,7 +179,10 @@ pub enum Format {
     Custom(CustomFormat),
 }
 
-/// How numbers and dates are written where the app runs.
+/// How numbers and dates are written: those of the document, or where the
+/// app runs (PXV-09). The language gives the words, as the names of the
+/// months, and where the currency symbol goes; the region gives the
+/// separators, the order of the short date and the currency.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Locale {
     /// The decimal separator.
@@ -191,6 +194,8 @@ pub struct Locale {
     /// Whether dates are written day first, as 06/01/2009, rather than
     /// month first.
     pub day_first: bool,
+    /// What separates the day, the month and the year of a short date.
+    pub date_separator: char,
     /// The months, from January.
     pub months: [&'static str; 12],
     /// The days of the week, from Sunday.
@@ -198,85 +203,191 @@ pub struct Locale {
     /// The word between the parts of a long date, as "de"; empty for an
     /// English date.
     pub of: &'static str,
+    /// Whether the words are Portuguese, rather than English.
+    pub portuguese: bool,
 }
+
+/// The languages whose words Desk writes dates and numbers in, as their
+/// BCP 47 tags, with the region each takes when none is given (PXV-09).
+pub const LANGUAGES: [(&str, &str); 2] = [("en", "US"), ("pt", "BR")];
+
+/// The regions whose separators, short dates and currencies Desk knows,
+/// as ISO 3166 codes: decimal separator, thousands separator, whether the
+/// day comes first, the separator of the short date, and the currency
+/// symbol (PXV-09).
+pub const REGIONS: [(&str, char, char, bool, char, &str); 13] = [
+    ("AR", ',', '.', true, '/', "$"),
+    ("AU", '.', ',', true, '/', "$"),
+    ("BR", ',', '.', true, '/', "R$"),
+    ("CA", '.', ',', false, '/', "$"),
+    ("DE", ',', '.', true, '.', "€"),
+    ("ES", ',', '.', true, '/', "€"),
+    ("FR", ',', '\u{202f}', true, '/', "€"),
+    ("GB", '.', ',', true, '/', "£"),
+    ("IT", ',', '.', true, '/', "€"),
+    ("MX", '.', ',', true, '/', "$"),
+    ("PT", ',', '.', true, '/', "€"),
+    ("US", '.', ',', false, '/', "$"),
+    ("ZA", ',', '\u{a0}', true, '/', "R"),
+];
 
 impl Locale {
     /// Brazilian Portuguese.
     pub fn pt_br() -> Self {
-        Self {
-            decimal: ',',
-            group: '.',
-            currency: "R$".to_owned(),
-            day_first: true,
-            months: [
-                "janeiro",
-                "fevereiro",
-                "março",
-                "abril",
-                "maio",
-                "junho",
-                "julho",
-                "agosto",
-                "setembro",
-                "outubro",
-                "novembro",
-                "dezembro",
-            ],
-            weekdays: [
-                "domingo",
-                "segunda-feira",
-                "terça-feira",
-                "quarta-feira",
-                "quinta-feira",
-                "sexta-feira",
-                "sábado",
-            ],
-            of: "de",
-        }
+        Self::of("pt", Some("BR"))
     }
 
     /// American English.
     pub fn en_us() -> Self {
+        Self::of("en", Some("US"))
+    }
+
+    /// The words of a language and the numbers and dates of a region. A
+    /// language Desk has no words for writes English; a region Desk does
+    /// not know, or none, takes the one of the language.
+    pub fn of(language: &str, region: Option<&str>) -> Self {
+        let portuguese = language.eq_ignore_ascii_case("pt");
+        let fallback = if portuguese { "BR" } else { "US" };
+        let region = region
+            .and_then(|r| {
+                REGIONS
+                    .iter()
+                    .find(|(code, ..)| code.eq_ignore_ascii_case(r))
+            })
+            .or_else(|| REGIONS.iter().find(|(code, ..)| *code == fallback))
+            .copied()
+            .unwrap_or(("US", '.', ',', false, '/', "$"));
+        let (_, decimal, group, day_first, date_separator, currency) = region;
+        let (months, weekdays, of) = if portuguese {
+            (
+                [
+                    "janeiro",
+                    "fevereiro",
+                    "março",
+                    "abril",
+                    "maio",
+                    "junho",
+                    "julho",
+                    "agosto",
+                    "setembro",
+                    "outubro",
+                    "novembro",
+                    "dezembro",
+                ],
+                [
+                    "domingo",
+                    "segunda-feira",
+                    "terça-feira",
+                    "quarta-feira",
+                    "quinta-feira",
+                    "sexta-feira",
+                    "sábado",
+                ],
+                "de",
+            )
+        } else {
+            (
+                [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                ],
+                [
+                    "Sunday",
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                ],
+                "",
+            )
+        };
         Self {
-            decimal: '.',
-            group: ',',
-            currency: "$".to_owned(),
-            day_first: false,
-            months: [
-                "January",
-                "February",
-                "March",
-                "April",
-                "May",
-                "June",
-                "July",
-                "August",
-                "September",
-                "October",
-                "November",
-                "December",
-            ],
-            weekdays: [
-                "Sunday",
-                "Monday",
-                "Tuesday",
-                "Wednesday",
-                "Thursday",
-                "Friday",
-                "Saturday",
-            ],
-            of: "",
+            decimal,
+            group,
+            currency: currency.to_owned(),
+            day_first,
+            date_separator,
+            months,
+            weekdays,
+            of,
+            portuguese,
         }
     }
 
-    /// The locale of a language tag such as `pt_BR.UTF-8`; English for
-    /// any language but Portuguese.
-    pub fn from_tag(tag: &str) -> Self {
-        if tag.starts_with("pt") {
-            Self::pt_br()
-        } else {
-            Self::en_us()
+    /// A date and time, in days from 30 December 1899, written in a
+    /// pattern of the symbols of Unicode (LDML) such as `d MMMM y`, as the
+    /// date fields of the text are (EST-27, PXV-09). Unlike the patterns of
+    /// cells, a lone `y` is the whole year.
+    pub fn date(&self, days: f64, pattern: &str) -> String {
+        let chars: Vec<char> = pattern.chars().collect();
+        let mut out = String::new();
+        // The symbols since the last quoted text.
+        let mut symbols = String::new();
+        let mut i = 0;
+        while i < chars.len() {
+            let c = chars[i];
+            if c == '\'' {
+                out += &custom_date(days, &std::mem::take(&mut symbols), self);
+                // Quoted text, where '' is a quote, inside quotes or out.
+                if chars.get(i + 1) == Some(&'\'') {
+                    out.push('\'');
+                    i += 2;
+                    continue;
+                }
+                let mut j = i + 1;
+                while j < chars.len() {
+                    if chars[j] == '\'' {
+                        if chars.get(j + 1) == Some(&'\'') {
+                            out.push('\'');
+                            j += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    out.push(chars[j]);
+                    j += 1;
+                }
+                i = j + 1;
+                continue;
+            }
+            let lone =
+                c == 'y' && (i == 0 || chars[i - 1] != 'y') && chars.get(i + 1) != Some(&'y');
+            if lone {
+                symbols.push_str("yyyy");
+            } else {
+                symbols.push(c);
+            }
+            i += 1;
         }
+        out += &custom_date(days, &symbols, self);
+        out
+    }
+
+    /// The locale of a tag such as `pt-BR`, `en-GB` or `pt_BR.UTF-8`: its
+    /// language and its region.
+    pub fn from_tag(tag: &str) -> Self {
+        let tag = tag.split(['.', '@']).next().unwrap_or_default();
+        let mut parts = tag.split(['-', '_']);
+        let language = parts.next().unwrap_or_default();
+        // The region is the part of two letters or three digits, after a
+        // script of four letters if there is one.
+        let region = parts.find(|p| {
+            (p.len() == 2 && p.chars().all(|c| c.is_ascii_alphabetic()))
+                || (p.len() == 3 && p.chars().all(|c| c.is_ascii_digit()))
+        });
+        Self::of(language, region)
     }
 }
 
@@ -438,8 +549,10 @@ fn date_text(days: f64, date: DateStyle, time: TimeStyle, locale: &Locale) -> St
     let short_month: String = month.chars().take(3).collect();
     let date_part = match date {
         DateStyle::None => String::new(),
-        DateStyle::Short if locale.day_first => format!("{d:02}/{m:02}/{y:04}"),
-        DateStyle::Short => format!("{m}/{d}/{y:04}"),
+        DateStyle::Short if locale.day_first => {
+            format!("{d:02}{sep}{m:02}{sep}{y:04}", sep = locale.date_separator)
+        }
+        DateStyle::Short => format!("{m}{sep}{d}{sep}{y:04}", sep = locale.date_separator),
         DateStyle::Medium if locale.of.is_empty() => format!("{short_month} {d}, {y}"),
         DateStyle::Medium => format!("{d} {of} {short_month}. {of} {y}", of = locale.of),
         DateStyle::Long if locale.of.is_empty() => format!("{month} {d}, {y}"),
@@ -814,7 +927,7 @@ impl Format {
 
     /// A value written in this format.
     pub fn show(&self, value: &Value, locale: &Locale) -> Shown {
-        let pt = locale.decimal == ',';
+        let pt = locale.portuguese;
         let numeric = |text: String, red: bool| Shown {
             text,
             red,
@@ -1224,6 +1337,62 @@ mod tests {
 
     fn show(f: &Format, v: Value) -> String {
         f.show(&v, &Locale::pt_br()).text
+    }
+
+    #[test]
+    fn pxv_09_the_language_gives_the_words_and_the_region_the_numbers() {
+        let money = Format::Currency {
+            symbol: "R$".into(),
+            decimals: 2,
+            thousands: true,
+            negative: Negative::Minus,
+            accounting: false,
+        };
+        let long = Format::DateTime {
+            date: DateStyle::Long,
+            time: TimeStyle::None,
+        };
+        let short = Format::DateTime {
+            date: DateStyle::Short,
+            time: TimeStyle::None,
+        };
+        // 18 November 2026.
+        let day = Value::Date(46_344.0);
+        // English words with the numbers of Brazil.
+        let en_br = Locale::from_tag("en-BR");
+        assert_eq!(en_br.currency, "R$");
+        assert_eq!(
+            money.show(&Value::Number(1234.5), &en_br).text,
+            "R$1.234,50"
+        );
+        assert_eq!(long.show(&day, &en_br).text, "November 18, 2026");
+        assert_eq!(short.show(&day, &en_br).text, "18/11/2026");
+        // Portuguese words with the numbers of the United States.
+        let pt_us = Locale::from_tag("pt-US");
+        assert_eq!(
+            money.show(&Value::Number(1234.5), &pt_us).text,
+            "R$\u{a0}1,234.50"
+        );
+        assert_eq!(long.show(&day, &pt_us).text, "18 de novembro de 2026");
+        assert_eq!(short.show(&day, &pt_us).text, "11/18/2026");
+        // A region of its own separator of dates, and one from the system.
+        assert_eq!(
+            short.show(&day, &Locale::from_tag("en-DE")).text,
+            "18.11.2026"
+        );
+        assert_eq!(Locale::from_tag("pt_PT.UTF-8").currency, "€");
+        // No region takes the one of the language.
+        assert_eq!(Locale::from_tag("pt"), Locale::pt_br());
+        assert_eq!(Locale::from_tag("und"), Locale::en_us());
+        // The date fields of the text, in patterns of Unicode.
+        assert_eq!(
+            Locale::pt_br().date(46_344.5, "EEEE, d MMMM y"),
+            "quarta-feira, 18 novembro 2026"
+        );
+        assert_eq!(
+            Locale::en_us().date(46_344.5, "d/M/yy HH:mm"),
+            "18/11/26 12:00"
+        );
     }
 
     #[test]

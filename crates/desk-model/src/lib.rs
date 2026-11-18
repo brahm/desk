@@ -51,6 +51,7 @@ mod case_change;
 mod connection;
 mod convert_quotes;
 mod document;
+mod document_language;
 mod error;
 mod find;
 mod format;

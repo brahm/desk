@@ -513,7 +513,7 @@ impl TableGroups {
             Box::new(|this, editor| {
                 let decimals = (this.format.selected() != 0 && this.decimals.value() >= 0.0)
                     .then(|| this.decimals.value() as u8);
-                let symbol = editor.table_locale().currency.clone();
+                let symbol = editor.locale().currency.clone();
                 editor.set_cell_format(format_at(
                     this.format.selected(),
                     decimals,
@@ -603,7 +603,7 @@ impl TableGroups {
             self,
             Box::new(|this, editor| {
                 let text = this.operand.text().to_string();
-                let number = desk_model::table::parse_number(&text, &editor.table_locale())
+                let number = desk_model::table::parse_number(&text, &editor.locale())
                     .map(|(n, _)| Operand::Number(Num(n)))
                     .unwrap_or_else(|| Operand::Text(text.clone()));
                 let condition = match this.condition.selected() {
