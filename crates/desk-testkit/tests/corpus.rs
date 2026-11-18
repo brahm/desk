@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use desk_testkit::case::REFERENCE_PDF;
 use desk_testkit::report::{Report, run_case};
-use desk_testkit::{Case, Outcome, Status, matrix};
+use desk_testkit::{Case, Outcome, Phase, Status, matrix};
 
 fn corpus() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
@@ -85,7 +85,7 @@ fn a_case_matches_its_own_pdf_and_not_another() {
     let report = Report::new(
         vec![matrix::Row {
             id: "FMT-12".into(),
-            phase: Some(1),
+            phase: Some(Phase::Old(1)),
             feature: "Alignment".into(),
             expected: String::new(),
             guide_pages: String::new(),
@@ -167,7 +167,7 @@ fn the_report_tells_tests_that_compare_with_pages_from_the_others() {
 
     let row = |id: &str| matrix::Row {
         id: id.into(),
-        phase: Some(2),
+        phase: Some(Phase::Old(2)),
         feature: String::new(),
         expected: String::new(),
         guide_pages: String::new(),
@@ -208,7 +208,7 @@ fn the_report_tells_documents_of_pages_that_still_differ() {
     let report = Report::new(
         vec![matrix::Row {
             id: "OBJ-12".into(),
-            phase: Some(6),
+            phase: Some(Phase::Old(6)),
             feature: String::new(),
             expected: String::new(),
             guide_pages: String::new(),

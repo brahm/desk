@@ -48,7 +48,7 @@ W044	3.3 View and navigation	Invisibles	Equal (15 chooses the color)	Equal in bo
 W045	3.3 View and navigation	Layout marks	Equal	Equal in both	-	In	Done	-	done	Show Layout (INT-09)
 W046	3.3 View and navigation	Rulers	Equal	Equal in both	-	In	Done	-	done	Rulers and guides (INT-17)
 W047	3.3 View and navigation	Go to page	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Go to page from the bottom bar (INT-19)
-W048	3.3 View and navigation	Step through items (page, section, comment, change, bookmark, match)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Navigate by kind of item from the bottom bar (INT-19)
+W048	3.3 View and navigation	Step through items (page, section, comment, change, bookmark, match)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W1	Navigate by kind of item from the bottom bar (INT-19); Pages 15.4 only steps by page (seen 2026-11-18), so the kinds of the '09 stay (D-003)
 W049	3.4 Text and characters	Text selection	Different	15.4	D-001	In	Done	-	done	Discontinuous selection with Ctrl (TXT-03)
 W050	3.4 Text and characters	Font, size, bold, italic, underline, strikethrough	Different (place)	15.4	D-001	In	Done	-	done	Font group of the Format pane (FMT-01, FMT-02, FMT-05)
 W051	3.4 Text and characters	Default font	Different	15.4	D-001	In	Partial	-	W1	The default font comes from the template; choosing it in Preferences is missing

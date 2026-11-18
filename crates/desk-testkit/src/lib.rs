@@ -19,5 +19,5 @@ pub mod matrix;
 pub mod report;
 
 pub use case::{Case, CaseError, CaseSpec};
-pub use matrix::Row;
+pub use matrix::{Phase, Row};
 pub use report::{CaseResult, Outcome, Report, Status};
