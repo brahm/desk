@@ -605,7 +605,7 @@ feature	W171	done
 feature	W172	missing
 feature	W173	partial
 feature	W174	missing
-phase	B1	in-progress
+phase	B1	done
 phase	R	done
 phase	S1	not-started
 phase	S2	not-started
@@ -617,7 +617,7 @@ phase	T2	not-started
 phase	T3	not-started
 phase	T4	not-started
 phase	T5	not-started
-phase	W1	not-started
+phase	W1	in-progress
 phase	W2	not-started
 phase	W3	not-started
 phase	W4	not-started
