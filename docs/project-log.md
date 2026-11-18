@@ -1001,6 +1001,44 @@ matrix rows done on 9 November, before the change of target.
   corpus, without the Mac; only the metrics of the Apple fonts (B-021) are
   measured there.
 
+### 18 November: the Mac session with Pages 15.4 for W1
+
+- The session the plan of W1 asks for at the start of the phase ran on the
+  owner's Mac, with Pages 15.4 (build 7051.0.79), by control of the
+  screen, after the owner freed the Mac. An earlier attempt was stuck on
+  a Windows PC that was off; a new thread bound to the Mac replaced it.
+- *What was done:* the features that exist only in Pages 15 were used and
+  written down (drop cap, automatic fractions, Screen View, table title
+  and lock, a table made by dragging cells out of another), as well as
+  the missing parts of the partial rows (default font, quotes,
+  capitalization, document language and region, gradient and image text
+  fill, dragging list items by the bullet, columns on a selection, threads
+  of linked text boxes, table styles, custom cell formats). The notes, in
+  English, and 65 screenshots stay in the project folder
+  (`w1-mac/notes.md` and `w1-mac/capturas/`), for the thread of W1 to turn
+  into parity rows.
+- *What it showed:* the sidebar table of contents (W041) updates while a
+  heading is typed, as Desk must; Go to page (W047) works as already
+  built; stepping through items by kind (W048) does not exist in 15.4,
+  where View > Go To only steps by page; the thread of W1 decides what
+  that row keeps. Automatic fractions only produce the ready-made Unicode
+  fractions (½, ⅝, ⅒): 13/16 stays as typed, so Desk needs no built-up
+  fraction. Columns on a selection put two layout breaks around it and
+  balance the region between them. A table can only be locked once it
+  stops being inline.
+- *Also done:* the 152 PDFs exported from Pages 15.4 that were still only
+  on the Mac were copied to the project folder, for B-020 and the other
+  layout items.
+- *Left for a later Mac session, still in W1:* using the default text box
+  style (W081, only found), dragging cells inside a table and renaming or
+  deleting custom formats (W132, B-012), converting quotes already typed
+  (W062), the effect of the document language on hyphenation (W072), and
+  merging cells in practice (W131).
+- *B-021:* no Python on the Mac (macOS 26.7.3) has PyObjC, which the
+  measuring script needs. The owner chose to install it in a throwaway
+  environment under `/tmp`; the measuring of Baskerville and Didot waits
+  for that.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
