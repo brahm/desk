@@ -1065,6 +1065,22 @@ matrix rows done on 9 November, before the change of target.
   B-020 was reverted on the branch so that the matrix could go first, and
   came back with B-021 in the next pull request.
 
+### 18 November: capitalization of the 15 (W054, step 3 of W1)
+
+- Start Case joins None, All Caps, Small Caps and Title Case, as Pages
+  15.4 offers them: it capitalizes every word, where Title Case leaves
+  the short words that join others in lower case. In ODF,
+  `fo:text-transform="capitalize"` is what other programs mean by Start
+  Case, so Desk now reads it so, and keeps Title Case with a new
+  extension, `desk:title-case`. A document saved with Title Case by an
+  older Desk reads as Start Case.
+- Make Upper Case, Make Lower Case and Capitalize, the Transformations of
+  the Edit menu of Pages 15.4, change the characters themselves and keep
+  their formatting. GNOME apps have no menu bar, so they are in the
+  context menu of the text and in the command search. Pages 15.4 has no
+  Sentence case, which the inventory had listed.
+
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

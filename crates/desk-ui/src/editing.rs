@@ -2754,6 +2754,19 @@ impl TextEditor {
         });
     }
 
+    /// Changes the case of the selected characters, as one action of the
+    /// history, as Edit > Transformations does in Pages 15.4 (W054).
+    pub fn change_case(&self, case: desk_model::CaseChange) {
+        let name = match case {
+            desk_model::CaseChange::Upper => "Make Upper Case",
+            desk_model::CaseChange::Lower => "Make Lower Case",
+            desk_model::CaseChange::Capitalize => "Capitalize",
+        };
+        self.format_ranges(name, |edit, from, to| {
+            edit.change_case(from, to, case).map(|_| ())
+        });
+    }
+
     /// Sets paragraph formatting on the paragraphs of the selection.
     pub fn set_paragraph_attrs(&self, name: &str, attrs: &ParaAttrs) {
         self.format_ranges(name, |edit, from, to| {

@@ -274,7 +274,13 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
     let capitalization = match (t.small_caps, t.transform) {
         (_, Some(odf::TextTransform::Uppercase)) => Some(Capitalization::AllCaps),
         (Some(true), _) => Some(Capitalization::SmallCaps),
-        (_, Some(odf::TextTransform::Capitalize)) => Some(Capitalization::Title),
+        // `capitalize` is Start Case; `desk:title-case` makes it Title
+        // Case (docs/odf-extensions.md).
+        (_, Some(odf::TextTransform::Capitalize)) => Some(if t.title_case == Some(true) {
+            Capitalization::Title
+        } else {
+            Capitalization::Start
+        }),
         (Some(false), _) | (_, Some(odf::TextTransform::None | odf::TextTransform::Lowercase)) => {
             Some(Capitalization::None)
         }
@@ -394,8 +400,13 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         }),
         transform: a.capitalization.map(|c| match c {
             Capitalization::AllCaps => odf::TextTransform::Uppercase,
-            Capitalization::Title => odf::TextTransform::Capitalize,
+            Capitalization::Title | Capitalization::Start => odf::TextTransform::Capitalize,
             Capitalization::None | Capitalization::SmallCaps => odf::TextTransform::None,
+        }),
+        title_case: a.capitalization.and_then(|c| match c {
+            Capitalization::Title => Some(true),
+            Capitalization::Start => Some(false),
+            _ => None,
         }),
         small_caps: a.capitalization.map(|c| c == Capitalization::SmallCaps),
         language,

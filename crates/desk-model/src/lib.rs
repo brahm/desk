@@ -47,6 +47,7 @@
 mod arrange;
 mod auto_numbers;
 mod autocorrect;
+mod case_change;
 mod connection;
 mod document;
 mod error;
@@ -81,6 +82,7 @@ pub mod workbook;
 pub use arrange::SectionsClip;
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{AutoCorrect, Correction, Replacement, ends_word, smart_quote};
+pub use case_change::CaseChange;
 pub use connection::{Connection, bend_through, bent_controls, bent_middle, connect, flattened};
 pub use document::{
     Container, Document, FixedGuide, Metadata, OutlineOptions, PageSetup, PagedFlow,

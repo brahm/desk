@@ -172,7 +172,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 71] = [
+const DOCUMENT_ACTIONS: [&str; 74] = [
     "outline",
     "contents",
     "edit-toc",
@@ -184,6 +184,9 @@ const DOCUMENT_ACTIONS: [&str; 71] = [
     "thumbnails",
     "delete-page",
     "special-characters",
+    "make-upper-case",
+    "make-lower-case",
+    "capitalize",
     "save",
     "save-as",
     "save-copy",
@@ -2267,6 +2270,15 @@ impl DocumentWindow {
             ("select-all", TextEditor::select_all),
             ("deselect-all", TextEditor::deselect_all),
             ("special-characters", TextEditor::special_characters),
+            ("make-upper-case", |e: &TextEditor| {
+                e.change_case(desk_model::CaseChange::Upper);
+            }),
+            ("make-lower-case", |e: &TextEditor| {
+                e.change_case(desk_model::CaseChange::Lower);
+            }),
+            ("capitalize", |e: &TextEditor| {
+                e.change_case(desk_model::CaseChange::Capitalize);
+            }),
         ] {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
@@ -3166,6 +3178,7 @@ impl DocumentWindow {
         menu.append_section(None, &style);
         let tools = gio::Menu::new();
         tools.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
+        tools.append_submenu(Some(&tr("T_ransformations")), &transformations_menu());
         tools.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
         tools.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
         menu.append_section(None, &tools);
@@ -3586,11 +3599,24 @@ pub(crate) fn format_menu() -> gio::Menu {
     menu
 }
 
-/// Select All and Deselect All, for the command search (VMI-01).
+/// Select All and Deselect All, for the command search (VMI-01), and
+/// the transformations of the case (W054).
 pub(crate) fn edit_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("Select _All")), Some("win.select-all"));
     menu.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
+    menu.append_section(None, &transformations_menu());
+    menu
+}
+
+/// Edit > Transformations of Pages 15.4, which change the case of the
+/// characters themselves (W054), in the context menu of the text and in
+/// the command search.
+fn transformations_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&tr("Make _Upper Case")), Some("win.make-upper-case"));
+    menu.append(Some(&tr("Make _Lower Case")), Some("win.make-lower-case"));
+    menu.append(Some(&tr("_Capitalize")), Some("win.capitalize"));
     menu
 }
 

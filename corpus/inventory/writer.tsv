@@ -54,7 +54,7 @@ W050	3.4 Text and characters	Font, size, bold, italic, underline, strikethrough	
 W051	3.4 Text and characters	Default font	Different	15.4	D-001	In	Partial	-	W1	The default font comes from the template; choosing it in Preferences is missing
 W052	3.4 Text and characters	Text color	Different	15.4	D-001	In	Partial	-	W1	Solid color (FMT-11); gradient and image in text are missing
 W053	3.4 Text and characters	Outline and shadow	Equal	Equal in both	-	In	Done	-	done	Text outline and shadow (FMT-03, FMT-04)
-W054	3.4 Text and characters	Capitalization	Different	15.4	D-001	In	Partial	-	W1	All caps, small caps and Title Case, which leaves short joining words in lower case as Pages 15.4 does (FMT-07); Start Case, Sentence case and the other transformations of the 15 are missing
+W054	3.4 Text and characters	Capitalization	Different	15.4	D-001	In	Done	-	W1	None, All Caps, Small Caps, Title Case, which leaves short joining words in lower case, and Start Case, which capitalizes every word, as Pages 15.4 offers them (FMT-07, PXV-05); Make Upper Case, Make Lower Case and Capitalize change the characters, in the context menu and the command search. Pages 15.4 has no Sentence case
 W055	3.4 Text and characters	Superscript/subscript, baseline shift	Equal	Equal in both	-	In	Done	-	done	Superscript and baseline (FMT-06)
 W056	3.4 Text and characters	Character spacing and ligatures	Equal	Equal in both	-	In	Done	-	done	Spacing and ligatures (FMT-09, FMT-10)
 W057	3.4 Text and characters	Font smoothing	Only '09	'09, in the form of the 15	D-002	Not applicable to GNOME (D-005)	Not applicable	-	-	Font smoothing belongs to the system in GNOME

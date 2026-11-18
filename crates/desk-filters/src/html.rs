@@ -280,7 +280,9 @@ fn character_css(format: &CharFormat) -> String {
         Capitalization::None => {}
         Capitalization::AllCaps => css.push_str(";text-transform:uppercase"),
         Capitalization::SmallCaps => css.push_str(";font-variant:small-caps"),
-        Capitalization::Title => css.push_str(";text-transform:capitalize"),
+        Capitalization::Title | Capitalization::Start => {
+            css.push_str(";text-transform:capitalize");
+        }
     }
     css
 }

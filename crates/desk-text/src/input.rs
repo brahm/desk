@@ -440,6 +440,7 @@ impl ParagraphText {
                     Capitalization::None => false,
                     Capitalization::AllCaps | Capitalization::SmallCaps => true,
                     Capitalization::Title => word_start && !minor,
+                    Capitalization::Start => word_start,
                 };
                 if upper && c.is_lowercase() {
                     out.text.extend(c.to_uppercase());
@@ -583,6 +584,20 @@ mod tests {
         // takes both lists.
         assert_eq!(title("what we do", "en"), "What We Do");
         assert_eq!(title("cidade do porto", "und"), "Cidade do Porto");
+    }
+
+    #[test]
+    fn pxv_05_start_case_capitalizes_every_word() {
+        let text = ParagraphText::from_runs(
+            ParaFormat::default(),
+            CharFormat::default(),
+            [(
+                "the return of the king and 'single quotes'",
+                format(Capitalization::Start),
+            )],
+        );
+        // As Pages 15.4 drew it: every word, "and" and "of" too.
+        assert_eq!(text.text(), "The Return Of The King And 'Single Quotes'");
     }
 
     #[test]
