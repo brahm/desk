@@ -102,6 +102,9 @@ pub struct GraphicProperties {
     /// `desk:default-object-style`, of an object style: whether new
     /// objects of its kind take it.
     pub default_object_style: Option<bool>,
+    /// `desk:text-box-paragraph-style`, of the default text box style: the
+    /// paragraph style of the text of new text boxes (PXV-10).
+    pub text_box_paragraph_style: Option<String>,
     /// `desk:picture-frame`: the picture frame of the library of Desk
     /// around the object, by its name.
     pub picture_frame: Option<String>,
@@ -628,6 +631,7 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         picture_frame: text(DESK, "picture-frame"),
         object_style: text(DESK, "object-style"),
         default_object_style: e.attr(DESK, "default-object-style").map(|v| v == "true"),
+        text_box_paragraph_style: text(DESK, "text-box-paragraph-style"),
         master_pages: text(DESK, "master-pages"),
         picture_frame_scale: e.attr(DESK, "picture-frame-scale").and_then(parse_percent),
         fill_tint: e.attr(DESK, "fill-tint").and_then(Color::parse),
@@ -739,6 +743,10 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
             if default { "true" } else { "false" },
         );
     }
+    w.attr_opt(
+        "desk:text-box-paragraph-style",
+        g.text_box_paragraph_style.as_deref(),
+    );
     if let Some(opacity) = g.opacity {
         w.attr("draw:opacity", &format!("{}%", decimal(opacity)));
     }

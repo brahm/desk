@@ -21,8 +21,8 @@ use desk_model::{
 use desk_odf as odf;
 
 use super::{
-    FilterError, export_spans, length, odf_color, odf_length, odf_paragraph_properties, rgba,
-    text_properties,
+    FilterError, char_attrs, export_spans, length, odf_color, odf_length, odf_paragraph_properties,
+    para_attrs, paragraph_properties, rgba, text_properties,
 };
 
 /// The largest side of a picture of an object, in pixels.
@@ -1026,6 +1026,7 @@ fn import_object_styles(
 ) -> Result<(), FilterError> {
     let mut styles = desk_model::ObjectStyles::default();
     let mut defaults = Vec::new();
+    let mut text_box = None;
     for style in source
         .styles
         .iter()
@@ -1055,6 +1056,9 @@ fn import_object_styles(
         });
         if g.default_object_style == Some(true) {
             defaults.push(id);
+            if kind == desk_model::ObjectStyleKind::TextBox && g.padding.is_some() {
+                text_box = Some(text_box_default(source, document, style));
+            }
         }
     }
     if styles.is_empty() {
@@ -1063,8 +1067,73 @@ fn import_object_styles(
     for id in defaults {
         styles.set_default(id);
     }
+    if let Some(text_box) = text_box {
+        styles.set_text_box_default(text_box);
+    }
     document.apply(desk_model::Op::SetObjectStyles { styles })?;
     Ok(())
+}
+
+/// What new text boxes take besides their look, from the default text box
+/// style of a file of Desk (PXV-10).
+fn text_box_default(
+    source: &odf::TextDocument,
+    document: &Document,
+    style: &odf::Style,
+) -> desk_model::TextBoxDefault {
+    let g = &style.properties.graphic;
+    let mut default = desk_model::TextBoxDefault::default();
+    if let Some(padding) = g.padding {
+        default.inset = length(padding);
+    }
+    default.vertical = match g.textarea_vertical_align.as_deref() {
+        Some("middle") => VerticalAlignment::Middle,
+        Some("bottom") => VerticalAlignment::Bottom,
+        _ => VerticalAlignment::Top,
+    };
+    default.wrap = model_wrap(g);
+    default.paragraph_style = g.text_box_paragraph_style.as_deref().and_then(|name| {
+        let shown = source
+            .styles
+            .iter()
+            .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+            .map_or(name, odf::Style::shown_name);
+        document
+            .styles()
+            .by_name(desk_model::StyleFamily::Paragraph, shown)
+            .map(desk_model::Style::id)
+    });
+    let text = &style.properties.text;
+    default.paragraph = para_attrs(&style.properties.paragraph, text);
+    default.character = char_attrs(text, 12.0);
+    default
+}
+
+/// How the body goes around an object, from its graphic properties.
+fn model_wrap(g: &odf::GraphicProperties) -> Wrap {
+    match (g.wrap.as_deref(), g.run_through.as_deref()) {
+        (Some("none"), _) => Wrap::AboveAndBelow,
+        (Some("left"), _) => Wrap::Left,
+        (Some("right"), _) => Wrap::Right,
+        (Some("biggest"), _) => Wrap::Largest,
+        (Some("run-through"), Some("background")) => Wrap::Behind,
+        (Some("run-through"), _) => Wrap::Through,
+        _ => Wrap::Both,
+    }
+}
+
+/// The wrap of an object as ODF writes it, and whether the object is in
+/// front of or behind the text it runs through.
+fn odf_wrap(wrap: Wrap) -> (&'static str, Option<&'static str>) {
+    match wrap {
+        Wrap::Both => ("parallel", None),
+        Wrap::Largest => ("biggest", None),
+        Wrap::Left => ("left", None),
+        Wrap::Right => ("right", None),
+        Wrap::AboveAndBelow => ("none", None),
+        Wrap::Through => ("run-through", Some("foreground")),
+        Wrap::Behind => ("run-through", Some("background")),
+    }
 }
 
 /// The object style that an object of a file of Desk took: the parent of
@@ -1296,15 +1365,7 @@ fn import_one(
     if let ObjectKind::Image(picture) = &built.kind {
         built.picture = model_picture_settings(&g, picture, frame);
     }
-    built.wrap = match (g.wrap.as_deref(), g.run_through.as_deref()) {
-        (Some("none"), _) => Wrap::AboveAndBelow,
-        (Some("left"), _) => Wrap::Left,
-        (Some("right"), _) => Wrap::Right,
-        (Some("biggest"), _) => Wrap::Largest,
-        (Some("run-through"), Some("background")) => Wrap::Behind,
-        (Some("run-through"), _) => Wrap::Through,
-        _ => Wrap::Both,
-    };
+    built.wrap = model_wrap(&g);
     if anchor_type == "as-char" {
         built.wrap = Wrap::AboveAndBelow;
     }
@@ -1901,15 +1962,7 @@ impl Exporter<'_> {
                 desk_model::MarginPages::Left => Some("left".into()),
             };
         }
-        let (wrap, through) = match object.wrap {
-            Wrap::Both => ("parallel", None),
-            Wrap::Largest => ("biggest", None),
-            Wrap::Left => ("left", None),
-            Wrap::Right => ("right", None),
-            Wrap::AboveAndBelow => ("none", None),
-            Wrap::Through => ("run-through", Some("foreground")),
-            Wrap::Behind => ("run-through", Some("background")),
-        };
+        let (wrap, through) = odf_wrap(object.wrap);
         g.wrap = Some(wrap.into());
         g.run_through = through.map(Into::into);
         g.margin = Some(odf_length(object.wrap_margin));
@@ -2270,14 +2323,36 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
         let mut graphic = exporter.look(&style.graphic);
         graphic.object_style = Some(style.kind.name().to_owned());
         graphic.default_object_style = object_styles.is_default(style.id).then_some(true);
+        let mut properties = odf::Properties::default();
+        // What new text boxes take besides their look, on the default text
+        // box style, when the document set it (PXV-10).
+        let text_box = object_styles.text_box_default();
+        if style.kind == desk_model::ObjectStyleKind::TextBox
+            && object_styles.is_default(style.id)
+            && *text_box != desk_model::TextBoxDefault::default()
+        {
+            graphic.padding = Some(odf_length(text_box.inset));
+            graphic.textarea_vertical_align = match text_box.vertical {
+                VerticalAlignment::Top => Some("top".into()),
+                VerticalAlignment::Middle => Some("middle".into()),
+                VerticalAlignment::Bottom => Some("bottom".into()),
+            };
+            let (wrap, through) = odf_wrap(text_box.wrap);
+            graphic.wrap = Some(wrap.into());
+            graphic.run_through = through.map(Into::into);
+            graphic.text_box_paragraph_style = text_box
+                .paragraph_style
+                .and_then(|id| exporter.names.get(&id).cloned());
+            properties.paragraph = paragraph_properties(&text_box.paragraph);
+            properties.text =
+                text_properties(&text_box.character, &desk_model::CharFormat::default());
+        }
+        properties.graphic = graphic;
         out.styles.push(odf::Style {
             display_name: (name != *style.name).then(|| style.name.to_string()),
             name,
             family: odf::Family::Graphic,
-            properties: odf::Properties {
-                graphic,
-                ..Default::default()
-            },
+            properties,
             ..odf::Style::default()
         });
     }

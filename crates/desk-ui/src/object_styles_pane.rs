@@ -84,6 +84,10 @@ pub fn commands_menu() -> gio::Menu {
         Some(&tr("Define as _Default Style")),
         Some("win.default-object-style"),
     );
+    style.append(
+        Some(&tr("Set as Default _Text Box Appearance")),
+        Some("win.default-text-box"),
+    );
     menu.append_section(None, &style);
     let manage = gio::Menu::new();
     manage.append(Some(&tr("_Rename Style…")), Some("win.rename-object-style"));

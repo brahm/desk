@@ -3481,6 +3481,68 @@ fn mod_04_mod_07_object_styles_and_the_objects_that_took_them_are_kept() {
 }
 
 #[test]
+fn pxv_10_the_default_text_box_appearance_is_kept() {
+    use desk_model::{Frame, Object, ObjectKind, TextBox, VerticalAlignment, Wrap};
+    let mut document = Document::new_word_processing();
+    let quote = document.new_id();
+    document
+        .transact("Styles", |edit| {
+            edit.apply(Op::PutStyle {
+                style: Style::Paragraph(ParagraphStyle::new(quote, "Quote")),
+            })?;
+            let paragraph = Paragraph::from_runs(
+                edit.new_id(),
+                quote,
+                ParaAttrs {
+                    alignment: Some(Alignment::Center),
+                    ..ParaAttrs::default()
+                },
+                [Run::with_attrs(
+                    "Note",
+                    None,
+                    CharAttrs {
+                        weight: Some(FontWeight::BOLD),
+                        color: Some(Rgba::rgb(200, 0, 0)),
+                        ..CharAttrs::default()
+                    },
+                )],
+            )?;
+            let mut text = TextBox::new(std::sync::Arc::from([paragraph]), Length::from_points(9));
+            text.vertical = VerticalAlignment::Bottom;
+            let id = edit.new_id();
+            let mut object = Object::new(
+                id,
+                ObjectKind::TextBox(text),
+                Frame::from_pt(0.0, 0.0, 100.0, 100.0),
+            );
+            edit.document().give_default_style(&mut object);
+            object.wrap = Wrap::AboveAndBelow;
+            edit.add_object(object)?;
+            edit.set_default_text_box(id, "Default")
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-default-text-box.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let default = read.object_styles().text_box_default();
+    let before = document.object_styles().text_box_default();
+    assert_eq!(default.inset, before.inset);
+    assert_eq!(default.vertical, VerticalAlignment::Bottom);
+    assert_eq!(default.wrap, Wrap::AboveAndBelow);
+    assert_eq!(default.paragraph.alignment, Some(Alignment::Center));
+    assert_eq!(default.character.weight, Some(FontWeight::BOLD));
+    assert_eq!(default.character.color, Some(Rgba::rgb(200, 0, 0)));
+    let style = default.paragraph_style.and_then(|id| read.styles().get(id));
+    assert_eq!(style.map(Style::name), Some("Quote"));
+    // A document that never set it reads back with the default of Desk.
+    let plain = read_odt(&write_odt(&Document::new_word_processing()).unwrap()).unwrap();
+    assert_eq!(
+        *plain.object_styles().text_box_default(),
+        desk_model::TextBoxDefault::default()
+    );
+}
+
+#[test]
 fn mod_04_the_styles_of_the_library_come_back_as_they_were() {
     let read = read_odt(&write_odt(&sample()).unwrap()).unwrap();
     let new = Document::new_word_processing();

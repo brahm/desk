@@ -18,10 +18,11 @@ use std::sync::Arc;
 use imbl::OrdMap;
 
 use crate::error::ModelError;
-use crate::format::BorderStyle;
+use crate::format::{BorderStyle, CharAttrs, ParaAttrs};
 use crate::id::NodeId;
 use crate::object::{
     Fill, FrameStyle, GraphicStyle, Object, ObjectKind, ObjectShadow, PictureFrame, Stroke,
+    VerticalAlignment, Wrap,
 };
 use crate::op::Op;
 use crate::style::StyleId;
@@ -111,11 +112,51 @@ impl ObjectStyle {
     }
 }
 
-/// The object styles of a document, and the default of each kind.
+/// What a new text box of a document takes besides the look of its
+/// default style: the room around its text, where the text sits, how the
+/// body goes around it and how its text is formatted, as Format >
+/// Advanced > Set as Default Text Box Appearance of Pages 15.4 keeps them
+/// (PXV-10). Its size is not part of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextBoxDefault {
+    /// The room between the frame and the text.
+    pub inset: Length,
+    /// Where the text sits in the frame.
+    pub vertical: VerticalAlignment,
+    /// How the text of the body goes around the box.
+    pub wrap: Wrap,
+    /// The paragraph style of its text, or the default one of the
+    /// document when none.
+    pub paragraph_style: Option<StyleId>,
+    /// The paragraph formatting of its text.
+    pub paragraph: ParaAttrs,
+    /// The character formatting of its text.
+    pub character: CharAttrs,
+}
+
+impl Default for TextBoxDefault {
+    /// A new text box of Desk until a document says otherwise: 4 pt
+    /// around the text, at the top, in front of the body, with the text
+    /// of the default paragraph style.
+    fn default() -> Self {
+        Self {
+            inset: Length::from_points(4),
+            vertical: VerticalAlignment::default(),
+            wrap: Wrap::Through,
+            paragraph_style: None,
+            paragraph: ParaAttrs::default(),
+            character: CharAttrs::default(),
+        }
+    }
+}
+
+/// The object styles of a document, the default of each kind, and what a
+/// new text box takes besides its look.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ObjectStyles {
     styles: OrdMap<StyleId, ObjectStyle>,
     defaults: OrdMap<ObjectStyleKind, StyleId>,
+    text_box: TextBoxDefault,
 }
 
 /// The look of a style of the library: a fill, a line, a shadow, a
@@ -295,6 +336,16 @@ pub fn library(kind: ObjectStyleKind) -> [(&'static str, GraphicStyle); 6] {
 }
 
 impl ObjectStyles {
+    /// What a new text box takes besides its look (PXV-10).
+    pub fn text_box_default(&self) -> &TextBoxDefault {
+        &self.text_box
+    }
+
+    /// Sets what a new text box takes besides its look (PXV-10).
+    pub fn set_text_box_default(&mut self, default: TextBoxDefault) {
+        self.text_box = default;
+    }
+
     /// The styles of the library, with identifiers from `new_id`: six
     /// of each kind, the first of each the default.
     pub fn library(mut new_id: impl FnMut() -> NodeId) -> Self {
@@ -564,6 +615,59 @@ impl Edit {
         })
     }
 
+    /// Makes a text box the appearance of the new text boxes of the
+    /// document, as Set as Default Text Box Appearance of Pages 15.4
+    /// (PXV-10): its look becomes the default text box style, its own
+    /// style when it still looks as it or a new one named `name`, and its
+    /// inset, the place of its text, its wrap and the formatting of the
+    /// start of its text are kept for the text of new boxes.
+    pub fn set_default_text_box(&mut self, id: NodeId, name: &str) -> Result<(), ModelError> {
+        let object = self
+            .document()
+            .objects()
+            .get(id)
+            .cloned()
+            .ok_or(ModelError::UnknownObject(id))?;
+        let ObjectKind::TextBox(text) = &object.kind else {
+            return Ok(());
+        };
+        let style = match self
+            .document()
+            .object_style_of(&object)
+            .filter(|(_, same)| *same)
+        {
+            Some((style, _)) => style.id,
+            None => {
+                let style =
+                    self.add_object_style(ObjectStyleKind::TextBox, name, object.style.clone())?;
+                self.apply_object_style(&[id], style)?;
+                style
+            }
+        };
+        let first = text.paragraphs.first();
+        let character = first
+            .and_then(|p| p.runs().next())
+            .map(|run| CharAttrs {
+                field: None,
+                link: None,
+                ..run.attrs.clone()
+            })
+            .unwrap_or_default();
+        let default = TextBoxDefault {
+            inset: text.inset,
+            vertical: text.vertical,
+            wrap: object.wrap,
+            paragraph_style: first.map(crate::Paragraph::style),
+            paragraph: first.map(|p| p.attrs().clone()).unwrap_or_default(),
+            character,
+        };
+        self.change_object_styles(|styles| {
+            styles.set_default(style);
+            styles.set_text_box_default(default);
+            Ok(())
+        })
+    }
+
     /// Deletes a style. The objects that took it keep their look and
     /// forget it. The last style of a kind cannot go, as new objects need
     /// a default.
@@ -628,6 +732,60 @@ mod tests {
         assert_eq!(
             basic.graphic.fill,
             Some(Fill::Color(Rgba::rgb(0x6c, 0x9f, 0xd8)))
+        );
+    }
+
+    #[test]
+    fn pxv_10_a_text_box_sets_the_appearance_of_new_ones() {
+        use crate::{FontWeight, Paragraph, Run, TextBox};
+        let mut document = Document::new_word_processing();
+        let body = document.styles().default_paragraph();
+        let bold = CharAttrs {
+            weight: Some(FontWeight::BOLD),
+            ..CharAttrs::default()
+        };
+        let paragraph = Paragraph::from_runs(
+            document.new_id(),
+            body,
+            ParaAttrs::default(),
+            [Run::with_attrs("Note", None, bold.clone())],
+        )
+        .unwrap();
+        let mut text = TextBox::new(std::sync::Arc::from([paragraph]), Length::from_points(9));
+        text.vertical = VerticalAlignment::Middle;
+        let (mut document, id) = {
+            let id = document.new_id();
+            let mut object = Object::new(
+                id,
+                ObjectKind::TextBox(text),
+                Frame::from_pt(0.0, 0.0, 100.0, 100.0),
+            );
+            document.give_default_style(&mut object);
+            object.style.opacity = 50;
+            object.wrap = Wrap::AboveAndBelow;
+            document
+                .transact("Insert", |edit| edit.add_object(object))
+                .unwrap();
+            (document, id)
+        };
+        document
+            .transact("Set as Default Text Box Appearance", |edit| {
+                edit.set_default_text_box(id, "Default")
+            })
+            .unwrap();
+        let styles = document.object_styles();
+        let style = styles.default_for(ObjectStyleKind::TextBox).unwrap();
+        assert_eq!(style.graphic.opacity, 50);
+        let default = styles.text_box_default();
+        assert_eq!(default.inset, Length::from_points(9));
+        assert_eq!(default.vertical, VerticalAlignment::Middle);
+        assert_eq!(default.wrap, Wrap::AboveAndBelow);
+        assert_eq!(default.paragraph_style, Some(body));
+        assert_eq!(default.character, bold);
+        assert_eq!(
+            TextBoxDefault::default().inset,
+            Length::from_points(4),
+            "the default of Desk"
         );
     }
 

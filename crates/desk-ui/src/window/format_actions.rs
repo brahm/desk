@@ -20,7 +20,7 @@ use crate::editing::{Format, ObjectInfo, TextEditor};
 use crate::formatting;
 
 /// The formatting actions, which need a document.
-pub(super) const FORMAT_BAR_ACTIONS: [&str; 16] = [
+pub(super) const FORMAT_BAR_ACTIONS: [&str; 17] = [
     "character-style",
     "line-spacing",
     "list-style",
@@ -35,6 +35,7 @@ pub(super) const FORMAT_BAR_ACTIONS: [&str; 16] = [
     "update-object-style",
     "new-object-style",
     "default-object-style",
+    "default-text-box",
     "rename-object-style",
     "delete-object-style",
 ];
@@ -234,10 +235,11 @@ impl DocumentWindow {
         );
         /// A command on the style of the selected objects.
         type StyleCommand = fn(&TextEditor);
-        let style_commands: [(&str, StyleCommand); 4] = [
+        let style_commands: [(&str, StyleCommand); 5] = [
             ("update-object-style", TextEditor::update_object_style),
             ("new-object-style", TextEditor::new_object_style),
             ("default-object-style", TextEditor::set_default_object_style),
+            ("default-text-box", TextEditor::set_default_text_box),
             ("delete-object-style", TextEditor::delete_object_style),
         ];
         for (name, run) in style_commands {
@@ -323,6 +325,11 @@ impl DocumentWindow {
             ),
             ("new-object-style", has_styles && !locked),
             ("default-object-style", has_styles),
+            (
+                "default-text-box",
+                info.as_ref()
+                    .is_some_and(|i| matches!(i.object.kind, desk_model::ObjectKind::TextBox(_))),
+            ),
             ("rename-object-style", current.is_some()),
             (
                 "delete-object-style",

@@ -208,6 +208,21 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Value:** a boolean; `false` when absent.
 - **Fallback:** none; other programs use their own defaults.
 
+#### `desk:text-box-paragraph-style`
+
+- **Feature:** the appearance of new text boxes of a document, as Set as
+  Default Text Box Appearance of Pages 15.4 sets it (PXV-10). The rest of
+  it is standard ODF on the same default text box style: `fo:padding`,
+  `draw:textarea-vertical-align`, `style:wrap` and `style:run-through`
+  in its graphic properties, and the formatting of the text in its
+  `style:paragraph-properties` and `style:text-properties`, which Desk
+  writes only once the document has set it.
+- **On:** the same element as `desk:object-style`, of the default text
+  box style.
+- **Value:** the name of the paragraph style of the text of new text
+  boxes.
+- **Fallback:** other programs give new text boxes their own text.
+
 ### Master pages (`style:graphic-properties`)
 
 #### `desk:master-pages`
