@@ -77,6 +77,7 @@ const NAMES: &[&str] = &[
     n_("Replace Font"),
     n_("Replace Style"),
     n_("Revert to Defined Style"),
+    n_("Set as Default Text Box Appearance"),
     n_("Shape"),
     n_("Skip Slide"),
     n_("Sort"),

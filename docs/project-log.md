@@ -1133,6 +1133,25 @@ matrix rows done on 9 November, before the change of target.
   text box appearance of a document (W081) comes in the next one, still
   in W1.
 
+### 18 November: the default text box appearance (W081, second half of step 6 of W1)
+
+- Each document already kept the look of its new text boxes, as the
+  default text box style (MOD-04). Set as Default Text Box Appearance,
+  the command of Format > Advanced in Pages 15.4, now also keeps the room
+  around the text, where the text sits, how the body goes around the box
+  and how its text is formatted (the paragraph style, and the paragraph
+  and character formatting of the start of the text). New text boxes of
+  the document take all of it; their size stays that of Desk.
+- In the commands of objects (the command search) and of the object
+  styles of the Format pane.
+- In the file, it is standard ODF on the default text box style: its
+  padding, vertical alignment and wrap, and paragraph and text
+  properties, written only once the document has set them. The paragraph
+  style is the one new extension, `desk:text-box-paragraph-style`.
+- Pages 15.4 was not tried for this on the Mac: only the command was
+  found. Using it there stays for the last Mac session of W1, as the plan
+  already says.
+
 
 ## Decisions, with their reasons and consequences
 

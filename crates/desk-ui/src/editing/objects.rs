@@ -21,8 +21,8 @@ use std::sync::Arc;
 use desk_layout::{DocumentLayout, PlacedObject, object_at};
 use desk_model::{
     Anchor, Distribution, Document, Edit, Fill, Frame, GraphicStyle, Layer, Length, ModelError,
-    NodeId, Object, ObjectAlignment, ObjectKind, ObjectStyleKind, ParaAttrs, Paragraph, Rgba, Run,
-    Shape, Story, Stroke, TextBox, Wrap,
+    NodeId, Object, ObjectAlignment, ObjectKind, ObjectStyleKind, Paragraph, Rgba, Run, Shape,
+    Story, Stroke, TextBox, Wrap,
 };
 use gtk::gdk;
 
@@ -1657,6 +1657,21 @@ impl TextEditor {
         });
     }
 
+    /// Makes the selected text box the appearance of the new text boxes of
+    /// the document: its look, the room around its text, the place of its
+    /// text, its wrap and the formatting of its text, as Format > Advanced >
+    /// Set as Default Text Box Appearance of Pages 15.4 (PXV-10).
+    pub fn set_default_text_box(&self) {
+        let Some((object, ObjectStyleKind::TextBox)) = self.styled_object() else {
+            return;
+        };
+        let name = crate::i18n::tr("Default");
+        self.arrange_objects("Set as Default Text Box Appearance", |edit, _| {
+            edit.set_default_text_box(object.id, &name)?;
+            Ok(None)
+        });
+    }
+
     /// Renames the style of the selected object. A name that another
     /// style of its kind has is refused, with the error.
     pub fn rename_object_style(&self, name: &str) -> Result<(), ModelError> {
@@ -1721,17 +1736,26 @@ impl TextEditor {
             let kind = match shape {
                 NewShape::Line => Shape::Line { rising: false }.into(),
                 NewShape::TextBox => {
-                    let style = edit.document().styles().default_paragraph();
+                    // As the document says new text boxes look (PXV-10).
+                    let document = edit.document();
+                    let default = document.object_styles().text_box_default().clone();
+                    let style = default
+                        .paragraph_style
+                        .filter(|s| document.styles().paragraph(*s).is_some())
+                        .unwrap_or_else(|| document.styles().default_paragraph());
                     let paragraph = Paragraph::from_runs(
                         edit.new_id(),
                         style,
-                        ParaAttrs::default(),
-                        [Run::new(&crate::i18n::tr("Text"))],
+                        default.paragraph.clone(),
+                        [Run::with_attrs(
+                            &crate::i18n::tr("Text"),
+                            None,
+                            default.character.clone(),
+                        )],
                     )?;
-                    ObjectKind::TextBox(TextBox::new(
-                        Arc::from([paragraph]),
-                        Length::from_points(4),
-                    ))
+                    let mut text = TextBox::new(Arc::from([paragraph]), default.inset);
+                    text.vertical = default.vertical;
+                    ObjectKind::TextBox(text)
                 }
                 other => other.shape().unwrap_or(Shape::Rectangle).into(),
             };
@@ -1742,7 +1766,7 @@ impl TextEditor {
                 object.style = default_style(&object.kind);
             }
             if shape == NewShape::TextBox {
-                object.wrap = Wrap::Through;
+                object.wrap = edit.document().object_styles().text_box_default().wrap;
             }
             edit.add_object(object)?;
             Ok(id)

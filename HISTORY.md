@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Set as Default Text Box Appearance, which makes a text box, with
+  its text, the look of the new text boxes of a document.
 * Added: Default Font in the preferences, the font and size of new
   documents of Desk Writer.
 * Added: a choice of double and single quotes for smart quotes, smart

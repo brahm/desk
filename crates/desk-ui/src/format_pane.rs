@@ -406,6 +406,10 @@ pub(crate) fn object_menu() -> gio::Menu {
         Some("win.reapply-defaults"),
     );
     defaults.append(
+        Some(&tr("Set as Default _Text Box Appearance")),
+        Some("win.default-text-box"),
+    );
+    defaults.append(
         Some(&tr("Show Co_nnection Lines")),
         Some("win.connection-lines"),
     );

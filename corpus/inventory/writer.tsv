@@ -81,7 +81,7 @@ W077	3.5 Styles	Import styles from another document	Only '09	'09, in the form of
 W078	3.5 Styles	Find and replace styles	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Find and replace styles (STY-09)
 W079	3.5 Styles	Show only the styles in use	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Show only the styles in use on the Styles page
 W080	3.5 Styles	Object, table and chart styles	Only 15	15.4	D-001	In	Partial	-	W1	Object styles in the Inspector (PR of 15 Nov); table and chart styles are missing
-W081	3.5 Styles	Default text box style	Different	15.4	D-001	In	Partial	-	W1	Text box default stored in the template (MOD-04); setting it per document is missing
+W081	3.5 Styles	Default text box style	Different	15.4	D-001	In	Done	-	W1	Set as Default Text Box Appearance, among the commands of objects and of object styles, makes the selected text box the appearance of the new text boxes of the document: its look as the default text box style (MOD-04), and the room around its text, the place of the text, the wrap and the formatting of its text, kept in the file on that style (PXV-10)
 W082	3.6 Paragraph, lists and columns	Alignment, line and paragraph spacing, indents	Equal	Equal in both	-	In	Done	-	done	Alignment, spacing and indents (FMT-12 to FMT-18)
 W083	3.6 Paragraph, lists and columns	Tabs	Equal	Equal in both	-	In	Done	-	done	Tabs (FMT-16)
 W084	3.6 Paragraph, lists and columns	Pagination (keep together, keep with next, new page, widows/orphans)	Equal	Equal in both	-	In	Done	-	done	Pagination (EST-05)

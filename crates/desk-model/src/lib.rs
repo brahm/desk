@@ -121,7 +121,9 @@ pub use object_edit::{
     Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, new_origin, reframed,
     translated, union,
 };
-pub use object_style::{ObjectStyle, ObjectStyleKind, ObjectStyles, apply_object_style};
+pub use object_style::{
+    ObjectStyle, ObjectStyleKind, ObjectStyles, TextBoxDefault, apply_object_style,
+};
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::{Picture, PictureFormat};

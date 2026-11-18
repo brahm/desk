@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-18 18:03+0000\n"
+"POT-Creation-Date: 2026-11-18 18:27+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -113,7 +113,7 @@ msgstr ""
 #: crates/desk-ui/src/tables/window.rs:754 crates/desk-ui/src/thumbnails.rs:395
 #: crates/desk-ui/src/window.rs:1687 crates/desk-ui/src/window.rs:1850
 #: crates/desk-ui/src/window.rs:1972
-#: crates/desk-ui/src/window/format_actions.rs:370
+#: crates/desk-ui/src/window/format_actions.rs:377
 msgid "_Cancel"
 msgstr ""
 
@@ -255,7 +255,8 @@ msgid "2-Axis"
 msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:41
-#: crates/desk-ui/src/editing/objects.rs:1640 crates/desk-ui/src/effects.rs:46
+#: crates/desk-ui/src/editing/objects.rs:1640
+#: crates/desk-ui/src/editing/objects.rs:1668 crates/desk-ui/src/effects.rs:46
 msgid "Default"
 msgstr ""
 
@@ -953,12 +954,12 @@ msgstr ""
 msgid "Style"
 msgstr ""
 
-#: crates/desk-ui/src/editing/objects.rs:1729 crates/desk-ui/src/fonts.rs:367
+#: crates/desk-ui/src/editing/objects.rs:1751 crates/desk-ui/src/fonts.rs:367
 #: crates/desk-ui/src/formatting.rs:301 crates/desk-ui/src/formatting.rs:323
 #: crates/desk-ui/src/function_browser.rs:23 crates/desk-ui/src/inspector.rs:59
 #: crates/desk-ui/src/outline_view.rs:359 crates/desk-ui/src/table_pane.rs:35
 #: crates/desk-ui/src/tables/inspector.rs:196
-#: crates/desk-ui/src/undo_names.rs:85
+#: crates/desk-ui/src/undo_names.rs:86
 msgid "Text"
 msgstr ""
 
@@ -1730,10 +1731,15 @@ msgid "Reapply _Defaults to Selection"
 msgstr ""
 
 #: crates/desk-ui/src/format_pane.rs:409
+#: crates/desk-ui/src/object_styles_pane.rs:88
+msgid "Set as Default _Text Box Appearance"
+msgstr ""
+
+#: crates/desk-ui/src/format_pane.rs:413
 msgid "Show Co_nnection Lines"
 msgstr ""
 
-#: crates/desk-ui/src/format_pane.rs:420
+#: crates/desk-ui/src/format_pane.rs:424
 msgid "_Wrap"
 msgstr ""
 
@@ -2151,7 +2157,7 @@ msgid ""
 msgstr ""
 
 #: crates/desk-ui/src/inspector.rs:61 crates/desk-ui/src/shape_pane.rs:153
-#: crates/desk-ui/src/tables/header.rs:60 crates/desk-ui/src/undo_names.rs:80
+#: crates/desk-ui/src/tables/header.rs:60 crates/desk-ui/src/undo_names.rs:81
 #: crates/desk-ui/src/window/header.rs:86
 #: crates/desk-ui/src/window/header.rs:88
 msgid "Shape"
@@ -2801,34 +2807,34 @@ msgstr ""
 msgid "Define as _Default Style"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:89
+#: crates/desk-ui/src/object_styles_pane.rs:93
 #: crates/desk-ui/src/styles_drawer.rs:1125
 msgid "_Rename Style…"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:90
+#: crates/desk-ui/src/object_styles_pane.rs:94
 msgid "De_lete Style"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:231
-#: crates/desk-ui/src/object_styles_pane.rs:292
+#: crates/desk-ui/src/object_styles_pane.rs:235
+#: crates/desk-ui/src/object_styles_pane.rs:296
 msgid "Object Styles"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:286
 #: crates/desk-ui/src/object_styles_pane.rs:290
+#: crates/desk-ui/src/object_styles_pane.rs:294
 msgid "Style Commands"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:315
+#: crates/desk-ui/src/object_styles_pane.rs:319
 msgid "changed"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:318
+#: crates/desk-ui/src/object_styles_pane.rs:322
 msgid "default"
 msgstr ""
 
-#: crates/desk-ui/src/object_styles_pane.rs:321
+#: crates/desk-ui/src/object_styles_pane.rs:325
 msgid "No style"
 msgstr ""
 
@@ -3400,7 +3406,7 @@ msgstr ""
 #: crates/desk-ui/src/tables/inspector.rs:161
 #: crates/desk-ui/src/tables/inspector.rs:244
 #: crates/desk-ui/src/tables/window.rs:752
-#: crates/desk-ui/src/window/format_actions.rs:364
+#: crates/desk-ui/src/window/format_actions.rs:371
 #: crates/desk-ui/src/window/rename.rs:40
 msgid "Name"
 msgstr ""
@@ -3910,7 +3916,7 @@ msgstr ""
 msgid "(Delete)"
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:183 crates/desk-ui/src/undo_names.rs:84
+#: crates/desk-ui/src/styles_drawer.rs:183 crates/desk-ui/src/undo_names.rs:85
 #: crates/desk-ui/src/window.rs:465
 msgid "Styles"
 msgstr ""
@@ -3979,7 +3985,7 @@ msgstr ""
 msgid "Cannot Revert to the Style"
 msgstr ""
 
-#: crates/desk-ui/src/styles_drawer.rs:524 crates/desk-ui/src/undo_names.rs:83
+#: crates/desk-ui/src/styles_drawer.rs:524 crates/desk-ui/src/undo_names.rs:84
 msgid "Style Shortcut"
 msgstr ""
 
@@ -3988,19 +3994,19 @@ msgid "Cannot Set the Shortcut"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:565
-#: crates/desk-ui/src/window/format_actions.rs:385
+#: crates/desk-ui/src/window/format_actions.rs:392
 msgid "A style needs a name."
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:568
-#: crates/desk-ui/src/window/format_actions.rs:387
+#: crates/desk-ui/src/window/format_actions.rs:394
 msgid "Another style is already named “{name}”."
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:573
 #: crates/desk-ui/src/tables/window.rs:206 crates/desk-ui/src/window.rs:345
 #: crates/desk-ui/src/window.rs:1352
-#: crates/desk-ui/src/window/format_actions.rs:392
+#: crates/desk-ui/src/window/format_actions.rs:399
 msgid "_Close"
 msgstr ""
 
@@ -4038,14 +4044,14 @@ msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:679
 #: crates/desk-ui/src/styles_drawer.rs:700 crates/desk-ui/src/undo_names.rs:74
-#: crates/desk-ui/src/window/format_actions.rs:358
-#: crates/desk-ui/src/window/format_actions.rs:391
+#: crates/desk-ui/src/window/format_actions.rs:365
+#: crates/desk-ui/src/window/format_actions.rs:398
 msgid "Rename Style"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:688
 #: crates/desk-ui/src/tables/window.rs:755
-#: crates/desk-ui/src/window/format_actions.rs:371
+#: crates/desk-ui/src/window/format_actions.rs:378
 #: crates/desk-ui/src/window/rename.rs:42
 msgid "_Rename"
 msgstr ""
@@ -4346,7 +4352,7 @@ msgstr ""
 
 #: crates/desk-ui/src/table_pane.rs:270
 #: crates/desk-ui/src/tables/inspector.rs:209
-#: crates/desk-ui/src/undo_names.rs:82
+#: crates/desk-ui/src/undo_names.rs:83
 msgid "Sort"
 msgstr ""
 
@@ -4572,7 +4578,7 @@ msgstr ""
 
 #: crates/desk-ui/src/tables/bars.rs:349 crates/desk-ui/src/tables/bars.rs:352
 #: crates/desk-ui/src/tables/window.rs:902
-#: crates/desk-ui/src/tables/window.rs:1172 crates/desk-ui/src/undo_names.rs:88
+#: crates/desk-ui/src/tables/window.rs:1172 crates/desk-ui/src/undo_names.rs:89
 msgid "Add Sheet"
 msgstr ""
 
@@ -4677,11 +4683,11 @@ msgstr ""
 msgid "_New Window"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:152 crates/desk-ui/src/undo_names.rs:133
+#: crates/desk-ui/src/tables/header.rs:152 crates/desk-ui/src/undo_names.rs:134
 msgid "_Undo"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:153 crates/desk-ui/src/undo_names.rs:141
+#: crates/desk-ui/src/tables/header.rs:153 crates/desk-ui/src/undo_names.rs:142
 msgid "_Redo"
 msgstr ""
 
@@ -4887,7 +4893,7 @@ msgid "Select a table to see its format."
 msgstr ""
 
 #: crates/desk-ui/src/tables/inspector.rs:165
-#: crates/desk-ui/src/tables/window.rs:732 crates/desk-ui/src/undo_names.rs:95
+#: crates/desk-ui/src/tables/window.rs:732 crates/desk-ui/src/undo_names.rs:96
 msgid "Show Table Name"
 msgstr ""
 
@@ -5079,32 +5085,32 @@ msgstr ""
 msgid "In “{sheet}”"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:689 crates/desk-ui/src/undo_names.rs:94
+#: crates/desk-ui/src/tables/window.rs:689 crates/desk-ui/src/undo_names.rs:95
 msgid "Rename Table"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:699 crates/desk-ui/src/undo_names.rs:89
+#: crates/desk-ui/src/tables/window.rs:699 crates/desk-ui/src/undo_names.rs:90
 msgid "Change Table"
 msgstr ""
 
 #: crates/desk-ui/src/tables/window.rs:725
-#: crates/desk-ui/src/tables/window.rs:747 crates/desk-ui/src/undo_names.rs:93
+#: crates/desk-ui/src/tables/window.rs:747 crates/desk-ui/src/undo_names.rs:94
 msgid "Rename Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:777 crates/desk-ui/src/undo_names.rs:96
+#: crates/desk-ui/src/tables/window.rs:777 crates/desk-ui/src/undo_names.rs:97
 msgid "Add Row Above"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:778 crates/desk-ui/src/undo_names.rs:97
+#: crates/desk-ui/src/tables/window.rs:778 crates/desk-ui/src/undo_names.rs:98
 msgid "Add Row Below"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:779 crates/desk-ui/src/undo_names.rs:98
+#: crates/desk-ui/src/tables/window.rs:779 crates/desk-ui/src/undo_names.rs:99
 msgid "Add Column Before"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:780 crates/desk-ui/src/undo_names.rs:99
+#: crates/desk-ui/src/tables/window.rs:780 crates/desk-ui/src/undo_names.rs:100
 msgid "Add Column After"
 msgstr ""
 
@@ -5116,11 +5122,11 @@ msgstr ""
 msgid "(copy)"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:910 crates/desk-ui/src/undo_names.rs:91
+#: crates/desk-ui/src/tables/window.rs:910 crates/desk-ui/src/undo_names.rs:92
 msgid "Duplicate Sheet"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:917 crates/desk-ui/src/undo_names.rs:90
+#: crates/desk-ui/src/tables/window.rs:917 crates/desk-ui/src/undo_names.rs:91
 msgid "Delete Sheet"
 msgstr ""
 
@@ -5129,7 +5135,7 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:996 crates/desk-ui/src/undo_names.rs:92
+#: crates/desk-ui/src/tables/window.rs:996 crates/desk-ui/src/undo_names.rs:93
 msgid "Move Sheet"
 msgstr ""
 
@@ -5347,15 +5353,19 @@ msgstr ""
 msgid "Replace Font"
 msgstr ""
 
-#: crates/desk-ui/src/undo_names.rs:81
+#: crates/desk-ui/src/undo_names.rs:80
+msgid "Set as Default Text Box Appearance"
+msgstr ""
+
+#: crates/desk-ui/src/undo_names.rs:82
 msgid "Skip Slide"
 msgstr ""
 
-#: crates/desk-ui/src/undo_names.rs:86
+#: crates/desk-ui/src/undo_names.rs:87
 msgid "Typing"
 msgstr ""
 
-#: crates/desk-ui/src/undo_names.rs:87
+#: crates/desk-ui/src/undo_names.rs:88
 msgid "Unmerge Cells"
 msgstr ""
 
