@@ -172,7 +172,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 74] = [
+const DOCUMENT_ACTIONS: [&str; 75] = [
     "outline",
     "contents",
     "edit-toc",
@@ -187,6 +187,7 @@ const DOCUMENT_ACTIONS: [&str; 74] = [
     "make-upper-case",
     "make-lower-case",
     "capitalize",
+    "convert-quotes",
     "save",
     "save-as",
     "save-copy",
@@ -2279,6 +2280,7 @@ impl DocumentWindow {
             ("capitalize", |e: &TextEditor| {
                 e.change_case(desk_model::CaseChange::Capitalize);
             }),
+            ("convert-quotes", TextEditor::convert_quotes),
         ] {
             let weak = Rc::downgrade(self);
             let action = gio::SimpleAction::new(name, None);
@@ -3179,6 +3181,7 @@ impl DocumentWindow {
         let tools = gio::Menu::new();
         tools.append_submenu(Some(&tr("_Writing Tools")), &writing_tools_menu());
         tools.append_submenu(Some(&tr("T_ransformations")), &transformations_menu());
+        tools.append_submenu(Some(&tr("Su_bstitutions")), &substitutions_menu());
         tools.append_submenu(Some(&tr("Spe_lling and Grammar")), &spelling_menu());
         tools.append_submenu(Some(&tr("_Arrange")), &objects::arrange_menu());
         menu.append_section(None, &tools);
@@ -3599,13 +3602,24 @@ pub(crate) fn format_menu() -> gio::Menu {
     menu
 }
 
-/// Select All and Deselect All, for the command search (VMI-01), and
-/// the transformations of the case (W054).
+/// Select All and Deselect All, for the command search (VMI-01), the
+/// transformations of the case (W054) and converting quotes (PXV-08).
 pub(crate) fn edit_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("Select _All")), Some("win.select-all"));
     menu.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
     menu.append_section(None, &transformations_menu());
+    menu.append_section(None, &substitutions_menu());
+    menu
+}
+
+/// What Edit > Substitutions of Pages 15.4 does with the panel of macOS
+/// for quotes already typed (PXV-08). GNOME has no such panel, so it is a
+/// command: on the selection, or on the whole text when nothing is
+/// selected.
+fn substitutions_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&tr("Convert _Quotes")), Some("win.convert-quotes"));
     menu
 }
 

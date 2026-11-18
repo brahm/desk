@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: a choice of double and single quotes for smart quotes, smart
+  dashes, and Convert Quotes for the quotes already typed.
+* Changed: the cells of tables take the corrections of typing, such as
+  smart quotes and the replacement list.
 * Added: Format Fractions Automatically in the preferences, which makes
   1/2 into ½ while typing.
 * Added: Start Case in the capitalization of Desk Writer, and Make Upper

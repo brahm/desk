@@ -18,6 +18,7 @@ const NAMES: &[&str] = &[
     n_("Capitalize"),
     n_("Character Style"),
     n_("Columns"),
+    n_("Convert Quotes"),
     n_("Data Format"),
     n_("Delete"),
     n_("Delete Column"),

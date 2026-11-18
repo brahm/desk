@@ -14,7 +14,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::glib;
 
-use desk_model::{AutoCorrect, Replacement, Rgba};
+use desk_model::{AutoCorrect, QuoteStyle, Quotes, Replacement, Rgba};
 
 use crate::i18n::tr;
 
@@ -135,9 +135,12 @@ pub struct Preferences {
     /// Whether a paragraph that starts with "•", "-", "*", "+", "1.",
     /// "1)", "a." or "I." and a space becomes a list on Return (LST-01).
     pub automatic_lists: bool,
-    /// Whether straight quotes become curly ones as they are typed
-    /// (TXT-06).
+    /// Whether straight quotes become curly ones, and two hyphens an em
+    /// dash, as they are typed (TXT-06, PXV-08).
     pub smart_quotes: bool,
+    /// The quotes that smart quotes make, as Double Quotes and Single
+    /// Quotes of Pages 15.4 choose them (PXV-08).
+    pub quotes: QuoteStyle,
     /// The corrections made while typing (TXT-07).
     pub autocorrect: AutoCorrect,
     /// Whether misspelled words are marked as they are typed (TXT-10).
@@ -213,6 +216,7 @@ impl Default for Preferences {
             vertical_ruler: false,
             automatic_lists: true,
             smart_quotes: true,
+            quotes: QuoteStyle::default(),
             autocorrect: AutoCorrect::default(),
             check_spelling: true,
             proofread: false,
@@ -283,6 +287,14 @@ impl Preferences {
         let editing = |key: &str, default: bool| file.boolean(EDITING, key).unwrap_or(default);
         out.automatic_lists = editing("automatic-lists", out.automatic_lists);
         out.smart_quotes = editing("smart-quotes", out.smart_quotes);
+        let quotes = |key: &str, choices: &[Quotes], default: Quotes| {
+            file.string(EDITING, key)
+                .ok()
+                .and_then(|q| Quotes::from_sample(&q, choices))
+                .unwrap_or(default)
+        };
+        out.quotes.double = quotes("double-quotes", &Quotes::DOUBLE, out.quotes.double);
+        out.quotes.single = quotes("single-quotes", &Quotes::SINGLE, out.quotes.single);
         out.check_spelling = editing("check-spelling", out.check_spelling);
         out.proofread = editing("proofread", out.proofread);
         out.accept_single_suggestion =
@@ -357,6 +369,8 @@ impl Preferences {
         file.set_boolean(RULERS, "vertical-ruler", self.vertical_ruler);
         file.set_boolean(EDITING, "automatic-lists", self.automatic_lists);
         file.set_boolean(EDITING, "smart-quotes", self.smart_quotes);
+        file.set_string(EDITING, "double-quotes", &self.quotes.double.sample());
+        file.set_string(EDITING, "single-quotes", &self.quotes.single.sample());
         file.set_boolean(EDITING, "check-spelling", self.check_spelling);
         file.set_boolean(EDITING, "proofread", self.proofread);
         file.set_boolean(
@@ -605,10 +619,22 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         .description(tr("While typing, in every document"))
         .build();
     correction.add(&switch(
-        &tr("Use Smart Quotes"),
-        &tr("Straight quotes become curly quotes"),
+        &tr("Use Smart Quotes and Dashes"),
+        &tr("Straight quotes become curly quotes, and two hyphens a dash"),
         current.smart_quotes,
         |p, on| p.smart_quotes = on,
+    ));
+    correction.add(&quotes_row(
+        &tr("Double Quotes"),
+        &Quotes::DOUBLE,
+        current.quotes.double,
+        |p, q| p.quotes.double = q,
+    ));
+    correction.add(&quotes_row(
+        &tr("Single Quotes"),
+        &Quotes::SINGLE,
+        current.quotes.single,
+        |p, q| p.quotes.single = q,
     ));
     correction.add(&switch(
         &tr("Fix Capitalization"),
@@ -736,6 +762,29 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
     dialog.present(Some(parent));
 }
 
+/// A list of the quotes that smart quotes can make (PXV-08).
+fn quotes_row(
+    title: &str,
+    choices: &'static [Quotes],
+    current: Quotes,
+    set: impl Fn(&mut Preferences, Quotes) + 'static,
+) -> adw::ComboRow {
+    let samples: Vec<String> = choices.iter().map(|q| q.sample()).collect();
+    let row = adw::ComboRow::builder()
+        .title(title)
+        .model(&gtk::StringList::new(
+            &samples.iter().map(String::as_str).collect::<Vec<_>>(),
+        ))
+        .selected(choices.iter().position(|q| *q == current).unwrap_or(0) as u32)
+        .build();
+    row.connect_selected_notify(move |row| {
+        if let Some(quotes) = choices.get(row.selected() as usize) {
+            change(|p| set(p, *quotes));
+        }
+    });
+    row
+}
+
 /// The table of replacements: a switch for the table, and each
 /// replacement with its own switch, which can be removed, and a row to
 /// add one (TXT-07).
@@ -838,6 +887,10 @@ mod tests {
             vertical_ruler: true,
             automatic_lists: false,
             smart_quotes: false,
+            quotes: QuoteStyle {
+                double: Quotes::DOUBLE[4],
+                single: Quotes::SINGLE[5],
+            },
             check_spelling: false,
             proofread: true,
             autocorrect: AutoCorrect {

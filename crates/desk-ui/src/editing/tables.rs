@@ -53,6 +53,56 @@ pub(crate) struct CellEditor {
     /// Set while the field's text is being set, so that it suggests
     /// nothing then.
     filling: bool,
+    /// The text of the field when it last changed, to find what was typed.
+    last: String,
+}
+
+/// The one character typed into `old` to make `new`, and where.
+fn typed_char(old: &str, new: &str) -> Option<(usize, char)> {
+    let at = old
+        .char_indices()
+        .zip(new.chars())
+        .find(|((_, a), b)| a != b)
+        .map_or(old.len(), |((i, _), _)| i);
+    let c = new.get(at..)?.chars().next()?;
+    (new.len() == old.len() + c.len_utf8() && new[at + c.len_utf8()..] == old[at..])
+        .then_some((at, c))
+}
+
+/// What the text before the cursor of a cell becomes when `typed` is
+/// typed after it, with the corrections of the preferences that all the
+/// apps share (TXT-06, TXT-07, W064): smart quotes and dashes, the table of
+/// replacements, capitals, fractions. A formula is left as typed, and so
+/// is a correction that raises text, which a cell cannot show.
+pub(crate) fn correct_in_cell(
+    before: &str,
+    typed: char,
+    preferences: &crate::preferences::Preferences,
+) -> Option<String> {
+    if before.starts_with('=') {
+        return None;
+    }
+    if matches!(typed, '"' | '\'') && preferences.smart_quotes {
+        let mut out = before.to_owned();
+        out.push(preferences.quotes.smart_quote(before, typed));
+        return Some(out);
+    }
+    if preferences.smart_quotes && desk_model::smart_dash(before, typed) {
+        let mut out = before[..before.len() - 1].to_owned();
+        out.push('\u{2014}');
+        return Some(out);
+    }
+    if !desk_model::ends_word(typed) {
+        return None;
+    }
+    let correction = preferences.autocorrect.correct(before)?;
+    if correction.superscript.is_some() {
+        return None;
+    }
+    let mut out = before.to_owned();
+    out.replace_range(correction.range, &correction.text);
+    out.push(typed);
+    Some(out)
 }
 
 impl TextEditor {
@@ -809,10 +859,12 @@ impl TextEditor {
             glib::Propagation::Stop
         });
         entry.add_controller(keys);
-        // The values of the column, as the text is typed (TAB-17).
+        // The values of the column, as the text is typed (TAB-17), and
+        // the corrections of typing (W064).
         let weak = self.downgrade();
         entry.connect_changed(move |entry| {
             let Some(this) = weak.upgrade() else { return };
+            this.correct_cell(entry);
             this.suggest(entry);
         });
         let weak = self.downgrade();
@@ -827,6 +879,45 @@ impl TextEditor {
             entry,
             cell: None,
             filling: false,
+            last: String::new(),
+        });
+    }
+
+    /// Makes the corrections of typing on the character just typed in the
+    /// field, once the field has taken it.
+    fn correct_cell(&self, entry: &gtk::Entry) {
+        let text = entry.text().to_string();
+        let (old, filling) = match self.state.borrow_mut().cell_editor.as_mut() {
+            Some(e) => (std::mem::replace(&mut e.last, text.clone()), e.filling),
+            None => return,
+        };
+        if filling {
+            return;
+        }
+        let Some((at, typed)) = typed_char(&old, &text) else {
+            return;
+        };
+        let Some(corrected) = correct_in_cell(&text[..at], typed, &crate::preferences::get())
+        else {
+            return;
+        };
+        let rest = text[at + typed.len_utf8()..].to_owned();
+        let weak = self.downgrade();
+        let entry = entry.clone();
+        glib::idle_add_local_once(move || {
+            let Some(this) = weak.upgrade() else { return };
+            if entry.text() != text {
+                return;
+            }
+            if let Some(e) = this.state.borrow_mut().cell_editor.as_mut() {
+                e.filling = true;
+            }
+            entry.set_text(&format!("{corrected}{rest}"));
+            entry.set_position(corrected.chars().count() as i32);
+            if let Some(e) = this.state.borrow_mut().cell_editor.as_mut() {
+                e.filling = false;
+                e.last = entry.text().to_string();
+            }
         });
     }
 
@@ -982,5 +1073,46 @@ impl TextEditor {
             sel.focus = (area.row_end() - 1, area.col_end() - 1);
         });
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::preferences::Preferences;
+
+    #[test]
+    fn w064_cells_take_the_corrections_of_typing() {
+        assert_eq!(typed_char("ab", "abc"), Some((2, 'c')));
+        assert_eq!(typed_char("ac", "abc"), Some((1, 'b')));
+        assert_eq!(typed_char("abc", "ab"), None);
+        assert_eq!(typed_char("ab", "abcd"), None);
+        let mut preferences = Preferences::default();
+        assert_eq!(
+            correct_in_cell("He said ", '"', &preferences).as_deref(),
+            Some("He said “")
+        );
+        // A new install replaces nothing, as Pages.
+        assert_eq!(correct_in_cell("(c)", ' ', &preferences), None);
+        preferences.autocorrect.replace = true;
+        preferences.autocorrect.fractions = true;
+        preferences.autocorrect.ordinals = true;
+        assert_eq!(
+            correct_in_cell("Desk (c)", ' ', &preferences).as_deref(),
+            Some("Desk © ")
+        );
+        assert_eq!(
+            correct_in_cell("1/2", '.', &preferences).as_deref(),
+            Some("½.")
+        );
+        // A cell cannot raise the suffix, nor change a formula.
+        assert_eq!(correct_in_cell("1st", ' ', &preferences), None);
+        assert_eq!(correct_in_cell("=\"a", '"', &preferences), None);
+        assert_eq!(
+            correct_in_cell("a-", '-', &preferences).as_deref(),
+            Some("a—")
+        );
+        preferences.smart_quotes = false;
+        assert_eq!(correct_in_cell("a", '\'', &preferences), None);
     }
 }

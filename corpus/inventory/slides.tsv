@@ -162,7 +162,7 @@ S158	3.14 Review and writing tools	Comments	Different	15.4	D-001	In	Missing	the 
 S159	3.14 Review and writing tools	Author name and color	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	S2	Author name and color
 S160	3.14 Review and writing tools	Review highlight	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	S2	Review highlight
 S161	3.14 Review and writing tools	Spelling and grammar	Equal	Equal in both	-	In	Engine ready	the window changes (D-008)	S2	Spelling of Writer
-S162	3.14 Review and writing tools	Autocorrection	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S2	Autocorrection of Writer; fractions and quote style are missing
+S162	3.14 Review and writing tools	Autocorrection	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S2	Autocorrection of Writer, with fractions and the quote style
 S163	3.14 Review and writing tools	Find and replace	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S2	Live search bar of Writer
 S164	3.14 Review and writing tools	Dictionary 🌐 (in 15, partial)	Equal	Equal in both	-	Out: AI, online or paid (D-004)	Out of scope	-	-	Dictionary (online part)
 S165	3.14 Review and writing tools	Writing Tools 🤖🌐	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	Writing Tools
