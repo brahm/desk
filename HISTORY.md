@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: drop caps, in the Style tab of text, kept in the standard ODF
+  drop cap.
 * Added: Language and Region in the main menu, which sets how the tables
   and date fields of a document write dates and numbers.
 * Added: Set as Default Text Box Appearance, which makes a text box, with

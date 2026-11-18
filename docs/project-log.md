@@ -1169,6 +1169,24 @@ matrix rows done on 9 November, before the change of target.
   than English and Portuguese, the two Desk is translated into. W6 brings
   the translations.
 
+### 18 November: drop caps (W060, first half of step 8 of W1)
+
+- Drop Cap, in the Style tab of text, makes the first characters of the
+  selected paragraphs as tall as their first lines, three lines and one
+  character by default, as Pages 15.4 does. The capitals of the letters
+  reach those of the first line and they stand on the baseline of the
+  last; the lines beside them start after them, and the paragraph goes
+  back to the margin below.
+- The text engine lays the letters out on their own and the rest of the
+  paragraph in a space that leaves room for them, so the cursor, the
+  selection and the lines keep the offsets of the paragraph.
+- In the file it is the standard `style:drop-cap` of ODF, which a
+  paragraph can also turn off when its style has one.
+- The options of Pages (raised lines, wrap by the shape of the letter,
+  spacing, outdent, a background shape) and its six styles of drop cap
+  come in the second pull request of the step. The spacing Pages leaves
+  beside the letters is checked in the last Mac session of W1.
+
 
 ## Decisions, with their reasons and consequences
 

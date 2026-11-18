@@ -95,6 +95,8 @@ pub struct Inspector {
     right: compact::SpinRow,
     /// Whether words break with hyphens (TXT-09).
     hyphenate: compact::SwitchRow,
+    /// The drop cap of the paragraphs (PXV-06).
+    drop_cap: Rc<crate::drop_cap_pane::DropCapGroup>,
     /// Whether the document is hyphenated and has ligatures at all.
     document_hyphenation: compact::SwitchRow,
     document_ligatures: compact::SwitchRow,
@@ -234,6 +236,7 @@ impl Inspector {
             .subtitle(tr("At the ends of lines, in the language of the text"))
             .build();
         let hyphenation = compact::Group::builder().title(tr("Hyphenation")).build();
+        let drop_cap = crate::drop_cap_pane::DropCapGroup::new(editor.clone());
         hyphenation.add(&hyphenate);
         let document_hyphenation = compact::SwitchRow::builder()
             .title(tr("Hyphenate the Document"))
@@ -275,6 +278,7 @@ impl Inspector {
                         lists.widget(),
                         character,
                         text_shadow,
+                        drop_cap.group(),
                     ],
                 ),
                 Tab::new(
@@ -378,6 +382,7 @@ impl Inspector {
             left,
             right,
             hyphenate,
+            drop_cap,
             document_hyphenation,
             document_ligatures,
             facing_pages,
@@ -656,6 +661,7 @@ impl Inspector {
         if self.hyphenate.is_active() != paragraph.hyphenate {
             self.hyphenate.set_active(paragraph.hyphenate);
         }
+        self.drop_cap.show(paragraph);
         let settings = &format.text_settings;
         if self.document_hyphenation.is_active() != settings.hyphenation {
             self.document_hyphenation.set_active(settings.hyphenation);

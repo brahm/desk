@@ -685,6 +685,30 @@ impl Default for ParaBorder {
     }
 }
 
+/// A drop cap: the first letters of a paragraph made as tall as some of
+/// its lines, which wrap beside them (PXV-06).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DropCap {
+    /// How many lines the letters reach down, from 2.
+    pub lines: u8,
+    /// How many characters are made large, from 1.
+    pub characters: u8,
+    /// The space between the letters and the text beside them, past the
+    /// width of the letters.
+    pub distance: Length,
+}
+
+impl Default for DropCap {
+    /// One character three lines tall, as Pages 15.4 makes it.
+    fn default() -> Self {
+        Self {
+            lines: 3,
+            characters: 1,
+            distance: Length::ZERO,
+        }
+    }
+}
+
 formatting! {
     /// Paragraph attributes that a style or a paragraph sets.
     attrs ParaAttrs;
@@ -749,6 +773,8 @@ formatting! {
         /// Whether words break with a hyphen at the ends of lines, by the
         /// patterns of their language (TXT-09).
         hyphenate: bool = false,
+        /// The drop cap that starts the paragraph, if it has one (PXV-06).
+        drop_cap: Option<DropCap> = None,
         /// That the paragraph is an entry of a table of contents (EST-22),
         /// which updating the table makes again. It belongs to the
         /// paragraph, never to its style.

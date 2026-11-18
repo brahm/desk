@@ -32,6 +32,7 @@
 //! println!("{} lines", layout.lines.len());
 //! ```
 
+mod drop_cap;
 pub mod fonts;
 mod input;
 mod layout;

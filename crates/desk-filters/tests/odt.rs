@@ -3568,3 +3568,59 @@ fn pxv_09_the_language_and_region_of_the_document_are_kept() {
     let plain = read_odt(&write_odt(&Document::new_word_processing()).unwrap()).unwrap();
     assert_eq!(plain.language(), Language::undetermined());
 }
+
+#[test]
+fn pxv_06_drop_caps_of_styles_and_paragraphs_are_kept() {
+    use desk_model::DropCap;
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let initial = document.new_id();
+    let mut style = ParagraphStyle::new(initial, "Initial");
+    style.parent = Some(body);
+    style.paragraph.drop_cap = Some(Some(DropCap::default()));
+    document.put_style(style).unwrap();
+    let two = DropCap {
+        lines: 2,
+        characters: 3,
+        distance: Length::from_points(4),
+    };
+    let first = document.body().get(0).unwrap().id();
+    for (index, (style, cap)) in [
+        (initial, None),
+        (initial, Some(None)),
+        (body, Some(Some(two))),
+        (body, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let attrs = ParaAttrs {
+            drop_cap: cap,
+            ..ParaAttrs::default()
+        };
+        let paragraph =
+            Paragraph::from_runs(document.new_id(), style, attrs, vec![Run::new("Text")]).unwrap();
+        document
+            .apply(Op::InsertParagraph {
+                index: index + 1,
+                paragraph,
+            })
+            .unwrap();
+    }
+    document
+        .apply(Op::RemoveParagraph { paragraph: first })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-drop-caps.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let caps: Vec<Option<DropCap>> = read
+        .body()
+        .iter()
+        .map(|p| {
+            read.styles()
+                .resolve_paragraph(p.style(), p.attrs())
+                .drop_cap
+        })
+        .collect();
+    assert_eq!(caps, [Some(DropCap::default()), None, Some(two), None]);
+}

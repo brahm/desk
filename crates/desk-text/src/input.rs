@@ -509,6 +509,55 @@ impl ParagraphText {
         &self.formats
     }
 
+    /// The text from `start`, a character boundary of the laid out text,
+    /// with offsets that still lead to the model, and without the drop cap
+    /// or the list label: what a drop cap leaves to the lines beside it
+    /// and under it (PXV-06).
+    pub(crate) fn without_start(&self, start: usize) -> Self {
+        let text = self.text[start..].to_owned();
+        let offsets = if self.offsets.is_empty() {
+            text.char_indices()
+                .map(|(i, _)| (i, i + start))
+                .chain([(text.len(), self.text.len())])
+                .collect()
+        } else {
+            self.offsets
+                .iter()
+                .filter(|&&(laid, _)| laid >= start)
+                .map(|&(laid, model)| (laid - start, model))
+                .collect()
+        };
+        let ranges = self
+            .ranges
+            .iter()
+            .filter(|r| r.range.end > start)
+            .map(|r| StyledRange {
+                range: r.range.start.max(start) - start..r.range.end - start,
+                ..r.clone()
+            })
+            .collect();
+        let mut paragraph = self.paragraph.clone();
+        paragraph.drop_cap = None;
+        Self {
+            text,
+            offsets,
+            formats: self.formats.clone(),
+            ranges,
+            paragraph,
+            label: None,
+            objects: self.objects.clone(),
+        }
+    }
+
+    /// The index of the format of the character at an offset of the laid
+    /// out text.
+    pub(crate) fn format_at(&self, offset: usize) -> u32 {
+        self.ranges
+            .iter()
+            .find(|r| r.range.contains(&offset))
+            .map_or(0, |r| r.format)
+    }
+
     /// The model offset of an offset in the laid out text.
     pub fn to_model(&self, offset: usize) -> usize {
         if self.offsets.is_empty() {

@@ -1195,3 +1195,59 @@ fn fmt_12_a_justified_line_with_few_spaces_spreads_its_letters_as_pages_does() {
     let between = 0.2892 * 12.0;
     check(&mut system, advance + 80.0, between, 80.0 - 6.0 * between);
 }
+
+#[test]
+fn pxv_06_a_drop_cap_is_as_tall_as_its_lines_which_wrap_beside_it() {
+    let mut system = TextSystem::new();
+    let plain_layout = plain(&mut system, ParaFormat::default(), TEXT);
+    let pitch = plain_layout.lines[0].height;
+    let capped = ParaFormat {
+        drop_cap: Some(desk_model::DropCap::default()),
+        ..ParaFormat::default()
+    };
+    let layout = plain(&mut system, capped, TEXT);
+    // The first line starts at the start of the paragraph and draws the
+    // letter first, larger, on the baseline of the third line.
+    let first = &layout.lines[0];
+    assert_eq!(first.range.start, 0);
+    let letter = &first.runs[0];
+    assert_eq!(letter.text, "D");
+    assert!(letter.size > 3.0 * 12.0, "{}", letter.size);
+    assert!((letter.baseline - layout.lines[2].baseline).abs() < 0.01);
+    assert!((letter.glyphs[0].x).abs() < 0.01);
+    // Its capital reaches the capitals of the first line: Liberation Sans
+    // gives them 1409 of its 2048 units.
+    let caps = 1409.0 / 2048.0;
+    let top = letter.baseline - caps * letter.size;
+    let first_caps = first.baseline - caps * 12.0;
+    assert!((top - first_caps).abs() < 0.01, "{top} {first_caps}");
+    // The three lines beside it start after it; the fourth at the margin.
+    for line in &layout.lines[..3] {
+        assert!((line.x - letter.advance).abs() < 0.01, "{}", line.x);
+        assert!((line.height - pitch).abs() < 0.01);
+    }
+    assert_eq!(layout.lines[3].x, 0.0);
+    // The text beside it is the rest of the paragraph, in order.
+    assert_eq!(first.carets[0], (0, 0.0));
+    let rest: String = layout
+        .lines
+        .iter()
+        .map(|l| &TEXT[l.range.start.max(1)..l.range.end])
+        .collect();
+    assert_eq!(rest, &TEXT[1..]);
+    // A paragraph shorter than the letter ends below it.
+    let short = ParaFormat {
+        drop_cap: Some(desk_model::DropCap::default()),
+        ..ParaFormat::default()
+    };
+    let layout = plain(&mut system, short, "Desk");
+    assert_eq!(layout.lines.len(), 1);
+    assert!(layout.bottom > layout.lines[0].runs[0].baseline);
+    // Without anything after it, there is no drop cap.
+    let alone = ParaFormat {
+        drop_cap: Some(desk_model::DropCap::default()),
+        ..ParaFormat::default()
+    };
+    let layout = plain(&mut system, alone, "D");
+    assert!((layout.lines[0].runs[0].size - 12.0).abs() < 0.01);
+}
