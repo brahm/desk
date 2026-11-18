@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Pages 15.4 was studied on the Mac for phase W1: drop cap,
+  automatic fractions, Screen View, table title and lock, and the
+  missing parts of eleven partial rows of Desk Writer.
 * Added: The plan of phase W1 of Desk Writer, which brings its text,
   styles, view and tables to the behaviour of Pages 15.4.
 * Changed: Four rows of Desk Writer moved out of W1: the review
