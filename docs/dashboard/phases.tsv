@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 phase	status	started	ended
 R	done	2026-11-16	2026-11-16
-B1	in-progress	2026-11-16	-
-W1	not-started	-	-
+B1	done	2026-11-16	2026-11-17
+W1	in-progress	2026-11-17	-
 W2	not-started	-	-
 W3	not-started	-	-
 W4	not-started	-	-

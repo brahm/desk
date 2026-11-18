@@ -960,6 +960,20 @@ matrix rows done on 9 November, before the change of target.
 - *Consequences:* a note can no longer outlive the work it names, and the
   register is the one place where pending work is written down.
 
+### 17 November: B1 closed, W1 next
+
+- The owner closed phase B1 once all its inventory rows were done, the
+  Mac had checked them, and no backlog item was open for it
+  (`ci/check-backlog.py --phase B1` passes).
+- It took two days, 16 and 17 November, against the seven estimated. It
+  moved 12 of its 53 rows to later phases (B-030 to B-038), so part of
+  that difference went to them; the estimate of the other phases stays
+  until each one ends.
+- *Next:* asked which phase to start, the owner chose W1, Writer to the
+  behaviour of 15, over T1 and S1: Writer has its whole engine and is the
+  closest to a usable app, and W1 holds the most open backlog items (B-012,
+  B-020 to B-025 and B-038).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -1355,12 +1369,13 @@ with the layout of Pages. Desk Tables and Desk Slides have a window, and
 engines for tables, formulas, charts and animation that the apps do not
 use yet.
 
-Phase B1 of the [roadmap](roadmap.md), the common base, started on 16
-November: the M+ window in the three apps, automatic saving with versions, the reference
-cases redone on iWork 15.4, and the backlog carried from the replanning.
-After it the three apps can advance side by side: six phases of Writer,
-five of Tables, five of Slides, and a last phase across the apps before
-version 1.0.
+Phase B1 of the [roadmap](roadmap.md), the common base, ran from 16 to
+17 November: the M+ window in the three apps, automatic saving with
+versions, the reference cases redone on iWork 15.4, and the backlog
+carried from the replanning. The owner closed it on 17 November and
+chose W1, Writer to the behaviour of 15, as the next phase. The three
+apps can advance side by side: six phases of Writer, five of Tables, five
+of Slides, and a last phase across the apps before version 1.0.
 
 Open questions that this log should close when they are answered:
 

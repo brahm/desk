@@ -100,3 +100,5 @@ date	kind	id	from	to
 2026-11-17	feature	S013	review	done
 2026-11-17	feature	S014	review	done
 2026-11-17	feature	S016	review	done
+2026-11-17	phase	B1	in-progress	done
+2026-11-17	phase	W1	not-started	in-progress
