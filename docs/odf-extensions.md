@@ -399,6 +399,37 @@ These sit on the `style:graphic-properties` of the graphic style of a
   as other programs mean it; a document that an older Desk saved with
   Title Case reads as Start Case.
 
+### Text: drop caps (`style:drop-cap`)
+
+The drop cap is the standard `style:drop-cap` of the paragraph
+properties, with its `style:length`, `style:lines` (the whole height of
+the letters, in lines) and `style:distance`. These attributes add the
+options of Pages 15.4 (PXV-06), written by `paragraph_children` in
+`write.rs` and read by `paragraph_properties`.
+
+#### `desk:drop-cap-raised`
+
+- **Feature:** a raised drop cap, whose letters rise above the first line
+  of the text by some of their lines (PXV-06).
+- **Value:** a whole number of lines, from 0 to one less than
+  `style:lines`.
+- **Fallback:** a drop cap as tall, beside the first lines.
+
+#### `desk:drop-cap-wrap`
+
+- **Feature:** whether the lines beside a drop cap follow the shape of
+  its letters or the rectangle around them (PXV-06).
+- **Value:** `shape` or `rectangle`. Without it, Desk reads `rectangle`,
+  as other programs draw it.
+- **Fallback:** the rectangle.
+
+#### `desk:drop-cap-outdent`
+
+- **Feature:** a drop cap that stands in the margin, outside the indent,
+  with the lines beside it at the indent (PXV-06).
+- **Value:** a boolean.
+- **Fallback:** the letters inside the indent.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

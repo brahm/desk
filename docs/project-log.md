@@ -1187,6 +1187,27 @@ matrix rows done on 9 November, before the change of target.
   come in the second pull request of the step. The spacing Pages leaves
   beside the letters is checked in the last Mac session of W1.
 
+### 18 November: the options of drop caps (W060, second part of step 8 of W1)
+
+- The Drop Cap group has the options of Pages 15.4: raised lines, which
+  lift the letters above the first line while the text moves down to
+  make room; the text beside them following the outline of the letters,
+  as Pages does by default, or their rectangle; extra spacing; and
+  outdent, which puts the letters in the margin with the lines at the
+  indent.
+- The outline comes from the glyphs of the font, flattened into
+  segments; each line beside the letters starts after their ink at its
+  height, as far from it as the letters end past their ink.
+- The three options are extensions on the standard `style:drop-cap`
+  (`desk:drop-cap-raised`, `desk:drop-cap-wrap`, `desk:drop-cap-outdent`),
+  defined in odf-extensions.md; other programs show the drop cap with its
+  rectangle, in the indent.
+- Not checked on the Mac yet: whether a raised drop cap moves the text
+  down in Pages, as Desk does, or overlaps what is above. It goes to the
+  last Mac session of W1 with the spacing.
+- The background shape and the six styles of drop cap come in the last
+  pull request of the step.
+
 
 ## Decisions, with their reasons and consequences
 

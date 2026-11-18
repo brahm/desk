@@ -603,6 +603,20 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
                 .and_then(|n| n.trim().parse().ok())
                 .unwrap_or(1),
             distance: length(d, STYLE, "distance"),
+            // The extensions of the drop cap (docs/odf-extensions.md).
+            raised: d
+                .attr(DESK, "drop-cap-raised")
+                .and_then(|n| n.trim().parse().ok()),
+            follow_shape: d.attr(DESK, "drop-cap-wrap").and_then(|w| match w {
+                "shape" => Some(true),
+                "rectangle" => Some(false),
+                _ => None,
+            }),
+            outdent: d.attr(DESK, "drop-cap-outdent").and_then(|b| match b {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            }),
         }),
     }
 }

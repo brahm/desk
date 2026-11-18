@@ -492,6 +492,14 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
                 lines: d.lines.min(u32::from(u8::MAX)) as u8,
                 characters: d.length.clamp(1, u32::from(u8::MAX)) as u8,
                 distance: d.distance.map_or(Length::ZERO, length),
+                raised: d
+                    .raised
+                    .unwrap_or(0)
+                    .min(d.lines - 1)
+                    .min(u32::from(u8::MAX)) as u8,
+                // Other programs wrap the lines by the rectangle.
+                follow_shape: d.follow_shape.unwrap_or(false),
+                outdent: d.outdent.unwrap_or(false),
             })
         }),
         // Lists come from the list elements and list styles.
@@ -675,11 +683,14 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
                 length: u32::from(cap.characters),
                 lines: u32::from(cap.lines),
                 distance: Some(odf_length(cap.distance)),
+                raised: (cap.raised > 0).then_some(u32::from(cap.raised)),
+                follow_shape: Some(cap.follow_shape),
+                outdent: cap.outdent.then_some(true),
             },
             None => odf::DropCap {
                 length: 1,
                 lines: 1,
-                distance: None,
+                ..odf::DropCap::default()
             },
         }),
         ..odf::ParagraphProperties::default()
