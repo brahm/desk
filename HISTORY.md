@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Default Font in the preferences, the font and size of new
+  documents of Desk Writer.
 * Added: a choice of double and single quotes for smart quotes, smart
   dashes, and Convert Quotes for the quotes already typed.
 * Changed: the cells of tables take the corrections of typing, such as

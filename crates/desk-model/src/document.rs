@@ -469,6 +469,36 @@ impl Document {
         &self.styles
     }
 
+    /// Gives a new document the font and size of the Default Font of the
+    /// preferences, as Pages 15.4 does for new documents of its Basic
+    /// templates (PXV-03): the default paragraph style takes them, and
+    /// every other paragraph style that sets a size keeps it in
+    /// proportion. It is not a step of the history: it is for a document
+    /// that is just made.
+    pub fn set_default_font(&mut self, family: &str, size: Length) {
+        let body = self.styles.default_paragraph();
+        let before = self
+            .styles
+            .paragraph(body)
+            .and_then(|s| s.character.font_size)
+            .unwrap_or(crate::CharFormat::default().font_size);
+        let ratio = size.to_pt() / before.to_pt();
+        let styles: Vec<Style> = self.styles.iter().cloned().collect();
+        for style in styles {
+            let Style::Paragraph(mut paragraph) = style else {
+                continue;
+            };
+            if paragraph.id == body {
+                paragraph.character.font_family = Some(family.into());
+                paragraph.character.font_size = Some(size);
+            } else if let Some(own) = paragraph.character.font_size {
+                paragraph.character.font_size =
+                    Some(Length::from_pt((own.to_pt() * ratio * 2.0).round() / 2.0));
+            }
+            self.styles.insert(Style::Paragraph(paragraph));
+        }
+    }
+
     /// The container.
     pub fn container(&self) -> &Container {
         &self.container
@@ -1018,5 +1048,34 @@ fn object_colors(object: &Object, add: &mut impl FnMut(crate::Rgba)) {
         for object in objects.iter() {
             object_colors(object, add);
         }
+    }
+}
+
+#[cfg(test)]
+mod default_font_tests {
+    use super::*;
+
+    #[test]
+    fn pxv_03_a_new_document_takes_the_default_font() {
+        let mut document = Document::new_word_processing();
+        let title = document.new_id();
+        let mut style = ParagraphStyle::new(title, "Title");
+        style.character.font_size = Some(Length::from_pt(24.0));
+        document.styles.insert(Style::Paragraph(style));
+        document.set_default_font("Helvetica Neue", Length::from_pt(11.0));
+        // The other styles keep their size in proportion: 24 pt of 12 pt
+        // become 22 pt of 11 pt.
+        let title = document.styles().paragraph(title).unwrap();
+        assert_eq!(title.character.font_size, Some(Length::from_pt(22.0)));
+        assert_eq!(title.character.font_family, None);
+        let body = document
+            .styles()
+            .paragraph(document.styles().default_paragraph())
+            .unwrap();
+        assert_eq!(
+            body.character.font_family.as_deref(),
+            Some("Helvetica Neue")
+        );
+        assert_eq!(body.character.font_size, Some(Length::from_pt(11.0)));
     }
 }

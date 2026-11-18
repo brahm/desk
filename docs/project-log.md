@@ -1119,6 +1119,20 @@ matrix rows done on 9 November, before the change of target.
 - Converting quotes on the Mac (only the panel was found) stays for the
   last Mac session of W1.
 
+### 18 November: the default font (W051, first half of step 6 of W1)
+
+- Default Font joins the Editing group of the preferences, off as in
+  Pages 15.4. Desk Slides shows the same group, but the setting only
+  touches the templates of Desk Writer. When it is on, new documents of
+  the Blank and Blank Layout templates take its font and size, Helvetica
+  Neue 11 pt offered first as in the sheet of Pages: the Body style takes
+  them, and any other paragraph style with a size of its own keeps it in
+  proportion, as Pages says the other styles adjust. Documents already
+  made, and those that are opened, keep their fonts.
+- Step 6 is split in two pull requests to keep them small: the default
+  text box appearance of a document (W081) comes in the next one, still
+  in W1.
+
 
 ## Decisions, with their reasons and consequences
 

@@ -3539,12 +3539,18 @@ fn template_gallery() -> gtk::Box {
     gallery
 }
 
-/// A new document from a template of the gallery.
+/// A new document from a template of the gallery, in the Default Font of
+/// the preferences when it is set (PXV-03).
 fn from_template(target: &str) -> Document {
-    match target {
+    let mut document = match target {
         "layout" => Document::new_page_layout(),
         _ => Document::new_word_processing(),
+    };
+    let preferences = crate::preferences::get();
+    if preferences.set_default_font {
+        document.set_default_font(&preferences.default_font, preferences.default_font_size);
     }
+    document
 }
 
 /// The menu of the Add button of the navigation sidebar (GNM-12): a blank
