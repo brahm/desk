@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The 39 finished rows of the common base that the validation
+  on the Mac checked count as done on the dashboard.
 * Added: The table of contents in the sidebar of Desk Writer, with Edit
   and Insert.
 * Added: Document Warnings in the View menu of Desk Writer and Desk

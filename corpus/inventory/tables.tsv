@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 id	area	feature	in_iwork	target	rule	scope	status_in_desk	review	phase	note
 T001	3.1 Window, menus and panes	Menu bar	Different	15.4	D-001	In	Partial	the window changes (D-008)	T3	GNOME menus of interface B (NGNM-10); the Organize menu (sort, filter, categories) is missing and comes with phase 5
-T002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Header bar of interface B (NINT-07)
-T003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	the window changes (D-008)	B1	What the format bar of the cells held is in the Cell and Text tabs of the Format pane (NINT-08, step 2 of M+)
+T002	3.1 Window, menus and panes	Toolbar	Different	15.4	D-001	In	Done	-	B1	Header bar of interface B (NINT-07)
+T003	3.1 Window, menus and panes	Format bar	Only '09	'09, in the form of the 15	D-002	In	Done	-	B1	What the format bar of the cells held is in the Cell and Text tabs of the Format pane (NINT-08, step 2 of M+)
 T004	3.1 Window, menus and panes	Formula bar	Only '09	'09, in the form of the 15	D-002	In	Partial	the window changes (D-008)	T2	The formula bar is in the window, but the cells have no content yet (NINT-10, phase 4)
-T005	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Inspector with Format, Data and Document (NINT-09)
-T006	3.1 Window, menus and panes	Sheets pane (sidebar)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	B1	The tables and charts of the sheet in view in the sidebar, the sheets in the switcher of the bottom bar (NINT-03, NGNM-13, step 4 of window M+)
+T005	3.1 Window, menus and panes	Inspector	Different	15.4	D-001	In	Done	-	B1	Inspector with Format, Data and Document (NINT-09)
+T006	3.1 Window, menus and panes	Sheets pane (sidebar)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	B1	The tables and charts of the sheet in view in the sidebar, the sheets in the switcher of the bottom bar (NINT-03, NGNM-13, step 4 of window M+)
 T007	3.1 Window, menus and panes	Styles pane (sidebar)	Different	15.4	D-001	In	Missing	the window changes (D-008)	T1	Table styles with thumbnails (phase 5)
 T008	3.1 Window, menus and panes	Instant calculations	Different	15.4	D-001	In	Partial	the window changes (D-008)	T2	Calculations in the bottom bar (NGNM-13); choosing the functions is missing and the cells have no values yet
 T009	3.1 Window, menus and panes	Reorganize	Different	15.4	D-001	In	Missing	the window changes (D-008)	T3	Organize (sort, filter) in a sidebar (phase 5)
@@ -14,12 +14,12 @@ T010	3.1 Window, menus and panes	Function Browser	Different	15.4	D-001	In	Engine
 T011	3.1 Window, menus and panes	Media Browser 🌐💲 (in 15)	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T4	The Media popover exists in Writer; it is missing in the Tables window (NINT-14)
 T012	3.1 Window, menus and panes	Colors / Fonts window	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T2	Fonts and colors popovers of Writer; connecting them to Tables is missing
 T013	3.1 Window, menus and panes	Document Warnings window	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	T5	Warnings banner of Writer; missing in Tables (NINT-15)
-T014	3.1 Window, menus and panes	Zoom	Different (place)	15.4	D-001	In	Done	the window changes (D-008)	B1	Zoom (NINT-04)
-T015	3.1 Window, menus and panes	Full screen	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Fullscreen in the View menu, F11 and Escape, as in Writer (NINT-06)
-T016	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Done	the window changes (D-008)	B1	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
-T017	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	the window changes (D-008)	B1	Light/dark style of the system
-T018	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	The Preferences of Writer, without what only text documents have
-T019	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	the window changes (D-008)	B1	Undo and redo (NDOC-08)
+T014	3.1 Window, menus and panes	Zoom	Different (place)	15.4	D-001	In	Done	-	B1	Zoom (NINT-04)
+T015	3.1 Window, menus and panes	Full screen	Equal	Equal in both	-	In	Done	-	B1	Fullscreen in the View menu, F11 and Escape, as in Writer (NINT-06)
+T016	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Done	-	B1	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
+T017	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	-	B1	Light/dark style of the system
+T018	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Done	-	B1	The Preferences of Writer, without what only text documents have
+T019	3.1 Window, menus and panes	Undo/redo	Equal	Equal in both	-	In	Done	-	B1	Undo and redo (NDOC-08)
 T020	3.2 Spreadsheets, templates and files	Template chooser 🌐💲 (in 15)	Different	15.4	D-001	In	Missing	-	T5	Template chooser (phase 8)
 T021	3.2 Spreadsheets, templates and files	New spreadsheet always from the same template	Equal	Equal in both	-	In	Missing	-	T5	Default template (phase 8)
 T022	3.2 Spreadsheets, templates and files	Save	Different	15.4	D-001	In	Missing	-	T5	Tables does not save or open files yet (NDOC-07; ODS belongs to phase 1)

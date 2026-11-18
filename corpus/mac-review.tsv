@@ -19,7 +19,7 @@ W005	2026-11-17	No styles drawer; paragraph styles from the style button at the 
 W006	2026-11-17	Media button and the Photo and Video and Music browsers in the View menu; Content Hub and Image Playground	same	Content Hub and the generated images stay out (online or AI)
 W007	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	by decision	D-024: Fonts popover and the color chooser
 W008	2026-11-17	Show Adjust Image in the View menu opens a window	by decision	D-008: Adjust Image in the Image tab of the Inspector
-W010	2026-11-17	No bottom bar; zoom in the toolbar; Show Word Count puts a count over the foot of the page; Go To with Next, Previous, First and Last Page and Page…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Width, Fit Page, Zoom to Selection, One and Two Pages	gap	Desk has the count over the page, Go to Page and the zoom levels, but no First Page and Last Page in the menu (B-028) and no Zoom to Selection (B-027)
+W010	2026-11-17	No bottom bar; zoom in the toolbar; Show Word Count puts a count over the foot of the page; Go To with Next, Previous, First and Last Page and Page…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Width, Fit Page, Zoom to Selection, One and Two Pages	gap	Desk has the count over the page, Go to Page and the zoom levels, but no First Page and Last Page in the menu (B-028) and no Zoom to Selection (B-027); closed by pull request #140
 W013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	Tabs of AdwTabView with the tab overview
 W014	2026-11-17	Follows the light and dark appearance of macOS	same	-
 W015	2026-11-17	Settings with General, Rulers and Auto-Correction	same	Preferences with General, Rulers and Correction
@@ -30,15 +30,15 @@ T002	2026-11-17	Toolbar with View, Insert, Table, Chart, Text, Shape, Media, Com
 T003	2026-11-17	No format bar; Table, Cell, Text and Arrange tabs in the Format pane	same	-
 T005	2026-11-17	Inspector with Format, Organize and Document	same	-
 T006	2026-11-17	No sheets pane; sheet tabs under the toolbar with a + button; Show Previous, Next, First and Last Sheet in the Window menu	by decision	D-001 and step 4 of M+: tables and charts in the sidebar, sheets in the switcher of the bottom bar
-T014	2026-11-17	Zoom with Zoom In, Zoom Out, Actual Size and Zoom to Selection	gap	No Zoom to Selection (B-027)
+T014	2026-11-17	Zoom with Zoom In, Zoom Out, Actual Size and Zoom to Selection	gap	No Zoom to Selection (B-027); closed by pull request #140
 T016	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
 T017	2026-11-17	Follows the light and dark appearance of macOS	same	-
-T019	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing)	gap	Desk Tables undoes and redoes, but its menus say only Undo and Redo (B-029)
+T019	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing)	gap	Desk Tables undoes and redoes, but its menus say only Undo and Redo (B-029); closed by pull request #140
 S001	2026-11-17	Keynote, File, Edit, Insert, Slide, Format, Arrange, View, Play, Window and Help in the macOS menu bar	by decision	D-008: GNOME menus and command search
 S002	2026-11-17	Toolbar with View, Play, Add Slide, insert buttons, Comment, Zoom, Format, Animate and Document	by decision	D-008: header bar with Play and the insert buttons
 S003	2026-11-17	No format bar; the Slide tab with layout, appearance and background when nothing is selected	same	-
 S004	2026-11-17	Inspector with Format, Animate and Document	same	-
-S011	2026-11-17	No bottom bar; Go To in the Slide menu with Next, Previous, First and Last Slide and Slide…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Slide, Auto-Center, Zoom to Selection and Zoom to Fit Content	gap	Desk has Go to Slide and the first and the last slide, but no Zoom to Selection, Auto-Center or Zoom to Fit Content (B-027)
+S011	2026-11-17	No bottom bar; Go To in the Slide menu with Next, Previous, First and Last Slide and Slide…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Slide, Auto-Center, Zoom to Selection and Zoom to Fit Content	gap	Desk has Go to Slide and the first and the last slide, but no Zoom to Selection, Auto-Center or Zoom to Fit Content (B-027); closed by pull request #140
 S012	2026-11-17	Enter Full Screen and Slide Only in the View menu	same	-
 S013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
 S014	2026-11-17	Follows the light and dark appearance of macOS	same	-

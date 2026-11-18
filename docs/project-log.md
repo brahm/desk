@@ -910,6 +910,32 @@ matrix rows done on 9 November, before the change of target.
   owns is done and no backlog item is open for B1, so the phase can be
   closed when the owner decides.
 
+### 17 November: The review of the B1 rows marked "done, to review"
+
+- The owner asked to check the real state of the B1 rows that the
+  dashboard showed as done but to review, and whether any had a pending
+  item or a problem.
+- *What was found:* the 39 rows marked done in B1 all had a verdict in
+  corpus/mac-review.tsv: 22 the same as iWork 15.4, 13 different by a
+  decision, and 4 gaps (W010, T014, T019, S011) that pull request #140
+  closed (B-027 to B-029). Their review mark had stayed because the
+  validation did not clear it, so the mark was cleared, and mac-review.tsv
+  says that pull request #140 closed the gaps.
+- *What stays for later phases, and where:* some of these rows are done
+  as a window but show controls that do nothing yet, because their engine
+  comes in a later phase; each has its own row in the inventory, so none
+  needed a backlog item:
+  - in Desk Tables, the Chart, Text Box, Shape, Media and Comment buttons
+    (T4, T2 and T3; the Media button is B-036), the controls of the Cell
+    and Text tabs of the Format pane (T1 and T2) and the Data level of the
+    Inspector (T3);
+  - in Desk Slides, the master slide, background and transition of the
+    Slide tab (S1 and S3), and the Animation level, which has what the
+    old phase 2 gave (S3);
+  - Document Warnings in Desk Slides opens only when a presentation has
+    warnings, which come with the files of S5;
+  - Fullscreen in Desk Tables was checked in the code, not on screen.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
