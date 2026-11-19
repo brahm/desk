@@ -401,9 +401,8 @@ struct State {
     /// selected, which a drag then extends by whole words or paragraphs.
     unit: Unit,
     drag_from: Option<Selection>,
-    /// A drag of the label of a list item (LST-02): where it started on
-    /// its page, and how many levels it has moved the item.
-    label_drag: Option<(f64, i32)>,
+    /// A drag of the label of a list item (LST-02, PXV-11).
+    item_drag: Option<ItemDrag>,
     /// The picture that clicks take colors out of, while Instant Alpha
     /// is on (OBJ-06), and whether a press on it is being dragged.
     alpha_pick: Option<(desk_model::NodeId, bool)>,
@@ -502,6 +501,22 @@ pub struct Format {
     pub object_text: bool,
 }
 
+/// A drag of a list item by its label (LST-02, PXV-11).
+#[derive(Clone, Copy, Debug)]
+struct ItemDrag {
+    /// The paragraph of the item.
+    paragraph: usize,
+    /// Where the drag started across its page.
+    from: f64,
+    /// Where its label starts, from the left of its column.
+    label: f64,
+    /// Its level when the drag started.
+    level: u8,
+    /// The paragraph it goes before, and its level there, once the drag
+    /// has moved.
+    target: Option<(usize, u8)>,
+}
+
 /// Edits the document of a window.
 #[derive(Clone)]
 pub struct TextEditor {
@@ -557,7 +572,7 @@ impl TextEditor {
                 on_change: Vec::new(),
                 unit: Unit::Character,
                 drag_from: None,
-                label_drag: None,
+                item_drag: None,
                 alpha_pick: None,
                 pen: None,
                 connection_drag: None,
@@ -2184,6 +2199,95 @@ impl TextEditor {
         self.format_edit(name, move |edit| edit.set_page_setup(setup));
     }
 
+    /// Shows where a list item dragged by its label to a point of the
+    /// window would go, and at which level: a level for each step of the
+    /// indent of a level that the pointer moved sideways, at most one
+    /// deeper than the item it would follow (PXV-11).
+    fn drag_list_item(&self, drag: ItemDrag, x: f64, y: f64) {
+        const STEP: f64 = 18.0;
+        let Some((page, px, py)) = self.view.page_at(x, y) else {
+            return;
+        };
+        let found = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            text_nav::list_drop_at(&state.layout, page, py).map(|drop| {
+                let wanted = i32::from(drag.level) + ((px - drag.from) / STEP).round() as i32;
+                let level =
+                    text_nav::list_drop_level(document, drag.paragraph, drop.before, wanted);
+                let indent = |level: u8| {
+                    let p = document.body().get(drag.paragraph)?;
+                    let styles = document.styles();
+                    let format = styles.resolve_paragraph(p.style(), p.attrs());
+                    let style = styles.list(format.list_style?)?;
+                    Some(style.level(level).label_indent.to_pt())
+                };
+                let shift = indent(level).zip(indent(drag.level)).map_or(
+                    f64::from(i32::from(level) - i32::from(drag.level)) * STEP,
+                    |(to, from)| to - from,
+                );
+                (drop, level, drop.left + drag.label + shift)
+            })
+        };
+        let Some((drop, level, at)) = found else {
+            return;
+        };
+        self.state.borrow_mut().item_drag = Some(ItemDrag {
+            target: Some((drop.before, level)),
+            ..drag
+        });
+        self.view.set_list_drop(Some(crate::view::ListDropMark {
+            page,
+            at: (at, drop.y),
+            right: drop.right,
+        }));
+    }
+
+    /// Puts a list item dragged by its label where the drag showed, and
+    /// keeps its text selected (PXV-11).
+    fn end_item_drag(&self) {
+        let Some(drag) = self.state.borrow_mut().item_drag.take() else {
+            return;
+        };
+        self.view.set_list_drop(None);
+        if let Some((before, level)) = drag.target {
+            self.move_list_item(drag.paragraph, before, level);
+        }
+    }
+
+    /// Moves a list item, with the items under it, before paragraph
+    /// `before` and to `level`, as one action, and selects its text
+    /// (PXV-11).
+    pub fn move_list_item(&self, index: usize, before: usize, level: u8) {
+        let selection = self.selection();
+        let depth = self.state.borrow().editor.undo_depth();
+        let result = self
+            .state
+            .borrow_mut()
+            .editor
+            .edit("Move", |edit| edit.move_list_item(index, before, level));
+        self.state.borrow_mut().typing = false;
+        match result {
+            // A drop where the item was, at its level, changes nothing.
+            Ok(_) if self.state.borrow().editor.undo_depth() == depth => {}
+            Ok(moved) => {
+                let after = text_nav::paragraph_at(
+                    self.state.borrow().editor.document(),
+                    Spot::new(moved.start, 0),
+                );
+                {
+                    let mut state = self.state.borrow_mut();
+                    let action = state.next_action;
+                    state.next_action += 1;
+                    state.undo.push((selection, after, action));
+                    state.redo.clear();
+                }
+                self.after_change(after);
+            }
+            Err(error) => glib::g_warning!("desk", "cannot move: {error}"),
+        }
+    }
+
     /// Moves the selected items of lists `by` levels, with the items
     /// under them when `children` is true (LST-02). Returns false when
     /// the selection is not in a list, for Tab to insert a tab.
@@ -3781,9 +3885,23 @@ impl TextEditor {
                 );
                 this.select(selection);
                 let mut state = this.state.borrow_mut();
+                let label = state
+                    .layout
+                    .pages
+                    .get(page)
+                    .and_then(|p| p.lines.iter().find(|l| l.paragraph == paragraph))
+                    .and_then(|l| l.line.label.clone())
+                    .map_or(0.0, |label| f64::from(label.start));
+                let level = state.editor.document().list_level(paragraph).unwrap_or(0);
                 state.typing = false;
                 state.drag_from = None;
-                state.label_drag = Some((px, 0));
+                state.item_drag = Some(ItemDrag {
+                    paragraph,
+                    from: px,
+                    label,
+                    level,
+                    target: None,
+                });
                 return;
             }
             // A click on a link follows it, unless the document's links
@@ -3857,17 +3975,9 @@ impl TextEditor {
                 this.drag_objects(x + dx, y + dy, gesture.current_event_state());
                 return;
             }
-            let label_drag = this.state.borrow().label_drag;
-            if let Some((from, moved)) = label_drag {
-                // A level for each step of the indent of a level.
-                const STEP: f64 = 18.0;
-                if let Some((_, px, _)) = this.view.page_at(x + dx, y) {
-                    let levels = ((px - from) / STEP).trunc() as i32;
-                    if levels != moved {
-                        this.change_list_level(levels - moved, true);
-                        this.state.borrow_mut().label_drag = Some((from, levels));
-                    }
-                }
+            let item_drag = this.state.borrow().item_drag;
+            if let Some(drag) = item_drag {
+                this.drag_list_item(drag, x + dx, y + dy);
                 return;
             }
             let Some(from) = this.state.borrow().drag_from else {
@@ -3889,9 +3999,9 @@ impl TextEditor {
             this.end_pen_drag();
             this.end_points_drag();
             this.end_connection_drag();
+            this.end_item_drag();
             let mut state = this.state.borrow_mut();
             state.drag_from = None;
-            state.label_drag = None;
             state.adding = false;
         });
         self.view.area().add_controller(drag);

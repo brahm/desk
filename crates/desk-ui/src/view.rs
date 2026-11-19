@@ -67,6 +67,21 @@ struct State {
     fixed_guides: Vec<desk_model::FixedGuide>,
     /// A guide being dragged out of a ruler or along the page.
     dragged_guide: Option<desk_model::FixedGuide>,
+    /// Where a dragged list item would go (PXV-11).
+    list_drop: Option<ListDropMark>,
+}
+
+/// Where a dragged list item would go, as Pages shows it: a blue line
+/// across the column, with a triangle where the level the item takes
+/// starts (PXV-11). In points on its page.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ListDropMark {
+    /// The page it is on.
+    pub page: usize,
+    /// Where the triangle is.
+    pub at: (f64, f64),
+    /// Where the line ends on the right.
+    pub right: f64,
 }
 
 /// What a drag of objects tells next to the pointer: where the objects
@@ -216,6 +231,7 @@ impl DocumentView {
             drag_label: None,
             path: None,
             marquee: None,
+            list_drop: None,
             outlines: Vec::new(),
             fixed_guides: Vec::new(),
             dragged_guide: None,
@@ -321,6 +337,15 @@ impl DocumentView {
             return;
         }
         self.state.borrow_mut().marquee = marquee;
+        self.area.queue_draw();
+    }
+
+    /// Shows where a dragged list item would go, or nothing (PXV-11).
+    pub fn set_list_drop(&self, mark: Option<ListDropMark>) {
+        if self.state.borrow().list_drop == mark {
+            return;
+        }
+        self.state.borrow_mut().list_drop = mark;
         self.area.queue_draw();
     }
 
@@ -974,6 +999,7 @@ fn draw_marks(
     }
     cr.fill().ok();
     draw_objects(cr, state, page, rect, scale);
+    draw_list_drop(cr, state, page, rect, scale);
     draw_drag_label(cr, state, page, rect, scale);
     let Some(caret) = state.caret.filter(|c| c.page == page) else {
         return;
@@ -987,6 +1013,34 @@ fn draw_marks(
     cr.move_to(x, rect.y + caret.top * scale);
     cr.line_to(x, rect.y + caret.bottom * scale);
     cr.stroke().ok();
+}
+
+/// Where a dragged list item would go: a line in the accent color, with
+/// a triangle pointing at it where the level of the item starts (PXV-11).
+fn draw_list_drop(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
+    let Some(mark) = state.list_drop.filter(|m| m.page == page) else {
+        return;
+    };
+    let x = rect.x + mark.at.0 * scale;
+    let y = (rect.y + mark.at.1 * scale).round();
+    let right = rect.x + mark.right * scale;
+    const SIZE: f64 = 6.0;
+    cr.save().ok();
+    cr.set_source_rgb(0.21, 0.52, 0.89);
+    cr.rectangle(x, y - 1.0, (right - x).max(0.0), 2.0);
+    cr.fill().ok();
+    cr.move_to(x - SIZE, y - SIZE);
+    cr.line_to(x, y);
+    cr.line_to(x - SIZE, y + SIZE);
+    cr.close_path();
+    cr.fill().ok();
+    cr.restore().ok();
 }
 
 /// What a drag of objects tells, below and right of the pointer, as Pages

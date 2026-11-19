@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: dragging the bullet of a list item moves it, with its sub-items,
+  to another place and level, shown by a blue line and a triangle.
 * Added: Color, Gradient, Advanced Gradient, Image and Tinted Image fills
   of text in the Font group of the sidebar.
 * Added: text filled with a gradient or a picture, drawn and kept in
