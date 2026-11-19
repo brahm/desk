@@ -98,6 +98,52 @@ impl Document {
         chain
     }
 
+    /// The threads of text boxes of the document, as Pages numbers them
+    /// (PXV-13): the boxes linked with others, and those alone in a
+    /// thread, each thread with its boxes in order, by their first boxes
+    /// from back to front. A thread is numbered by its place here, from 1.
+    pub fn text_box_threads(&self) -> Vec<Vec<NodeId>> {
+        self.objects()
+            .iter()
+            .filter(|o| self.text_box_head(o.id) == o.id)
+            .filter_map(|o| {
+                let ObjectKind::TextBox(text) = &o.kind else {
+                    return None;
+                };
+                let chain = self.text_box_chain(o.id);
+                (chain.len() > 1 || text.thread).then_some(chain)
+            })
+            .collect()
+    }
+
+    /// The name of a thread of text boxes in its menu: the first words of
+    /// its text, or nothing when it has none (PXV-13).
+    pub fn text_box_thread_name(&self, id: NodeId) -> String {
+        const WORDS: usize = 4;
+        let head = self.text_box_head(id);
+        let Some(text) = self.objects().get(head).and_then(Object::text_box) else {
+            return String::new();
+        };
+        let mut words = text
+            .paragraphs
+            .iter()
+            .flat_map(|p| {
+                p.text()
+                    .split_whitespace()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>()
+            })
+            .take(WORDS + 1)
+            .collect::<Vec<_>>();
+        let more = words.len() > WORDS;
+        words.truncate(WORDS);
+        let mut name = words.join(" ");
+        if more {
+            name.push('…');
+        }
+        name
+    }
+
     /// The text boxes of the document, and the shapes with text, from
     /// back to front, as stories.
     pub fn text_box_stories(&self) -> Vec<Story> {

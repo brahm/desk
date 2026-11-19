@@ -41,6 +41,7 @@ mod sections;
 mod slides;
 mod stories;
 mod tables;
+mod threads;
 
 pub use navigate::Navigate;
 pub use objects::{NewShape, ObjectInfo, ObjectStylesInfo};
@@ -3854,7 +3855,9 @@ impl TextEditor {
             }
             // A click on an object selects it, or on a handle of one
             // starts resizing it (OBJ-33).
-            if this.press_object(presses, x, y, gesture.current_event_state()) {
+            if this.press_thread(x, y)
+                || this.press_object(presses, x, y, gesture.current_event_state())
+            {
                 this.state.borrow_mut().drag_from = None;
                 return;
             }

@@ -318,6 +318,19 @@ These sit on the `style:graphic-properties` of the graphic style of a
   an older file. A field removed or changed in meaning gets a new
   attribute name (rule 6).
 
+#### `desk:thread`
+
+- **Feature:** a thread of text boxes of Pages with one box in it, which
+  shows its number on the box and that other boxes can be added to
+  (PXV-13, W091). Threads of several boxes are the standard links of
+  `draw:chain-next-name`; Desk also writes the attribute on the first box
+  of those, so that taking the others out keeps it in a thread.
+- **On:** `draw:text-box`.
+- **Value:** a boolean. Absent means the box is in a thread only when it
+  is linked with others.
+- **Fallback:** none needed; the box shows the same text, without the
+  number of its thread.
+
 #### `desk:media-start`, `desk:media-stop`, `desk:poster-time`
 
 - **Feature:** the trim and the poster frame of a movie or a sound
@@ -625,7 +638,6 @@ specified here, by the rules above, in the phase that implements it.
 | Drop caps beyond the ODF model, automatic fractions, phonetic guide details | Writer | ODF covers part of each | The ODF drop cap, the literal characters, ODF ruby |
 | Page templates (pages of the template to add), section masters | Writer | ODF master pages have no "page to insert" with placeholders | Ordinary master pages |
 | Placeholder text and media placeholders | All | ODF has a placeholder field for text only | Ordinary content |
-| Threaded text boxes with an order shown | Writer | ODF chains frames, without the display data | The ODF chain |
 | Comment threads with replies and highlights | All | ODF 1.3 annotations have no reply relation | Flat annotations, in order |
 | Tracking of format and table-cell changes | Writer | ODF tracks insertions, deletions and some format changes only | The changes ODF can express |
 | Several free tables on a sheet, each with its name, headers and footers | Tables | An ODF sheet is one grid | Each table as a range of the sheet, as today in `desk:table` |
