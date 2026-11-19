@@ -1253,6 +1253,22 @@ matrix rows done on 9 November, before the change of target.
   differ from those of a new document, so other programs see nothing new.
 - W060 is done for W1.
 
+### 19 November: gradients and pictures that fill text (W052, step 9 of W1)
+
+- Text can be filled with a gradient, an advanced gradient, a picture or
+  a tinted picture, as in Pages 15.4, besides its color. One gradient
+  goes once across the neighbouring text it fills on each line, over the
+  height of the line. Documents keep the fill as `desk:text-fill` and its
+  attributes, and keep the color too, so other programs show colored
+  text (pull request 159).
+- The Font group of the sidebar chooses the fill: Color Fill shows the
+  Text Color row, and the other fills show the rows of the Graphic group
+  of objects, which both groups now share (pull request 160).
+- A third Mac session is to check how far one gradient spreads in Pages
+  (per line, per passage or per word) and whether underline and
+  strikethrough take it. Desk draws them in the text color until then.
+- W052 is done for W1.
+
 
 ## Decisions, with their reasons and consequences
 

@@ -478,7 +478,7 @@ note	Navegar por tipo de item pela barra inferior (INT-19)	Navigate by kind of i
 note	Seleção descontínua com Ctrl (TXT-03)	Discontinuous selection with Ctrl (TXT-03)
 note	Grupo Fonte do painel Formatar (FMT-01, FMT-02, FMT-05)	Font group of the Format pane (FMT-01, FMT-02, FMT-05)
 note	A fonte padrão vem do modelo; falta escolhê-la nas Preferências	The default font comes from the template; choosing it in Preferences is missing
-note	Cor sólida (FMT-11); falta gradiente e imagem no texto	Solid color (FMT-11); gradient and image in text are missing
+note	Preenchimento do texto no grupo Fonte: Preenchimento de Cor (FMT-11), Preenchimento de Gradiente, Preenchimento de Gradiente Avançado, Preenchimento de Imagem e Preenchimento de Imagem com Tom, como no Pages 15.4; um gradiente atravessa o texto que preenche em cada linha, e o preenchimento fica no ODF como desk:text-fill (PXV-04)	Fill of text in the Font group: Color Fill (FMT-11), Gradient Fill, Advanced Gradient Fill, Image Fill and Tinted Image Fill, as in Pages 15.4; one gradient goes across the text it fills on each line, and the fill is kept in ODF as desk:text-fill (PXV-04)
 note	Contorno e sombra de texto (FMT-03, FMT-04)	Text outline and shadow (FMT-03, FMT-04)
 note	Maiúsculas, versalete e Título, que deixa as palavras curtas de ligação em minúsculas como o Pages 15.4 (FMT-07); faltam Iniciais, Início de frase e as outras transformações do 15	All caps, small caps and Title Case, which leaves short joining words in lower case as Pages 15.4 does (FMT-07); Start Case, Sentence case and the other transformations of the 15 are missing
 note	Sobrescrito e linha de base (FMT-06)	Superscript and baseline (FMT-06)
