@@ -370,6 +370,7 @@ pub struct Document {
     view: Option<ViewSettings>,
     pub(crate) styles: Styles,
     pub(crate) object_styles: crate::ObjectStyles,
+    pub(crate) table_styles: crate::TableStyles,
     pub(crate) container: Container,
     /// The slides of a presentation, one for each page; none for other
     /// documents.
@@ -384,6 +385,7 @@ impl PartialEq for Document {
             && self.text_settings == other.text_settings
             && self.styles == other.styles
             && self.object_styles == other.object_styles
+            && self.table_styles == other.table_styles
             && self.container == other.container
             && self.slides == other.slides
     }
@@ -399,6 +401,7 @@ impl Document {
         let body_style = ids.allocate();
         let first = ids.allocate();
         let object_styles = crate::ObjectStyles::library(|| ids.allocate());
+        let table_styles = crate::TableStyles::library(|| ids.allocate());
         Self {
             ids,
             metadata: Metadata::default(),
@@ -411,6 +414,7 @@ impl Document {
             view: None,
             styles: Styles::new(ParagraphStyle::new(body_style, "Body")),
             object_styles,
+            table_styles,
             container: Container::Pages(PagedFlow {
                 // The footer of the Blank template is 0.6 inch from the
                 // bottom of the paper, the header half an inch from the top.
@@ -865,6 +869,13 @@ impl Document {
                 }
                 let old = std::mem::replace(&mut self.object_styles, styles);
                 Ok(Op::SetObjectStyles { styles: old })
+            }
+            Op::SetTableStyles { styles } => {
+                for style in styles.iter() {
+                    self.ids.observe(style.id);
+                }
+                let old = std::mem::replace(&mut self.table_styles, styles);
+                Ok(Op::SetTableStyles { styles: old })
             }
             Op::RemoveStyle { style } => {
                 if style == self.styles.default_paragraph() {

@@ -98,6 +98,9 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for style in &document.list_styles {
         write_list_style(&mut w, style);
     }
+    for template in &document.table_templates {
+        crate::table::write_table_template(&mut w, template);
+    }
     for gradient in &document.gradients {
         crate::draw::write_gradient(&mut w, gradient);
     }

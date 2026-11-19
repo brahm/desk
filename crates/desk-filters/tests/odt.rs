@@ -3785,3 +3785,47 @@ fn pxv_04_gradients_and_pictures_that_fill_text_are_kept() {
         .collect();
     assert_eq!(fills, [Some(red), None, Some(radial), Some(image)]);
 }
+
+#[test]
+fn pxv_14_table_styles_are_kept_as_table_templates() {
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let id = editor
+        .edit("Insert Table", |edit| {
+            let mut table = desk_model::Table::new(3, 3);
+            table.style.alternating = Some(desk_table::Color::rgb(0xee, 0xf4, 0xfa));
+            table.style.font = "Noto Sans".into();
+            table.style.font_size = 12_000;
+            let id = edit.new_id();
+            edit.add_object(desk_model::Object::new(
+                id,
+                desk_model::ObjectKind::Table(std::sync::Arc::new(table)),
+                desk_model::Frame::from_pt(72.0, 72.0, 216.0, 60.0),
+            ))?;
+            Ok(id)
+        })
+        .unwrap();
+    editor
+        .edit("Create Table Style", |edit| {
+            edit.create_table_style(id, "Table Style {number}")
+                .map(drop)
+        })
+        .unwrap();
+    let document = editor.document();
+    assert_eq!(document.table_styles().len(), 7);
+    let bytes = write_odt(document).unwrap();
+    keep("pxv-table-styles.odt", &bytes);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut text = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("styles.xml").unwrap(), &mut text).unwrap();
+    assert!(text.contains("<table:table-template table:name=\"Table Style 1\""));
+    let read = read_odt(&bytes).unwrap();
+    // The styles of the library keep their identifiers; the others get
+    // new ones.
+    let looks = |d: &Document| -> Vec<(String, desk_model::TableLook)> {
+        d.table_styles()
+            .iter()
+            .map(|s| (s.name.to_string(), s.look.clone()))
+            .collect()
+    };
+    assert_eq!(looks(&read), looks(document));
+}

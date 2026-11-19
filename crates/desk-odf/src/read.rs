@@ -71,6 +71,8 @@ pub fn read_streams(
                     document.markers.push(marker);
                 } else if let Some(image) = crate::draw::fill_image(element) {
                     document.fill_images.push(image);
+                } else if let Some(template) = crate::table::table_template(element) {
+                    document.table_templates.push(template);
                 } else if element.name.is(TEXT, "notes-configuration") {
                     let attr = |ns, name| element.attr(ns, name).map(str::to_owned);
                     document.notes_configuration.push(NotesConfiguration {

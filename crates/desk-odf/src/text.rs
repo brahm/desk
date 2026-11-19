@@ -40,6 +40,9 @@ pub struct TextDocument {
     pub style_shortcuts: Vec<StyleShortcut>,
     /// The common list styles (`text:list-style` in `office:styles`).
     pub list_styles: Vec<ListStyle>,
+    /// The table templates of `office:styles`, which hold the table
+    /// styles of the document; their cell styles are among `styles`.
+    pub table_templates: Vec<crate::table::TableTemplate>,
     /// The automatic list styles, which other programs write for lists
     /// formatted directly.
     pub automatic_list_styles: Vec<ListStyle>,

@@ -1584,6 +1584,7 @@ pub(super) fn import_objects(
     paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
 ) -> Result<(), FilterError> {
     import_object_styles(source, document)?;
+    super::tables::import_table_styles(source, document)?;
     let setup = *document.page_setup();
     let ids: Vec<NodeId> = document.body().iter().map(Paragraph::id).collect();
     let mut found: Vec<(&odf::DrawObject, Option<NodeId>)> =
@@ -2328,6 +2329,7 @@ fn master_paragraphs(page: &mut odf::MasterPage) -> impl Iterator<Item = &mut od
 /// first paragraph, and those that move with a paragraph in it.
 pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDocument) {
     let document = exporter.document;
+    super::tables::export_table_styles(document, out);
     // The object styles, among the named styles, with the kind of object
     // each is for and the default of each kind (MOD-04, MOD-07).
     let object_styles = document.object_styles();
