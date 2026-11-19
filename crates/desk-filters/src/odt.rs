@@ -14,11 +14,12 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape, FontFeature,
-    FontFeatures, FontWeight, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor,
-    LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, ModelError, NumberFormat,
-    Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle,
-    Rgba, Run, Shadow, Style, StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape, DropCapStyle,
+    FontFeature, FontFeatures, FontWeight, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures,
+    LineColor, LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, ModelError,
+    NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphSpacing,
+    ParagraphStyle, Rgba, Run, Shadow, Style, StyleId, TabAlignment, TabLeader, TabStop, TabStops,
+    TextSettings,
 };
 use desk_model::{
     FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
@@ -1691,6 +1692,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             },
             links_inactive: text.links_inactive.unwrap_or(false),
             guides: fixed_guides(&text.guides),
+            drop_cap_styles: text.drop_cap_styles.as_ref().map_or_else(
+                || DropCapStyle::library().to_vec(),
+                |styles| styles.iter().filter_map(|s| drop_cap_style(s)).collect(),
+            ),
         },
     })?;
 
@@ -2612,6 +2617,14 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     }
                 })
                 .collect(),
+            // Only when they are not those of a new document.
+            drop_cap_styles: (settings.drop_cap_styles != DropCapStyle::library()).then(|| {
+                settings
+                    .drop_cap_styles
+                    .iter()
+                    .map(odf_drop_cap_style)
+                    .collect()
+            }),
             ..odf_note_settings(settings.notes)
         },
         notes_configuration: notes_configuration(settings.notes),
@@ -3086,6 +3099,100 @@ pub fn export(document: &Document) -> odf::TextDocument {
 /// (OBJ-28): `h` or `v`, the distance from the edge of the paper, and the
 /// page from 1, which a guide on every page has not. One that cannot be
 /// read is left out.
+/// A style of drop caps from its line in the settings: words of a name,
+/// `=` and a value, as `lines=3 weight=700 color=#000000`, which
+/// [`odf_drop_cap_style`] writes.
+fn drop_cap_style(line: &str) -> Option<DropCapStyle> {
+    let mut style = DropCapStyle::library()[0];
+    let mut shape: Option<DropCapShape> = None;
+    let number = |v: &str, max: u32| {
+        v.trim_end_matches('%')
+            .parse::<u32>()
+            .ok()
+            .map(|n| n.min(max))
+    };
+    for word in line.split_whitespace() {
+        let (name, value) = word.split_once('=')?;
+        let cap = &mut style.cap;
+        match name {
+            "lines" => cap.lines = number(value, 255)?.max(2) as u8,
+            "characters" => cap.characters = number(value, 255)?.max(1) as u8,
+            "raised" => cap.raised = number(value, 255)? as u8,
+            "wrap" => cap.follow_shape = value == "shape",
+            "distance" => cap.distance = length(odf::Length::parse(value)?),
+            "outdent" => cap.outdent = number(value, 200)? as u8,
+            "weight" => style.weight = desk_model::FontWeight::new(number(value, 900)? as u16),
+            "color" => style.color = rgba(odf::Color::parse(value)?),
+            "fill" => {
+                shape.get_or_insert_with(DropCapShape::default).fill =
+                    rgba(odf::Color::parse(value)?)
+            }
+            "border" => {
+                shape.get_or_insert_with(DropCapShape::default).border_width =
+                    length(odf::Length::parse(value)?)
+            }
+            "border-color" => {
+                shape.get_or_insert_with(DropCapShape::default).border_color =
+                    rgba(odf::Color::parse(value)?)
+            }
+            "border-style" => {
+                shape.get_or_insert_with(DropCapShape::default).border_style = match value {
+                    "dashed" => BorderStyle::Dashed,
+                    "dotted" => BorderStyle::Dotted,
+                    _ => BorderStyle::Solid,
+                }
+            }
+            "scale" => {
+                shape.get_or_insert_with(DropCapShape::default).scale =
+                    number(value, 100)?.max(10) as u8
+            }
+            "radius" => {
+                shape.get_or_insert_with(DropCapShape::default).radius = number(value, 100)? as u8
+            }
+            _ => {}
+        }
+    }
+    style.cap.raised = style.cap.raised.min(style.cap.lines - 1);
+    style.cap.background = shape;
+    Some(style)
+}
+
+/// The line of a style of drop caps in the settings.
+fn odf_drop_cap_style(style: &DropCapStyle) -> String {
+    let cap = &style.cap;
+    let mut line = format!(
+        "lines={} characters={} raised={} wrap={} distance={} outdent={}% weight={} color={}",
+        cap.lines,
+        cap.characters,
+        cap.raised,
+        if cap.follow_shape {
+            "shape"
+        } else {
+            "rectangle"
+        },
+        odf_length(cap.distance),
+        cap.outdent,
+        style.weight.value(),
+        odf_color(style.color),
+    );
+    if let Some(shape) = cap.background {
+        let border_style = match shape.border_style {
+            BorderStyle::Solid => "solid",
+            BorderStyle::Dashed => "dashed",
+            BorderStyle::Dotted => "dotted",
+        };
+        line.push_str(&format!(
+            " fill={} border={} border-color={} border-style={border_style} scale={}% radius={}%",
+            odf_color(shape.fill),
+            odf_length(shape.border_width),
+            odf_color(shape.border_color),
+            shape.scale,
+            shape.radius,
+        ));
+    }
+    line
+}
+
 fn fixed_guides(guides: &[String]) -> Vec<desk_model::FixedGuide> {
     let mut out: Vec<desk_model::FixedGuide> = guides
         .iter()

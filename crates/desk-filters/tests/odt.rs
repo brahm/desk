@@ -369,6 +369,30 @@ fn sample() -> Document {
                 toc: Default::default(),
                 links_inactive: true,
                 guides: Vec::new(),
+                // The first of the library deleted, and one saved
+                // after the others (PXV-06).
+                drop_cap_styles: desk_model::DropCapStyle::library()[1..]
+                    .iter()
+                    .copied()
+                    .chain([desk_model::DropCapStyle {
+                        cap: desk_model::DropCap {
+                            lines: 5,
+                            characters: 2,
+                            distance: Length::from_points(3),
+                            background: Some(desk_model::DropCapShape {
+                                fill: Rgba::rgb(10, 120, 200),
+                                border_width: Length::from_points(1),
+                                border_style: desk_model::BorderStyle::Dashed,
+                                border_color: Rgba::rgb(200, 0, 0),
+                                scale: 60,
+                                radius: 100,
+                            }),
+                            ..desk_model::DropCap::default()
+                        },
+                        weight: desk_model::FontWeight::BLACK,
+                        color: Rgba::rgb(255, 255, 0),
+                    }])
+                    .collect(),
             },
         })
         .unwrap();

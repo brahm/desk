@@ -1232,6 +1232,27 @@ matrix rows done on 9 November, before the change of target.
   session of W1 (step 19): Pages hyphenates all the text by that one
   language and has no language per paragraph.
 
+### 19 November: the outdent, the border lines and the styles of drop caps (W060, end of step 8 of W1)
+
+- Outdent is a percent of the width of the letters, from 0 to 200 %, as
+  in Pages 15.4, rather than on or off: at 50 % half of the letters
+  stand in the margin and the lines beside them move in by the other
+  half; at 200 % no line moves (pull request 157).
+- The border of the shape of a drop cap is solid, dashed or dotted.
+  Moved to W3 (B-044): the five artistic lines of the ten of Pages
+  (chalk, thick brush, chisel pen, dry brush and uneven ink), which Desk
+  draws nowhere yet, with those of objects and pages.
+- A second Mac session read the six Drop Cap Styles of Pages, and Desk
+  has them with the same values: plain; bold, two lines and raised;
+  bold, four lines, following the letter; bold and raised; bold, raised
+  and half outdented; and white on a black square. A style also sets the
+  weight and color of the letters. The button in the header of the Drop
+  Cap group applies one, saves the drop cap at the cursor as a new one,
+  and redefines or deletes one, as the secondary click of Pages does.
+- The document keeps its styles in its settings, written only when they
+  differ from those of a new document, so other programs see nothing new.
+- W060 is done for W1.
+
 
 ## Decisions, with their reasons and consequences
 

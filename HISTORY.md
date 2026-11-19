@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: the six Drop Cap Styles of Pages, and saving, redefining and
+  deleting styles of drop caps.
 * Changed: a drop cap stands out into the margin by a percent of its
   width, up to 200 %, and the border of its shape can be dashed or
   dotted.

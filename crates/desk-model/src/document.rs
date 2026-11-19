@@ -94,6 +94,8 @@ pub struct TextSettings {
     pub links_inactive: bool,
     /// The guides fixed on the pages, which objects snap to (OBJ-28).
     pub guides: Vec<FixedGuide>,
+    /// The styles of drop caps, in the order of their menu (PXV-06).
+    pub drop_cap_styles: Vec<crate::DropCapStyle>,
 }
 
 /// A guide fixed on a page, dragged out of a ruler, that objects snap to
@@ -139,6 +141,7 @@ impl Default for TextSettings {
             toc: crate::toc::TocSettings::default(),
             links_inactive: false,
             guides: Vec::new(),
+            drop_cap_styles: crate::DropCapStyle::library().to_vec(),
         }
     }
 }

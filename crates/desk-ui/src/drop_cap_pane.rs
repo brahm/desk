@@ -35,6 +35,7 @@ pub struct DropCapGroup {
     border_style: compact::ComboRow,
     scale: compact::SpinRow,
     radius: compact::SpinRow,
+    _styles: Rc<crate::drop_cap_styles::StylesButton>,
     /// Whether the rows are being set from the selection.
     updating: Cell<bool>,
 }
@@ -77,7 +78,12 @@ impl DropCapGroup {
         scale.set_subtitle(&tr("Percent of the shape"));
         let radius = spin(&tr("Corner Radius"), 0.0, 100.0);
         radius.set_subtitle(&tr("Percent"));
-        let group = compact::Group::builder().title(tr("Drop Cap")).build();
+        // The styles of drop caps, in the header (PXV-06).
+        let styles = crate::drop_cap_styles::StylesButton::new(editor.clone());
+        let group = compact::Group::builder()
+            .title(tr("Drop Cap"))
+            .header_suffix(styles.widget())
+            .build();
         group.add(&on);
         group.add(&lines);
         group.add(&characters);
@@ -106,6 +112,7 @@ impl DropCapGroup {
             border_style,
             scale,
             radius,
+            _styles: styles,
             updating: Cell::new(false),
         });
         let apply = {

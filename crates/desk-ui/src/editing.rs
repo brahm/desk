@@ -2821,6 +2821,38 @@ impl TextEditor {
         });
     }
 
+    /// The styles of drop caps of the document (PXV-06).
+    pub fn drop_cap_styles(&self) -> Vec<desk_model::DropCapStyle> {
+        self.state
+            .borrow()
+            .editor
+            .document()
+            .drop_cap_styles()
+            .to_vec()
+    }
+
+    /// The look of the drop cap of the paragraph at the cursor, as a
+    /// style would keep it; none when it has none.
+    pub fn drop_cap_style(&self) -> Option<desk_model::DropCapStyle> {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        let at = at_spot(document, state.selection.focus).ok()?;
+        document.drop_cap_style_at(at.paragraph)
+    }
+
+    /// Gives the paragraphs of the selection the drop cap of a style, and
+    /// their first characters its weight and color.
+    pub fn apply_drop_cap_style(&self, style: desk_model::DropCapStyle) {
+        self.format_ranges("Drop Cap Style", move |edit, from, to| {
+            edit.apply_drop_cap_style(from, to, &style)
+        });
+    }
+
+    /// Sets the styles of drop caps, as one action of the history.
+    pub fn set_drop_cap_styles(&self, name: &str, styles: Vec<desk_model::DropCapStyle>) {
+        self.format_edit(name, move |edit| edit.set_drop_cap_styles(styles));
+    }
+
     /// Changes the margins of the page, as one action of the history
     /// (FMT-18). With `keep_indents`, how far each edge of the text moved
     /// in, in points, the paragraphs of the selection change their indents
