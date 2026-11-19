@@ -1321,18 +1321,33 @@ fn pxv_06_a_drop_cap_can_rise_and_stand_in_the_margin() {
     assert!(raised.lines[1].x > 0.0);
     assert_eq!(raised.lines[2].x, 0.0);
     assert_eq!(raised.top, 0.0);
-    // Outdented: the letter ends at the indent and no line moves.
-    let indented = ParaFormat {
+    // Outdented by its whole width: the letter ends at the indent and no
+    // line moves.
+    let indented = |outdent: u8| ParaFormat {
         left_indent: Length::from_points(60),
         ..capped(desk_model::DropCap {
-            outdent: true,
+            outdent,
             ..rectangle
         })
     };
-    let outdent = plain(&mut system, indented, TEXT);
+    let outdent = plain(&mut system, indented(100), TEXT);
     let letter = &outdent.lines[0].runs[0];
-    assert!((letter.x + letter.advance - 60.0).abs() < 0.01);
+    let advance = letter.advance;
+    assert!((letter.x + advance - 60.0).abs() < 0.01);
     assert!(outdent.lines.iter().all(|l| l.x == 60.0));
+    // By half: half of it in the margin, the lines beside it after it.
+    let half = plain(&mut system, indented(50), TEXT);
+    let letter = &half.lines[0].runs[0];
+    assert!((letter.x - (60.0 - advance / 2.0)).abs() < 0.01);
+    for line in &half.lines[..3] {
+        assert!((line.x - (60.0 + advance / 2.0)).abs() < 0.01, "{}", line.x);
+    }
+    assert_eq!(half.lines[3].x, 60.0);
+    // By twice: a gap between the letter and the indent.
+    let twice = plain(&mut system, indented(200), TEXT);
+    let letter = &twice.lines[0].runs[0];
+    assert!((letter.x - (60.0 - 2.0 * advance)).abs() < 0.01);
+    assert!(twice.lines.iter().all(|l| l.x == 60.0));
 }
 
 #[test]

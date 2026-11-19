@@ -406,7 +406,13 @@ impl DisplayList {
                     stroke: (border > 0.0).then(|| PathStroke {
                         width: border,
                         color: cap.shape.border_color,
-                        dashes: Vec::new(),
+                        dashes: cap
+                            .shape
+                            .border_style
+                            .dashes(f64::from(border))
+                            .into_iter()
+                            .map(|d| d as f32)
+                            .collect(),
                     }),
                 });
             }

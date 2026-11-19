@@ -425,9 +425,12 @@ options of Pages 15.4 (PXV-06), written by `paragraph_children` in
 
 #### `desk:drop-cap-outdent`
 
-- **Feature:** a drop cap that stands in the margin, outside the indent,
-  with the lines beside it at the indent (PXV-06).
-- **Value:** a boolean.
+- **Feature:** a drop cap that stands out into the margin, outside the
+  indent, by a part of its width (PXV-06). At 100 % it ends at the
+  indent, and the lines beside it start there.
+- **Value:** a percent of the width of the letters, from 0 % to 200 %.
+  Desk wrote `true` and `false` before 18 November 2026, which it reads
+  as 100 % and 0 %.
 - **Fallback:** the letters inside the indent.
 
 #### `desk:drop-cap-fill`
@@ -450,6 +453,14 @@ options of Pages 15.4 (PXV-06), written by `paragraph_children` in
 - **Feature:** the color of the line around the shape of a drop cap
   (PXV-06).
 - **Value:** `#rrggbb`; black when absent.
+- **Fallback:** no line.
+
+#### `desk:drop-cap-border-style`
+
+- **Feature:** how the line around the shape of a drop cap is drawn
+  (PXV-06).
+- **Value:** `solid`, `dashed` or `dotted`, as `fo:border` names them;
+  solid when absent.
 - **Fallback:** no line.
 
 #### `desk:drop-cap-scale`

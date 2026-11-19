@@ -14,9 +14,10 @@ use std::rc::Rc;
 use desk_model::{DropCap, DropCapShape, Length, ParaAttrs, ParaFormat};
 
 use crate::compact;
-use crate::effects::ColorRow;
+use crate::effects::{ColorRow, STYLES, style_name};
 use crate::formatting::EditorOf;
 use crate::i18n::tr;
+use crate::tab_stops::string_list;
 
 /// The Drop Cap group.
 pub struct DropCapGroup {
@@ -26,11 +27,12 @@ pub struct DropCapGroup {
     characters: compact::SpinRow,
     raised: compact::SpinRow,
     follow_shape: compact::SwitchRow,
-    outdent: compact::SwitchRow,
+    outdent: compact::SpinRow,
     spacing: compact::SpinRow,
     shape: ColorRow,
     border: ColorRow,
     border_width: compact::SpinRow,
+    border_style: compact::ComboRow,
     scale: compact::SpinRow,
     radius: compact::SpinRow,
     /// Whether the rows are being set from the selection.
@@ -58,10 +60,8 @@ impl DropCapGroup {
             .title(tr("Follow the Shape"))
             .subtitle(tr("The text beside the letters follows their outline"))
             .build();
-        let outdent = compact::SwitchRow::builder()
-            .title(tr("Outdent"))
-            .subtitle(tr("The letters stand in the margin"))
-            .build();
+        let outdent = spin(&tr("Outdent"), 0.0, 200.0);
+        outdent.set_subtitle(&tr("Percent of the width of the letters, in the margin"));
         let spacing = spin(&tr("Spacing"), 0.0, 1000.0);
         spacing.set_subtitle(&tr("Points"));
         let start = DropCapShape::default();
@@ -69,6 +69,10 @@ impl DropCapGroup {
         let border = ColorRow::new(&tr("Border"), start.border_color);
         let border_width = spin(&tr("Border Width"), 0.0, 20.0);
         border_width.set_subtitle(&tr("Points"));
+        let border_style = compact::ComboRow::builder()
+            .title(tr("Border Style"))
+            .model(&string_list(STYLES.map(style_name)))
+            .build();
         let scale = spin(&tr("Letter Size"), 10.0, 100.0);
         scale.set_subtitle(&tr("Percent of the shape"));
         let radius = spin(&tr("Corner Radius"), 0.0, 100.0);
@@ -86,6 +90,7 @@ impl DropCapGroup {
         group.add(&radius);
         group.add(&border.row);
         group.add(&border_width);
+        group.add(&border_style);
         let this = Rc::new(Self {
             group,
             on,
@@ -98,6 +103,7 @@ impl DropCapGroup {
             shape,
             border,
             border_width,
+            border_style,
             scale,
             radius,
             updating: Cell::new(false),
@@ -121,7 +127,11 @@ impl DropCapGroup {
                 );
             }
         };
-        for row in [&this.on, &this.follow_shape, &this.outdent] {
+        {
+            let apply = apply.clone();
+            this.border_style.connect_selected_notify(move |_| apply());
+        }
+        for row in [&this.on, &this.follow_shape] {
             let apply = apply.clone();
             row.connect_active_notify(move |_| apply());
         }
@@ -130,6 +140,7 @@ impl DropCapGroup {
             &this.characters,
             &this.raised,
             &this.spacing,
+            &this.outdent,
             &this.border_width,
             &this.scale,
             &this.radius,
@@ -152,7 +163,7 @@ impl DropCapGroup {
             distance: Length::from_pt(self.spacing.value().max(0.0)),
             raised: (self.raised.value().round().max(0.0) as u8).min(lines - 1),
             follow_shape: self.follow_shape.is_active(),
-            outdent: self.outdent.is_active(),
+            outdent: self.outdent.value().round().clamp(0.0, 200.0) as u8,
             background: self.shape.value().map(|fill| {
                 let border = self.border.value();
                 DropCapShape {
@@ -162,6 +173,8 @@ impl DropCapGroup {
                         None => 0.0,
                     }),
                     border_color: border.unwrap_or(DropCapShape::default().border_color),
+                    border_style: STYLES
+                        [(self.border_style.selected() as usize).min(STYLES.len() - 1)],
                     scale: self.scale.value().round().clamp(10.0, 100.0) as u8,
                     radius: self.radius.value().round().clamp(0.0, 100.0) as u8,
                 }
@@ -171,19 +184,25 @@ impl DropCapGroup {
 
     /// Makes the rows of a drop cap usable when there is one.
     fn sensitive(&self, on: bool) {
-        for row in [&self.lines, &self.characters, &self.raised, &self.spacing] {
+        for row in [
+            &self.lines,
+            &self.characters,
+            &self.raised,
+            &self.spacing,
+            &self.outdent,
+        ] {
             row.set_sensitive(on);
         }
         self.follow_shape.set_sensitive(on);
-        self.outdent.set_sensitive(on);
         self.shape.row.set_sensitive(on);
         let shape = on && self.shape.value().is_some();
         for row in [&self.scale, &self.radius] {
             row.set_sensitive(shape);
         }
         self.border.row.set_sensitive(shape);
-        self.border_width
-            .set_sensitive(shape && self.border.value().is_some());
+        let line = shape && self.border.value().is_some();
+        self.border_width.set_sensitive(line);
+        self.border_style.set_sensitive(line);
     }
 
     /// The group, to put in the Style tab.
@@ -208,6 +227,7 @@ impl DropCapGroup {
         set(&self.characters, f64::from(shown.characters));
         set(&self.raised, f64::from(shown.raised));
         set(&self.spacing, shown.distance.to_pt());
+        set(&self.outdent, f64::from(shown.outdent));
         let background = shown.background;
         let start = background.unwrap_or_default();
         self.shape.show(background.map(|b| b.fill));
@@ -217,15 +237,17 @@ impl DropCapGroup {
             &self.border_width,
             border.map_or(2.0, |b| b.border_width.to_pt()),
         );
+        let style = STYLES
+            .iter()
+            .position(|s| *s == start.border_style)
+            .unwrap_or_default() as u32;
+        if self.border_style.selected() != style {
+            self.border_style.set_selected(style);
+        }
         set(&self.scale, f64::from(start.scale));
         set(&self.radius, f64::from(start.radius));
-        for (row, value) in [
-            (&self.follow_shape, shown.follow_shape),
-            (&self.outdent, shown.outdent),
-        ] {
-            if row.is_active() != value {
-                row.set_active(value);
-            }
+        if self.follow_shape.is_active() != shown.follow_shape {
+            self.follow_shape.set_active(shown.follow_shape);
         }
         self.sensitive(cap.is_some());
         self.updating.set(false);

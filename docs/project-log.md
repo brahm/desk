@@ -1208,6 +1208,30 @@ matrix rows done on 9 November, before the change of target.
 - The background shape and the six styles of drop cap come in the last
   pull request of the step.
 
+### 18 November: the background shape of drop caps, checked on the Mac (W060, third part of step 8 of W1)
+
+- A drop cap can stand in a shape: a rectangle with rounded corners as
+  tall as the letters would be, the letters smaller in its middle and the
+  lines beside it. Fill, border, letter size (10 to 100 %) and corner
+  radius (0 to 100 %, a circle at 100) are in the Drop Cap group, and in
+  five more extensions on `style:drop-cap` (pull request 156).
+- A session on the Mac checked Pages 15.4 the same day: a raised drop
+  cap moves the paragraph down and covers nothing, as Desk does; the
+  shape starts gray (#7F7F7F) with the letters at 80 % and the corners at
+  20 %; a solid border starts black at 2 pt; spacing goes to 1000 pt.
+- Changed by that check: the lines beside a drop cap now wrap its
+  rectangle by default, as Pages does ("Tudo"); following the outline of
+  the letters is the other choice, no longer the default.
+- Paragraph and character styles are boxed in the model, as the larger
+  paragraph format made them too uneven in size for the linter.
+- Still to come in step 8, in its next pull request: the six styles of
+  drop cap and saving one as a new style; outdent as a percent of the
+  width of the letters (0 to 200 %), which Pages has rather than on or
+  off; and the eleven line styles of the border of the shape.
+- Hyphenation by the language of the document stays for the last Mac
+  session of W1 (step 19): Pages hyphenates all the text by that one
+  language and has no language per paragraph.
+
 
 ## Decisions, with their reasons and consequences
 

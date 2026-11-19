@@ -3585,10 +3585,11 @@ fn pxv_06_drop_caps_of_styles_and_paragraphs_are_kept() {
         distance: Length::from_points(4),
         raised: 1,
         follow_shape: false,
-        outdent: true,
+        outdent: 50,
         background: Some(desk_model::DropCapShape {
             fill: Rgba::rgb(200, 30, 40),
             border_width: Length::from_points(2),
+            border_style: desk_model::BorderStyle::Dotted,
             border_color: Rgba::rgb(10, 20, 30),
             scale: 70,
             radius: 50,

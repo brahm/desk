@@ -771,16 +771,21 @@ fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
             );
         }
         if let Some(outdent) = cap.outdent {
-            w.attr(
-                "desk:drop-cap-outdent",
-                if outdent { "true" } else { "false" },
-            );
+            w.attr("desk:drop-cap-outdent", &format!("{outdent}%"));
         }
         if let Some(shape) = cap.background {
             w.attr("desk:drop-cap-fill", &shape.fill.to_string());
             len(w, "desk:drop-cap-border-width", shape.border_width);
             if let Some(color) = shape.border_color {
                 w.attr("desk:drop-cap-border-color", &color.to_string());
+            }
+            if let Some(style) = shape.border_style {
+                let name = match style {
+                    BorderLine::Solid => "solid",
+                    BorderLine::Dashed => "dashed",
+                    BorderLine::Dotted => "dotted",
+                };
+                w.attr("desk:drop-cap-border-style", name);
             }
             if let Some(scale) = shape.scale {
                 w.attr("desk:drop-cap-scale", &format!("{scale}%"));

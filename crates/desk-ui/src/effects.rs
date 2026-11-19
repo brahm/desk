@@ -106,7 +106,8 @@ const SIDES: [BorderSides; 5] = [
 ];
 
 /// The styles of lines in the order of their menu.
-const STYLES: [BorderStyle; 3] = [BorderStyle::Solid, BorderStyle::Dashed, BorderStyle::Dotted];
+pub(crate) const STYLES: [BorderStyle; 3] =
+    [BorderStyle::Solid, BorderStyle::Dashed, BorderStyle::Dotted];
 
 /// The name of a choice of ligatures.
 pub fn ligatures_name(ligatures: Ligatures) -> String {
@@ -127,7 +128,7 @@ fn sides_name(sides: BorderSides) -> String {
     }
 }
 
-fn style_name(style: BorderStyle) -> String {
+pub(crate) fn style_name(style: BorderStyle) -> String {
     match style {
         BorderStyle::Solid => tr("Solid"),
         BorderStyle::Dashed => tr("Dashed"),
