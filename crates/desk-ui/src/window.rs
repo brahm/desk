@@ -143,6 +143,8 @@ pub struct DocumentWindow {
     /// Media in the header bar, whose popover holds the Media Browser
     /// (INT-14).
     media_button: gtk::MenuButton,
+    /// Table, whose popover shows the table styles (PXV-14).
+    table_button: gtk::MenuButton,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     ruler: Ruler,
@@ -316,6 +318,7 @@ impl DocumentWindow {
             insert_button,
             objects: object_buttons,
             media_button,
+            table_button,
             find_toggle,
             menu_button,
         } = header::Header::new(info, opener.is_some(), &controls.navigation);
@@ -626,6 +629,7 @@ impl DocumentWindow {
             side,
             spelling: std::cell::OnceCell::new(),
             media_button,
+            table_button,
             media_browser: std::cell::OnceCell::new(),
             ruler,
             vertical_ruler,
@@ -2098,6 +2102,35 @@ impl DocumentWindow {
                     this.find.widget().set_search_mode(false);
                 }
             }
+        });
+
+        // The table styles of the document, drawn again each time the
+        // popover of the Table button opens; a click inserts a table of
+        // the style (PXV-14).
+        let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        holder.set_margin_top(6);
+        holder.set_margin_bottom(6);
+        holder.set_margin_start(6);
+        holder.set_margin_end(6);
+        let popover = gtk::Popover::builder().child(&holder).build();
+        self.table_button.set_popover(Some(&popover));
+        let weak = Rc::downgrade(self);
+        popover.connect_show(move |popover| {
+            let Some(editor) = weak.upgrade().and_then(|this| this.editor()) else {
+                return;
+            };
+            while let Some(child) = holder.first_child() {
+                holder.remove(&child);
+            }
+            let weak_popover = popover.downgrade();
+            let target = editor.clone();
+            let grid = crate::table_styles::grid(&editor.table_styles(), None, move |style| {
+                if let Some(popover) = weak_popover.upgrade() {
+                    popover.popdown();
+                }
+                target.insert_table_of(Some(style));
+            });
+            holder.append(&grid);
         });
 
         // The Media Browser goes in the popover when it first opens.

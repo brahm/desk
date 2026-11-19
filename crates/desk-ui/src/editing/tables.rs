@@ -158,7 +158,17 @@ impl TextEditor {
     /// first cell (TAB-01): five rows and four columns with a header row
     /// and a header column, as iWork makes them.
     pub fn insert_table(&self) {
+        self.insert_table_of(None);
+    }
+
+    /// Puts a new table in the look of a table style, as a click on the
+    /// style in the popover of the Table button does (PXV-14), or in the
+    /// look of new tables.
+    pub fn insert_table_of(&self, style: Option<desk_model::StyleId>) {
         let mut table = Table::new(5, 4);
+        if let Some(entry) = style.and_then(|s| self.document().table_styles().get(s).cloned()) {
+            entry.look.apply_to(&mut table);
+        }
         let count = self
             .document()
             .objects()

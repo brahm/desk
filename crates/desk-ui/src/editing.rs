@@ -40,6 +40,7 @@ mod points;
 mod sections;
 mod slides;
 mod stories;
+mod table_looks;
 mod tables;
 mod threads;
 

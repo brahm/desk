@@ -68,6 +68,7 @@ mod spelling_window;
 mod styles_drawer;
 mod tab_stops;
 mod table_pane;
+mod table_styles;
 mod tables;
 mod tabs;
 pub mod text_nav;

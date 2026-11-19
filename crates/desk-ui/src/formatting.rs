@@ -318,11 +318,22 @@ impl Inspector {
             );
         }
         contexts.insert(Context::Group, vec![style(), arrange()]);
-        let [table_group, rows_cols, cell, highlight, cell_text] = table.groups();
+        let [
+            table_styles,
+            table_group,
+            rows_cols,
+            cell,
+            highlight,
+            cell_text,
+        ] = table.groups();
         contexts.insert(
             Context::Table,
             vec![
-                Tab::new("table", n_("Table"), &[table_group, rows_cols]),
+                Tab::new(
+                    "table",
+                    n_("Table"),
+                    &[table_styles, table_group, rows_cols],
+                ),
                 Tab::new("cell", n_("Cell"), &[cell, highlight]),
                 Tab::new("text", n_("Text"), &[cell_text]),
                 arrange(),
