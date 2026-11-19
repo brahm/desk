@@ -30,6 +30,7 @@ mod editing;
 mod effects;
 mod eyedropper;
 mod fields;
+mod fill_rows;
 mod find;
 mod fonts;
 mod format_pane;
@@ -720,6 +721,46 @@ fn show_about(app: &adw::Application, info: AppInfo) {
         .issue_url("https://github.com/brahm/desk/issues")
         .build();
     dialog.present(app.active_window().as_ref());
+}
+
+/// Runs a test that makes widgets on the one thread that GTK lives on in
+/// the tests, as GTK takes one thread only; none when there is no display
+/// to start GTK on.
+#[cfg(test)]
+pub(crate) fn with_gtk<R: Send + 'static>(
+    f: impl FnOnce() -> R + Send + std::panic::UnwindSafe + 'static,
+) -> Option<R> {
+    use std::sync::mpsc;
+    type Job = Box<dyn FnOnce() + Send>;
+    static GTK: std::sync::OnceLock<Option<std::sync::Mutex<mpsc::Sender<Job>>>> =
+        std::sync::OnceLock::new();
+    let sender = GTK.get_or_init(|| {
+        let (jobs, queue) = mpsc::channel::<Job>();
+        let (started, start) = mpsc::channel();
+        std::thread::spawn(move || {
+            let ok = gtk::init().is_ok();
+            let _ = started.send(ok);
+            if ok {
+                for job in queue {
+                    job();
+                }
+            }
+        });
+        start
+            .recv()
+            .unwrap_or(false)
+            .then(|| std::sync::Mutex::new(jobs))
+    });
+    let sender = sender.as_ref()?;
+    let (done, result) = mpsc::channel();
+    let job: Job = Box::new(move || {
+        let _ = done.send(std::panic::catch_unwind(f));
+    });
+    sender.lock().unwrap().send(job).unwrap();
+    match result.recv().unwrap() {
+        Ok(r) => Some(r),
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
 }
 
 #[cfg(test)]

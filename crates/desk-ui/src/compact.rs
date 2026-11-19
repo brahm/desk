@@ -270,7 +270,7 @@ impl Group {
     }
 
     /// Adds a row at the end.
-    pub fn add(&self, row: &impl Row) {
+    pub fn add(&self, row: &(impl Row + ?Sized)) {
         self.card.append(row.row_widget());
         if let Some(label) = row.title_label() {
             self.labels.add_widget(label);
@@ -1147,15 +1147,12 @@ impl Row for gtk::Widget {
 mod tests {
     use super::*;
 
-    fn init() -> bool {
-        gtk::init().is_ok()
-    }
-
     #[test]
     fn rows_line_up_and_keep_their_values() {
-        if !init() {
-            return;
-        }
+        crate::with_gtk(rows_line_up);
+    }
+
+    fn rows_line_up() {
         let group = Group::builder().title("Spacing").build();
         let spin = SpinRow::with_range(0.0, 10.0, 0.5);
         spin.set_title("Before Paragraph");
