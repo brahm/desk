@@ -14,12 +14,12 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape, DropCapStyle,
-    FontFeature, FontFeatures, FontWeight, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures,
-    LineColor, LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, ModelError,
-    NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphSpacing,
-    ParagraphStyle, Rgba, Run, Shadow, Style, StyleId, TabAlignment, TabLeader, TabStop, TabStops,
-    TextSettings,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape, DropCapStyle, Fill,
+    FontFeature, FontFeatures, FontWeight, ImageFill, LINE_BREAK, LIST_LEVELS, Language, Length,
+    Ligatures, LineColor, LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata,
+    ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph,
+    ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId, TabAlignment, TabLeader,
+    TabStop, TabStops, TextSettings,
 };
 use desk_model::{
     FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
@@ -254,7 +254,7 @@ fn odf_background(background: Option<Rgba>) -> odf::Background {
 /// The character attributes of ODF text properties, whose text is
 /// `size` points large. Font sizes in percent of the parent style are not
 /// kept.
-fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
+fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) -> CharAttrs {
     let language = t.language.as_ref().map(|language| {
         // `zxx` is "no linguistic content", as Desk writes the undetermined
         // language.
@@ -307,6 +307,7 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
             odf::LineColor::Color(c) => LineColor::Custom(rgba(c)),
         }),
         color: t.color.map(rgba),
+        fill: text_fill(source, t),
         baseline: t.position.map(|p| match p {
             odf::TextPosition::Super => Baseline::Superscript,
             odf::TextPosition::Sub => Baseline::Subscript,
@@ -334,9 +335,150 @@ fn char_attrs(t: &odf::TextProperties, size: f64) -> CharAttrs {
     }
 }
 
+/// The gradient or picture that fills the letters of ODF text
+/// properties: none for `desk:text-fill="none"`, and nothing set when
+/// there is no `desk:text-fill` or what it names is missing (PXV-04).
+fn text_fill(source: &odf::TextDocument, t: &odf::TextProperties) -> Option<Option<Fill>> {
+    match t.fill.as_deref()? {
+        "none" => Some(None),
+        "gradient" => {
+            let name = t.fill_gradient_name.as_deref()?;
+            let gradient = source.gradients.iter().find(|g| g.name == name)?;
+            Some(Some(objects::model_gradient(gradient)))
+        }
+        "bitmap" => {
+            let picture = objects::fill_picture(source, t.fill_image_name.as_deref()?)?;
+            let mode = match t.fill_image_mode.as_deref() {
+                Some("scale-to-fit") => ImageFill::ScaleToFit,
+                Some("stretch") => ImageFill::Stretch,
+                Some("original-size") => ImageFill::OriginalSize,
+                Some("tile") => ImageFill::Tile,
+                _ => ImageFill::ScaleToFill,
+            };
+            let tint = t.fill_tint.map(|color| Rgba {
+                a: (t.fill_tint_opacity.unwrap_or(100.0).clamp(0.0, 100.0) * 2.55).round() as u8,
+                ..rgba(color)
+            });
+            Some(Some(Fill::Image {
+                picture,
+                mode,
+                tint,
+            }))
+        }
+        _ => None,
+    }
+}
+
+/// The gradients and pictures that fill letters (PXV-04), which go to
+/// `office:styles` beside those of the objects, under names of their own.
+#[derive(Default)]
+pub(super) struct TextFills {
+    gradients: Vec<odf::Gradient>,
+    images: Vec<odf::FillImage>,
+    pictures: Vec<(String, Vec<u8>)>,
+}
+
+impl TextFills {
+    /// The name of a gradient like this one, added when there is none yet.
+    fn gradient(&mut self, gradient: odf::Gradient) -> String {
+        if let Some(existing) = self.gradients.iter().find(|g| {
+            odf::Gradient {
+                name: String::new(),
+                ..(*g).clone()
+            } == gradient
+        }) {
+            return existing.name.clone();
+        }
+        let name = format!("Text_Gradient_{}", self.gradients.len() + 1);
+        self.gradients.push(odf::Gradient {
+            name: name.clone(),
+            ..gradient
+        });
+        name
+    }
+
+    /// The name of the fill image of a picture, added to the package when
+    /// it is not there yet.
+    fn image(&mut self, picture: &desk_model::Picture) -> String {
+        let href = match self.pictures.iter().find(|(_, b)| b == picture.data()) {
+            Some((href, _)) => href.clone(),
+            None => {
+                let href = format!(
+                    "Pictures/text-fill{}.{}",
+                    self.pictures.len() + 1,
+                    picture.format().extension()
+                );
+                self.pictures.push((href.clone(), picture.data().to_vec()));
+                href
+            }
+        };
+        if let Some(existing) = self.images.iter().find(|i| i.href == href) {
+            return existing.name.clone();
+        }
+        let name = format!("Text_Image_{}", self.images.len() + 1);
+        self.images.push(odf::FillImage {
+            name: name.clone(),
+            href,
+        });
+        name
+    }
+
+    /// Adds the gradients and pictures to a document and its pictures.
+    fn finish(self, out: &mut odf::TextDocument, pictures: &mut Vec<(String, Vec<u8>)>) {
+        out.gradients.extend(self.gradients);
+        out.fill_images.extend(self.images);
+        pictures.extend(self.pictures);
+    }
+
+    /// The fill attributes of ODF text properties for a fill of letters.
+    fn properties(&mut self, fill: Option<&Fill>, t: &mut odf::TextProperties) {
+        match fill {
+            None => t.fill = Some("none".into()),
+            Some(&Fill::Gradient { from, to, angle }) => {
+                t.fill = Some("gradient".into());
+                t.fill_gradient_name = Some(self.gradient(objects::odf_gradient(from, to, angle)));
+            }
+            Some(Fill::Advanced(gradient)) => {
+                t.fill = Some("gradient".into());
+                t.fill_gradient_name =
+                    Some(self.gradient(objects::odf_advanced_gradient(gradient)));
+            }
+            Some(Fill::Image {
+                picture,
+                mode,
+                tint,
+            }) => {
+                t.fill = Some("bitmap".into());
+                t.fill_image_name = Some(self.image(picture));
+                t.fill_image_mode = Some(
+                    match mode {
+                        ImageFill::ScaleToFill => "scale-to-fill",
+                        ImageFill::ScaleToFit => "scale-to-fit",
+                        ImageFill::Stretch => "stretch",
+                        ImageFill::OriginalSize => "original-size",
+                        ImageFill::Tile => "tile",
+                    }
+                    .into(),
+                );
+                if let Some(tint) = *tint {
+                    t.fill_tint = Some(odf_color(tint));
+                    t.fill_tint_opacity = Some((f64::from(tint.a) / 2.55 * 10.0).round() / 10.0);
+                }
+            }
+            // A plain color is the color of the text.
+            Some(_) => t.fill = Some("none".into()),
+        }
+    }
+}
+
 /// The ODF text properties of character attributes, at a level of styles,
-/// a style or a run, whose format resolves to `resolved`.
-fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties {
+/// a style or a run, whose format resolves to `resolved`, with the
+/// gradients and pictures that fill letters added to `fills`.
+fn text_properties(
+    a: &CharAttrs,
+    resolved: &CharFormat,
+    fills: &mut TextFills,
+) -> odf::TextProperties {
     let (language, script, country) = match &a.language {
         Some(language) if language.tag() != "und" => {
             let mut parts = language.tag().split('-');
@@ -373,7 +515,7 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
     } else {
         None
     };
-    odf::TextProperties {
+    let mut out = odf::TextProperties {
         font_family,
         font_size: a.font_size.map(odf_length),
         font_size_percent: None,
@@ -428,7 +570,12 @@ fn text_properties(a: &CharAttrs, resolved: &CharFormat) -> odf::TextProperties 
         // A paragraph attribute, which the paragraph styles write.
         hyphenate: None,
         desk_hyphenate: None,
+        ..odf::TextProperties::default()
+    };
+    if let Some(fill) = &a.fill {
+        fills.properties(fill.as_ref(), &mut out);
     }
+    out
 }
 
 fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttrs {
@@ -1116,7 +1263,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     let defaults = &source.default_style;
     let mut default_style = ParagraphStyle::new(default, DEFAULT_NAME);
     default_style.paragraph = para_attrs(&defaults.paragraph, &defaults.text);
-    default_style.character = char_attrs(&defaults.text, odf_default_size(source));
+    default_style.character = char_attrs(source, &defaults.text, odf_default_size(source));
     if let Some(standard) = standard {
         default_style.name = names[&default].as_str().into();
         default_style.shortcut = source
@@ -1129,6 +1276,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             &standard.properties.text,
         ));
         default_style.character.merge(&char_attrs(
+            source,
             &standard.properties.text,
             odf_default_size(source),
         ));
@@ -1178,7 +1326,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         list_style: list_of(&style.list_style),
                         ..para_attrs(&style.properties.paragraph, &style.properties.text)
                     },
-                    character: char_attrs(&style.properties.text, size),
+                    character: char_attrs(source, &style.properties.text, size),
                 }
                 .into(),
                 odf::Family::Text => CharacterStyle {
@@ -1186,7 +1334,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     name: names[&id].as_str().into(),
                     shortcut,
                     parent: link(&style.parent, odf::Family::Text),
-                    character: char_attrs(&style.properties.text, size),
+                    character: char_attrs(source, &style.properties.text, size),
                 }
                 .into(),
             };
@@ -2060,7 +2208,7 @@ fn import_paragraph(
                 .and_then(|p| ids.get(&(odf::Family::Paragraph, p)).copied())
                 .unwrap_or(default);
             attrs = para_attrs(&automatic.properties.paragraph, &automatic.properties.text);
-            base = char_attrs(&automatic.properties.text, paragraph_size);
+            base = char_attrs(source, &automatic.properties.text, paragraph_size);
         }
     }
     if relative {
@@ -2087,7 +2235,7 @@ fn import_paragraph(
                     .and_then(|p| ids.get(&(odf::Family::Text, p)).copied());
                 let size =
                     odf_font_size(source, odf::Family::Text, Some(name)).unwrap_or(paragraph_size);
-                run_attrs.merge(&char_attrs(&automatic.properties.text, size));
+                run_attrs.merge(&char_attrs(source, &automatic.properties.text, size));
             }
         }
         if let Some(odf::Field::Note(note)) = &span.field {
@@ -2382,6 +2530,7 @@ fn section_masters(document: &Document) -> HashMap<NodeId, String> {
 fn export_margins(
     document: &Document,
     names: &HashMap<StyleId, String>,
+    fills: &mut TextFills,
     out: &mut odf::TextDocument,
 ) {
     let styles = document.styles();
@@ -2458,6 +2607,7 @@ fn export_margins(
                     text: text_properties(
                         &attrs,
                         &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                        fills,
                     ),
                     ..Default::default()
                 };
@@ -2597,6 +2747,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
     }
 
     let mut pictures: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut fills = TextFills::default();
     let mut out = odf::TextDocument {
         text_settings: odf::TextSettings {
             hyphenation: (!settings.hyphenation).then_some(false),
@@ -2688,6 +2839,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         ..text_properties(
                             &p.character,
                             &styles.resolve_character(p.id, None, &CharAttrs::default()),
+                            &mut fills,
                         )
                     },
                     ..Default::default()
@@ -2706,6 +2858,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     text: text_properties(
                         &c.character,
                         &styles.resolve_character(default, Some(c.id), &CharAttrs::default()),
+                        &mut fills,
                     ),
                     ..Default::default()
                 },
@@ -2874,6 +3027,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         text: text_properties(
                             &attrs,
                             &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                            &mut fills,
                         ),
                         ..Default::default()
                     },
@@ -2981,6 +3135,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                         text: text_properties(
                             &attrs,
                             &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                            &mut fills,
                         ),
                         ..Default::default()
                     },
@@ -3030,6 +3185,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             markers: Vec::new(),
             fill_images: Vec::new(),
             charts: Vec::new(),
+            text_fills: &mut fills,
         },
         &mut out,
     );
@@ -3038,14 +3194,16 @@ pub fn export(document: &Document) -> odf::TextDocument {
     }
     out.automatic_styles = automatic;
     out.section_styles = section_styles;
-    export_margins(document, &names, &mut out);
+    export_margins(document, &names, &mut fills, &mut out);
     objects::export_master_objects(
         document,
         &names,
         &section_masters(document),
         &mut pictures,
+        &mut fills,
         &mut out,
     );
+    fills.finish(&mut out, &mut pictures);
     out.pictures = pictures;
 
     let page = document.page_setup();

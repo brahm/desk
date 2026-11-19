@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use crate::header::Field;
 use crate::list::ListLevel;
+use crate::object::Fill;
 use crate::section::Start;
 use crate::style::StyleId;
 use crate::units::{Length, Rgba};
@@ -388,6 +389,10 @@ formatting! {
         strikethrough_color: LineColor = LineColor::Text,
         /// The color of the text (FMT-11).
         color: Rgba = Rgba::BLACK,
+        /// A gradient or a picture that fills the letters in place of
+        /// their color, the Gradient Fill and Image Fill of the text color
+        /// of Pages (PXV-04). The color stays, for when the fill goes.
+        fill: Option<Fill> = None,
         /// Superscript or subscript (FMT-06).
         baseline: Baseline = Baseline::Normal,
         /// An exact raise (positive) or lowering (negative) of the

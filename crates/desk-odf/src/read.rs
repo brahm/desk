@@ -385,6 +385,15 @@ impl Reader {
                 .and_then(|v| v.trim().parse::<i32>().ok())
                 .map(|t| t.clamp(-1000, 10_000)),
             title_case: e.attr(DESK, "title-case").map(|v| v == "true"),
+            fill: e.attr(DESK, "text-fill").map(str::to_owned),
+            fill_gradient_name: e.attr(DESK, "text-fill-gradient-name").map(str::to_owned),
+            fill_image_name: e.attr(DESK, "text-fill-image-name").map(str::to_owned),
+            fill_image_mode: e.attr(DESK, "text-fill-image-mode").map(str::to_owned),
+            fill_tint: e.attr(DESK, "text-fill-tint").and_then(Color::parse),
+            fill_tint_opacity: e
+                .attr(DESK, "text-fill-tint-opacity")
+                .and_then(parse_percent)
+                .map(|p| p.clamp(0.0, 100.0)),
         }
     }
 }

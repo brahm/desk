@@ -399,6 +399,51 @@ These sit on the `style:graphic-properties` of the graphic style of a
   as other programs mean it; a document that an older Desk saved with
   Title Case reads as Start Case.
 
+#### `desk:text-fill`
+
+- **Feature:** a gradient or a picture that fills the letters in place of
+  their color: the Gradient Fill and Image Fill of the text color of
+  Pages (PXV-04, W052).
+- **Value:** `gradient`, `bitmap` or `none`; `none` takes away a fill
+  that the style of the text has.
+- **Fallback:** `fo:color`, which Desk keeps beside it, so that other
+  programs show the letters in that color.
+
+#### `desk:text-fill-gradient-name`
+
+- **Feature:** the gradient that fills the letters (PXV-04).
+- **Value:** the name of a `draw:gradient` of `office:styles`, the
+  gradients that objects fill with, with the `desk:gradient-stop` of an
+  advanced gradient.
+- **Fallback:** as `desk:text-fill`.
+
+#### `desk:text-fill-image-name`
+
+- **Feature:** the picture that fills the letters (PXV-04).
+- **Value:** the name of a `draw:fill-image` of `office:styles`.
+- **Fallback:** as `desk:text-fill`.
+
+#### `desk:text-fill-image-mode`
+
+- **Feature:** how the picture that fills the letters is sized to them
+  (PXV-04).
+- **Value:** `scale-to-fill`, `scale-to-fit`, `stretch`, `original-size`
+  or `tile`; `scale-to-fill` when absent.
+- **Fallback:** as `desk:text-fill`.
+
+#### `desk:text-fill-tint`
+
+- **Feature:** a color laid over the picture that fills the letters
+  (PXV-04).
+- **Value:** an ODF color, `#rrggbb`.
+- **Fallback:** as `desk:text-fill`.
+
+#### `desk:text-fill-tint-opacity`
+
+- **Feature:** the opacity of `desk:text-fill-tint` (PXV-04).
+- **Value:** a percent from 0 to 100; 100 when absent.
+- **Fallback:** as `desk:text-fill`.
+
 ### Text: drop caps (`style:drop-cap`)
 
 The drop cap is the standard `style:drop-cap` of the paragraph

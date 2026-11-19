@@ -42,6 +42,9 @@ pub enum Item {
         /// The width of the line of outlined glyphs, which are not filled
         /// (FMT-04).
         outline: Option<f32>,
+        /// A gradient or picture that fills the glyphs in place of the
+        /// color, which stays for the text of a PDF (PXV-04).
+        paint: Option<Paint>,
     },
     /// The blurred shadow of glyphs (FMT-03).
     Shadow {
@@ -247,6 +250,71 @@ fn gradient_paint(gradient: &Gradient, frame: (f32, f32, f32, f32)) -> Paint {
     }
 }
 
+/// What paints a fill over a frame: left, top, width and height.
+fn fill_paint(fill: Fill, frame: (f32, f32, f32, f32)) -> Paint {
+    match fill {
+        Fill::Color(color) => Paint::Color(color),
+        Fill::Gradient { from, to, angle } => {
+            gradient_paint(&Gradient::linear(from, to, angle), frame)
+        }
+        Fill::Advanced(gradient) => gradient_paint(&gradient, frame),
+        Fill::Image {
+            picture,
+            mode,
+            tint,
+        } => match image_paint(picture, mode, frame) {
+            Paint::Image {
+                picture,
+                rect,
+                tile,
+                ..
+            } => Paint::Image {
+                picture,
+                rect,
+                tile,
+                tint,
+            },
+            other => other,
+        },
+        _ => Paint::Color(Rgba::BLACK),
+    }
+}
+
+/// The frames that the fills of the runs of a line span: each run with a
+/// fill takes the stretch of the line from the first to the last of the
+/// runs beside it that share its fill, over the height of the line, so
+/// that a gradient goes once across a word whatever its formatting
+/// (PXV-04).
+fn fill_frames(
+    runs: &[desk_text::GlyphRun],
+    top: f32,
+    bottom: f32,
+) -> Vec<Option<(f32, f32, f32, f32)>> {
+    let mut frames = vec![None; runs.len()];
+    let mut i = 0;
+    while i < runs.len() {
+        let Some(fill) = &runs[i].fill else {
+            i += 1;
+            continue;
+        };
+        let mut j = i + 1;
+        while j < runs.len() && runs[j].fill.as_ref() == Some(fill) {
+            j += 1;
+        }
+        let left = runs[i..j].iter().map(|r| r.x).fold(f32::INFINITY, f32::min);
+        let right = runs[i..j]
+            .iter()
+            .map(|r| r.x + r.advance)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let frame = (left, top, (right - left).max(0.5), (bottom - top).max(0.5));
+        for slot in &mut frames[i..j] {
+            *slot = Some(frame);
+        }
+        i = j;
+    }
+    frames
+}
+
 /// Where a picture that fills a frame lies, as the mode sizes it, a pixel
 /// to a point at its own size (OBJ-09).
 fn image_paint(picture: Picture, mode: ImageFill, frame: (f32, f32, f32, f32)) -> Paint {
@@ -416,7 +484,8 @@ impl DisplayList {
                     }),
                 });
             }
-            for run in &placed.line.runs {
+            let frames = fill_frames(&placed.line.runs, top - dy, bottom - dy);
+            for (run, frame) in placed.line.runs.iter().zip(frames) {
                 if run.glyphs.is_empty() {
                     continue;
                 }
@@ -456,6 +525,11 @@ impl DisplayList {
                     // As Pages strokes outlined text, at a hundredth of
                     // its size.
                     outline: run.outline.then_some(run.size / 100.0),
+                    paint: run
+                        .fill
+                        .clone()
+                        .zip(frame)
+                        .map(|(fill, (x, y, w, h))| fill_paint(fill, (x + dx, y + dy, w, h))),
                 });
             }
             if let Some(image) = &placed.line.label_image {
@@ -594,32 +668,10 @@ fn object_item(placed: &PlacedObject) -> Item {
     let (x, y, w, h) = (placed.x, placed.y, placed.width, placed.height);
     let mut list = DisplayList::default();
     let style = &object.style;
-    let fill = style.fill.clone().map(|fill| match fill {
-        Fill::Color(color) => Paint::Color(color),
-        Fill::Gradient { from, to, angle } => {
-            gradient_paint(&Gradient::linear(from, to, angle), (x, y, w, h))
-        }
-        Fill::Advanced(gradient) => gradient_paint(&gradient, (x, y, w, h)),
-        Fill::Image {
-            picture,
-            mode,
-            tint,
-        } => match image_paint(picture, mode, (x, y, w, h)) {
-            Paint::Image {
-                picture,
-                rect,
-                tile,
-                ..
-            } => Paint::Image {
-                picture,
-                rect,
-                tile,
-                tint,
-            },
-            other => other,
-        },
-        _ => Paint::Color(Rgba::BLACK),
-    });
+    let fill = style
+        .fill
+        .clone()
+        .map(|fill| fill_paint(fill, (x, y, w, h)));
     // A picture frame takes the place of the line (OBJ-36).
     let stroke = style
         .stroke

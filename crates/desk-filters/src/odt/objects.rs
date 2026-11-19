@@ -118,7 +118,7 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
 /// line from one color to the other; the colors of an advanced gradient
 /// of Desk; a radial gradient out from its center, as the other round and
 /// square ones are taken; or an axial one as a line that turns back.
-fn model_gradient(gradient: &odf::Gradient) -> Fill {
+pub(super) fn model_gradient(gradient: &odf::Gradient) -> Fill {
     use desk_model::{Gradient, GradientStop};
     // ODF turns its gradient counterclockwise from going down; Desk
     // measures the way it goes counterclockwise from going right.
@@ -176,7 +176,11 @@ fn model_gradient(gradient: &odf::Gradient) -> Fill {
 }
 
 /// The gradient of ODF that fills as Desk does, without its name.
-fn odf_gradient(from: desk_model::Rgba, to: desk_model::Rgba, angle: i32) -> odf::Gradient {
+pub(super) fn odf_gradient(
+    from: desk_model::Rgba,
+    to: desk_model::Rgba,
+    angle: i32,
+) -> odf::Gradient {
     odf::Gradient {
         name: String::new(),
         style: "linear".into(),
@@ -192,7 +196,7 @@ fn odf_gradient(from: desk_model::Rgba, to: desk_model::Rgba, angle: i32) -> odf
 /// The gradient of ODF for an advanced gradient of Desk, without its
 /// name: its first and last colors as ODF has them, for the other apps,
 /// and all of them in `desk:gradient-stop` (OBJ-41).
-fn odf_advanced_gradient(gradient: &desk_model::Gradient) -> odf::Gradient {
+pub(super) fn odf_advanced_gradient(gradient: &desk_model::Gradient) -> odf::Gradient {
     let mut stops = gradient.stops.clone();
     stops.sort_by_key(|s| s.at);
     let first = stops.first().map_or(desk_model::Rgba::BLACK, |s| s.color);
@@ -1105,7 +1109,7 @@ fn text_box_default(
     });
     let text = &style.properties.text;
     default.paragraph = para_attrs(&style.properties.paragraph, text);
-    default.character = char_attrs(text, 12.0);
+    default.character = char_attrs(source, text, 12.0);
     default
 }
 
@@ -1163,6 +1167,17 @@ fn object_style_of(
         .map(|s| s.id)
 }
 
+/// The picture of a `draw:fill-image` of the package, by its name.
+pub(super) fn fill_picture(source: &odf::TextDocument, name: &str) -> Option<desk_model::Picture> {
+    let image = source.fill_images.iter().find(|i| i.name == name)?;
+    let path = image.href.strip_prefix("./").unwrap_or(&image.href);
+    source
+        .pictures
+        .iter()
+        .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
+        .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
+}
+
 /// The look of an object or an object style from its graphic
 /// properties: its fill, line, reflection, picture frame, shadow and
 /// opacity.
@@ -1183,15 +1198,7 @@ fn model_look(source: &odf::TextDocument, g: &odf::GraphicProperties) -> desk_mo
         .fill_image_name
         .as_deref()
         .filter(|_| g.fill.as_deref() == Some("bitmap"))
-        .and_then(|name| source.fill_images.iter().find(|i| i.name == name))
-        .and_then(|image| {
-            let path = image.href.strip_prefix("./").unwrap_or(&image.href);
-            source
-                .pictures
-                .iter()
-                .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
-                .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
-        });
+        .and_then(|name| fill_picture(source, name));
     if let Some(picture) = image {
         let mode = match (g.fill_image_mode.as_deref(), g.repeat.as_deref()) {
             (Some("scale-to-fill"), _) => ImageFill::ScaleToFill,
@@ -1675,6 +1682,8 @@ pub(super) struct Exporter<'a> {
     pub fill_images: Vec<odf::FillImage>,
     /// The charts, by the folder of each in the package.
     pub charts: Vec<(String, odf::ChartDocument)>,
+    /// The gradients and pictures that fill letters.
+    pub text_fills: &'a mut super::TextFills,
 }
 
 impl super::tables::TableStyles for Exporter<'_> {
@@ -1801,6 +1810,7 @@ impl Exporter<'_> {
                     text: text_properties(
                         &attrs,
                         &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                        self.text_fills,
                     ),
                     ..Default::default()
                 };
@@ -2344,8 +2354,11 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
                 .paragraph_style
                 .and_then(|id| exporter.names.get(&id).cloned());
             properties.paragraph = paragraph_properties(&text_box.paragraph);
-            properties.text =
-                text_properties(&text_box.character, &desk_model::CharFormat::default());
+            properties.text = text_properties(
+                &text_box.character,
+                &desk_model::CharFormat::default(),
+                exporter.text_fills,
+            );
         }
         properties.graphic = graphic;
         out.styles.push(odf::Style {
@@ -2423,6 +2436,7 @@ pub(super) fn export_master_objects(
     names: &HashMap<desk_model::StyleId, String>,
     masters: &HashMap<NodeId, String>,
     pictures: &mut Vec<(String, Vec<u8>)>,
+    text_fills: &mut super::TextFills,
     out: &mut odf::TextDocument,
 ) {
     let mut automatic = std::mem::take(&mut out.master_styles);
@@ -2435,6 +2449,7 @@ pub(super) fn export_master_objects(
         markers: std::mem::take(&mut out.markers),
         fill_images: std::mem::take(&mut out.fill_images),
         charts: Vec::new(),
+        text_fills,
     };
     // The objects in the lines of the headers and footers (EST-12), with
     // the styles of the master pages.

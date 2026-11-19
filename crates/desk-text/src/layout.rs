@@ -107,6 +107,9 @@ pub struct GlyphRun {
     pub shadow: Option<Shadow>,
     /// The color behind the run, over the height of the line (FMT-20).
     pub background: Option<Rgba>,
+    /// A gradient or picture that fills the glyphs in place of the color
+    /// (PXV-04).
+    pub fill: Option<desk_model::Fill>,
 }
 
 /// One line of a paragraph, or one piece of a line beside a wrapped object.
@@ -999,6 +1002,7 @@ impl TextSystem {
                     outline: format.outline,
                     shadow: format.shadow,
                     background: format.background,
+                    fill: format.fill.clone(),
                 });
             }
             for (place, font, size, format_index) in leaders {
@@ -1015,8 +1019,10 @@ impl TextSystem {
                 metrics.advance - metrics.hanging_advance + tabs.last().map_or(0.0, |t| t.moved);
             if let Some((font, size, id, hyphen_advance)) = &place.hyphen {
                 let last = glyph_runs.last();
-                let (outline, shadow, background) =
-                    last.map_or((false, None, None), |r| (r.outline, r.shadow, r.background));
+                let (outline, shadow, background, fill) = last
+                    .map_or((false, None, None, None), |r| {
+                        (r.outline, r.shadow, r.background, r.fill.clone())
+                    });
                 glyph_runs.push(GlyphRun {
                     font: font.clone(),
                     size: *size,
@@ -1037,6 +1043,7 @@ impl TextSystem {
                     outline,
                     shadow,
                     background,
+                    fill,
                 });
                 advance += hyphen_advance;
             }
@@ -1332,6 +1339,7 @@ fn leader_run(
         // The background of the tab, which spans the whole of it, is drawn
         // with the tab.
         background: None,
+        fill: format.fill.clone(),
     })
 }
 

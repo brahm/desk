@@ -97,6 +97,29 @@ impl Painter {
         Some(surface)
     }
 
+    /// Sets what fills glyphs as the source: their gradient or picture,
+    /// or their color (PXV-04).
+    fn set_glyph_paint(
+        &mut self,
+        cr: &Context,
+        paint: Option<&Paint>,
+        color: Rgba,
+    ) -> Result<(), RenderError> {
+        match paint {
+            Some(Paint::Image {
+                picture,
+                rect,
+                tile,
+                ..
+            }) => self.set_picture(cr, picture, *rect, *tile),
+            Some(paint) => set_paint(cr, paint),
+            None => {
+                set_color(cr, color);
+                Ok(())
+            }
+        }
+    }
+
     /// Sets a picture as the source, over a rectangle of the page, or
     /// repeated from it.
     fn set_picture(
@@ -201,11 +224,12 @@ impl Painter {
                     text,
                     clusters,
                     outline,
+                    paint,
                 } => {
                     self.set_font(cr, font, *size)?;
                     let glyphs = cairo_glyphs(glyphs);
                     if let Some(width) = outline {
-                        set_color(cr, *color);
+                        self.set_glyph_paint(cr, paint.as_ref(), *color)?;
                         cr.glyph_path(&glyphs);
                         cr.set_line_width(f64::from(*width));
                         cr.set_line_join(cairo::LineJoin::Miter);
@@ -215,7 +239,7 @@ impl Painter {
                         // that Pages strokes.
                         set_color(cr, Rgba { a: 1, ..*color });
                     } else {
-                        set_color(cr, *color);
+                        self.set_glyph_paint(cr, paint.as_ref(), *color)?;
                     }
                     if clusters.is_empty() {
                         cr.show_glyphs(&glyphs)?;
@@ -234,6 +258,19 @@ impl Painter {
                             &clusters,
                             cairo::TextClusterFlags::None,
                         )?;
+                    }
+                    // The tint of a picture goes over it, inside the
+                    // letters (OBJ-42, PXV-04).
+                    if outline.is_none()
+                        && let Some(Paint::Image {
+                            tint: Some(tint), ..
+                        }) = paint
+                        && tint.a > 0
+                    {
+                        cr.new_path();
+                        cr.glyph_path(&glyphs);
+                        set_color(cr, *tint);
+                        cr.fill()?;
                     }
                 }
                 Item::Shadow {
