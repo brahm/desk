@@ -702,9 +702,10 @@ pub struct DropCap {
     /// Whether the lines beside the letters follow their shape, rather
     /// than the rectangle around them.
     pub follow_shape: bool,
-    /// Whether the letters stand in the margin, outside the indent, with
-    /// the lines at the indent.
-    pub outdent: bool,
+    /// How far the letters stand out into the margin, in percent of their
+    /// width, from 0 to 200: at 100 they end at the indent, and the lines
+    /// beside them start there.
+    pub outdent: u8,
     /// A shape behind the letters, which the text then wraps around.
     pub background: Option<DropCapShape>,
 }
@@ -718,6 +719,8 @@ pub struct DropCapShape {
     pub fill: Rgba,
     /// The width of the line around it; none when zero.
     pub border_width: Length,
+    /// How the line around it is drawn.
+    pub border_style: BorderStyle,
     /// The color of the line around it.
     pub border_color: Rgba,
     /// How tall the letters are, in percent of their height without the
@@ -735,6 +738,7 @@ impl Default for DropCapShape {
         Self {
             fill: Rgba::rgb(127, 127, 127),
             border_width: Length::ZERO,
+            border_style: BorderStyle::Solid,
             border_color: Rgba::BLACK,
             scale: 80,
             radius: 20,
@@ -752,7 +756,7 @@ impl Default for DropCap {
             distance: Length::ZERO,
             raised: 0,
             follow_shape: false,
-            outdent: false,
+            outdent: 0,
             background: None,
         }
     }

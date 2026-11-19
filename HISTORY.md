@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: a drop cap stands out into the margin by a percent of its
+  width, up to 200 %, and the border of its shape can be dashed or
+  dotted.
 * Added: a shape behind the letters of a drop cap, with its fill,
   border, letter size and rounded corners.
 * Added: the options of drop caps: raised lines, text that follows the

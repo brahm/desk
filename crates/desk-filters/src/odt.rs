@@ -499,7 +499,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
                     .min(u32::from(u8::MAX)) as u8,
                 // Other programs wrap the lines by the rectangle.
                 follow_shape: d.follow_shape.unwrap_or(false),
-                outdent: d.outdent.unwrap_or(false),
+                outdent: d.outdent.unwrap_or(0).min(200) as u8,
                 background: d.background.map(|b| {
                     let start = DropCapShape::default();
                     let percent = |v: Option<u32>, or: u8| v.map_or(or, |v| v.min(100) as u8);
@@ -507,6 +507,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
                         fill: rgba(b.fill),
                         border_width: b.border_width.map_or(Length::ZERO, length),
                         border_color: b.border_color.map_or(start.border_color, rgba),
+                        border_style: b.border_style.map_or(start.border_style, border_style),
                         scale: percent(b.scale, start.scale).max(10),
                         radius: percent(b.radius, start.radius),
                     }
@@ -559,13 +560,25 @@ fn para_border(p: &odf::ParagraphProperties) -> Option<ParaBorder> {
         sides: kind,
         width: length(width),
         color: rgba(color),
-        style: match style {
-            odf::BorderLine::Solid => BorderStyle::Solid,
-            odf::BorderLine::Dashed => BorderStyle::Dashed,
-            odf::BorderLine::Dotted => BorderStyle::Dotted,
-        },
+        style: border_style(style),
         offset: padding.map_or(Length::ZERO, length),
     })
+}
+
+fn border_style(style: odf::BorderLine) -> BorderStyle {
+    match style {
+        odf::BorderLine::Solid => BorderStyle::Solid,
+        odf::BorderLine::Dashed => BorderStyle::Dashed,
+        odf::BorderLine::Dotted => BorderStyle::Dotted,
+    }
+}
+
+fn odf_border_style(style: BorderStyle) -> odf::BorderLine {
+    match style {
+        BorderStyle::Solid => odf::BorderLine::Solid,
+        BorderStyle::Dashed => odf::BorderLine::Dashed,
+        BorderStyle::Dotted => odf::BorderLine::Dotted,
+    }
 }
 
 /// Writes the rules or border of a paragraph as ODF borders, with
@@ -573,11 +586,7 @@ fn para_border(p: &odf::ParagraphProperties) -> Option<ParaBorder> {
 fn odf_border(p: &mut odf::ParagraphProperties, border: &ParaBorder) {
     let line = odf::Border::Line {
         width: odf_length(border.width),
-        style: match border.style {
-            BorderStyle::Solid => odf::BorderLine::Solid,
-            BorderStyle::Dashed => odf::BorderLine::Dashed,
-            BorderStyle::Dotted => odf::BorderLine::Dotted,
-        },
+        style: odf_border_style(border.style),
         color: odf_color(border.color),
     };
     let sides = border.sides;
@@ -696,13 +705,16 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
                 distance: Some(odf_length(cap.distance)),
                 raised: (cap.raised > 0).then_some(u32::from(cap.raised)),
                 follow_shape: Some(cap.follow_shape),
-                outdent: cap.outdent.then_some(true),
+                outdent: (cap.outdent > 0).then_some(u32::from(cap.outdent)),
                 background: cap.background.map(|b| odf::DropCapBackground {
                     fill: odf_color(b.fill),
                     border_width: (b.border_width > Length::ZERO)
                         .then(|| odf_length(b.border_width)),
                     border_color: (b.border_width > Length::ZERO)
                         .then(|| odf_color(b.border_color)),
+                    border_style: (b.border_width > Length::ZERO
+                        && b.border_style != BorderStyle::Solid)
+                        .then(|| odf_border_style(b.border_style)),
                     scale: Some(u32::from(b.scale)),
                     radius: Some(u32::from(b.radius)),
                 }),

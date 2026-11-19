@@ -766,9 +766,9 @@ pub struct DropCap {
     /// `desk:drop-cap-wrap`: true for `shape`, where the lines follow the
     /// shape of the characters, false for `rectangle`.
     pub follow_shape: Option<bool>,
-    /// `desk:drop-cap-outdent`: whether the characters stand in the
-    /// margin.
-    pub outdent: Option<bool>,
+    /// `desk:drop-cap-outdent`: how far the characters stand out into
+    /// the margin, in percent of their width.
+    pub outdent: Option<u32>,
     /// The shape behind the characters, with `desk:drop-cap-fill`.
     pub background: Option<DropCapBackground>,
 }
@@ -783,6 +783,9 @@ pub struct DropCapBackground {
     pub border_width: Option<Length>,
     /// `desk:drop-cap-border-color`: the color of that line.
     pub border_color: Option<Color>,
+    /// `desk:drop-cap-border-style`: how that line is drawn, as
+    /// `fo:border` names it: `solid`, `dashed` or `dotted`.
+    pub border_style: Option<BorderLine>,
     /// `desk:drop-cap-scale`: how tall the characters are in it, in
     /// percent of their height without it.
     pub scale: Option<u32>,

@@ -612,10 +612,12 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
                 "rectangle" => Some(false),
                 _ => None,
             }),
-            outdent: d.attr(DESK, "drop-cap-outdent").and_then(|b| match b {
-                "true" => Some(true),
-                "false" => Some(false),
-                _ => None,
+            // A percent of the width of the characters; true and false,
+            // as Desk wrote it before, are 100 % and 0 %.
+            outdent: d.attr(DESK, "drop-cap-outdent").and_then(|v| match v {
+                "true" => Some(100),
+                "false" => Some(0),
+                _ => v.trim().trim_end_matches('%').trim().parse().ok(),
             }),
             background: d
                 .attr(DESK, "drop-cap-fill")
@@ -629,6 +631,14 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
                         fill,
                         border_width: length(d, DESK, "drop-cap-border-width"),
                         border_color: d.attr(DESK, "drop-cap-border-color").and_then(Color::parse),
+                        border_style: d.attr(DESK, "drop-cap-border-style").and_then(|v| {
+                            match v.trim() {
+                                "solid" => Some(BorderLine::Solid),
+                                "dashed" => Some(BorderLine::Dashed),
+                                "dotted" => Some(BorderLine::Dotted),
+                                _ => None,
+                            }
+                        }),
                         scale: percent("drop-cap-scale"),
                         radius: percent("drop-cap-radius"),
                     }

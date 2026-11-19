@@ -245,12 +245,9 @@ impl TextSystem {
             Some(_) => height.max(line.advance + 2.0 * margin),
             None => line.advance,
         };
-        // Outdented, the letters end where the text starts.
-        let left = if cap.outdent {
-            indent - width - distance
-        } else {
-            indent
-        };
+        // Outdented, the letters stand out into the margin by a part of
+        // their width: all of it at 100 %.
+        let left = indent - width * f32::from(cap.outdent.min(200)) / 100.0;
         let shape = cap.background.map(|shape| DropCapBox {
             x: left,
             y: baseline - height,
@@ -277,17 +274,17 @@ impl TextSystem {
             .collect();
         // The text beside the letters starts after them: after their
         // rectangle or their shape, or after their ink at the height of
-        // each line, as far from it as the letters end past their ink.
-        let rectangle = left + width + distance;
-        let right: Box<dyn Fn(f32, f32) -> f32> = if cap.outdent {
-            Box::new(move |_, _| indent)
-        } else if cap.follow_shape && shape.is_none() {
+        // each line, as far from it as the letters end past their ink;
+        // never before the indent, where outdented letters leave the text.
+        let rectangle = (left + width + distance).max(indent);
+        let right: Box<dyn Fn(f32, f32) -> f32> = if cap.follow_shape && shape.is_none() {
             let ink = ink(&runs);
             let bearing = right_of(&ink, f32::MIN, f32::MAX)
                 .map_or(0.0, |widest| (x + line.advance - widest).max(0.0));
             Box::new(move |top, height| {
-                right_of(&ink, top, top + height)
-                    .map_or(indent, |r| (r + bearing + distance).min(rectangle))
+                right_of(&ink, top, top + height).map_or(indent, |r| {
+                    (r + bearing + distance).clamp(indent, rectangle)
+                })
             })
         } else {
             Box::new(move |_, _| rectangle)
