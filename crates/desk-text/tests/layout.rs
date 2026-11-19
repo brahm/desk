@@ -1269,11 +1269,12 @@ fn pxv_06_the_lines_follow_the_shape_of_the_letter() {
     let mut system = TextSystem::new();
     let text = "Very few letters narrow as they go down, and the text beside \
                 them comes closer to them on every line, as it does in Pages.";
-    let shape = plain(&mut system, capped(desk_model::DropCap::default()), text);
-    let rectangle = plain(
+    // Pages wraps the rectangle unless told to follow the shape.
+    let rectangle = plain(&mut system, capped(desk_model::DropCap::default()), text);
+    let shape = plain(
         &mut system,
         capped(desk_model::DropCap {
-            follow_shape: false,
+            follow_shape: true,
             ..desk_model::DropCap::default()
         }),
         text,
@@ -1332,4 +1333,49 @@ fn pxv_06_a_drop_cap_can_rise_and_stand_in_the_margin() {
     let letter = &outdent.lines[0].runs[0];
     assert!((letter.x + letter.advance - 60.0).abs() < 0.01);
     assert!(outdent.lines.iter().all(|l| l.x == 60.0));
+}
+
+#[test]
+fn pxv_06_a_drop_cap_can_stand_in_a_shape() {
+    let mut system = TextSystem::new();
+    let rectangle = desk_model::DropCap {
+        follow_shape: false,
+        ..desk_model::DropCap::default()
+    };
+    let bare = plain(&mut system, capped(rectangle), TEXT);
+    let shaped = plain(
+        &mut system,
+        capped(desk_model::DropCap {
+            background: Some(desk_model::DropCapShape::default()),
+            // The shape is wrapped by its rectangle, whatever this says.
+            follow_shape: true,
+            ..rectangle
+        }),
+        TEXT,
+    );
+    let shape = shaped.lines[0].drop_cap_shape.expect("a shape");
+    assert!(bare.lines[0].drop_cap_shape.is_none());
+    // As tall as the letter was, from its capitals to the baseline of the
+    // third line.
+    let caps = 1409.0 / 2048.0;
+    let letter = &bare.lines[0].runs[0];
+    let height = caps * letter.size;
+    assert!((shape.height - height).abs() < 0.01, "{}", shape.height);
+    assert!((shape.y + shape.height - shaped.lines[2].baseline).abs() < 0.01);
+    assert!(shape.width >= shape.height - 0.01);
+    assert_eq!(shape.x, 0.0);
+    // The letter is 80 % as tall, in the middle of the shape.
+    let small = &shaped.lines[0].runs[0];
+    assert!((small.size - 0.8 * letter.size).abs() < 0.01);
+    let margin = 0.1 * height;
+    assert!((small.baseline - (shape.y + shape.height - margin)).abs() < 0.01);
+    let middle = small.x + small.advance / 2.0;
+    assert!((middle - shape.width / 2.0).abs() < 0.01);
+    // Corners of 20 % of half the shorter side.
+    assert!((shape.radius - 0.2 * shape.height / 2.0).abs() < 0.01);
+    // The lines beside it start after it; the fourth at the margin.
+    for line in &shaped.lines[..3] {
+        assert!((line.x - shape.width).abs() < 0.01, "{}", line.x);
+    }
+    assert_eq!(shaped.lines[3].x, 0.0);
 }

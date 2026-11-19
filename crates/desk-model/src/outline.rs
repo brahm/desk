@@ -115,7 +115,7 @@ impl Edit {
                 id,
                 name: name.as_str().into(),
                 shortcut: None,
-                ..style
+                ..*style
             },
             _ => {
                 let mut style = ParagraphStyle::new(id, &name);
@@ -126,7 +126,7 @@ impl Edit {
         };
         style.next = Some(self.document().styles().default_paragraph());
         self.apply(Op::PutStyle {
-            style: Style::Paragraph(style),
+            style: Style::from(style),
         })?;
         Ok(id)
     }

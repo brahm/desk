@@ -61,11 +61,11 @@ pub use package::{
 pub use read::read_streams;
 pub use table::{MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow};
 pub use text::{
-    Background, Border, BorderLine, Break, Column, Columns, DropCap, Family, Field, HeaderFooter,
-    HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration, PageLayout,
-    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
-    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground, Family,
+    Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight,
+    ListLabel, ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration,
+    PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span,
+    Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
     TextSettings, TextShadow, TextTransform, TocLevel, ViewSettings,
 };
 pub use units::{Color, Length};

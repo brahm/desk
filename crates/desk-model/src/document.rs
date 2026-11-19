@@ -1061,7 +1061,7 @@ mod default_font_tests {
         let title = document.new_id();
         let mut style = ParagraphStyle::new(title, "Title");
         style.character.font_size = Some(Length::from_pt(24.0));
-        document.styles.insert(Style::Paragraph(style));
+        document.styles.insert(Style::from(style));
         document.set_default_font("Helvetica Neue", Length::from_pt(11.0));
         // The other styles keep their size in proportion: 24 pt of 12 pt
         // become 22 pt of 11 pt.

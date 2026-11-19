@@ -776,6 +776,19 @@ fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
                 if outdent { "true" } else { "false" },
             );
         }
+        if let Some(shape) = cap.background {
+            w.attr("desk:drop-cap-fill", &shape.fill.to_string());
+            len(w, "desk:drop-cap-border-width", shape.border_width);
+            if let Some(color) = shape.border_color {
+                w.attr("desk:drop-cap-border-color", &color.to_string());
+            }
+            if let Some(scale) = shape.scale {
+                w.attr("desk:drop-cap-scale", &format!("{scale}%"));
+            }
+            if let Some(radius) = shape.radius {
+                w.attr("desk:drop-cap-radius", &format!("{radius}%"));
+            }
+        }
         w.end();
     }
 }

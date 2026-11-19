@@ -1183,7 +1183,7 @@ impl Edit {
                 position = self.split_paragraph(position)?;
             }
             if !joins {
-                let id = self.style_by_name_or_add(Style::Paragraph(style.clone()))?;
+                let id = self.style_by_name_or_add(Style::from(style.clone()))?;
                 let p = Position::new(position.paragraph, 0);
                 self.set_paragraph_style(p, p, id)?;
                 self.set_own_paragraph_attrs(position.paragraph, attrs)?;
@@ -1192,7 +1192,7 @@ impl Edit {
             let mut runs = Vec::new();
             for (text, character, run_attrs) in &source.runs {
                 let character_id = match character {
-                    Some(c) => Some(self.style_by_name_or_add(Style::Character(c.clone()))?),
+                    Some(c) => Some(self.style_by_name_or_add(Style::from(c.clone()))?),
                     None => None,
                 };
                 let attrs = if joins {
@@ -1274,7 +1274,7 @@ impl Edit {
             relink(&mut paragraph.paragraph);
             let mut paragraph_attrs = copied.paragraph_attrs.without_structure();
             relink(&mut paragraph_attrs);
-            let paragraph_style = self.style_by_name_or_add(Style::Paragraph(paragraph))?;
+            let paragraph_style = self.style_by_name_or_add(Style::from(paragraph))?;
             for (id, _) in &ranges {
                 let p = Position::new(*id, 0);
                 self.set_paragraph_style(p, p, paragraph_style)?;
@@ -1285,7 +1285,7 @@ impl Edit {
         }
         if copied.parts != StyleParts::Paragraph && start != end {
             let character_style = match &copied.character {
-                Some(style) => Some(self.style_by_name_or_add(Style::Character(style.clone()))?),
+                Some(style) => Some(self.style_by_name_or_add(Style::from(style.clone()))?),
                 None => None,
             };
             let attrs = copied.character_attrs.clone();
@@ -1366,8 +1366,8 @@ impl Edit {
                 return Ok(Some(found));
             }
             let style = match family {
-                StyleFamily::Paragraph => from.flat_paragraph_style(id).map(Style::Paragraph),
-                StyleFamily::Character => from.flat_character_style(id).map(Style::Character),
+                StyleFamily::Paragraph => from.flat_paragraph_style(id).map(Style::from),
+                StyleFamily::Character => from.flat_character_style(id).map(Style::from),
                 StyleFamily::List => from.styles().list(id).cloned().map(Style::List),
             };
             let Some(style) = style else {
@@ -1411,15 +1411,15 @@ impl Edit {
         }
         let id = self.new_id();
         let style = match style {
-            Style::Paragraph(p) => Style::Paragraph(ParagraphStyle {
+            Style::Paragraph(p) => Style::from(ParagraphStyle {
                 id,
                 shortcut: None,
-                ..p
+                ..*p
             }),
-            Style::Character(c) => Style::Character(CharacterStyle {
+            Style::Character(c) => Style::from(CharacterStyle {
                 id,
                 shortcut: None,
-                ..c
+                ..*c
             }),
             Style::List(l) => Style::List(ListStyle {
                 id,
@@ -1489,12 +1489,12 @@ impl Edit {
             };
             // First on its own, with every attribute its chain gives it.
             let flat = match family {
-                StyleFamily::Paragraph => Style::Paragraph(ParagraphStyle {
+                StyleFamily::Paragraph => Style::from(ParagraphStyle {
                     id: target,
                     shortcut,
                     ..source.flat_paragraph_style(id).expect("a paragraph style")
                 }),
-                StyleFamily::Character => Style::Character(CharacterStyle {
+                StyleFamily::Character => Style::from(CharacterStyle {
                     id: target,
                     shortcut,
                     ..source.flat_character_style(id).expect("a character style")
@@ -1558,20 +1558,18 @@ impl Edit {
                         if let Some(Some(list)) = paragraph.list_style {
                             paragraph.list_style = Some(map.get(&list).copied());
                         }
-                        Style::Paragraph(ParagraphStyle {
+                        Style::from(ParagraphStyle {
                             parent,
                             paragraph,
                             character: o.character.clone(),
-                            ..p.clone()
+                            ..(**p).clone()
                         })
                     }
-                    (Style::Character(c), Style::Character(o)) => {
-                        Style::Character(CharacterStyle {
-                            parent,
-                            character: o.character.clone(),
-                            ..c.clone()
-                        })
-                    }
+                    (Style::Character(c), Style::Character(o)) => Style::from(CharacterStyle {
+                        parent,
+                        character: o.character.clone(),
+                        ..(**c).clone()
+                    }),
                     _ => unreachable!("the same family"),
                 };
                 // A parent that would make a cycle, as when a replaced

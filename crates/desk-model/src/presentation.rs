@@ -65,9 +65,7 @@ impl Document {
         let body = document.styles.default_paragraph();
         if let Some(mut style) = document.styles.paragraph(body).cloned() {
             style.character.font_size = Some(Length::from_points(BODY_SIZE));
-            document
-                .styles
-                .insert(crate::style::Style::Paragraph(style));
+            document.styles.insert(crate::style::Style::from(style));
         }
         document.slides = Some(imbl::vector![Slide::default()]);
         document

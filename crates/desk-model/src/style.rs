@@ -101,10 +101,11 @@ impl CharacterStyle {
 /// A style of any family.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Style {
-    /// A paragraph style.
-    Paragraph(ParagraphStyle),
-    /// A character style.
-    Character(CharacterStyle),
+    /// A paragraph style, boxed, as styles of text are much larger than
+    /// list styles.
+    Paragraph(Box<ParagraphStyle>),
+    /// A character style, boxed too.
+    Character(Box<CharacterStyle>),
     /// A list style.
     List(ListStyle),
 }
@@ -178,6 +179,12 @@ impl Style {
 
 impl From<ParagraphStyle> for Style {
     fn from(style: ParagraphStyle) -> Self {
+        Self::Paragraph(Box::new(style))
+    }
+}
+
+impl From<Box<ParagraphStyle>> for Style {
+    fn from(style: Box<ParagraphStyle>) -> Self {
         Self::Paragraph(style)
     }
 }
@@ -190,6 +197,12 @@ impl From<ListStyle> for Style {
 
 impl From<CharacterStyle> for Style {
     fn from(style: CharacterStyle) -> Self {
+        Self::Character(Box::new(style))
+    }
+}
+
+impl From<Box<CharacterStyle>> for Style {
+    fn from(style: Box<CharacterStyle>) -> Self {
         Self::Character(style)
     }
 }
@@ -206,7 +219,7 @@ impl Styles {
     pub(crate) fn new(default_paragraph: ParagraphStyle) -> Self {
         let id = default_paragraph.id;
         let mut styles = OrdMap::new();
-        styles.insert(id, Style::Paragraph(default_paragraph));
+        styles.insert(id, Style::Paragraph(Box::new(default_paragraph)));
         Self {
             styles,
             default_paragraph: id,

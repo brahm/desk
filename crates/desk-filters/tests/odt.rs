@@ -3488,7 +3488,7 @@ fn pxv_10_the_default_text_box_appearance_is_kept() {
     document
         .transact("Styles", |edit| {
             edit.apply(Op::PutStyle {
-                style: Style::Paragraph(ParagraphStyle::new(quote, "Quote")),
+                style: Style::from(ParagraphStyle::new(quote, "Quote")),
             })?;
             let paragraph = Paragraph::from_runs(
                 edit.new_id(),
@@ -3586,6 +3586,13 @@ fn pxv_06_drop_caps_of_styles_and_paragraphs_are_kept() {
         raised: 1,
         follow_shape: false,
         outdent: true,
+        background: Some(desk_model::DropCapShape {
+            fill: Rgba::rgb(200, 30, 40),
+            border_width: Length::from_points(2),
+            border_color: Rgba::rgb(10, 20, 30),
+            scale: 70,
+            radius: 50,
+        }),
     };
     let first = document.body().get(0).unwrap().id();
     for (index, (style, cap)) in [

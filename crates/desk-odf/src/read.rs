@@ -8,11 +8,11 @@ use std::collections::HashMap;
 use crate::error::OdfError;
 use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK};
 use crate::text::{
-    Background, Border, BorderLine, Break, Column, Columns, DropCap, Family, Field, HeaderFooter,
-    HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight, ListLabel,
-    ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration, PageLayout,
-    Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style,
-    StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
+    Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground, Family,
+    Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight,
+    ListLabel, ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration,
+    PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span,
+    Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
     TextSettings, TextShadow, TextTransform, TocLevel,
 };
 use crate::units::{Color, Length, parse_percent};
@@ -617,6 +617,22 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
                 "false" => Some(false),
                 _ => None,
             }),
+            background: d
+                .attr(DESK, "drop-cap-fill")
+                .and_then(Color::parse)
+                .map(|fill| {
+                    let percent = |name: &str| {
+                        d.attr(DESK, name)
+                            .and_then(|v| v.trim().trim_end_matches('%').parse().ok())
+                    };
+                    DropCapBackground {
+                        fill,
+                        border_width: length(d, DESK, "drop-cap-border-width"),
+                        border_color: d.attr(DESK, "drop-cap-border-color").and_then(Color::parse),
+                        scale: percent("drop-cap-scale"),
+                        radius: percent("drop-cap-radius"),
+                    }
+                }),
         }),
     }
 }

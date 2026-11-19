@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: a shape behind the letters of a drop cap, with its fill,
+  border, letter size and rounded corners.
 * Added: the options of drop caps: raised lines, text that follows the
   shape of the letters, spacing and outdent into the margin.
 * Added: drop caps, in the Style tab of text, kept in the standard ODF

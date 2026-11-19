@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-18 23:48+0000\n"
+"POT-Creation-Date: 2026-11-19 00:17+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -366,9 +366,9 @@ msgid "Gap Between Bars"
 msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:179 crates/desk-ui/src/chart_pane.rs:202
-#: crates/desk-ui/src/compact.rs:46 crates/desk-ui/src/effects.rs:263
-#: crates/desk-ui/src/effects.rs:337 crates/desk-ui/src/fonts.rs:395
-#: crates/desk-ui/src/graphic_pane.rs:214
+#: crates/desk-ui/src/compact.rs:46 crates/desk-ui/src/drop_cap_pane.rs:75
+#: crates/desk-ui/src/effects.rs:263 crates/desk-ui/src/effects.rs:337
+#: crates/desk-ui/src/fonts.rs:395 crates/desk-ui/src/graphic_pane.rs:214
 #: crates/desk-ui/src/graphic_pane.rs:218
 #: crates/desk-ui/src/graphic_pane.rs:220
 #: crates/desk-ui/src/graphic_pane.rs:237
@@ -609,12 +609,12 @@ msgstr ""
 msgid "Custom…"
 msgstr ""
 
-#: crates/desk-ui/src/compact.rs:42 crates/desk-ui/src/drop_cap_pane.rs:59
-#: crates/desk-ui/src/effects.rs:274 crates/desk-ui/src/effects.rs:308
-#: crates/desk-ui/src/effects.rs:335 crates/desk-ui/src/effects.rs:336
-#: crates/desk-ui/src/fonts.rs:396 crates/desk-ui/src/fonts.rs:397
-#: crates/desk-ui/src/formatting.rs:193 crates/desk-ui/src/formatting.rs:194
-#: crates/desk-ui/src/graphic_pane.rs:241
+#: crates/desk-ui/src/compact.rs:42 crates/desk-ui/src/drop_cap_pane.rs:66
+#: crates/desk-ui/src/drop_cap_pane.rs:71 crates/desk-ui/src/effects.rs:274
+#: crates/desk-ui/src/effects.rs:308 crates/desk-ui/src/effects.rs:335
+#: crates/desk-ui/src/effects.rs:336 crates/desk-ui/src/fonts.rs:396
+#: crates/desk-ui/src/fonts.rs:397 crates/desk-ui/src/formatting.rs:193
+#: crates/desk-ui/src/formatting.rs:194 crates/desk-ui/src/graphic_pane.rs:241
 #: crates/desk-ui/src/graphic_pane.rs:250
 #: crates/desk-ui/src/graphic_pane.rs:252
 #: crates/desk-ui/src/object_text_pane.rs:111
@@ -948,51 +948,75 @@ msgstr ""
 msgid "of {count}"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:37
-#: crates/desk-ui/src/drop_cap_pane.rs:60 crates/desk-ui/src/undo_names.rs:30
+#: crates/desk-ui/src/drop_cap_pane.rs:44
+#: crates/desk-ui/src/drop_cap_pane.rs:76 crates/desk-ui/src/undo_names.rs:30
 msgid "Drop Cap"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:38
+#: crates/desk-ui/src/drop_cap_pane.rs:45
 msgid "The first letters as tall as several lines"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:46 crates/desk-ui/src/formatting.rs:192
+#: crates/desk-ui/src/drop_cap_pane.rs:53 crates/desk-ui/src/formatting.rs:192
 #: crates/desk-ui/src/writing_tools.rs:80
 msgid "Lines"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:47 crates/desk-ui/src/effects.rs:285
+#: crates/desk-ui/src/drop_cap_pane.rs:54 crates/desk-ui/src/effects.rs:285
 #: crates/desk-ui/src/formatting.rs:704 crates/desk-ui/src/writing_tools.rs:74
 msgid "Characters"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:48
+#: crates/desk-ui/src/drop_cap_pane.rs:55
 msgid "Raised Lines"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:49
+#: crates/desk-ui/src/drop_cap_pane.rs:56
 msgid "Above the first line of the text"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:51
+#: crates/desk-ui/src/drop_cap_pane.rs:58
 msgid "Follow the Shape"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:52
+#: crates/desk-ui/src/drop_cap_pane.rs:59
 msgid "The text beside the letters follows their outline"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:55
+#: crates/desk-ui/src/drop_cap_pane.rs:62
 msgid "Outdent"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:56
+#: crates/desk-ui/src/drop_cap_pane.rs:63
 msgid "The letters stand in the margin"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:58 crates/desk-ui/src/formatting.rs:226
+#: crates/desk-ui/src/drop_cap_pane.rs:65 crates/desk-ui/src/formatting.rs:226
 msgid "Spacing"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:68
+msgid "Background Shape"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:69
+msgid "Border"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:70 crates/desk-ui/src/table_pane.rs:292
+msgid "Border Width"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:72
+msgid "Letter Size"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:73
+msgid "Percent of the shape"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:74 crates/desk-ui/src/shape_pane.rs:110
+msgid "Corner Radius"
 msgstr ""
 
 #: crates/desk-ui/src/editing/objects.rs:1625
@@ -3583,10 +3607,6 @@ msgstr ""
 msgid "Margins"
 msgstr ""
 
-#: crates/desk-ui/src/shape_pane.rs:110
-msgid "Corner Radius"
-msgstr ""
-
 #: crates/desk-ui/src/shape_pane.rs:114
 msgid "Star Points"
 msgstr ""
@@ -4501,10 +4521,6 @@ msgstr ""
 
 #: crates/desk-ui/src/table_pane.rs:291
 msgid "Borders"
-msgstr ""
-
-#: crates/desk-ui/src/table_pane.rs:292
-msgid "Border Width"
 msgstr ""
 
 #: crates/desk-ui/src/table_pane.rs:297 crates/desk-ui/src/tables/header.rs:62
