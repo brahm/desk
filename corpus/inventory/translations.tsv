@@ -514,7 +514,7 @@ note	Paginação (EST-05)	Pagination (EST-05)
 note	Bordas e filetes (FMT-21)	Borders and rules (FMT-21)
 note	Listas automáticas (LST-01)	Automatic lists (LST-01)
 note	Marcadores e listas escalonadas (LST-03 a LST-05)	Bullets and tiered lists (LST-03 to LST-05)
-note	Reordenar no modo tópicos; falta arrastar pelo marcador direto no texto	Reorder in outline mode; dragging by the bullet right in the text is missing
+note	Reordenar no modo estrutura de tópicos, e arrastando o marcador no texto: o item se move com os subitens, uma linha azul com um triângulo marca onde ele vai, e a posição do triângulo define o nível, no máximo um abaixo do item anterior; o item continua selecionado (LST-02, PXV-11)	Reorder in outline mode, and by dragging the bullet in the text: the item moves with its sub-items, a blue line with a triangle marks where it goes, and where the triangle sits sets its level, at most one deeper than the item before; the item stays selected (LST-02, PXV-11)
 note	Colunas e quebras manuais do '09 (EST-07 a EST-10); faltam as colunas da seleção com quebras automáticas do 15	Columns and manual breaks of the '09 (EST-07 to EST-10); the columns on the selection with automatic breaks of the 15 are missing
 note	Quebras de coluna, linha, página e seção (EST-04, EST-06, EST-08)	Column, line, page and section breaks (EST-04, EST-06, EST-08)
 note	Caixas vinculadas e linhas de conexão (OBJ-15, VMI-03); faltam os fios numerados e coloridos e vários fios	Linked boxes and connection lines (OBJ-15, VMI-03); the numbered and colored threads and several threads are missing

@@ -393,3 +393,45 @@ fn sty_02_a_paragraph_style_chosen_takes_the_place_of_a_list() {
         .unwrap();
     assert_eq!(labels(&editor)[..2], ["", "\u{2022}"]);
 }
+
+#[test]
+fn pxv_11_a_dragged_item_moves_with_the_items_under_it() {
+    let mut editor = editor();
+    let bullet = add(&mut editor, ListStyle::bullet, "Bullet");
+    let (a, e) = (at(&editor, 0), at(&editor, 4));
+    editor
+        .edit("List", |edit| edit.set_list_style(a, e, Some(bullet)))
+        .unwrap();
+    // b with c under it.
+    let c = at(&editor, 2);
+    editor
+        .edit("Level", |edit| edit.change_list_level(c, c, 1, false))
+        .unwrap();
+    assert_eq!(levels(&editor), [0, 0, 1, 0, 0]);
+    assert_eq!(editor.document().list_item_range(1), 1..3);
+    assert_eq!(editor.document().list_item_range(3), 3..4);
+    let texts = |editor: &Editor| -> Vec<String> {
+        editor.document().body().iter().map(|p| p.text()).collect()
+    };
+    // b and c go after d, one level in: c stays one level under b.
+    let moved = editor
+        .edit("Move", |edit| edit.move_list_item(1, 4, 1))
+        .unwrap();
+    assert_eq!(moved, 2..4);
+    assert_eq!(texts(&editor), ["a", "d", "b", "c", "e"]);
+    assert_eq!(levels(&editor), [0, 0, 1, 2, 0]);
+    // Back to the top, at the first level.
+    let moved = editor
+        .edit("Move", |edit| edit.move_list_item(2, 0, 0))
+        .unwrap();
+    assert_eq!(moved, 0..2);
+    assert_eq!(texts(&editor), ["b", "c", "a", "d", "e"]);
+    assert_eq!(levels(&editor), [0, 1, 0, 0, 0]);
+    // A drop at its own place only changes the level.
+    let moved = editor
+        .edit("Move", |edit| edit.move_list_item(3, 4, 1))
+        .unwrap();
+    assert_eq!(moved, 3..4);
+    assert_eq!(texts(&editor), ["b", "c", "a", "d", "e"]);
+    assert_eq!(levels(&editor), [0, 1, 0, 1, 0]);
+}

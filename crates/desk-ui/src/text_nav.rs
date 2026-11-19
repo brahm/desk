@@ -212,6 +212,72 @@ pub fn label_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<
     })
 }
 
+/// A place between paragraphs of a page where a dragged list item can
+/// go (PXV-11).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ListDrop {
+    /// The paragraph it goes before.
+    pub before: usize,
+    /// The height of the place on the page.
+    pub y: f64,
+    /// The left edge of the text column there.
+    pub left: f64,
+    /// Its right edge.
+    pub right: f64,
+}
+
+/// The place between paragraphs of the body nearest to a height of a
+/// page: the top of a paragraph, or the bottom of the last one on the
+/// page (PXV-11).
+pub fn list_drop_at(layout: &DocumentLayout, page: usize, y: f64) -> Option<ListDrop> {
+    let lines = &layout.pages.get(page)?.lines;
+    let right_of = |origin: f32| {
+        lines
+            .iter()
+            .filter(|l| l.origin.0 == origin)
+            .map(|l| l.origin.0 + l.line.x + l.line.width)
+            .fold(origin, f32::max)
+    };
+    let gaps = lines
+        .iter()
+        .filter(|l| l.index == 0)
+        .map(|l| (l.paragraph, l.top(), l.origin.0))
+        .chain(
+            lines
+                .last()
+                .map(|l| (l.paragraph + 1, l.bottom(), l.origin.0)),
+        );
+    gaps.min_by(|a, b| {
+        (f64::from(a.1) - y)
+            .abs()
+            .total_cmp(&(f64::from(b.1) - y).abs())
+    })
+    .map(|(before, at, origin)| ListDrop {
+        before,
+        y: f64::from(at),
+        left: f64::from(origin),
+        right: f64::from(right_of(origin)),
+    })
+}
+
+/// The level a list item dragged before paragraph `before` takes when
+/// the drag asks for `wanted`: from the first level to one deeper than
+/// the item it would follow, or the first after a paragraph outside a
+/// list (PXV-11).
+pub fn list_drop_level(document: &Document, item: usize, before: usize, wanted: i32) -> u8 {
+    let range = document.list_item_range(item);
+    let previous = if (range.start..=range.end).contains(&before) {
+        range.start.checked_sub(1)
+    } else {
+        before.checked_sub(1)
+    };
+    let deepest = previous
+        .and_then(|i| document.list_level(i))
+        .map_or(0, |level| i32::from(level) + 1)
+        .min(desk_model::LIST_LEVELS as i32 - 1);
+    wanted.clamp(0, deepest) as u8
+}
+
 /// The rectangles that show a selection, line by line.
 pub fn selection_rects(layout: &DocumentLayout, selection: &Selection) -> Vec<SpanRect> {
     let (start, end) = selection.ordered();
@@ -958,5 +1024,51 @@ mod tests {
         assert_eq!(label_at(&layout, 0, text.x, y), None);
         let second = &layout.pages[0].lines[1];
         assert!(second.line.label.is_none());
+    }
+
+    #[test]
+    fn pxv_11_a_dragged_item_goes_at_most_one_level_under_the_item_before() {
+        let mut editor = Editor::new(document(&["Intro", "a", "b", "c"]));
+        editor
+            .edit("List", |edit| {
+                let id = |i: usize| edit.document().body().get(i).unwrap().id();
+                let (a, c) = (Position::new(id(1), 0), Position::new(id(3), 0));
+                let b = Position::new(id(2), 0);
+                let style = edit.list_style_or_add("Bullet", desk_model::ListStyle::bullet)?;
+                edit.set_list_style(a, c, Some(style))?;
+                edit.change_list_level(b, b, 1, false)
+            })
+            .unwrap();
+        let document = editor.document();
+        // c after b, which is at the second level: down to the third.
+        assert_eq!(list_drop_level(document, 3, 4, 5), 2);
+        assert_eq!(list_drop_level(document, 3, 4, -2), 0);
+        // c after a: down to the second.
+        assert_eq!(list_drop_level(document, 3, 2, 5), 1);
+        // a, the first item, stays at the first level at its place, with b
+        // under it, and after the paragraph outside the list.
+        assert_eq!(list_drop_level(document, 1, 1, 3), 0);
+        assert_eq!(list_drop_level(document, 1, 3, 3), 0);
+        assert_eq!(list_drop_level(document, 1, 0, 3), 0);
+    }
+
+    #[test]
+    fn pxv_11_a_dragged_item_goes_between_the_paragraphs_nearest_the_pointer() {
+        let editor = Editor::new(document(&["One", "Two", "Three"]));
+        let layout = laid_out(editor.document());
+        let lines = &layout.pages[0].lines;
+        let (first, second, third) = (&lines[0], &lines[1], &lines[2]);
+        // Just above the middle of the second paragraph: before it.
+        let y = f64::from(second.top() + second.line.height * 0.4);
+        let drop = list_drop_at(&layout, 0, y).unwrap();
+        assert_eq!(drop.before, 1);
+        assert_eq!(drop.y, f64::from(second.top()));
+        assert!(drop.left <= f64::from(first.origin.0));
+        assert!(drop.right > drop.left);
+        // Below the last paragraph: after it.
+        let y = f64::from(third.bottom() + 20.0);
+        assert_eq!(list_drop_at(&layout, 0, y).unwrap().before, 3);
+        // Above the first: before it.
+        assert_eq!(list_drop_at(&layout, 0, 0.0).unwrap().before, 0);
     }
 }

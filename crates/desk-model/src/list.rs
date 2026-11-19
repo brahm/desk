@@ -17,8 +17,10 @@
 //! list continues from the previous one unless it is set to start again.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::sync::Arc;
 
+use crate::document::Document;
 use crate::error::ModelError;
 use crate::format::{ParaAttrs, ParaFormat};
 use crate::id::NodeId;
@@ -510,6 +512,35 @@ pub fn detect_marker(text: &str) -> Option<Marker> {
     Some(Marker { len, kind })
 }
 
+impl Document {
+    /// The level of the paragraph at `index` in its list, or none when it
+    /// is not a list item.
+    pub fn list_level(&self, index: usize) -> Option<u8> {
+        let styles = self.styles();
+        let p = self.body().get(index)?;
+        let format = styles.resolve_paragraph(p.style(), p.attrs());
+        format
+            .list_style
+            .and_then(|id| styles.list(id))
+            .is_some_and(ListStyle::has_labels)
+            .then_some(format.list_level)
+    }
+
+    /// The paragraphs of the list item at `index` and of the items under
+    /// it: the list items right after it that are deeper (PXV-11). A
+    /// paragraph outside a list is alone.
+    pub fn list_item_range(&self, index: usize) -> Range<usize> {
+        let Some(top) = self.list_level(index) else {
+            return index..index + 1;
+        };
+        let mut end = index + 1;
+        while self.list_level(end).is_some_and(|level| level > top) {
+            end += 1;
+        }
+        index..end
+    }
+}
+
 impl Edit {
     /// Sets the attributes of a paragraph itself.
     fn set_list_attrs(
@@ -660,6 +691,37 @@ impl Edit {
             })?;
         }
         Ok(())
+    }
+
+    /// Moves the list item at `index`, with the items under it, before
+    /// paragraph `before`, as counted before the move, and to `level`;
+    /// the items under it keep their depth below it (PXV-11). A drop at
+    /// its own place only changes its level. Gives where the paragraphs
+    /// are after the move.
+    pub fn move_list_item(
+        &mut self,
+        index: usize,
+        before: usize,
+        level: u8,
+    ) -> Result<Range<usize>, ModelError> {
+        let document = self.document();
+        let Some(old) = document.list_level(index) else {
+            return Err(ModelError::IndexOutOfBounds {
+                index,
+                len: document.body().len(),
+            });
+        };
+        let range = document.list_item_range(index);
+        let moved = self.move_paragraphs(range, before)?;
+        let by = i32::from(level.min(LIST_LEVELS as u8 - 1)) - i32::from(old);
+        if by != 0 {
+            let body = self.document().body();
+            let id = |i: usize| body.get(i).map(Paragraph::id);
+            if let (Some(first), Some(last)) = (id(moved.start), id(moved.end - 1)) {
+                self.change_list_level(Position::new(first, 0), Position::new(last, 0), by, false)?;
+            }
+        }
+        Ok(moved)
     }
 
     /// Sets the number that an item starts its list again at, or lets it
