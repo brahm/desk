@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: threads of text boxes, as in Pages: a circle on a selected box
+  starts a thread or adds a box to it, each box shows its number in the
+  color of its thread, and its menu moves it to another thread, puts the
+  thread in layout order, creates a new one or removes the box.
 * Added: columns given to selected text, between layout breaks, ending at
   the same height when text follows them.
 * Added: dragging the bullet of a list item moves it, with its sub-items,

@@ -1307,6 +1307,27 @@ matrix rows done on 9 November, before the change of target.
   pagination and ODF have tests of their own.
 - W089 is done for W1.
 
+### 19 November: threads of text boxes (W091, step 12 of W1)
+
+- A selected text box shows a circle above the middle of its top edge.
+  A click on it starts a thread; while a box of a thread is selected, a
+  click on the circle of a box in no thread adds it at the end of the
+  thread (pull request 166).
+- Each box of a thread shows its place in it, in the color of the
+  thread. The number of the selected box opens a menu with the threads
+  of the document, named after their first words, to move the box to
+  another one; Layout Order, which puts the boxes in the order of the
+  pages and gives the text to the new first box; Create New Thread; and
+  Remove from Thread. What is left of a thread stays one.
+- A thread of one box is kept as `desk:thread` on `draw:text-box`, the
+  extension defined in docs/odf-extensions.md; longer threads stay the
+  standard `draw:chain-next-name` links.
+- The colors of the threads and the place of the circle were chosen
+  here, not compared with Pages on the Mac; "Cadeia" names a thread in
+  Portuguese. No UI test clicks the circle in the running app; the model
+  and the circles have tests of their own.
+- W091 is done for W1.
+
 
 ## Decisions, with their reasons and consequences
 
