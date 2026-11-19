@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-18 23:18+0000\n"
+"POT-Creation-Date: 2026-11-18 23:48+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -609,11 +609,12 @@ msgstr ""
 msgid "Custom…"
 msgstr ""
 
-#: crates/desk-ui/src/compact.rs:42 crates/desk-ui/src/effects.rs:274
-#: crates/desk-ui/src/effects.rs:308 crates/desk-ui/src/effects.rs:335
-#: crates/desk-ui/src/effects.rs:336 crates/desk-ui/src/fonts.rs:396
-#: crates/desk-ui/src/fonts.rs:397 crates/desk-ui/src/formatting.rs:193
-#: crates/desk-ui/src/formatting.rs:194 crates/desk-ui/src/graphic_pane.rs:241
+#: crates/desk-ui/src/compact.rs:42 crates/desk-ui/src/drop_cap_pane.rs:59
+#: crates/desk-ui/src/effects.rs:274 crates/desk-ui/src/effects.rs:308
+#: crates/desk-ui/src/effects.rs:335 crates/desk-ui/src/effects.rs:336
+#: crates/desk-ui/src/fonts.rs:396 crates/desk-ui/src/fonts.rs:397
+#: crates/desk-ui/src/formatting.rs:193 crates/desk-ui/src/formatting.rs:194
+#: crates/desk-ui/src/graphic_pane.rs:241
 #: crates/desk-ui/src/graphic_pane.rs:250
 #: crates/desk-ui/src/graphic_pane.rs:252
 #: crates/desk-ui/src/object_text_pane.rs:111
@@ -947,23 +948,51 @@ msgstr ""
 msgid "of {count}"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:31
-#: crates/desk-ui/src/drop_cap_pane.rs:42 crates/desk-ui/src/undo_names.rs:30
+#: crates/desk-ui/src/drop_cap_pane.rs:37
+#: crates/desk-ui/src/drop_cap_pane.rs:60 crates/desk-ui/src/undo_names.rs:30
 msgid "Drop Cap"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:32
+#: crates/desk-ui/src/drop_cap_pane.rs:38
 msgid "The first letters as tall as several lines"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:40 crates/desk-ui/src/formatting.rs:192
+#: crates/desk-ui/src/drop_cap_pane.rs:46 crates/desk-ui/src/formatting.rs:192
 #: crates/desk-ui/src/writing_tools.rs:80
 msgid "Lines"
 msgstr ""
 
-#: crates/desk-ui/src/drop_cap_pane.rs:41 crates/desk-ui/src/effects.rs:285
+#: crates/desk-ui/src/drop_cap_pane.rs:47 crates/desk-ui/src/effects.rs:285
 #: crates/desk-ui/src/formatting.rs:704 crates/desk-ui/src/writing_tools.rs:74
 msgid "Characters"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:48
+msgid "Raised Lines"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:49
+msgid "Above the first line of the text"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:51
+msgid "Follow the Shape"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:52
+msgid "The text beside the letters follows their outline"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:55
+msgid "Outdent"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:56
+msgid "The letters stand in the margin"
+msgstr ""
+
+#: crates/desk-ui/src/drop_cap_pane.rs:58 crates/desk-ui/src/formatting.rs:226
+msgid "Spacing"
 msgstr ""
 
 #: crates/desk-ui/src/editing/objects.rs:1625
@@ -1772,10 +1801,6 @@ msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:196
 msgid "First Line"
-msgstr ""
-
-#: crates/desk-ui/src/formatting.rs:226
-msgid "Spacing"
 msgstr ""
 
 #: crates/desk-ui/src/formatting.rs:230

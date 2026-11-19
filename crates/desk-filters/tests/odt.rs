@@ -3583,6 +3583,9 @@ fn pxv_06_drop_caps_of_styles_and_paragraphs_are_kept() {
         lines: 2,
         characters: 3,
         distance: Length::from_points(4),
+        raised: 1,
+        follow_shape: false,
+        outdent: true,
     };
     let first = document.body().get(0).unwrap().id();
     for (index, (style, cap)) in [

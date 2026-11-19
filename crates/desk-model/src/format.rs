@@ -696,15 +696,28 @@ pub struct DropCap {
     /// The space between the letters and the text beside them, past the
     /// width of the letters.
     pub distance: Length,
+    /// How many of the lines the letters rise above the first line of the
+    /// text, which moves down to make room; fewer than `lines`.
+    pub raised: u8,
+    /// Whether the lines beside the letters follow their shape, rather
+    /// than the rectangle around them.
+    pub follow_shape: bool,
+    /// Whether the letters stand in the margin, outside the indent, with
+    /// the lines at the indent.
+    pub outdent: bool,
 }
 
 impl Default for DropCap {
-    /// One character three lines tall, as Pages 15.4 makes it.
+    /// One character three lines tall, which the text wraps around, as
+    /// Pages 15.4 makes it.
     fn default() -> Self {
         Self {
             lines: 3,
             characters: 1,
             distance: Length::ZERO,
+            raised: 0,
+            follow_shape: true,
+            outdent: false,
         }
     }
 }

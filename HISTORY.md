@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: the options of drop caps: raised lines, text that follows the
+  shape of the letters, spacing and outdent into the margin.
 * Added: drop caps, in the Style tab of text, kept in the standard ODF
   drop cap.
 * Added: Language and Region in the main menu, which sets how the tables

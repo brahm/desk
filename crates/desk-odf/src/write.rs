@@ -760,6 +760,22 @@ fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
         }
         w.attr("style:lines", &cap.lines.to_string());
         len(w, "style:distance", cap.distance);
+        // The extensions of the drop cap (docs/odf-extensions.md).
+        if let Some(raised) = cap.raised {
+            w.attr("desk:drop-cap-raised", &raised.to_string());
+        }
+        if let Some(shape) = cap.follow_shape {
+            w.attr(
+                "desk:drop-cap-wrap",
+                if shape { "shape" } else { "rectangle" },
+            );
+        }
+        if let Some(outdent) = cap.outdent {
+            w.attr(
+                "desk:drop-cap-outdent",
+                if outdent { "true" } else { "false" },
+            );
+        }
         w.end();
     }
 }

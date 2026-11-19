@@ -760,6 +760,15 @@ pub struct DropCap {
     pub lines: u32,
     /// `style:distance`: the space between the characters and the text.
     pub distance: Option<Length>,
+    /// `desk:drop-cap-raised`: how many of the lines the characters rise
+    /// above the first line (docs/odf-extensions.md).
+    pub raised: Option<u32>,
+    /// `desk:drop-cap-wrap`: true for `shape`, where the lines follow the
+    /// shape of the characters, false for `rectangle`.
+    pub follow_shape: Option<bool>,
+    /// `desk:drop-cap-outdent`: whether the characters stand in the
+    /// margin.
+    pub outdent: Option<bool>,
 }
 
 /// `style:type` of a tab stop.

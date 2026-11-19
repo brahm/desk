@@ -1201,8 +1201,13 @@ fn pxv_06_a_drop_cap_is_as_tall_as_its_lines_which_wrap_beside_it() {
     let mut system = TextSystem::new();
     let plain_layout = plain(&mut system, ParaFormat::default(), TEXT);
     let pitch = plain_layout.lines[0].height;
+    // Wrapped by its rectangle, here.
+    let rectangle = desk_model::DropCap {
+        follow_shape: false,
+        ..desk_model::DropCap::default()
+    };
     let capped = ParaFormat {
-        drop_cap: Some(desk_model::DropCap::default()),
+        drop_cap: Some(rectangle),
         ..ParaFormat::default()
     };
     let layout = plain(&mut system, capped, TEXT);
@@ -1250,4 +1255,81 @@ fn pxv_06_a_drop_cap_is_as_tall_as_its_lines_which_wrap_beside_it() {
     };
     let layout = plain(&mut system, alone, "D");
     assert!((layout.lines[0].runs[0].size - 12.0).abs() < 0.01);
+}
+
+fn capped(cap: desk_model::DropCap) -> ParaFormat {
+    ParaFormat {
+        drop_cap: Some(cap),
+        ..ParaFormat::default()
+    }
+}
+
+#[test]
+fn pxv_06_the_lines_follow_the_shape_of_the_letter() {
+    let mut system = TextSystem::new();
+    let text = "Very few letters narrow as they go down, and the text beside \
+                them comes closer to them on every line, as it does in Pages.";
+    let shape = plain(&mut system, capped(desk_model::DropCap::default()), text);
+    let rectangle = plain(
+        &mut system,
+        capped(desk_model::DropCap {
+            follow_shape: false,
+            ..desk_model::DropCap::default()
+        }),
+        text,
+    );
+    let letter = &shape.lines[0].runs[0];
+    assert_eq!(letter.text, "V");
+    let xs: Vec<f32> = shape.lines[..3].iter().map(|l| l.x).collect();
+    // A V is widest at the top: the third line comes closest to it.
+    assert!(xs[0] > xs[2] + 5.0, "{xs:?}");
+    for (line, boxed) in shape.lines[..3].iter().zip(&rectangle.lines) {
+        assert!(line.x <= boxed.x + 0.01);
+    }
+    assert!(
+        (xs[0] - letter.advance).abs() < 1.0,
+        "{xs:?} {}",
+        letter.advance
+    );
+    assert_eq!(shape.lines[3].x, 0.0);
+}
+
+#[test]
+fn pxv_06_a_drop_cap_can_rise_and_stand_in_the_margin() {
+    let mut system = TextSystem::new();
+    let pitch = plain(&mut system, ParaFormat::default(), TEXT).lines[0].height;
+    let rectangle = desk_model::DropCap {
+        follow_shape: false,
+        ..desk_model::DropCap::default()
+    };
+    // Raised by a line: the text moves down a line and two lines are
+    // beside the letter, which is as tall as before.
+    let plain_cap = plain(&mut system, capped(rectangle), TEXT);
+    let raised = plain(
+        &mut system,
+        capped(desk_model::DropCap {
+            raised: 1,
+            ..rectangle
+        }),
+        TEXT,
+    );
+    let letter = &raised.lines[0].runs[0];
+    assert!((letter.size - plain_cap.lines[0].runs[0].size).abs() < 0.01);
+    assert!((raised.lines[0].top - pitch).abs() < 0.01);
+    assert!((letter.baseline - raised.lines[1].baseline).abs() < 0.01);
+    assert!(raised.lines[1].x > 0.0);
+    assert_eq!(raised.lines[2].x, 0.0);
+    assert_eq!(raised.top, 0.0);
+    // Outdented: the letter ends at the indent and no line moves.
+    let indented = ParaFormat {
+        left_indent: Length::from_points(60),
+        ..capped(desk_model::DropCap {
+            outdent: true,
+            ..rectangle
+        })
+    };
+    let outdent = plain(&mut system, indented, TEXT);
+    let letter = &outdent.lines[0].runs[0];
+    assert!((letter.x + letter.advance - 60.0).abs() < 0.01);
+    assert!(outdent.lines.iter().all(|l| l.x == 60.0));
 }
