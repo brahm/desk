@@ -1269,6 +1269,20 @@ matrix rows done on 9 November, before the change of target.
   strikethrough take it. Desk draws them in the text color until then.
 - W052 is done for W1.
 
+### 19 November: dragging list items by the bullet (W088, step 10 of W1)
+
+- A drag of the bullet of a list item moves the item with the items
+  under it, as in Pages 15.4: a blue line with a triangle marks the place
+  between paragraphs nearest the pointer, and the triangle moves a level
+  for each step sideways, up to one level deeper than the item it would
+  follow. The item keeps its text selected after the drop (pull request
+  162).
+- A drag only sideways changed the level of the item as the pointer
+  moved; it now changes it on the drop, as Pages does.
+- No UI test drags the bullet in the app; the model and the choice of
+  place and level have tests of their own.
+- W088 is done for W1.
+
 
 ## Decisions, with their reasons and consequences
 
