@@ -1980,6 +1980,17 @@ fn with_objects() -> Document {
             let linked_id = linked.id;
             edit.add_object(linked)?;
             edit.link_text_box(first_box, linked_id)?;
+            // A box alone in a thread of Pages (W091).
+            let style = edit.document().styles().default_paragraph();
+            let empty = Paragraph::new(edit.new_id(), style);
+            let alone = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox::new(Arc::from([empty]), Length::from_points(4))),
+                Frame::from_pt(300.0, 600.0, 120.0, 60.0),
+            );
+            let alone_id = alone.id;
+            edit.add_object(alone)?;
+            edit.start_text_box_thread(alone_id)?;
             let picture = Picture::from_png(pixel_png()).unwrap();
             let mut image = Object::new(
                 edit.new_id(),

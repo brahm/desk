@@ -69,7 +69,29 @@ struct State {
     dragged_guide: Option<desk_model::FixedGuide>,
     /// Where a dragged list item would go (PXV-11).
     list_drop: Option<ListDropMark>,
+    /// The circles and numbers of the threads of text boxes (PXV-13).
+    threads: Vec<ThreadMark>,
 }
+
+/// The circle on the top edge of a text box, as Pages draws it when a
+/// text box is selected (PXV-13): empty for a box in no thread, which a
+/// click puts in one, or with the place of the box in its thread, in the
+/// color of the thread.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ThreadMark {
+    /// The page it is on.
+    pub page: usize,
+    /// Its center, in points on the page: the middle of the top edge.
+    pub at: (f64, f64),
+    /// The place of the box in its thread, from 1, or none for a box in
+    /// no thread.
+    pub number: Option<usize>,
+    /// The color of the thread.
+    pub color: desk_model::Rgba,
+}
+
+/// The radius of the circle of a thread, in pixels.
+pub const THREAD_RADIUS: f64 = 9.0;
 
 /// Where a dragged list item would go, as Pages shows it: a blue line
 /// across the column, with a triangle where the level the item takes
@@ -232,6 +254,7 @@ impl DocumentView {
             path: None,
             marquee: None,
             list_drop: None,
+            threads: Vec::new(),
             outlines: Vec::new(),
             fixed_guides: Vec::new(),
             dragged_guide: None,
@@ -346,6 +369,16 @@ impl DocumentView {
             return;
         }
         self.state.borrow_mut().list_drop = mark;
+        self.area.queue_draw();
+    }
+
+    /// Shows the circles and numbers of the threads of text boxes
+    /// (PXV-13).
+    pub fn set_thread_marks(&self, marks: Vec<ThreadMark>) {
+        if self.state.borrow().threads == marks {
+            return;
+        }
+        self.state.borrow_mut().threads = marks;
         self.area.queue_draw();
     }
 
@@ -1000,6 +1033,7 @@ fn draw_marks(
     cr.fill().ok();
     draw_objects(cr, state, page, rect, scale);
     draw_list_drop(cr, state, page, rect, scale);
+    draw_threads(cr, state, page, rect, scale);
     draw_drag_label(cr, state, page, rect, scale);
     let Some(caret) = state.caret.filter(|c| c.page == page) else {
         return;
@@ -1040,6 +1074,49 @@ fn draw_list_drop(
     cr.line_to(x - SIZE, y + SIZE);
     cr.close_path();
     cr.fill().ok();
+    cr.restore().ok();
+}
+
+/// The circles of the threads of text boxes: white with a border in the
+/// accent color for a box in no thread, or filled with the color of the
+/// thread and the place of the box in white (PXV-13).
+fn draw_threads(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
+    cr.save().ok();
+    cr.select_font_face(
+        "Sans",
+        gtk::cairo::FontSlant::Normal,
+        gtk::cairo::FontWeight::Bold,
+    );
+    cr.set_font_size(11.0);
+    cr.set_line_width(1.5);
+    for mark in state.threads.iter().filter(|m| m.page == page) {
+        let (x, y) = (rect.x + mark.at.0 * scale, rect.y + mark.at.1 * scale);
+        let c = mark.color;
+        let part = |v: u8| f64::from(v) / 255.0;
+        cr.new_path();
+        cr.arc(x, y, THREAD_RADIUS, 0.0, std::f64::consts::TAU);
+        match mark.number {
+            Some(number) => {
+                cr.set_source_rgb(part(c.r), part(c.g), part(c.b));
+                cr.fill().ok();
+                let text = number.to_string();
+                if let Ok(extents) = cr.text_extents(&text) {
+                    cr.set_source_rgb(1.0, 1.0, 1.0);
+                    cr.move_to(
+                        x - extents.x_bearing() - extents.width() / 2.0,
+                        y - extents.y_bearing() - extents.height() / 2.0,
+                    );
+                    cr.show_text(&text).ok();
+                }
+            }
+            None => {
+                cr.set_source_rgb(1.0, 1.0, 1.0);
+                cr.fill_preserve().ok();
+                cr.set_source_rgb(part(c.r), part(c.g), part(c.b));
+                cr.stroke().ok();
+            }
+        }
+    }
     cr.restore().ok();
 }
 

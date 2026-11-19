@@ -523,6 +523,10 @@ pub struct TextBox {
     /// all in the first of them; the paragraphs of the others are left
     /// empty.
     pub next: Option<NodeId>,
+    /// Whether the box is in a thread of Pages even when it is the only
+    /// box of it, which shows its number on the box (PXV-13). Boxes linked
+    /// with others are always in a thread; this is kept on the first.
+    pub thread: bool,
 }
 
 impl TextBox {
@@ -545,6 +549,7 @@ impl TextBox {
             columns: 1,
             column_gap: Length::from_points(18),
             next: None,
+            thread: false,
         }
     }
 }

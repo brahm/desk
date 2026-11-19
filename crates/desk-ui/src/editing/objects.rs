@@ -910,6 +910,7 @@ impl TextEditor {
             (marks, state.guides.clone())
         };
         self.view.set_object_marks(marks, guides);
+        self.show_threads();
     }
 
     /// What the inspectors show of the selected objects.

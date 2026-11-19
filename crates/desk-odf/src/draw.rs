@@ -575,6 +575,9 @@ pub enum DrawKind {
         /// `draw:chain-next-name`: the `draw:name` of the frame that the
         /// text goes on in.
         chain_next: Option<String>,
+        /// `desk:thread`: whether the box is in a thread of Pages, which
+        /// a box alone in one needs.
+        thread: bool,
     },
     /// `draw:g`.
     Group(Vec<DrawObject>),
@@ -941,6 +944,7 @@ fn draw_object_at(
                         .map(paragraph)
                         .collect(),
                     chain_next: text.attr(DRAW, "chain-next-name").map(str::to_owned),
+                    thread: text.attr(DESK, "thread") == Some("true"),
                 }
             }
         }
@@ -1209,9 +1213,14 @@ pub(crate) fn write_draw_object(
         DrawKind::TextBox {
             paragraphs,
             chain_next,
+            thread,
         } => {
             w.start("draw:text-box");
             w.attr_opt("draw:chain-next-name", chain_next.as_deref());
+            if *thread {
+                // docs/odf-extensions.md: desk:thread.
+                w.attr("desk:thread", "true");
+            }
             for p in paragraphs {
                 paragraph(w, p);
             }

@@ -910,7 +910,9 @@ fn kind(
             };
             ObjectKind::Media(media)
         }
-        odf::DrawKind::TextBox { paragraphs, .. } => {
+        odf::DrawKind::TextBox {
+            paragraphs, thread, ..
+        } => {
             let mut built = Vec::with_capacity(paragraphs.len());
             for p in paragraphs {
                 built.push(paragraph(document, p)?);
@@ -919,10 +921,10 @@ fn kind(
                 let style = document.styles().default_paragraph();
                 built.push(Paragraph::new(document.new_id(), style));
             }
-            ObjectKind::TextBox(TextBox::new(
-                Arc::from(built),
-                padding.map_or(Length::ZERO, length),
-            ))
+            ObjectKind::TextBox(TextBox {
+                thread: *thread,
+                ..TextBox::new(Arc::from(built), padding.map_or(Length::ZERO, length))
+            })
         }
         odf::DrawKind::Table(table) => {
             ObjectKind::Table(Arc::new(super::tables::import_table(source, table)))
@@ -2129,6 +2131,7 @@ impl Exporter<'_> {
                 odf::DrawKind::TextBox {
                     paragraphs: text.paragraphs.iter().map(|p| self.paragraph(p)).collect(),
                     chain_next: text.next.map(text_box_name),
+                    thread: text.thread,
                 }
             }
             ObjectKind::Table(table) => {

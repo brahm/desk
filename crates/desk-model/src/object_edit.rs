@@ -279,7 +279,10 @@ impl Edit {
                 if let ObjectKind::TextBox(t) = &mut before.kind {
                     t.next = text.next;
                 }
-                self.replace_object(before)
+                let head = self.document().text_box_head(before.id);
+                self.replace_object(before)?;
+                // What is left of the thread stays one (PXV-13).
+                self.set_text_box_thread(head, true)
             }
             None => {
                 let Some(next) = text.next else {
@@ -304,10 +307,129 @@ impl Edit {
                     }
                     self.replace_object(emptied)?;
                     t.paragraphs = text.paragraphs.clone();
+                    t.thread = true;
                 }
                 self.replace_object(after)
             }
         }
+    }
+
+    /// Marks the first box of a thread as in a thread, or not.
+    fn set_text_box_thread(&mut self, head: NodeId, thread: bool) -> Result<(), ModelError> {
+        let mut object = self.object(head)?.clone();
+        match &mut object.kind {
+            ObjectKind::TextBox(t) if t.thread != thread => t.thread = thread,
+            _ => return Ok(()),
+        }
+        self.replace_object(object)
+    }
+
+    /// Starts a thread with a text box, as its circle does in Pages: the
+    /// box is numbered 1 in it, and other boxes can be added (PXV-13). A
+    /// box already in a thread stays as it is.
+    pub fn start_text_box_thread(&mut self, id: NodeId) -> Result<(), ModelError> {
+        let head = self.document().text_box_head(id);
+        self.set_text_box_thread(head, true)
+    }
+
+    /// Takes a text box out of its thread, as Remove from Thread does
+    /// (PXV-13): the boxes before and after it are linked to each other,
+    /// and the first box leaves its text to the next. The box is left
+    /// empty when it had none of the text, and in no thread.
+    pub fn remove_from_text_box_thread(&mut self, id: NodeId) -> Result<(), ModelError> {
+        let object = self.object(id)?.clone();
+        let ObjectKind::TextBox(text) = &object.kind else {
+            return Ok(());
+        };
+        let head = self.document().text_box_head(id);
+        if head == id && text.next.is_none() {
+            return self.set_text_box_thread(id, false);
+        }
+        self.unlink_text_box(id, text)?;
+        let mut object = self.object(id)?.clone();
+        if let ObjectKind::TextBox(t) = &mut object.kind {
+            t.next = None;
+            t.thread = false;
+        }
+        self.replace_object(object)
+    }
+
+    /// Moves a text box out of its thread into a new one of its own, as
+    /// Create New Thread does (PXV-13).
+    pub fn new_text_box_thread(&mut self, id: NodeId) -> Result<(), ModelError> {
+        self.remove_from_text_box_thread(id)?;
+        self.start_text_box_thread(id)
+    }
+
+    /// Moves a text box to the end of another thread, by one of its
+    /// boxes, as choosing the thread in the menu of the box does
+    /// (PXV-13). Its text goes with it, at the end of that of the thread.
+    pub fn move_to_text_box_thread(
+        &mut self,
+        id: NodeId,
+        thread: NodeId,
+    ) -> Result<(), ModelError> {
+        let document = self.document();
+        let head = document.text_box_head(thread);
+        if document.text_box_head(id) == head
+            || !matches!(
+                document.objects().get(head).map(|o| &o.kind),
+                Some(ObjectKind::TextBox(_))
+            )
+        {
+            return Ok(());
+        }
+        self.remove_from_text_box_thread(id)?;
+        self.link_text_box(head, id)
+    }
+
+    /// Puts the boxes of a thread in another order, as Layout Order does
+    /// with the order of the pages (PXV-13): the text goes to the box that
+    /// becomes the first. `order` has every box of the thread, or nothing
+    /// changes.
+    pub fn order_text_box_thread(&mut self, order: &[NodeId]) -> Result<(), ModelError> {
+        let Some(&first) = order.first() else {
+            return Ok(());
+        };
+        let head = self.document().text_box_head(first);
+        let chain = self.document().text_box_chain(head);
+        let mut sorted = order.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        let mut had = chain.clone();
+        had.sort();
+        if sorted != had || order.len() != chain.len() || order == chain.as_slice() {
+            return Ok(());
+        }
+        let Some(ObjectKind::TextBox(old)) =
+            self.document().objects().get(head).map(|o| o.kind.clone())
+        else {
+            return Ok(());
+        };
+        let style = old
+            .paragraphs
+            .first()
+            .map(crate::text::Paragraph::style)
+            .unwrap_or_else(|| self.document().styles().default_paragraph());
+        // The old first box gives up the text before the new one takes
+        // it, as no two boxes can hold the same paragraphs.
+        let mut by_place: Vec<(usize, NodeId)> = order.iter().copied().enumerate().collect();
+        by_place.sort_by_key(|&(_, id)| id != head);
+        for (i, id) in by_place {
+            let mut object = self.object(id)?.clone();
+            let ObjectKind::TextBox(t) = &mut object.kind else {
+                return Ok(());
+            };
+            t.next = order.get(i + 1).copied();
+            t.thread = i == 0 && old.thread;
+            if i == 0 {
+                t.paragraphs = old.paragraphs.clone();
+            } else if id == head {
+                t.paragraphs = Arc::from([crate::text::Paragraph::new(self.new_id(), style)]);
+            }
+            self.replace_object(object)?;
+        }
+        Ok(())
     }
 
     /// Links a text box after the last of the boxes linked from another,
@@ -1226,6 +1348,127 @@ mod tests {
         let document = editor.document();
         assert_eq!(document.text_box_chain(c), vec![c]);
         assert_eq!(document.story_paragraphs(Story::TextBox(c)).len(), 2);
+    }
+
+    #[test]
+    fn pxv_13_text_boxes_are_put_in_threads() {
+        use crate::object::TextBox;
+        use crate::story::Story;
+        use crate::text::{Paragraph, Run};
+        let mut editor = Editor::new(Document::new_page_layout());
+        let boxes: Vec<NodeId> = ["One two three four five", "Six", "", "Seven"]
+            .iter()
+            .map(|text| {
+                editor
+                    .edit("Add", |e| {
+                        let style = e.document().styles().default_paragraph();
+                        let paragraph = Paragraph::from_runs(
+                            e.new_id(),
+                            style,
+                            crate::ParaAttrs::default(),
+                            [Run::new(text)],
+                        )?;
+                        let id = e.new_id();
+                        e.add_object(Object::new(
+                            id,
+                            ObjectKind::TextBox(TextBox::new(
+                                Arc::from([paragraph]),
+                                Length::from_points(4),
+                            )),
+                            Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                        ))?;
+                        Ok(id)
+                    })
+                    .unwrap()
+            })
+            .collect();
+        let [a, b, c, d] = boxes[..] else {
+            unreachable!()
+        };
+        let text = |editor: &Editor, id| -> Vec<String> {
+            editor
+                .document()
+                .story_paragraphs(Story::TextBox(id))
+                .iter()
+                .map(|p| p.text().to_string())
+                .collect()
+        };
+        assert!(editor.document().text_box_threads().is_empty());
+        // The circle of a box starts a thread of one, numbered 1.
+        editor
+            .edit("Thread", |e| e.start_text_box_thread(a))
+            .unwrap();
+        assert_eq!(editor.document().text_box_threads(), vec![vec![a]]);
+        assert_eq!(
+            editor.document().text_box_thread_name(a),
+            "One two three four…"
+        );
+        editor.edit("Link", |e| e.link_text_box(a, b)).unwrap();
+        editor.edit("Link", |e| e.link_text_box(a, c)).unwrap();
+        editor
+            .edit("Thread", |e| e.start_text_box_thread(d))
+            .unwrap();
+        assert_eq!(
+            editor.document().text_box_threads(),
+            vec![vec![a, b, c], vec![d]]
+        );
+        // Layout Order: the text goes to the new first box.
+        editor
+            .edit("Order", |e| e.order_text_box_thread(&[c, a, b]))
+            .unwrap();
+        let document = editor.document();
+        assert_eq!(document.text_box_chain(c), vec![c, a, b]);
+        assert_eq!(document.text_box_head(b), c);
+        assert_eq!(text(&editor, c), vec!["One two three four five", "Six"]);
+        let first = editor
+            .document()
+            .objects()
+            .get(a)
+            .unwrap()
+            .text_box()
+            .unwrap();
+        assert!(first.paragraphs.iter().all(Paragraph::is_empty));
+        // An order without every box of the thread changes nothing.
+        editor
+            .edit("Order", |e| e.order_text_box_thread(&[a, b]))
+            .unwrap();
+        assert_eq!(editor.document().text_box_chain(c), vec![c, a, b]);
+        // Remove from Thread: the first box leaves its text to the next.
+        editor
+            .edit("Remove", |e| e.remove_from_text_box_thread(c))
+            .unwrap();
+        assert_eq!(
+            editor.document().text_box_threads(),
+            vec![vec![a, b], vec![d]]
+        );
+        assert_eq!(text(&editor, a), vec!["One two three four five", "Six"]);
+        // Create New Thread: the box leaves its thread for one of its own,
+        // and what is left of the old one stays a thread.
+        editor.edit("New", |e| e.new_text_box_thread(b)).unwrap();
+        let threads = editor.document().text_box_threads();
+        assert_eq!(threads.len(), 3);
+        assert!(threads.contains(&vec![a]) && threads.contains(&vec![b]));
+        // Choosing another thread moves the box to its end, with its text.
+        editor
+            .edit("Move", |e| e.move_to_text_box_thread(d, a))
+            .unwrap();
+        assert_eq!(editor.document().text_box_chain(a), vec![a, d]);
+        assert_eq!(
+            text(&editor, a),
+            vec!["One two three four five", "Six", "Seven"]
+        );
+        // A box alone in its thread leaves it.
+        editor
+            .edit("Remove", |e| e.remove_from_text_box_thread(b))
+            .unwrap();
+        assert_eq!(editor.document().text_box_threads(), vec![vec![a, d]]);
+        assert!(
+            editor
+                .document()
+                .text_box_threads()
+                .iter()
+                .all(|t| !t.contains(&c))
+        );
     }
 
     #[test]
