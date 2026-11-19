@@ -25,6 +25,7 @@ mod compact;
 mod contents_page;
 mod document_controls;
 mod drop_cap_pane;
+mod drop_cap_styles;
 mod editing;
 mod effects;
 mod eyedropper;

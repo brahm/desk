@@ -263,6 +263,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if !text.guides.is_empty() {
             config_item(&mut w, "Guides", "string", &text.guides.join("\n"));
         }
+        if let Some(styles) = &text.drop_cap_styles {
+            config_item(&mut w, "DropCapStyles", "string", &styles.join("\n"));
+        }
         if !text.never_hyphenate.is_empty() {
             config_item(
                 &mut w,

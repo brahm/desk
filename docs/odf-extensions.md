@@ -479,6 +479,19 @@ options of Pages 15.4 (PXV-06), written by `paragraph_children` in
   corners) to 100 %; 20 % when absent.
 - **Fallback:** no shape.
 
+#### Styles of drop caps (settings, not an attribute)
+
+The styles of drop caps of a document (PXV-06) are not part of its
+content, so Desk keeps them where applications keep their own settings:
+the `DropCapStyles` item of the `DeskTextSettings` set in `settings.xml`,
+written only when they are not the six of a new document. Each line is
+one style, in the order of the menu, as words of a name, `=` and a value:
+`lines`, `characters`, `raised`, `wrap` (`shape` or `rectangle`),
+`distance`, `outdent` (a percent), `weight` (100 to 900) and `color` of
+the letters, and, for a style with a shape, `fill`, `border`,
+`border-color`, `border-style`, `scale` and `radius`. Other programs
+ignore the item; Desk reads a document without it with the six styles.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

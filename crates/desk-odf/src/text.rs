@@ -298,6 +298,9 @@ pub struct TextSettings {
     /// the page or `v` for one down it, and its distance from the top or
     /// the left edge of the paper: `h 72pt`.
     pub guides: Vec<String>,
+    /// The styles of drop caps (PXV-06), one a line, as the filter writes
+    /// them; none when the document has those of a new one.
+    pub drop_cap_styles: Option<Vec<String>>,
 }
 
 /// A list style (`text:list-style`).

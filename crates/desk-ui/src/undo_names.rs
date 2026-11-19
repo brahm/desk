@@ -28,6 +28,7 @@ const NAMES: &[&str] = &[
     n_("Stop Skipping Slide"),
     n_("Draw Shape"),
     n_("Drop Cap"),
+    n_("Drop Cap Style"),
     n_("Duplicate"),
     n_("Edit Chart Data"),
     n_("Edit Note"),

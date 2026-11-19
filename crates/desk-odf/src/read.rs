@@ -718,6 +718,16 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                         .ok()
                         .filter(|n| (1..=10_000).contains(n));
                 }
+                Some("DropCapStyles") => {
+                    out.drop_cap_styles = Some(
+                        text.lines()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .take(1_000)
+                            .map(str::to_owned)
+                            .collect(),
+                    );
+                }
                 Some("Guides") => {
                     out.guides = text
                         .lines()

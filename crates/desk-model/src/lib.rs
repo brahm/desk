@@ -52,6 +52,7 @@ mod connection;
 mod convert_quotes;
 mod document;
 mod document_language;
+mod drop_cap_style;
 mod error;
 mod find;
 mod format;
@@ -93,6 +94,7 @@ pub use document::{
     Container, Document, FixedGuide, Metadata, OutlineOptions, PageSetup, PagedFlow,
     ParagraphSpacing, Statistics, TextSettings, ViewSettings, ViewZoom,
 };
+pub use drop_cap_style::DropCapStyle;
 pub use error::ModelError;
 pub use find::{Found, Query};
 pub use format::{
