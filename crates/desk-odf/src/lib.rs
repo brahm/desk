@@ -59,7 +59,9 @@ pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,
 };
 pub use read::read_streams;
-pub use table::{MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow};
+pub use table::{
+    MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow, TableTemplate,
+};
 pub use text::{
     Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground, Family,
     Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight,

@@ -470,3 +470,78 @@ pub(crate) fn write_table_properties(
         w.end();
     }
 }
+
+/// A table template of `office:styles` (`table:table-template`): a named
+/// look of tables, as the table styles of Desk keep it, by the cell styles
+/// of its parts.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TableTemplate {
+    /// `table:name`.
+    pub name: String,
+    /// The cell style of the first row (`table:first-row`).
+    pub first_row: Option<String>,
+    /// The cell style of the last row (`table:last-row`).
+    pub last_row: Option<String>,
+    /// The cell style of the first column (`table:first-column`).
+    pub first_column: Option<String>,
+    /// The cell style of the body (`table:body`).
+    pub body: Option<String>,
+    /// The cell style of every other row (`table:even-rows`).
+    pub even_rows: Option<String>,
+}
+
+/// The parts of a table template, by element, with how to reach them.
+type TemplatePart = (&'static str, fn(&TableTemplate) -> &Option<String>);
+
+/// The parts of a table template that Desk reads and writes, in the
+/// order of the schema.
+const TEMPLATE_PARTS: [TemplatePart; 5] = [
+    ("table:first-row", |t| &t.first_row),
+    ("table:last-row", |t| &t.last_row),
+    ("table:first-column", |t| &t.first_column),
+    ("table:body", |t| &t.body),
+    ("table:even-rows", |t| &t.even_rows),
+];
+
+/// Reads a `table:table-template`, or none for another element.
+pub(crate) fn table_template(e: &Element) -> Option<TableTemplate> {
+    if !e.name.is(TABLE, "table-template") {
+        return None;
+    }
+    // ODF 1.2 named the template with text:style-name.
+    let name = e
+        .attr(TABLE, "name")
+        .or_else(|| e.attr(TEXT, "style-name"))?;
+    let part = |local: &str| {
+        e.child(TABLE, local)
+            .and_then(|p| p.attr(TABLE, "style-name"))
+            .map(str::to_owned)
+    };
+    Some(TableTemplate {
+        name: name.to_owned(),
+        first_row: part("first-row"),
+        last_row: part("last-row"),
+        first_column: part("first-column"),
+        body: part("body"),
+        even_rows: part("even-rows"),
+    })
+}
+
+/// Writes a `table:table-template`.
+pub(crate) fn write_table_template(w: &mut Writer, template: &TableTemplate) {
+    // The corners belong to the header and footer rows, as Desk draws
+    // them; ODF 1.3 asks to say so.
+    w.start("table:table-template")
+        .attr("table:name", &template.name)
+        .attr("table:first-row-start-column", "row")
+        .attr("table:first-row-end-column", "row")
+        .attr("table:last-row-start-column", "row")
+        .attr("table:last-row-end-column", "row");
+    for (name, part) in TEMPLATE_PARTS {
+        if let Some(style) = part(template) {
+            w.start(name).attr("table:style-name", style);
+            w.end();
+        }
+    }
+    w.end();
+}

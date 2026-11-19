@@ -71,6 +71,11 @@ pub enum Op {
         /// The styles.
         styles: crate::ObjectStyles,
     },
+    /// Sets the table styles (PXV-14).
+    SetTableStyles {
+        /// The styles.
+        styles: crate::TableStyles,
+    },
     /// Removes a style that nothing uses.
     RemoveStyle {
         /// The style.

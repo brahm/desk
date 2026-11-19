@@ -698,6 +698,122 @@ pub(crate) fn import_chart(
     Some(chart)
 }
 
+/// The cell style of a part of a table style: its fill, its lines, the
+/// room in its cells and the font of its text.
+fn template_cell_style(
+    name: String,
+    fill: Option<Color>,
+    look: &desk_model::TableLook,
+) -> odf::Style {
+    let mut properties = odf::Properties::default();
+    let border = odf_border(look.border).or(Some(odf::Border::None));
+    let t = &mut properties.table;
+    t.background = fill.map(odf_color);
+    t.border_top = border;
+    t.border_bottom = border;
+    t.border_left = border;
+    t.border_right = border;
+    t.padding = Some(pt(look.style.padding));
+    properties.text.font_family = Some(look.style.font.clone());
+    properties.text.font_size = Some(pt(look.style.font_size));
+    odf::Style {
+        name,
+        family: odf::Family::TableCell,
+        properties,
+        ..odf::Style::default()
+    }
+}
+
+/// The table styles of a document, as the table templates of ODF and the
+/// cell styles of their parts (PXV-14). Their names start with
+/// `Desk_Table_Style_`, which no other style of Desk takes.
+pub(crate) fn export_table_styles(document: &Document, out: &mut odf::TextDocument) {
+    for (i, entry) in document.table_styles().iter().enumerate() {
+        let look = &entry.look;
+        let s = &look.style;
+        let prefix = format!("Desk_Table_Style_{}", i + 1);
+        let mut part = |suffix: &str, fill: Option<Color>| {
+            let name = format!("{prefix}.{suffix}");
+            out.styles
+                .push(template_cell_style(name.clone(), fill, look));
+            Some(name)
+        };
+        let template = odf::TableTemplate {
+            name: entry.name.to_string(),
+            first_row: part("FirstRow", s.header_row_fill),
+            first_column: part("FirstColumn", s.header_column_fill),
+            last_row: part("LastRow", s.footer_fill),
+            even_rows: s.alternating.and_then(|c| part("EvenRows", Some(c))),
+            body: part("Body", s.body_fill),
+        };
+        out.table_templates.push(template);
+    }
+}
+
+/// The table styles of a file, from its table templates, in place of those
+/// of the document (PXV-14). A style of the library keeps its identifier;
+/// a file with none leaves the document with its own.
+pub(crate) fn import_table_styles(
+    source: &odf::TextDocument,
+    document: &mut Document,
+) -> Result<(), crate::FilterError> {
+    if source.table_templates.is_empty() {
+        return Ok(());
+    }
+    let cell = |name: &Option<String>| {
+        let name = name.as_deref()?;
+        source
+            .styles
+            .iter()
+            .find(|s| s.family == odf::Family::TableCell && s.name == name)
+    };
+    let mut entries: Vec<desk_model::TableStyleEntry> = Vec::new();
+    for template in &source.table_templates {
+        if entries.iter().any(|e| *e.name == *template.name) {
+            continue;
+        }
+        let fill = |name: &Option<String>| {
+            cell(name).and_then(|s| s.properties.table.background.map(model_color))
+        };
+        let mut look = desk_model::TableLook::default();
+        let s = &mut look.style;
+        s.header_row_fill = fill(&template.first_row);
+        s.header_column_fill = fill(&template.first_column);
+        s.footer_fill = fill(&template.last_row);
+        s.body_fill = fill(&template.body);
+        s.alternating = fill(&template.even_rows);
+        let body = cell(&template.body).or_else(|| cell(&template.first_row));
+        if let Some(body) = body {
+            let p = &body.properties;
+            if let Some(font) = &p.text.font_family {
+                s.font.clone_from(font);
+            }
+            if let Some(size) = p.text.font_size {
+                s.font_size = thousandths(size).clamp(1_000, 1_638_000);
+            }
+            if let Some(padding) = p.table.padding {
+                s.padding = thousandths(padding).min(100_000);
+            }
+            look.border = model_border(p.table.border_top);
+        }
+        let own = document
+            .table_styles()
+            .iter()
+            .find(|e| *e.name == *template.name)
+            .map(|e| e.id);
+        let id = own.unwrap_or_else(|| document.new_id());
+        entries.push(desk_model::TableStyleEntry {
+            id,
+            name: template.name.as_str().into(),
+            look,
+        });
+    }
+    document.apply(desk_model::Op::SetTableStyles {
+        styles: desk_model::TableStyles::from_entries(entries),
+    })?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
