@@ -32,6 +32,7 @@ use crate::fonts::{Face, face_name, family_faces, nearest_face};
 
 use crate::compact;
 use crate::editing::Format;
+use crate::fill_rows::{FillRows, Kind};
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
 use crate::i18n::{n_, tr};
 
@@ -77,8 +78,12 @@ pub struct ObjectTextGroups {
     /// The Advanced Options, hidden until rows go in.
     advanced: compact::ExpanderRow,
     color: gtk::ColorDialogButton,
+    color_row: compact::ActionRow,
     /// The button of the Colors popover, which shows `color`.
     colors: gtk::MenuButton,
+    /// The gradient or picture that fills the letters in place of their
+    /// color (PXV-04).
+    fill: Rc<FillRows>,
     list: compact::ComboRow,
     updating: Cell<bool>,
 }
@@ -144,7 +149,26 @@ impl ObjectTextGroups {
         // The Colors popover opens from the row (INT-16, step 2 of M+).
         let colors = crate::color_popover::button(&color, &tr("Text Color"));
         color_row.add_suffix(&colors);
+        // The fill of the letters, before their color, as the menu of
+        // the text color of Pages offers it (PXV-04).
+        let fill = FillRows::new(
+            &[
+                Kind::Plain,
+                Kind::Gradient,
+                Kind::Advanced,
+                Kind::Image,
+                Kind::TintedImage,
+            ],
+            &tr("Color Fill"),
+        );
+        let mut fill_rows = fill.rows().into_iter();
+        if let Some(first) = fill_rows.next() {
+            font.add(first);
+        }
         font.add(&color_row);
+        for row in fill_rows {
+            font.add(row);
+        }
         let advanced = compact::ExpanderRow::builder()
             .title(tr("Advanced Options"))
             .build();
@@ -192,7 +216,9 @@ impl ObjectTextGroups {
             size,
             advanced,
             color,
+            color_row,
             colors,
+            fill,
             list,
             updating: Cell::new(false),
         });
@@ -249,6 +275,24 @@ impl ObjectTextGroups {
                     "Text Color",
                     &CharAttrs {
                         color: Some(from_gdk(&button.rgba())),
+                        ..CharAttrs::default()
+                    },
+                );
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let of = editor.clone();
+        this.fill.connect_changed(move || {
+            let Some(this) = weak.upgrade() else { return };
+            this.show_fill_rows();
+            if this.updating.get() {
+                return;
+            }
+            if let Some(editor) = of() {
+                editor.set_character_attrs(
+                    "Text Color",
+                    &CharAttrs {
+                        fill: Some(this.fill.value()),
                         ..CharAttrs::default()
                     },
                 );
@@ -322,6 +366,13 @@ impl ObjectTextGroups {
         self.show_characters(format);
     }
 
+    /// Shows the Text Color row while no gradient or picture fills the
+    /// letters.
+    fn show_fill_rows(&self) {
+        self.color_row
+            .set_visible(self.fill.kind() == crate::fill_rows::Kind::Plain);
+    }
+
     /// Lists the faces of the family at the selection, and chooses the one
     /// nearest to its weight and slant, as the Fonts popover does.
     fn show_typeface(&self, character: &desk_model::CharFormat) {
@@ -353,6 +404,8 @@ impl ObjectTextGroups {
         if self.color.rgba() != color {
             self.color.set_rgba(&color);
         }
+        self.fill.show(character.fill.as_ref(), character.color);
+        self.show_fill_rows();
         let list = crate::lists_pane::list_target(format.list.as_ref());
         let index = crate::format_pane::LISTS
             .iter()
