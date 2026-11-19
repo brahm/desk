@@ -218,6 +218,9 @@ pub struct SectionStyle {
     pub space_after: Option<Length>,
     /// `desk:new-page`: whether the section starts on a new page.
     pub new_page: Option<bool>,
+    /// `text:dont-balance-text-columns`: whether the columns fill down
+    /// the page rather than end at the same height.
+    pub dont_balance: Option<bool>,
     /// `desk:section-start`: the page that a section of Pages starts on,
     /// when the section is one.
     pub section_start: Option<SectionStart>,

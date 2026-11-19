@@ -226,6 +226,7 @@ impl PageSetup {
                 left: Length::ZERO,
                 right: Length::ZERO,
                 new_page: false,
+                balanced: false,
             },
             headers: true,
             footers: true,

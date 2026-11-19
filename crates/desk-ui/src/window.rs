@@ -2735,8 +2735,8 @@ impl DocumentWindow {
                 let count = count.clamp(1, desk_model::MAX_COLUMNS as i32) as u8;
                 let layout =
                     crate::layout_pane::with_columns(&format.setup, &format.layout, count, gap);
-                if layout != format.layout {
-                    editor.set_layout("Columns", layout);
+                if layout != format.layout || !editor.selection().is_empty() {
+                    editor.set_columns("Columns", layout);
                 }
                 action.set_state(&i32::from(count).to_variant());
             }

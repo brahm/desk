@@ -1294,8 +1294,22 @@ fn est_07_to_est_18_layouts_sections_and_facing_pages_are_kept() {
                     let (lx, ly) = (x.layout(), y.layout());
                     same_columns(&lx.columns, &ly.columns, name);
                     assert_eq!(
-                        (lx.before, lx.after, lx.left, lx.right, lx.new_page),
-                        (ly.before, ly.after, ly.left, ly.right, ly.new_page),
+                        (
+                            lx.before,
+                            lx.after,
+                            lx.left,
+                            lx.right,
+                            lx.new_page,
+                            lx.balanced
+                        ),
+                        (
+                            ly.before,
+                            ly.after,
+                            ly.left,
+                            ly.right,
+                            ly.new_page,
+                            ly.balanced
+                        ),
                         "{name}"
                     );
                     assert_eq!(
@@ -1341,6 +1355,8 @@ fn est_07_est_18_columns_and_page_numbers_of_other_programs_are_read() {
         panic!("{starts:?}");
     };
     assert_eq!(two.columns.count, 2);
+    // Columns of ODF end at the same height unless told not to (PXV-12).
+    assert!(two.balanced);
     assert_eq!(
         starts[2],
         Some(desk_model::Start::Layout(desk_model::Layout::default()))
@@ -1349,6 +1365,33 @@ fn est_07_est_18_columns_and_page_numbers_of_other_programs_are_read() {
         panic!("{starts:?}");
     };
     assert_eq!(section.first_number, Some(7));
+}
+
+#[test]
+fn pxv_12_columns_of_selected_text_are_kept() {
+    use desk_model::Columns;
+    let mut document = Document::new_word_processing();
+    let first = document.body().get(0).unwrap().id();
+    document
+        .transact("Text", |edit| {
+            edit.insert_text(desk_model::Position::new(first, 0), "a\nb\nc\nd")?;
+            let two = Columns::equal(2, Columns::DEFAULT_GAP);
+            edit.set_columns_between(1, 1, two)?;
+            edit.set_columns_between(3, 3, two)
+        })
+        .unwrap();
+    let read = read_odt(&write_odt(&document).unwrap()).unwrap();
+    let balanced = |d: &Document| -> Vec<(usize, bool)> {
+        (0..d.body().len())
+            .map(|i| d.layout_at(i))
+            .map(|(_, l)| (usize::from(l.columns.count), l.balanced))
+            .collect()
+    };
+    assert_eq!(
+        balanced(&document),
+        [(1, false), (2, true), (1, false), (2, false)]
+    );
+    assert_eq!(balanced(&read), balanced(&document));
 }
 
 #[test]

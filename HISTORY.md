@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: columns given to selected text, between layout breaks, ending at
+  the same height when text follows them.
 * Added: dragging the bullet of a list item moves it, with its sub-items,
   to another place and level, shown by a blue line and a triangle.
 * Added: Color, Gradient, Advanced Gradient, Image and Tinted Image fills

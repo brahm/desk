@@ -655,7 +655,13 @@ impl LayoutGroups {
         if layout != shown
             && let Some(editor) = (self.editor)()
         {
-            editor.set_layout("Layout", layout);
+            // A new number of columns goes to the selected text, between
+            // layout breaks, as in Pages 15 (PXV-12).
+            if count != shown.columns.count {
+                editor.set_columns("Columns", layout);
+            } else {
+                editor.set_layout("Layout", layout);
+            }
         }
     }
 
