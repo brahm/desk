@@ -3659,3 +3659,75 @@ fn pxv_06_drop_caps_of_styles_and_paragraphs_are_kept() {
         .collect();
     assert_eq!(caps, [Some(DropCap::default()), None, Some(two), None]);
 }
+
+#[test]
+fn pxv_04_gradients_and_pictures_that_fill_text_are_kept() {
+    use desk_model::{Fill, Gradient, GradientStop, ImageFill, Picture};
+    let mut document = Document::new_word_processing();
+    let red = Fill::Gradient {
+        from: Rgba::rgb(220, 30, 30),
+        to: Rgba::rgb(30, 30, 220),
+        angle: 9000,
+    };
+    let mut style = CharacterStyle::new(document.new_id(), "Glow");
+    style.character.fill = Some(Some(red.clone()));
+    let glow = style.id;
+    document.put_style(style).unwrap();
+    let radial = Fill::Advanced(Gradient {
+        stops: vec![
+            GradientStop::new(0, Rgba::rgb(250, 200, 0)),
+            GradientStop {
+                blend: 300,
+                ..GradientStop::new(400, Rgba::rgb(200, 0, 100))
+            },
+            GradientStop::new(1000, Rgba::rgb(0, 80, 40)),
+        ],
+        angle: 0,
+        center: Some((500, 250)),
+    });
+    let image = Fill::Image {
+        picture: Picture::from_png(pixel_png()).unwrap(),
+        mode: ImageFill::Tile,
+        tint: Some(Rgba {
+            a: 128,
+            ..Rgba::rgb(0, 0, 255)
+        }),
+    };
+    let fill = |fill: Option<Fill>| CharAttrs {
+        fill: Some(fill),
+        ..CharAttrs::default()
+    };
+    let runs = vec![
+        Run::with_attrs("Glowing ", Some(glow), CharAttrs::default()),
+        Run::with_attrs("plain ", Some(glow), fill(None)),
+        Run::with_attrs("radial ", None, fill(Some(radial.clone()))),
+        Run::with_attrs("picture", None, fill(Some(image.clone()))),
+    ];
+    let body = document.styles().default_paragraph();
+    let first = document.body().get(0).unwrap().id();
+    let paragraph =
+        Paragraph::from_runs(document.new_id(), body, ParaAttrs::default(), runs).unwrap();
+    document
+        .apply(Op::InsertParagraph {
+            index: 1,
+            paragraph,
+        })
+        .unwrap();
+    document
+        .apply(Op::RemoveParagraph { paragraph: first })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-text-fills.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let paragraph = read.body().get(0).unwrap();
+    let fills: Vec<Option<Fill>> = [1, 9, 15, 22]
+        .into_iter()
+        .map(|at| {
+            let (style, attrs) = paragraph.format_at(at);
+            read.styles()
+                .resolve_character(paragraph.style(), style, &attrs)
+                .fill
+        })
+        .collect();
+    assert_eq!(fills, [Some(red), None, Some(radial), Some(image)]);
+}

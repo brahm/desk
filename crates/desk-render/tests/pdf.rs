@@ -32,7 +32,11 @@ fn layout(runs: &[(&str, CharFormat)], setup: PageSetup) -> DocumentLayout {
 
 /// Runs a Poppler tool on a PDF and returns what it prints.
 fn poppler(tool: &str, args: &[&str], pdf: &[u8]) -> String {
-    let dir = std::env::temp_dir().join(format!("desk-render-{}-{tool}", std::process::id()));
+    // A folder of its own for each call, as the tests run at once.
+    static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir =
+        std::env::temp_dir().join(format!("desk-render-{}-{tool}-{call}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("out.pdf");
     std::fs::write(&path, pdf).unwrap();
@@ -1126,4 +1130,56 @@ fn iop_07_objects_and_their_effects_look_the_same_on_screen_and_in_the_pdf() {
             "({x}, {y}): {a:?} on screen, {b:?} in the PDF"
         );
     }
+}
+
+#[test]
+fn pxv_04_a_gradient_goes_once_across_the_text_it_fills() {
+    use desk_model::{Fill, FontWeight};
+    let fill = Fill::Gradient {
+        from: Rgba::rgb(200, 0, 0),
+        to: Rgba::rgb(0, 0, 200),
+        angle: 0,
+    };
+    let filled = CharFormat {
+        fill: Some(fill.clone()),
+        ..sans()
+    };
+    // A bold letter in the middle does not start the gradient again.
+    let bold = CharFormat {
+        weight: FontWeight::BOLD,
+        ..filled.clone()
+    };
+    let layout = layout(
+        &[
+            ("plain ", sans()),
+            ("Gra", filled.clone()),
+            ("d", bold),
+            ("ient", filled),
+        ],
+        PageSetup::a4(),
+    );
+    let pages = DisplayList::pages(&layout);
+    let paints: Vec<_> = pages[0]
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Glyphs { paint, glyphs, .. } => Some((paint.clone(), glyphs[0].x)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(paints.len(), 4);
+    assert_eq!(paints[0].0, None);
+    let Some(desk_render::Paint::Linear { start, end, stops }) = paints[1].0.clone() else {
+        panic!("{:?}", paints[1].0);
+    };
+    // From the left of the word to its right, left to right.
+    assert!((start.0 - paints[1].1).abs() < 0.5, "{start:?}");
+    assert!(end.0 > paints[3].1 && (start.1 - end.1).abs() < 0.01);
+    assert_eq!(stops.first().map(|s| s.1), Some(Rgba::rgb(200, 0, 0)));
+    assert!(paints[2..].iter().all(|(p, _)| p == &paints[1].0));
+    // The PDF fills the letters with it, and keeps their text.
+    let pdf = Painter::new()
+        .unwrap()
+        .pdf_bytes(&pages, &Metadata::default());
+    assert!(poppler("pdftotext", &[], &pdf.unwrap()).contains("plain Gradient"));
 }

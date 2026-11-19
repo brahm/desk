@@ -938,6 +938,22 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
     if let Some(opacity) = t.shadow_opacity {
         w.attr("desk:shadow-opacity", &format!("{}%", decimal(opacity)));
     }
+    w.attr_opt("desk:text-fill", t.fill.as_deref())
+        .attr_opt(
+            "desk:text-fill-gradient-name",
+            t.fill_gradient_name.as_deref(),
+        )
+        .attr_opt("desk:text-fill-image-name", t.fill_image_name.as_deref())
+        .attr_opt("desk:text-fill-image-mode", t.fill_image_mode.as_deref());
+    if let Some(tint) = t.fill_tint {
+        w.attr("desk:text-fill-tint", &tint.to_string());
+    }
+    if let Some(opacity) = t.fill_tint_opacity {
+        w.attr(
+            "desk:text-fill-tint-opacity",
+            &format!("{}%", decimal(opacity)),
+        );
+    }
     w.attr_opt("fo:language", t.language.as_deref())
         .attr_opt("fo:country", t.country.as_deref())
         .attr_opt("fo:script", t.script.as_deref());

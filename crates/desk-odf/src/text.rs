@@ -581,6 +581,23 @@ pub struct TextProperties {
     /// the short words that join others in lower case, as Title Case of
     /// Pages does, rather than capitalizing every word (FMT-07, W054).
     pub title_case: Option<bool>,
+    /// `desk:text-fill`: `gradient` or `bitmap` when a gradient or a
+    /// picture fills the letters in place of `fo:color` (PXV-04).
+    pub fill: Option<String>,
+    /// `desk:text-fill-gradient-name`: the `draw:gradient` of
+    /// `office:styles` that fills the letters.
+    pub fill_gradient_name: Option<String>,
+    /// `desk:text-fill-image-name`: the `draw:fill-image` of
+    /// `office:styles` that fills the letters.
+    pub fill_image_name: Option<String>,
+    /// `desk:text-fill-image-mode`: how the picture is sized to the
+    /// letters, `scale-to-fill`, `scale-to-fit`, `stretch`,
+    /// `original-size` or `tile`.
+    pub fill_image_mode: Option<String>,
+    /// `desk:text-fill-tint`: a color laid over the picture.
+    pub fill_tint: Option<Color>,
+    /// `desk:text-fill-tint-opacity`, in percent.
+    pub fill_tint_opacity: Option<f64>,
 }
 
 /// `fo:text-shadow`.
