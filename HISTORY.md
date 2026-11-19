@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: table and chart styles, as in Pages: six of each in a new
+  document, shown as pictures in the Table and Chart buttons, where a
+  click inserts a table or chart of the style, and in the Table and Chart
+  tabs, where a click applies it; Copy Style, Paste Style and Create Style
+  pass a look to another table or chart and keep it as a new style.
 * Added: threads of text boxes, as in Pages: a circle on a selected box
   starts a thread or adds a box to it, each box shows its number in the
   color of its thread, and its menu moves it to another thread, puts the

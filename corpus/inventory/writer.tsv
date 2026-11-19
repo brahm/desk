@@ -80,7 +80,7 @@ W076	3.5 Styles	Copy and paste style	Equal	Equal in both	-	In	Done	-	done	Copy a
 W077	3.5 Styles	Import styles from another document	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Import styles (STY-10)
 W078	3.5 Styles	Find and replace styles	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Find and replace styles (STY-09)
 W079	3.5 Styles	Show only the styles in use	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Show only the styles in use on the Styles page
-W080	3.5 Styles	Object, table and chart styles	Only 15	15.4	D-001	In	Partial	-	W1	Object styles in the Inspector (PR of 15 Nov); table and chart styles are missing
+W080	3.5 Styles	Object, table and chart styles	Only 15	15.4	D-001	In	Done	-	done	Object styles in the Inspector, and the table and chart styles of the 15 (TAB-04, PXV-14): six of each in a new document, in view in the Table and Chart buttons and in the Table and Chart tabs, applied with a click, with Copy Style, Paste Style and Create Style; table styles kept in ODF as table:table-template, chart styles in settings.xml
 W081	3.5 Styles	Default text box style	Different	15.4	D-001	In	Done	-	W1	Set as Default Text Box Appearance, among the commands of objects and of object styles, makes the selected text box the appearance of the new text boxes of the document: its look as the default text box style (MOD-04), and the room around its text, the place of the text, the wrap and the formatting of its text, kept in the file on that style (PXV-10)
 W082	3.6 Paragraph, lists and columns	Alignment, line and paragraph spacing, indents	Equal	Equal in both	-	In	Done	-	done	Alignment, spacing and indents (FMT-12 to FMT-18)
 W083	3.6 Paragraph, lists and columns	Tabs	Equal	Equal in both	-	In	Done	-	done	Tabs (FMT-16)
@@ -127,7 +127,7 @@ W123	3.8 Objects: images, shapes, media	Exact position, align and distribute	Equ
 W124	3.8 Objects: images, shapes, media	Alignment guides	Different	15.4	D-001	In	Partial	-	W4	Dynamic and fixed guides (OBJ-27, OBJ-28); their own color is missing
 W125	3.8 Objects: images, shapes, media	Layers, group, lock	Equal	Equal in both	-	In	Done	-	done	Layers, group, lock (OBJ-24, OBJ-30, OBJ-32)
 W126	3.8 Objects: images, shapes, media	Resize, rotate, flip	Equal	Equal in both	-	In	Done	-	done	Resize, rotate, flip (OBJ-33, OBJ-34)
-W127	3.9 Tables	Insert table	Different	15.4	D-001	In	Partial	-	W1	Insert table (TAB-01); the table styles in view are missing
+W127	3.9 Tables	Insert table	Different	15.4	D-001	In	Done	-	done	Insert table (TAB-01), with the table styles in view in the Table button: a click inserts a table of the style (PXV-14)
 W128	3.9 Tables	Rows, columns, headers, footers, repeat header	Equal	Equal in both	-	In	Done	-	done	Rows, columns, headers and footers (TAB-10 to TAB-13)
 W129	3.9 Tables	Convert text to table	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Convert text to table (TAB-05)
 W130	3.9 Tables	Create a table from cells	Only 15	15.4	D-001	In	Missing	-	W1	Create a table by dragging cells out
@@ -147,7 +147,7 @@ W143	3.10 Charts	Axes, labels, legends	Equal	Equal in both	-	In	Done	the window 
 W144	3.10 Charts	Error bars and trendlines	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Error bars and trendline (GRF-13, GRF-14); reference lines are missing
 W145	3.10 Charts	Rounded corners, 3D bevel, donut hole	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	W4	Rounded corners, bevel and donut hole
 W146	3.10 Charts	3D scene (light, angle)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	W4	3D scene with light (GRF-20)
-W147	3.10 Charts	Chart styles	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	W4	Chart styles
+W147	3.10 Charts	Chart styles	Only 15	15.4	D-001	In	Done	-	done	Chart styles, done with W080 in W1: six in a new document, in view in the Chart button and the Chart tab, with Copy Style, Paste Style and Create Style
 W148	3.11 Review and writing tools	Change tracking	Different	15.4, plus what the '09 did	D-001, D-003	In	Missing	the window changes (D-008)	W2	Change tracking (REV-01 to REV-07, phase 8)
 W149	3.11 Review and writing tools	Comments	Different	15.4	D-001	In	Missing	the window changes (D-008)	W2	Comments with replies (REV-08, phase 8)
 W150	3.11 Review and writing tools	Author name and color	Equal	Equal in both	-	In	Missing	the window changes (D-008)	W2	Author name and color (phase 8)

@@ -1328,6 +1328,35 @@ matrix rows done on 9 November, before the change of target.
   and the circles have tests of their own.
 - W091 is done for W1.
 
+### 19 November: table and chart styles (W080, W127, W147, step 13 of W1)
+
+- A document has table styles, the fills of the headers, the footers and
+  the body, every other row, the font, the room in the cells and the
+  lines; a new one has six (pull request 168). They are kept as the
+  standard `table:table-template` of ODF in `office:styles`, with a cell
+  style for each part, and a file without them opens with the six.
+- The Table button opens the table styles, drawn as small tables; a click
+  inserts a table of the style. The Table tab shows them, with the one
+  the table looks like chosen, and Copy Style, Paste Style and Create
+  Style below (pull request 169). Copy and Paste Table Style were the
+  rest of TAB-04 in B-012.
+- Chart styles are the fills of the series and the text of a chart; a
+  new document has six, the colors of new charts, pastel, gray,
+  gradients, textures and dark colors (pull request 170). The Chart
+  button and the Chart tab show them in the same way. ODF has no place
+  for them, so, like the styles of drop caps, they are the `ChartStyles`
+  item of `settings.xml`, one JSON line a style. As in Pages, they have
+  no names.
+- In Pages 15 the Chart button shows each type of chart in the styles;
+  in Desk it shows the styles and inserts a column chart, and the other
+  types stay in the Insert menu. A table inserted from a style goes on
+  the page, as Desk places new tables, where Pages puts it in the text.
+- W147, chart styles, was planned for W4 with the window changes; it came
+  here with W080 and is done.
+- The rest of B-012, pushing objects aside, dragging cells and managing
+  formats, stays for step 15 of W1.
+- W080 and W127 are done for W1.
+
 
 ## Decisions, with their reasons and consequences
 

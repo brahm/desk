@@ -506,7 +506,7 @@ note	Copiar e colar estilo (STY-08)	Copy and paste style (STY-08)
 note	Importar estilos (STY-10)	Import styles (STY-10)
 note	Localizar e substituir estilos (STY-09)	Find and replace styles (STY-09)
 note	Mostrar só estilos usados na página Estilos	Show only the styles in use on the Styles page
-note	Estilos de objeto no Inspetor (PR de 15/11); faltam estilos de tabela e de gráfico	Object styles in the Inspector (PR of 15 Nov); table and chart styles are missing
+note	Estilos de objeto no Inspetor, e os estilos de tabela e de gráfico do 15 (TAB-04, PXV-14): seis de cada num documento novo, à vista nos botões Tabela e Gráfico e nas abas Tabela e Gráfico, aplicados com um clique, com Copiar estilo, Colar estilo e Criar estilo; estilos de tabela guardados no ODF como table:table-template, estilos de gráfico no settings.xml	Object styles in the Inspector, and the table and chart styles of the 15 (TAB-04, PXV-14): six of each in a new document, in view in the Table and Chart buttons and in the Table and Chart tabs, applied with a click, with Copy Style, Paste Style and Create Style; table styles kept in ODF as table:table-template, chart styles in settings.xml
 note	Padrão de caixa de texto gravado no modelo (MOD-04); falta definir por documento	Text box default stored in the template (MOD-04); setting it per document is missing
 note	Alinhamento, espaçamento e recuos (FMT-12 a FMT-18)	Alignment, spacing and indents (FMT-12 to FMT-18)
 note	Tabulações (FMT-16)	Tabs (FMT-16)
@@ -553,7 +553,7 @@ note	Posição, alinhar e distribuir (OBJ-26, OBJ-29)	Position, align and distri
 note	Guias dinâmicas e fixas (OBJ-27, OBJ-28); falta a cor própria	Dynamic and fixed guides (OBJ-27, OBJ-28); their own color is missing
 note	Camadas, agrupar, travar (OBJ-24, OBJ-30, OBJ-32)	Layers, group, lock (OBJ-24, OBJ-30, OBJ-32)
 note	Redimensionar, girar, espelhar (OBJ-33, OBJ-34)	Resize, rotate, flip (OBJ-33, OBJ-34)
-note	Inserir tabela (TAB-01); faltam os estilos de tabela à vista	Insert table (TAB-01); the table styles in view are missing
+note	Inserir tabela (TAB-01), com os estilos de tabela à vista no botão Tabela: um clique insere uma tabela no estilo (PXV-14)	Insert table (TAB-01), with the table styles in view in the Table button: a click inserts a table of the style (PXV-14)
 note	Linhas, colunas, cabeçalhos e rodapés (TAB-10 a TAB-13)	Rows, columns, headers and footers (TAB-10 to TAB-13)
 note	Converter texto em tabela (TAB-05)	Convert text to table (TAB-05)
 note	Criar tabela arrastando células para fora	Create a table by dragging cells out
@@ -573,7 +573,7 @@ note	Eixos, rótulos e legenda (GRF-07, GRF-10, GRF-12)	Axes, labels and legend 
 note	Barras de erro e tendência (GRF-13, GRF-14); faltam linhas de referência	Error bars and trendline (GRF-13, GRF-14); reference lines are missing
 note	Cantos arredondados, chanfro e furo da rosca	Rounded corners, bevel and donut hole
 note	Cena 3D com luz (GRF-20)	3D scene with light (GRF-20)
-note	Estilos de gráfico	Chart styles
+note	Estilos de gráfico, feitos com o W080 na W1: seis num documento novo, à vista no botão Gráfico e na aba Gráfico, com Copiar estilo, Colar estilo e Criar estilo	Chart styles, done with W080 in W1: six in a new document, in view in the Chart button and the Chart tab, with Copy Style, Paste Style and Create Style
 note	Controle de alterações (REV-01 a REV-07, fase 8)	Change tracking (REV-01 to REV-07, phase 8)
 note	Comentários com respostas (REV-08, fase 8)	Comments with replies (REV-08, phase 8)
 note	Nome e cor do autor (fase 8)	Author name and color (phase 8)
