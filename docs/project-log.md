@@ -1283,6 +1283,30 @@ matrix rows done on 9 November, before the change of target.
   place and level have tests of their own.
 - W088 is done for W1.
 
+### 19 November: columns on the selection (W089, step 11 of W1)
+
+- With text selected, a new number of columns, from the Layout pane or
+  the Columns menu, goes to the selected paragraphs, as in Pages 15.4:
+  a layout break before them, and one after them that goes back to the
+  layout they were in. Their columns end at the same height when text
+  follows them, and fill down the page when the selection runs to the
+  end. With nothing selected, the columns go to the layout at the cursor,
+  as before (pull request 164).
+- Balanced columns end at the same height only when their text fits on
+  the page it starts on; text that goes on to the next page fills the
+  columns down.
+- Documents keep the balance as the standard
+  `text:dont-balance-text-columns`, whose absence means balanced, as in
+  LibreOffice. Sections with columns of earlier ODF files, those saved
+  by Desk included, now end at the same height when another layout
+  follows them on the page.
+- A UI test that read the accessibility tree while a closing tab took
+  its widgets out of it now looks again, as the other readers of the
+  tree in the tests do.
+- No UI test changes the columns of selected text; the model, the
+  pagination and ODF have tests of their own.
+- W089 is done for W1.
+
 
 ## Decisions, with their reasons and consequences
 
