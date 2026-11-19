@@ -34,10 +34,15 @@ TIMEOUT = 20
 
 
 def wait_for(what, find):
-    """Calls find until it returns something true, or fails."""
+    """Calls find until it returns something true, or fails. A node that
+    goes away while find reads the tree, as the widgets of a closing tab
+    do, makes it look again."""
     deadline = time.monotonic() + TIMEOUT
     while time.monotonic() < deadline:
-        found = find()
+        try:
+            found = find()
+        except GLib.GError:
+            found = None
         if found:
             return found
         time.sleep(0.2)
