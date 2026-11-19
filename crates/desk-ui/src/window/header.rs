@@ -25,6 +25,8 @@ pub(super) struct Header {
     pub objects: gtk::Box,
     /// Media, whose popover holds the Media Browser (INT-14).
     pub media_button: gtk::MenuButton,
+    /// Table, whose popover shows the table styles (PXV-14).
+    pub table_button: gtk::MenuButton,
     /// Find, in step with the find bar.
     pub find_toggle: gtk::ToggleButton,
     /// The main menu, whose View submenu holds Go to Page.
@@ -69,8 +71,13 @@ impl Header {
             .tooltip_text(tr("Media"))
             .build();
         formatting::labelled(&media_button, &tr("Media"));
+        let table_button = gtk::MenuButton::builder()
+            .icon_name("desk-table-symbolic")
+            .tooltip_text(tr("Table"))
+            .build();
+        formatting::labelled(&table_button, &tr("Table"));
+        objects.append(&table_button);
         for (icon, label, action) in [
-            ("desk-table-symbolic", tr("Table"), "win.insert-table"),
             ("desk-chart-symbolic", tr("Chart"), "win.insert-chart"),
             (
                 "desk-textbox-symbolic",
@@ -143,6 +150,7 @@ impl Header {
             insert_button,
             objects,
             media_button,
+            table_button,
             find_toggle,
             menu_button,
         }

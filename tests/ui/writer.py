@@ -3171,7 +3171,7 @@ def tables_and_charts(work):
     Table, Cell and Text tabs, and the screen reader hears the cell. A
     chart from the menu shows the Chart, Axis and Series tabs, and both
     are saved in the file (TAB-01, TAB-02, TAB-22, GRF-01, GRF-03,
-    GNM-04)."""
+    GNM-04). The Table tab shows the table styles (PXV-14)."""
     name = "Tables.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -3212,6 +3212,24 @@ def tables_and_charts(work):
             and saved_content(letter, r'<table:table-cell [^>]*office:value="42"'),
         )
         check("typing in the cells and a formula reach the file (TAB-01, TAB-22)", True)
+        # The Table tab shows the table styles, and Create Style keeps the
+        # look of the table as a new one, saved as an ODF table template
+        # (PXV-14).
+        wait_for("the table styles of the Table tab", lambda: showing_named(app, "Blue"))
+        create = wait_for("the Create Style button", lambda: showing_named(app, "Create Style"))
+        Atspi.Action.do_action(create, 0)
+        press("ctrl+s")
+
+        def template_saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    styles = package.read("styles.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return False
+            return 'table:name="Table Style 1"' in styles
+
+        wait_for("the new table style in the saved file", template_saved)
+        check("the Table tab shows the table styles and Create Style keeps one (PXV-14)", True)
         activate("insert-chart-kind", "pie")
         wait_for("the Chart tab", lambda: context_title(app, "Chart"))
         check(

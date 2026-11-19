@@ -164,6 +164,19 @@ type TextChange = fn(&mut desk_model::table::TextStyle, bool);
 
 /// The groups of the tabs of a selected table.
 pub struct TableGroups {
+    /// The table styles in view, with Copy, Paste and Create (PXV-14).
+    styles: compact::Group,
+    /// Where the pictures of the styles go.
+    style_holder: gtk::Box,
+    /// What the pictures show: the styles and the chosen one.
+    shown_styles: std::cell::RefCell<
+        Option<(
+            Vec<desk_model::TableStyleEntry>,
+            Option<desk_model::StyleId>,
+        )>,
+    >,
+    paste_style: gtk::Button,
+    editor: EditorOf,
     table: compact::Group,
     rows_cols: compact::Group,
     cell: compact::Group,
@@ -351,7 +364,53 @@ impl TableGroups {
         text.add(&h_align);
         text.add(&v_align);
 
+        let style_holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let style_buttons = gtk::Box::builder()
+            .spacing(6)
+            .homogeneous(true)
+            .margin_top(6)
+            .build();
+        let style_button = |label: &str| {
+            let button = gtk::Button::with_label(&tr(label));
+            style_buttons.append(&button);
+            button
+        };
+        let copy_style = style_button(n_("Copy Style"));
+        let paste_style = style_button(n_("Paste Style"));
+        let create_style = style_button(n_("Create Style"));
+        copy_style.set_tooltip_text(Some(&tr("Copy Table Style")));
+        paste_style.set_tooltip_text(Some(&tr("Paste Table Style")));
+        create_style.set_tooltip_text(Some(&tr("Create Table Style")));
+        let styles_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        styles_box.append(&style_holder);
+        styles_box.append(&style_buttons);
+        let styles = compact::Group::builder().title(tr("Table Styles")).build();
+        styles.add_widget(&styles_box);
+        for (button, run) in [
+            (
+                &copy_style,
+                crate::editing::TextEditor::copy_table_style as fn(&crate::editing::TextEditor),
+            ),
+            (&paste_style, crate::editing::TextEditor::paste_table_style),
+            (
+                &create_style,
+                crate::editing::TextEditor::create_table_style,
+            ),
+        ] {
+            let editor = editor.clone();
+            button.connect_clicked(move |_| {
+                if let Some(editor) = editor() {
+                    run(&editor);
+                }
+            });
+        }
+
         let this = Rc::new(Self {
+            styles,
+            style_holder,
+            shown_styles: std::cell::RefCell::new(None),
+            paste_style,
+            editor: editor.clone(),
             table,
             rows_cols,
             cell,
@@ -396,11 +455,12 @@ impl TableGroups {
         this
     }
 
-    /// The groups: Table and Rows and Columns for the Table tab, Cell and
-    /// Conditional Highlighting for the Cell tab, and Cell Text for the
-    /// Text tab.
-    pub fn groups(&self) -> [&compact::Group; 5] {
+    /// The groups: Table Styles, Table and Rows and Columns for the Table
+    /// tab, Cell and Conditional Highlighting for the Cell tab, and Cell
+    /// Text for the Text tab.
+    pub fn groups(&self) -> [&compact::Group; 6] {
         [
+            &self.styles,
             &self.table,
             &self.rows_cols,
             &self.cell,
@@ -712,11 +772,34 @@ impl TableGroups {
     }
 
     /// Shows the selected table and cells.
+    /// The pictures of the table styles, with the one the table looks
+    /// like chosen; drawn again only when they change.
+    fn show_styles(&self, editor: &crate::editing::TextEditor) {
+        self.paste_style
+            .set_sensitive(editor.can_paste_table_style());
+        let shown = (editor.table_styles(), editor.current_table_style());
+        if self.shown_styles.borrow().as_ref() == Some(&shown) {
+            return;
+        }
+        while let Some(child) = self.style_holder.first_child() {
+            self.style_holder.remove(&child);
+        }
+        let editor_of = self.editor.clone();
+        let grid = crate::table_styles::grid(&shown.0, shown.1, move |style| {
+            if let Some(editor) = editor_of() {
+                editor.apply_table_style(style);
+            }
+        });
+        self.style_holder.append(&grid);
+        *self.shown_styles.borrow_mut() = Some(shown);
+    }
+
     pub fn show(&self, editor: &crate::editing::TextEditor) {
         let Some((table, area)) = editor.table_selection() else {
             return;
         };
         self.updating.set(true);
+        self.show_styles(editor);
         let set_spin = |row: &compact::SpinRow, v: f64| {
             if (row.value() - v).abs() > 0.001 {
                 row.set_value(v);
