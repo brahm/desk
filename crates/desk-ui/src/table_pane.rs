@@ -771,7 +771,6 @@ impl TableGroups {
         }
     }
 
-    /// Shows the selected table and cells.
     /// The pictures of the table styles, with the one the table looks
     /// like chosen; drawn again only when they change.
     fn show_styles(&self, editor: &crate::editing::TextEditor) {
@@ -794,6 +793,7 @@ impl TableGroups {
         *self.shown_styles.borrow_mut() = Some(shown);
     }
 
+    /// Shows the selected table and cells.
     pub fn show(&self, editor: &crate::editing::TextEditor) {
         let Some((table, area)) = editor.table_selection() else {
             return;

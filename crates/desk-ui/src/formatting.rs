@@ -339,11 +339,18 @@ impl Inspector {
                 arrange(),
             ],
         );
-        let [chart_group, scene, value_axis, category_axis, series] = chart.groups();
+        let [
+            chart_styles,
+            chart_group,
+            scene,
+            value_axis,
+            category_axis,
+            series,
+        ] = chart.groups();
         contexts.insert(
             Context::Chart,
             vec![
-                Tab::new("chart", n_("Chart"), &[chart_group, scene]),
+                Tab::new("chart", n_("Chart"), &[chart_styles, chart_group, scene]),
                 Tab::new("axis", n_("Axis"), &[value_axis, category_axis]),
                 Tab::new("series", n_("Series"), &[series]),
                 arrange(),

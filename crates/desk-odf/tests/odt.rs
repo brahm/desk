@@ -507,6 +507,7 @@ fn full_document() -> TextDocument {
             layout_pages: Some(3),
             guides: vec!["h 72pt".into(), "v 1in".into()],
             drop_cap_styles: Some(vec!["lines=2 weight=700".into(), "lines=5".into()]),
+            chart_styles: Some(vec![r#"{"fills":[]}"#.into(), "{}".into()]),
         },
         style_shortcuts: vec![
             StyleShortcut {

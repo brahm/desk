@@ -145,6 +145,8 @@ pub struct DocumentWindow {
     media_button: gtk::MenuButton,
     /// Table, whose popover shows the table styles (PXV-14).
     table_button: gtk::MenuButton,
+    /// Chart, whose popover shows the chart styles (W080).
+    chart_button: gtk::MenuButton,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     ruler: Ruler,
@@ -319,6 +321,7 @@ impl DocumentWindow {
             objects: object_buttons,
             media_button,
             table_button,
+            chart_button,
             find_toggle,
             menu_button,
         } = header::Header::new(info, opener.is_some(), &controls.navigation);
@@ -630,6 +633,7 @@ impl DocumentWindow {
             spelling: std::cell::OnceCell::new(),
             media_button,
             table_button,
+            chart_button,
             media_browser: std::cell::OnceCell::new(),
             ruler,
             vertical_ruler,
@@ -2129,6 +2133,34 @@ impl DocumentWindow {
                     popover.popdown();
                 }
                 target.insert_table_of(Some(style));
+            });
+            holder.append(&grid);
+        });
+
+        // The chart styles of the document, in the same way: a click
+        // inserts a column chart of the style (W080).
+        let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        holder.set_margin_top(6);
+        holder.set_margin_bottom(6);
+        holder.set_margin_start(6);
+        holder.set_margin_end(6);
+        let popover = gtk::Popover::builder().child(&holder).build();
+        self.chart_button.set_popover(Some(&popover));
+        let weak = Rc::downgrade(self);
+        popover.connect_show(move |popover| {
+            let Some(editor) = weak.upgrade().and_then(|this| this.editor()) else {
+                return;
+            };
+            while let Some(child) = holder.first_child() {
+                holder.remove(&child);
+            }
+            let weak_popover = popover.downgrade();
+            let target = editor.clone();
+            let grid = crate::chart_styles::grid(&editor.chart_styles(), None, move |style| {
+                if let Some(popover) = weak_popover.upgrade() {
+                    popover.popdown();
+                }
+                target.insert_chart_of(desk_model::chart::ChartKind::Column, Some(style));
             });
             holder.append(&grid);
         });

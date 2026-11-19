@@ -3171,7 +3171,8 @@ def tables_and_charts(work):
     Table, Cell and Text tabs, and the screen reader hears the cell. A
     chart from the menu shows the Chart, Axis and Series tabs, and both
     are saved in the file (TAB-01, TAB-02, TAB-22, GRF-01, GRF-03,
-    GNM-04). The Table tab shows the table styles (PXV-14)."""
+    GNM-04). The Table and Chart tabs show the table and chart styles
+    (PXV-14, W080)."""
     name = "Tables.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -3249,6 +3250,22 @@ def tables_and_charts(work):
 
         wait_for("the chart in the saved file", chart_saved)
         check("the chart is saved as a chart of ODF (GRF-01)", True)
+        # The Chart tab shows the chart styles, and Create Style keeps the
+        # look of the chart after them, in the settings of the file (W080).
+        wait_for("the chart styles of the Chart tab", lambda: showing_named(app, "Chart Style 6"))
+        create = wait_for("the Create Style button", lambda: showing_named(app, "Create Style"))
+        Atspi.Action.do_action(create, 0)
+        press("ctrl+s")
+
+        def chart_style_saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    return "ChartStyles" in package.read("settings.xml").decode()
+            except (zipfile.BadZipFile, KeyError, OSError):
+                return False
+
+        wait_for("the new chart style in the saved file", chart_style_saved)
+        check("the Chart tab shows the chart styles and Create Style keeps one (W080)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

@@ -27,6 +27,8 @@ pub(super) struct Header {
     pub media_button: gtk::MenuButton,
     /// Table, whose popover shows the table styles (PXV-14).
     pub table_button: gtk::MenuButton,
+    /// Chart, whose popover shows the chart styles (W080).
+    pub chart_button: gtk::MenuButton,
     /// Find, in step with the find bar.
     pub find_toggle: gtk::ToggleButton,
     /// The main menu, whose View submenu holds Go to Page.
@@ -77,16 +79,17 @@ impl Header {
             .build();
         formatting::labelled(&table_button, &tr("Table"));
         objects.append(&table_button);
-        for (icon, label, action) in [
-            ("desk-chart-symbolic", tr("Chart"), "win.insert-chart"),
-            (
-                "desk-textbox-symbolic",
-                tr("Text Box"),
-                "win.insert-text-box",
-            ),
-        ] {
-            objects.append(&object_button(icon, &label, action));
-        }
+        let chart_button = gtk::MenuButton::builder()
+            .icon_name("desk-chart-symbolic")
+            .tooltip_text(tr("Chart"))
+            .build();
+        formatting::labelled(&chart_button, &tr("Chart"));
+        objects.append(&chart_button);
+        objects.append(&object_button(
+            "desk-textbox-symbolic",
+            &tr("Text Box"),
+            "win.insert-text-box",
+        ));
         let shape_button = gtk::MenuButton::builder()
             .icon_name("desk-shape-symbolic")
             .menu_model(&shape_menu())
@@ -151,6 +154,7 @@ impl Header {
             objects,
             media_button,
             table_button,
+            chart_button,
             find_toggle,
             menu_button,
         }

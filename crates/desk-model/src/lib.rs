@@ -48,6 +48,7 @@ mod arrange;
 mod auto_numbers;
 mod autocorrect;
 mod case_change;
+mod chart_style;
 mod connection;
 mod convert_quotes;
 mod document;
@@ -90,6 +91,7 @@ pub use autocorrect::{
     smart_quote,
 };
 pub use case_change::CaseChange;
+pub use chart_style::ChartStyle;
 pub use connection::{Connection, bend_through, bent_controls, bent_middle, connect, flattened};
 pub use document::{
     Container, Document, FixedGuide, Metadata, OutlineOptions, PageSetup, PagedFlow,

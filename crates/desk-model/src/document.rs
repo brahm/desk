@@ -96,6 +96,8 @@ pub struct TextSettings {
     pub guides: Vec<FixedGuide>,
     /// The styles of drop caps, in the order of their menu (PXV-06).
     pub drop_cap_styles: Vec<crate::DropCapStyle>,
+    /// The chart styles, in the order of their pictures (W080).
+    pub chart_styles: Vec<crate::ChartStyle>,
 }
 
 /// A guide fixed on a page, dragged out of a ruler, that objects snap to
@@ -142,6 +144,7 @@ impl Default for TextSettings {
             links_inactive: false,
             guides: Vec::new(),
             drop_cap_styles: crate::DropCapStyle::library().to_vec(),
+            chart_styles: crate::ChartStyle::library().to_vec(),
         }
     }
 }

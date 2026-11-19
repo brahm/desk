@@ -20,6 +20,7 @@ mod auto_numbers;
 mod bullet_pictures;
 mod chart_data;
 mod chart_pane;
+mod chart_styles;
 mod color_popover;
 mod compact;
 mod contents_page;
