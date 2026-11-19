@@ -665,6 +665,9 @@ struct Region {
     layout: Layout,
     /// Where its columns start, from the top of the body.
     top: f32,
+    /// Where its columns end, from the top of the body, when they are
+    /// balanced above the bottom of the body (PXV-12).
+    limit: Option<f32>,
 }
 
 /// Where the next line goes.
@@ -725,7 +728,9 @@ impl Cursor {
 ///   would start in another (EST-05). A chain that starts at the top of a
 ///   column breaks normally, since moving it would not help.
 /// - Text fills the columns of a layout one after the other, without
-///   balancing them. A layout starts below the lowest column of the one
+///   balancing them, unless the layout is balanced and ends on the page it
+///   starts on: then its columns end at the same height, as in Pages 15
+///   for columns given to selected text (PXV-12). A layout starts below the lowest column of the one
 ///   before it on the page, after the space after that one and the space
 ///   before its own, or on a new page when it says so (EST-09, EST-10).
 /// - A section starts on a new page, the next right or left one when it
@@ -1168,7 +1173,14 @@ impl Paginator<'_> {
         } else {
             0.0
         };
-        Cursor::at(page, Region { layout, top })
+        Cursor::at(
+            page,
+            Region {
+                layout,
+                top,
+                limit: None,
+            },
+        )
     }
 
     /// The next column of the layout, or the first of a new page.
@@ -1202,6 +1214,7 @@ impl Paginator<'_> {
             Region {
                 layout,
                 top: top + layout.before.to_pt() as f32,
+                limit: None,
             },
         )
     }
@@ -1266,6 +1279,9 @@ impl Paginator<'_> {
                         cursor = self.start_layout(cursor, *layout);
                     }
                     None => {}
+                }
+                if i == 0 || format.start.is_some() {
+                    cursor.region.limit = self.balanced_limit(i, cursor);
                 }
             }
             if i == 0 || !self.texts[i - 1].paragraph().keep_with_next || format.start.is_some() {
@@ -1346,6 +1362,75 @@ impl Paginator<'_> {
         }
     }
 
+    /// Where the columns of a balanced layout that starts at paragraph
+    /// `first` end, from the top of the body, for them to end at the same
+    /// height: the lowest limit at which its paragraphs still fit on the
+    /// page it starts on. None for a layout that is not balanced, or whose
+    /// paragraphs go past its page, whose columns fill down (PXV-12).
+    fn balanced_limit(&mut self, first: usize, cursor: Cursor) -> Option<f32> {
+        let layout = cursor.region.layout;
+        if !layout.balanced || layout.columns.count < 2 {
+            return None;
+        }
+        let end = (first + 1..self.texts.len())
+            .find(|&i| self.texts[i].paragraph().start.is_some())
+            .unwrap_or(self.texts.len());
+        let (top, bottom) = self.pages[cursor.page].body;
+        let full = bottom - top;
+        if !self.fits_within(first..end, cursor, full) {
+            return None;
+        }
+        let (mut low, mut high) = (cursor.region.top, full);
+        while high - low > 0.5 {
+            let middle = (low + high) / 2.0;
+            if self.fits_within(first..end, cursor, middle) {
+                high = middle;
+            } else {
+                low = middle;
+            }
+        }
+        Some(high)
+    }
+
+    /// Whether paragraphs placed from a cursor stay on its page with the
+    /// columns ending at `limit` from the top of the body. What it places
+    /// is taken back.
+    fn fits_within(
+        &mut self,
+        paragraphs: std::ops::Range<usize>,
+        cursor: Cursor,
+        limit: f32,
+    ) -> bool {
+        let pages = self.pages.clone();
+        let met = self.met.clone();
+        let mut at = Cursor {
+            region: Region {
+                limit: Some(limit),
+                ..cursor.region
+            },
+            ..cursor
+        };
+        let mut fits = true;
+        for i in paragraphs {
+            let format = self.texts[i].paragraph();
+            if format.page_break_before && i > 0 {
+                fits = false;
+                break;
+            }
+            if format.column_break_before && !at.empty {
+                at = self.next_column(at);
+            }
+            self.place(i, &mut at);
+            if at.page != cursor.page {
+                fits = false;
+                break;
+            }
+        }
+        self.pages = pages;
+        self.met = met;
+        fits
+    }
+
     /// Places paragraph `i` from a cursor, and returns the page and column
     /// where it starts and where it ends.
     fn place(&mut self, i: usize, cursor: &mut Cursor) -> ((usize, usize), (usize, usize)) {
@@ -1361,7 +1446,10 @@ impl Paginator<'_> {
             // The body of the page, which a tall header or footer makes
             // smaller.
             let (top, bottom) = self.pages[cursor.page].body;
-            let body = bottom - top;
+            let body = cursor
+                .region
+                .limit
+                .map_or(bottom - top, |limit| limit.min(bottom - top));
             let (x, width) = self.column(cursor.page, &cursor.region, cursor.column);
             let column_height = body - cursor.region.top;
             let reserved = footnotes.as_ref().map_or(0.0, |n| {

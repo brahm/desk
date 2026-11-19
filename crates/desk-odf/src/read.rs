@@ -999,6 +999,9 @@ fn section_style(e: &Element) -> Option<SectionStyle> {
         style.space_before = length(p, DESK, "space-before");
         style.space_after = length(p, DESK, "space-after");
         style.new_page = flag("new-page");
+        style.dont_balance = p
+            .attr(TEXT, "dont-balance-text-columns")
+            .map(|v| v == "true");
         style.section_start = p.attr(DESK, "section-start").and_then(|v| match v {
             "any" => Some(SectionStart::Any),
             "left" => Some(SectionStart::Left),

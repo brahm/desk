@@ -2157,6 +2157,27 @@ impl TextEditor {
         });
     }
 
+    /// Gives the columns of a layout to the selected paragraphs of the
+    /// body, between layout breaks, as Pages 15 does (PXV-12), or to the
+    /// layout at the cursor when nothing is selected.
+    pub fn set_columns(&self, name: &str, layout: Layout) {
+        let (start, end) = self.selection().ordered();
+        if start == end || self.story().is_some() {
+            self.set_layout(name, layout);
+            return;
+        }
+        // A selection that ends at the start of a paragraph stops before it.
+        let last = if end.offset == 0 && end.paragraph > start.paragraph {
+            end.paragraph - 1
+        } else {
+            end.paragraph
+        };
+        let columns = layout.columns;
+        self.format_edit(name, move |edit| {
+            edit.set_columns_between(start.paragraph, last, columns)
+        });
+    }
+
     /// Changes the section that the cursor is in, as one action of the
     /// history.
     pub fn set_section(&self, name: &str, section: Section) {

@@ -118,6 +118,7 @@ pub fn section_style(
         space_before: some(layout.before),
         space_after: some(layout.after),
         new_page: layout.new_page.then_some(true),
+        dont_balance: (layout.columns.count > 1 && !layout.balanced).then_some(true),
         section_start: section.map(|s| match s.start {
             SectionStart::AnyPage => odf::SectionStart::Any,
             SectionStart::LeftPage => odf::SectionStart::Left,
@@ -143,6 +144,10 @@ pub fn layout(style: &odf::SectionStyle, setup: &PageSetup) -> Layout {
         left,
         right,
         new_page: style.new_page.unwrap_or(false),
+        // The columns of a section of ODF end at the same height unless
+        // it says otherwise (PXV-12).
+        balanced: style.columns.as_ref().is_some_and(|c| c.count > 1)
+            && style.dont_balance != Some(true),
     }
 }
 

@@ -453,6 +453,7 @@ fn write_section_style(w: &mut Writer, style: &SectionStyle) {
         }
     };
     flag(w, "desk:new-page", style.new_page);
+    flag(w, "text:dont-balance-text-columns", style.dont_balance);
     if let Some(start) = style.section_start {
         w.attr(
             "desk:section-start",

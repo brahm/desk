@@ -1325,3 +1325,47 @@ fn est_07_est_13_a_note_in_the_second_column_takes_room_from_the_first() {
     }
     assert!(first.lines.iter().any(|l| l.paragraph == 1));
 }
+
+#[test]
+fn pxv_12_balanced_columns_end_at_the_same_height() {
+    let mut system = TextSystem::new();
+    let balanced = Layout {
+        balanced: true,
+        ..columns(2)
+    };
+    // Six lines in two balanced columns, followed by a layout of one
+    // column: three lines in each, and the next layout below them.
+    let texts = [
+        para(1, ParaFormat::default()),
+        para(6, starting(Start::Layout(balanced))),
+        para(1, starting(Start::Layout(Layout::default()))),
+    ];
+    let layout = paginate_texts(setup(500.0), &texts, &mut system);
+    assert_eq!(layout.pages.len(), 1);
+    let lines = &layout.pages[0].lines;
+    let left: Vec<_> = lines
+        .iter()
+        .filter(|l| l.paragraph == 1 && l.origin.0 == 50.0)
+        .collect();
+    let right: Vec<_> = lines
+        .iter()
+        .filter(|l| l.paragraph == 1 && l.origin.0 == 155.0)
+        .collect();
+    assert_eq!((left.len(), right.len()), (3, 3));
+    assert_eq!(left[0].top(), right[0].top());
+    let next = lines.iter().find(|l| l.paragraph == 2).unwrap();
+    assert!((next.top() - left[2].bottom()).abs() < 0.01);
+    // Unbalanced, the same columns fill down the page.
+    let texts = [
+        para(1, ParaFormat::default()),
+        para(6, starting(Start::Layout(columns(2)))),
+        para(1, starting(Start::Layout(Layout::default()))),
+    ];
+    let layout = paginate_texts(setup(500.0), &texts, &mut system);
+    let right = layout.pages[0]
+        .lines
+        .iter()
+        .filter(|l| l.paragraph == 1 && l.origin.0 == 155.0)
+        .count();
+    assert_eq!(right, 0);
+}

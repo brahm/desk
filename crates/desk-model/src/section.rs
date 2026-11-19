@@ -11,7 +11,13 @@
 //! body are in the page setup; each later one starts at a paragraph,
 //! which holds it.
 
+use std::sync::Arc;
+
 use crate::document::Document;
+use crate::error::ModelError;
+use crate::format::ParaAttrs;
+use crate::text::Position;
+use crate::transaction::Edit;
 use crate::units::Length;
 
 /// The most columns a layout has, as in Pages.
@@ -114,6 +120,10 @@ pub struct Layout {
     /// Whether the layout starts on a new page rather than below the
     /// layout before it.
     pub new_page: bool,
+    /// Whether its columns end at the same height when a layout below
+    /// follows it on the page, as for columns given to selected text in
+    /// Pages 15 (PXV-12), rather than filling down the page.
+    pub balanced: bool,
 }
 
 /// The page that a section starts on (EST-16).
@@ -196,12 +206,99 @@ impl Document {
             .unwrap_or((None, self.page_setup().section))
     }
 
+    /// The index of the paragraph where the layout of paragraph `index`
+    /// ends: the next one that starts a layout or a section, or the
+    /// length of the body.
+    pub fn layout_end(&self, index: usize) -> usize {
+        (index + 1..self.body().len())
+            .find(|&i| self.start_at(i).is_some())
+            .unwrap_or(self.body().len())
+    }
+
     /// How many sections paragraphs `first` to `last` of the body are in
     /// (DOC-20).
     pub fn sections_between(&self, first: usize, last: usize) -> usize {
         1 + (first + 1..=last)
             .filter(|&i| matches!(self.start_at(i), Some(Start::Section(..))))
             .count()
+    }
+}
+
+impl Edit {
+    /// Makes paragraph `index` of the body start a layout, keeping the
+    /// section it starts, or sets the first layout of the body.
+    fn start_layout_at(&mut self, index: usize, layout: Layout) -> Result<(), ModelError> {
+        let document = self.document();
+        if index == 0 {
+            let mut setup = *document.page_setup();
+            setup.layout = layout;
+            return self.set_page_setup(setup);
+        }
+        let Some(paragraph) = document.body().get(index) else {
+            return Err(ModelError::IndexOutOfBounds {
+                index,
+                len: document.body().len(),
+            });
+        };
+        let start = match document.start_at(index) {
+            Some(Start::Section(section, _)) => Start::Section(*section, layout),
+            _ => Start::Layout(layout),
+        };
+        let at = Position::new(paragraph.id(), 0);
+        self.set_paragraph_attrs(
+            at,
+            at,
+            &ParaAttrs {
+                start: Some(Some(Arc::new(start))),
+                ..ParaAttrs::default()
+            },
+        )
+    }
+
+    /// Gives paragraphs `first` to `last` of the body columns of their
+    /// own, as Pages 15 does for selected text (PXV-12): a layout break
+    /// before them, and, when they stop before the end of their layout,
+    /// one after them that goes back to the layout they were in. Their
+    /// columns are balanced when text follows them, and fill down the
+    /// page when they run to the end of the body.
+    pub fn set_columns_between(
+        &mut self,
+        first: usize,
+        last: usize,
+        columns: Columns,
+    ) -> Result<(), ModelError> {
+        let document = self.document();
+        let last = last.max(first);
+        let (held, around) = document.layout_at(first);
+        let end = document.layout_end(first);
+        // Text that runs to the end of the body has nothing below it to
+        // end at the height of.
+        let to_end = last + 1 >= document.body().len();
+        let break_after = last + 1 < end;
+        let starts_here = first == 0 || held == Some(first);
+        let layout = Layout {
+            columns,
+            balanced: !to_end && columns.count > 1,
+            ..if starts_here {
+                around
+            } else {
+                Layout {
+                    before: Length::ZERO,
+                    after: Length::ZERO,
+                    new_page: false,
+                    ..around
+                }
+            }
+        };
+        if break_after {
+            let after = Layout {
+                before: Length::ZERO,
+                new_page: false,
+                ..around
+            };
+            self.start_layout_at(last + 1, after)?;
+        }
+        self.start_layout_at(first, layout)
     }
 }
 
@@ -225,6 +322,49 @@ mod tests {
         uneven.widths[1] = PARTS * 13 / 20;
         let spans = uneven.spans(100.0);
         assert!((spans[1].0 - 35.0).abs() < 1e-6 && (spans[1].1 - 65.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn pxv_12_columns_on_selected_paragraphs_have_layout_breaks_around_them() {
+        use crate::Position;
+        let two = Columns::equal(2, Columns::DEFAULT_GAP);
+        let three = Columns::equal(3, Columns::DEFAULT_GAP);
+        let mut document = Document::new_word_processing();
+        document
+            .transact("Text", |edit| {
+                let first = edit.document().body().get(0).unwrap().id();
+                edit.insert_text(Position::new(first, 0), "a\nb\nc\nd")?;
+                Ok(())
+            })
+            .unwrap();
+        // b and c, in the middle: a break before and after, balanced.
+        document
+            .transact("Columns", |edit| edit.set_columns_between(1, 2, two))
+            .unwrap();
+        let (held, layout) = document.layout_at(1);
+        assert_eq!(held, Some(1));
+        assert_eq!(layout.columns, two);
+        assert!(layout.balanced);
+        assert_eq!(document.layout_at(2).0, Some(1));
+        let (held, after) = document.layout_at(3);
+        assert_eq!(held, Some(3));
+        assert_eq!(after.columns, Columns::ONE);
+        assert_eq!(document.layout_at(0), (None, document.page_setup().layout));
+        // d, to the end: one break before, and the columns fill down.
+        document
+            .transact("Columns", |edit| edit.set_columns_between(3, 3, three))
+            .unwrap();
+        let (held, layout) = document.layout_at(3);
+        assert_eq!(held, Some(3));
+        assert_eq!(layout.columns, three);
+        assert!(!layout.balanced);
+        assert_eq!(document.layout_end(1), 3);
+        // From the first paragraph: the first layout of the body.
+        document
+            .transact("Columns", |edit| edit.set_columns_between(0, 0, two))
+            .unwrap();
+        assert_eq!(document.page_setup().layout.columns, two);
+        assert!(document.page_setup().layout.balanced);
     }
 
     #[test]
