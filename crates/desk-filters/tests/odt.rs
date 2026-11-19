@@ -393,6 +393,28 @@ fn sample() -> Document {
                         color: Rgba::rgb(255, 255, 0),
                     }])
                     .collect(),
+                // The gray style deleted, and one of a gradient, a texture
+                // and bold text saved after the others (W080).
+                chart_styles: {
+                    use desk_model::chart::{ChartText, SeriesFill, Texture};
+                    let mut styles = desk_model::ChartStyle::library().to_vec();
+                    styles.remove(2);
+                    styles.push(desk_model::ChartStyle {
+                        fills: vec![
+                            SeriesFill::Gradient(
+                                desk_model::table::Color::rgb(1, 2, 3),
+                                desk_model::table::Color::rgb(200, 100, 50),
+                            ),
+                            SeriesFill::Texture(Texture::Wood),
+                        ],
+                        text: ChartText {
+                            font: "Avenir Next".into(),
+                            bold: true,
+                            ..ChartText::default()
+                        },
+                    });
+                    styles
+                },
             },
         })
         .unwrap();

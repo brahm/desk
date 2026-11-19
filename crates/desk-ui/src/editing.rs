@@ -28,6 +28,7 @@ use crate::i18n::tr;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
+mod chart_looks;
 mod connections;
 mod copies;
 mod guides;

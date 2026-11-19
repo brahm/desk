@@ -205,7 +205,17 @@ impl TextEditor {
     /// Puts a new chart of a kind in the middle of the page shown, with
     /// the data of iWork, and selects it (GRF-01, GRF-03).
     pub fn insert_chart(&self, kind: ChartKind) {
+        self.insert_chart_of(kind, None);
+    }
+
+    /// Puts a new chart of a kind in the look of a chart style, as a click
+    /// on the style in the popover of the Chart button does (W080), or in
+    /// the look of new charts.
+    pub fn insert_chart_of(&self, kind: ChartKind, style: Option<usize>) {
         let mut chart = Chart::new(kind);
+        if let Some(style) = style.and_then(|s| self.document().chart_styles().get(s).cloned()) {
+            style.apply_to(&mut chart);
+        }
         // The names of the sample data, in the language of the app.
         for (i, row) in chart.data.rows.iter_mut().enumerate() {
             *row = format!("{} {}", crate::i18n::tr("Region"), i + 1);

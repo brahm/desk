@@ -307,6 +307,9 @@ pub struct TextSettings {
     /// The styles of drop caps (PXV-06), one a line, as the filter writes
     /// them; none when the document has those of a new one.
     pub drop_cap_styles: Option<Vec<String>>,
+    /// The chart styles (W080), one a line, as the filter writes them;
+    /// none when the document has those of a new one.
+    pub chart_styles: Option<Vec<String>>,
 }
 
 /// A list style (`text:list-style`).

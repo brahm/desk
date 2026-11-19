@@ -739,6 +739,16 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                             .collect(),
                     );
                 }
+                Some("ChartStyles") => {
+                    out.chart_styles = Some(
+                        text.lines()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .take(1_000)
+                            .map(str::to_owned)
+                            .collect(),
+                    );
+                }
                 Some("Guides") => {
                     out.guides = text
                         .lines()

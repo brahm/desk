@@ -550,6 +550,18 @@ the letters, and, for a style with a shape, `fill`, `border`,
 `border-color`, `border-style`, `scale` and `radius`. Other programs
 ignore the item; Desk reads a document without it with the six styles.
 
+#### Chart styles (settings, not an attribute)
+
+The chart styles of a document (W080) are not part of its content
+either, so Desk keeps them in the `ChartStyles` item of the
+`DeskTextSettings` set in `settings.xml`, written only when they are not
+the six of a new document. Each line is one style, in the order of the
+pictures, as a JSON object with `fills`, the fills of the series in
+order, and `text`, the font, size, color, bold and italic of the chart,
+written as `desk:chart` writes them. Other programs ignore the item; Desk
+reads a document without it, or with no line it can read, with the six
+styles.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

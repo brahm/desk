@@ -14,12 +14,12 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape, DropCapStyle, Fill,
-    FontFeature, FontFeatures, FontWeight, ImageFill, LINE_BREAK, LIST_LEVELS, Language, Length,
-    Ligatures, LineColor, LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata,
-    ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph,
-    ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId, TabAlignment, TabLeader,
-    TabStop, TabStops, TextSettings,
+    CharacterStyle, ChartStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape,
+    DropCapStyle, Fill, FontFeature, FontFeatures, FontWeight, ImageFill, LINE_BREAK, LIST_LEVELS,
+    Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, ListLabel, ListLevel,
+    ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder,
+    ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId,
+    TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_model::{
     FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
@@ -1844,6 +1844,17 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 || DropCapStyle::library().to_vec(),
                 |styles| styles.iter().filter_map(|s| drop_cap_style(s)).collect(),
             ),
+            chart_styles: text
+                .chart_styles
+                .as_ref()
+                .map(|styles| {
+                    styles
+                        .iter()
+                        .filter_map(|s| chart_style(s))
+                        .collect::<Vec<_>>()
+                })
+                .filter(|styles| !styles.is_empty())
+                .unwrap_or_else(|| ChartStyle::library().to_vec()),
         },
     })?;
 
@@ -2776,6 +2787,8 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     .map(odf_drop_cap_style)
                     .collect()
             }),
+            chart_styles: (settings.chart_styles != ChartStyle::library())
+                .then(|| settings.chart_styles.iter().map(odf_chart_style).collect()),
             ..odf_note_settings(settings.notes)
         },
         notes_configuration: notes_configuration(settings.notes),
@@ -3316,6 +3329,27 @@ fn drop_cap_style(line: &str) -> Option<DropCapStyle> {
 }
 
 /// The line of a style of drop caps in the settings.
+/// A chart style of the `ChartStyles` item of the settings (W080): the
+/// fills and the text as JSON, as `desk:chart` keeps them.
+fn chart_style(line: &str) -> Option<ChartStyle> {
+    let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    let fills: Vec<desk_model::chart::SeriesFill> =
+        serde_json::from_value(value.get("fills")?.clone()).ok()?;
+    if fills.is_empty() {
+        return None;
+    }
+    let text = value
+        .get("text")
+        .and_then(|t| serde_json::from_value(t.clone()).ok())
+        .unwrap_or_default();
+    Some(ChartStyle { fills, text })
+}
+
+/// A chart style as a line of the `ChartStyles` item.
+fn odf_chart_style(style: &ChartStyle) -> String {
+    serde_json::json!({ "fills": style.fills, "text": style.text }).to_string()
+}
+
 fn odf_drop_cap_style(style: &DropCapStyle) -> String {
     let cap = &style.cap;
     let mut line = format!(

@@ -95,12 +95,15 @@ pub fn picture(look: &TableLook) -> gtk::DrawingArea {
     area
 }
 
-/// The table styles of a document as a grid of pictures, the current one
-/// shown as chosen; `pick` runs with the style that a click chooses.
-pub fn grid(
-    styles: &[TableStyleEntry],
-    current: Option<StyleId>,
-    pick: impl Fn(StyleId) + 'static,
+/// Pictures of styles in a grid of three a line, each with its name for
+/// the tooltip and the screen reader, the current one shown as chosen;
+/// `pick` runs with the place of the one a click chooses. The table
+/// styles and the chart styles show this way (PXV-14, W080).
+pub fn pictures(
+    label: &str,
+    items: Vec<(gtk::Widget, String)>,
+    current: Option<usize>,
+    pick: impl Fn(usize) + 'static,
 ) -> gtk::FlowBox {
     let flow = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::Single)
@@ -111,23 +114,41 @@ pub fn grid(
         .row_spacing(6)
         .activate_on_single_click(true)
         .build();
-    flow.update_property(&[gtk::accessible::Property::Label(&tr("Table Styles"))]);
-    for style in styles {
+    flow.update_property(&[gtk::accessible::Property::Label(label)]);
+    for (index, (picture, name)) in items.into_iter().enumerate() {
         let child = gtk::FlowBoxChild::new();
-        let picture = picture(&style.look);
         child.set_child(Some(&picture));
-        child.set_tooltip_text(Some(&tr(&style.name)));
-        child.update_property(&[gtk::accessible::Property::Label(&tr(&style.name))]);
+        child.set_tooltip_text(Some(&name));
+        child.update_property(&[gtk::accessible::Property::Label(&name)]);
         flow.append(&child);
-        if current == Some(style.id) {
+        if current == Some(index) {
             flow.select_child(&child);
         }
     }
-    let ids: Vec<StyleId> = styles.iter().map(|s| s.id).collect();
     flow.connect_child_activated(move |_, child| {
-        if let Some(&id) = usize::try_from(child.index()).ok().and_then(|i| ids.get(i)) {
-            pick(id);
+        if let Ok(index) = usize::try_from(child.index()) {
+            pick(index);
         }
     });
     flow
+}
+
+/// The table styles of a document as a grid of pictures, the current one
+/// shown as chosen; `pick` runs with the style that a click chooses.
+pub fn grid(
+    styles: &[TableStyleEntry],
+    current: Option<StyleId>,
+    pick: impl Fn(StyleId) + 'static,
+) -> gtk::FlowBox {
+    let items = styles
+        .iter()
+        .map(|s| (picture(&s.look).upcast(), tr(&s.name)))
+        .collect();
+    let chosen = styles.iter().position(|s| Some(s.id) == current);
+    let ids: Vec<StyleId> = styles.iter().map(|s| s.id).collect();
+    pictures(&tr("Table Styles"), items, chosen, move |i| {
+        if let Some(&id) = ids.get(i) {
+            pick(id);
+        }
+    })
 }

@@ -110,6 +110,14 @@ fn error_amount(index: u32, value: f64) -> Option<ErrorAmount> {
 
 /// The groups of the tabs of a selected chart.
 pub struct ChartGroups {
+    /// The chart styles in view, with Copy, Paste and Create (W080).
+    styles: compact::Group,
+    /// Where the pictures of the styles go.
+    style_holder: gtk::Box,
+    /// What the pictures show: the styles and the chosen one.
+    shown_styles: std::cell::RefCell<Option<(Vec<desk_model::ChartStyle>, Option<usize>)>>,
+    paste_style: gtk::Button,
+    editor: EditorOf,
     chart: compact::Group,
     scene: compact::Group,
     value_axis: compact::Group,
@@ -290,7 +298,47 @@ impl ChartGroups {
         series.add(&errors);
         series.add(&error_value);
 
+        let style_holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let style_buttons = gtk::Box::builder()
+            .spacing(6)
+            .homogeneous(true)
+            .margin_top(6)
+            .build();
+        let style_button = |label: &str| {
+            let button = gtk::Button::with_label(&tr(label));
+            style_buttons.append(&button);
+            button
+        };
+        let copy_style = style_button(n_("Copy Style"));
+        let paste_style = style_button(n_("Paste Style"));
+        let create_style = style_button(n_("Create Style"));
+        copy_style.set_tooltip_text(Some(&tr("Copy Chart Style")));
+        paste_style.set_tooltip_text(Some(&tr("Paste Chart Style")));
+        create_style.set_tooltip_text(Some(&tr("Create Chart Style")));
+        let styles_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        styles_box.append(&style_holder);
+        styles_box.append(&style_buttons);
+        let styles = compact::Group::builder().title(tr("Chart Styles")).build();
+        styles.add_widget(&styles_box);
+        for (button, run) in [
+            (&copy_style, TextEditor::copy_chart_style as fn(&TextEditor)),
+            (&paste_style, TextEditor::paste_chart_style),
+            (&create_style, TextEditor::create_chart_style),
+        ] {
+            let editor = editor.clone();
+            button.connect_clicked(move |_| {
+                if let Some(editor) = editor() {
+                    run(&editor);
+                }
+            });
+        }
+
         let this = Rc::new(Self {
+            styles,
+            style_holder,
+            shown_styles: std::cell::RefCell::new(None),
+            paste_style,
+            editor: editor.clone(),
             chart,
             scene,
             value_axis,
@@ -337,10 +385,11 @@ impl ChartGroups {
         this
     }
 
-    /// The groups: Chart and 3D Scene for the Chart tab, the axes for
-    /// the Axis tab and Series for the Series tab.
-    pub fn groups(&self) -> [&compact::Group; 5] {
+    /// The groups: Chart Styles, Chart and 3D Scene for the Chart tab,
+    /// the axes for the Axis tab and Series for the Series tab.
+    pub fn groups(&self) -> [&compact::Group; 6] {
         [
+            &self.styles,
             &self.chart,
             &self.scene,
             &self.value_axis,
@@ -546,11 +595,35 @@ impl ChartGroups {
     }
 
     /// Shows the selected chart.
+    /// The pictures of the chart styles, with the one the chart looks
+    /// like chosen; drawn again only when they change.
+    fn show_styles(&self, editor: &TextEditor) {
+        self.paste_style
+            .set_sensitive(editor.can_paste_chart_style());
+        let shown = (editor.chart_styles(), editor.current_chart_style());
+        if self.shown_styles.borrow().as_ref() == Some(&shown) {
+            return;
+        }
+        while let Some(child) = self.style_holder.first_child() {
+            self.style_holder.remove(&child);
+        }
+        let editor_of = self.editor.clone();
+        let grid = crate::chart_styles::grid(&shown.0, shown.1, move |style| {
+            if let Some(editor) = editor_of() {
+                editor.apply_chart_style(style);
+            }
+        });
+        self.style_holder.append(&grid);
+        *self.shown_styles.borrow_mut() = Some(shown);
+    }
+
+    /// Shows the selected chart.
     pub fn show(&self, editor: &TextEditor) {
         let Some(chart) = editor.selected_chart() else {
             return;
         };
         self.updating.set(true);
+        self.show_styles(editor);
         let set_spin = |row: &compact::SpinRow, v: f64| {
             if (row.value() - v).abs() > 1e-9 {
                 row.set_value(v);
