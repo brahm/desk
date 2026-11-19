@@ -769,6 +769,26 @@ pub struct DropCap {
     /// `desk:drop-cap-outdent`: whether the characters stand in the
     /// margin.
     pub outdent: Option<bool>,
+    /// The shape behind the characters, with `desk:drop-cap-fill`.
+    pub background: Option<DropCapBackground>,
+}
+
+/// The shape behind the characters of a drop cap, written with
+/// `desk:drop-cap-fill` (docs/odf-extensions.md).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DropCapBackground {
+    /// `desk:drop-cap-fill`: the color inside.
+    pub fill: Color,
+    /// `desk:drop-cap-border-width`: the width of the line around it.
+    pub border_width: Option<Length>,
+    /// `desk:drop-cap-border-color`: the color of that line.
+    pub border_color: Option<Color>,
+    /// `desk:drop-cap-scale`: how tall the characters are in it, in
+    /// percent of their height without it.
+    pub scale: Option<u32>,
+    /// `desk:drop-cap-radius`: how round its corners are, in percent of
+    /// half its shorter side.
+    pub radius: Option<u32>,
 }
 
 /// `style:type` of a tab stop.

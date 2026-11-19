@@ -147,6 +147,27 @@ pub struct Line {
     /// The picture of an image bullet on the first line of an item
     /// (LST-03).
     pub label_image: Option<LabelImage>,
+    /// The shape behind the letters of a drop cap, on the first line of
+    /// its paragraph (PXV-06).
+    pub drop_cap_shape: Option<DropCapBox>,
+}
+
+/// The shape behind the letters of a drop cap, where it is drawn: from
+/// the left and the top of the paragraph, as glyphs are placed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DropCapBox {
+    /// The left edge.
+    pub x: f32,
+    /// The top edge.
+    pub y: f32,
+    /// The width.
+    pub width: f32,
+    /// The height.
+    pub height: f32,
+    /// The radius of the corners.
+    pub radius: f32,
+    /// Its colors and line.
+    pub shape: desk_model::DropCapShape,
 }
 
 /// The picture of an image bullet, where it is drawn: from the left and
@@ -1055,6 +1076,7 @@ impl TextSystem {
                 carets,
                 label: None,
                 label_image: None,
+                drop_cap_shape: None,
             });
         }
         if let (Some((laid, x, format, raise, image)), Some(first)) = (label, lines.first_mut()) {

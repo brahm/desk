@@ -204,7 +204,7 @@ fn styles_in_use_cannot_be_removed() {
     editor
         .edit("Style", |edit| {
             edit.apply(Op::PutStyle {
-                style: Style::Paragraph(style),
+                style: Style::from(style),
             })?;
             edit.set_paragraph_style(start, end, id)
         })

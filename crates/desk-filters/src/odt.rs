@@ -14,11 +14,11 @@ use std::fmt;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, FontFeature, FontFeatures, FontWeight,
-    LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle,
-    ListLabel, ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs,
-    ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style,
-    StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
+    CharacterStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape, FontFeature,
+    FontFeatures, FontWeight, LINE_BREAK, LIST_LEVELS, Language, Length, Ligatures, LineColor,
+    LineSpacing, LineStyle, ListLabel, ListLevel, ListStyle, Metadata, ModelError, NumberFormat,
+    Op, PageSetup, ParaAttrs, ParaBorder, ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle,
+    Rgba, Run, Shadow, Style, StyleId, TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_model::{
     FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
@@ -500,6 +500,17 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
                 // Other programs wrap the lines by the rectangle.
                 follow_shape: d.follow_shape.unwrap_or(false),
                 outdent: d.outdent.unwrap_or(false),
+                background: d.background.map(|b| {
+                    let start = DropCapShape::default();
+                    let percent = |v: Option<u32>, or: u8| v.map_or(or, |v| v.min(100) as u8);
+                    DropCapShape {
+                        fill: rgba(b.fill),
+                        border_width: b.border_width.map_or(Length::ZERO, length),
+                        border_color: b.border_color.map_or(start.border_color, rgba),
+                        scale: percent(b.scale, start.scale).max(10),
+                        radius: percent(b.radius, start.radius),
+                    }
+                }),
             })
         }),
         // Lists come from the list elements and list styles.
@@ -686,6 +697,15 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
                 raised: (cap.raised > 0).then_some(u32::from(cap.raised)),
                 follow_shape: Some(cap.follow_shape),
                 outdent: cap.outdent.then_some(true),
+                background: cap.background.map(|b| odf::DropCapBackground {
+                    fill: odf_color(b.fill),
+                    border_width: (b.border_width > Length::ZERO)
+                        .then(|| odf_length(b.border_width)),
+                    border_color: (b.border_width > Length::ZERO)
+                        .then(|| odf_color(b.border_color)),
+                    scale: Some(u32::from(b.scale)),
+                    radius: Some(u32::from(b.radius)),
+                }),
             },
             None => odf::DropCap {
                 length: 1,

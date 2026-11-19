@@ -705,6 +705,41 @@ pub struct DropCap {
     /// Whether the letters stand in the margin, outside the indent, with
     /// the lines at the indent.
     pub outdent: bool,
+    /// A shape behind the letters, which the text then wraps around.
+    pub background: Option<DropCapShape>,
+}
+
+/// The shape behind the letters of a drop cap (PXV-06): a rectangle as
+/// tall as the letters would be, with rounded corners, and the letters
+/// smaller in its middle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DropCapShape {
+    /// The color inside.
+    pub fill: Rgba,
+    /// The width of the line around it; none when zero.
+    pub border_width: Length,
+    /// The color of the line around it.
+    pub border_color: Rgba,
+    /// How tall the letters are, in percent of their height without the
+    /// shape.
+    pub scale: u8,
+    /// How round the corners are, in percent of half the shorter side:
+    /// 100 makes a circle of a square.
+    pub radius: u8,
+}
+
+impl Default for DropCapShape {
+    /// A gray shape without a line, the letters at 80 % and the corners
+    /// at 20 %, as Pages 15.4 starts it.
+    fn default() -> Self {
+        Self {
+            fill: Rgba::rgb(127, 127, 127),
+            border_width: Length::ZERO,
+            border_color: Rgba::BLACK,
+            scale: 80,
+            radius: 20,
+        }
+    }
 }
 
 impl Default for DropCap {
@@ -716,8 +751,9 @@ impl Default for DropCap {
             characters: 1,
             distance: Length::ZERO,
             raised: 0,
-            follow_shape: true,
+            follow_shape: false,
             outdent: false,
+            background: None,
         }
     }
 }

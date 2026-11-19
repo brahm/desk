@@ -430,6 +430,44 @@ options of Pages 15.4 (PXV-06), written by `paragraph_children` in
 - **Value:** a boolean.
 - **Fallback:** the letters inside the indent.
 
+#### `desk:drop-cap-fill`
+
+- **Feature:** a shape behind the letters of a drop cap, a rectangle with
+  rounded corners as tall as the letters would be, with the letters
+  smaller in its middle and the lines beside it (PXV-06).
+- **Value:** the color inside, as `#rrggbb`. The other attributes of the
+  shape are read only with it.
+- **Fallback:** the letters without a shape, at their full height.
+
+#### `desk:drop-cap-border-width`
+
+- **Feature:** the line around the shape of a drop cap (PXV-06).
+- **Value:** a length; none when absent.
+- **Fallback:** no line.
+
+#### `desk:drop-cap-border-color`
+
+- **Feature:** the color of the line around the shape of a drop cap
+  (PXV-06).
+- **Value:** `#rrggbb`; black when absent.
+- **Fallback:** no line.
+
+#### `desk:drop-cap-scale`
+
+- **Feature:** how tall the letters of a drop cap are in its shape
+  (PXV-06).
+- **Value:** a percent of their height without the shape, from 10 % to
+  100 %; 80 % when absent.
+- **Fallback:** the letters at their full height.
+
+#### `desk:drop-cap-radius`
+
+- **Feature:** how round the corners of the shape of a drop cap are
+  (PXV-06).
+- **Value:** a percent of half the shorter side, from 0 % (square
+  corners) to 100 %; 20 % when absent.
+- **Fallback:** no shape.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

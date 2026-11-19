@@ -389,6 +389,27 @@ impl DisplayList {
                     });
                 }
             }
+            // The shape behind the letters of a drop cap (PXV-06).
+            if let Some(cap) = &placed.line.drop_cap_shape {
+                let border = cap.shape.border_width.to_pt() as f32;
+                list.items.push(Item::Path {
+                    path: shape_path(
+                        &Shape::RoundedRectangle {
+                            radius: desk_model::Length::from_pt(f64::from(cap.radius)),
+                        },
+                        cap.x + dx,
+                        cap.y + dy,
+                        cap.width,
+                        cap.height,
+                    ),
+                    fill: Some(Paint::Color(cap.shape.fill)),
+                    stroke: (border > 0.0).then(|| PathStroke {
+                        width: border,
+                        color: cap.shape.border_color,
+                        dashes: Vec::new(),
+                    }),
+                });
+            }
             for run in &placed.line.runs {
                 if run.glyphs.is_empty() {
                     continue;

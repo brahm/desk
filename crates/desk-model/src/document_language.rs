@@ -34,7 +34,7 @@ impl Edit {
         }
         style.character.language = language;
         self.apply(Op::PutStyle {
-            style: Style::Paragraph(style),
+            style: Style::from(style),
         })
     }
 }

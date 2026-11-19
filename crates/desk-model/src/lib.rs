@@ -97,9 +97,9 @@ pub use error::ModelError;
 pub use find::{Found, Query};
 pub use format::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
-    DEFAULT_TAB_INTERVAL, DropCap, FontFeature, FontFeatures, FontWeight, Language, Ligatures,
-    LineColor, LineSpacing, LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow, TabAlignment,
-    TabLeader, TabStop, TabStops,
+    DEFAULT_TAB_INTERVAL, DropCap, DropCapShape, FontFeature, FontFeatures, FontWeight, Language,
+    Ligatures, LineColor, LineSpacing, LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow,
+    TabAlignment, TabLeader, TabStop, TabStops,
 };
 pub use header::{
     DateWriter, FIELD_CHARACTER, Field, HeadersFooters, MarginKind, MarginPages, MarginPlace,

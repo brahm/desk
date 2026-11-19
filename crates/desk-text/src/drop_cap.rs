@@ -10,7 +10,7 @@ use desk_model::{DropCap, LINE_BREAK, Length, ParaFormat};
 use parley::PositionedLayoutItem;
 
 use crate::input::ParagraphText;
-use crate::layout::{GlyphRun, ParagraphLayout, TextSystem};
+use crate::layout::{DropCapBox, GlyphRun, ParagraphLayout, TextSystem};
 use crate::space::{Column, LineSpace};
 
 /// The width that the characters are laid out in, wider than any.
@@ -220,8 +220,14 @@ impl TextSystem {
         if body_caps <= 0.0 || size <= 0.0 {
             return None;
         }
-        // Capitals as tall as the lines, from capitals to baseline.
-        let cap_size = ((lines - 1.0) * pitch + body_caps) / (body_caps / size);
+        // Capitals as tall as the lines, from capitals to baseline: the
+        // height of the shape behind them, when they have one, with the
+        // letters smaller in it.
+        let height = (lines - 1.0) * pitch + body_caps;
+        let scale = cap
+            .background
+            .map_or(1.0, |shape| f32::from(shape.scale.clamp(10, 100)) / 100.0);
+        let cap_size = height / (body_caps / size) * scale;
         let mut big = format.clone();
         big.font_size = Length::from_pt(f64::from(cap_size));
         let letters =
@@ -231,14 +237,30 @@ impl TextSystem {
         let paragraph = text.paragraph();
         let indent = (paragraph.left_indent + paragraph.first_line_indent).to_pt() as f32;
         let distance = cap.distance.to_pt() as f32;
+        let baseline = text_top + first_baseline + (lines - raised - 1.0) * pitch;
+        // The shape is as wide as it is tall, or as the letters with as
+        // much room on each side as above and below them.
+        let margin = height * (1.0 - scale) / 2.0;
+        let width = match cap.background {
+            Some(_) => height.max(line.advance + 2.0 * margin),
+            None => line.advance,
+        };
         // Outdented, the letters end where the text starts.
-        let x = if cap.outdent {
-            indent - line.advance - distance
+        let left = if cap.outdent {
+            indent - width - distance
         } else {
             indent
         };
-        let baseline = text_top + first_baseline + (lines - raised - 1.0) * pitch;
-        let (dx, dy) = (x - line.x, baseline - line.baseline);
+        let shape = cap.background.map(|shape| DropCapBox {
+            x: left,
+            y: baseline - height,
+            width,
+            height,
+            radius: f32::from(shape.radius.min(100)) / 100.0 * width.min(height) / 2.0,
+            shape,
+        });
+        let x = left + (width - line.advance) / 2.0;
+        let (dx, dy) = (x - line.x, baseline - margin - line.baseline);
         let runs: Vec<GlyphRun> = line
             .runs
             .iter()
@@ -254,12 +276,12 @@ impl TextSystem {
             })
             .collect();
         // The text beside the letters starts after them: after their
-        // rectangle, or after their ink at the height of each line, as
-        // far from it as the letters end past their ink.
-        let rectangle = x + line.advance + distance;
+        // rectangle or their shape, or after their ink at the height of
+        // each line, as far from it as the letters end past their ink.
+        let rectangle = left + width + distance;
         let right: Box<dyn Fn(f32, f32) -> f32> = if cap.outdent {
             Box::new(move |_, _| indent)
-        } else if cap.follow_shape {
+        } else if cap.follow_shape && shape.is_none() {
             let ink = ink(&runs);
             let bearing = right_of(&ink, f32::MIN, f32::MAX)
                 .map_or(0.0, |widest| (x + line.advance - widest).max(0.0));
@@ -278,9 +300,10 @@ impl TextSystem {
         };
         let mut layout = self.layout(&rest, &beside, text_top);
         layout.top = top;
-        let bottom = baseline + (line.text_bottom - line.baseline);
-        layout.bottom = layout.bottom.max(bottom);
+        let bottom = baseline - margin + (line.text_bottom - line.baseline);
+        layout.bottom = layout.bottom.max(bottom).max(baseline);
         let first = layout.lines.first_mut()?;
+        first.drop_cap_shape = shape;
         first.range.start = 0;
         let mut runs = runs;
         runs.append(&mut first.runs);
