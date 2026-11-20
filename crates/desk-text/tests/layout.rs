@@ -442,6 +442,35 @@ fn soft_hyphen_draws_a_hyphen_only_at_a_break() {
 }
 
 #[test]
+fn txt_09_a_word_breaks_only_before_the_first_letter_that_does_not_fit() {
+    // Pages 15.4 hyphenates "extraordinarily" at "extraor-" only from a
+    // measure where the "d" after it fits too, not only the hyphen, and at
+    // "extra-" below that (B-023).
+    let mut system = TextSystem::new();
+    let text = format!("The word extra{SOFT_HYPHEN}or{SOFT_HYPHEN}dinarily long");
+    let width = |system: &mut TextSystem, text: &str| {
+        plain(system, ParaFormat::default(), text).lines[0].advance
+    };
+    let with_hyphen = width(&mut system, "The word extraor-");
+    let with_letter = width(&mut system, "The word extraord");
+    assert!(with_letter > with_hyphen + 1.0);
+    let first_line = |system: &mut TextSystem, measure: f32| {
+        let laid = lay_in(
+            system,
+            ParaFormat::default(),
+            &[(&text, sans())],
+            &Column::new(measure),
+        );
+        text[laid.lines[0].range.clone()].replace(SOFT_HYPHEN, "")
+    };
+    assert_eq!(first_line(&mut system, with_letter - 0.5), "The word extra");
+    assert_eq!(
+        first_line(&mut system, with_letter + 0.1),
+        "The word extraor"
+    );
+}
+
+#[test]
 fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
     let mut system = TextSystem::new();
     let text = "The hyphenation of representative words";

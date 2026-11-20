@@ -652,8 +652,20 @@ impl TextSystem {
                 let mut end = None;
                 let mut i = next_break;
                 while i < breaks.len() {
-                    if natural(pos, breaks[i], x, x + width).0 > width + 0.001 {
+                    let (wide, _) = natural(pos, breaks[i], x, x + width);
+                    if wide > width + 0.001 {
                         break;
+                    }
+                    // Pages 15.4 hyphenates a word only before the first
+                    // letter that does not fit: the letter after the
+                    // hyphen has to fit in place of the hyphen too (B-023).
+                    if let Some(hyphen) = hyphen_at(breaks[i]) {
+                        let next = clusters
+                            .get(clusters.partition_point(|c| c.start < breaks[i]))
+                            .map_or(0.0, |c| c.advance);
+                        if wide - hyphen.3 + next > width + 0.001 {
+                            break;
+                        }
                     }
                     end = Some(i);
                     if mandatory(breaks[i]) {
