@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Screen View, as in Pages (View menu, Ctrl+Shift+R): the text
+  flows in one column as wide as the window, without pages, margins,
+  headers or footers, with the objects in the flow and Text Size to make
+  the text bigger or smaller; a preference opens new documents in it.
 * Added: dragging the selected cells of a table, as in Pages: they move,
   with Alt they are copied, onto another table they go there, and onto
   the page they make a new table; a table that grows moves the objects

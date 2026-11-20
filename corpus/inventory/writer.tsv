@@ -12,7 +12,7 @@ W008	3.1 Window, menus and panes	Adjust Image window	Different	15.4	D-001	In	Don
 W009	3.1 Window, menus and panes	Document Warnings window	Different	15.4	D-001	In	Done	-	B1	Banner with View Warnings and Document Warnings in the View menu (INT-22); the Warnings window replaces each missing font
 W010	3.1 Window, menus and panes	Bottom bar	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	B1	Zoom and word count over the document; Go to Page, the previous and the next place and Navigate By in the View menu (GNM-13, INT-19, step 3 of M+)
 W011	3.1 Window, menus and panes	Left pane	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	B1	Thumbnails, the table of contents (with Edit and Insert), styles and search results in the sidebar; the Comments page only says there are none (W2)
-W012	3.1 Window, menus and panes	Full screen	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed; the window changes (D-008)	W1	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
+W012	3.1 Window, menus and panes	Full screen	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	done	Full screen with F11 (DOC-07), and Screen View inside it (PXV-01)
 W013	3.1 Window, menus and panes	Several documents	Different	15.4	D-001	In	Done	-	B1	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
 W014	3.1 Window, menus and panes	Dark mode	Only 15	15.4	D-001	In	Done	-	B1	Libadwaita follows the light/dark style of the system
 W015	3.1 Window, menus and panes	Preferences	Equal	Equal in both	-	In	Done	-	B1	Preferences (General, Rulers, Correction) with AdwPreferencesDialog
@@ -41,9 +41,9 @@ W037	3.2 Documents, templates and files	Recent files	Equal	Equal in both	-	In	Do
 W038	3.3 View and navigation	Zoom	Equal	Equal in both	-	In	Done	-	done	Zoom (INT-07)
 W039	3.3 View and navigation	Two pages	Equal	Equal in both	-	In	Done	-	done	One or two pages (INT-08)
 W040	3.3 View and navigation	Thumbnails	Equal	Equal in both	-	In	Done	-	done	Thumbnails that reorder sections (EST-17)
-W041	3.3 View and navigation	Table of contents in the sidebar	Only 15	15.4	D-001	In	Missing	-	W1	Live table of contents in the sidebar
+W041	3.3 View and navigation	Table of contents in the sidebar	Only 15	15.4	D-001	In	Done	-	done	Live table of contents in the sidebar, which follows the headings as they are typed (PXV-02)
 W042	3.3 View and navigation	Outline mode	Only '09	'09, in the form of the 15	D-002	In	Done	-	done	Outline mode (TXT-14)
-W043	3.3 View and navigation	Screen View	Only 15	15.4	D-001	In	Missing	-	W1	Screen View
+W043	3.3 View and navigation	Screen View	Only 15	15.4	D-001	In	Done	-	done	Screen View (View menu, Ctrl+Shift+R): the text in one flow as wide as the window, with Text Size and a notice of what it hides (PXV-01)
 W044	3.3 View and navigation	Invisibles	Equal (15 chooses the color)	Equal in both	-	In	Done	-	done	Invisibles (INT-10); the configurable color of the 15 does not exist
 W045	3.3 View and navigation	Layout marks	Equal	Equal in both	-	In	Done	-	done	Show Layout (INT-09)
 W046	3.3 View and navigation	Rulers	Equal	Equal in both	-	In	Done	-	done	Rulers and guides (INT-17)

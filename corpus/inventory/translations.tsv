@@ -438,7 +438,7 @@ note	Ajustar Imagem na aba Imagem do Inspetor (OBJ-07, etapa 4)	Adjust Image in 
 note	Banner com Ver avisos (INT-22) feito; falta Substituir Fontes, que o 15 oferece direto do aviso	Banner with View Warnings (INT-22) done; Replace Fonts, which the 15 offers right from the warning, is missing
 note	Zoom e contagem de palavras sobre o documento; Ir para a Página, o lugar anterior e o próximo e Navegar Por no menu Visualização (GNM-13, INT-19, passo 3 da M+)	Zoom and word count over the document; Go to Page, the previous and the next place and Navigate By in the View menu (GNM-13, INT-19, step 3 of M+)
 note	Miniaturas, estilos e resultados da busca na barra lateral; falta o sumário vivo do 15 e a página Comentários só diz que não há (fase 8)	Thumbnails, styles and search results in the sidebar; the live table of contents of the 15 is missing and the Comments page only says there are none (phase 8)
-note	Tela cheia por F11 (DOC-07); falta o Screen View do 15 (fluxo contínuo para escrever)	Full screen with F11 (DOC-07); the Screen View of the 15 (continuous flow for writing) is missing
+note	Tela cheia com F11 (DOC-07), e a Visualização de Tela dentro dela (PXV-01)	Full screen with F11 (DOC-07), and Screen View inside it (PXV-01)
 note	Documentos em abas de uma janela, com a visão geral das abas (AdwTabView, passo 1 da M+)	Documents in tabs of one window, with the tab overview (AdwTabView, step 1 of M+)
 note	Libadwaita segue o estilo claro/escuro do sistema	Libadwaita follows the light/dark style of the system
 note	Preferências (Geral, Réguas, Correção) com AdwPreferencesDialog	Preferences (General, Rulers, Correction) with AdwPreferencesDialog
@@ -467,9 +467,9 @@ note	Abrir recente pelo RecentManager do GTK	Open Recent through the GTK RecentM
 note	Zoom (INT-07)	Zoom (INT-07)
 note	Uma ou duas páginas (INT-08)	One or two pages (INT-08)
 note	Miniaturas que reordenam seções (EST-17)	Thumbnails that reorder sections (EST-17)
-note	Sumário vivo na barra lateral	Live table of contents in the sidebar
+note	Índice vivo na barra lateral, que acompanha os títulos enquanto são digitados (PXV-02)	Live table of contents in the sidebar, which follows the headings as they are typed (PXV-02)
 note	Modo Estrutura de Tópicos (TXT-14)	Outline mode (TXT-14)
-note	Screen View	Screen View
+note	Visualização de Tela (menu Visualizar, Ctrl+Shift+R): o texto num fluxo só, da largura da janela, com Tamanho do Texto e um aviso do que ela oculta (PXV-01)	Screen View (View menu, Ctrl+Shift+R): the text in one flow as wide as the window, with Text Size and a notice of what it hides (PXV-01)
 note	Invisíveis (INT-10); a cor configurável do 15 não existe	Invisibles (INT-10); the configurable color of the 15 does not exist
 note	Mostrar leiaute (INT-09)	Show Layout (INT-09)
 note	Réguas e guias (INT-17)	Rulers and guides (INT-17)
