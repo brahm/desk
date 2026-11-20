@@ -272,6 +272,14 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(styles) = &text.chart_styles {
             config_item(&mut w, "ChartStyles", "string", &styles.join("\n"));
         }
+        if !text.custom_formats.is_empty() {
+            config_item(
+                &mut w,
+                "CustomFormats",
+                "string",
+                &text.custom_formats.join("\n"),
+            );
+        }
         if !text.never_hyphenate.is_empty() {
             config_item(
                 &mut w,

@@ -415,6 +415,18 @@ fn sample() -> Document {
                     });
                     styles
                 },
+                // Two custom formats, a number in kilograms and a date
+                // (PXV-18).
+                custom_formats: vec![
+                    desk_model::table::CustomFormat {
+                        name: "Kilograms".into(),
+                        pattern: "#,##0.0 \"kg\"".into(),
+                    },
+                    desk_model::table::CustomFormat {
+                        name: "Day".into(),
+                        pattern: "dd/MM".into(),
+                    },
+                ],
             },
         })
         .unwrap();

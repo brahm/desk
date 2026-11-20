@@ -32,6 +32,7 @@ mod cell_drag;
 mod chart_looks;
 mod connections;
 mod copies;
+mod custom_formats;
 mod guides;
 mod media;
 mod navigate;

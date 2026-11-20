@@ -565,6 +565,17 @@ written as `desk:chart` writes them. Other programs ignore the item; Desk
 reads a document without it, or with no line it can read, with the six
 styles.
 
+#### Custom cell formats (settings, not an attribute)
+
+The custom formats of the cells of a document (PXV-18, TAB-31), which
+the Data Format menu lists by name, are kept in the `CustomFormats` item
+of the `DeskTextSettings` set in `settings.xml`, written only when there
+is one. Each line is one format, in the order of the menu, as a JSON
+object with `name` and `pattern`, the pattern in the syntax of
+spreadsheets that `desk:table` keeps for a cell. A cell keeps its own
+copy of its format in `desk:table`, so a format renamed or deleted in the
+menu stays on the cells that have it. Other programs ignore the item.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

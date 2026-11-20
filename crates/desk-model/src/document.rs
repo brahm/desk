@@ -98,6 +98,9 @@ pub struct TextSettings {
     pub drop_cap_styles: Vec<crate::DropCapStyle>,
     /// The chart styles, in the order of their pictures (W080).
     pub chart_styles: Vec<crate::ChartStyle>,
+    /// The custom formats of the cells of tables, in the order of the
+    /// Data Format menu (PXV-18, TAB-31).
+    pub custom_formats: Vec<crate::table::CustomFormat>,
 }
 
 /// A guide fixed on a page, dragged out of a ruler, that objects snap to
@@ -145,6 +148,7 @@ impl Default for TextSettings {
             guides: Vec::new(),
             drop_cap_styles: crate::DropCapStyle::library().to_vec(),
             chart_styles: crate::ChartStyle::library().to_vec(),
+            custom_formats: Vec::new(),
         }
     }
 }

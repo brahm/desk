@@ -3173,7 +3173,8 @@ def tables_and_charts(work):
     are saved in the file (TAB-01, TAB-02, TAB-22, GRF-01, GRF-03,
     GNM-04). The Table and Chart tabs show the table and chart styles
     (PXV-14, W080), a locked table is not edited (PXV-16), and cells
-    dragged onto the page make a new table (TAB-26, PXV-17)."""
+    dragged onto the page make a new table (TAB-26, PXV-17), with a custom
+    format (PXV-18)."""
     name = "Tables.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -3254,10 +3255,32 @@ def tables_and_charts(work):
             and len(re.findall(r'office:value="7"', saved_part(letter, "content.xml", "(?s).*").group(0))) == 2,
         )
         check("cells dragged onto the page make a new table and stay in theirs (TAB-26, PXV-17)", True)
+        # Create Custom Format, at the end of the Data Format menu, keeps a
+        # format under a name in the settings of the file and gives it to
+        # the cells (PXV-18).
+        choose_in_list(app, "Data Format", name, ["End", "Return"])
+        ok = wait_for(
+            "the Create Custom Format sheet",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.BUTTON and n.get_name() == "OK" and showing(n)
+                ),
+                None,
+            ),
+        )
+        Atspi.Action.do_action(ok, 0)
+        press("ctrl+s")
+        wait_for(
+            "the custom format in the saved file",
+            lambda: saved_part(letter, "settings.xml", r'config:name="CustomFormats"[^>]*>[^<]*Custom Format 1'),
+        )
+        check("Create Custom Format keeps a format by name in the file (PXV-18)", True)
         # The Table tab shows the table styles, and Create Style keeps the
         # look of the table as a new one, saved as an ODF table template
         # (PXV-14).
-        wait_for("the table styles of the Table tab", lambda: showing_named(app, "Blue"))
+        wait_for("the table styles of the Table tab", lambda: inspector_node(app, "Blue"))
         create = wait_for("the Create Style button", lambda: showing_named(app, "Create Style"))
         Atspi.Action.do_action(create, 0)
         press("ctrl+s")
