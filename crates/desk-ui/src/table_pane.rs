@@ -197,6 +197,12 @@ pub struct TableGroups {
     rows: compact::SpinRow,
     cols: compact::SpinRow,
     format: compact::ComboRow,
+    /// The custom formats that the Data Format menu lists after the
+    /// others: those of the document, and the one of the cell when it is
+    /// not among them (PXV-18).
+    custom_formats: std::cell::RefCell<Vec<desk_model::table::CustomFormat>>,
+    /// Edit Custom Format, for a format of the document (PXV-18, TAB-31).
+    edit_format: gtk::Button,
     decimals: compact::SpinRow,
     thousands: compact::SwitchRow,
     fill_on: compact::SwitchRow,
@@ -297,6 +303,10 @@ impl TableGroups {
         rows_cols.add_widget(&actions);
 
         let format = combo(n_("Data Format"), &FORMATS);
+        let edit_format = gtk::Button::builder()
+            .label(tr("Edit Custom Format…"))
+            .visible(false)
+            .build();
         let decimals = spin(n_("Decimals"), 0.0, 10.0);
         let thousands = switch(n_("Thousands Separator"));
         let fill_on = switch(n_("Fill"));
@@ -315,6 +325,7 @@ impl TableGroups {
         let comment = compact::EntryRow::builder().title(tr("Comment")).build();
         let cell = compact::Group::builder().title(tr("Cell")).build();
         cell.add(&format);
+        cell.add_widget(&edit_format);
         cell.add(&decimals);
         cell.add(&thousands);
         cell.add(&fill_on);
@@ -436,6 +447,8 @@ impl TableGroups {
             rows,
             cols,
             format,
+            custom_formats: std::cell::RefCell::new(Vec::new()),
+            edit_format,
             decimals,
             thousands,
             fill_on,
@@ -581,6 +594,20 @@ impl TableGroups {
         let format = run(
             self,
             Box::new(|this, editor| {
+                // After the formats of iWork come the custom ones and
+                // Create Custom Format (PXV-18).
+                let at = this.format.selected();
+                if let Some(i) = at.checked_sub(FORMATS.len() as u32) {
+                    let custom = this.custom_formats.borrow().get(i as usize).cloned();
+                    match custom {
+                        Some(custom) => editor.set_cell_format(Format::Custom(custom)),
+                        None => {
+                            crate::custom_format::present(&*this.format, editor, None);
+                            this.show(editor);
+                        }
+                    }
+                    return;
+                }
                 let decimals = (this.format.selected() != 0 && this.decimals.value() >= 0.0)
                     .then(|| this.decimals.value() as u8);
                 let symbol = editor.locale().currency.clone();
@@ -601,6 +628,20 @@ impl TableGroups {
             self.decimals.connect_value_notify(move |_| f());
         }
         self.thousands.connect_active_notify(move |_| format());
+        {
+            let edit = run(
+                self,
+                Box::new(|this, editor| {
+                    let at = this.format.selected() as usize;
+                    if let Some(i) = at.checked_sub(FORMATS.len())
+                        && i < editor.custom_formats().len()
+                    {
+                        crate::custom_format::present(&*this.format, editor, Some(i));
+                    }
+                }),
+            );
+            self.edit_format.connect_clicked(move |_| edit());
+        }
         // The fill of the cells.
         let fill = run(
             self,
@@ -803,6 +844,42 @@ impl TableGroups {
         *self.shown_styles.borrow_mut() = Some(shown);
     }
 
+    /// Shows the format of the cell in the Data Format menu, with the
+    /// custom formats after those of iWork, and Edit Custom Format for
+    /// one of the document (PXV-18).
+    fn show_format(&self, editor: &crate::editing::TextEditor, format: &Format) {
+        let mut custom = editor.custom_formats();
+        let saved = custom.len();
+        if let Format::Custom(c) = format
+            && !custom.contains(c)
+        {
+            custom.push(c.clone());
+        }
+        let items = (FORMATS.len() + custom.len() + 1) as u32;
+        let listed = self.format.model().map_or(0, |m| m.n_items());
+        if *self.custom_formats.borrow() != custom || listed != items {
+            let names: Vec<String> = FORMATS
+                .iter()
+                .map(|f| tr(f))
+                .chain(custom.iter().map(|c| c.name.clone()))
+                .chain(std::iter::once(tr("Create Custom Format…")))
+                .collect();
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            self.format.set_model(Some(&gtk::StringList::new(&names)));
+            *self.custom_formats.borrow_mut() = custom.clone();
+        }
+        let position = match format {
+            Format::Custom(c) => custom.iter().position(|f| f == c),
+            _ => None,
+        };
+        self.format.set_selected(match position {
+            Some(i) => FORMATS.len() as u32 + i as u32,
+            None => format_index(format),
+        });
+        self.edit_format
+            .set_visible(position.is_some_and(|i| i < saved));
+    }
+
     /// Shows the selected table and cells.
     pub fn show(&self, editor: &crate::editing::TextEditor) {
         let Some((table, area)) = editor.table_selection() else {
@@ -849,7 +926,7 @@ impl TableGroups {
         set_spin(&self.rows, f64::from(table.rows()));
         set_spin(&self.cols, f64::from(table.cols()));
         let cell = table.cell(area.row, area.col);
-        self.format.set_selected(format_index(&cell.format));
+        self.show_format(editor, &cell.format);
         set_spin(
             &self.decimals,
             f64::from(format_decimals(&cell.format).unwrap_or(0)),

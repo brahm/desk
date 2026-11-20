@@ -310,6 +310,9 @@ pub struct TextSettings {
     /// The chart styles (W080), one a line, as the filter writes them;
     /// none when the document has those of a new one.
     pub chart_styles: Option<Vec<String>>,
+    /// The custom formats of cells (PXV-18), one a line, as the filter
+    /// writes them.
+    pub custom_formats: Vec<String>,
 }
 
 /// A list style (`text:list-style`).

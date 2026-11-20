@@ -24,6 +24,7 @@ mod chart_styles;
 mod color_popover;
 mod compact;
 mod contents_page;
+mod custom_format;
 mod document_controls;
 mod drop_cap_pane;
 mod drop_cap_styles;

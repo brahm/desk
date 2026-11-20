@@ -1855,6 +1855,11 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 })
                 .filter(|styles| !styles.is_empty())
                 .unwrap_or_else(|| ChartStyle::library().to_vec()),
+            custom_formats: text
+                .custom_formats
+                .iter()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .collect(),
         },
     })?;
 
@@ -2789,6 +2794,11 @@ pub fn export(document: &Document) -> odf::TextDocument {
             }),
             chart_styles: (settings.chart_styles != ChartStyle::library())
                 .then(|| settings.chart_styles.iter().map(odf_chart_style).collect()),
+            custom_formats: settings
+                .custom_formats
+                .iter()
+                .filter_map(|f| serde_json::to_string(f).ok())
+                .collect(),
             ..odf_note_settings(settings.notes)
         },
         notes_configuration: notes_configuration(settings.notes),

@@ -52,6 +52,7 @@ mod case_change;
 mod chart_style;
 mod connection;
 mod convert_quotes;
+mod custom_format;
 mod document;
 mod document_language;
 mod drop_cap_style;
