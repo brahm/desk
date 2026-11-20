@@ -12,7 +12,7 @@ backlog	B-008	done
 backlog	B-009	done
 backlog	B-010	done
 backlog	B-011	done
-backlog	B-012	open
+backlog	B-012	done
 backlog	B-013	open
 backlog	B-014	open
 backlog	B-015	open
@@ -566,9 +566,9 @@ feature	W126	done
 feature	W127	done
 feature	W128	done
 feature	W129	done
-feature	W130	missing
+feature	W130	done
 feature	W131	review
-feature	W132	partial
+feature	W132	done
 feature	W133	partial
 feature	W134	done
 feature	W135	done

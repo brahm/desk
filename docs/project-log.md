@@ -1374,6 +1374,26 @@ matrix rows done on 9 November, before the change of target.
   not measured on the Mac.
 - W138 and W140 are done for W1.
 
+### 20 November: cells dragged, objects aside, custom formats (W130, W132, B-012, step 15 of W1)
+
+- A drag from inside the selected cells of a table moves them where it
+  ends, and Alt copies them; dropped on another table they go there,
+  and dropped on the page they make a new table with its title shown,
+  the source keeping them, as Pages 15 does (pull request 174).
+- A table that grows moves the objects beside it to the right and those
+  under it down, as Pages '09 did, with a preference to turn it off
+  (pull request 175), kept from '09 (D-003). Whether Pages 15.4 still
+  moves objects aside, and has the preference, is to be checked on the Mac
+  in step 19, as are the title of a table made from cells and the cells
+  that keep an edited format.
+- Create Custom Format, at the end of the Data Format menu, opens a sheet
+  with a name, a kind, the pattern and its pieces, and a preview; Edit
+  Custom Format changes, renames, moves or deletes a format, and cells
+  keep theirs (pull request 176). The formats are settings of the
+  document. In Pages the pieces are dragged into the pattern; here a
+  click puts one at the cursor.
+- B-012 is closed. W130 and W132 are done for W1.
+
 
 ## Decisions, with their reasons and consequences
 

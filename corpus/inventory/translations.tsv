@@ -556,9 +556,9 @@ note	Redimensionar, girar, espelhar (OBJ-33, OBJ-34)	Resize, rotate, flip (OBJ-3
 note	Inserir tabela (TAB-01), com os estilos de tabela à vista no botão Tabela: um clique insere uma tabela no estilo (PXV-14)	Insert table (TAB-01), with the table styles in view in the Table button: a click inserts a table of the style (PXV-14)
 note	Linhas, colunas, cabeçalhos e rodapés (TAB-10 a TAB-13)	Rows, columns, headers and footers (TAB-10 to TAB-13)
 note	Converter texto em tabela (TAB-05)	Convert text to table (TAB-05)
-note	Criar tabela arrastando células para fora	Create a table by dragging cells out
+note	Arrastar as células selecionadas para a página cria uma tabela só delas, com o título à mostra, e a origem as mantém (PXV-17); dentro da tabela elas se movem, com Alt são copiadas, e sobre outra tabela vão para ela (TAB-26)	A drag from the selected cells onto the page makes a new table of their own with its title shown, the source keeping them (PXV-17); within a table they move, with Alt they are copied, and onto another table they go there (TAB-26)
 note	Mesclar e dividir (TAB-23, TAB-24)	Merge and split (TAB-23, TAB-24)
-note	Formatos, fração e sistema numérico (TAB-28 a TAB-30); falta a janela de gerenciar formatos (TAB-31)	Formats, fraction and numeral system (TAB-28 to TAB-30); the window to manage formats is missing (TAB-31)
+note	Formatos, fração e sistema numérico (TAB-28 a TAB-30); Criar formato personalizado no fim do menu Formato de dados, e Editar formato personalizado para mudar, renomear, mover ou excluir um (PXV-18, TAB-31), guardados nos ajustes do arquivo	Formats, fraction and numeral system (TAB-28 to TAB-30); Create Custom Format at the end of the Data Format menu, and Edit Custom Format to change, rename, move or delete one (PXV-18, TAB-31), kept in the settings of the file
 note	Navegador de funções e 94 funções; o 15 tem 250+; funções que buscam na internet ficam fora	Function browser and 94 functions; the 15 has 250+; functions that fetch from the internet stay out
 note	Formatação condicional (TAB-21)	Conditional formatting (TAB-21)
 note	Ordenar (TAB-15)	Sort (TAB-15)
