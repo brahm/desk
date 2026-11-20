@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: dragging the selected cells of a table, as in Pages: they move,
+  with Alt they are copied, onto another table they go there, and onto
+  the page they make a new table; a table that grows moves the objects
+  beside and under it aside; and custom formats of cells, made, edited,
+  renamed, moved and deleted from the Data Format menu.
 * Added: the title of a table, as in Pages: its name centered above it,
   with a line around it when asked; and locked tables and charts, which
   are not edited until unlocked.
