@@ -18,13 +18,20 @@ use desk_model::{
 use crate::fonts::pages_font;
 use crate::layout::SOFT_HYPHEN;
 
+/// The language whose patterns hyphenate text of an undetermined
+/// language: Pages 15.4 hyphenates such text, as the documents of Pages
+/// '09 have, as English, where Pages '09 found no break in it (B-023).
+const UNDETERMINED_HYPHENATION: &str = "en-US";
+
 /// The byte offsets in a text where its words may break with a hyphen,
-/// in order: none for the undetermined language or a language without
-/// patterns, nor in words that have soft hyphens of their own.
+/// in order: none for a language without patterns, nor in words that
+/// have soft hyphens of their own.
 fn hyphen_points(text: &str, language: &str, settings: &TextSettings) -> Vec<usize> {
-    if language == "und" {
-        return Vec::new();
-    }
+    let language = if language == "und" {
+        UNDETERMINED_HYPHENATION
+    } else {
+        language
+    };
     let Some(patterns) = desk_lang::patterns(language) else {
         return Vec::new();
     };
