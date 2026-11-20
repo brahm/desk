@@ -3172,7 +3172,8 @@ def tables_and_charts(work):
     chart from the menu shows the Chart, Axis and Series tabs, and both
     are saved in the file (TAB-01, TAB-02, TAB-22, GRF-01, GRF-03,
     GNM-04). The Table and Chart tabs show the table and chart styles
-    (PXV-14, W080), and a locked table is not edited (PXV-16)."""
+    (PXV-14, W080), a locked table is not edited (PXV-16), and cells
+    dragged onto the page make a new table (TAB-26, PXV-17)."""
     name = "Tables.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -3213,6 +3214,46 @@ def tables_and_charts(work):
             and saved_content(letter, r'<table:table-cell [^>]*office:value="42"'),
         )
         check("typing in the cells and a formula reach the file (TAB-01, TAB-22)", True)
+        # Selected cells dragged out of the table onto the page make a new
+        # table of their own, and the table keeps them (TAB-26, PXV-17).
+        type_text("7")
+        field = wait_for(
+            "the field over the cell",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() in (Atspi.Role.TEXT, Atspi.Role.ENTRY)
+                    and showing(n)
+                    and text_of(n) == "7"
+                ),
+                None,
+            ),
+        )
+        box = extents(field)
+        press("Return", "Up")
+        geometry = subprocess.run(
+            ["xdotool", "search", "--name", name, "getwindowgeometry", "--shell"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        window = dict(line.split("=", 1) for line in geometry.split() if "=" in line)
+        x = int(window["X"]) + box.x + box.width // 2
+        y = int(window["Y"]) + box.y + box.height // 2
+        subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y), "mousedown", "1"], check=True)
+        for step in range(1, 11):
+            subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y - step * 16)], check=True)
+            time.sleep(0.05)
+        subprocess.run(["xdotool", "mouseup", "1"], check=True)
+        time.sleep(0.5)
+        press("ctrl+s")
+        wait_for(
+            "the new table of the dragged cell in the saved file",
+            lambda: saved_content(letter, r'(?s)table:name="Table 2".*office:value="7"')
+            and len(re.findall(r'office:value="7"', saved_part(letter, "content.xml", "(?s).*").group(0))) == 2,
+        )
+        check("cells dragged onto the page make a new table and stay in theirs (TAB-26, PXV-17)", True)
         # The Table tab shows the table styles, and Create Style keeps the
         # look of the table as a new one, saved as an ODF table template
         # (PXV-14).

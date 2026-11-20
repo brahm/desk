@@ -34,6 +34,8 @@ const NAMES: &[&str] = &[
     n_("Draw Shape"),
     n_("Layout Order"),
     n_("Outline Table Title"),
+    n_("Move Cells"),
+    n_("Copy Cells"),
     n_("Paste Chart Style"),
     n_("Paste Table Style"),
     n_("Remove from Thread"),

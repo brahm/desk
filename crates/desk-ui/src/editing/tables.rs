@@ -191,15 +191,32 @@ impl TextEditor {
         if let Some(entry) = style.and_then(|s| self.document().table_styles().get(s).cloned()) {
             entry.look.apply_to(&mut table);
         }
+        self.add_table(table, None, (1, 1));
+    }
+
+    /// The name of the next table: Table and the number after those of
+    /// the document.
+    pub(super) fn next_table_name(&self) -> String {
         let count = self
             .document()
             .objects()
             .iter()
             .filter(|o| matches!(o.kind, ObjectKind::Table(_)))
             .count();
-        table.name = format!("{} {}", crate::i18n::tr("Table"), count + 1);
+        format!("{} {}", crate::i18n::tr("Table"), count + 1)
+    }
+
+    /// Puts a new table on the page, centered on `at` or in the middle of
+    /// the page shown, and selects it with the cell `cell` chosen.
+    pub(super) fn add_table(
+        &self,
+        mut table: Table,
+        at: Option<(usize, f64, f64)>,
+        cell: (u32, u32),
+    ) {
+        table.name = self.next_table_name();
         let size = self.table_size(&table);
-        let (page, frame) = self.placed_frame(|_| size, None);
+        let (page, frame) = self.placed_frame(|_| size, at);
         self.leave_story(None);
         self.close_cell_editor(false);
         let selection = self.selection();
@@ -215,8 +232,8 @@ impl TextEditor {
             Ok(id) => {
                 self.state.borrow_mut().cells = Some(CellSelection {
                     id,
-                    anchor: (1, 1),
-                    focus: (1, 1),
+                    anchor: cell,
+                    focus: cell,
                 });
                 self.select_new_object(selection, id);
             }
@@ -674,6 +691,19 @@ impl TextEditor {
         let Some(cell) = cell else {
             return false;
         };
+        // A press inside the selected cells may start dragging them
+        // (TAB-26); without a drag, it selects the cell on release.
+        if selected
+            && presses == 1
+            && !shift
+            && let Some(cells) = self.selected_cells().filter(|c| c.id == id)
+            && let Some((table, _)) = self.table_selection()
+            && cells.area(&table).contains(cell.0, cell.1)
+        {
+            self.close_cell_editor(true);
+            self.start_cell_drag(id, cells.area(&table), cell);
+            return true;
+        }
         if !selected && presses < 2 {
             self.close_cell_editor(true);
             self.state.borrow_mut().cells = None;

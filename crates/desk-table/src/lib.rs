@@ -16,6 +16,7 @@
 mod cell;
 mod conditional;
 mod copy;
+mod drag;
 mod eval;
 mod format;
 mod nav;

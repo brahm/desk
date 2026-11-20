@@ -28,6 +28,7 @@ use crate::i18n::tr;
 use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
+mod cell_drag;
 mod chart_looks;
 mod connections;
 mod copies;
@@ -406,6 +407,8 @@ struct State {
     drag_from: Option<Selection>,
     /// A drag of the label of a list item (LST-02, PXV-11).
     item_drag: Option<ItemDrag>,
+    /// Selected cells being dragged (TAB-26, PXV-17).
+    cell_drag: Option<cell_drag::CellDrag>,
     /// The picture that clicks take colors out of, while Instant Alpha
     /// is on (OBJ-06), and whether a press on it is being dragged.
     alpha_pick: Option<(desk_model::NodeId, bool)>,
@@ -576,6 +579,7 @@ impl TextEditor {
                 unit: Unit::Character,
                 drag_from: None,
                 item_drag: None,
+                cell_drag: None,
                 alpha_pick: None,
                 pen: None,
                 connection_drag: None,
@@ -3982,7 +3986,9 @@ impl TextEditor {
             let Some((x, y)) = gesture.start_point() else {
                 return;
             };
-            if this.drag_alpha(dx, dy)
+            let copying = cell_drag::copying(gesture.current_event_state());
+            if this.drag_cells(dx, dy, copying)
+                || this.drag_alpha(dx, dy)
                 || this.drag_pen(dx, dy)
                 || this.drag_points(x + dx, y + dy)
                 || this.drag_connection(x + dx, y + dy)
@@ -4014,10 +4020,14 @@ impl TextEditor {
             }
         });
         let weak = self.downgrade();
-        drag.connect_drag_end(move |_, _, _| {
+        drag.connect_drag_end(move |gesture, dx, dy| {
             let Some(this) = weak.upgrade() else {
                 return Default::default();
             };
+            if let Some((x, y)) = gesture.start_point() {
+                let copying = cell_drag::copying(gesture.current_event_state());
+                this.end_cell_drag(x + dx, y + dy, copying);
+            }
             this.end_object_drag();
             this.end_marquee();
             this.end_guide_drag();
