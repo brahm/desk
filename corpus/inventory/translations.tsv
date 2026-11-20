@@ -564,9 +564,9 @@ note	Formatação condicional (TAB-21)	Conditional formatting (TAB-21)
 note	Ordenar (TAB-15)	Sort (TAB-15)
 note	Preenchimento automático e sugestões da coluna (TAB-19)	Autofill and suggestions from the column (TAB-19)
 note	Cores alternadas (TAB-14)	Alternating colors (TAB-14)
-note	Título da tabela	Table title
+note	Título na aba Tabela mostra o nome da tabela centralizado acima dela, dentro da tabela, e Contornar título da tabela desenha uma linha em volta (PXV-15); guardado no desk:table	Title in the Table tab shows the name of the table centered above it, inside the table, and Outline Table Title draws a line around it (PXV-15); kept in desk:table
 note	Tabela da direita para a esquerda	Right-to-left table
-note	Travar tabela	Lock table
+note	Travar e destravar tabela: uma tabela travada só é selecionada como objeto, suas células não são editadas e suas abas ficam desligadas até destravar (PXV-16); guardado como style:protect do quadro	Lock and Unlock of a table: a locked table is selected only as an object, its cells are not edited and its tabs are off until Unlock (PXV-16); kept as the style:protect of its frame
 note	Onze tipos 2D e 3D (GRF-01); faltam rosca, radar, bolhas e interativo	Eleven 2D and 3D types (GRF-01); donut, radar, bubble and interactive are missing
 note	Editor de Dados (GRF-03, GRF-05); faltam compartilhar o eixo X e a amostragem	Data Editor (GRF-03, GRF-05); sharing the X axis and sampling are missing
 note	Eixos, rótulos e legenda (GRF-07, GRF-10, GRF-12)	Axes, labels and legend (GRF-07, GRF-10, GRF-12)
