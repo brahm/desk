@@ -195,6 +195,9 @@ pub struct Preferences {
     /// Whether a drag of objects shows where they go, how big they get or
     /// how far they turn, next to the pointer (OBJ-23).
     pub show_size_and_position: bool,
+    /// Whether a table that grows moves the objects beside and under it
+    /// aside, as Pages '09 did (TAB-09).
+    pub move_objects_aside: bool,
 }
 
 /// The color of invisible characters until it is changed: the blue of
@@ -247,6 +250,7 @@ impl Default for Preferences {
             guides_at_center: true,
             guides_at_edges: false,
             show_size_and_position: true,
+            move_objects_aside: true,
         }
     }
 }
@@ -361,6 +365,7 @@ impl Preferences {
         out.show_size_and_position = editing("show-size-and-position", out.show_size_and_position);
         out.guides_at_center = editing("guides-at-center", out.guides_at_center);
         out.guides_at_edges = editing("guides-at-edges", out.guides_at_edges);
+        out.move_objects_aside = editing("move-objects-aside", out.move_objects_aside);
         let correct = &mut out.autocorrect;
         correct.capitalization = editing("fix-capitalization", correct.capitalization);
         correct.ordinals = editing("superscript-ordinals", correct.ordinals);
@@ -424,6 +429,7 @@ impl Preferences {
         file.set_string(EDITING, "guide-color", &color_key(self.guide_color));
         file.set_boolean(EDITING, "guides-at-center", self.guides_at_center);
         file.set_boolean(EDITING, "guides-at-edges", self.guides_at_edges);
+        file.set_boolean(EDITING, "move-objects-aside", self.move_objects_aside);
         file.set_boolean(
             EDITING,
             "show-size-and-position",
@@ -772,6 +778,14 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         current.show_size_and_position,
         |p, on| p.show_size_and_position = on,
     ));
+    if !tables {
+        objects.add(&switch(
+            &tr("Move Objects Aside as Tables Grow"),
+            &tr("Rows and columns added to a table push the objects beside and under it"),
+            current.move_objects_aside,
+            |p, on| p.move_objects_aside = on,
+        ));
+    }
     let page = adw::PreferencesPage::builder()
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
@@ -998,6 +1012,7 @@ mod tests {
             guides_at_center: false,
             guides_at_edges: true,
             show_size_and_position: false,
+            move_objects_aside: false,
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -1016,6 +1031,7 @@ mod tests {
         assert!(Preferences::read(&empty).guides_at_center);
         assert!(!Preferences::read(&empty).guides_at_edges);
         assert!(Preferences::read(&empty).show_size_and_position);
+        assert!(Preferences::read(&empty).move_objects_aside);
         assert_eq!(
             Preferences::read(&empty).autocorrect,
             AutoCorrect::default()

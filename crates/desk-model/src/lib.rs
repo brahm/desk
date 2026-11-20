@@ -45,6 +45,7 @@
 //! ```
 
 mod arrange;
+mod aside;
 mod auto_numbers;
 mod autocorrect;
 mod case_change;

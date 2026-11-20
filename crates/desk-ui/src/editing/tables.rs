@@ -354,14 +354,19 @@ impl TextEditor {
         cells.focus = clamp(cells.focus);
         let (w, h) = self.table_size(&changed);
         let changed = Arc::new(changed);
+        let aside = crate::preferences::get().move_objects_aside;
         self.arrange_objects(name, move |edit, _| {
             let Some(mut object) = edit.document().objects().get(id).cloned() else {
                 return Ok(None);
             };
+            let old = object.frame;
             object.kind = ObjectKind::Table(changed);
             object.frame.width = desk_model::Length::from_pt(w);
             object.frame.height = desk_model::Length::from_pt(h);
             edit.replace_object(object)?;
+            if aside {
+                edit.move_aside(id, old)?;
+            }
             Ok(None)
         });
         self.state.borrow_mut().cells = Some(cells);
