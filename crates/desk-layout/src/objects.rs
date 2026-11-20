@@ -537,6 +537,8 @@ pub(crate) fn inline_sizes(
             // with its paragraph takes no room in the line (OBJ-14).
             let height = if hangs(o) {
                 desk_model::Length::ZERO
+            } else if is_sound(o) {
+                o.frame.height + desk_model::Length::from_pt(SOUND_HEADROOM)
             } else {
                 o.frame.height
             };
@@ -549,6 +551,17 @@ pub(crate) fn inline_sizes(
         })
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
+}
+
+/// How much higher than a sound in the text Pages 15.4 makes its line,
+/// in points (B-025): in the PDF of `obj-18-audio-video` the line of a
+/// sound 53 points high is 7.23 points taller than the sound, while a movie
+/// takes its own height. The sound stands on the baseline under that room.
+const SOUND_HEADROOM: f64 = 7.23;
+
+/// Whether an object is a sound, whose line Pages 15.4 makes taller.
+fn is_sound(object: &Object) -> bool {
+    matches!(&object.kind, ObjectKind::Media(media) if media.is_sound())
 }
 
 /// Puts the objects in the text on the pages, where the lines put their
