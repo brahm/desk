@@ -169,6 +169,8 @@ pub struct Preferences {
     /// Whether a banner says so when a document opens with problems, as
     /// the Warnings window of Pages shows itself (INT-22).
     pub show_warnings: bool,
+    /// Whether a new document opens in Screen View (PXV-01).
+    pub screen_view: bool,
     /// The font families of the Favorites collection of the Fonts
     /// popover (INT-15).
     pub font_favorites: Vec<String>,
@@ -239,6 +241,7 @@ impl Default for Preferences {
             show_counts: true,
             count: "words".into(),
             show_warnings: true,
+            screen_view: false,
             font_favorites: Vec::new(),
             include_preview: true,
             // What the sheet of Pages 15.4 offers first.
@@ -336,6 +339,9 @@ impl Preferences {
         out.show_warnings = file
             .boolean(WINDOW, "show-warnings")
             .unwrap_or(out.show_warnings);
+        out.screen_view = file
+            .boolean(WINDOW, "screen-view")
+            .unwrap_or(out.screen_view);
         out.set_default_font = editing("set-default-font", out.set_default_font);
         if let Ok(font) = file.string(EDITING, "default-font")
             && !font.is_empty()
@@ -415,6 +421,7 @@ impl Preferences {
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
         file.set_string(WINDOW, "count", &self.count);
         file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
+        file.set_boolean(WINDOW, "screen-view", self.screen_view);
         // As a list of the key file: names, each ended by a semicolon.
         let favorites: String = self
             .font_favorites
@@ -716,6 +723,14 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         current.show_warnings,
         |p, on| p.show_warnings = on,
     ));
+    if !tables {
+        window.add(&switch(
+            &tr("Open New Documents in Screen View"),
+            &tr("The text flows to the width of the window, without pages"),
+            current.screen_view,
+            |p, on| p.screen_view = on,
+        ));
+    }
     let color = gtk::ColorDialogButton::builder()
         .dialog(&gtk::ColorDialog::new())
         .rgba(&crate::formatting::to_gdk(current.invisibles_color))
@@ -1003,6 +1018,7 @@ mod tests {
             show_counts: false,
             count: "paragraphs".into(),
             show_warnings: false,
+            screen_view: true,
             font_favorites: vec!["Liberation Serif".into(), "DejaVu Sans".into()],
             include_preview: false,
             set_default_font: true,
@@ -1023,6 +1039,7 @@ mod tests {
         assert!(Preferences::read(&empty).automatic_lists);
         assert!(Preferences::read(&empty).show_counts);
         assert!(Preferences::read(&empty).show_warnings);
+        assert!(!Preferences::read(&empty).screen_view);
         assert!(Preferences::read(&empty).detect_links);
         assert!(Preferences::read(&empty).include_preview);
         assert_eq!(Preferences::read(&empty).zoom, 125);

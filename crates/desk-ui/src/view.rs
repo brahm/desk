@@ -34,6 +34,11 @@ struct State {
     painter: Option<Painter>,
     on_zoom: Vec<Box<dyn Fn(f64)>>,
     on_pages: Vec<Box<dyn Fn()>>,
+    /// Whether it shows the text in one flow as wide as the view, without
+    /// the edges of pages (Screen View, PXV-01).
+    screen: bool,
+    /// What to call when the width of the flow in Screen View changes.
+    on_width: Vec<Box<dyn Fn()>>,
     /// The selection and the cursor, drawn over the pages.
     selection: Vec<SpanRect>,
     caret: Option<CaretRect>,
@@ -241,6 +246,8 @@ impl DocumentView {
             painter: Painter::new().ok(),
             on_zoom: Vec::new(),
             on_pages: Vec::new(),
+            screen: false,
+            on_width: Vec::new(),
             selection: Vec::new(),
             caret: None,
             caret_on: true,
@@ -275,6 +282,7 @@ impl DocumentView {
             adjustment.connect_page_size_notify(move |_| {
                 if let Some(view) = weak.upgrade() {
                     view.refit();
+                    view.width_changed();
                 }
             });
         }
@@ -788,6 +796,7 @@ impl DocumentView {
             callback(zoom);
         }
         self.state.borrow_mut().on_zoom = callbacks;
+        self.width_changed();
     }
 
     /// Calls `f` with the new zoom whenever it changes.
@@ -834,8 +843,45 @@ impl DocumentView {
     }
 
     fn layout(&self, area_width: f64) -> (Vec<PageRect>, f64, f64) {
-        let book = self.state.borrow().book;
-        geometry::place_pages(&self.sizes(), self.zoom(), area_width, self.columns(), book)
+        let state = self.state.borrow();
+        place(&self.sizes(), &state, area_width)
+    }
+
+    /// Shows the text in one flow without the edges of pages, or the
+    /// pages (Screen View, PXV-01).
+    pub fn set_screen(&self, on: bool) {
+        self.state.borrow_mut().screen = on;
+        self.resize();
+    }
+
+    /// How wide the flow of Screen View is, in points: as wide as the
+    /// view, at its zoom.
+    pub fn screen_width(&self) -> f64 {
+        let page = self.scrolled.hadjustment().page_size();
+        let pixels = if page > 0.0 {
+            page
+        } else {
+            f64::from(self.scrolled.width())
+        };
+        pixels.floor().max(1.0) / self.scale()
+    }
+
+    /// Calls `f` whenever the width of the flow of Screen View may have
+    /// changed: when the view is resized or zoomed.
+    pub fn connect_width_changed(&self, f: impl Fn() + 'static) {
+        self.state.borrow_mut().on_width.push(Box::new(f));
+    }
+
+    fn width_changed(&self) {
+        // The callbacks may read the view, so they run without the borrow.
+        let callbacks = std::mem::take(&mut self.state.borrow_mut().on_width);
+        for callback in &callbacks {
+            callback();
+        }
+        let mut state = self.state.borrow_mut();
+        let added = std::mem::take(&mut state.on_width);
+        state.on_width = callbacks;
+        state.on_width.extend(added);
     }
 
     fn resize(&self) {
@@ -858,13 +904,7 @@ impl DocumentView {
                 .iter()
                 .map(|p| (f64::from(p.width), f64::from(p.height)))
                 .collect();
-            let (rects, _, _) = geometry::place_pages(
-                &sizes,
-                state.zoom,
-                f64::from(width),
-                state.columns,
-                state.book,
-            );
+            let (rects, _, _) = place(&sizes, &state, f64::from(width));
             let vadj = scrolled.vadjustment();
             let (top, bottom) = (vadj.value(), vadj.value() + vadj.page_size());
             let scale = state.zoom * PIXELS_PER_POINT;
@@ -878,11 +918,18 @@ impl DocumentView {
                 );
                 cr.paint().ok();
             }
+            // Screen View shows the text on white, without a sheet.
+            if state.screen {
+                cr.set_source_rgb(1.0, 1.0, 1.0);
+                cr.paint().ok();
+            }
             for (index, rect) in rects.iter().enumerate() {
                 if rect.y + rect.height < top || rect.y > bottom {
                     continue;
                 }
-                draw_page_frame(cr, rect, dark);
+                if !state.screen {
+                    draw_page_frame(cr, rect, dark);
+                }
                 let State { pages, painter, .. } = &mut *state;
                 if let Some(painter) = painter.as_mut() {
                     cr.save().ok();
@@ -1459,6 +1506,27 @@ fn draw_break(cr: &gtk::cairo::Context, kind: Invisible, x: f64, baseline: f64, 
         _ => {}
     }
     cr.stroke().ok();
+}
+
+/// Where the pages go in the area: as `geometry::place_pages` places
+/// them, or the one page of Screen View in its top left corner.
+fn place(sizes: &[(f64, f64)], state: &State, area_width: f64) -> (Vec<PageRect>, f64, f64) {
+    if state.screen {
+        let scale = state.zoom * PIXELS_PER_POINT;
+        let rects: Vec<PageRect> = sizes
+            .iter()
+            .map(|&(w, h)| PageRect {
+                x: 0.0,
+                y: 0.0,
+                width: w * scale,
+                height: h * scale,
+            })
+            .collect();
+        let width = rects.iter().map(|r| r.width).fold(0.0, f64::max);
+        let height = rects.iter().map(|r| r.height).fold(0.0, f64::max);
+        return (rects, width, height);
+    }
+    geometry::place_pages(sizes, state.zoom, area_width, state.columns, state.book)
 }
 
 /// The shadow and white sheet of a page.

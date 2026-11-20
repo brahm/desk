@@ -540,6 +540,7 @@ def main():
     objects_between_apps(work)
     styled_text_between_apps(work)
     guide_from_the_ruler(work)
+    screen_view(work)
     pages_as_sections(work)
     reflection_of_a_shape(work)
     advanced_gradient(work)
@@ -2217,6 +2218,70 @@ def guide_from_the_ruler(work):
             lambda: saved_part(letter, "settings.xml", r'config:name="Guides"[^>]*>h [0-9.]+(pt|in|cm|mm) 1<'),
         )
         check("a drag from the ruler leaves a guide on its page, saved with it (OBJ-28)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
+def screen_view(work):
+    """Screen View shows the text in one flow as wide as the window,
+    without pages, page breaks or rulers, and View ▸ Screen View again
+    shows the pages (PXV-01). The table of contents of the sidebar
+    follows the headings as they are typed (PXV-02, W041)."""
+    name = "Screen.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    with zipfile.ZipFile(letter) as package:
+        files = {n: package.read(n) for n in package.namelist()}
+    files["content.xml"] = files["content.xml"].replace(
+        b"<office:text>",
+        b'<office:text><text:h text:style-name="Heading_20_1" text:outline-level="1">'
+        b"Chapter</text:h>",
+        1,
+    )
+    with zipfile.ZipFile(letter, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for n, data in files.items():
+            package.writestr(n, data, zipfile.ZIP_DEFLATED)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        # The table of contents of the sidebar changes as a heading is
+        # typed (W041).
+        activate("contents")
+        wait_for("the heading in the sidebar", lambda: showing_named(app, "Chapter"))
+        press("ctrl+Home")
+        type_text("First ")
+        wait_for("the heading typed in the sidebar", lambda: showing_named(app, "First Chapter"))
+        check("the table of contents of the sidebar follows the text as it is typed (W041)", True)
+        activate("contents")
+        press("ctrl+End")
+        activate("insert-page-break")
+        type_text("Second page")
+        wait_for("the text on the second page", lambda: text_of(document).endswith("Second page\n"))
+
+        def height():
+            return Atspi.Component.get_extents(document, Atspi.CoordType.WINDOW).height
+
+        # Two pages, one under the other, are taller than the window.
+        wait_for("two pages", lambda: height() > 1500)
+        wait_for("the ruler", lambda: showing_named(app, "Ruler"))
+        press("ctrl+shift+r")
+        wait_for("the text in one flow, without the ruler", lambda: showing_named(app, "Ruler") is None)
+        wait_for("the flow as high as the window", lambda: height() < 1200)
+        # The text is edited as on the pages.
+        type_text(" flows")
+        wait_for("the text typed in the flow", lambda: text_of(document).endswith("Second page flows\n"))
+        activate("text-size", "bigger")
+        activate("screen-view")
+        wait_for("the pages again", lambda: height() > 1500)
+        wait_for("the ruler again", lambda: showing_named(app, "Ruler"))
+        check("Screen View flows the text without pages, and the pages come back (PXV-01)", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

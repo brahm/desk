@@ -253,6 +253,7 @@ the Mac on 2026-11-16. Where the two agree, the table gives one column.
 | Insert, Choose | ⇧⌘V | Ctrl+Alt+P | 3 | Ctrl+Shift+V is paste and match style |
 | Inspector | ⌥⌘I | Ctrl+Alt+I | 2 | |
 | Ruler, layout, invisibles | ⌘R, ⇧⌘L, ⇧⌘I | Ctrl+R, Ctrl+Shift+L, Ctrl+Shift+I | 2 | |
+| Screen View | ⇧⌘R | Ctrl+Shift+R | 2 | In the View menu, with Text Size |
 | Fonts | ⌘T | None | 3 | Ctrl+T is a new tab in GNOME (D-024); Fonts opens from the Font row of the Format pane and from Search Commands |
 | Colors | ⇧⌘C | Ctrl+Shift+C | 2 | It opens as a popover |
 | New document in a tab | ⌘N | Ctrl+N or Ctrl+T | 1 | Ctrl+Shift+N opens a new window |

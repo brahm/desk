@@ -288,6 +288,11 @@ pub(crate) fn lay_out(document: &Document) -> desk_layout::DocumentLayout {
     TEXT.with(|text| desk_layout::paginate(document, &mut text.borrow_mut()))
 }
 
+/// Lays out a document in Screen View, `width` points wide (PXV-01).
+pub(crate) fn lay_out_screen(document: &Document, width: f64) -> desk_layout::DocumentLayout {
+    TEXT.with(|text| desk_layout::paginate_screen(document, width, &mut text.borrow_mut()))
+}
+
 /// The document a path names. A Pages document can be a package folder,
 /// which the Open dialog cannot pick, so picking the index inside it opens
 /// the package.
@@ -391,6 +396,7 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.align('right')", &["<Control>braceright"]),
             ("win.invisibles", &["<Control><Shift>i"]),
             ("win.show-layout", &["<Control><Shift>l"]),
+            ("win.screen-view", &["<Control><Shift>r"]),
             ("win.styles-drawer", &["<Control><Shift>t"]),
             ("win.copy-paragraph-style", &["<Control><Alt>c"]),
             ("win.copy-character-style", &["<Control><Shift><Alt>c"]),

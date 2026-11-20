@@ -110,7 +110,8 @@ impl TextEditor {
     pub(super) fn show_outlines(&self) {
         let outlines = {
             let state = self.state.borrow();
-            if state.show_layout {
+            // Screen View has no layout to show (PXV-01).
+            if state.show_layout && state.screen.is_none() {
                 outlines(Self::main_document(&state), Self::main_layout(&state))
             } else {
                 Vec::new()

@@ -26,10 +26,12 @@ mod notes;
 mod objects;
 mod outline;
 mod pages;
+mod screen;
 mod tables;
 
 pub use objects::{PlacedObject, flow_text_boxes, object_at, place_object_text, text_box_lines};
 pub use outline::{outline_document, paginate_outline, paginate_view};
+pub use screen::{SCREEN_MARGIN, paginate_screen, screen_document};
 pub use tables::{
     CellLayout, ChartLabel, ChartLayout, TableLayout, document_locale, lay_out_chart,
     lay_out_table, table_size, today,

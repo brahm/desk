@@ -873,6 +873,11 @@ impl TextEditor {
                 .filter(|id| ids.contains(id))
                 .collect();
             ids.dedup();
+            // The objects in the flow of Screen View are not selected
+            // (PXV-01).
+            if state.screen.is_some() {
+                ids.clear();
+            }
             state.objects = ids;
         }
         self.show_objects();
@@ -1995,6 +2000,10 @@ impl TextEditor {
         y: f64,
         modifiers: gdk::ModifierType,
     ) -> bool {
+        // The objects in the flow of Screen View are not moved (PXV-01).
+        if self.screen_view() {
+            return false;
+        }
         let Some((page, px, py)) = self.view.page_at(x, y) else {
             return false;
         };

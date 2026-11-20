@@ -95,6 +95,7 @@ const SECTIONS: &[Section] = &[
             ("<Control>bar", n_("Center")),
             ("<Control>braceright", n_("Align right")),
             ("<Control><Shift>i", n_("Show invisibles")),
+            ("<Control><Shift>r", n_("Screen View")),
             ("<Control><Alt>i", n_("Inspector")),
             ("F9", n_("Show the sidebar")),
             ("<Control><Shift>c", n_("Show colors")),
