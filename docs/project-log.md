@@ -1394,6 +1394,27 @@ matrix rows done on 9 November, before the change of target.
   click puts one at the cursor.
 - B-012 is closed. W130 and W132 are done for W1.
 
+### 20 November: Screen View and the live table of contents (W043, W012, W041, B-038, step 16 of W1)
+
+- View ▸ Screen View (Ctrl+Shift+R) lays the document out as one page
+  as wide as the window and as tall as its text: no page edges,
+  margins, headers or footers, no page, column or section breaks, one
+  column, and notes at the end (pull request 178).
+- Floating objects show in the flow after their paragraph, and those
+  fixed on a page after the last paragraph that starts there; objects of
+  the masters are hidden, and a notice says when something is. Objects
+  in the flow are not selected or moved.
+- The flow follows the width of the window, also in full screen, and the
+  zoom sets the size of its text, as View ▸ Text Size (Auto, Bigger,
+  Smaller) does. Rulers, thumbnails and the layout view are off while it
+  shows. A preference opens new documents in it.
+- The table of contents of the sidebar was already rebuilt on every
+  change; the UI test now checks that it follows a heading as it is
+  typed.
+- The notice, Text Size, selecting objects in the flow and the page
+  count are left for the Mac in step 19.
+- B-038 is closed. W012, W041 and W043 are done for W1.
+
 
 ## Decisions, with their reasons and consequences
 

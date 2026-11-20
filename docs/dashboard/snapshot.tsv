@@ -38,7 +38,7 @@ backlog	B-034	open
 backlog	B-035	open
 backlog	B-036	open
 backlog	B-037	open
-backlog	B-038	open
+backlog	B-038	done
 backlog	B-039	open
 backlog	B-040	open
 backlog	B-041	open
@@ -448,7 +448,7 @@ feature	W008	done
 feature	W009	done
 feature	W010	done
 feature	W011	done
-feature	W012	partial
+feature	W012	done
 feature	W013	done
 feature	W014	done
 feature	W015	done
@@ -477,9 +477,9 @@ feature	W037	done
 feature	W038	done
 feature	W039	done
 feature	W040	done
-feature	W041	missing
+feature	W041	done
 feature	W042	done
-feature	W043	missing
+feature	W043	done
 feature	W044	done
 feature	W045	done
 feature	W046	done
