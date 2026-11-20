@@ -138,9 +138,9 @@ W134	3.9 Tables	Conditional highlighting	Equal	Equal in both	-	In	Done	-	done	Co
 W135	3.9 Tables	Sort	Equal	Equal in both	-	In	Done	-	done	Sort (TAB-15)
 W136	3.9 Tables	Autofill and autocomplete	Equal	Equal in both	-	In	Done	-	done	Autofill and suggestions from the column (TAB-19)
 W137	3.9 Tables	Alternating colors	Equal	Equal in both	-	In	Done	-	done	Alternating colors (TAB-14)
-W138	3.9 Tables	Table title	Only 15	15.4	D-001	In	Missing	-	W1	Table title
+W138	3.9 Tables	Table title	Only 15	15.4	D-001	In	Done	-	done	Title in the Table tab shows the name of the table centered above it, inside the table, and Outline Table Title draws a line around it (PXV-15); kept in desk:table
 W139	3.9 Tables	Table direction (bidi)	Only 15	15.4	D-001	In	Missing	-	W6	Right-to-left table
-W140	3.9 Tables	Lock table	Only 15	15.4	D-001	In	Missing	-	W1	Lock table
+W140	3.9 Tables	Lock table	Only 15	15.4	D-001	In	Done	-	done	Lock and Unlock of a table: a locked table is selected only as an object, its cells are not edited and its tabs are off until Unlock (PXV-16); kept as the style:protect of its frame
 W141	3.10 Charts	Types	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Eleven 2D and 3D types (GRF-01); donut, radar, bubble and interactive are missing
 W142	3.10 Charts	Data	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Data Editor (GRF-03, GRF-05); sharing the X axis and sampling are missing
 W143	3.10 Charts	Axes, labels, legends	Equal	Equal in both	-	In	Done	the window changes (D-008)	W4	Axes, labels and legend (GRF-07, GRF-10, GRF-12)

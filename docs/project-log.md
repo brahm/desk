@@ -1357,6 +1357,23 @@ matrix rows done on 9 November, before the change of target.
   formats, stays for step 15 of W1.
 - W080 and W127 are done for W1.
 
+### 20 November: table title and lock (W138, W140, step 14 of W1)
+
+- Title, in the Table tab, shows the name of a table centered above it,
+  inside the table, as Pages 15 does; Outline Table Title draws a thin
+  line around it (pull request 172). It replaces Show Name in the Table
+  tab of Desk Writer; Desk Tables keeps its name at the left. Both are
+  options of the table, kept in `desk:table`, and an older file reads
+  them as off.
+- Lock and Unlock already applied to tables as objects. A locked table
+  or chart is now selected only as an object: a click selects no cell,
+  its cells, data and look do not change, and its tabs of the Format pane
+  are off until Unlock, as Pages shows only Unlock. The lock is the
+  standard `style:protect` of the frame.
+- The line around the title is black and one point wide, chosen here,
+  not measured on the Mac.
+- W138 and W140 are done for W1.
+
 
 ## Decisions, with their reasons and consequences
 

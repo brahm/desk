@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: the title of a table, as in Pages: its name centered above it,
+  with a line around it when asked; and locked tables and charts, which
+  are not edited until unlocked.
 * Added: table and chart styles, as in Pages: six of each in a new
   document, shown as pictures in the Table and Chart buttons, where a
   click inserts a table or chart of the style, and in the Table and Chart
