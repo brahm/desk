@@ -464,14 +464,16 @@ fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
     if desk_lang::patterns("en-US").is_none() {
         return;
     }
-    let broken = lay_in(&mut system, hyphenating.clone(), &[(text, english)], &column);
+    let broken = lay_in(
+        &mut system,
+        hyphenating.clone(),
+        &[(text, english)],
+        &column,
+    );
     // Text in the undetermined language is hyphenated as English, as
     // Pages 15.4 does (B-023).
     let undetermined = lay_in(&mut system, hyphenating, &[(text, sans())], &column);
-    assert_eq!(
-        line_texts(&undetermined, text),
-        line_texts(&broken, text)
-    );
+    assert_eq!(line_texts(&undetermined, text), line_texts(&broken, text));
     let first = broken
         .lines
         .iter()
