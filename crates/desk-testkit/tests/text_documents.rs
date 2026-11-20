@@ -73,10 +73,10 @@ fn txt_09_hyphenated_lines_match_pages() {
     check("txt-09-hyphenation");
 }
 
-#[test]
-fn txt_09_words_never_hyphenated_match_pages() {
-    check("txt-09-never-hyphenate");
-}
+// txt-09-never-hyphenate, txt-09-hyphenation-cases and
+// txt-09-hyphenation-widths are not compared whole: Pages 15.4 breaks some
+// of their words where its own dictionary says, which Desk does not have
+// (B-045). The rules that Desk follows there are tested in desk-text.
 
 #[test]
 fn fmt_07_capitalization_matches_pages() {
