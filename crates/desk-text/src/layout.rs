@@ -922,7 +922,8 @@ impl TextSystem {
                 let run = glyph_run.run();
                 let format_index = glyph_run.style().brush;
                 let format = &text.formats()[format_index as usize];
-                let shift = script_shift(format, run.font_size(), run.font_metrics()) - delta;
+                let shift =
+                    script_shift(format, run.font_size(), run.font_metrics(), run.font()) - delta;
                 let spans = cluster_spans(&glyph_run);
                 let positioned: Vec<_> = glyph_run.positioned_glyphs().collect();
                 let mut glyphs: Vec<Glyph> = Vec::with_capacity(positioned.len());
@@ -1447,18 +1448,35 @@ fn font_features(format: &CharFormat, pages: bool) -> String {
 }
 
 /// How far a run is raised for a superscript, or lowered (negative) for a
-/// subscript, as Pages measured on the reference machine (FMT-06): a
-/// superscript until its top meets the top of the text at full size, a
-/// subscript until its bottom meets the bottom. `size` is the size of the
-/// run and `metrics` its font's metrics at that size.
-fn script_shift(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> f32 {
+/// subscript. Pages 15.4 raises a superscript until the top of its
+/// capitals meets the top of the capitals of the text at full size, as
+/// measured in its PDFs (FMT-06, B-022), where Pages '09 raised it until
+/// the top of its text met the top of the text; a font that does not say
+/// how tall its capitals are is raised as Pages '09 did. A subscript is
+/// lowered until its bottom meets the bottom of the text. `size` is the
+/// size of the run and `metrics` its font's metrics at that size.
+fn script_shift(
+    format: &CharFormat,
+    size: f32,
+    metrics: &parley::FontMetrics,
+    font: &FontData,
+) -> f32 {
     let full = format.font_size.to_pt() as f32 / size - 1.0;
     let (ascent, descent, _, _) = vertical_metrics(format, size, metrics);
     match format.baseline {
         Baseline::Normal => 0.0,
-        Baseline::Superscript => ascent * full,
+        Baseline::Superscript => cap_height(font).map_or(ascent, |cap| cap * size) * full,
         Baseline::Subscript => -descent * full,
     }
+}
+
+/// The height of the capitals of a font, in ems, when the font says it.
+fn cap_height(font: &FontData) -> Option<f32> {
+    use skrifa::raw::TableProvider;
+    let font = skrifa::FontRef::from_index(font.data.as_ref(), font.index).ok()?;
+    let units = f32::from(font.head().ok()?.units_per_em());
+    let cap = f32::from(font.os2().ok()?.s_cap_height()?);
+    (cap > 0.0).then_some(cap / units)
 }
 
 /// Where the leading of a line goes.

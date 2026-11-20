@@ -1526,6 +1526,23 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     // new page (EST-04).
     let mut break_before_next = false;
     for (i, paragraph) in source.body.iter().enumerate() {
+        // Pages '09 ends a table of contents with an empty paragraph,
+        // which Pages 15.4 takes into the table when it opens the
+        // document: no empty line shows after it (B-022).
+        let ends_toc = i > 0
+            && source.body[i - 1].toc
+            && !paragraph.toc
+            && paragraph.section.is_none()
+            && paragraph.layout.is_none()
+            && !paragraph.column_break_before
+            && paragraph.marks.is_empty()
+            && paragraph
+                .runs
+                .iter()
+                .all(|r| r.text.is_empty() && r.field.is_none() && r.bookmark.is_none());
+        if ends_toc {
+            continue;
+        }
         importer.next_id = ahead.get(&i).copied();
         let start = match (&paragraph.section, &paragraph.layout) {
             _ if i == 0 => None,

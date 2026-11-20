@@ -215,12 +215,13 @@ fn fmt_06_superscript_is_smaller_and_raised() {
     let runs = &layout.lines[0].runs;
     assert_eq!(runs.len(), 4);
     assert_eq!(runs[1].size, 12.0 * SCRIPT_SCALE);
-    // As in Pages: the top of a superscript meets the top of the text and
-    // the bottom of a subscript its bottom. Liberation Sans rises 0.905 em
-    // and falls 0.212 em, and 4 pt are lost to the smaller size.
+    // As in Pages 15.4: the top of the capitals of a superscript meets the
+    // top of the capitals of the text (B-022), and the bottom of a
+    // subscript its bottom. The capitals of Liberation Sans are 0.688 em
+    // tall, it falls 0.212 em, and 4 pt are lost to the smaller size.
     let raise = runs[0].baseline - runs[1].baseline;
     let drop = runs[3].baseline - runs[2].baseline;
-    assert!((raise - 0.905 * 4.0).abs() < 0.01, "{raise}");
+    assert!((raise - 0.688 * 4.0).abs() < 0.01, "{raise}");
     assert!((drop - 0.212 * 4.0).abs() < 0.01, "{drop}");
 }
 
