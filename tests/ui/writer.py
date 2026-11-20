@@ -3172,7 +3172,7 @@ def tables_and_charts(work):
     chart from the menu shows the Chart, Axis and Series tabs, and both
     are saved in the file (TAB-01, TAB-02, TAB-22, GRF-01, GRF-03,
     GNM-04). The Table and Chart tabs show the table and chart styles
-    (PXV-14, W080)."""
+    (PXV-14, W080), and a locked table is not edited (PXV-16)."""
     name = "Tables.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -3231,6 +3231,31 @@ def tables_and_charts(work):
 
         wait_for("the new table style in the saved file", template_saved)
         check("the Table tab shows the table styles and Create Style keeps one (PXV-14)", True)
+        # Lock leaves the table selected as an object, with its tabs off
+        # until Unlock, and the file keeps it locked (PXV-16).
+        activate("lock")
+
+        def tabs_off():
+            # The group of the button is turned off, which AT-SPI shows on
+            # the group, not on the button inside it.
+            node = create
+            for _ in range(8):
+                if node is None:
+                    return False
+                if not node.get_state_set().contains(Atspi.StateType.SENSITIVE):
+                    return True
+                node = node.get_parent()
+            return False
+
+        wait_for("the Table tab to turn off for a locked table", tabs_off)
+        press("ctrl+s")
+        wait_for(
+            "the locked table in the saved file",
+            lambda: saved_content(letter, r'style:protect="position size"'),
+        )
+        activate("unlock")
+        wait_for("the Table tab to come back", lambda: not tabs_off())
+        check("a locked table is not edited and the file keeps the lock (PXV-16)", True)
         activate("insert-chart-kind", "pie")
         wait_for("the Chart tab", lambda: context_title(app, "Chart"))
         check(

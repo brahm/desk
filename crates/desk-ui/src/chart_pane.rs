@@ -623,6 +623,11 @@ impl ChartGroups {
             return;
         };
         self.updating.set(true);
+        // A locked chart is not edited either (PXV-16).
+        let editable = !editor.selection_locked();
+        for group in self.groups() {
+            group.set_sensitive(editable);
+        }
         self.show_styles(editor);
         let set_spin = |row: &compact::SpinRow, v: f64| {
             if (row.value() - v).abs() > 1e-9 {
