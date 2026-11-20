@@ -115,3 +115,30 @@ fn tab_04_each_part_of_the_table_takes_the_fill_of_its_style() {
     assert_eq!(fill(1, 1), rgb(body));
     assert_eq!(fill(2, 2), rgb(own));
 }
+
+#[test]
+fn pxv_15_the_title_shows_centered_and_outlined() {
+    let mut table = Table::new(3, 3);
+    table.name = "Table 1".into();
+    table.options.show_name = true;
+    // As the name of Desk Tables: at the left, with no line around it.
+    let left = lay_out(&table);
+    let first = &left.name[0];
+    assert!(first.origin.0 + first.line.x < 1.0);
+    assert_eq!(left.name_outline, None);
+    // As the title of Pages 15: in the middle, the line around it with
+    // Outline Table Title, and the cells below both.
+    table.options.name_centered = true;
+    table.options.name_outline = true;
+    let titled = lay_out(&table);
+    let line = &titled.name[0];
+    let (start, end) = (
+        line.origin.0 + line.line.x,
+        line.origin.0 + line.line.x + line.line.width,
+    );
+    let width = titled.width();
+    assert!(((start + end) / 2.0 - width / 2.0).abs() < 2.0);
+    let (x, y, w, h) = titled.name_outline.expect("a line around the title");
+    assert_eq!((x, y, w), (0.0, 0.0, width));
+    assert!(h > 0.0 && h <= titled.rows[0]);
+}

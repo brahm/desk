@@ -107,10 +107,32 @@ pub(crate) fn correct_in_cell(
 
 impl TextEditor {
     /// The cells selected, while the only object selected is a table.
+    /// None in a locked table, whose cells cannot be edited (PXV-16).
     pub fn selected_cells(&self) -> Option<CellSelection> {
         let state = self.state.borrow();
         let cells = state.cells?;
-        (state.objects == [cells.id]).then_some(cells)
+        let locked = state
+            .editor
+            .document()
+            .objects()
+            .get(cells.id)
+            .is_some_and(|o| o.locked);
+        (state.objects == [cells.id] && !locked).then_some(cells)
+    }
+
+    /// Whether the selected object is locked: a locked table or chart is
+    /// moved, resized and edited only once unlocked (PXV-16).
+    pub fn selection_locked(&self) -> bool {
+        let state = self.state.borrow();
+        let [id] = state.objects[..] else {
+            return false;
+        };
+        state
+            .editor
+            .document()
+            .objects()
+            .get(id)
+            .is_some_and(|o| o.locked)
     }
 
     /// The selected table and its selected cells, or all its cells when
@@ -281,6 +303,9 @@ impl TextEditor {
         let Some((table, _)) = self.table_selection() else {
             return;
         };
+        if self.selection_locked() {
+            return;
+        }
         let id = self.selected_objects()[0];
         let mut cells = self
             .state
@@ -332,6 +357,9 @@ impl TextEditor {
         let Some(chart) = self.selected_chart() else {
             return;
         };
+        if self.selection_locked() {
+            return;
+        }
         let mut changed = (*chart).clone();
         change(&mut changed);
         if changed == *chart {
@@ -620,7 +648,8 @@ impl TextEditor {
             let Some((p, placed)) = find(&state.layout, id) else {
                 return false;
             };
-            if p != page {
+            // A locked table or chart is only selected as an object.
+            if p != page || placed.object.locked {
                 return false;
             }
             let selected = state.objects == [id];

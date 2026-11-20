@@ -1486,6 +1486,18 @@ fn table_items(
     }
     let name = moved_lines(&laid.name, x, y);
     list.lines(name.iter());
+    // Outline Table Title: a thin line around the name (PXV-15).
+    if let Some((nx, ny, nw, nh)) = laid.name_outline {
+        let (left, top) = (x + nx + 0.5, y + ny + 0.5);
+        let (right, bottom) = (x + nx + nw - 0.5, y + ny + nh - 0.5);
+        list.items.push(Item::Stroke {
+            points: vec![(left, top), (right, top), (right, bottom), (left, bottom)],
+            closed: true,
+            width: 1.0,
+            color: Rgba::rgb(0, 0, 0),
+            dashes: Vec::new(),
+        });
+    }
     list.items
 }
 

@@ -372,6 +372,9 @@ These sit on the `style:graphic-properties` of the graphic style of a
   or cannot be read, Desk reads the standard table.
 - **Fallback:** the standard table, with its columns, rows, cells, values
   and formulas in OpenFormula, which other programs show and compute.
+  The title of a table (PXV-15), shown, centered and outlined, is among
+  the options it keeps; other programs show the table without it. The
+  lock of a table (PXV-16) is the standard `style:protect` of its frame.
 - **Versioning:** as for `desk:chart`.
 
 ### Text: paragraphs and characters (`style:text-properties`)

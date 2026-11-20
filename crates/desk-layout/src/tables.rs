@@ -52,6 +52,10 @@ pub struct TableLayout {
     pub cells: Vec<CellLayout>,
     /// The name above the table, when it shows.
     pub name: Vec<PlacedLine>,
+    /// The line around the name, when Outline Table Title is on: its
+    /// left, top, width and height from the top left of the frame
+    /// (PXV-15).
+    pub name_outline: Option<(f32, f32, f32, f32)>,
 }
 
 impl TableLayout {
@@ -260,6 +264,7 @@ pub fn lay_out_table(
     }
     // The name above the table.
     let mut name = Vec::new();
+    let mut name_outline = None;
     let mut top = 0.0;
     if table.options.show_name && !table.name.is_empty() {
         let attrs = CharAttrs {
@@ -270,15 +275,17 @@ pub fn lay_out_table(
             weight: Some(FontWeight::BOLD),
             ..CharAttrs::default()
         };
-        name = text_lines(
-            document,
-            &table.name,
-            &attrs,
-            Alignment::Left,
-            cols[cols.len() - 1],
-            system,
-        );
+        let width = cols[cols.len() - 1];
+        let align = if table.options.name_centered {
+            Alignment::Center
+        } else {
+            Alignment::Left
+        };
+        name = text_lines(document, &table.name, &attrs, align, width, system);
         top = lines_height(&name) + 4.0;
+        if table.options.name_outline {
+            name_outline = Some((0.0, 0.0, width, top - 2.0));
+        }
     }
     // The text of each visible cell, laid out at the width of its column
     // or its merged columns.
@@ -465,6 +472,7 @@ pub fn lay_out_table(
         rows,
         cells,
         name,
+        name_outline,
     }
 }
 

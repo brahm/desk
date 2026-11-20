@@ -197,9 +197,16 @@ pub enum LastCellTab {
 
 /// The options of a table (TAB-08, TAB-12, TAB-17).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct TableOptions {
     /// Whether the name shows above the table.
     pub show_name: bool,
+    /// Whether the name shows centered, as the title of a table of Pages
+    /// 15, rather than at the left, as in Desk Tables (PXV-15).
+    pub name_centered: bool,
+    /// Whether a line goes around the name: Outline Table Title of Pages
+    /// 15 (PXV-15).
+    pub name_outline: bool,
     /// Whether the header rows repeat on each page, column or box that
     /// the table goes on to (TAB-12).
     pub repeat_headers: bool,
@@ -216,6 +223,8 @@ impl Default for TableOptions {
     fn default() -> Self {
         Self {
             show_name: false,
+            name_centered: false,
+            name_outline: false,
             repeat_headers: true,
             return_moves: true,
             last_cell_tab: LastCellTab::AddRow,

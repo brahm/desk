@@ -184,6 +184,7 @@ pub struct TableGroups {
     text: compact::Group,
     name: compact::EntryRow,
     show_name: compact::SwitchRow,
+    outline_name: compact::SwitchRow,
     header_rows: compact::SpinRow,
     header_cols: compact::SpinRow,
     footer_rows: compact::SpinRow,
@@ -236,7 +237,10 @@ impl TableGroups {
         };
 
         let name = compact::EntryRow::builder().title(tr("Name")).build();
-        let show_name = switch(n_("Show Name"));
+        // Title of the table options of Pages 15: the name centered
+        // above the table, with a line around it when asked (PXV-15).
+        let show_name = switch(n_("Title"));
+        let outline_name = switch(n_("Outline Table Title"));
         let header_rows = spin(n_("Header Rows"), 0.0, 5.0);
         let header_cols = spin(n_("Header Columns"), 0.0, 5.0);
         let footer_rows = spin(n_("Footer Rows"), 0.0, 5.0);
@@ -257,6 +261,7 @@ impl TableGroups {
         let table = compact::Group::builder().title(tr("Table")).build();
         table.add(&name);
         table.add(&show_name);
+        table.add(&outline_name);
         table.add(&header_rows);
         table.add(&header_cols);
         table.add(&footer_rows);
@@ -418,6 +423,7 @@ impl TableGroups {
             text,
             name,
             show_name,
+            outline_name,
             header_rows,
             header_cols,
             footer_rows,
@@ -499,9 +505,13 @@ impl TableGroups {
             });
             self.name.connect_apply(move |_| f());
         }
-        let switches: [(&compact::SwitchRow, &'static str, TableChange); 5] = [
-            (&self.show_name, "Table Name", |this, t| {
+        let switches: [(&compact::SwitchRow, &'static str, TableChange); 6] = [
+            (&self.show_name, "Table Title", |this, t| {
                 t.options.show_name = this.show_name.is_active();
+                t.options.name_centered = true;
+            }),
+            (&self.outline_name, "Outline Table Title", |this, t| {
+                t.options.name_outline = this.outline_name.is_active();
             }),
             (&self.repeat_headers, "Header Rows", |this, t| {
                 t.options.repeat_headers = this.repeat_headers.is_active();
@@ -799,6 +809,12 @@ impl TableGroups {
             return;
         };
         self.updating.set(true);
+        // A locked table is not edited: only Unlock, in Arrange, works
+        // (PXV-16).
+        let editable = !editor.selection_locked();
+        for group in self.groups() {
+            group.set_sensitive(editable);
+        }
         self.show_styles(editor);
         let set_spin = |row: &compact::SpinRow, v: f64| {
             if (row.value() - v).abs() > 0.001 {
@@ -814,6 +830,8 @@ impl TableGroups {
             self.name.set_text(&table.name);
         }
         set_switch(&self.show_name, table.options.show_name);
+        set_switch(&self.outline_name, table.options.name_outline);
+        self.outline_name.set_sensitive(table.options.show_name);
         set_spin(&self.header_rows, f64::from(table.header_rows()));
         set_spin(&self.header_cols, f64::from(table.header_cols()));
         set_spin(&self.footer_rows, f64::from(table.footer_rows()));

@@ -3851,3 +3851,43 @@ fn pxv_14_table_styles_are_kept_as_table_templates() {
     };
     assert_eq!(looks(&read), looks(document));
 }
+
+#[test]
+fn pxv_15_pxv_16_a_table_keeps_its_title_and_its_lock() {
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Insert Table", |edit| {
+            let mut table = desk_model::Table::new(3, 3);
+            table.name = "Vendas".into();
+            table.options.show_name = true;
+            table.options.name_centered = true;
+            table.options.name_outline = true;
+            let id = edit.new_id();
+            let mut object = desk_model::Object::new(
+                id,
+                desk_model::ObjectKind::Table(std::sync::Arc::new(table)),
+                desk_model::Frame::from_pt(72.0, 72.0, 216.0, 80.0),
+            );
+            object.locked = true;
+            edit.add_object(object)?;
+            Ok(id)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("pxv-table-title-lock.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let table = read
+        .objects()
+        .iter()
+        .find_map(|o| match &o.kind {
+            desk_model::ObjectKind::Table(t) => Some((o.locked, t.clone())),
+            _ => None,
+        })
+        .expect("the table is read back");
+    let (locked, table) = table;
+    // The title shows centered, outlined, and the table stays locked,
+    // as draw:protect of its frame says.
+    assert!(locked);
+    assert_eq!(table.name, "Vendas");
+    assert!(table.options.show_name && table.options.name_centered && table.options.name_outline);
+}
