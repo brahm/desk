@@ -1382,8 +1382,10 @@ matrix rows done on 9 November, before the change of target.
   the source keeping them, as Pages 15 does (pull request 174).
 - A table that grows moves the objects beside it to the right and those
   under it down, as Pages '09 did, with a preference to turn it off
-  (pull request 175). Pages 15.4 has no such preference; it is kept from
-  '09 (D-003).
+  (pull request 175), kept from '09 (D-003). Whether Pages 15.4 still
+  moves objects aside, and has the preference, is to be checked on the Mac
+  in step 19, as are the title of a table made from cells and the cells
+  that keep an edited format.
 - Create Custom Format, at the end of the Data Format menu, opens a sheet
   with a name, a kind, the pattern and its pieces, and a preview; Edit
   Custom Format changes, renames, moves or deletes a format, and cells
