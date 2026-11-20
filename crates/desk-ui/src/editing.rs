@@ -40,6 +40,7 @@ mod objects;
 mod outline;
 mod pen;
 mod points;
+mod screen;
 mod sections;
 mod slides;
 mod stories;
@@ -459,6 +460,25 @@ struct State {
     cells: Option<tables::CellSelection>,
     /// The field that edits the text of a cell.
     cell_editor: Option<tables::CellEditor>,
+    /// How wide the text flows in Screen View, in points, while it is on
+    /// (PXV-01).
+    screen: Option<f64>,
+}
+
+impl State {
+    /// Lays out a document as the view shows it: as pages, or in Screen
+    /// View.
+    fn lay_out(&self, document: &Document) -> DocumentLayout {
+        lay_out_in(self.screen, document)
+    }
+}
+
+/// Lays out a document as pages, or in Screen View `screen` points wide.
+fn lay_out_in(screen: Option<f64>, document: &Document) -> DocumentLayout {
+    match screen {
+        Some(width) => crate::lay_out_screen(document, width),
+        None => crate::lay_out(document),
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -606,10 +626,12 @@ impl TextEditor {
                 guides: Vec::new(),
                 cells: None,
                 cell_editor: None,
+                screen: None,
             })),
         };
         this.show_pages();
         this.update_squiggles();
+        this.follow_screen_width();
         this.connect_keyboard();
         this.connect_pointer();
         this.connect_drop();
@@ -2358,7 +2380,7 @@ impl TextEditor {
     fn after_change(&self, selection: Selection) {
         if !self.sync_story() {
             let mut state = self.state.borrow_mut();
-            state.layout = crate::lay_out(state.editor.document());
+            state.layout = state.lay_out(state.editor.document());
         }
         if self.story().is_some_and(|story| !self.story_exists(story)) {
             self.leave_story(None);

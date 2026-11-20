@@ -292,6 +292,13 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
     let window = gio::Menu::new();
     window.append(Some(&tr("As _Outline")), Some("win.outline"));
+    // Screen View, and the size of its text (PXV-01).
+    window.append(Some(&tr("Scr_een View")), Some("win.screen-view"));
+    let text_size = gio::Menu::new();
+    text_size.append(Some(&tr("_Auto")), Some("win.text-size('auto')"));
+    text_size.append(Some(&tr("_Bigger")), Some("win.text-size('bigger')"));
+    text_size.append(Some(&tr("_Smaller")), Some("win.text-size('smaller')"));
+    window.append_submenu(Some(&tr("Te_xt Size")), &text_size);
     window.append(Some(&tr("_Fullscreen")), Some("win.fullscreen"));
     window.append_submenu(
         Some(&tr("_Zoom")),

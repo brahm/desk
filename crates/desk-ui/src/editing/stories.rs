@@ -540,6 +540,7 @@ impl TextEditor {
     pub(super) fn sync_story(&self) -> bool {
         let mut guard = self.state.borrow_mut();
         let state = &mut *guard;
+        let screen = state.screen;
         let Some(mode) = state.story.as_mut() else {
             return false;
         };
@@ -562,7 +563,7 @@ impl TextEditor {
         if let Err(error) = result {
             gtk::glib::g_warning!("desk", "cannot write the text back: {error}");
         }
-        mode.main_layout = crate::lay_out(mode.main.document());
+        mode.main_layout = super::lay_out_in(screen, mode.main.document());
         state.layout = story_layout(&mode.main_layout, story, mode.page, &copy);
         true
     }

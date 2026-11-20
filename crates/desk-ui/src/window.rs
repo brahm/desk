@@ -159,6 +159,11 @@ pub struct DocumentWindow {
     slides: Option<Rc<slides::Slides>>,
     /// Whether the document changed since the last draft.
     draft_due: Cell<bool>,
+    /// The notices over the pages, such as what Screen View hides.
+    toasts: adw::ToastOverlay,
+    /// How the pages showed before Screen View: the zoom, how it
+    /// followed the window, and whether the thumbnails showed (PXV-01).
+    before_screen: Cell<Option<(f64, Option<geometry::Fit>, bool)>>,
     /// The save that waits for a pause in the editing (DOC-11).
     autosave_source: RefCell<Option<glib::SourceId>>,
     /// Whether the file as it was opened is kept as a version yet.
@@ -176,8 +181,10 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 76] = [
+const DOCUMENT_ACTIONS: [&str; 78] = [
     "outline",
+    "screen-view",
+    "text-size",
     "contents",
     "edit-toc",
     "go-to-page-end",
@@ -412,6 +419,7 @@ impl DocumentWindow {
         // Desk Slides has the presenter notes under the slide, and the
         // light table in its place (KINT-05, KINT-09).
         let slides = is_slides.then(|| slides::Slides::new(editor_of()));
+        let toasts = adw::ToastOverlay::new();
         if let Some(slides) = &slides {
             let column = gtk::Box::builder()
                 .orientation(gtk::Orientation::Vertical)
@@ -423,7 +431,8 @@ impl DocumentWindow {
             stack.add_named(slides.light_table.widget(), Some("light-table"));
             controls.add_to_zoom(&slides.size);
         } else {
-            stack.add_named(&pages, Some("document"));
+            toasts.set_child(Some(&pages));
+            stack.add_named(&toasts, Some("document"));
         }
         // The document as an outline (TXT-14).
         let outline = crate::outline_view::OutlineView::new(editor_of());
@@ -640,6 +649,8 @@ impl DocumentWindow {
             ruler_corner,
             draft: RefCell::new(None),
             draft_due: Cell::new(false),
+            toasts,
+            before_screen: Cell::new(None),
             autosave_source: RefCell::new(None),
             opened_kept: Cell::new(false),
             slides,
@@ -981,6 +992,12 @@ impl DocumentWindow {
         *self.path.borrow_mut() = None;
         *self.name.borrow_mut() = name;
         self.show_document(document);
+        // A new document opens in Screen View, if the preferences ask
+        // (PXV-01).
+        if preferences::get().screen_view && self.slides.is_none() {
+            self.actions
+                .change_action_state("screen-view", &true.to_variant());
+        }
     }
 
     /// How the document shows now.
@@ -1046,11 +1063,23 @@ impl DocumentWindow {
         editor.set_show_invisibles(self.action_state("invisibles"));
         editor.set_show_connection_lines(self.action_state("connection-lines"));
         editor.set_show_layout(self.action_state("show-layout"));
+        let screen = self.action_state("screen-view");
         *self.editor.borrow_mut() = Some(editor);
         self.stack.set_visible_child_name("document");
         // A document saved as an outline opens as one (DOC-16).
         if self.action_state("outline") {
             self.show_outline(true);
+        }
+        // Screen View stays on for the next document, if it can show it
+        // (PXV-01).
+        if screen && let Some(editor) = self.editor() {
+            if editor.is_page_layout() || editor.is_presentation() {
+                self.actions
+                    .change_action_state("screen-view", &false.to_variant());
+            } else {
+                editor.set_screen_view(true);
+                self.show_rulers();
+            }
         }
         // A page layout document opens with its thumbnails and both
         // rulers, as in Pages (INT-03).
@@ -1141,7 +1170,9 @@ impl DocumentWindow {
 
     /// Shows the rulers that Show Ruler and the preferences ask for.
     fn show_rulers(&self) {
-        let on = self.action_state("ruler");
+        // Screen View has no rulers (PXV-01).
+        let screen = self.editor().is_some_and(|e| e.screen_view());
+        let on = self.action_state("ruler") && !screen;
         let page_layout = self.editor().is_some_and(|e| e.is_page_layout());
         let vertical = on && (page_layout || preferences::get().vertical_ruler);
         self.ruler.widget().set_visible(on);
@@ -1308,6 +1339,18 @@ impl DocumentWindow {
         // Paste Style is off until a style is copied, as in Pages.
         let copied = COPIED_STYLE.with(|c| c.borrow().is_some());
         self.enable("paste-style", has_document && copied);
+        // Screen View is for word processing documents, and while it is
+        // on the pages, their thumbnails and their layout do not show
+        // (PXV-01).
+        let screen = editor.as_ref().is_some_and(TextEditor::screen_view);
+        let words = editor
+            .as_ref()
+            .is_some_and(|e| !e.is_page_layout() && !e.is_presentation());
+        self.enable("screen-view", has_document && words);
+        self.enable("text-size", has_document && screen);
+        for action in ["thumbnails", "show-layout", "ruler", "page-layout"] {
+            self.enable(action, has_document && !screen);
+        }
     }
 
     fn enable(&self, name: &str, enabled: bool) {
@@ -1829,6 +1872,58 @@ impl DocumentWindow {
         }
     }
 
+    /// Shows the text in one flow as wide as the window, or as pages
+    /// again as they showed before (PXV-01).
+    fn show_screen_view(&self, on: bool) {
+        let Some(editor) = self.editor() else {
+            return;
+        };
+        if on && editor.screen_view() {
+            return;
+        }
+        if on {
+            if editor.is_page_layout() || editor.is_presentation() {
+                formatting::set_state(&self.actions, "screen-view", false.to_variant());
+                return;
+            }
+            if self.action_state("outline") {
+                self.actions
+                    .change_action_state("outline", &false.to_variant());
+            }
+            let thumbnails = self.action_state("thumbnails");
+            self.before_screen
+                .set(Some((self.view.zoom(), self.view.fit(), thumbnails)));
+            if thumbnails {
+                self.actions
+                    .change_action_state("thumbnails", &false.to_variant());
+            }
+            // The text starts at its own size: Text Size ▸ Auto.
+            self.view.set_zoom(geometry::DEFAULT_ZOOM);
+            editor.set_screen_view(true);
+            if editor.screen_hides_content() {
+                self.toasts.add_toast(adw::Toast::new(&tr(
+                    "Some content, such as headers and footers, is hidden in Screen View",
+                )));
+            }
+        } else {
+            editor.set_screen_view(false);
+            if let Some((zoom, fit, thumbnails)) = self.before_screen.take() {
+                match fit {
+                    Some(fit) => self.view.set_fit(Some(fit)),
+                    None => self.view.set_zoom(zoom),
+                }
+                if thumbnails {
+                    self.actions
+                        .change_action_state("thumbnails", &true.to_variant());
+                }
+            }
+        }
+        self.show_rulers();
+        self.refresh();
+        editor.show_selection();
+        editor.focus();
+    }
+
     /// Deletes the page the cursor is on, after asking (TXT-02).
     fn delete_page(self: &Rc<Self>) {
         let Some(editor) = self.editor() else {
@@ -2287,6 +2382,15 @@ impl DocumentWindow {
                 return;
             };
             let view = &this.view;
+            // In Screen View the zoom sets the size of the text, and the
+            // flow is always as wide as the window (PXV-01).
+            let screen = this.editor().is_some_and(|e| e.screen_view());
+            let value = match value.as_str() {
+                "fit-width" | "fit-page" | "selection" | "content" if screen => {
+                    geometry::DEFAULT_ZOOM.to_string()
+                }
+                _ => value,
+            };
             let zoom = match value.as_str() {
                 "in" => geometry::zoom_in(view.zoom()),
                 "out" => geometry::zoom_out(view.zoom()),
@@ -2642,9 +2746,45 @@ impl DocumentWindow {
                 return;
             };
             action.set_state(&on.to_variant());
+            if on {
+                this.actions
+                    .change_action_state("screen-view", &false.to_variant());
+            }
             this.show_outline(on);
         });
         self.actions.add_action(&outline);
+
+        // View ▸ Screen View: the text in one flow as wide as the window,
+        // without pages (PXV-01).
+        let screen = gio::SimpleAction::new_stateful("screen-view", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        screen.connect_change_state(move |action, value| {
+            let (Some(this), Some(on)) = (weak.upgrade(), value.and_then(|v| v.get::<bool>()))
+            else {
+                return;
+            };
+            action.set_state(&on.to_variant());
+            this.show_screen_view(on);
+        });
+        self.actions.add_action(&screen);
+
+        // View ▸ Text Size, in Screen View: Auto, Bigger and Smaller.
+        let text_size = gio::SimpleAction::new("text-size", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        text_size.connect_activate(move |_, parameter| {
+            let (Some(this), Some(value)) =
+                (weak.upgrade(), parameter.and_then(|p| p.get::<String>()))
+            else {
+                return;
+            };
+            let zoom = this.view.zoom();
+            this.view.set_zoom(match value.as_str() {
+                "bigger" => geometry::zoom_in(zoom),
+                "smaller" => geometry::zoom_out(zoom),
+                _ => geometry::DEFAULT_ZOOM,
+            });
+        });
+        self.actions.add_action(&text_size);
 
         // Edit ▸ Delete Page, after asking (TXT-02).
         let delete_page = gio::SimpleAction::new("delete-page", None);
