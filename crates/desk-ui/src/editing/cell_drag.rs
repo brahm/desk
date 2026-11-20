@@ -133,6 +133,7 @@ impl TextEditor {
                 }
                 let name = if copying { "Copy Cells" } else { "Move Cells" };
                 let from = drag.id;
+                let aside = crate::preferences::get().move_objects_aside;
                 self.arrange_objects(name, move |edit, _| {
                     let objects = edit.document().objects();
                     let (Some(mut into), Some(mut out)) =
@@ -140,10 +141,14 @@ impl TextEditor {
                     else {
                         return Ok(None);
                     };
+                    let old = into.frame;
                     into.kind = ObjectKind::Table(Arc::new(table));
                     into.frame.width = desk_model::Length::from_pt(w);
                     into.frame.height = desk_model::Length::from_pt(h);
                     edit.replace_object(into)?;
+                    if aside {
+                        edit.move_aside(id, old)?;
+                    }
                     if !copying {
                         out.kind = ObjectKind::Table(Arc::new(left));
                         edit.replace_object(out)?;
