@@ -13,7 +13,7 @@ use desk_text::TextSystem;
 fn pxv_01_screen_view_flows_the_text_without_pages() {
     let mut editor = Editor::new(Document::new_word_processing());
     let start = editor.document().start();
-    let (fixed, wide, master) = editor
+    let (fixed, moving, wide, master) = editor
         .edit("Text", |edit| {
             let end = edit.insert_text(start, &"words of text that wrap ".repeat(300))?;
             let second = edit.split_paragraph(end)?;
@@ -27,6 +27,7 @@ fn pxv_01_screen_view_flows_the_text_without_pages() {
                     ..ParaAttrs::default()
                 },
             )?;
+            let first = edit.document().body().get(0).unwrap().id();
             let mut add = |anchor, width| {
                 let mut object = Object::new(
                     edit.new_id(),
@@ -38,9 +39,10 @@ fn pxv_01_screen_view_flows_the_text_without_pages() {
                 edit.add_object(object).map(|()| id)
             };
             let fixed = add(Anchor::Page(0), 100.0)?;
-            let wide = add(Anchor::Page(0), 2000.0)?;
+            let moving = add(Anchor::Paragraph(first), 100.0)?;
+            let wide = add(Anchor::Paragraph(first), 2000.0)?;
             let master = add(Anchor::Master(None, MarginPages::Default), 50.0)?;
-            Ok((fixed, wide, master))
+            Ok((fixed, moving, wide, master))
         })
         .unwrap();
     let document = editor.document();
@@ -66,12 +68,13 @@ fn pxv_01_screen_view_flows_the_text_without_pages() {
     for line in &page.lines {
         assert!((line.origin.0 - SCREEN_MARGIN as f32).abs() < 0.01);
     }
-    // The objects fixed on the first page show in the flow, after the
-    // last paragraph that starts there, across the column at most; the
-    // object of the masters does not show.
+    // The objects that move with the first paragraph show in the flow
+    // after it, across the column at most (the Mac, 2026-11-18); the one
+    // fixed on a page and the one of the masters do not show (the Mac,
+    // 2026-11-21).
     let shown: Vec<_> = page.objects.iter().map(|o| o.object.id).collect();
-    assert!(shown.contains(&fixed) && shown.contains(&wide));
-    assert!(!shown.contains(&master));
+    assert!(shown.contains(&moving) && shown.contains(&wide));
+    assert!(!shown.contains(&fixed) && !shown.contains(&master));
     let wide = page.objects.iter().find(|o| o.object.id == wide).unwrap();
     assert!((wide.width - (500.0 - 2.0 * SCREEN_MARGIN as f32)).abs() < 0.5);
     assert!((wide.x - SCREEN_MARGIN as f32).abs() < 0.5);

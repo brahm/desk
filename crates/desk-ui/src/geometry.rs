@@ -38,6 +38,40 @@ pub fn zoom_out(zoom: f64) -> f64 {
         .unwrap_or(ZOOM_LEVELS[0])
 }
 
+/// The sizes of the text of Screen View, as View > Text Size of Pages
+/// 15.4 steps through them with Bigger and Smaller, from 80% to 310%
+/// (PXV-01).
+pub const TEXT_SIZES: [f64; 12] = [
+    0.8, 0.85, 0.9, 1.0, 1.1, 1.2, 1.35, 1.6, 1.9, 2.35, 2.75, 3.1,
+];
+
+/// The next text size of Screen View above `size`, or the largest.
+pub fn text_bigger(size: f64) -> f64 {
+    TEXT_SIZES
+        .iter()
+        .copied()
+        .find(|&s| s > size + 1e-6)
+        .unwrap_or(TEXT_SIZES[TEXT_SIZES.len() - 1])
+}
+
+/// The next text size of Screen View below `size`, or the smallest.
+pub fn text_smaller(size: f64) -> f64 {
+    TEXT_SIZES
+        .iter()
+        .rev()
+        .copied()
+        .find(|&s| s < size - 1e-6)
+        .unwrap_or(TEXT_SIZES[0])
+}
+
+/// The text size of Text Size > Auto in Screen View, for a window as
+/// wide as `width` logical pixels. Pages 15.4 sets 120% in a window 1031
+/// points wide and 100% in one 560 points wide, the text flowing to the
+/// window in both (PXV-01); Desk takes the larger from 800 on.
+pub fn text_size_auto(width: f64) -> f64 {
+    if width >= 800.0 { 1.2 } else { 1.0 }
+}
+
 /// A zoom as people read it, such as "125%".
 pub fn zoom_label(zoom: f64) -> String {
     format!("{}%", (zoom * 100.0).round())

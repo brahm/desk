@@ -191,7 +191,7 @@ impl TextEditor {
         if let Some(entry) = style.and_then(|s| self.document().table_styles().get(s).cloned()) {
             entry.look.apply_to(&mut table);
         }
-        self.add_table(table, None, (1, 1));
+        self.add_table(table, None, (1, 1), "Insert Table", |_| Ok(()));
     }
 
     /// The name of the next table: Table and the number after those of
@@ -207,12 +207,16 @@ impl TextEditor {
     }
 
     /// Puts a new table on the page, centered on `at` or in the middle of
-    /// the page shown, and selects it with the cell `cell` chosen.
+    /// the page shown, and selects it with the cell `cell` chosen. `also`
+    /// makes the rest of the step `name`, such as emptying the cells the
+    /// table was made from.
     pub(super) fn add_table(
         &self,
         mut table: Table,
         at: Option<(usize, f64, f64)>,
         cell: (u32, u32),
+        name: &str,
+        also: impl FnOnce(&mut desk_model::Edit) -> Result<(), desk_model::ModelError>,
     ) {
         table.name = self.next_table_name();
         let size = self.table_size(&table);
@@ -220,12 +224,13 @@ impl TextEditor {
         self.leave_story(None);
         self.close_cell_editor(false);
         let selection = self.selection();
-        let result = self.state.borrow_mut().editor.edit("Insert Table", |edit| {
+        let result = self.state.borrow_mut().editor.edit(name, |edit| {
             let id = edit.new_id();
             let mut object = Object::new(id, ObjectKind::Table(Arc::new(table)), frame);
             object.anchor = Anchor::Page(page as u32);
             object.wrap = Wrap::AboveAndBelow;
             edit.add_object(object)?;
+            also(edit)?;
             Ok(id)
         });
         match result {

@@ -3,8 +3,9 @@
 
 //! The custom formats of the document (PXV-18, TAB-31): Create and Edit
 //! Custom Format keep one and give it to the selected cells, as one step
-//! of the history; a format is also moved in the menu or deleted, and the
-//! cells that have it keep it.
+//! of the history; a format is also moved in the menu or deleted. Changing
+//! a format changes it in every cell that has it, and deleting it gives
+//! those cells the Automatic format, as in Pages 15.4.
 
 use std::sync::Arc;
 
@@ -34,16 +35,26 @@ impl TextEditor {
             changed.cell_mut(r, c).format = Format::Custom(format.clone());
         }
         let (w, h) = self.table_size(&changed);
+        let custom = Format::Custom(format.clone());
         let name = if index.is_some() {
             "Edit Custom Format"
         } else {
             "Create Custom Format"
         };
         self.arrange_objects(name, move |edit, _| {
+            // Saving the format changes it in the other cells that have
+            // it, this table's too.
             edit.save_custom_format(index, format)?;
             let Some(mut object) = edit.document().objects().get(id).cloned() else {
                 return Ok(None);
             };
+            let ObjectKind::Table(saved) = &object.kind else {
+                return Ok(None);
+            };
+            let mut changed = (**saved).clone();
+            for (r, c) in area.cells() {
+                changed.cell_mut(r, c).format = custom.clone();
+            }
             object.kind = ObjectKind::Table(Arc::new(changed));
             object.frame.width = desk_model::Length::from_pt(w);
             object.frame.height = desk_model::Length::from_pt(h);
@@ -63,7 +74,8 @@ impl TextEditor {
         self.selection_changed();
     }
 
-    /// Takes a custom format out of the menu; the cells keep it.
+    /// Takes a custom format out of the menu; the cells that have it take
+    /// the Automatic format.
     pub fn delete_custom_format(&self, index: usize) {
         self.arrange_objects("Delete Custom Format", move |edit, _| {
             edit.delete_custom_format(index)?;

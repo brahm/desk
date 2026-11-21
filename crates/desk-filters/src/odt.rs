@@ -308,6 +308,7 @@ fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) ->
         }),
         color: t.color.map(rgba),
         fill: text_fill(source, t),
+        fill_page: t.fill_page,
         baseline: t.position.map(|p| match p {
             odf::TextPosition::Super => Baseline::Superscript,
             odf::TextPosition::Sub => Baseline::Subscript,
@@ -567,6 +568,7 @@ fn text_properties(
             .filter(|s| s.opacity < 100)
             .map(|s| f64::from(s.opacity)),
         background: a.background.map(odf_background),
+        fill_page: a.fill_page,
         // A paragraph attribute, which the paragraph styles write.
         hyphenate: None,
         desk_hyphenate: None,

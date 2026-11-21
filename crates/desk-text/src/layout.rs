@@ -110,6 +110,8 @@ pub struct GlyphRun {
     /// A gradient or picture that fills the glyphs in place of the color
     /// (PXV-04).
     pub fill: Option<desk_model::Fill>,
+    /// Whether the fill runs across the whole page (W052).
+    pub fill_page: bool,
 }
 
 /// One line of a paragraph, or one piece of a line beside a wrapped object.
@@ -1073,6 +1075,7 @@ impl TextSystem {
                     shadow: format.shadow,
                     background: format.background,
                     fill: format.fill.clone(),
+                    fill_page: format.fill_page,
                 });
             }
             for (place, font, size, format_index) in leaders {
@@ -1093,6 +1096,7 @@ impl TextSystem {
                     .map_or((false, None, None, None), |r| {
                         (r.outline, r.shadow, r.background, r.fill.clone())
                     });
+                let fill_page = last.is_some_and(|r| r.fill_page);
                 glyph_runs.push(GlyphRun {
                     font: font.clone(),
                     size: *size,
@@ -1114,6 +1118,7 @@ impl TextSystem {
                     shadow,
                     background,
                     fill,
+                    fill_page,
                 });
                 advance += hyphen_advance;
             }
@@ -1423,6 +1428,7 @@ fn leader_run(
         // with the tab.
         background: None,
         fill: format.fill.clone(),
+        fill_page: format.fill_page,
     })
 }
 

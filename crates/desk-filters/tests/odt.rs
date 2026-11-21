@@ -3791,7 +3791,14 @@ fn pxv_04_gradients_and_pictures_that_fill_text_are_kept() {
     let runs = vec![
         Run::with_attrs("Glowing ", Some(glow), CharAttrs::default()),
         Run::with_attrs("plain ", Some(glow), fill(None)),
-        Run::with_attrs("radial ", None, fill(Some(radial.clone()))),
+        Run::with_attrs(
+            "radial ",
+            None,
+            CharAttrs {
+                fill_page: Some(true),
+                ..fill(Some(radial.clone()))
+            },
+        ),
         Run::with_attrs("picture", None, fill(Some(image.clone()))),
     ];
     let body = document.styles().default_paragraph();
@@ -3821,6 +3828,17 @@ fn pxv_04_gradients_and_pictures_that_fill_text_are_kept() {
         })
         .collect();
     assert_eq!(fills, [Some(red), None, Some(radial), Some(image)]);
+    // The radial one runs across the entire page (W052).
+    let pages: Vec<bool> = [9, 15]
+        .into_iter()
+        .map(|at| {
+            let (style, attrs) = paragraph.format_at(at);
+            read.styles()
+                .resolve_character(paragraph.style(), style, &attrs)
+                .fill_page
+        })
+        .collect();
+    assert_eq!(pages, [false, true]);
 }
 
 #[test]

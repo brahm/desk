@@ -5,7 +5,8 @@
 //! inside the selected cells moves them to where it ends in the same
 //! table, or with Alt copies them; ending on another table puts them
 //! there, and ending on the page makes them a new table of their own,
-//! leaving the source as it was. A press that does not move selects the
+//! with the title setting of the source; without Alt the cells left
+//! behind are emptied, as Pages 15.4 does. A press that does not move selects the
 //! cell under it, as a click does.
 
 use std::sync::Arc;
@@ -162,11 +163,24 @@ impl TextEditor {
             }
             // Between the cells of a table, nothing changes.
             Some((_, None, false)) => self.select_cell(drag.id, drag.grabbed),
+            // The new table keeps the title setting of the source, whose
+            // cells are emptied unless copying, as in Pages 15.4.
             None => {
-                let mut table = source.sub_table(drag.area);
-                table.options.show_name = true;
-                table.options.name_centered = true;
-                self.add_table(table, Some((page, px, py)), (0, 0));
+                let table = source.sub_table(drag.area);
+                let from = drag.id;
+                let mut left = (*source).clone();
+                left.clear_cells(drag.area);
+                let name = if copying { "Copy Cells" } else { "Move Cells" };
+                self.add_table(table, Some((page, px, py)), (0, 0), name, move |edit| {
+                    if copying {
+                        return Ok(());
+                    }
+                    let Some(mut out) = edit.document().objects().get(from).cloned() else {
+                        return Ok(());
+                    };
+                    out.kind = ObjectKind::Table(Arc::new(left));
+                    edit.replace_object(out)
+                });
             }
         }
         true

@@ -315,6 +315,94 @@ fn fill_frames(
     frames
 }
 
+/// A frame of a fill: left, top, width and height.
+type FillFrame = (f32, f32, f32, f32);
+
+/// Spreads the frames of fills that go on from one line of a paragraph
+/// to the next over all those lines: Pages 15.4 runs one gradient once
+/// from the top line to the bottom line of the text that has it, and
+/// across the widest of them, whether that text is a word or the lines
+/// of a paragraph (PXV-04, W052).
+fn spread_fills(lines: &[&PlacedLine], fills: &mut [Vec<Option<FillFrame>>]) {
+    // The lines and runs of the fill being followed, and their frame.
+    let mut chain: Vec<(usize, usize)> = Vec::new();
+    let mut union: Option<FillFrame> = None;
+    let close = |chain: &mut Vec<(usize, usize)>,
+                 union: &mut Option<FillFrame>,
+                 fills: &mut [Vec<Option<FillFrame>>]| {
+        if let Some(frame) = union.take()
+            && chain
+                .iter()
+                .map(|&(l, _)| l)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                > 1
+        {
+            for &(l, r) in chain.iter() {
+                fills[l][r] = Some(frame);
+            }
+        }
+        chain.clear();
+    };
+    for k in 0..lines.len() {
+        let runs = &lines[k].line.runs;
+        let first = runs.first().and_then(|r| r.fill.as_ref());
+        let goes_on = k > 0
+            && !chain.is_empty()
+            && lines[k - 1].paragraph == lines[k].paragraph
+            && lines[k - 1].origin == lines[k].origin
+            && lines[k - 1].line.runs.last().and_then(|r| r.fill.as_ref()) == first
+            && first.is_some();
+        if goes_on {
+            // The runs at the start of the line that share the fill.
+            let lead = fills[k][0];
+            for (r, frame) in fills[k].iter().enumerate() {
+                if *frame != lead {
+                    break;
+                }
+                chain.push((k, r));
+            }
+            if let (Some(u), Some(f)) = (union, lead) {
+                let left = u.0.min(f.0);
+                let right = (u.0 + u.2).max(f.0 + f.2);
+                let bottom = (u.1 + u.3).max(f.1 + f.3);
+                union = Some((left, u.1, right - left, bottom - u.1));
+            }
+        } else {
+            close(&mut chain, &mut union, fills);
+        }
+        // The runs at the end of the line that share the fill go on.
+        let ends_filled = runs.last().is_some_and(|r| r.fill.is_some());
+        if !ends_filled {
+            close(&mut chain, &mut union, fills);
+            continue;
+        }
+        let tail = fills[k][runs.len() - 1];
+        if chain.last().is_none_or(|&(l, _)| l != k) {
+            // A new chain from the runs at the end of this line.
+            close(&mut chain, &mut union, fills);
+            union = tail;
+            for (r, frame) in fills[k].iter().enumerate().rev() {
+                if *frame != tail {
+                    break;
+                }
+                chain.push((k, r));
+            }
+        } else if fills[k].iter().any(|f| *f != tail) {
+            // The fill stops in this line and another one ends it.
+            close(&mut chain, &mut union, fills);
+            union = tail;
+            for (r, frame) in fills[k].iter().enumerate().rev() {
+                if *frame != tail {
+                    break;
+                }
+                chain.push((k, r));
+            }
+        }
+    }
+    close(&mut chain, &mut union, fills);
+}
+
 /// Where a picture that fills a frame lies, as the mode sizes it, a pixel
 /// to a point at its own size (OBJ-09).
 fn image_paint(picture: Picture, mode: ImageFill, frame: (f32, f32, f32, f32)) -> Paint {
@@ -440,7 +528,28 @@ impl DisplayList {
     /// pictures and lines.
     fn lines<'a>(&mut self, lines: impl Iterator<Item = &'a PlacedLine>) {
         let list = self;
-        for placed in lines {
+        let lines: Vec<&PlacedLine> = lines.collect();
+        let mut fills: Vec<_> = lines
+            .iter()
+            .map(|p| {
+                let dy = p.origin.1;
+                fill_frames(&p.line.runs, p.top() - dy, p.bottom() - dy)
+            })
+            .collect();
+        spread_fills(&lines, &mut fills);
+        // A gradient applied to the entire page runs across the page,
+        // whatever text has it (W052).
+        if list.width > 0.0 && list.height > 0.0 {
+            for (placed, frames) in lines.iter().zip(&mut fills) {
+                let (dx, dy) = placed.origin;
+                for (run, frame) in placed.line.runs.iter().zip(frames.iter_mut()) {
+                    if run.fill_page && frame.is_some() {
+                        *frame = Some((-dx, -dy, list.width, list.height));
+                    }
+                }
+            }
+        }
+        for (placed, frames) in lines.into_iter().zip(fills) {
             let (dx, dy) = placed.origin;
             // The backgrounds of runs span the height of the line, as
             // Pages 15.4 draws them (FMT-20, B-020).
@@ -484,7 +593,6 @@ impl DisplayList {
                     }),
                 });
             }
-            let frames = fill_frames(&placed.line.runs, top - dy, bottom - dy);
             for (run, frame) in placed.line.runs.iter().zip(frames) {
                 if run.glyphs.is_empty() {
                     continue;

@@ -396,6 +396,7 @@ impl Reader {
                 .attr(DESK, "text-fill-tint-opacity")
                 .and_then(parse_percent)
                 .map(|p| p.clamp(0.0, 100.0)),
+            fill_page: e.attr(DESK, "text-fill-page").map(|v| v == "true"),
         }
     }
 }

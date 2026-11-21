@@ -84,6 +84,9 @@ pub struct ObjectTextGroups {
     /// The gradient or picture that fills the letters in place of their
     /// color (PXV-04).
     fill: Rc<FillRows>,
+    /// Whether a gradient runs across the whole page: "Apply gradient to
+    /// entire page" of Pages 15.4 (W052).
+    fill_page: compact::SwitchRow,
     list: compact::ComboRow,
     updating: Cell<bool>,
 }
@@ -169,6 +172,11 @@ impl ObjectTextGroups {
         for row in fill_rows {
             font.add(row);
         }
+        let fill_page = compact::SwitchRow::builder()
+            .title(tr("Apply Gradient to Entire Page"))
+            .subtitle(tr("The gradient stretches across the page"))
+            .build();
+        font.add(&fill_page);
         let advanced = compact::ExpanderRow::builder()
             .title(tr("Advanced Options"))
             .build();
@@ -219,6 +227,7 @@ impl ObjectTextGroups {
             color_row,
             colors,
             fill,
+            fill_page,
             list,
             updating: Cell::new(false),
         });
@@ -275,6 +284,23 @@ impl ObjectTextGroups {
                     "Text Color",
                     &CharAttrs {
                         color: Some(from_gdk(&button.rgba())),
+                        ..CharAttrs::default()
+                    },
+                );
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let of = editor.clone();
+        this.fill_page.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() {
+                return;
+            }
+            if let Some(editor) = of() {
+                editor.set_character_attrs(
+                    "Text Color",
+                    &CharAttrs {
+                        fill_page: Some(row.is_active()),
                         ..CharAttrs::default()
                     },
                 );
@@ -371,6 +397,10 @@ impl ObjectTextGroups {
     fn show_fill_rows(&self) {
         self.color_row
             .set_visible(self.fill.kind() == crate::fill_rows::Kind::Plain);
+        self.fill_page.set_visible(matches!(
+            self.fill.kind(),
+            crate::fill_rows::Kind::Gradient | crate::fill_rows::Kind::Advanced
+        ));
     }
 
     /// Lists the faces of the family at the selection, and chooses the one
@@ -405,6 +435,9 @@ impl ObjectTextGroups {
             self.color.set_rgba(&color);
         }
         self.fill.show(character.fill.as_ref(), character.color);
+        if self.fill_page.is_active() != character.fill_page {
+            self.fill_page.set_active(character.fill_page);
+        }
         self.show_fill_rows();
         let list = crate::lists_pane::list_target(format.list.as_ref());
         let index = crate::format_pane::LISTS

@@ -462,6 +462,14 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Value:** a percent from 0 to 100; 100 when absent.
 - **Fallback:** as `desk:text-fill`.
 
+#### `desk:text-fill-page`
+
+- **Feature:** "Apply gradient to entire page" of Pages 15.4: the
+  gradient of `desk:text-fill` runs across the whole page rather than
+  the text that has it (W052).
+- **Value:** `true` or `false`; `false` when absent.
+- **Fallback:** as `desk:text-fill`.
+
 ### Text: drop caps (`style:drop-cap`)
 
 The drop cap is the standard `style:drop-cap` of the paragraph

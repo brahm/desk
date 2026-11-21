@@ -196,6 +196,24 @@ fn languages(styles: &Styles, paragraph: &Paragraph) -> Vec<(Range<usize>, Strin
         .collect()
 }
 
+/// The languages that Desk is made in, whose words are not marked in
+/// the text of the other, as Pages 15.4 checks each word in the language
+/// that macOS finds for it, whatever the language of the document: on the
+/// owner's Mac on 2026-11-21, English words were not marked in a document
+/// in Portuguese, nor Portuguese ones in English (PXV-09).
+const CHECKED_TOGETHER: [&str; 2] = ["en-US", "pt-BR"];
+
+/// Whether a word misspelled in `language` is a word of the other
+/// language of [`CHECKED_TOGETHER`].
+fn in_other_language(language: &str, word: &str) -> bool {
+    let base = |tag: &str| tag.split(['-', '_']).next().unwrap_or_default().to_owned();
+    CHECKED_TOGETHER
+        .iter()
+        .filter(|other| base(other) != base(language))
+        .filter_map(|other| desk_lang::speller(other))
+        .any(|speller| speller.check(word))
+}
+
 /// The mistakes of a paragraph, in order: misspelled words when
 /// `spelling` is on and the language has a dictionary, and the mistakes
 /// of the proofreader when `proofreading` is on.
@@ -234,6 +252,7 @@ pub fn mistakes(
             }
             if let Some(speller) = desk_lang::speller(language)
                 && !speller.check(word)
+                && !in_other_language(language, word)
             {
                 out.push(Mistake {
                     range,
@@ -395,6 +414,33 @@ mod tests {
         );
         ignore("vermelah");
         assert!(mistakes(document.styles(), paragraph, true, false).is_empty());
+    }
+
+    #[test]
+    fn pxv_09_english_words_are_not_marked_in_a_document_in_portuguese() {
+        if desk_lang::speller("pt-BR").is_none() || desk_lang::speller("en-US").is_none() {
+            return;
+        }
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Typing", |edit| {
+                edit.insert_text(start, "The committee will receive uma casa vermelah. Teh")
+            })
+            .unwrap();
+        editor
+            .edit("Language", |edit| {
+                edit.set_document_language(Language::new("pt-BR"))
+            })
+            .unwrap();
+        let document = editor.document();
+        let paragraph = document.body().get(0).unwrap();
+        let text = paragraph.text();
+        let found: Vec<&str> = mistakes(document.styles(), paragraph, true, false)
+            .iter()
+            .map(|m| &text[m.range.clone()])
+            .collect();
+        assert_eq!(found, ["vermelah", "Teh"]);
     }
 
     #[test]
