@@ -155,6 +155,8 @@ pub fn screen_document(document: &Document, width: f64, zoom: f64) -> Document {
 
 fn screen_document_with(document: &Document, width: f64, zoom: f64, fits: &Fits) -> Document {
     let mut screen = document.clone();
+    // Text at the sizes Screen View shows (the Mac, step 19g).
+    screen.set_screen_styles(Some(zoom));
     let mut page = *screen.page_setup();
 
     let width = width.max(NARROWEST);
@@ -264,7 +266,13 @@ fn screen_document_with(document: &Document, width: f64, zoom: f64, fits: &Fits)
         } else {
             0.0
         };
-        let (w, h) = (object.frame.width.to_pt(), object.frame.height.to_pt());
+        // The others keep their size on the screen, whatever the Text
+        // Size (the Mac, step 19g).
+        let zoom = if zoom > 0.0 { zoom } else { 1.0 };
+        let (w, h) = (
+            object.frame.width.to_pt() / zoom,
+            object.frame.height.to_pt() / zoom,
+        );
         let (w, h) = if spans_column(&object) {
             (column, fits.heights.get(&object.id).copied().unwrap_or(h))
         } else if w > column && w > 0.0 {

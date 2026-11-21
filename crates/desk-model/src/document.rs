@@ -484,6 +484,13 @@ impl Document {
         &self.styles
     }
 
+    /// Makes the styles resolve formatting as Screen View shows it at a
+    /// Text Size of `zoom`, or as the pages do: for the copy of a document
+    /// that Screen View lays out (PXV-01).
+    pub fn set_screen_styles(&mut self, zoom: Option<f64>) {
+        self.styles.set_screen(zoom);
+    }
+
     /// Gives a new document the font and size of the Default Font of the
     /// preferences, as Pages 15.4 does for new documents of its Basic
     /// templates (PXV-03): the default paragraph style takes them, and

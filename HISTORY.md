@@ -13,7 +13,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   with text boxes and rectangles with text across the column, and those
   fixed on a page are hidden. Its column is 664 points long at most, in
   the middle of the window, a table in the text is that wide, and
-  pictures and shapes in the text keep their size on the screen.
+  pictures and shapes keep their size on the screen. Text shows at the
+  sizes Pages 15.4 shows it there, from 10 to 26 points at 100%, without
+  its left indent.
 * Changed: documents are laid out as Pages 15.4 lays them out: text
   wraps tightly around the outline that Pages traces from the pixels of
   a picture, tables of contents, superscripts, text that overflows the

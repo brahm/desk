@@ -1497,8 +1497,21 @@ paragraph, and objects on a second page.
   shapes in the text keep their size on the screen, whatever the Text
   Size. The owner chose to follow Pages, overflow included, and Desk now
   does all of this. Where the 664 points come from was not found; it
-  behaves as a constant. Body text of 11 pt shows at about 13 pt at
-  100%, which Desk does not copy yet.
+  behaves as a constant.
+- A last round (step 19g) measured the text. Its size on the screen is
+  one curve of its size in print, times the Text Size, for every font,
+  in the body, text boxes, shapes and table cells: 10 points up to 8,
+  then s + 2 up to 11, 13 + (s − 11) / 2 up to 24, 19.5 + (s − 24) / 4
+  up to 50, and 26 above; 23 sizes from 4 to 96 points match within
+  0.1 point. The left indent goes, and a first line indent becomes 36
+  points on the screen whatever the Text Size (one value measured).
+  Pictures, ovals and empty rectangles after their paragraph keep their
+  size on the screen at 85, 100, 120 and 135%. Desk does all of this.
+- Not copied, for want of a rule: a single line is about 1.3 times the
+  size on the screen (1.19 to 1.35), against 1.2 in print; an exact line
+  spacing of 30 points follows nothing clear; 24 points of space before
+  or after became about 14.5 times the Text Size (one value). Tabs were
+  not measured.
 
 ## Decisions, with their reasons and consequences
 

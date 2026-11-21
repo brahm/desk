@@ -295,3 +295,81 @@ fn pxv_01_screen_view_keeps_its_line_and_sizes_the_objects_in_the_text() {
     assert!((shape.width - 100.0).abs() < 0.5, "{}", shape.width);
     assert!((shape.height - 50.0).abs() < 0.5, "{}", shape.height);
 }
+
+#[test]
+fn pxv_01_screen_view_shows_text_and_objects_at_the_sizes_of_pages() {
+    // Pages 15.4 (step 19g of W1): one curve gives the size of text on
+    // the screen at 100%, which the Text Size multiplies; the left indent
+    // goes, and a first line indent is 36 points on the screen; a picture
+    // or a shape after its paragraph keeps its size on the screen.
+    use desk_model::screen_font_size;
+    for (print, shown) in [
+        (4.0, 10.0),
+        (9.0, 11.0),
+        (11.0, 13.0),
+        (16.0, 15.5),
+        (24.0, 19.5),
+        (36.0, 22.5),
+        (48.0, 25.5),
+        (96.0, 26.0),
+    ] {
+        assert!((screen_font_size(print) - shown).abs() < 1e-9, "{print}");
+    }
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let shape = editor
+        .edit("Text", |edit| {
+            let end = edit.insert_text(start, &"words of text that wrap ".repeat(40))?;
+            edit.set_character_attrs(
+                start,
+                end,
+                &desk_model::CharAttrs {
+                    font_size: Some(Length::from_pt(16.0)),
+                    ..desk_model::CharAttrs::default()
+                },
+            )?;
+            edit.set_paragraph_attrs(
+                start,
+                end,
+                &ParaAttrs {
+                    left_indent: Some(Length::from_pt(85.0)),
+                    first_line_indent: Some(Length::from_pt(142.0)),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let first = edit.document().body().get(0).unwrap().id();
+            let mut shape = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(0.0, 0.0, 100.0, 100.0),
+            );
+            shape.anchor = Anchor::Paragraph(first);
+            let id = shape.id;
+            edit.add_object(shape)?;
+            Ok(id)
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let zoom = 1.25;
+    let screen = paginate_screen(editor.document(), 900.0, zoom, &mut system);
+    let page = &screen.pages[0];
+    let side = SCREEN_MARGIN.max((900.0 - 664.0) / 2.0) as f32;
+    let first = &page.lines[0];
+    assert!(
+        (first.line.runs[0].size - 15.5).abs() < 0.01,
+        "{}",
+        first.line.runs[0].size
+    );
+    // The first line starts 36 points on the screen in, the others at the
+    // edge of the column.
+    let indent = first.origin.0 + first.line.runs[0].x - side;
+    assert!((indent - 36.0 / zoom as f32).abs() < 0.5, "{indent}");
+    let second = &page.lines[1];
+    assert!((second.origin.0 + second.line.runs[0].x - side).abs() < 0.5);
+    let shape = page.objects.iter().find(|o| o.object.id == shape).unwrap();
+    assert!(
+        (shape.width - 100.0 / zoom as f32).abs() < 0.5,
+        "{}",
+        shape.width
+    );
+}

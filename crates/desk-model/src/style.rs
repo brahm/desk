@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use imbl::OrdMap;
 
+use crate::Length;
 use crate::error::ModelError;
 use crate::format::{CharAttrs, CharFormat, ParaAttrs, ParaFormat};
 use crate::id::NodeId;
@@ -212,6 +213,9 @@ impl From<Box<CharacterStyle>> for Style {
 pub struct Styles {
     styles: OrdMap<StyleId, Style>,
     default_paragraph: StyleId,
+    /// The Text Size of Screen View, in thousandths, while the styles
+    /// resolve formatting as it shows (PXV-01); never saved.
+    screen: Option<u32>,
 }
 
 impl Styles {
@@ -223,7 +227,14 @@ impl Styles {
         Self {
             styles,
             default_paragraph: id,
+            screen: None,
         }
+    }
+
+    /// Resolves formatting as Screen View shows it at a Text Size of
+    /// `zoom`, 1 for 100%, or as the pages do: see [`screen_font_size`].
+    pub fn set_screen(&mut self, zoom: Option<f64>) {
+        self.screen = zoom.map(|z| (z * 1000.0).round().max(1.0) as u32);
     }
 
     /// The paragraph style of new paragraphs, which cannot be removed.
@@ -404,6 +415,19 @@ impl Styles {
             }
         }
         direct.apply_to(&mut format);
+        // Screen View sets no left indent, and a first line indent of its
+        // own, 36 points on the screen whatever the Text Size (the Mac,
+        // step 19g of W1).
+        // A hanging first line, as of a list, keeps its indents: the Mac
+        // showed only a first line indented to the right.
+        if let Some(zoom) = self.screen
+            && format.first_line_indent >= Length::ZERO
+        {
+            format.left_indent = Length::ZERO;
+            if format.first_line_indent > Length::ZERO {
+                format.first_line_indent = Length::from_pt(36.0 * 1000.0 / f64::from(zoom));
+            }
+        }
         format
     }
 
@@ -431,6 +455,23 @@ impl Styles {
             }
         }
         direct.apply_to(&mut format);
+        if self.screen.is_some() {
+            format.font_size = Length::from_pt(screen_font_size(format.font_size.to_pt()));
+        }
         format
+    }
+}
+
+/// The size, in points at a Text Size of 100%, at which Screen View of
+/// Pages 15.4 shows text of a size: one curve for every font, with a floor
+/// of 10 points and a ceiling of 26, measured on the owner's Mac for 23
+/// sizes from 4 to 96 points within 0.1 point (step 19g of W1).
+pub fn screen_font_size(size: f64) -> f64 {
+    match size {
+        s if s <= 8.0 => 10.0,
+        s if s <= 11.0 => s + 2.0,
+        s if s <= 24.0 => 13.0 + (s - 11.0) / 2.0,
+        s if s <= 50.0 => 19.5 + (s - 24.0) / 4.0,
+        _ => 26.0,
     }
 }
