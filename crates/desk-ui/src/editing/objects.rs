@@ -2443,7 +2443,7 @@ pub(super) fn refresh_contour(object: &mut Object, before: &Object) {
         || object.frame.width != before.frame.width
         || object.frame.height != before.frame.height;
     if changed {
-        object.contour = desk_render::object_contour(object);
+        desk_render::trace_contour(object);
     }
 }
 

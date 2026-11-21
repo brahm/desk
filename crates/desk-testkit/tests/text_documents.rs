@@ -79,6 +79,14 @@ fn txt_09_hyphenated_lines_match_pages() {
 // (B-045). The rules that Desk follows there are tested in desk-text.
 
 #[test]
+fn txt_09_a_word_breaks_at_a_hyphen_typed_by_hand_as_in_pages() {
+    // Hyphenation off, a hyphen typed by hand in every long word of a
+    // narrow justified paragraph: Pages 15.4 breaks a word there only
+    // before the first letter that does not fit, as it hyphenates (B-023).
+    check("txt-09-soft-hyphens");
+}
+
+#[test]
 fn fmt_07_capitalization_matches_pages() {
     check("fmt-07-capitalization");
 }

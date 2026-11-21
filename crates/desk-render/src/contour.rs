@@ -8,33 +8,51 @@ use std::sync::Arc;
 
 use desk_model::{Object, ObjectKind, POLYGON_SCALE};
 
-/// How many bands of the picture the outline follows at most.
-const MAX_BANDS: usize = 64;
+/// Sets the contour that text wraps tightly around an object, as
+/// [`object_contours`] traces it: its first part and the parts apart from
+/// it. None when there is nothing to go around.
+pub fn trace_contour(object: &mut Object) {
+    let mut parts = object_contours(object).into_iter();
+    object.contour = parts.next();
+    object.contour_parts = parts.collect();
+}
 
 /// The contour that text wraps tightly around for an object: the outline
 /// of a shape, or of the opaque part of a picture after Instant Alpha, in
 /// parts of [`POLYGON_SCALE`] of its frame. None for other objects, and
 /// for a picture with nothing opaque.
 pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
+    object_contours(object).into_iter().next()
+}
+
+/// The parts of the contour that text wraps tightly around for an object:
+/// one for a shape, and one for each part apart of the opaque pixels of a
+/// picture, which Pages 15.4 runs the text between (B-047). Empty when
+/// there is nothing to go around.
+pub fn object_contours(object: &Object) -> Vec<Arc<[(i32, i32)]>> {
     let ObjectKind::Image(picture) = &object.kind else {
-        return object.shape_contour();
+        return object.shape_contour().into_iter().collect();
     };
-    let source = crate::picture_surface(picture)?;
+    let Some(source) = crate::picture_surface(picture) else {
+        return Vec::new();
+    };
     let settings = &object.picture;
     let mut surface = if settings.alpha.is_empty() && settings.alpha_kept.is_none() {
         source
     } else {
-        crate::adjusted_surface(
+        match crate::adjusted_surface(
             &source,
             &settings.alpha,
             settings.alpha_kept.as_ref(),
             desk_model::Adjustments::default(),
-        )
-        .ok()?
+        ) {
+            Ok(surface) => surface,
+            Err(_) => return Vec::new(),
+        }
     };
     let (fw, fh) = (object.frame.width.to_pt(), object.frame.height.to_pt());
     if fw <= 0.0 || fh <= 0.0 {
-        return None;
+        return Vec::new();
     }
     // The picture fills its mask, placed from the frame, or the frame.
     let (mx, my, mw, mh) = match settings.mask {
@@ -55,30 +73,22 @@ pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
             y.round().clamp(0.0, scale) as i32,
         )
     };
-    // The outline of the opaque pixels as Pages traces it, or, for a
-    // picture of opaque parts apart, the bands of the opaque pixels:
-    // down the right edges of the bands, then up their left edges.
-    let mut points: Vec<(i32, i32)> = match traced_outline(&mut surface, object.wrap_threshold) {
-        Some(outline) => outline.into_iter().map(|(x, y)| place(x, y)).collect(),
-        None => {
-            let spans = opaque_spans(surface, object.wrap_threshold)?;
-            let mut points = Vec::with_capacity(spans.len() * 4);
-            for &(top, bottom, _, right) in &spans {
-                points.push(place(right, top));
-                points.push(place(right, bottom));
+    // The outlines of the opaque pixels as Pages traces them.
+    traced_outlines(&mut surface, object.wrap_threshold)
+        .into_iter()
+        .filter_map(|outline| {
+            let mut points: Vec<(i32, i32)> =
+                outline.into_iter().map(|(x, y)| place(x, y)).collect();
+            points.dedup();
+            if points.len() > 1 && points.first() == points.last() {
+                points.pop();
             }
-            for &(top, bottom, left, _) in spans.iter().rev() {
-                points.push(place(left, bottom));
-                points.push(place(left, top));
-            }
-            points
-        }
-    };
-    points.dedup();
-    if points.len() > 1 && points.first() == points.last() {
-        points.pop();
-    }
-    (points.len() >= 3).then(|| points.into())
+            // A part that the mask leaves out is a line along its edge.
+            let (xs, ys): (Vec<i32>, Vec<i32>) = points.iter().copied().unzip();
+            let flat = |v: &[i32]| v.iter().min() == v.iter().max();
+            (points.len() >= 3 && !flat(&xs) && !flat(&ys)).then(|| points.into())
+        })
+        .collect()
 }
 
 /// The least alpha of a pixel more opaque than `threshold` percent: 50%
@@ -87,81 +97,32 @@ fn least_alpha(threshold: u8) -> u16 {
     (f64::from(threshold.min(100)) * 255.0 / 100.0).floor() as u16 + 1
 }
 
-/// The outline of the opaque part of a picture, as Pages 15.4 traces it,
-/// in parts of the picture. None when the picture has nothing opaque, or
-/// opaque parts apart.
-fn traced_outline(surface: &mut cairo::ImageSurface, threshold: u8) -> Option<Vec<(f64, f64)>> {
+/// The outlines of the parts of the opaque pixels of a picture, as Pages
+/// 15.4 traces them, in parts of the picture. Empty when the picture has
+/// nothing opaque.
+fn traced_outlines(surface: &mut cairo::ImageSurface, threshold: u8) -> Vec<Vec<(f64, f64)>> {
     surface.flush();
     let (w, h) = (surface.width() as usize, surface.height() as usize);
     if w == 0 || h == 0 {
-        return None;
+        return Vec::new();
     }
     let stride = surface.stride() as usize;
     let format = surface.format();
     let least = least_alpha(threshold);
-    let data = surface.data().ok()?;
-    let outline = desk_model::pixel_outline(w, h, |x, y| {
+    let Ok(data) = surface.data() else {
+        return Vec::new();
+    };
+    desk_model::pixel_outlines(w, h, |x, y| {
         format != cairo::Format::ARgb32 || u16::from(data[y * stride + x * 4 + 3]) >= least
-    })?;
-    Some(
+    })
+    .into_iter()
+    .map(|outline| {
         outline
             .into_iter()
             .map(|(x, y)| (f64::from(x) / w as f64, f64::from(y) / h as f64))
-            .collect(),
-    )
-}
-
-/// The bands of a picture that have opaque pixels, from top to bottom: the
-/// top and bottom of each band and the left and right of its opaque
-/// pixels, in parts of the picture. A pixel counts when it is more opaque
-/// than `threshold` percent.
-fn opaque_spans(
-    mut surface: cairo::ImageSurface,
-    threshold: u8,
-) -> Option<Vec<(f64, f64, f64, f64)>> {
-    let least = least_alpha(threshold);
-    surface.flush();
-    let (w, h) = (surface.width() as usize, surface.height() as usize);
-    if w == 0 || h == 0 {
-        return None;
-    }
-    let stride = surface.stride() as usize;
-    let format = surface.format();
-    let data = surface.data().ok()?;
-    let bands = h.min(MAX_BANDS);
-    let mut spans: Vec<(f64, f64, f64, f64)> = Vec::new();
-    for band in 0..bands {
-        let (first, last) = (band * h / bands, (band + 1) * h / bands);
-        let mut left = usize::MAX;
-        let mut right = 0;
-        for row in first..last {
-            let pixels = &data[row * stride..][..w * 4];
-            let opaque = |x: &usize| {
-                format != cairo::Format::ARgb32 || u16::from(pixels[x * 4 + 3]) >= least
-            };
-            if let Some(l) = (0..w).find(opaque) {
-                left = left.min(l);
-                right = right.max((0..w).rev().find(opaque).unwrap_or(l) + 1);
-            }
-        }
-        if left < right {
-            // A band as wide as the one above it lengthens it.
-            if let Some(above) = spans.last_mut()
-                && above.1 == first as f64 / h as f64
-                && (above.2, above.3) == (left as f64 / w as f64, right as f64 / w as f64)
-            {
-                above.1 = last as f64 / h as f64;
-                continue;
-            }
-            spans.push((
-                first as f64 / h as f64,
-                last as f64 / h as f64,
-                left as f64 / w as f64,
-                right as f64 / w as f64,
-            ));
-        }
-    }
-    (!spans.is_empty()).then_some(spans)
+            .collect()
+    })
+    .collect()
 }
 
 #[cfg(test)]
@@ -205,6 +166,44 @@ mod tests {
         // Nothing opaque in the frame: no contour.
         object.picture.mask = Some(Frame::from_pt(0.0, 0.0, 80.0, 40.0));
         assert_eq!(object_contour(&object), None);
+    }
+
+    #[test]
+    fn obj_17_the_parts_apart_of_a_picture_each_have_an_outline() {
+        // Two opaque columns of 4 by 4 pixels with a gap between them.
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 4, 4).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(1.0, 0.0, 0.0);
+            cr.rectangle(0.0, 0.0, 1.0, 4.0);
+            cr.rectangle(3.0, 0.0, 1.0, 4.0);
+            cr.fill().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Image(Picture::from_png(png).unwrap()),
+            Frame::from_pt(0.0, 0.0, 40.0, 40.0),
+        );
+        trace_contour(&mut object);
+        assert_eq!(
+            object.contour.as_deref(),
+            Some(&[(0, 0), (2_500, 0), (2_500, 10_000), (0, 10_000)][..])
+        );
+        assert_eq!(
+            object
+                .contour_parts
+                .iter()
+                .map(|p| p.to_vec())
+                .collect::<Vec<_>>(),
+            [vec![
+                (7_500, 0),
+                (10_000, 0),
+                (10_000, 10_000),
+                (7_500, 10_000)
+            ]]
+        );
     }
 
     #[test]

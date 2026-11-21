@@ -17,15 +17,72 @@ const STRAIGHTENING: f64 = 2.0;
 /// pixels away from it. The corners are in pixels, from the top left
 /// corner of the picture.
 ///
-/// None when no pixel is opaque, or when some opaque pixels are outside
-/// the outline, apart from the others: the traces of the pictures that
-/// Pages was compared on are of a single part.
+/// None when no pixel is opaque, or when the opaque pixels are in parts
+/// apart, which [`pixel_outlines`] traces one by one.
 pub fn pixel_outline(
     width: usize,
     height: usize,
     opaque: impl Fn(usize, usize) -> bool,
 ) -> Option<Vec<(u32, u32)>> {
-    let first = (0..height).find_map(|y| (0..width).find(|&x| opaque(x, y)).map(|x| (x, y)))?;
+    let mut parts = pixel_outlines(width, height, opaque);
+    (parts.len() == 1).then(|| parts.remove(0))
+}
+
+/// The outlines of the parts apart of the opaque pixels of a picture, each
+/// traced as [`pixel_outline`] traces one, in the order of their first
+/// pixel, row by row: Pages 15.4 runs text between them (OBJ-17, B-047).
+/// Pixels that touch by a corner are one part, and a part inside a hole of
+/// another is in it.
+pub fn pixel_outlines(
+    width: usize,
+    height: usize,
+    opaque: impl Fn(usize, usize) -> bool,
+) -> Vec<Vec<(u32, u32)>> {
+    let mut covered = vec![false; width * height];
+    let mut parts = Vec::new();
+    for y in 0..height {
+        for x in 0..width {
+            if covered[y * width + x] || !opaque(x, y) {
+                continue;
+            }
+            covered[y * width + x] = true;
+            let Some((corners, crossings)) = trace(width, height, &opaque, (x, y)) else {
+                continue;
+            };
+            // What the outline holds, by the even-odd rule along each row.
+            for (row, mut xs) in crossings.into_iter().enumerate() {
+                xs.sort_unstable();
+                for &[a, b] in xs.as_chunks::<2>().0 {
+                    let (a, b) = (a.max(0) as usize, (b.max(0) as usize).min(width));
+                    covered[row * width + a..row * width + b.max(a)].fill(true);
+                }
+            }
+            // A part of a few pixels could be straightened to a line: its
+            // corners are kept as they are.
+            let mut kept = straightened(&corners);
+            if kept.len() < 3 {
+                kept = corners;
+            }
+            parts.push(
+                kept.into_iter()
+                    .map(|(x, y)| (x as u32, y as u32))
+                    .collect(),
+            );
+        }
+    }
+    parts
+}
+
+/// The corners of the edges of the pixels around the part of the opaque
+/// pixels whose first pixel, row by row, is `first`, clockwise from its
+/// top left corner, and where the outline crosses each row.
+#[allow(clippy::type_complexity)]
+fn trace(
+    width: usize,
+    height: usize,
+    opaque: &impl Fn(usize, usize) -> bool,
+    first: (usize, usize),
+) -> Option<(Vec<(i64, i64)>, Vec<Vec<i64>>)> {
     let pixel = |x: i64, y: i64| {
         x >= 0
             && y >= 0
@@ -40,8 +97,6 @@ pub fn pixel_outline(
     let start = (first.0 as i64, first.1 as i64);
     let (mut at, mut heading) = (start, (1i64, 0i64));
     let mut corners: Vec<(i64, i64)> = vec![start];
-    // Where the outline crosses each row, to see that it holds every
-    // opaque pixel.
     let mut crossings: Vec<Vec<i64>> = vec![Vec::new(); height];
     let limit = 4 * (width + 1) * (height + 1);
     for _ in 0..limit {
@@ -75,35 +130,7 @@ pub fn pixel_outline(
             heading = turned;
         }
     }
-    if at != start {
-        return None;
-    }
-    // Every opaque pixel is inside the outline, by the even-odd rule
-    // along its row.
-    for (y, xs) in crossings.iter_mut().enumerate() {
-        xs.sort_unstable();
-        let mut inside = xs.as_chunks::<2>().0.iter().map(|&[a, b]| (a, b));
-        let mut span = inside.next();
-        for x in 0..width as i64 {
-            while span.is_some_and(|s| x >= s.1) {
-                span = inside.next();
-            }
-            if opaque(x as usize, y) && !span.is_some_and(|s| x >= s.0) {
-                return None;
-            }
-        }
-    }
-    // A picture of a few pixels could be straightened to a line: its
-    // corners are kept as they are.
-    let mut kept = straightened(&corners);
-    if kept.len() < 3 {
-        kept = corners;
-    }
-    Some(
-        kept.into_iter()
-            .map(|(x, y)| (x as u32, y as u32))
-            .collect(),
-    )
+    (at == start).then_some((corners, crossings))
 }
 
 /// The corners of a closed outline kept when each edge goes from a corner
@@ -200,6 +227,27 @@ mod tests {
         assert_eq!(pixel_outline(9, 3, |x, _| x == 1 || x == 7), None);
         // Pixels that touch by a corner are one part.
         assert!(pixel_outline(2, 2, |x, y| x == y).is_some());
+    }
+
+    #[test]
+    fn obj_17_parts_apart_are_traced_one_by_one() {
+        // Two columns, and a square lower down, in the order of their
+        // first pixels.
+        let parts = pixel_outlines(9, 6, |x, y| {
+            ((x == 1 || x == 7) && y < 3) || ((3..6).contains(&x) && y >= 4)
+        });
+        assert_eq!(
+            parts,
+            [
+                vec![(1, 0), (2, 0), (2, 3), (1, 3)],
+                vec![(7, 0), (8, 0), (8, 3), (7, 3)],
+                vec![(3, 4), (6, 4), (6, 6), (3, 6)],
+            ]
+        );
+        // A part in the hole of a ring is in the ring.
+        let ring = |x: usize, y: usize| x == 0 || y == 0 || x == 6 || y == 6 || (x == 3 && y == 3);
+        assert_eq!(pixel_outlines(7, 7, ring).len(), 1);
+        assert!(pixel_outlines(3, 3, |_, _| false).is_empty());
     }
 
     #[test]

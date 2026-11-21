@@ -166,7 +166,9 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Value:** a percent from 0 to 100: how opaque a pixel must be for the
   text to go around it.
 - **Fallback:** `draw:contour-polygon` on the frame, the outline Desk
-  computed with that threshold, and `style:wrap-contour="true"`.
+  computed with that threshold, and `style:wrap-contour="true"`; a
+  `draw:contour-path` with one subpath for each part when the opaque
+  parts of the picture are apart (B-047).
 
 ### Lines and shadows (`style:graphic-properties`)
 

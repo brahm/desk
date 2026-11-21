@@ -21,6 +21,12 @@ pub trait LineSpace {
         let _ = top;
         false
     }
+
+    /// The narrowest piece of a line that is worth filling, as beside an
+    /// object; a shape fills any piece that its next word fits (B-046).
+    fn min_piece(&self) -> f32 {
+        crate::MIN_SEGMENT_WIDTH
+    }
 }
 
 /// A column of a fixed width with nothing in it.

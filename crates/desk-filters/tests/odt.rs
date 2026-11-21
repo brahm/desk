@@ -2033,6 +2033,9 @@ fn with_objects() -> Document {
             );
             image.wrap = Wrap::Largest;
             image.contour = Some(Arc::from([(0, 0), (10_000, 0), (5_000, 10_000)]));
+            // A second part apart, written as a path (B-047).
+            image.contour_parts =
+                Arc::from([Arc::from([(6_000, 6_000), (9_000, 6_000), (9_000, 9_000)])]);
             image.picture = desk_model::PictureSettings {
                 mask: Some(Frame::from_pt(-10.0, -20.0, 120.0, 100.0)),
                 mask_shape: None,

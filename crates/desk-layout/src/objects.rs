@@ -204,6 +204,23 @@ impl PlacedObject {
     /// from a top to a bottom, and from a left to a right.
     fn profile(&self, margin: f32) -> Option<Profile> {
         let contour = self.object.contour.as_ref().filter(|c| c.len() >= 3)?;
+        let mut bands = Vec::new();
+        // Each part apart of the outline takes its own room (B-047).
+        let parts = std::iter::once(contour).chain(self.object.contour_parts.iter());
+        for (part, contour) in parts.enumerate().filter(|(_, c)| c.len() >= 3) {
+            self.part_profile(contour, margin, part as u16, &mut bands);
+        }
+        Some(bands.into())
+    }
+
+    /// The bands of one part of the outline, numbered `part`.
+    fn part_profile(
+        &self,
+        contour: &[(i32, i32)],
+        margin: f32,
+        part: u16,
+        bands: &mut Vec<(f32, f32, f32, f32, u16)>,
+    ) {
         let scale = desk_model::POLYGON_SCALE as f32;
         let points: Vec<(f32, f32)> = contour
             .iter()
@@ -216,7 +233,6 @@ impl PlacedObject {
             .collect();
         let top = points.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
         let bottom = points.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max);
-        let mut bands = Vec::new();
         let mut b0 = top - margin;
         while b0 < bottom + margin {
             let b1 = b0 + PROFILE_BAND;
@@ -273,11 +289,10 @@ impl PlacedObject {
                 }
             }
             if let Some(span) = span {
-                bands.push((b0, b1, span.0, span.1));
+                bands.push((b0, b1, span.0, span.1, part));
             }
             b0 = b1;
         }
-        Some(bands.into())
     }
 }
 
@@ -372,8 +387,8 @@ pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::Docu
 }
 
 /// The bands of a contour down the page, each from a top to a bottom and
-/// from a left to a right, in points.
-pub(crate) type Profile = Arc<[(f32, f32, f32, f32)]>;
+/// from a left to a right, in points, and the part of the outline it is of.
+pub(crate) type Profile = Arc<[(f32, f32, f32, f32, u16)]>;
 
 /// How tall the bands of the contour of an object are, in points.
 const PROFILE_BAND: f32 = 0.25;
@@ -398,18 +413,36 @@ impl Exclusion {
     /// The left and right of the room it takes from a line from `y0` to
     /// `y1`, or none when it takes none there.
     fn span(&self, y0: f32, y1: f32) -> Option<(f32, f32)> {
+        self.spans(y0, y1)
+            .into_iter()
+            .reduce(|(s, t), (a, b)| (s.min(a), t.max(b)))
+    }
+
+    /// The left and right of the room that each part of it takes from a
+    /// line from `y0` to `y1`, left to right, merged where they meet.
+    fn spans(&self, y0: f32, y1: f32) -> Vec<(f32, f32)> {
         if self.y1 <= y0 || self.y0 >= y1 {
-            return None;
+            return Vec::new();
         }
         let Some(bands) = &self.profile else {
-            return Some((self.x0, self.x1));
+            return vec![(self.x0, self.x1)];
         };
-        bands
-            .iter()
-            .filter(|b| b.1 > y0 && b.0 < y1)
-            .fold(None, |span, b| {
-                Some(span.map_or((b.2, b.3), |(s, t): (f32, f32)| (s.min(b.2), t.max(b.3))))
-            })
+        let mut parts: Vec<(u16, f32, f32)> = Vec::new();
+        for b in bands.iter().filter(|b| b.1 > y0 && b.0 < y1) {
+            match parts.iter_mut().find(|p| p.0 == b.4) {
+                Some(p) => (p.1, p.2) = (p.1.min(b.2), p.2.max(b.3)),
+                None => parts.push((b.4, b.2, b.3)),
+            }
+        }
+        parts.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let mut spans: Vec<(f32, f32)> = Vec::new();
+        for (_, a, b) in parts {
+            match spans.last_mut() {
+                Some(last) if a <= last.1 => last.1 = last.1.max(b),
+                _ => spans.push((a, b)),
+            }
+        }
+        spans
     }
 }
 
@@ -459,6 +492,14 @@ fn free_segments(piece: &Piece, width: f32, top: f32, height: f32) -> Vec<(f32, 
     let (y0, y1) = (piece.origin + top, piece.origin + top + height);
     let mut free = vec![(0.0f32, width)];
     for e in &piece.exclusions {
+        // On both sides, the text also runs between the parts of an
+        // outline apart, as in Pages 15.4 (B-047).
+        if e.wrap == Wrap::Both {
+            for (x0, x1) in e.spans(y0, y1) {
+                free = cut(free, x0 - piece.left, x1 - piece.left);
+            }
+            continue;
+        }
         let Some((x0, x1)) = e.span(y0, y1) else {
             continue;
         };
@@ -481,22 +522,27 @@ fn free_segments(piece: &Piece, width: f32, top: f32, height: f32) -> Vec<(f32, 
             Wrap::AboveAndBelow => (f32::NEG_INFINITY, f32::INFINITY),
             Wrap::Through | Wrap::Behind => continue,
         };
-        free = free
-            .into_iter()
-            .flat_map(|(s, t)| {
-                let mut out = Vec::with_capacity(2);
-                if cut0 > s {
-                    out.push((s, cut0.min(t)));
-                }
-                if cut1 < t {
-                    out.push((cut1.max(s), t));
-                }
-                out
-            })
-            .filter(|(s, t)| t > s)
-            .collect();
+        free = cut(free, cut0, cut1);
     }
     free.into_iter().map(|(s, t)| (s, t - s)).collect()
+}
+
+/// What is left of the pieces `free`, each from a left to a right, once
+/// what is from `cut0` to `cut1` is taken out.
+fn cut(free: Vec<(f32, f32)>, cut0: f32, cut1: f32) -> Vec<(f32, f32)> {
+    free.into_iter()
+        .flat_map(|(s, t)| {
+            let mut out = Vec::with_capacity(2);
+            if cut0 > s {
+                out.push((s, cut0.min(t)));
+            }
+            if cut1 < t {
+                out.push((cut1.max(s), t));
+            }
+            out
+        })
+        .filter(|(s, t)| t > s)
+        .collect()
 }
 
 /// Whether an exclusion is in the way of a column from `left` to `right`
@@ -544,6 +590,8 @@ pub(crate) fn inline_sizes(
             };
             let width = if floats_in_text(o) {
                 desk_model::Length::ZERO
+            } else if is_sound(o) {
+                o.frame.width + desk_model::Length::from_pt(SOUND_SIDE_ROOM)
             } else {
                 o.frame.width
             };
@@ -559,7 +607,14 @@ pub(crate) fn inline_sizes(
 /// takes its own height. The sound stands on the baseline under that room.
 const SOUND_HEADROOM: f64 = 7.23;
 
-/// Whether an object is a sound, whose line Pages 15.4 makes taller.
+/// How much wider than a sound in the text Pages 15.4 leaves its room, in
+/// points: in the PDF of `obj-18-sound-sizes` the words after a sound 53
+/// points wide start 7 points further on than in that of Pages '09, at
+/// every size of text (B-025).
+const SOUND_SIDE_ROOM: f64 = 7.0;
+
+/// Whether an object is a sound, whose line Pages 15.4 makes taller and
+/// wider.
 fn is_sound(object: &Object) -> bool {
     matches!(&object.kind, ObjectKind::Media(media) if media.is_sound())
 }
@@ -1175,15 +1230,30 @@ impl LineSpace for ShapeSpace {
     fn is_exhausted(&self, top: f32) -> bool {
         top > self.height - self.inset
     }
+
+    fn min_piece(&self) -> f32 {
+        0.5
+    }
 }
 
 /// The lines of the text of a shape, from the top of its room down, as
-/// many as fit (OBJ-12). Text aligned to the middle or the bottom that
-/// fits is laid out again lower, by half or all of the room left below
-/// it. Text aligned to the middle that does not fit then starts a point
-/// lower than its first line, as Pages lays it out; text aligned to the
-/// bottom that does not fit goes down by the room the lines that fit
-/// leave, less a point, as Pages 15.4 lays it out (B-024).
+/// many as fit (OBJ-12). Text aligned to the middle that fits is laid out
+/// again lower, by half the room left below it. Otherwise the text shows
+/// what it shows from the top, and goes down while it shows the same, as
+/// Pages lays it out (B-024, B-046):
+///
+/// - text aligned to the middle that does not fit, as long as it does
+///   from the top down;
+/// - text aligned to the bottom that does not fit, by the room its lines
+///   leave less a point, when it shows the same there;
+/// - otherwise text aligned to the bottom, to the lowest heights that
+///   show the same: in a triangle, the wide part, on fewer lines; in a
+///   diamond, below its middle, on lines that break otherwise. Pages 15.4
+///   does not find heights lower down that show what does not fit for
+///   less than [`SHAPE_RUN_MIN`].
+///
+/// The text then starts [`SHAPE_RUN_SHORT`] above the lowest height that
+/// shows the same, if it shows the same there too.
 fn shape_lines(
     document: &Document,
     placed: &PlacedObject,
@@ -1191,31 +1261,99 @@ fn shape_lines(
     paragraphs: &[desk_model::Paragraph],
     system: &mut TextSystem,
 ) -> Vec<PlacedLine> {
-    let (lines, end, fits) = shape_lines_from(
-        document,
-        placed,
-        space,
-        paragraphs,
-        system,
-        space.inset.ceil(),
-    );
-    let start = lines.first().map_or(space.inset.ceil(), |l| l.line.top);
+    let first = space.inset.ceil();
+    let (lines, end, fits) = shape_lines_from(document, placed, space, paragraphs, system, first);
+    let start = lines.first().map_or(first, |l| l.line.top);
     let room = (space.height - space.inset - end).max(0.0);
-    let lower = match (space.vertical, fits) {
-        (VerticalAlignment::Top, _) => 0.0,
-        // Pages 15.4 sets the lines that fit of text aligned to the
-        // bottom that does not fit a point above the bottom of its room
-        // (B-024).
-        (VerticalAlignment::Bottom, false) => (room - 1.0).max(1.0),
-        (_, false) => 1.0,
-        (VerticalAlignment::Middle, true) => (room / 2.0).floor(),
-        (VerticalAlignment::Bottom, true) => room.floor(),
+    let bottom = space.vertical == VerticalAlignment::Bottom;
+    if space.vertical == VerticalAlignment::Top || lines.is_empty() {
+        return lines;
+    }
+    if fits && !bottom {
+        let lower = (room / 2.0).floor();
+        if lower > 0.0 {
+            return shape_lines_from(document, placed, space, paragraphs, system, start + lower).0;
+        }
+        return lines;
+    }
+    // The lines from a height, if they show what the lines from the top
+    // show.
+    let shown = |l: &[PlacedLine]| l.last().map(|l| (l.paragraph, l.line.range.end));
+    let text = shown(&lines);
+    let same = |y: f32, system: &mut TextSystem| {
+        let (l, _, f) = shape_lines_from(document, placed, space, paragraphs, system, y);
+        (f == fits && shown(&l) == text).then_some(l)
     };
-    if lower > 0.0 {
-        return shape_lines_from(document, placed, space, paragraphs, system, start + lower).0;
+    if !fits
+        && bottom
+        && room > 1.0
+        && let Some(lines) = same(start + room - 1.0, system)
+    {
+        return lines;
+    }
+    // The lowest height tried that shows the same: down from the top for
+    // the middle, up from the bottom for the bottom.
+    let heights: Vec<f32> = (0..)
+        .map(|k| start + k as f32 * SHAPE_RUN_STEP)
+        .take_while(|&y| y <= space.height - space.inset)
+        .collect();
+    let mut to = start;
+    if bottom {
+        let mut run_end = None;
+        for &y in heights.iter().rev() {
+            if y <= start || same(y, system).is_some() {
+                let end = *run_end.get_or_insert(y);
+                if fits || y <= start || end - y >= SHAPE_RUN_MIN {
+                    to = end;
+                    break;
+                }
+            } else {
+                run_end = None;
+            }
+        }
+    } else {
+        for &y in &heights[1..] {
+            if same(y, system).is_none() {
+                break;
+            }
+            to = y;
+        }
+    }
+    // Where the heights that show the same end, between the last tried
+    // and the next.
+    let mut step = SHAPE_RUN_STEP;
+    for _ in 0..4 {
+        step /= 2.0;
+        if same(to + step, system).is_some() {
+            to += step;
+        }
+    }
+    if to - start > SHAPE_RUN_SHORT
+        && let Some(lines) = same(to - SHAPE_RUN_SHORT, system)
+    {
+        return lines;
+    }
+    if to > start {
+        return shape_lines_from(document, placed, space, paragraphs, system, to).0;
     }
     lines
 }
+
+/// How far above the lowest height that shows the same Pages 15.4 sets
+/// the text of a shape (B-046): from a point less, in a diamond 120 by 80,
+/// to a tenth of a point, in a diamond 160 by 80.
+const SHAPE_RUN_SHORT: f32 = 0.5;
+
+/// How far apart the heights are that the text of a shape is tried at,
+/// to find where it shows the same as from the top (B-046).
+const SHAPE_RUN_STEP: f32 = 0.5;
+
+/// The fewest points of heights in a row, below those of the top, that
+/// show the same overflowing text of a shape for Pages 15.4 to set it
+/// there (B-046): it leaves the text of a diamond 160 by 80 aligned to
+/// the bottom at the top, where Pages '09 moves it 14 points down, to
+/// heights 2.2 points apart.
+const SHAPE_RUN_MIN: f32 = 3.0;
 
 /// The lines of the text of a shape from `y` down, where the last ends,
 /// and whether all the text fits.
@@ -1344,6 +1482,51 @@ mod tests {
         object.contour = None;
         let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
         assert_eq!(e.span(100.0, 102.0), Some((200.0, 300.0)));
+    }
+
+    #[test]
+    fn obj_17_the_parts_apart_of_a_contour_each_take_their_own_room() {
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(200.0, 100.0, 100.0, 100.0),
+        );
+        object.wrap_margin = desk_model::Length::from_points(5);
+        // The left and the right fifths of the frame (B-047).
+        object.contour = Some(Arc::from([
+            (0, 0),
+            (2_000, 0),
+            (2_000, 10_000),
+            (0, 10_000),
+        ]));
+        object.contour_parts = Arc::from([Arc::from(
+            &[(8_000, 0), (10_000, 0), (10_000, 10_000), (8_000, 10_000)][..],
+        )]);
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        let spans = e.spans(150.0, 160.0);
+        assert_eq!(spans.len(), 2, "{spans:?}");
+        assert!((spans[0].0 - 195.0).abs() < 0.01 && (spans[0].1 - 225.0).abs() < 0.01);
+        assert!((spans[1].0 - 275.0).abs() < 0.01 && (spans[1].1 - 305.0).abs() < 0.01);
+        assert_eq!(e.span(150.0, 160.0).map(|s| s.1 - s.0), Some(110.0));
+        // On both sides, the text runs between them; on one side, not.
+        let piece = Piece {
+            from: 0.0,
+            left: 0.0,
+            origin: 0.0,
+            exclusions: vec![e.clone()],
+        };
+        let free = free_segments(&piece, 500.0, 150.0, 10.0);
+        assert_eq!(free.len(), 3, "{free:?}");
+        assert!((free[1].0 - 225.0).abs() < 0.01 && (free[1].1 - 50.0).abs() < 0.01);
+        let piece = Piece {
+            exclusions: vec![Exclusion {
+                wrap: Wrap::Left,
+                ..e
+            }],
+            ..piece
+        };
+        assert_eq!(free_segments(&piece, 500.0, 150.0, 10.0).len(), 1);
     }
 
     #[test]
