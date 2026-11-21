@@ -3281,7 +3281,8 @@ def tables_and_charts(work):
         )
         check("typing in the cells and a formula reach the file (TAB-01, TAB-22)", True)
         # Selected cells dragged out of the table onto the page make a new
-        # table of their own, and the table keeps them (TAB-26, PXV-17).
+        # table of their own, and leave theirs, as Pages 15.4 moves them
+        # (TAB-26, PXV-17).
         type_text("7")
         field = wait_for(
             "the field over the cell",
@@ -3317,9 +3318,9 @@ def tables_and_charts(work):
         wait_for(
             "the new table of the dragged cell in the saved file",
             lambda: saved_content(letter, r'(?s)table:name="Table 2".*office:value="7"')
-            and len(re.findall(r'office:value="7"', saved_part(letter, "content.xml", "(?s).*").group(0))) == 2,
+            and len(re.findall(r'office:value="7"', saved_part(letter, "content.xml", "(?s).*").group(0))) == 1,
         )
-        check("cells dragged onto the page make a new table and stay in theirs (TAB-26, PXV-17)", True)
+        check("cells dragged onto the page make a new table and leave theirs (TAB-26, PXV-17)", True)
         # Create Custom Format, at the end of the Data Format menu, keeps a
         # format under a name in the settings of the file and gives it to
         # the cells (PXV-18).
