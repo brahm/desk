@@ -22,10 +22,10 @@ backlog	B-018	open
 backlog	B-019	done
 backlog	B-020	done
 backlog	B-021	done
-backlog	B-022	open
-backlog	B-023	open
-backlog	B-024	open
-backlog	B-025	open
+backlog	B-022	done
+backlog	B-023	done
+backlog	B-024	done
+backlog	B-025	done
 backlog	B-026	done
 backlog	B-027	done
 backlog	B-028	done
@@ -45,6 +45,7 @@ backlog	B-041	open
 backlog	B-042	open
 backlog	B-043	open
 backlog	B-044	open
+backlog	B-045	open
 feature	S001	done
 feature	S002	done
 feature	S003	done
