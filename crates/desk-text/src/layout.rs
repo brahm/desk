@@ -608,6 +608,7 @@ impl TextSystem {
         let first = format.first_line_indent.to_pt() as f32;
         let right = format.right_indent.to_pt() as f32;
         let column = space.width();
+        let min_piece = space.min_piece();
 
         let mut placed: Vec<Placed> = Vec::new();
         let mut breaker = layout.break_lines();
@@ -617,6 +618,8 @@ impl TextSystem {
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
         let mut searched_from = y;
+        // Where the search for a line wide enough for the next word began.
+        let mut narrow_from = y;
         // Whether the band was measured again with a shorter line.
         let mut shortened = false;
         'band: loop {
@@ -627,7 +630,7 @@ impl TextSystem {
                 .filter_map(|(x, w)| {
                     let x0 = x.max(indent);
                     let x1 = (x + w).min(column - right);
-                    (x1 - x0 >= MIN_SEGMENT_WIDTH).then_some((x0, x1 - x0))
+                    (x1 - x0 >= min_piece).then_some((x0, x1 - x0))
                 })
                 .collect();
             if segments.is_empty() {
@@ -680,6 +683,22 @@ impl TextSystem {
                 if end.is_none() && index + 1 < count && next_break < breaks.len() {
                     continue;
                 }
+                // A word that does not fit a line narrowed by the room
+                // around it, as in a triangle or beside an object, goes
+                // lower, where the line may be wider, as in Pages '09 and
+                // 15.4 (B-046); a piece after text of the line stays empty.
+                let measure = column - right - indent;
+                if end.is_none()
+                    && next_break < breaks.len()
+                    && width + 0.001 < measure
+                    && y - narrow_from < MAX_SEARCH
+                {
+                    if placed.len() > saved_placed {
+                        break;
+                    }
+                    y += 1.0;
+                    continue 'band;
+                }
                 let (mut line_end, mut chosen) =
                     match end.or((next_break < breaks.len()).then_some(next_break)) {
                         Some(i) => (breaks[i], i + 1),
@@ -689,7 +708,6 @@ impl TextSystem {
                 // letter that fits, as in Pages '09 and 15.4, and the rest
                 // of it starts the next line (B-023). Indents wider than
                 // the column leave no line to fit, and the text overflows.
-                let measure = column - right - indent;
                 if end.is_none()
                     && next_break < breaks.len()
                     && measure >= MIN_SEGMENT_WIDTH
@@ -830,6 +848,7 @@ impl TextSystem {
                 pos = line_end;
                 next_break = chosen;
                 first_line = false;
+                narrow_from = y;
                 if pos >= source.len() {
                     break 'band;
                 }

@@ -210,6 +210,73 @@ fn obj_12_text_follows_the_outline_of_its_shape() {
 }
 
 #[test]
+fn obj_12_overflowing_text_aligned_to_the_bottom_of_a_triangle_or_diamond() {
+    // A rectangle, a triangle, a diamond and a rounded rectangle with more
+    // text than fits, aligned to the bottom: the triangle shows its first
+    // lines from the top, as there is no room lower for them, and the
+    // diamond shows them below its middle, on lines that break otherwise
+    // (B-046).
+    check("shape-bottom-cases");
+}
+
+#[test]
+fn obj_12_text_of_triangles_and_diamonds_goes_down_as_in_pages() {
+    // Sixteen triangles, diamonds and a rounded rectangle aligned to the
+    // bottom, the middle and the top, with text that overflows or fits:
+    // the text keeps what it shows from the top and goes down as far as
+    // it shows the same (B-046). In the ninth, a diamond with words of two
+    // letters, Pages 15.4 starts the first line lower than Desk near the
+    // top point, which breaks the lines otherwise, and it is left out.
+    let fixtures = fixtures();
+    let name = "shape-bottom-more";
+    let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
+    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let pages = DisplayList::pages(&layout);
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.pdf"));
+    desk_render::Painter::new()
+        .unwrap()
+        .write_pdf(&pages, document.metadata(), &out)
+        .unwrap();
+    // The words of each shape, shape by shape: the shapes stand two by
+    // two, at 72 and 330 across and 120, 320 and 520 down, and those side
+    // by side have lines at heights a little apart. The ninth shape is
+    // the third of the second page.
+    let without_ninth = |pages: Vec<Vec<desk_testkit::compare::Word>>| {
+        pages
+            .into_iter()
+            .enumerate()
+            .map(|(page, words)| {
+                let mut shapes = Vec::new();
+                for slot in 0..6 {
+                    if page == 1 && slot == 2 {
+                        continue;
+                    }
+                    let (x, y) = ([72.0, 330.0][slot % 2], [120.0, 320.0, 520.0][slot / 2]);
+                    let mut in_shape: Vec<_> = words
+                        .iter()
+                        .filter(|w| (x..x + 160.0).contains(&w.x) && (y..y + 122.0).contains(&w.y))
+                        .cloned()
+                        .collect();
+                    in_shape.sort_by(|a, b| {
+                        (a.y.round(), a.x).partial_cmp(&(b.y.round(), b.x)).unwrap()
+                    });
+                    shapes.extend(in_shape);
+                }
+                shapes
+            })
+            .collect::<Vec<_>>()
+    };
+    let reference = without_ninth(words(&fixtures.join(format!("{name}.pdf"))).unwrap());
+    let desk = without_ninth(words(&out).unwrap());
+    assert_eq!(desk.len(), 3, "pages");
+    let diff = compare_words(&reference, &desk);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
+    );
+}
+
+#[test]
 fn obj_14_inline_text_boxes_match_pages() {
     check("obj-14-inline-text-box");
 }

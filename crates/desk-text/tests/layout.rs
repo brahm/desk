@@ -698,6 +698,50 @@ fn obj_17_a_piece_too_narrow_for_the_next_word_stays_empty() {
     assert_eq!(layout.lines.last().unwrap().range.end, TEXT.len());
 }
 
+/// A room that widens downwards, as in a triangle: 20pt wide at the top,
+/// a point wider for each point down.
+struct Widening;
+
+impl LineSpace for Widening {
+    fn width(&self) -> f32 {
+        200.0
+    }
+
+    fn segments(&self, top: f32, _height: f32) -> Vec<(f32, f32)> {
+        vec![(0.0, (20.0 + top).min(200.0))]
+    }
+
+    fn min_piece(&self) -> f32 {
+        0.5
+    }
+}
+
+#[test]
+fn obj_12_a_word_that_does_not_fit_a_narrowed_line_goes_lower() {
+    // Pages '09 and 15.4 set the first word of a triangle lower down, where
+    // the triangle is wide enough for it, rather than over its sides
+    // (B-046).
+    let mut system = TextSystem::new();
+    let layout = lay_in(
+        &mut system,
+        ParaFormat::default(),
+        &[("extraordinary words", sans())],
+        &Widening,
+    );
+    let first = &layout.lines[0];
+    assert!(first.top > 30.0, "{}", first.top);
+    assert!(
+        first.advance <= first.width + 0.01,
+        "{} {}",
+        first.advance,
+        first.width
+    );
+    assert_eq!(
+        layout.lines.last().unwrap().range.end,
+        "extraordinary words".len()
+    );
+}
+
 /// A column with an object on its right half from 21pt down.
 struct Below;
 

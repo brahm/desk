@@ -1230,15 +1230,30 @@ impl LineSpace for ShapeSpace {
     fn is_exhausted(&self, top: f32) -> bool {
         top > self.height - self.inset
     }
+
+    fn min_piece(&self) -> f32 {
+        0.5
+    }
 }
 
 /// The lines of the text of a shape, from the top of its room down, as
-/// many as fit (OBJ-12). Text aligned to the middle or the bottom that
-/// fits is laid out again lower, by half or all of the room left below
-/// it. Text aligned to the middle that does not fit then starts a point
-/// lower than its first line, as Pages lays it out; text aligned to the
-/// bottom that does not fit goes down by the room the lines that fit
-/// leave, less a point, as Pages 15.4 lays it out (B-024).
+/// many as fit (OBJ-12). Text aligned to the middle that fits is laid out
+/// again lower, by half the room left below it. Otherwise the text shows
+/// what it shows from the top, and goes down while it shows the same, as
+/// Pages lays it out (B-024, B-046):
+///
+/// - text aligned to the middle that does not fit, as long as it does
+///   from the top down;
+/// - text aligned to the bottom that does not fit, by the room its lines
+///   leave less a point, when it shows the same there;
+/// - otherwise text aligned to the bottom, to the lowest heights that
+///   show the same: in a triangle, the wide part, on fewer lines; in a
+///   diamond, below its middle, on lines that break otherwise. Pages 15.4
+///   does not find heights lower down that show what does not fit for
+///   less than [`SHAPE_RUN_MIN`].
+///
+/// The text then starts [`SHAPE_RUN_SHORT`] above the lowest height that
+/// shows the same, if it shows the same there too.
 fn shape_lines(
     document: &Document,
     placed: &PlacedObject,
@@ -1246,31 +1261,99 @@ fn shape_lines(
     paragraphs: &[desk_model::Paragraph],
     system: &mut TextSystem,
 ) -> Vec<PlacedLine> {
-    let (lines, end, fits) = shape_lines_from(
-        document,
-        placed,
-        space,
-        paragraphs,
-        system,
-        space.inset.ceil(),
-    );
-    let start = lines.first().map_or(space.inset.ceil(), |l| l.line.top);
+    let first = space.inset.ceil();
+    let (lines, end, fits) = shape_lines_from(document, placed, space, paragraphs, system, first);
+    let start = lines.first().map_or(first, |l| l.line.top);
     let room = (space.height - space.inset - end).max(0.0);
-    let lower = match (space.vertical, fits) {
-        (VerticalAlignment::Top, _) => 0.0,
-        // Pages 15.4 sets the lines that fit of text aligned to the
-        // bottom that does not fit a point above the bottom of its room
-        // (B-024).
-        (VerticalAlignment::Bottom, false) => (room - 1.0).max(1.0),
-        (_, false) => 1.0,
-        (VerticalAlignment::Middle, true) => (room / 2.0).floor(),
-        (VerticalAlignment::Bottom, true) => room.floor(),
+    let bottom = space.vertical == VerticalAlignment::Bottom;
+    if space.vertical == VerticalAlignment::Top || lines.is_empty() {
+        return lines;
+    }
+    if fits && !bottom {
+        let lower = (room / 2.0).floor();
+        if lower > 0.0 {
+            return shape_lines_from(document, placed, space, paragraphs, system, start + lower).0;
+        }
+        return lines;
+    }
+    // The lines from a height, if they show what the lines from the top
+    // show.
+    let shown = |l: &[PlacedLine]| l.last().map(|l| (l.paragraph, l.line.range.end));
+    let text = shown(&lines);
+    let same = |y: f32, system: &mut TextSystem| {
+        let (l, _, f) = shape_lines_from(document, placed, space, paragraphs, system, y);
+        (f == fits && shown(&l) == text).then_some(l)
     };
-    if lower > 0.0 {
-        return shape_lines_from(document, placed, space, paragraphs, system, start + lower).0;
+    if !fits
+        && bottom
+        && room > 1.0
+        && let Some(lines) = same(start + room - 1.0, system)
+    {
+        return lines;
+    }
+    // The lowest height tried that shows the same: down from the top for
+    // the middle, up from the bottom for the bottom.
+    let heights: Vec<f32> = (0..)
+        .map(|k| start + k as f32 * SHAPE_RUN_STEP)
+        .take_while(|&y| y <= space.height - space.inset)
+        .collect();
+    let mut to = start;
+    if bottom {
+        let mut run_end = None;
+        for &y in heights.iter().rev() {
+            if y <= start || same(y, system).is_some() {
+                let end = *run_end.get_or_insert(y);
+                if fits || y <= start || end - y >= SHAPE_RUN_MIN {
+                    to = end;
+                    break;
+                }
+            } else {
+                run_end = None;
+            }
+        }
+    } else {
+        for &y in &heights[1..] {
+            if same(y, system).is_none() {
+                break;
+            }
+            to = y;
+        }
+    }
+    // Where the heights that show the same end, between the last tried
+    // and the next.
+    let mut step = SHAPE_RUN_STEP;
+    for _ in 0..4 {
+        step /= 2.0;
+        if same(to + step, system).is_some() {
+            to += step;
+        }
+    }
+    if to - start > SHAPE_RUN_SHORT
+        && let Some(lines) = same(to - SHAPE_RUN_SHORT, system)
+    {
+        return lines;
+    }
+    if to > start {
+        return shape_lines_from(document, placed, space, paragraphs, system, to).0;
     }
     lines
 }
+
+/// How far above the lowest height that shows the same Pages 15.4 sets
+/// the text of a shape (B-046): from a point less, in a diamond 120 by 80,
+/// to a tenth of a point, in a diamond 160 by 80.
+const SHAPE_RUN_SHORT: f32 = 0.5;
+
+/// How far apart the heights are that the text of a shape is tried at,
+/// to find where it shows the same as from the top (B-046).
+const SHAPE_RUN_STEP: f32 = 0.5;
+
+/// The fewest points of heights in a row, below those of the top, that
+/// show the same overflowing text of a shape for Pages 15.4 to set it
+/// there (B-046): it leaves the text of a diamond 160 by 80 aligned to
+/// the bottom at the top, where Pages '09 moves it 14 points down, to
+/// heights 2.2 points apart.
+const SHAPE_RUN_MIN: f32 = 3.0;
 
 /// The lines of the text of a shape from `y` down, where the last ends,
 /// and whether all the text fits.
