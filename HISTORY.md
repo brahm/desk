@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: documents are laid out as Pages 15.4 lays them out: text
+  wraps tightly around the outline that Pages traces from the pixels of
+  a picture, tables of contents, superscripts, text that overflows the
+  bottom of a shape, the line of a sound, and hyphenation, which breaks
+  a word only where its next letter would not fit.
 * Added: Screen View, as in Pages (View menu, Ctrl+Shift+R): the text
   flows in one column as wide as the window, without pages, margins,
   headers or footers, with the objects in the flow and Text Size to make

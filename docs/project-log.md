@@ -1415,6 +1415,50 @@ matrix rows done on 9 November, before the change of target.
   count are left for the Mac in step 19.
 - B-038 is closed. W012, W041 and W043 are done for W1.
 
+### 21 November: the layout of Pages 15.4 (B-022 to B-025, step 17 of W1)
+
+The four documents that Pages 15.4 laid out otherwise were studied from
+its PDFs and from cases made for each question in Pages '09 in the
+Mojave VM and exported by Pages 15.4 on the owner's Mac.
+
+- *B-025, a sound in the text:* the line of a sound has 7.23 pt of room
+  over it, and a movie only its own height (pull request 180).
+- *B-024, text in an oval:* when text aligned to the bottom of a shape
+  does not fit, the lines that fit go down by the room they leave less a
+  point, where Pages '09 drew them from the top (pull request 181).
+- *B-023, justification and hyphenation:* text of an undetermined
+  language is hyphenated as English, a word breaks only before the first
+  letter that does not fit (the letter after the hyphen has to fit in
+  its place too), and the words of a line spread by up to 0.1 em stay
+  whole in the PDF (pull request 182). Pages 15.4 also breaks some words
+  where only the dictionary of macOS does (pho-tographs, cel-ebration),
+  which cannot be copied: the owner chose on 20 November to test the
+  rules on their own, and the breaks and the comparison of the three
+  hyphenation documents as wholes moved to W2 (B-045). justify-spacing
+  and justify-space-limit keep the PDF of Pages '09 until the Mac has
+  the fonts of the corpus, in step 19.
+- *B-022, table of contents, superscripts and tight wrap:* a table of
+  contents keeps 1 pt above and below its entries and drops the empty
+  paragraph that Pages '09 saves after it, and a superscript rises by
+  the cap height. Page 32 of long-document was still up to 5.8 pt off,
+  around a round picture. Three rounds of cases on the Mac (a disc with
+  three margins, at half size and at the margin; a disc of 20 pixels, a
+  diamond and stairs; the same disc at five sizes) showed that Pages
+  15.4 does not use the outline that Pages '09 saved: it follows the
+  edges of the opaque pixels from the top left corner of the first one,
+  clockwise, and makes the outline straight, each edge going to the
+  farthest corner that leaves none out more than two pixels of the
+  picture away. All 15 pages match within 0.3 pt, and page 32 within
+  1.07 pt (pull request 183). A piece of a line beside an object that
+  the next word does not fit now stays empty when another piece
+  follows, as in Pages. The three documents of cases are in the corpus.
+- Left for the Mac in step 19: a hyphen typed by hand, the two
+  justification documents with the corpus fonts, words kept whole in
+  lines spread more, a sound at other sizes, other shapes than an oval,
+  the table of contents with other styles, and pictures with Instant
+  Alpha or of opaque parts apart.
+- B-022, B-023, B-024 and B-025 are closed; B-045 moved from W1 to W2.
+
 
 ## Decisions, with their reasons and consequences
 
