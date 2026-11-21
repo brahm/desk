@@ -460,9 +460,9 @@ struct State {
     cells: Option<tables::CellSelection>,
     /// The field that edits the text of a cell.
     cell_editor: Option<tables::CellEditor>,
-    /// How wide the text flows in Screen View, in points, while it is on
-    /// (PXV-01).
-    screen: Option<f64>,
+    /// How wide the text flows in Screen View, in points, and its Text
+    /// Size, while it is on (PXV-01).
+    screen: Option<(f64, f64)>,
 }
 
 impl State {
@@ -473,10 +473,10 @@ impl State {
     }
 }
 
-/// Lays out a document as pages, or in Screen View `screen` points wide.
-fn lay_out_in(screen: Option<f64>, document: &Document) -> DocumentLayout {
+/// Lays out a document as pages, or in Screen View as `screen` says.
+fn lay_out_in(screen: Option<(f64, f64)>, document: &Document) -> DocumentLayout {
     match screen {
-        Some(width) => crate::lay_out_screen(document, width),
+        Some((width, zoom)) => crate::lay_out_screen(document, width, zoom),
         None => crate::lay_out(document),
     }
 }

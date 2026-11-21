@@ -1460,6 +1460,46 @@ Mojave VM and exported by Pages 15.4 on the owner's Mac.
 - B-022, B-023, B-024 and B-025 are closed; B-045 moved from W1 to W2.
 
 
+### 21 November: which objects Screen View shows (W043, PXV-01, step 19e of W1)
+
+Two Mac sessions had seen Screen View differently: a floating text box
+shown after its paragraph, then a floating shape gone. One Blank document
+in Pages 15.4 settled it, with a text box, shapes, a picture and a table
+in each placement and wrap, objects anchored to the first and the last
+paragraph, and objects on a second page.
+
+- Only the placement decides. Objects that stay on the page are hidden
+  on every page, as headers are, whatever their wrap; objects that move
+  with the text always show, with each of the five wraps. The two
+  sessions had a Move with Text box and a Stay on Page shape.
+- An object in the line stays in it at its size. With any other wrap it
+  goes after the paragraph that holds its anchor, centred, at its size;
+  objects of one paragraph go one under the other.
+- A text box, or a plain rectangle with text in it, takes the width of
+  the column and the height of its text. Ovals, rounded rectangles,
+  empty rectangles and pictures keep their size.
+- Desk now does the same: step 19 already hid the objects fixed on a
+  page, and this step centres the others, gives text boxes and
+  rectangles with text the column, and puts the objects of the last
+  paragraph below its text (crates/desk-layout/src/screen.rs). In Screen
+  View an object that moves with the text can be selected but not moved
+  or resized, as in Pages, whose placement and size controls are off
+  there; objects in the text are moved as on the pages.
+- Pages also moves an object's anchor to a paragraph near the object
+  when it is moved, so the paragraph beside an object is not always the
+  one it follows.
+- An inline table showed wider than the column (16.99 cm became
+  28.11 cm). Another round (step 19f) found the rule: the column of
+  Screen View is 664 points at most at a Text Size of 100%, in the
+  middle of a wider window, and a table in the text is always that wide
+  times the Text Size, whatever its own width, its columns in
+  proportion; in a narrower window it runs past the column. Pictures and
+  shapes in the text keep their size on the screen, whatever the Text
+  Size. The owner chose to follow Pages, overflow included, and Desk now
+  does all of this. Where the 664 points come from was not found; it
+  behaves as a constant. Body text of 11 pt shows at about 13 pt at
+  100%, which Desk does not copy yet.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

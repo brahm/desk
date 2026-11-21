@@ -2008,7 +2008,7 @@ impl TextEditor {
         let reach = (REACH / scale) as f32;
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
         let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
-        let (mut grabbed, mut hit_id) = {
+        let (mut grabbed, hit_id) = {
             let state = self.state.borrow();
             let mut grabbed = None;
             if state.story.is_none() {
@@ -2032,13 +2032,14 @@ impl TextEditor {
                 hit(&state.layout, page, px, py, reach, state.selectable),
             )
         };
-        // In Screen View only the objects in the text are selected and
-        // moved, as in Pages 15.4; the others show where the flow puts
-        // them, not where they are (PXV-01).
-        if self.screen_view() {
+        // In Screen View the objects in the text are selected, moved and
+        // resized; those that move with it show where the flow puts them,
+        // not where they are, so they are only selected, as in Pages 15.4
+        // (PXV-01).
+        let screen = self.screen_view();
+        if screen {
             let in_text = |id| self.object_by_id(id).anchor == Anchor::InText;
             grabbed = grabbed.filter(|&(id, _)| in_text(id));
-            hit_id = hit_id.filter(|&id| in_text(id));
             if grabbed.is_none() && hit_id.is_none() {
                 if self.has_selected_objects() {
                     self.select_objects(Vec::new());
@@ -2114,7 +2115,11 @@ impl TextEditor {
             selected = vec![id];
         }
         self.select_objects(selected.clone());
-        if selected.contains(&id) {
+        let movable = !screen
+            || selected
+                .iter()
+                .all(|&s| self.object_by_id(s).anchor == Anchor::InText);
+        if selected.contains(&id) && movable {
             self.start_object_drag(DragKind::Move, page, (px, py), self.selected_objects());
         }
         true
@@ -2397,8 +2402,14 @@ impl TextEditor {
             1.0
         };
         let copy = modifiers.contains(gdk::ModifierType::ALT_MASK);
+        // Screen View does not show where objects are, so it moves none
+        // (PXV-01).
+        let screen = self.screen_view();
         let nudge = |dx: f64, dy: f64| {
             let (dx, dy) = (Length::from_pt(dx), Length::from_pt(dy));
+            if screen {
+                return;
+            }
             if copy {
                 self.duplicate_objects_by("Nudge", dx, dy);
             } else {
