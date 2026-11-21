@@ -5,17 +5,36 @@
 //! continuous flow as wide as the window, without the edges of pages,
 //! their margins, headers and footers. Page, column and section breaks
 //! do not start a new page, the columns of a layout become one, and notes
-//! go to the end. An object that moves with the text shows in the flow,
-//! across the column, after the paragraph it is anchored to; objects in
-//! the text stay in their lines, where they can be selected and moved.
-//! Objects fixed on a page and those of the masters do not show.
+//! go to the end.
+//!
+//! Which objects show, and how, was settled on Pages 15.4 (step 19e of
+//! W1): only the placement decides it, never the wrap.
+//!
+//! - An object that moves with the text shows, whatever its wrap. In the
+//!   line (Inline with Text) it stays where it is, at its own size, where
+//!   it can be selected and moved. With any other wrap (Automatic, Around,
+//!   Above and Below, None) it leaves its place on the page for a block
+//!   of its own after the paragraph it is anchored to, centred in the
+//!   column; several objects of one paragraph go one under the other, in
+//!   their order.
+//! - It keeps its size, made smaller only when it is wider than the
+//!   column; but a text box, or a plain rectangle with text in it, takes
+//!   the width of the column and the height of its text, as a paragraph
+//!   would.
+//! - An object fixed on a page does not show, wherever its page is, nor
+//!   do the objects of the masters: they are the content that the notice
+//!   of Screen View says is hidden.
 //!
 //! The paragraphs and their text are those of the document, so a place
 //! in the text is the same in both; only how they are laid out changes.
 
-use desk_model::{Anchor, Document, Layout, Length, NoteKind, Op, ParaAttrs, TextSettings, Wrap};
+use desk_model::{
+    Anchor, Document, Layout, Length, NoteKind, Object, ObjectKind, Op, ParaAttrs, Shape,
+    TextSettings, VerticalAlignment, Wrap,
+};
 use desk_text::TextSystem;
 
+use crate::objects::{PlacedObject, text_box_lines};
 use crate::pages::{DocumentLayout, paginate};
 
 /// The room between the edges of the flow and its text, in points.
@@ -35,7 +54,7 @@ const NARROWEST: f64 = 144.0;
 /// Lays out a document in Screen View, `width` points wide: one page as
 /// tall as its text, whose `setup` gives that size.
 pub fn paginate_screen(document: &Document, width: f64, system: &mut TextSystem) -> DocumentLayout {
-    let screen = screen_document(document, width);
+    let screen = screen_document(document, width, system);
     let mut layout = paginate(&screen, system);
     // The flow ends below the last thing in it.
     let bottom = layout
@@ -54,7 +73,7 @@ pub fn paginate_screen(document: &Document, width: f64, system: &mut TextSystem)
 }
 
 /// The document as Screen View lays it out: see the module.
-pub fn screen_document(document: &Document, width: f64) -> Document {
+pub fn screen_document(document: &Document, width: f64, system: &mut TextSystem) -> Document {
     let mut screen = document.clone();
     let mut page = *screen.page_setup();
 
@@ -141,23 +160,66 @@ pub fn screen_document(document: &Document, width: f64) -> Document {
         // The paragraph after it holds the object above its text; the
         // last paragraph holds those after it.
         let holder = body.get(after + 1).copied().unwrap_or(body[after]);
-        let (w, h) = (object.frame.width.to_pt(), object.frame.height.to_pt());
-        let scale = if w > column && w > 0.0 {
-            column / w
+        let (w, h) = if fills_column(&object) {
+            (column, text_height(&screen, &object, column, system))
         } else {
-            1.0
+            let (w, h) = (object.frame.width.to_pt(), object.frame.height.to_pt());
+            let scale = if w > column && w > 0.0 {
+                column / w
+            } else {
+                1.0
+            };
+            (w * scale, h * scale)
         };
-        object.frame.width = Length::from_pt(w * scale);
-        object.frame.height = Length::from_pt(h * scale);
-        object.frame.x = Length::from_pt(SCREEN_MARGIN);
+        object.frame.width = Length::from_pt(w);
+        object.frame.height = Length::from_pt(h);
+        object.frame.x = Length::from_pt(SCREEN_MARGIN + (column - w) / 2.0);
         let top = stacked.entry(holder).or_insert(0.0);
         object.frame.y = Length::from_pt(*top);
-        *top += h * scale + OBJECT_GAP;
+        *top += h + OBJECT_GAP;
         object.anchor = Anchor::Paragraph(holder);
         object.wrap = Wrap::AboveAndBelow;
         apply(&mut screen, Op::ReplaceObject { object });
     }
     screen
+}
+
+/// Whether an object takes the width of the column in the flow: a text
+/// box, or a plain rectangle with some text in it, which Pages 15.4 shows
+/// as a block of text. Other shapes, pictures and empty rectangles keep
+/// their size.
+fn fills_column(object: &Object) -> bool {
+    match &object.kind {
+        ObjectKind::TextBox(_) => true,
+        ObjectKind::Shape(Shape::Rectangle) => object
+            .text_box()
+            .is_some_and(|text| text.paragraphs.iter().any(|p| !p.is_empty())),
+        _ => false,
+    }
+}
+
+/// How tall an object that fills the column is: its text laid out
+/// `width` points wide from the top, with its inset above and below; its
+/// own height when it has no text.
+fn text_height(document: &Document, object: &Object, width: f64, system: &mut TextSystem) -> f64 {
+    let mut measured = object.clone();
+    measured.frame.x = Length::ZERO;
+    measured.frame.y = Length::ZERO;
+    measured.frame.width = Length::from_pt(width);
+    measured.frame.height = Length::from_pt(FLOW_HEIGHT);
+    let Some(text) = measured.text_box_mut() else {
+        return object.frame.height.to_pt();
+    };
+    text.vertical = VerticalAlignment::Top;
+    let inset = text.inset.to_pt();
+    let paragraphs = text.paragraphs.clone();
+    let placed = PlacedObject::new(&measured, None, 0.0);
+    let lines = text_box_lines(document, &placed, &paragraphs, system);
+    if lines.is_empty() {
+        return object.frame.height.to_pt();
+    }
+    let bottom = lines.iter().map(|l| l.bottom()).fold(0.0f32, f32::max);
+    f64::from(bottom) + inset
 }
 
 fn apply(document: &mut Document, op: Op) {

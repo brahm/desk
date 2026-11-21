@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Screen View places objects as Pages 15.4 does: those that
+  move with the text show after their paragraph, centred at their size,
+  with text boxes and rectangles with text across the column, and those
+  fixed on a page are hidden.
 * Changed: documents are laid out as Pages 15.4 lays them out: text
   wraps tightly around the outline that Pages traces from the pixels of
   a picture, tables of contents, superscripts, text that overflows the
