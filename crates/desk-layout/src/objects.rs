@@ -376,7 +376,7 @@ pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::Docu
 pub(crate) type Profile = Arc<[(f32, f32, f32, f32)]>;
 
 /// How tall the bands of the contour of an object are, in points.
-const PROFILE_BAND: f32 = 0.5;
+const PROFILE_BAND: f32 = 0.25;
 
 /// How many steps an edge of a contour near a band is taken in.
 const PROFILE_STEPS: usize = 8;

@@ -646,7 +646,8 @@ impl TextSystem {
             let saved: BreakerState = breaker.state().clone();
             let (saved_pos, saved_next, saved_placed) = (pos, next_break, placed.len());
             let mut tallest = 0.0_f32;
-            for (x, width) in segments {
+            let count = segments.len();
+            for (index, (x, width)) in segments.into_iter().enumerate() {
                 // Greedy: the last break that fits, stopping at a manual
                 // line break; the first break when nothing fits.
                 let mut end = None;
@@ -672,6 +673,12 @@ impl TextSystem {
                         break;
                     }
                     i += 1;
+                }
+                // A piece beside an object that the next word does not fit
+                // stays empty when another piece follows it, as in Pages
+                // (OBJ-17).
+                if end.is_none() && index + 1 < count && next_break < breaks.len() {
+                    continue;
                 }
                 let (line_end, chosen) =
                     match end.or((next_break < breaks.len()).then_some(next_break)) {

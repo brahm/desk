@@ -221,6 +221,24 @@ fn obj_17_wraps_match_pages() {
 }
 
 #[test]
+fn obj_17_text_wraps_around_a_round_picture_as_in_pages() {
+    // A disc with margins of 12, 4 and 0, at half its size and touching
+    // the margin: Pages 15.4 traces the picture from its pixels, and the
+    // margin grows round around the outline (B-022).
+    check("wrap-circle-cases");
+}
+
+#[test]
+fn obj_17_the_outline_of_a_picture_is_made_straight_as_in_pages() {
+    // A disc of 20 pixels, a diamond and stairs, and the same disc at
+    // 40, 50, 100, 200 and 400 pixels, all shown 200 points wide: the
+    // outline of the pixels is made straight, leaving out the corners up
+    // to two pixels of the picture away from it (B-022).
+    check("wrap-contour-cases");
+    check("wrap-contour-res");
+}
+
+#[test]
 fn int_03_obj_15_obj_16_obj_17_obj_37_est_05_a_newsletter_in_page_layout_matches_pages() {
     // Two pages of Page Layout, the reference of phase 6: a title over a
     // rectangle, a rule, an article in two linked boxes around a picture

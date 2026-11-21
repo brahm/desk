@@ -663,6 +663,39 @@ fn lines_flow_around_an_object() {
     assert_eq!(layout.lines.last().unwrap().range.end, TEXT.len());
 }
 
+/// A column with a narrow piece on the left of an object near its top.
+struct Narrow;
+
+impl LineSpace for Narrow {
+    fn width(&self) -> f32 {
+        200.0
+    }
+
+    fn segments(&self, top: f32, height: f32) -> Vec<(f32, f32)> {
+        if top < 45.0 && top + height > 15.0 {
+            vec![(0.0, 12.0), (100.0, 100.0)]
+        } else {
+            vec![(0.0, 200.0)]
+        }
+    }
+}
+
+#[test]
+fn obj_17_a_piece_too_narrow_for_the_next_word_stays_empty() {
+    // Pages puts nothing in a piece beside an object that the next word
+    // does not fit, and goes on in the piece after it.
+    let mut system = TextSystem::new();
+    let layout = lay_in(
+        &mut system,
+        ParaFormat::default(),
+        &[(TEXT, sans())],
+        &Narrow,
+    );
+    assert!(layout.lines.iter().any(|l| l.x == 100.0));
+    assert!(layout.lines.iter().all(|l| l.x != 0.0 || l.width > 12.0));
+    assert_eq!(layout.lines.last().unwrap().range.end, TEXT.len());
+}
+
 /// A column with an object on its right half from 21pt down.
 struct Below;
 
