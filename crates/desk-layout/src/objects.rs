@@ -1180,8 +1180,10 @@ impl LineSpace for ShapeSpace {
 /// The lines of the text of a shape, from the top of its room down, as
 /// many as fit (OBJ-12). Text aligned to the middle or the bottom that
 /// fits is laid out again lower, by half or all of the room left below
-/// it; text that does not fit then starts a point lower than its first
-/// line, as Pages lays it out.
+/// it. Text aligned to the middle that does not fit then starts a point
+/// lower than its first line, as Pages lays it out; text aligned to the
+/// bottom that does not fit goes down by the room the lines that fit
+/// leave, less a point, as Pages 15.4 lays it out (B-024).
 fn shape_lines(
     document: &Document,
     placed: &PlacedObject,
@@ -1201,6 +1203,10 @@ fn shape_lines(
     let room = (space.height - space.inset - end).max(0.0);
     let lower = match (space.vertical, fits) {
         (VerticalAlignment::Top, _) => 0.0,
+        // Pages 15.4 sets the lines that fit of text aligned to the
+        // bottom that does not fit a point above the bottom of its room
+        // (B-024).
+        (VerticalAlignment::Bottom, false) => (room - 1.0).max(1.0),
         (_, false) => 1.0,
         (VerticalAlignment::Middle, true) => (room / 2.0).floor(),
         (VerticalAlignment::Bottom, true) => room.floor(),
