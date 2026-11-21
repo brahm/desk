@@ -652,8 +652,20 @@ impl TextSystem {
                 let mut end = None;
                 let mut i = next_break;
                 while i < breaks.len() {
-                    if natural(pos, breaks[i], x, x + width).0 > width + 0.001 {
+                    let (wide, _) = natural(pos, breaks[i], x, x + width);
+                    if wide > width + 0.001 {
                         break;
+                    }
+                    // Pages 15.4 hyphenates a word only before the first
+                    // letter that does not fit: the letter after the
+                    // hyphen has to fit in place of the hyphen too (B-023).
+                    if let Some(hyphen) = hyphen_at(breaks[i]) {
+                        let next = clusters
+                            .get(clusters.partition_point(|c| c.start < breaks[i]))
+                            .map_or(0.0, |c| c.advance);
+                        if wide - hyphen.3 + next > width + 0.001 {
+                            break;
+                        }
                     }
                     end = Some(i);
                     if mandatory(breaks[i]) {
@@ -828,7 +840,7 @@ impl TextSystem {
             // line with tabs, only the text after a last left tab is
             // justified, from its stop.
             let last_tab = tabs.last();
-            let spread = if format.alignment == Alignment::Justify
+            let (spread, between) = if format.alignment == Alignment::Justify
                 && last_tab.is_none_or(|t| t.place.stop.alignment == desk_model::TabAlignment::Left)
                 && !matches!(
                     line.break_reason(),
@@ -889,8 +901,13 @@ impl TextSystem {
                     runs.get(c.run).map_or(0.0, |r| r.1)
                 })
             } else {
-                Vec::new()
+                (Vec::new(), 0.0)
             };
+            // Pages spreads the letters with the spacing of its characters,
+            // which a reader of the PDF takes as part of each letter while
+            // it is under a tenth of an em; Desk places each letter, so
+            // there it joins the letters of a word to read as one (B-023).
+            let whole_words = between > 0.0 && between <= LETTERS_READ_TOGETHER;
             let moved = |offset: usize| -> f32 {
                 let i = tabs.partition_point(|t| t.offset < offset);
                 let tab = if i == 0 { 0.0 } else { tabs[i - 1].moved };
@@ -986,8 +1003,13 @@ impl TextSystem {
                         },
                     });
                 }
-                let (run_text, clusters) =
-                    run_text(source, run, glyph_run.style_index(), glyphs.len());
+                let (run_text, clusters) = run_text(
+                    source,
+                    run,
+                    glyph_run.style_index(),
+                    glyphs.len(),
+                    whole_words,
+                );
                 glyph_runs.push(GlyphRun {
                     font: run.font().clone(),
                     size: run.font_size(),
@@ -1134,6 +1156,11 @@ const WIDEST_SPACE_GROWTH: f32 = 0.5;
 /// in ems of the letter; past it the rest goes to the spaces again (FMT-12).
 const WIDEST_LETTER_GROWTH: f32 = 0.2892;
 
+/// The widest gap, in ems of the letter, that a reader of a PDF such as
+/// Poppler still takes as part of the letter before it, not as a space
+/// between words (B-023).
+const LETTERS_READ_TOGETHER: f32 = 0.1;
+
 /// How Pages justifies a line, as measured on the reference machine
 /// (FMT-12). Each space grows in proportion to its own size, up to half
 /// of it. Past that, the letters of the words spread too: before each
@@ -1145,18 +1172,19 @@ const WIDEST_LETTER_GROWTH: f32 = 0.2892;
 /// from which the text moves, the offset where it starts and how far it
 /// and what comes after it move from where Parley put them, with the
 /// `given` room alike in the spaces, when Pages has `extra` room to spread;
-/// nothing when Parley put them right.
+/// nothing when Parley put them right; and how much each gap between
+/// letters grows, in ems of the letter.
 fn letter_spread(
     clusters: &[Cluster],
     source: &str,
     given: f32,
     extra: f32,
     size: impl Fn(&Cluster) -> f32,
-) -> Vec<(usize, f32)> {
+) -> (Vec<(usize, f32)>, f32) {
     let is_space = |c: &Cluster| source[c.start..].starts_with([' ', '\u{a0}']);
     let words = clusters.iter().filter(|c| is_space(c)).count() as f32;
     if words == 0.0 || extra <= 0.0 {
-        return Vec::new();
+        return (Vec::new(), 0.0);
     }
     // The sizes of the spaces, of what follows them and of the letters
     // that follow letters.
@@ -1172,7 +1200,7 @@ fn letter_spread(
         .map(|p| size(&p[1]))
         .sum();
     if spaces <= 0.0 {
-        return Vec::new();
+        return (Vec::new(), 0.0);
     }
     // How much each point of a space grows, and each point of a letter.
     let (mut grow, mut between) = (extra / spaces, 0.0);
@@ -1202,9 +1230,9 @@ fn letter_spread(
         spread.push((cluster.start, moved));
     }
     if spread.iter().all(|s| s.1.abs() < 1e-3) {
-        return Vec::new();
+        return (Vec::new(), 0.0);
     }
-    spread
+    (spread, between)
 }
 
 /// A cluster of a glyph run, in visual order: its text, where it starts
@@ -1535,10 +1563,13 @@ fn run_text(
     run: &parley::Run<'_, u32>,
     style: u16,
     glyphs: usize,
+    whole_words: bool,
 ) -> (String, Vec<(u32, u32)>) {
     let mut text = String::new();
     let mut clusters: Vec<(u32, u32)> = Vec::new();
     let mut count = 0;
+    // Whether the last cluster is a letter that the next one may join.
+    let mut in_word = false;
     // The text of clusters without glyphs before the first with any.
     let mut pending = 0;
     for cluster in run.visual_clusters() {
@@ -1547,6 +1578,7 @@ fn run_text(
         }
         // A tab draws no glyph, and its leader is a run of its own.
         if source[cluster.text_range()].starts_with('\t') {
+            in_word = false;
             continue;
         }
         let start = text.len();
@@ -1573,9 +1605,20 @@ fn run_text(
                 None => pending += bytes,
             }
         } else if n > 0 {
-            clusters.push((bytes + std::mem::take(&mut pending), n as u32));
+            let letter = !source[cluster.text_range()].contains(char::is_whitespace);
+            match clusters.last_mut() {
+                // With its letters spread, a word is one cluster, so that
+                // a PDF reads it whole (B-023).
+                Some(last) if whole_words && letter && in_word => {
+                    last.0 += bytes;
+                    last.1 += n as u32;
+                }
+                _ => clusters.push((bytes + std::mem::take(&mut pending), n as u32)),
+            }
+            in_word = letter;
         } else if bytes > 0 {
             clusters.push((bytes, 0));
+            in_word = false;
         }
     }
     if pending > 0

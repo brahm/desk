@@ -442,6 +442,35 @@ fn soft_hyphen_draws_a_hyphen_only_at_a_break() {
 }
 
 #[test]
+fn txt_09_a_word_breaks_only_before_the_first_letter_that_does_not_fit() {
+    // Pages 15.4 hyphenates "extraordinarily" at "extraor-" only from a
+    // measure where the "d" after it fits too, not only the hyphen, and at
+    // "extra-" below that (B-023).
+    let mut system = TextSystem::new();
+    let text = format!("The word extra{SOFT_HYPHEN}or{SOFT_HYPHEN}dinarily long");
+    let width = |system: &mut TextSystem, text: &str| {
+        plain(system, ParaFormat::default(), text).lines[0].advance
+    };
+    let with_hyphen = width(&mut system, "The word extraor-");
+    let with_letter = width(&mut system, "The word extraord");
+    assert!(with_letter > with_hyphen + 1.0);
+    let first_line = |system: &mut TextSystem, measure: f32| {
+        let laid = lay_in(
+            system,
+            ParaFormat::default(),
+            &[(&text, sans())],
+            &Column::new(measure),
+        );
+        text[laid.lines[0].range.clone()].replace(SOFT_HYPHEN, "")
+    };
+    assert_eq!(first_line(&mut system, with_letter - 0.5), "The word extra");
+    assert_eq!(
+        first_line(&mut system, with_letter + 0.1),
+        "The word extraor"
+    );
+}
+
+#[test]
 fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
     let mut system = TextSystem::new();
     let text = "The hyphenation of representative words";
@@ -461,13 +490,19 @@ fn txt_09_automatic_hyphenation_breaks_words_by_their_language() {
         hyphenate: true,
         ..ParaFormat::default()
     };
-    // Text in the undetermined language is not hyphenated.
-    let undetermined = lay_in(&mut system, hyphenating.clone(), &[(text, sans())], &column);
-    assert!(undetermined.lines.iter().all(|l| !l.hyphenated));
     if desk_lang::patterns("en-US").is_none() {
         return;
     }
-    let broken = lay_in(&mut system, hyphenating, &[(text, english)], &column);
+    let broken = lay_in(
+        &mut system,
+        hyphenating.clone(),
+        &[(text, english)],
+        &column,
+    );
+    // Text in the undetermined language is hyphenated as English, as
+    // Pages 15.4 does (B-023).
+    let undetermined = lay_in(&mut system, hyphenating, &[(text, sans())], &column);
+    assert_eq!(line_texts(&undetermined, text), line_texts(&broken, text));
     let first = broken
         .lines
         .iter()
