@@ -364,11 +364,13 @@ fn traced_outline(
 /// The contour of a PNG picture as Pages 15.4 traces it from its pixels
 /// more opaque than `threshold` percent, in parts of its frame `shown`,
 /// the picture filling `whole` (OBJ-17). Pages 15.4 traces the picture
-/// again rather than take the outline that Pages '09 saved. None for a
-/// picture of another format, or of opaque parts apart.
+/// again rather than take the outline that Pages '09 saved, and leaves out
+/// the pixels that Instant Alpha took away, outside `kept` (B-022). None
+/// for a picture of another format, or of opaque parts apart.
 fn pixel_contour(
     picture: &desk_model::Picture,
     threshold: u8,
+    kept: Option<&desk_model::AlphaOutline>,
     whole: Frame,
     shown: Frame,
 ) -> Option<Arc<[(i32, i32)]>> {
@@ -389,10 +391,33 @@ fn pixel_contour(
     };
     // 50% counts the pixels from 128 up, as Pages does.
     let least = (f64::from(threshold.min(100)) * 255.0 / 100.0).floor() as u16 + 1;
+    let scale = f64::from(POLYGON_SCALE);
+    // Whether the middle of a pixel is in what Instant Alpha keeps, by the
+    // even-odd rule.
+    let in_kept = |x: usize, y: usize| {
+        let Some(kept) = kept else {
+            return true;
+        };
+        let (px, py) = (
+            (x as f64 + 0.5) / w as f64 * scale,
+            (y as f64 + 0.5) / h as f64 * scale,
+        );
+        let mut inside = false;
+        for polygon in kept.iter() {
+            for (i, &(ax, ay)) in polygon.iter().enumerate() {
+                let (bx, by) = polygon[(i + 1) % polygon.len()];
+                let (ax, ay, bx, by) = (f64::from(ax), f64::from(ay), f64::from(bx), f64::from(by));
+                if (ay > py) != (by > py) && px < ax + (py - ay) * (bx - ax) / (by - ay) {
+                    inside = !inside;
+                }
+            }
+        }
+        inside
+    };
     let outline = desk_model::pixel_outline(w, h, |x, y| {
         alpha.is_none_or(|a| u16::from(pixels[y * info.line_size + x * bytes + a]) >= least)
+            && in_kept(x, y)
     })?;
-    let scale = f64::from(POLYGON_SCALE);
     let points: Vec<(i32, i32)> = outline
         .into_iter()
         .map(|(x, y)| {
@@ -700,16 +725,21 @@ impl Builder<'_, '_> {
         {
             // Around the outline of a shape, or the opaque part of a
             // picture (OBJ-17).
-            // A picture without Instant Alpha is traced from its pixels,
-            // as Pages 15.4 does; the outline that Pages '09 saved is kept
-            // for the others.
+            // A picture is traced from its pixels, as Pages 15.4 does,
+            // within the outline that Instant Alpha keeps; the outline
+            // that Pages '09 saved is kept for one with other Instant
+            // Alpha.
             object.contour = match &object.kind {
                 ObjectKind::Image(picture) => picture_frames
-                    .filter(|_| {
-                        picture_settings.alpha.is_empty() && picture_settings.alpha_kept.is_none()
-                    })
+                    .filter(|_| picture_settings.alpha.is_empty())
                     .and_then(|(whole, shown)| {
-                        pixel_contour(picture, object.wrap_threshold, whole, shown)
+                        pixel_contour(
+                            picture,
+                            object.wrap_threshold,
+                            picture_settings.alpha_kept.as_ref(),
+                            whole,
+                            shown,
+                        )
                     })
                     .or(traced_contour),
                 _ => object.shape_contour(),

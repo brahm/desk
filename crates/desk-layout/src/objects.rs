@@ -544,6 +544,8 @@ pub(crate) fn inline_sizes(
             };
             let width = if floats_in_text(o) {
                 desk_model::Length::ZERO
+            } else if is_sound(o) {
+                o.frame.width + desk_model::Length::from_pt(SOUND_SIDE_ROOM)
             } else {
                 o.frame.width
             };
@@ -559,7 +561,14 @@ pub(crate) fn inline_sizes(
 /// takes its own height. The sound stands on the baseline under that room.
 const SOUND_HEADROOM: f64 = 7.23;
 
-/// Whether an object is a sound, whose line Pages 15.4 makes taller.
+/// How much wider than a sound in the text Pages 15.4 leaves its room, in
+/// points: in the PDF of `obj-18-sound-sizes` the words after a sound 53
+/// points wide start 7 points further on than in that of Pages '09, at
+/// every size of text (B-025).
+const SOUND_SIDE_ROOM: f64 = 7.0;
+
+/// Whether an object is a sound, whose line Pages 15.4 makes taller and
+/// wider.
 fn is_sound(object: &Object) -> bool {
     matches!(&object.kind, ObjectKind::Media(media) if media.is_sound())
 }

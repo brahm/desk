@@ -680,11 +680,32 @@ impl TextSystem {
                 if end.is_none() && index + 1 < count && next_break < breaks.len() {
                     continue;
                 }
-                let (line_end, chosen) =
+                let (mut line_end, mut chosen) =
                     match end.or((next_break < breaks.len()).then_some(next_break)) {
                         Some(i) => (breaks[i], i + 1),
                         None => (source.len(), next_break),
                     };
+                // A word wider than the whole line breaks after its last
+                // letter that fits, as in Pages '09 and 15.4, and the rest
+                // of it starts the next line (B-023). Indents wider than
+                // the column leave no line to fit, and the text overflows.
+                let measure = column - right - indent;
+                if end.is_none()
+                    && next_break < breaks.len()
+                    && measure >= MIN_SEGMENT_WIDTH
+                    && width >= measure
+                {
+                    let word = trim(pos, breaks[next_break]);
+                    let cut = span(pos, word)
+                        .iter()
+                        .skip(1)
+                        .map(|c| c.start)
+                        .take_while(|&c| natural(pos, c, x, x + width).0 <= width + 0.001)
+                        .last();
+                    if let Some(cut) = cut {
+                        (line_end, chosen) = (cut, next_break);
+                    }
+                }
                 let hyphen = hyphen_at(line_end);
                 let chars = source[pos..line_end].chars().count() as u32;
                 // Parley aligns the line as shaped, with narrow tabs, in
@@ -1191,7 +1212,7 @@ fn letter_spread(
 ) -> (Vec<(usize, f32)>, f32) {
     let is_space = |c: &Cluster| source[c.start..].starts_with([' ', '\u{a0}']);
     let words = clusters.iter().filter(|c| is_space(c)).count() as f32;
-    if words == 0.0 || extra <= 0.0 {
+    if extra <= 0.0 {
         return (Vec::new(), 0.0);
     }
     // The sizes of the spaces, of what follows them and of the letters
@@ -1207,12 +1228,19 @@ fn letter_spread(
         .filter(|p| !is_space(&p[0]) && !is_space(&p[1]))
         .map(|p| size(&p[1]))
         .sum();
-    if spaces <= 0.0 {
-        return (Vec::new(), 0.0);
-    }
     // How much each point of a space grows, and each point of a letter.
-    let (mut grow, mut between) = (extra / spaces, 0.0);
-    if grow > WIDEST_SPACE_GROWTH && letters > 0.0 {
+    let (mut grow, mut between) = (0.0, 0.0);
+    if spaces <= 0.0 {
+        // A line of one word, as when a word is wider than the line: its
+        // letters take all the room, as in Pages '09 and 15.4 (B-023).
+        if letters <= 0.0 {
+            return (Vec::new(), 0.0);
+        }
+        between = extra / letters;
+    } else {
+        grow = extra / spaces;
+    }
+    if spaces > 0.0 && grow > WIDEST_SPACE_GROWTH && letters > 0.0 {
         between = (extra - WIDEST_SPACE_GROWTH * spaces) / (letters + after_spaces / 2.0);
         grow = WIDEST_SPACE_GROWTH;
         if between > WIDEST_LETTER_GROWTH {
@@ -1220,7 +1248,7 @@ fn letter_spread(
             grow = (extra - between * (letters + after_spaces / 2.0)) / spaces;
         }
     }
-    let each = given / words;
+    let each = if words > 0.0 { given / words } else { 0.0 };
     let mut moved = 0.0;
     let mut spread = Vec::new();
     let mut previous: Option<&Cluster> = None;

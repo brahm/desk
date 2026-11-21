@@ -178,6 +178,14 @@ fn obj_18_sounds_and_movies_in_the_text_match_pages() {
 }
 
 #[test]
+fn obj_18_a_sound_takes_its_room_at_every_size_of_text() {
+    // A sound in paragraphs of 9, 12, 18 and 24 points: Pages 15.4 makes
+    // its line taller and leaves 7 points more room beside it than Pages
+    // '09, but draws no speaker in its PDF, where Desk draws one (B-025).
+    check_with("obj-18-sound-sizes", TEXT_PAGE_PIXEL_TOLERANCE);
+}
+
+#[test]
 fn obj_19_movies_match_pages() {
     check("obj-19-movie-settings");
 }

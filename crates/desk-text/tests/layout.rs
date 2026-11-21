@@ -426,11 +426,13 @@ fn soft_hyphen_draws_a_hyphen_only_at_a_break() {
     assert_eq!(wide.lines.len(), 1);
     assert!(!wide.lines[0].hyphenated);
 
+    // Narrower than the word, but not than "ordinary", which would break
+    // inside (B-023).
     let narrow = lay_in(
         &mut system,
         ParaFormat::default(),
         &[(&text, sans())],
-        &Column::new(40.0),
+        &Column::new(45.0),
     );
     assert_eq!(narrow.lines.len(), 2);
     let first = &narrow.lines[0];
@@ -1263,6 +1265,43 @@ fn fmt_12_a_justified_line_with_few_spaces_spreads_its_letters_as_pages_does() {
     // takes the rest.
     let between = 0.2892 * 12.0;
     check(&mut system, advance + 80.0, between, 80.0 - 6.0 * between);
+}
+
+#[test]
+fn fmt_12_a_word_wider_than_the_line_breaks_and_a_word_alone_spreads() {
+    // As in Pages '09 and 15.4 (B-023): a word wider than the line breaks
+    // after its last letter that fits, the rest of it starts the next
+    // line, and the letters of a word alone on a justified line spread to
+    // fill it.
+    let mut system = TextSystem::new();
+    let text = "extraordinary internationalization responsibilities";
+    let paragraph = ParaFormat {
+        alignment: Alignment::Justify,
+        ..ParaFormat::default()
+    };
+    let layout = lay_in(
+        &mut system,
+        paragraph,
+        &[(text, sans())],
+        &Column::new(100.0),
+    );
+    assert_eq!(
+        line_texts(&layout, text),
+        [
+            "extraordinary ",
+            "internationalizatio",
+            "n responsibilities"
+        ]
+    );
+    // The last letter of each of the first two lines, a y and an o of
+    // Liberation Sans at 12 points, 6 and 6.67 points wide, ends at the
+    // end of the line.
+    let last_letter = |line: usize, text: &str| {
+        let glyphs = &layout.lines[line].runs[0].glyphs;
+        glyphs[text.trim_end().chars().count() - 1].x
+    };
+    assert!((last_letter(0, "extraordinary ") - 94.0).abs() < 0.05);
+    assert!((last_letter(1, "internationalizatio") - 93.33).abs() < 0.05);
 }
 
 #[test]
