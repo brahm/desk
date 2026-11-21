@@ -5,10 +5,10 @@
 //! continuous flow as wide as the window, without the edges of pages,
 //! their margins, headers and footers. Page, column and section breaks
 //! do not start a new page, the columns of a layout become one, and notes
-//! go to the end. A floating object shows in the flow, across the column,
-//! after the paragraph it is anchored to; an object fixed on a page goes
-//! after the last paragraph that starts on that page. Objects of the
-//! masters do not show.
+//! go to the end. An object that moves with the text shows in the flow,
+//! across the column, after the paragraph it is anchored to; objects in
+//! the text stay in their lines, where they can be selected and moved.
+//! Objects fixed on a page and those of the masters do not show.
 //!
 //! The paragraphs and their text are those of the document, so a place
 //! in the text is the same in both; only how they are laid out changes.
@@ -35,7 +35,7 @@ const NARROWEST: f64 = 144.0;
 /// Lays out a document in Screen View, `width` points wide: one page as
 /// tall as its text, whose `setup` gives that size.
 pub fn paginate_screen(document: &Document, width: f64, system: &mut TextSystem) -> DocumentLayout {
-    let screen = screen_document(document, width, system);
+    let screen = screen_document(document, width);
     let mut layout = paginate(&screen, system);
     // The flow ends below the last thing in it.
     let bottom = layout
@@ -54,25 +54,9 @@ pub fn paginate_screen(document: &Document, width: f64, system: &mut TextSystem)
 }
 
 /// The document as Screen View lays it out: see the module.
-pub fn screen_document(document: &Document, width: f64, system: &mut TextSystem) -> Document {
+pub fn screen_document(document: &Document, width: f64) -> Document {
     let mut screen = document.clone();
     let mut page = *screen.page_setup();
-    // Where the objects fixed on pages go: after the last paragraph that
-    // starts on their page, as the pages lay it out.
-    let fixed_on_pages = screen
-        .objects()
-        .iter()
-        .any(|o| matches!(o.anchor, Anchor::Page(_)));
-    let last_on_page: Vec<Option<usize>> = if fixed_on_pages && page.layout_pages.is_none() {
-        let pages = paginate(document, system);
-        pages
-            .pages
-            .iter()
-            .map(|p| p.lines.iter().map(|l| l.paragraph).max())
-            .collect()
-    } else {
-        Vec::new()
-    };
 
     page.width = Length::from_pt(width.max(NARROWEST));
     page.height = Length::from_pt(FLOW_HEIGHT);
@@ -133,8 +117,10 @@ pub fn screen_document(document: &Document, width: f64, system: &mut TextSystem)
         apply(&mut screen, op);
     }
 
-    // Floating objects go in the flow, after their paragraph; those of
-    // the masters do not show.
+    // Objects that move with the text go in the flow, after their
+    // paragraph, as the Mac showed on 2026-11-18; those fixed on a page
+    // and those of the masters are hidden, as it showed on 2026-11-21.
+    // Objects in the text stay in its lines.
     let body: Vec<_> = screen.body().iter().map(|p| p.id()).collect();
     let index_of = |id| body.iter().position(|p| *p == id);
     let column = width.max(NARROWEST) - 2.0 * SCREEN_MARGIN;
@@ -145,18 +131,11 @@ pub fn screen_document(document: &Document, width: f64, system: &mut TextSystem)
     for mut object in objects {
         let after = match object.anchor {
             Anchor::InText => continue,
-            Anchor::Master(..) => {
-                apply(&mut screen, Op::RemoveObject { object: object.id });
-                continue;
-            }
             Anchor::Paragraph(id) => index_of(id),
-            Anchor::Page(n) => last_on_page
-                .get(n as usize)
-                .or(last_on_page.last())
-                .copied()
-                .flatten(),
+            Anchor::Page(_) | Anchor::Master(..) => None,
         };
-        let Some(after) = after.or(if body.is_empty() { None } else { Some(0) }) else {
+        let Some(after) = after else {
+            apply(&mut screen, Op::RemoveObject { object: object.id });
             continue;
         };
         // The paragraph after it holds the object above its text; the

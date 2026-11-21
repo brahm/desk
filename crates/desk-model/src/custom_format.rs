@@ -4,11 +4,15 @@
 //! The custom formats of the cells of a document (PXV-18, TAB-31): Create
 //! Custom Format in the Data Format menu of Pages 15.4 keeps one under a
 //! name, which the menu then lists; Edit Custom Format changes, renames,
-//! moves or deletes it. A cell keeps the format it was given, under its
-//! old name, until it is given another, as in Pages '09.
+//! moves or deletes it. As the owner's Mac showed on 2026-11-21, changing
+//! or renaming a format changes it in every cell that has it, and
+//! deleting it gives those cells the Automatic format.
 
+use std::sync::Arc;
+
+use crate::ObjectKind;
 use crate::error::ModelError;
-use crate::table::CustomFormat;
+use crate::table::{CustomFormat, Format};
 use crate::transaction::Edit;
 
 impl crate::Document {
@@ -38,7 +42,8 @@ impl Edit {
         let mut formats = self.document().custom_formats().to_vec();
         let at = match index {
             Some(i) if i < formats.len() => {
-                formats[i] = format;
+                let old = std::mem::replace(&mut formats[i], format.clone());
+                self.reformat_cells(&old, &Format::Custom(format))?;
                 i
             }
             _ => {
@@ -67,13 +72,43 @@ impl Edit {
         Ok(to)
     }
 
-    /// Takes out a custom format; the cells keep it.
+    /// Takes out a custom format; the cells that have it take the
+    /// Automatic format.
     pub fn delete_custom_format(&mut self, index: usize) -> Result<(), ModelError> {
         let mut formats = self.document().custom_formats().to_vec();
         if index < formats.len() {
-            formats.remove(index);
+            let old = formats.remove(index);
+            self.reformat_cells(&old, &Format::Automatic)?;
         }
         self.set_custom_formats(formats)
+    }
+
+    /// Gives the cells of every table that have the custom format `old`
+    /// the format `new`.
+    fn reformat_cells(&mut self, old: &CustomFormat, new: &Format) -> Result<(), ModelError> {
+        let old = Format::Custom(old.clone());
+        let objects: Vec<crate::Object> = self.document().objects().iter().cloned().collect();
+        for mut object in objects {
+            let ObjectKind::Table(table) = &object.kind else {
+                continue;
+            };
+            let mut changed = (**table).clone();
+            let mut any = false;
+            for r in 0..changed.rows() {
+                for c in 0..changed.cols() {
+                    let cell = changed.cell_mut(r, c);
+                    if cell.format == old {
+                        cell.format = new.clone();
+                        any = true;
+                    }
+                }
+            }
+            if any {
+                object.kind = ObjectKind::Table(Arc::new(changed));
+                self.replace_object(object)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -136,5 +171,49 @@ mod tests {
         assert_eq!(editor.document().custom_formats(), [day]);
         editor.undo().unwrap();
         assert_eq!(editor.document().custom_formats().len(), 2);
+    }
+
+    #[test]
+    fn tab_31_a_format_changes_in_its_cells_and_deleting_it_makes_them_automatic() {
+        use crate::table::Format;
+        use crate::{Frame, Object, ObjectKind, Table};
+        use std::sync::Arc;
+        let mut editor = Editor::new(Document::new_word_processing());
+        let kilo = format("Kilo", "#,##0.00K \" kg\"");
+        let id = editor
+            .edit("Create Custom Format", |e| {
+                e.save_custom_format(None, kilo.clone())?;
+                let mut table = Table::new(3, 2);
+                table.cell_mut(1, 1).format = Format::Custom(kilo.clone());
+                table.cell_mut(2, 1).format = Format::Custom(kilo.clone());
+                let id = e.new_id();
+                e.add_object(Object::new(
+                    id,
+                    ObjectKind::Table(Arc::new(table)),
+                    Frame::from_pt(0.0, 0.0, 200.0, 60.0),
+                ))?;
+                Ok(id)
+            })
+            .unwrap();
+        let formats = |editor: &Editor| match &editor.document().objects().get(id).unwrap().kind {
+            ObjectKind::Table(t) => (t.cell(1, 1).format.clone(), t.cell(2, 1).format.clone()),
+            _ => unreachable!(),
+        };
+        // Editing and renaming it changes it in every cell, under the new
+        // name, as Pages 15.4 does.
+        let weight = format("Weight", "#,##0.00K \" kg net\"");
+        editor
+            .edit("Edit Custom Format", |e| {
+                e.save_custom_format(Some(0), weight.clone()).map(|_| ())
+            })
+            .unwrap();
+        let custom = Format::Custom(weight);
+        assert_eq!(formats(&editor), (custom.clone(), custom));
+        // Deleting it gives the cells the Automatic format.
+        editor
+            .edit("Delete", |e| e.delete_custom_format(0))
+            .unwrap();
+        assert_eq!(formats(&editor), (Format::Automatic, Format::Automatic));
+        assert!(editor.document().custom_formats().is_empty());
     }
 }

@@ -644,6 +644,13 @@ fn duration_text(days: f64, style: DurationStyle, pt: bool) -> String {
     format!("{sign}{}", out.join(" "))
 }
 
+/// The tag of a custom pattern that shows a number in hundreds.
+pub const HUNDREDS: &str = "[Hundreds]";
+
+/// The tag of a custom pattern that shows a number in percent, without
+/// the sign that `%` adds.
+pub const PERCENT: &str = "[Percent]";
+
 /// A number written by a custom pattern (TAB-29).
 fn custom_number(n: f64, pattern: &str, locale: &Locale) -> (String, bool) {
     let sections: Vec<&str> = split_sections(pattern);
@@ -677,7 +684,16 @@ fn custom_number(n: f64, pattern: &str, locale: &Locale) -> (String, bool) {
     });
     let red = section.contains("[Red]") || section.contains("[Vermelho]");
     let section = section.replace("[Red]", "").replace("[Vermelho]", "");
-    let value = if abs { n.abs() } else { n };
+    let mut value = if abs { n.abs() } else { n };
+    // The scales of Pages 15.4 that have no symbol of their own in the
+    // pattern: hundreds, and percent without the sign (PXV-18).
+    let mut section = section.as_str().to_owned();
+    for (tag, by) in [(HUNDREDS, 0.01), (PERCENT, 100.0)] {
+        if section.contains(tag) {
+            section = section.replace(tag, "");
+            value *= by;
+        }
+    }
     (number_by_pattern(value, &section, locale), red)
 }
 
@@ -730,6 +746,7 @@ fn number_by_pattern(n: f64, pattern: &str, locale: &Locale) -> String {
     let mut digits = String::new();
     let mut chars = pattern.chars().peekable();
     let mut seen_digits = false;
+    let mut scientific_at = false;
     while let Some(c) = chars.next() {
         let lit = |s: &mut String, prefix: &mut String, suffix: &mut String, seen: bool| {
             if seen {
@@ -757,6 +774,17 @@ fn number_by_pattern(n: f64, pattern: &str, locale: &Locale) -> String {
                 seen_digits = true;
                 digits.push(c);
             }
+            // E+00 after the digits writes the number in scientific
+            // notation (PXV-18).
+            'E' if seen_digits
+                && suffix.is_empty()
+                && !scientific_at
+                && matches!(chars.peek(), Some('+' | '-')) =>
+            {
+                chars.next();
+                while chars.next_if(|d| matches!(d, '0' | '#')).is_some() {}
+                scientific_at = true;
+            }
             c => {
                 let mut s = c.to_string();
                 lit(&mut s, &mut prefix, &mut suffix, seen_digits);
@@ -779,6 +807,11 @@ fn number_by_pattern(n: f64, pattern: &str, locale: &Locale) -> String {
         .chars()
         .filter(|c| matches!(c, '0' | '#' | '?'))
         .count();
+    if scientific_at {
+        let sign = if value < 0.0 { "-" } else { "" };
+        let s = scientific(value.abs(), decimals.min(15) as u8, locale);
+        return format!("{prefix}{sign}{s}{suffix}");
+    }
     let min_decimals = frac_pat.chars().filter(|c| *c == '0').count();
     let grouped = int_pat.contains(',');
     let min_int = int_pat.chars().filter(|c| *c == '0').count();
@@ -903,12 +936,16 @@ fn custom_date(days: f64, pattern: &str, locale: &Locale) -> String {
     out
 }
 
-fn is_date_pattern(pattern: &str) -> bool {
+/// Whether a custom pattern writes dates: letters of dates outside
+/// quotes and brackets. E+00 is the scientific notation of a number.
+pub fn is_date_pattern(pattern: &str) -> bool {
     let mut quoted = false;
     let mut bracket = false;
-    for c in pattern.chars() {
+    let mut chars = pattern.chars().peekable();
+    while let Some(c) = chars.next() {
         match c {
             '\'' | '"' => quoted = !quoted,
+            'E' if matches!(chars.peek(), Some('+' | '-')) => {}
             '[' if !quoted => bracket = true,
             ']' if !quoted => bracket = false,
             'y' | 'd' | 'M' | 'H' | 'E' if !quoted && !bracket => return true,
@@ -1512,6 +1549,22 @@ mod tests {
             pattern: "#,##0, \"mil\"".into(),
         });
         assert_eq!(show(&thousands, Value::Number(1_500_000.0)), "1.500 mil");
+        // The scales of the pieces of Pages 15.4 (PXV-18).
+        let scaled = |pattern: &str, n: f64| {
+            let format = Format::Custom(CustomFormat {
+                name: "Escala".into(),
+                pattern: pattern.into(),
+            });
+            show(&format, Value::Number(n))
+        };
+        assert_eq!(scaled("#,##0.##,\"K\" \"kg\"", 1234.5), "1,23K kg");
+        assert_eq!(scaled("#,##0.##,\"K\" \"kg\"", 0.25), "0K kg");
+        assert_eq!(scaled("#,##0,,\"M\"", 25_000_000.0), "25M");
+        assert_eq!(scaled("#,##0[Hundreds]\"C\"", 1234.0), "12C");
+        assert_eq!(scaled("#,##0.0[Percent]", 0.25), "25,0");
+        assert_eq!(scaled("#,##0.0%", 0.25), "25,0%");
+        assert_eq!(scaled("#,##0.00E+00", 12345.0), "1,23E+04");
+        assert_eq!(scaled("0.0E+00 \"m\"", -0.00012), "-1,2E-04 m");
         let cond = Format::Custom(CustomFormat {
             name: "Grande".into(),
             pattern: "[>1000]\"muito\";0".into(),

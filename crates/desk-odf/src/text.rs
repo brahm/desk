@@ -610,6 +610,9 @@ pub struct TextProperties {
     pub fill_tint: Option<Color>,
     /// `desk:text-fill-tint-opacity`, in percent.
     pub fill_tint_opacity: Option<f64>,
+    /// `desk:text-fill-page`: whether the gradient runs across the whole
+    /// page rather than the text that has it (W052).
+    pub fill_page: Option<bool>,
 }
 
 /// `fo:text-shadow`.

@@ -221,3 +221,11 @@ fn fmt_12_harder_justified_lines_spread_as_pages_does() {
     // machine; and a text box.
     check("justify-cases");
 }
+
+#[test]
+fn fmt_12_a_word_wider_than_the_line_breaks_and_a_word_alone_spreads() {
+    // Words wider than a justified line of 100 points break after their
+    // last letter that fits, and the letters of a word alone on its line
+    // spread to fill it, as in Pages '09 and 15.4 (B-023).
+    check("justify-spread");
+}

@@ -424,11 +424,12 @@ impl ObjectGroups {
             let tight = row.is_active();
             if let Some(editor) = tight_editor() {
                 editor.set_object("Text Wrap", |object| {
-                    object.contour = if tight {
-                        desk_render::object_contour(object)
+                    if tight {
+                        desk_render::trace_contour(object);
                     } else {
-                        None
-                    };
+                        object.contour = None;
+                        object.contour_parts = Default::default();
+                    }
                 });
             }
         });

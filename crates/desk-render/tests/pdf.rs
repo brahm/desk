@@ -1183,3 +1183,84 @@ fn pxv_04_a_gradient_goes_once_across_the_text_it_fills() {
         .pdf_bytes(&pages, &Metadata::default());
     assert!(poppler("pdftotext", &[], &pdf.unwrap()).contains("plain Gradient"));
 }
+
+#[test]
+fn w052_a_gradient_runs_once_over_the_lines_of_its_paragraph() {
+    // Pages 15.4, on the owner's Mac on 2026-11-21: a vertical gradient
+    // on a paragraph of three lines goes once from the top line to the
+    // bottom one, light to dark, and not again on each line.
+    use desk_model::Fill;
+    let filled = CharFormat {
+        fill: Some(Fill::Gradient {
+            from: Rgba::rgb(200, 220, 255),
+            to: Rgba::rgb(0, 0, 120),
+            angle: 27000,
+        }),
+        ..sans()
+    };
+    let text = "A gradient on a whole paragraph that runs over several lines \
+                spreads once from the top line to the bottom line of the \
+                paragraph, and the lines do not each start it again. "
+        .repeat(3);
+    let layout = layout(&[(text.as_str(), filled)], PageSetup::a4());
+    let pages = DisplayList::pages(&layout);
+    let paints: Vec<_> = pages[0]
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Glyphs { paint, glyphs, .. } => Some((paint.clone(), glyphs[0].y)),
+            _ => None,
+        })
+        .collect();
+    let lines: std::collections::BTreeSet<i64> =
+        paints.iter().map(|(_, y)| (*y * 10.0) as i64).collect();
+    assert!(lines.len() >= 3, "{}", lines.len());
+    // One paint for every line: the same gradient, from above the first
+    // line to below the last.
+    assert!(paints.iter().all(|(p, _)| p == &paints[0].0));
+    let Some(desk_render::Paint::Linear { start, end, .. }) = paints[0].0.clone() else {
+        panic!("{:?}", paints[0].0);
+    };
+    let (first, last) = (paints[0].1, paints[paints.len() - 1].1);
+    let (top, bottom) = (start.1.min(end.1), start.1.max(end.1));
+    assert!(
+        top < first && bottom > last,
+        "{start:?} {end:?} {first} {last}"
+    );
+}
+
+#[test]
+fn w052_a_gradient_applied_to_the_entire_page_runs_across_the_page() {
+    // "Apply gradient to entire page" of Pages 15.4 stretches the
+    // gradient over the whole page, whatever text has it.
+    use desk_model::Fill;
+    let filled = CharFormat {
+        fill: Some(Fill::Gradient {
+            from: Rgba::rgb(200, 220, 255),
+            to: Rgba::rgb(0, 0, 120),
+            angle: 27000,
+        }),
+        fill_page: true,
+        ..sans()
+    };
+    let layout = layout(&[("One short line.", filled)], PageSetup::a4());
+    let pages = DisplayList::pages(&layout);
+    let height = pages[0].height;
+    let paint = pages[0]
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Glyphs { paint, .. } => paint.clone(),
+            _ => None,
+        })
+        .unwrap();
+    let desk_render::Paint::Linear { start, end, .. } = paint else {
+        panic!("{paint:?}");
+    };
+    // From the top of the page to its bottom.
+    let (top, bottom) = (start.1.min(end.1), start.1.max(end.1));
+    assert!(
+        top.abs() < 1.0 && (bottom - height).abs() < 1.0,
+        "{start:?} {end:?}"
+    );
+}

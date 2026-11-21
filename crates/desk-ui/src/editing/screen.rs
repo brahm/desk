@@ -3,7 +3,9 @@
 
 //! Screen View (PXV-01): the text in one flow as wide as the window,
 //! without the edges of pages, their margins, headers and footers. The
-//! objects show in the flow, where they cannot be moved; the flow follows
+//! objects in the text show in its lines, where they are selected and
+//! moved as on the pages, and those that move with the text show after
+//! their paragraph; the others are hidden. The flow follows
 //! the width of the window and its zoom, which sets the size of the text.
 
 use desk_model::Anchor;
@@ -34,16 +36,18 @@ impl TextEditor {
     }
 
     /// Whether Screen View hides something of the document: its headers
-    /// and footers, or the objects of its masters.
+    /// and footers, or objects fixed on a page or on the masters.
     pub fn screen_hides_content(&self) -> bool {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
-        let pages = crate::lay_out(document);
-        pages.pages.iter().any(|p| !p.margin_lines.is_empty())
-            || document
-                .objects()
+        document
+            .objects()
+            .iter()
+            .any(|o| matches!(o.anchor, Anchor::Page(_) | Anchor::Master(..)))
+            || crate::lay_out(document)
+                .pages
                 .iter()
-                .any(|o| matches!(o.anchor, Anchor::Master(..)))
+                .any(|p| !p.margin_lines.is_empty())
     }
 
     /// Lays out the flow again when the view changes width or zoom.

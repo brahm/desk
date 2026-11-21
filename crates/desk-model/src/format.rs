@@ -393,6 +393,10 @@ formatting! {
         /// their color, the Gradient Fill and Image Fill of the text color
         /// of Pages (PXV-04). The color stays, for when the fill goes.
         fill: Option<Fill> = None,
+        /// Whether a gradient fill runs across the whole page rather than
+        /// the text that has it: "Apply gradient to entire page" of Pages
+        /// 15.4 (W052).
+        fill_page: bool = false,
         /// Superscript or subscript (FMT-06).
         baseline: Baseline = Baseline::Normal,
         /// An exact raise (positive) or lowering (negative) of the

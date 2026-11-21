@@ -129,6 +129,34 @@ fn est_22_est_23_a_table_of_contents_matches_pages() {
 }
 
 #[test]
+fn est_22_entries_of_other_styles_and_superscripts_match_pages() {
+    // Entries of 9, 12 and 18 points with space before and after, whose
+    // page numbers Pages 15.4 puts on the next line, and superscripts in
+    // Times and Liberation Serif. The line in Georgia is left out: Desk
+    // has no font with its widths and sets it in Liberation Serif.
+    let (reference, desk, _) = render("est-22-toc-styles");
+    let without_georgia = |pages: Vec<Vec<Word>>| -> Vec<Vec<Word>> {
+        pages
+            .into_iter()
+            .map(|words| {
+                let line = words.iter().find(|w| w.text == "Georgia").map(|w| w.y);
+                words
+                    .into_iter()
+                    .filter(|w| line.is_none_or(|y| (w.y - y).abs() > 6.0))
+                    .collect()
+            })
+            .collect()
+    };
+    let (reference, desk) = (without_georgia(reference), without_georgia(desk));
+    assert_eq!(desk.len(), reference.len(), "pages");
+    let diff = compare_words(&reference, &desk);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
+    );
+}
+
+#[test]
 fn est_25_est_26_links_and_bookmarks_match_pages() {
     check("est-25-26-links-bookmarks");
 }

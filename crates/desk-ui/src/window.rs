@@ -1348,9 +1348,18 @@ impl DocumentWindow {
             .is_some_and(|e| !e.is_page_layout() && !e.is_presentation());
         self.enable("screen-view", has_document && words);
         self.enable("text-size", has_document && screen);
-        for action in ["thumbnails", "show-layout", "ruler", "page-layout"] {
+        // Screen View has no pages to go to, and shows no page count, as
+        // in Pages 15.4 (PXV-01).
+        for action in [
+            "thumbnails",
+            "show-layout",
+            "ruler",
+            "page-layout",
+            "go-to-page-end",
+        ] {
             self.enable(action, has_document && !screen);
         }
+        self.controls.go_to.set_sensitive(!screen);
     }
 
     fn enable(&self, name: &str, enabled: bool) {
@@ -1897,16 +1906,22 @@ impl DocumentWindow {
                 self.actions
                     .change_action_state("thumbnails", &false.to_variant());
             }
-            // The text starts at its own size: Text Size ▸ Auto.
-            self.view.set_zoom(geometry::DEFAULT_ZOOM);
+            // The text starts at Text Size ▸ Auto.
+            self.view
+                .set_zoom(geometry::text_size_auto(f64::from(self.window.width())));
             editor.set_screen_view(true);
-            if editor.screen_hides_content() {
-                self.toasts.add_toast(adw::Toast::new(&tr(
-                    "Some content, such as headers and footers, is hidden in Screen View",
-                )));
-            }
+            // Pages 15.4 always says so, and says what it hides when it
+            // hides something (PXV-01).
+            let notice = if editor.screen_hides_content() {
+                tr("Some content is hidden in Screen View")
+            } else {
+                tr("Screen View is on")
+            };
+            self.toasts.add_toast(adw::Toast::new(&notice));
         } else {
             editor.set_screen_view(false);
+            self.toasts
+                .add_toast(adw::Toast::new(&tr("Screen View is off")));
             if let Some((zoom, fit, thumbnails)) = self.before_screen.take() {
                 match fit {
                     Some(fit) => self.view.set_fit(Some(fit)),
@@ -2779,9 +2794,9 @@ impl DocumentWindow {
             };
             let zoom = this.view.zoom();
             this.view.set_zoom(match value.as_str() {
-                "bigger" => geometry::zoom_in(zoom),
-                "smaller" => geometry::zoom_out(zoom),
-                _ => geometry::DEFAULT_ZOOM,
+                "bigger" => geometry::text_bigger(zoom),
+                "smaller" => geometry::text_smaller(zoom),
+                _ => geometry::text_size_auto(f64::from(this.window.width())),
             });
         });
         self.actions.add_action(&text_size);

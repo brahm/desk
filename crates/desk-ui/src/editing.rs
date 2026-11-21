@@ -1228,7 +1228,7 @@ impl TextEditor {
                     }
                     _ => text,
                 };
-                let mut after = edit.insert_text(at, text)?;
+                let after = edit.insert_text(at, text)?;
                 if let Some(pending) = &pending {
                     edit.set_character_attrs(at, after, pending)?;
                 }
@@ -1240,22 +1240,20 @@ impl TextEditor {
                 {
                     detect_link(edit, at)?;
                 }
-                if let Some(c) = typed
-                    && desk_model::ends_word(c)
-                {
-                    let mut corrected = autocorrect(edit, at, &preferences.autocorrect)?;
-                    if preferences.accept_single_suggestion {
-                        corrected = accept_single_suggestion(edit, corrected)?;
-                    }
-                    after.offset = after.offset + corrected.offset - at.offset;
-                }
-                Ok(Spot::of(edit.document(), after))
+                // The corrections of the word come after, as an action of
+                // their own (PXV-07).
+                let word_end = typed.filter(|&c| desk_model::ends_word(c)).map(|_| at);
+                Ok((Spot::of(edit.document(), after), word_end))
             };
             if continuing {
                 state.editor.edit_continuing(name, edits)
             } else {
                 state.editor.edit(name, edits).map(|spot| (spot, false))
             }
+        };
+        let (result, word_end) = match result {
+            Ok(((spot, word_end), joined)) => (Ok((spot, joined)), word_end),
+            Err(error) => (Err(error), None),
         };
         match result {
             // The letter joins the typing before it: Undo goes back to
@@ -1271,7 +1269,43 @@ impl TextEditor {
             Ok((None, true)) => {}
             Err(error) => self.finish_edit(before, Err(error)),
         }
+        if let Some(at) = word_end {
+            self.correct_word(at);
+        }
         self.state.borrow_mut().typing = typing;
+    }
+
+    /// Makes the corrections of the word that ends at a position, after
+    /// the character that ends it was typed, as an action of its own: as
+    /// in Pages '09 and 15.4, the first Undo brings back what was typed,
+    /// as "1/2 " for "½ ", and the next one takes back the typing (TXT-07,
+    /// PXV-07).
+    fn correct_word(&self, at: desk_model::Position) {
+        let before = self.selection();
+        let result = {
+            let mut state = self.state.borrow_mut();
+            let preferences = crate::preferences::get();
+            let depth = state.editor.undo_depth();
+            let corrected = state.editor.edit("Replace", |edit| {
+                let typed_end = desk_model::Position::new(at.paragraph, at.offset);
+                let cursor = at_spot(edit.document(), before.focus)?;
+                let mut corrected = autocorrect(edit, typed_end, &preferences.autocorrect)?;
+                if preferences.accept_single_suggestion {
+                    corrected = accept_single_suggestion(edit, corrected)?;
+                }
+                let mut after = cursor;
+                if after.paragraph == at.paragraph && after.offset >= at.offset {
+                    after.offset = after.offset + corrected.offset - at.offset;
+                }
+                Ok(Spot::of(edit.document(), after))
+            });
+            match corrected {
+                Ok(spot) if state.editor.undo_depth() > depth => Ok(spot),
+                Ok(_) => return,
+                Err(error) => Err(error),
+            }
+        };
+        self.finish_edit(before, result);
     }
 
     /// Deletes the selection, or what a key deletes next to the cursor.
@@ -2947,16 +2981,20 @@ impl TextEditor {
 
     /// Makes the quotes of the selection, or of the whole text when
     /// nothing is selected, those of the preferences, straight or curly,
-    /// as one action of the history (PXV-08). It is what Replace in
-    /// Selection and Replace All of the substitutions of macOS do with
-    /// smart quotes for Pages 15.4.
+    /// as one action of the history (PXV-08), and with smart quotes two or
+    /// three hyphens an em dash. It is what Replace in Selection and
+    /// Replace All of the substitutions of macOS do with smart quotes and
+    /// dashes for Pages 15.4.
     pub fn convert_quotes(&self) {
-        let style = crate::preferences::get().quotes;
+        let preferences = crate::preferences::get();
+        let (style, dashes) = (preferences.quotes, preferences.smart_quotes);
         let name = "Convert Quotes";
         // Inside a text box with nothing selected, as with a selection:
         // the whole text is that of the body.
         if !self.selection().is_empty() || self.has_selected_objects() || self.story().is_some() {
-            self.format_ranges(name, |edit, from, to| edit.convert_quotes(from, to, style));
+            self.format_ranges(name, |edit, from, to| {
+                edit.convert_quotes(from, to, style, dashes)
+            });
             return;
         }
         let document = self.state.borrow().editor.snapshot();
@@ -2965,7 +3003,7 @@ impl TextEditor {
             let document = edit.document();
             let from = at_spot(document, Spot::default())?;
             let to = at_spot(document, end)?;
-            edit.convert_quotes(from, to, style)
+            edit.convert_quotes(from, to, style, dashes)
         });
     }
 

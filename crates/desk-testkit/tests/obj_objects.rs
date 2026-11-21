@@ -178,6 +178,14 @@ fn obj_18_sounds_and_movies_in_the_text_match_pages() {
 }
 
 #[test]
+fn obj_18_a_sound_takes_its_room_at_every_size_of_text() {
+    // A sound in paragraphs of 9, 12, 18 and 24 points: Pages 15.4 makes
+    // its line taller and leaves 7 points more room beside it than Pages
+    // '09, but draws no speaker in its PDF, where Desk draws one (B-025).
+    check_with("obj-18-sound-sizes", TEXT_PAGE_PIXEL_TOLERANCE);
+}
+
+#[test]
 fn obj_19_movies_match_pages() {
     check("obj-19-movie-settings");
 }
@@ -199,6 +207,73 @@ fn obj_12_text_follows_the_outline_of_its_shape() {
     // text than fits: each line takes the room that the outline leaves
     // across its height, the inset in from it.
     check("shape-text-cases");
+}
+
+#[test]
+fn obj_12_overflowing_text_aligned_to_the_bottom_of_a_triangle_or_diamond() {
+    // A rectangle, a triangle, a diamond and a rounded rectangle with more
+    // text than fits, aligned to the bottom: the triangle shows its first
+    // lines from the top, as there is no room lower for them, and the
+    // diamond shows them below its middle, on lines that break otherwise
+    // (B-046).
+    check("shape-bottom-cases");
+}
+
+#[test]
+fn obj_12_text_of_triangles_and_diamonds_goes_down_as_in_pages() {
+    // Sixteen triangles, diamonds and a rounded rectangle aligned to the
+    // bottom, the middle and the top, with text that overflows or fits:
+    // the text keeps what it shows from the top and goes down as far as
+    // it shows the same (B-046). In the ninth, a diamond with words of two
+    // letters, Pages 15.4 starts the first line lower than Desk near the
+    // top point, which breaks the lines otherwise, and it is left out.
+    let fixtures = fixtures();
+    let name = "shape-bottom-more";
+    let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
+    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let pages = DisplayList::pages(&layout);
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.pdf"));
+    desk_render::Painter::new()
+        .unwrap()
+        .write_pdf(&pages, document.metadata(), &out)
+        .unwrap();
+    // The words of each shape, shape by shape: the shapes stand two by
+    // two, at 72 and 330 across and 120, 320 and 520 down, and those side
+    // by side have lines at heights a little apart. The ninth shape is
+    // the third of the second page.
+    let without_ninth = |pages: Vec<Vec<desk_testkit::compare::Word>>| {
+        pages
+            .into_iter()
+            .enumerate()
+            .map(|(page, words)| {
+                let mut shapes = Vec::new();
+                for slot in 0..6 {
+                    if page == 1 && slot == 2 {
+                        continue;
+                    }
+                    let (x, y) = ([72.0, 330.0][slot % 2], [120.0, 320.0, 520.0][slot / 2]);
+                    let mut in_shape: Vec<_> = words
+                        .iter()
+                        .filter(|w| (x..x + 160.0).contains(&w.x) && (y..y + 122.0).contains(&w.y))
+                        .cloned()
+                        .collect();
+                    in_shape.sort_by(|a, b| {
+                        (a.y.round(), a.x).partial_cmp(&(b.y.round(), b.x)).unwrap()
+                    });
+                    shapes.extend(in_shape);
+                }
+                shapes
+            })
+            .collect::<Vec<_>>()
+    };
+    let reference = without_ninth(words(&fixtures.join(format!("{name}.pdf"))).unwrap());
+    let desk = without_ninth(words(&out).unwrap());
+    assert_eq!(desk.len(), 3, "pages");
+    let diff = compare_words(&reference, &desk);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {reference:?}\nDesk: {desk:?}"
+    );
 }
 
 #[test]
@@ -236,6 +311,35 @@ fn obj_17_the_outline_of_a_picture_is_made_straight_as_in_pages() {
     // to two pixels of the picture away from it (B-022).
     check("wrap-contour-cases");
     check("wrap-contour-res");
+}
+
+#[test]
+fn obj_17_text_runs_between_the_parts_apart_of_a_picture_as_in_pages() {
+    // Two opaque discs apart on a transparent ground, wrapped tightly on
+    // both sides: Pages 15.4 runs the text between them (B-047). The
+    // first page, a picture with Instant Alpha, has a line where a word
+    // fits by less than a point in Desk and not in Pages, and is not
+    // compared.
+    let fixtures = fixtures();
+    let name = "wrap-alpha-parts";
+    let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
+    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let pages = DisplayList::pages(&layout);
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.pdf"));
+    desk_render::Painter::new()
+        .unwrap()
+        .write_pdf(&pages, document.metadata(), &out)
+        .unwrap();
+    let reference = words(&fixtures.join(format!("{name}.pdf"))).unwrap();
+    let desk = words(&out).unwrap();
+    assert_eq!(desk.len(), 2, "pages");
+    let diff = compare_words(&reference[1..], &desk[1..]);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {:?}\nDesk: {:?}",
+        reference[1],
+        desk[1]
+    );
 }
 
 #[test]

@@ -110,6 +110,8 @@ pub struct GlyphRun {
     /// A gradient or picture that fills the glyphs in place of the color
     /// (PXV-04).
     pub fill: Option<desk_model::Fill>,
+    /// Whether the fill runs across the whole page (W052).
+    pub fill_page: bool,
 }
 
 /// One line of a paragraph, or one piece of a line beside a wrapped object.
@@ -608,6 +610,7 @@ impl TextSystem {
         let first = format.first_line_indent.to_pt() as f32;
         let right = format.right_indent.to_pt() as f32;
         let column = space.width();
+        let min_piece = space.min_piece();
 
         let mut placed: Vec<Placed> = Vec::new();
         let mut breaker = layout.break_lines();
@@ -617,6 +620,8 @@ impl TextSystem {
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
         let mut searched_from = y;
+        // Where the search for a line wide enough for the next word began.
+        let mut narrow_from = y;
         // Whether the band was measured again with a shorter line.
         let mut shortened = false;
         'band: loop {
@@ -627,7 +632,7 @@ impl TextSystem {
                 .filter_map(|(x, w)| {
                     let x0 = x.max(indent);
                     let x1 = (x + w).min(column - right);
-                    (x1 - x0 >= MIN_SEGMENT_WIDTH).then_some((x0, x1 - x0))
+                    (x1 - x0 >= min_piece).then_some((x0, x1 - x0))
                 })
                 .collect();
             if segments.is_empty() {
@@ -680,11 +685,47 @@ impl TextSystem {
                 if end.is_none() && index + 1 < count && next_break < breaks.len() {
                     continue;
                 }
-                let (line_end, chosen) =
+                // A word that does not fit a line narrowed by the room
+                // around it, as in a triangle or beside an object, goes
+                // lower, where the line may be wider, as in Pages '09 and
+                // 15.4 (B-046); a piece after text of the line stays empty.
+                let measure = column - right - indent;
+                if end.is_none()
+                    && next_break < breaks.len()
+                    && width + 0.001 < measure
+                    && y - narrow_from < MAX_SEARCH
+                {
+                    if placed.len() > saved_placed {
+                        break;
+                    }
+                    y += 1.0;
+                    continue 'band;
+                }
+                let (mut line_end, mut chosen) =
                     match end.or((next_break < breaks.len()).then_some(next_break)) {
                         Some(i) => (breaks[i], i + 1),
                         None => (source.len(), next_break),
                     };
+                // A word wider than the whole line breaks after its last
+                // letter that fits, as in Pages '09 and 15.4, and the rest
+                // of it starts the next line (B-023). Indents wider than
+                // the column leave no line to fit, and the text overflows.
+                if end.is_none()
+                    && next_break < breaks.len()
+                    && measure >= MIN_SEGMENT_WIDTH
+                    && width >= measure
+                {
+                    let word = trim(pos, breaks[next_break]);
+                    let cut = span(pos, word)
+                        .iter()
+                        .skip(1)
+                        .map(|c| c.start)
+                        .take_while(|&c| natural(pos, c, x, x + width).0 <= width + 0.001)
+                        .last();
+                    if let Some(cut) = cut {
+                        (line_end, chosen) = (cut, next_break);
+                    }
+                }
                 let hyphen = hyphen_at(line_end);
                 let chars = source[pos..line_end].chars().count() as u32;
                 // Parley aligns the line as shaped, with narrow tabs, in
@@ -809,6 +850,7 @@ impl TextSystem {
                 pos = line_end;
                 next_break = chosen;
                 first_line = false;
+                narrow_from = y;
                 if pos >= source.len() {
                     break 'band;
                 }
@@ -1033,6 +1075,7 @@ impl TextSystem {
                     shadow: format.shadow,
                     background: format.background,
                     fill: format.fill.clone(),
+                    fill_page: format.fill_page,
                 });
             }
             for (place, font, size, format_index) in leaders {
@@ -1053,6 +1096,7 @@ impl TextSystem {
                     .map_or((false, None, None, None), |r| {
                         (r.outline, r.shadow, r.background, r.fill.clone())
                     });
+                let fill_page = last.is_some_and(|r| r.fill_page);
                 glyph_runs.push(GlyphRun {
                     font: font.clone(),
                     size: *size,
@@ -1074,6 +1118,7 @@ impl TextSystem {
                     shadow,
                     background,
                     fill,
+                    fill_page,
                 });
                 advance += hyphen_advance;
             }
@@ -1191,7 +1236,7 @@ fn letter_spread(
 ) -> (Vec<(usize, f32)>, f32) {
     let is_space = |c: &Cluster| source[c.start..].starts_with([' ', '\u{a0}']);
     let words = clusters.iter().filter(|c| is_space(c)).count() as f32;
-    if words == 0.0 || extra <= 0.0 {
+    if extra <= 0.0 {
         return (Vec::new(), 0.0);
     }
     // The sizes of the spaces, of what follows them and of the letters
@@ -1207,12 +1252,19 @@ fn letter_spread(
         .filter(|p| !is_space(&p[0]) && !is_space(&p[1]))
         .map(|p| size(&p[1]))
         .sum();
-    if spaces <= 0.0 {
-        return (Vec::new(), 0.0);
-    }
     // How much each point of a space grows, and each point of a letter.
-    let (mut grow, mut between) = (extra / spaces, 0.0);
-    if grow > WIDEST_SPACE_GROWTH && letters > 0.0 {
+    let (mut grow, mut between) = (0.0, 0.0);
+    if spaces <= 0.0 {
+        // A line of one word, as when a word is wider than the line: its
+        // letters take all the room, as in Pages '09 and 15.4 (B-023).
+        if letters <= 0.0 {
+            return (Vec::new(), 0.0);
+        }
+        between = extra / letters;
+    } else {
+        grow = extra / spaces;
+    }
+    if spaces > 0.0 && grow > WIDEST_SPACE_GROWTH && letters > 0.0 {
         between = (extra - WIDEST_SPACE_GROWTH * spaces) / (letters + after_spaces / 2.0);
         grow = WIDEST_SPACE_GROWTH;
         if between > WIDEST_LETTER_GROWTH {
@@ -1220,7 +1272,7 @@ fn letter_spread(
             grow = (extra - between * (letters + after_spaces / 2.0)) / spaces;
         }
     }
-    let each = given / words;
+    let each = if words > 0.0 { given / words } else { 0.0 };
     let mut moved = 0.0;
     let mut spread = Vec::new();
     let mut previous: Option<&Cluster> = None;
@@ -1376,6 +1428,7 @@ fn leader_run(
         // with the tab.
         background: None,
         fill: format.fill.clone(),
+        fill_page: format.fill_page,
     })
 }
 

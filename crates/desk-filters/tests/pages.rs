@@ -1021,6 +1021,28 @@ fn obj_17_objects_saved_with_a_tight_wrap_keep_their_outline() {
 }
 
 #[test]
+fn obj_17_a_picture_with_instant_alpha_is_traced_within_what_it_keeps() {
+    // A blob on an opaque white ground that Instant Alpha cut out: Pages
+    // 15.4 wraps the text around the blob, not around the whole picture
+    // that Pages '09 traced (B-022).
+    let (_, objects) = fixture_objects("wrap-alpha-parts.pages");
+    let contour = objects[0].contour.as_deref().expect("a contour");
+    let (xs, ys): (Vec<i32>, Vec<i32>) = contour.iter().copied().unzip();
+    let span = |v: &[i32]| (*v.iter().min().unwrap(), *v.iter().max().unwrap());
+    // The blob of the picture is from about 13% to 91% across and 13% to
+    // 88% down.
+    let ((x0, x1), (y0, y1)) = (span(&xs), span(&ys));
+    assert!(
+        (1_200..1_500).contains(&x0) && (8_900..9_200).contains(&x1),
+        "{xs:?}"
+    );
+    assert!(
+        (1_200..1_500).contains(&y0) && (8_600..8_900).contains(&y1),
+        "{ys:?}"
+    );
+}
+
+#[test]
 fn obj_42_pictures_that_fill_shapes_are_read() {
     let (_, objects) = fixture_objects("obj-42-image-fill.pages");
     let filled = objects

@@ -969,6 +969,9 @@ fn text_attrs(w: &mut Writer, t: &TextProperties) {
             &format!("{}%", decimal(opacity)),
         );
     }
+    if let Some(page) = t.fill_page {
+        w.attr("desk:text-fill-page", if page { "true" } else { "false" });
+    }
     w.attr_opt("fo:language", t.language.as_deref())
         .attr_opt("fo:country", t.country.as_deref())
         .attr_opt("fo:script", t.script.as_deref());

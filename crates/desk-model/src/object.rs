@@ -60,6 +60,10 @@ pub struct Object {
     /// that of a shape, or the edge of the opaque part of a picture
     /// (OBJ-17). None when the text goes around the box of the object.
     pub contour: Option<Arc<[(i32, i32)]>>,
+    /// The other parts of the outline, for a picture whose opaque pixels
+    /// are in parts apart, in the same units: the text runs between them
+    /// (OBJ-17, B-047). Empty without a contour.
+    pub contour_parts: ContourParts,
     /// Whether it cannot be moved, resized or deleted until unlocked.
     pub locked: bool,
     /// What the copies of one object share with it, so that Magic Move
@@ -98,6 +102,10 @@ pub struct PictureSettings {
     /// The changes of Adjust Image (OBJ-07).
     pub adjust: Adjustments,
 }
+
+/// The parts of the outline that text wraps tightly around, apart from the
+/// first, each a closed polygon (B-047).
+pub type ContourParts = Arc<[Arc<[(i32, i32)]>]>;
 
 /// Closed polygons whose inside, by the even-odd rule, is the part of a
 /// picture that Instant Alpha keeps.
@@ -223,6 +231,7 @@ impl Object {
             wrap_margin: Length::from_points(12),
             wrap_threshold: Self::WRAP_THRESHOLD,
             contour: None,
+            contour_parts: Arc::from([]),
             locked: false,
             origin: None,
             text: None,

@@ -93,13 +93,14 @@ pub fn words(pdf: &Path) -> Result<Vec<Vec<Word>>, CompareError> {
     Ok(parse_bbox(&output?))
 }
 
-/// Whether a word is a ligature that Pages 15.4 drew in a span of its own
-/// that names its letters (DOC-05): Poppler reads such a glyph without the
-/// move to the start of its line, so it lands at the top of the page with
-/// no height, and leaves its word in two.
+/// Whether a word is a ligature, or a letter before a soft hyphen, that
+/// Pages 15.4 drew in a span of its own that names its letters (DOC-05,
+/// TXT-09): Poppler reads such a glyph without the move to the start of
+/// its line, so it lands at the top of the page with no height, and
+/// leaves its word in two.
 fn is_ligature_drawn_apart(word: &Word) -> bool {
     const LIGATURES: [&str; 5] = ["ff", "fi", "fl", "ffi", "ffl"];
-    word.height == 0.0 && LIGATURES.contains(&word.text.as_str())
+    word.height == 0.0 && (LIGATURES.contains(&word.text.as_str()) || word.text.ends_with('\u{ad}'))
 }
 
 /// Reads the output of `pdftotext -bbox`.

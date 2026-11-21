@@ -5,6 +5,8 @@
 //! TAB-31): a name, a kind (number, date and time, or text), the pattern
 //! and the pieces it is made of, with a preview. Pages 15.4 has the pieces
 //! dragged into the pattern; here a click puts one where the cursor is.
+//! The Scale piece is a menu of the scales of 15.4, from Percent to
+//! Scientific, which go after the digits.
 //! Editing a format also moves it in the menu or deletes it.
 
 use adw::prelude::*;
@@ -25,10 +27,10 @@ fn pieces(kind: u32, currency: &str) -> Vec<(String, String)> {
     let piece = |name: &str, text: &str| (tr(name), text.to_owned());
     match kind {
         0 => vec![
-            piece(n_("Integers"), "#,##0"),
-            piece(n_("Decimals"), ".00"),
+            piece(n_("Integer"), "#,##0"),
+            piece(n_("Decimal"), ".00"),
+            piece(SCALE, ""),
             piece(n_("Currency"), &format!("\"{currency}\"")),
-            piece(n_("Percent"), "%"),
             piece(n_("Space"), " "),
         ],
         1 => vec![
@@ -45,23 +47,44 @@ fn pieces(kind: u32, currency: &str) -> Vec<(String, String)> {
     }
 }
 
+/// The piece of the scales, a menu of them as in Pages 15.4.
+const SCALE: &str = n_("Scale");
+
+/// The scales of a number, by name and what they put in the pattern
+/// after the digits.
+fn scales() -> Vec<(String, String)> {
+    let hundreds = desk_model::table::HUNDREDS;
+    let percent = desk_model::table::PERCENT;
+    [
+        (n_("Percent"), percent.to_owned()),
+        (n_("Percent (%)"), "%".to_owned()),
+        (n_("Hundreds"), hundreds.to_owned()),
+        (n_("Hundreds (C)"), format!("{hundreds}\"C\"")),
+        (n_("Thousands"), ",".to_owned()),
+        (n_("Thousands (K)"), ",\"K\"".to_owned()),
+        (n_("Millions"), ",,".to_owned()),
+        (n_("Millions (M)"), ",,\"M\"".to_owned()),
+        (n_("Billions"), ",,,".to_owned()),
+        (n_("Billions (B)"), ",,,\"B\"".to_owned()),
+        (n_("Trillions"), ",,,,".to_owned()),
+        (n_("Trillions (T)"), ",,,,\"T\"".to_owned()),
+        (n_("Scientific"), "E+00".to_owned()),
+    ]
+    .into_iter()
+    .map(|(name, text)| (tr(name), text))
+    .collect()
+}
+
 /// The kind of a pattern: text with `@`, a date with letters of dates
 /// outside quotes and brackets, and a number otherwise.
 fn kind_of(pattern: &str) -> u32 {
     if pattern.contains('@') {
-        return 2;
+        2
+    } else if desk_model::table::is_date_pattern(pattern) {
+        1
+    } else {
+        0
     }
-    let (mut quoted, mut bracket) = (false, false);
-    for c in pattern.chars() {
-        match c {
-            '\'' | '"' => quoted = !quoted,
-            '[' if !quoted => bracket = true,
-            ']' if !quoted => bracket = false,
-            'y' | 'd' | 'M' | 'H' | 'E' if !quoted && !bracket => return 1,
-            _ => {}
-        }
-    }
-    0
 }
 
 /// A sample of a kind, which the preview writes.
@@ -127,14 +150,39 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor, index: Optio
         let pattern = pattern.clone();
         move |kind: u32| {
             holder.remove_all();
-            for (label, text) in pieces(kind, &currency) {
-                let button = gtk::Button::builder().label(&label).build();
+            let put = |button: &gtk::Button, text: String, popover: Option<gtk::Popover>| {
                 let pattern = pattern.clone();
                 button.connect_clicked(move |_| {
                     let mut at = pattern.position();
                     pattern.insert_text(&text, &mut at);
                     pattern.set_position(at);
+                    if let Some(popover) = &popover {
+                        popover.popdown();
+                    }
                 });
+            };
+            for (label, text) in pieces(kind, &currency) {
+                if label == tr(SCALE) {
+                    // The scales go after the digits, from a menu.
+                    let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    let popover = gtk::Popover::builder().child(&list).build();
+                    for (name, text) in scales() {
+                        let item = gtk::Button::builder()
+                            .label(&name)
+                            .css_classes(["flat"])
+                            .build();
+                        put(&item, text, Some(popover.clone()));
+                        list.append(&item);
+                    }
+                    let menu = gtk::MenuButton::builder()
+                        .label(&label)
+                        .popover(&popover)
+                        .build();
+                    holder.insert(&menu, -1);
+                    continue;
+                }
+                let button = gtk::Button::builder().label(&label).build();
+                put(&button, text, None);
                 holder.insert(&button, -1);
             }
         }
@@ -207,8 +255,14 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor, index: Optio
             Box::new(move |e| e.move_custom_format(i, true)),
         )
         .set_sensitive(i + 1 < formats.len());
-        action(n_("Delete"), Box::new(move |e| e.delete_custom_format(i)))
-            .add_css_class("destructive-action");
+        // Pages 15.4 asks first, as the cells that have the format lose it.
+        let shown = formats[i].name.clone();
+        let owner = parent.as_ref().clone();
+        action(
+            n_("Delete"),
+            Box::new(move |e| confirm_delete(&owner, e, i, &shown)),
+        )
+        .add_css_class("destructive-action");
         content.append(&row);
     }
 
@@ -237,6 +291,29 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor, index: Optio
     });
 }
 
+/// Asks whether to delete a custom format, as Pages 15.4 does, and
+/// deletes it: the cells that have it take the Automatic format (TAB-31).
+fn confirm_delete(parent: &gtk::Widget, editor: &TextEditor, index: usize, name: &str) {
+    let dialog = adw::AlertDialog::new(
+        Some(&tr("Delete Format?")),
+        Some(
+            &tr("The cells that use “{name}” will take the Automatic format.")
+                .replace("{name}", name),
+        ),
+    );
+    dialog.add_response("cancel", &tr("_Cancel"));
+    dialog.add_response("delete", &tr("_Delete"));
+    dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+    let editor = editor.clone();
+    dialog.choose(Some(parent), gio::Cancellable::NONE, move |response| {
+        if response == "delete" {
+            editor.delete_custom_format(index);
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,6 +323,9 @@ mod tests {
         assert_eq!(kind_of("#,##0.00 \"kg\""), 0);
         assert_eq!(kind_of("dd/MM/yyyy"), 1);
         assert_eq!(kind_of("@ \"m\""), 2);
+        assert_eq!(kind_of("0.00E+00"), 0);
+        assert_eq!(kind_of("#,##0[Hundreds]\"C\""), 0);
+        assert_eq!(scales().len(), 13);
         for (k, start) in STARTS.iter().enumerate() {
             assert_eq!(kind_of(start), k as u32);
         }

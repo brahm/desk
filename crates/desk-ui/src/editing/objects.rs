@@ -2000,10 +2000,6 @@ impl TextEditor {
         y: f64,
         modifiers: gdk::ModifierType,
     ) -> bool {
-        // The objects in the flow of Screen View are not moved (PXV-01).
-        if self.screen_view() {
-            return false;
-        }
         let Some((page, px, py)) = self.view.page_at(x, y) else {
             return false;
         };
@@ -2012,7 +2008,7 @@ impl TextEditor {
         let reach = (REACH / scale) as f32;
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
         let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
-        let (grabbed, hit_id) = {
+        let (mut grabbed, mut hit_id) = {
             let state = self.state.borrow();
             let mut grabbed = None;
             if state.story.is_none() {
@@ -2036,6 +2032,20 @@ impl TextEditor {
                 hit(&state.layout, page, px, py, reach, state.selectable),
             )
         };
+        // In Screen View only the objects in the text are selected and
+        // moved, as in Pages 15.4; the others show where the flow puts
+        // them, not where they are (PXV-01).
+        if self.screen_view() {
+            let in_text = |id| self.object_by_id(id).anchor == Anchor::InText;
+            grabbed = grabbed.filter(|&(id, _)| in_text(id));
+            hit_id = hit_id.filter(|&id| in_text(id));
+            if grabbed.is_none() && hit_id.is_none() {
+                if self.has_selected_objects() {
+                    self.select_objects(Vec::new());
+                }
+                return false;
+            }
+        }
         if grabbed.is_some() || hit_id.is_some() {
             PRESSED_ON.set(Some(page));
         }
@@ -2286,11 +2296,13 @@ impl TextEditor {
                 DragLabel { page, at, text }
             });
         self.view.set_drag_label(label);
+        // Screen View moves objects in the text, and copies none.
+        let screen = self.screen_view();
         {
             let mut state = self.state.borrow_mut();
             if let Some(drag) = state.object_drag.as_mut() {
                 drag.preview = preview;
-                drag.copying = alt && drag.kind == DragKind::Move;
+                drag.copying = alt && drag.kind == DragKind::Move && !screen;
             }
             state.guides = guides;
         }
@@ -2443,7 +2455,7 @@ pub(super) fn refresh_contour(object: &mut Object, before: &Object) {
         || object.frame.width != before.frame.width
         || object.frame.height != before.frame.height;
     if changed {
-        object.contour = desk_render::object_contour(object);
+        desk_render::trace_contour(object);
     }
 }
 
