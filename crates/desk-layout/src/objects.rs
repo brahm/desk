@@ -204,6 +204,23 @@ impl PlacedObject {
     /// from a top to a bottom, and from a left to a right.
     fn profile(&self, margin: f32) -> Option<Profile> {
         let contour = self.object.contour.as_ref().filter(|c| c.len() >= 3)?;
+        let mut bands = Vec::new();
+        // Each part apart of the outline takes its own room (B-047).
+        let parts = std::iter::once(contour).chain(self.object.contour_parts.iter());
+        for (part, contour) in parts.enumerate().filter(|(_, c)| c.len() >= 3) {
+            self.part_profile(contour, margin, part as u16, &mut bands);
+        }
+        Some(bands.into())
+    }
+
+    /// The bands of one part of the outline, numbered `part`.
+    fn part_profile(
+        &self,
+        contour: &[(i32, i32)],
+        margin: f32,
+        part: u16,
+        bands: &mut Vec<(f32, f32, f32, f32, u16)>,
+    ) {
         let scale = desk_model::POLYGON_SCALE as f32;
         let points: Vec<(f32, f32)> = contour
             .iter()
@@ -216,7 +233,6 @@ impl PlacedObject {
             .collect();
         let top = points.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
         let bottom = points.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max);
-        let mut bands = Vec::new();
         let mut b0 = top - margin;
         while b0 < bottom + margin {
             let b1 = b0 + PROFILE_BAND;
@@ -273,11 +289,10 @@ impl PlacedObject {
                 }
             }
             if let Some(span) = span {
-                bands.push((b0, b1, span.0, span.1));
+                bands.push((b0, b1, span.0, span.1, part));
             }
             b0 = b1;
         }
-        Some(bands.into())
     }
 }
 
@@ -372,8 +387,8 @@ pub(crate) fn place_master_objects(document: &Document, layout: &mut crate::Docu
 }
 
 /// The bands of a contour down the page, each from a top to a bottom and
-/// from a left to a right, in points.
-pub(crate) type Profile = Arc<[(f32, f32, f32, f32)]>;
+/// from a left to a right, in points, and the part of the outline it is of.
+pub(crate) type Profile = Arc<[(f32, f32, f32, f32, u16)]>;
 
 /// How tall the bands of the contour of an object are, in points.
 const PROFILE_BAND: f32 = 0.25;
@@ -398,18 +413,36 @@ impl Exclusion {
     /// The left and right of the room it takes from a line from `y0` to
     /// `y1`, or none when it takes none there.
     fn span(&self, y0: f32, y1: f32) -> Option<(f32, f32)> {
+        self.spans(y0, y1)
+            .into_iter()
+            .reduce(|(s, t), (a, b)| (s.min(a), t.max(b)))
+    }
+
+    /// The left and right of the room that each part of it takes from a
+    /// line from `y0` to `y1`, left to right, merged where they meet.
+    fn spans(&self, y0: f32, y1: f32) -> Vec<(f32, f32)> {
         if self.y1 <= y0 || self.y0 >= y1 {
-            return None;
+            return Vec::new();
         }
         let Some(bands) = &self.profile else {
-            return Some((self.x0, self.x1));
+            return vec![(self.x0, self.x1)];
         };
-        bands
-            .iter()
-            .filter(|b| b.1 > y0 && b.0 < y1)
-            .fold(None, |span, b| {
-                Some(span.map_or((b.2, b.3), |(s, t): (f32, f32)| (s.min(b.2), t.max(b.3))))
-            })
+        let mut parts: Vec<(u16, f32, f32)> = Vec::new();
+        for b in bands.iter().filter(|b| b.1 > y0 && b.0 < y1) {
+            match parts.iter_mut().find(|p| p.0 == b.4) {
+                Some(p) => (p.1, p.2) = (p.1.min(b.2), p.2.max(b.3)),
+                None => parts.push((b.4, b.2, b.3)),
+            }
+        }
+        parts.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let mut spans: Vec<(f32, f32)> = Vec::new();
+        for (_, a, b) in parts {
+            match spans.last_mut() {
+                Some(last) if a <= last.1 => last.1 = last.1.max(b),
+                _ => spans.push((a, b)),
+            }
+        }
+        spans
     }
 }
 
@@ -459,6 +492,14 @@ fn free_segments(piece: &Piece, width: f32, top: f32, height: f32) -> Vec<(f32, 
     let (y0, y1) = (piece.origin + top, piece.origin + top + height);
     let mut free = vec![(0.0f32, width)];
     for e in &piece.exclusions {
+        // On both sides, the text also runs between the parts of an
+        // outline apart, as in Pages 15.4 (B-047).
+        if e.wrap == Wrap::Both {
+            for (x0, x1) in e.spans(y0, y1) {
+                free = cut(free, x0 - piece.left, x1 - piece.left);
+            }
+            continue;
+        }
         let Some((x0, x1)) = e.span(y0, y1) else {
             continue;
         };
@@ -481,22 +522,27 @@ fn free_segments(piece: &Piece, width: f32, top: f32, height: f32) -> Vec<(f32, 
             Wrap::AboveAndBelow => (f32::NEG_INFINITY, f32::INFINITY),
             Wrap::Through | Wrap::Behind => continue,
         };
-        free = free
-            .into_iter()
-            .flat_map(|(s, t)| {
-                let mut out = Vec::with_capacity(2);
-                if cut0 > s {
-                    out.push((s, cut0.min(t)));
-                }
-                if cut1 < t {
-                    out.push((cut1.max(s), t));
-                }
-                out
-            })
-            .filter(|(s, t)| t > s)
-            .collect();
+        free = cut(free, cut0, cut1);
     }
     free.into_iter().map(|(s, t)| (s, t - s)).collect()
+}
+
+/// What is left of the pieces `free`, each from a left to a right, once
+/// what is from `cut0` to `cut1` is taken out.
+fn cut(free: Vec<(f32, f32)>, cut0: f32, cut1: f32) -> Vec<(f32, f32)> {
+    free.into_iter()
+        .flat_map(|(s, t)| {
+            let mut out = Vec::with_capacity(2);
+            if cut0 > s {
+                out.push((s, cut0.min(t)));
+            }
+            if cut1 < t {
+                out.push((cut1.max(s), t));
+            }
+            out
+        })
+        .filter(|(s, t)| t > s)
+        .collect()
 }
 
 /// Whether an exclusion is in the way of a column from `left` to `right`
@@ -1353,6 +1399,51 @@ mod tests {
         object.contour = None;
         let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
         assert_eq!(e.span(100.0, 102.0), Some((200.0, 300.0)));
+    }
+
+    #[test]
+    fn obj_17_the_parts_apart_of_a_contour_each_take_their_own_room() {
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(200.0, 100.0, 100.0, 100.0),
+        );
+        object.wrap_margin = desk_model::Length::from_points(5);
+        // The left and the right fifths of the frame (B-047).
+        object.contour = Some(Arc::from([
+            (0, 0),
+            (2_000, 0),
+            (2_000, 10_000),
+            (0, 10_000),
+        ]));
+        object.contour_parts = Arc::from([Arc::from(
+            &[(8_000, 0), (10_000, 0), (10_000, 10_000), (8_000, 10_000)][..],
+        )]);
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        let spans = e.spans(150.0, 160.0);
+        assert_eq!(spans.len(), 2, "{spans:?}");
+        assert!((spans[0].0 - 195.0).abs() < 0.01 && (spans[0].1 - 225.0).abs() < 0.01);
+        assert!((spans[1].0 - 275.0).abs() < 0.01 && (spans[1].1 - 305.0).abs() < 0.01);
+        assert_eq!(e.span(150.0, 160.0).map(|s| s.1 - s.0), Some(110.0));
+        // On both sides, the text runs between them; on one side, not.
+        let piece = Piece {
+            from: 0.0,
+            left: 0.0,
+            origin: 0.0,
+            exclusions: vec![e.clone()],
+        };
+        let free = free_segments(&piece, 500.0, 150.0, 10.0);
+        assert_eq!(free.len(), 3, "{free:?}");
+        assert!((free[1].0 - 225.0).abs() < 0.01 && (free[1].1 - 50.0).abs() < 0.01);
+        let piece = Piece {
+            exclusions: vec![Exclusion {
+                wrap: Wrap::Left,
+                ..e
+            }],
+            ..piece
+        };
+        assert_eq!(free_segments(&piece, 500.0, 150.0, 10.0).len(), 1);
     }
 
     #[test]

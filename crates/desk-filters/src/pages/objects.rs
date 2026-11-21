@@ -365,15 +365,17 @@ fn traced_outline(
 /// more opaque than `threshold` percent, in parts of its frame `shown`,
 /// the picture filling `whole` (OBJ-17). Pages 15.4 traces the picture
 /// again rather than take the outline that Pages '09 saved, and leaves out
-/// the pixels that Instant Alpha took away, outside `kept` (B-022). None
-/// for a picture of another format, or of opaque parts apart.
+/// the pixels that Instant Alpha took away, outside `kept` (B-022): the
+/// outline of the first part of the opaque pixels, and those of the parts
+/// apart from it (B-047). None for a picture of another format.
+#[allow(clippy::type_complexity)]
 fn pixel_contour(
     picture: &desk_model::Picture,
     threshold: u8,
     kept: Option<&desk_model::AlphaOutline>,
     whole: Frame,
     shown: Frame,
-) -> Option<Arc<[(i32, i32)]>> {
+) -> Option<(Arc<[(i32, i32)]>, Vec<Arc<[(i32, i32)]>>)> {
     if picture.format() != desk_model::PictureFormat::Png {
         return None;
     }
@@ -414,20 +416,24 @@ fn pixel_contour(
         }
         inside
     };
-    let outline = desk_model::pixel_outline(w, h, |x, y| {
+    let outlines = desk_model::pixel_outlines(w, h, |x, y| {
         alpha.is_none_or(|a| u16::from(pixels[y * info.line_size + x * bytes + a]) >= least)
             && in_kept(x, y)
-    })?;
-    let points: Vec<(i32, i32)> = outline
-        .into_iter()
-        .map(|(x, y)| {
-            (
-                (f64::from(x) / w as f64 * scale).round() as i32,
-                (f64::from(y) / h as f64 * scale).round() as i32,
-            )
-        })
-        .collect();
-    placed_outline(points.into(), whole, shown)
+    });
+    let mut parts = outlines.into_iter().filter_map(|outline| {
+        let points: Vec<(i32, i32)> = outline
+            .into_iter()
+            .map(|(x, y)| {
+                (
+                    (f64::from(x) / w as f64 * scale).round() as i32,
+                    (f64::from(y) / h as f64 * scale).round() as i32,
+                )
+            })
+            .collect();
+        placed_outline(points.into(), whole, shown)
+    });
+    let first = parts.next()?;
+    Some((first, parts.collect()))
 }
 
 /// A contour in parts of the frame `whole` of a picture, in parts of its
@@ -729,7 +735,7 @@ impl Builder<'_, '_> {
             // within the outline that Instant Alpha keeps; the outline
             // that Pages '09 saved is kept for one with other Instant
             // Alpha.
-            object.contour = match &object.kind {
+            let traced = match &object.kind {
                 ObjectKind::Image(picture) => picture_frames
                     .filter(|_| picture_settings.alpha.is_empty())
                     .and_then(|(whole, shown)| {
@@ -740,10 +746,19 @@ impl Builder<'_, '_> {
                             whole,
                             shown,
                         )
-                    })
-                    .or(traced_contour),
-                _ => object.shape_contour(),
+                    }),
+                _ => None,
             };
+            match traced {
+                Some((first, others)) => {
+                    object.contour = Some(first);
+                    object.contour_parts = others.into();
+                }
+                None if matches!(object.kind, ObjectKind::Image(_)) => {
+                    object.contour = traced_contour;
+                }
+                None => object.contour = object.shape_contour(),
+            }
         }
         object.locked = drawable.locked;
         object.picture = picture_settings;

@@ -382,6 +382,10 @@ pub struct DrawObject {
     /// The `draw:contour-polygon` of a frame: the points of the outline
     /// that text wraps around, in ten-thousandths of the frame.
     pub contour: Option<Vec<(i32, i32)>>,
+    /// The other parts of the outline, for a picture whose opaque parts
+    /// are apart: then the outline is written as the subpaths of a
+    /// `draw:contour-path`, the first of them `contour` (B-047).
+    pub contour_parts: Vec<Vec<(i32, i32)>>,
     /// `desk:origin`: what the copies of one object share, which Magic
     /// Move of Desk Slides matches (IOP-33).
     pub origin: Option<String>,
@@ -411,6 +415,7 @@ impl DrawObject {
             z_index: None,
             text: Vec::new(),
             contour: None,
+            contour_parts: Vec::new(),
             origin: None,
         }
     }
@@ -974,6 +979,17 @@ fn draw_object_at(
     } else {
         Vec::new()
     };
+    let (contour, contour_parts) = match e.child(DRAW, "contour-polygon") {
+        Some(polygon) => (contour_polygon(polygon), Vec::new()),
+        None => {
+            let mut parts = e
+                .child(DRAW, "contour-path")
+                .map(contour_path)
+                .unwrap_or_default()
+                .into_iter();
+            (parts.next(), parts.collect())
+        }
+    };
     Some(DrawObject {
         kind,
         style: e.attr(DRAW, "style-name").map(str::to_owned),
@@ -993,7 +1009,8 @@ fn draw_object_at(
         transform: e.attr(DRAW, "transform").map(str::to_owned),
         z_index: e.attr(DRAW, "z-index").and_then(|n| n.trim().parse().ok()),
         text,
-        contour: e.child(DRAW, "contour-polygon").and_then(contour_polygon),
+        contour,
+        contour_parts,
         origin: e.attr(DESK, "origin").map(str::to_owned),
     })
 }
@@ -1019,6 +1036,88 @@ fn contour_polygon(e: &Element) -> Option<Vec<(i32, i32)>> {
         })
         .collect();
     (points.len() >= 3).then_some(points)
+}
+
+/// The subpaths of a `draw:contour-path`, each the points of a polygon in
+/// ten-thousandths of the frame: lines are taken as they are, and curves by
+/// their ends.
+fn contour_path(e: &Element) -> Vec<Vec<(i32, i32)>> {
+    let (x0, y0, w, h) = match numbers(e.attr(SVG, "viewBox").unwrap_or_default())[..] {
+        [x, y, w, h] if w > 0.0 && h > 0.0 => (x, y, w, h),
+        _ => return Vec::new(),
+    };
+    let scale = f64::from(CONTOUR_SCALE);
+    let d = e.attr(SVG, "d").unwrap_or_default();
+    // The path as commands, each with its numbers.
+    let mut commands: Vec<(char, Vec<f64>)> = Vec::new();
+    let mut number = String::new();
+    let flush = |number: &mut String, commands: &mut Vec<(char, Vec<f64>)>| {
+        if let (Ok(n), Some(last)) = (number.parse::<f64>(), commands.last_mut())
+            && n.is_finite()
+        {
+            last.1.push(n);
+        }
+        number.clear();
+    };
+    for c in d.chars() {
+        if c.is_ascii_alphabetic() && c != 'e' && c != 'E' {
+            flush(&mut number, &mut commands);
+            commands.push((c, Vec::new()));
+        } else if c == '-' && !number.is_empty() && !number.ends_with(['e', 'E']) {
+            flush(&mut number, &mut commands);
+            number.push(c);
+        } else if c.is_whitespace() || c == ',' {
+            flush(&mut number, &mut commands);
+        } else {
+            number.push(c);
+        }
+    }
+    flush(&mut number, &mut commands);
+    let mut parts: Vec<Vec<(i32, i32)>> = Vec::new();
+    let mut part: Vec<(i32, i32)> = Vec::new();
+    let (mut at, mut start) = ((0.0, 0.0), (0.0, 0.0));
+    let close = |part: &mut Vec<(i32, i32)>, parts: &mut Vec<Vec<(i32, i32)>>| {
+        part.dedup();
+        if part.len() >= 3 {
+            parts.push(std::mem::take(part));
+        }
+        part.clear();
+    };
+    // Against hostile files.
+    for (command, values) in commands.into_iter().take(1 << 16) {
+        let relative = command.is_ascii_lowercase();
+        let step = match command.to_ascii_uppercase() {
+            'M' | 'L' | 'T' => 2,
+            'H' | 'V' => 1,
+            'C' => 6,
+            'S' | 'Q' => 4,
+            'A' => 7,
+            'Z' => {
+                close(&mut part, &mut parts);
+                at = start;
+                continue;
+            }
+            _ => continue,
+        };
+        for (k, v) in values.chunks_exact(step).enumerate() {
+            let base = if relative { at } else { (0.0, 0.0) };
+            at = match command.to_ascii_uppercase() {
+                'H' => (base.0 + v[0], at.1),
+                'V' => (at.0, base.1 + v[0]),
+                _ => (base.0 + v[step - 2], base.1 + v[step - 1]),
+            };
+            if command.eq_ignore_ascii_case(&'M') && k == 0 {
+                close(&mut part, &mut parts);
+                start = at;
+            }
+            part.push((
+                ((at.0 - x0) / w * scale).round() as i32,
+                ((at.1 - y0) / h * scale).round() as i32,
+            ));
+        }
+    }
+    close(&mut part, &mut parts);
+    parts
 }
 
 /// Writes a drawing object. `paragraph` writes the paragraphs of a text
@@ -1227,7 +1326,32 @@ pub(crate) fn write_draw_object(
             w.end();
         }
     }
-    if let Some(contour) = object.contour.as_ref().filter(|_| name == "draw:frame") {
+    if let Some(contour) = object
+        .contour
+        .as_ref()
+        .filter(|_| name == "draw:frame" && !object.contour_parts.is_empty())
+    {
+        // An outline of several parts, as the subpaths of a path.
+        let d: Vec<String> = std::iter::once(contour)
+            .chain(&object.contour_parts)
+            .map(|part| {
+                let points: Vec<String> = part.iter().map(|(x, y)| format!("{x} {y}")).collect();
+                format!("M {} Z", points.join(" L "))
+            })
+            .collect();
+        w.start("draw:contour-path");
+        if let (Some(width), Some(height)) = (object.width, object.height) {
+            w.attr("svg:width", &width.to_string())
+                .attr("svg:height", &height.to_string());
+        }
+        w.attr(
+            "svg:viewBox",
+            &format!("0 0 {CONTOUR_SCALE} {CONTOUR_SCALE}"),
+        )
+        .attr("svg:d", &d.join(" "))
+        .attr("draw:recreate-on-edit", "false")
+        .end();
+    } else if let Some(contour) = object.contour.as_ref().filter(|_| name == "draw:frame") {
         let points: Vec<String> = contour.iter().map(|(x, y)| format!("{x},{y}")).collect();
         w.start("draw:contour-polygon");
         if let (Some(width), Some(height)) = (object.width, object.height) {

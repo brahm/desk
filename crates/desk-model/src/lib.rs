@@ -121,10 +121,10 @@ pub use list::{
 pub use media::{Media, MediaFormat, Repeat};
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
-    Adjustments, AlphaOutline, AlphaSeed, Anchor, Fill, Frame, FrameStyle, Gradient, GradientStop,
-    GraphicStyle, ImageFill, LineEnd, MAX_SHAPE_SIDES, MAX_TEXT_BOX_COLUMNS, Object, ObjectKind,
-    ObjectShadow, Objects, POLYGON_SCALE, PathPoint, PictureFrame, PictureSettings, Shape, Stroke,
-    TextBox, VerticalAlignment, Wrap,
+    Adjustments, AlphaOutline, AlphaSeed, Anchor, ContourParts, Fill, Frame, FrameStyle, Gradient,
+    GradientStop, GraphicStyle, ImageFill, LineEnd, MAX_SHAPE_SIDES, MAX_TEXT_BOX_COLUMNS, Object,
+    ObjectKind, ObjectShadow, Objects, POLYGON_SCALE, PathPoint, PictureFrame, PictureSettings,
+    Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
 pub use object_edit::{
     Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, new_origin, reframed,
@@ -136,7 +136,7 @@ pub use object_style::{
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use picture::{Picture, PictureFormat};
-pub use pixel_outline::pixel_outline;
+pub use pixel_outline::{pixel_outline, pixel_outlines};
 pub use presentation::{SLIDE_SIZE, Slide, Topics};
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 pub use shape_path::PathSegment;

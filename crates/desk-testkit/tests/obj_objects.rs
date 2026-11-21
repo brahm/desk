@@ -247,6 +247,35 @@ fn obj_17_the_outline_of_a_picture_is_made_straight_as_in_pages() {
 }
 
 #[test]
+fn obj_17_text_runs_between_the_parts_apart_of_a_picture_as_in_pages() {
+    // Two opaque discs apart on a transparent ground, wrapped tightly on
+    // both sides: Pages 15.4 runs the text between them (B-047). The
+    // first page, a picture with Instant Alpha, has a line where a word
+    // fits by less than a point in Desk and not in Pages, and is not
+    // compared.
+    let fixtures = fixtures();
+    let name = "wrap-alpha-parts";
+    let document = desk_filters::read_pages_at(&fixtures.join(format!("{name}.pages"))).unwrap();
+    let layout = desk_layout::paginate(&document, &mut desk_text::TextSystem::new());
+    let pages = DisplayList::pages(&layout);
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.pdf"));
+    desk_render::Painter::new()
+        .unwrap()
+        .write_pdf(&pages, document.metadata(), &out)
+        .unwrap();
+    let reference = words(&fixtures.join(format!("{name}.pdf"))).unwrap();
+    let desk = words(&out).unwrap();
+    assert_eq!(desk.len(), 2, "pages");
+    let diff = compare_words(&reference[1..], &desk[1..]);
+    assert!(
+        diff.passes(DEFAULT_POSITION_TOLERANCE),
+        "{diff:?}\nPages: {:?}\nDesk: {:?}",
+        reference[1],
+        desk[1]
+    );
+}
+
+#[test]
 fn int_03_obj_15_obj_16_obj_17_obj_37_est_05_a_newsletter_in_page_layout_matches_pages() {
     // Two pages of Page Layout, the reference of phase 6: a title over a
     // rectangle, a rule, an article in two linked boxes around a picture

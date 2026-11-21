@@ -1394,6 +1394,13 @@ fn import_one(
             .as_ref()
             .map(|c| Arc::from(c.as_slice()))
             .or_else(|| built.shape_contour());
+        if object.contour.is_some() {
+            built.contour_parts = object
+                .contour_parts
+                .iter()
+                .map(|p| Arc::from(p.as_slice()))
+                .collect();
+        }
     }
     built.locked = g.protect.as_deref().is_some_and(|p| p.contains("position"));
     built.origin = object
@@ -2209,6 +2216,7 @@ impl Exporter<'_> {
         out.origin = object.origin.map(|o| format!("{o:016x}"));
         if !matches!(object.kind, ObjectKind::Shape(_)) {
             out.contour = object.contour.as_deref().map(<[_]>::to_vec);
+            out.contour_parts = object.contour_parts.iter().map(|p| p.to_vec()).collect();
         }
         if linked {
             // Named, for the boxes linked to it to name it.
