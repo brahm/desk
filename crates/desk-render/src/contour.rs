@@ -21,7 +21,7 @@ pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
     };
     let source = crate::picture_surface(picture)?;
     let settings = &object.picture;
-    let surface = if settings.alpha.is_empty() && settings.alpha_kept.is_none() {
+    let mut surface = if settings.alpha.is_empty() && settings.alpha_kept.is_none() {
         source
     } else {
         crate::adjusted_surface(
@@ -32,7 +32,6 @@ pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
         )
         .ok()?
     };
-    let spans = opaque_spans(surface, object.wrap_threshold)?;
     let (fw, fh) = (object.frame.width.to_pt(), object.frame.height.to_pt());
     if fw <= 0.0 || fh <= 0.0 {
         return None;
@@ -56,21 +55,60 @@ pub fn object_contour(object: &Object) -> Option<Arc<[(i32, i32)]>> {
             y.round().clamp(0.0, scale) as i32,
         )
     };
-    // Down the right edges of the bands, then up their left edges.
-    let mut points: Vec<(i32, i32)> = Vec::with_capacity(spans.len() * 4);
-    for &(top, bottom, _, right) in &spans {
-        points.push(place(right, top));
-        points.push(place(right, bottom));
-    }
-    for &(top, bottom, left, _) in spans.iter().rev() {
-        points.push(place(left, bottom));
-        points.push(place(left, top));
-    }
+    // The outline of the opaque pixels as Pages traces it, or, for a
+    // picture of opaque parts apart, the bands of the opaque pixels:
+    // down the right edges of the bands, then up their left edges.
+    let mut points: Vec<(i32, i32)> = match traced_outline(&mut surface, object.wrap_threshold) {
+        Some(outline) => outline.into_iter().map(|(x, y)| place(x, y)).collect(),
+        None => {
+            let spans = opaque_spans(surface, object.wrap_threshold)?;
+            let mut points = Vec::with_capacity(spans.len() * 4);
+            for &(top, bottom, _, right) in &spans {
+                points.push(place(right, top));
+                points.push(place(right, bottom));
+            }
+            for &(top, bottom, left, _) in spans.iter().rev() {
+                points.push(place(left, bottom));
+                points.push(place(left, top));
+            }
+            points
+        }
+    };
     points.dedup();
     if points.len() > 1 && points.first() == points.last() {
         points.pop();
     }
     (points.len() >= 3).then(|| points.into())
+}
+
+/// The least alpha of a pixel more opaque than `threshold` percent: 50%
+/// counts the pixels from 128 up, as Pages does.
+fn least_alpha(threshold: u8) -> u16 {
+    (f64::from(threshold.min(100)) * 255.0 / 100.0).floor() as u16 + 1
+}
+
+/// The outline of the opaque part of a picture, as Pages 15.4 traces it,
+/// in parts of the picture. None when the picture has nothing opaque, or
+/// opaque parts apart.
+fn traced_outline(surface: &mut cairo::ImageSurface, threshold: u8) -> Option<Vec<(f64, f64)>> {
+    surface.flush();
+    let (w, h) = (surface.width() as usize, surface.height() as usize);
+    if w == 0 || h == 0 {
+        return None;
+    }
+    let stride = surface.stride() as usize;
+    let format = surface.format();
+    let least = least_alpha(threshold);
+    let data = surface.data().ok()?;
+    let outline = desk_model::pixel_outline(w, h, |x, y| {
+        format != cairo::Format::ARgb32 || u16::from(data[y * stride + x * 4 + 3]) >= least
+    })?;
+    Some(
+        outline
+            .into_iter()
+            .map(|(x, y)| (f64::from(x) / w as f64, f64::from(y) / h as f64))
+            .collect(),
+    )
 }
 
 /// The bands of a picture that have opaque pixels, from top to bottom: the
@@ -81,8 +119,7 @@ fn opaque_spans(
     mut surface: cairo::ImageSurface,
     threshold: u8,
 ) -> Option<Vec<(f64, f64, f64, f64)>> {
-    // 50% counts the pixels from 128 up, as Pages does.
-    let least = (f64::from(threshold.min(100)) * 255.0 / 100.0).floor() as u16 + 1;
+    let least = least_alpha(threshold);
     surface.flush();
     let (w, h) = (surface.width() as usize, surface.height() as usize);
     if w == 0 || h == 0 {
@@ -156,14 +193,14 @@ mod tests {
         let contour = object_contour(&object).unwrap();
         assert_eq!(
             &*contour,
-            &[(10_000, 0), (10_000, 10_000), (5_000, 10_000), (5_000, 0)]
+            &[(5_000, 0), (10_000, 0), (10_000, 10_000), (5_000, 10_000)]
         );
         // Masked to its right half, the opaque part fills the frame.
         object.picture.mask = Some(Frame::from_pt(-40.0, 0.0, 80.0, 40.0));
         let contour = object_contour(&object).unwrap();
         assert_eq!(
             &*contour,
-            &[(10_000, 0), (10_000, 10_000), (0, 10_000), (0, 0)]
+            &[(0, 0), (10_000, 0), (10_000, 10_000), (0, 10_000)]
         );
         // Nothing opaque in the frame: no contour.
         object.picture.mask = Some(Frame::from_pt(0.0, 0.0, 80.0, 40.0));

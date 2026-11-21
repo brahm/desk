@@ -306,7 +306,15 @@ impl NotePlan {
                 key
             })
             .collect();
-        let mut room = room.with_keys(keys);
+        let toc = sources
+            .iter()
+            .map(|source| {
+                source
+                    .as_ref()
+                    .is_ok_and(|&p| room.toc.get(p).copied().unwrap_or(false))
+            })
+            .collect();
+        let mut room = room.with_keys(keys, toc);
         // The objects move with the paragraphs of the body where they are
         // in the flow.
         let flow_index: HashMap<usize, usize> = sources

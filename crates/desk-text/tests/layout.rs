@@ -215,12 +215,13 @@ fn fmt_06_superscript_is_smaller_and_raised() {
     let runs = &layout.lines[0].runs;
     assert_eq!(runs.len(), 4);
     assert_eq!(runs[1].size, 12.0 * SCRIPT_SCALE);
-    // As in Pages: the top of a superscript meets the top of the text and
-    // the bottom of a subscript its bottom. Liberation Sans rises 0.905 em
-    // and falls 0.212 em, and 4 pt are lost to the smaller size.
+    // As in Pages 15.4: the top of the capitals of a superscript meets the
+    // top of the capitals of the text (B-022), and the bottom of a
+    // subscript its bottom. The capitals of Liberation Sans are 0.688 em
+    // tall, it falls 0.212 em, and 4 pt are lost to the smaller size.
     let raise = runs[0].baseline - runs[1].baseline;
     let drop = runs[3].baseline - runs[2].baseline;
-    assert!((raise - 0.905 * 4.0).abs() < 0.01, "{raise}");
+    assert!((raise - 0.688 * 4.0).abs() < 0.01, "{raise}");
     assert!((drop - 0.212 * 4.0).abs() < 0.01, "{drop}");
 }
 
@@ -659,6 +660,39 @@ fn lines_flow_around_an_object() {
         .find(|p| p[0].x == 0.0 && p[1].x == 150.0)
         .unwrap();
     assert_eq!(pair[0].top, pair[1].top);
+    assert_eq!(layout.lines.last().unwrap().range.end, TEXT.len());
+}
+
+/// A column with a narrow piece on the left of an object near its top.
+struct Narrow;
+
+impl LineSpace for Narrow {
+    fn width(&self) -> f32 {
+        200.0
+    }
+
+    fn segments(&self, top: f32, height: f32) -> Vec<(f32, f32)> {
+        if top < 45.0 && top + height > 15.0 {
+            vec![(0.0, 12.0), (100.0, 100.0)]
+        } else {
+            vec![(0.0, 200.0)]
+        }
+    }
+}
+
+#[test]
+fn obj_17_a_piece_too_narrow_for_the_next_word_stays_empty() {
+    // Pages puts nothing in a piece beside an object that the next word
+    // does not fit, and goes on in the piece after it.
+    let mut system = TextSystem::new();
+    let layout = lay_in(
+        &mut system,
+        ParaFormat::default(),
+        &[(TEXT, sans())],
+        &Narrow,
+    );
+    assert!(layout.lines.iter().any(|l| l.x == 100.0));
+    assert!(layout.lines.iter().all(|l| l.x != 0.0 || l.width > 12.0));
     assert_eq!(layout.lines.last().unwrap().range.end, TEXT.len());
 }
 

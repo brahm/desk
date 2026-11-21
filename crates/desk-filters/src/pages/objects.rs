@@ -358,12 +358,64 @@ fn traced_outline(
         ObjectKind::Shape(outline),
         whole,
     );
-    let points = outline.shape_contour()?;
+    placed_outline(outline.shape_contour()?, whole, shown)
+}
+
+/// The contour of a PNG picture as Pages 15.4 traces it from its pixels
+/// more opaque than `threshold` percent, in parts of its frame `shown`,
+/// the picture filling `whole` (OBJ-17). Pages 15.4 traces the picture
+/// again rather than take the outline that Pages '09 saved. None for a
+/// picture of another format, or of opaque parts apart.
+fn pixel_contour(
+    picture: &desk_model::Picture,
+    threshold: u8,
+    whole: Frame,
+    shown: Frame,
+) -> Option<Arc<[(i32, i32)]>> {
+    if picture.format() != desk_model::PictureFormat::Png {
+        return None;
+    }
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(picture.data()));
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder.read_info().ok()?;
+    let mut pixels = vec![0; reader.output_buffer_size()?];
+    let info = reader.next_frame(&mut pixels).ok()?;
+    let (w, h) = (info.width as usize, info.height as usize);
+    let (bytes, alpha) = match info.color_type {
+        png::ColorType::Rgba => (4, Some(3)),
+        png::ColorType::GrayscaleAlpha => (2, Some(1)),
+        png::ColorType::Rgb => (3, None),
+        _ => (1, None),
+    };
+    // 50% counts the pixels from 128 up, as Pages does.
+    let least = (f64::from(threshold.min(100)) * 255.0 / 100.0).floor() as u16 + 1;
+    let outline = desk_model::pixel_outline(w, h, |x, y| {
+        alpha.is_none_or(|a| u16::from(pixels[y * info.line_size + x * bytes + a]) >= least)
+    })?;
+    let scale = f64::from(POLYGON_SCALE);
+    let points: Vec<(i32, i32)> = outline
+        .into_iter()
+        .map(|(x, y)| {
+            (
+                (f64::from(x) / w as f64 * scale).round() as i32,
+                (f64::from(y) / h as f64 * scale).round() as i32,
+            )
+        })
+        .collect();
+    placed_outline(points.into(), whole, shown)
+}
+
+/// A contour in parts of the frame `whole` of a picture, in parts of its
+/// frame `shown` instead: a mask shows a part of the picture, and the
+/// contour is kept inside it.
+fn placed_outline(
+    points: Arc<[(i32, i32)]>,
+    whole: Frame,
+    shown: Frame,
+) -> Option<Arc<[(i32, i32)]>> {
     if whole == shown {
         return Some(points);
     }
-    // A mask shows a part of the picture: the contour is placed in it,
-    // and kept inside it.
     let (sw, sh) = (shown.width.to_pt(), shown.height.to_pt());
     if sw <= 0.0 || sh <= 0.0 {
         return None;
@@ -502,6 +554,7 @@ impl Builder<'_, '_> {
         let mut text = Vec::new();
         let mut swap_ends = false;
         let mut traced_contour = None;
+        let mut picture_frames = None;
         let kind = match &drawable.kind {
             DrawableKind::Shape {
                 path,
@@ -591,6 +644,7 @@ impl Builder<'_, '_> {
                 traced_contour = traced
                     .as_deref()
                     .and_then(|t| traced_outline(t, geometry.natural, whole, frame));
+                picture_frames = Some((whole, frame));
                 ObjectKind::Image(picture)
             }
             DrawableKind::Media {
@@ -646,8 +700,18 @@ impl Builder<'_, '_> {
         {
             // Around the outline of a shape, or the opaque part of a
             // picture (OBJ-17).
+            // A picture without Instant Alpha is traced from its pixels,
+            // as Pages 15.4 does; the outline that Pages '09 saved is kept
+            // for the others.
             object.contour = match &object.kind {
-                ObjectKind::Image(_) => traced_contour,
+                ObjectKind::Image(picture) => picture_frames
+                    .filter(|_| {
+                        picture_settings.alpha.is_empty() && picture_settings.alpha_kept.is_none()
+                    })
+                    .and_then(|(whole, shown)| {
+                        pixel_contour(picture, object.wrap_threshold, whole, shown)
+                    })
+                    .or(traced_contour),
                 _ => object.shape_contour(),
             };
         }

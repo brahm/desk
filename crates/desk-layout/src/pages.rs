@@ -465,6 +465,9 @@ pub(crate) struct MarginRoom {
     heights: HashMap<(Option<desk_model::NodeId>, usize), f32>,
     /// The floating objects, with the texts they move with.
     pub floats: std::sync::Arc<Vec<Floating>>,
+    /// For each text laid out, whether it is an entry of a table of
+    /// contents (B-022).
+    pub toc: Vec<bool>,
 }
 
 impl MarginRoom {
@@ -482,6 +485,11 @@ impl MarginRoom {
             }
             keys.push(current);
         }
+        let toc = document
+            .body()
+            .iter()
+            .map(|p| p.attrs().toc_entry.flatten().is_some())
+            .collect();
         let mut heights = HashMap::new();
         let width = setup.body_width().to_pt() as f32;
         for (key, margins) in document.all_headers_footers() {
@@ -517,17 +525,19 @@ impl MarginRoom {
             keys,
             heights,
             floats: crate::objects::floating(document),
+            toc,
         }
     }
 
     /// The same room, for texts that show the headers and footers of the
     /// sections of these keys.
-    pub fn with_keys(&self, keys: Vec<Option<desk_model::NodeId>>) -> Self {
+    pub fn with_keys(&self, keys: Vec<Option<desk_model::NodeId>>, toc: Vec<bool>) -> Self {
         Self {
             setup: self.setup,
             keys,
             heights: self.heights.clone(),
             floats: self.floats.clone(),
+            toc,
         }
     }
 
@@ -611,6 +621,11 @@ fn margin_block(
     }
     (lines, y)
 }
+
+/// The space that Pages 15.4 puts above and below a table of contents,
+/// in points: measured as 1.02 to 1.27 in its PDFs, not yet checked on
+/// the Mac (B-022).
+const TOC_PADDING: f32 = 1.0;
 
 /// A paragraph laid out at the top of an endless column of one width.
 struct Block {
@@ -1016,6 +1031,12 @@ struct Paginator<'a> {
 }
 
 impl Paginator<'_> {
+    /// Whether text `i` is an entry of a table of contents.
+    fn is_toc(&self, i: usize) -> bool {
+        self.room
+            .is_some_and(|r| r.toc.get(i).copied().unwrap_or(false))
+    }
+
     fn top(&self) -> f32 {
         self.setup.margin_top.to_pt() as f32
     }
@@ -1437,6 +1458,8 @@ impl Paginator<'_> {
         let sum = self.sum;
         let footnotes = self.footnotes.clone();
         let mut start = (cursor.page, cursor.column);
+        let toc_edge = self.is_toc(i) && (i == 0 || !self.is_toc(i - 1));
+        let toc_end = self.is_toc(i) && !self.is_toc(i + 1);
         let mut a = 0;
         // The parts of the paragraph so far, around the objects of their
         // pages, and the lines as last laid out.
@@ -1471,6 +1494,13 @@ impl Paginator<'_> {
             let before = format.space_before.to_pt() as f32;
             let collapsed = if a > 0 || at_top {
                 0.0
+            } else if toc_edge {
+                // Pages 15.4 sets a table of contents off by a point,
+                // with no space before its first entry, after its last
+                // one or before the paragraph after it (B-022).
+                cursor.after + TOC_PADDING
+            } else if i > 0 && self.is_toc(i - 1) && !self.is_toc(i) {
+                cursor.after
             } else if sum {
                 cursor.after + before
             } else {
@@ -1671,6 +1701,8 @@ impl Paginator<'_> {
             a += k;
             if a < n {
                 *cursor = self.next_column(*cursor);
+            } else if toc_end {
+                cursor.after = TOC_PADDING;
             } else {
                 cursor.after = space_after;
             }
