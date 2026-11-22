@@ -616,7 +616,9 @@ impl TextSystem {
         let mut label_alone = false;
         let mut hidden_stop = None;
         let label = text.label().cloned().map(|label| {
-            let label_format = text.formats()[label.format as usize].clone();
+            let mut label_format = text.formats()[label.format as usize].clone();
+            // Pages spaces no letters of a label apart (step 19o of W1).
+            label_format.tracking = 0;
             let label_text = ParagraphText::from_runs(
                 desk_model::ParaFormat::default(),
                 label_format.clone(),
@@ -694,8 +696,22 @@ impl TextSystem {
                     };
                     let d = (s - millipoints(x)) as f32;
                     let q = d / millipoints(label.text_size).max(0.001) as f32;
+                    // The end of the label is its position as a float plus
+                    // its width at its own size, kerned inside but not
+                    // with the tab; the edge is the column less the right
+                    // indent as a float (step 19o of W1, 2,164 items
+                    // exact).
+                    let label_end = f64::from(millipoints(x) as f32) + f64::from(width);
                     let x1 = (millipoints(x) + f64::from(q) * millipoints(label.mark_size))
-                        .max(f64::from(x + width));
+                        .max(label_end);
+                    // Each margin of the page counts as a float where
+                    // that rounds it up, exactly otherwise (6,530 items).
+                    let (left_margin, right_margin) = text.page_margins();
+                    let up = |m: f64| (f64::from(m as f32) - m).max(0.0);
+                    let edge = millipoints(space.width())
+                        - up(left_margin)
+                        - up(right_margin)
+                        - f64::from(format.right_indent.to_pt().max(0.0) as f32);
                     let first = x1 as f32;
                     // Near the right edge (step 19m of W1, 5,325 items
                     // exact): the other lines start 18 points before it at
@@ -705,7 +721,7 @@ impl TextSystem {
                     // it at most, its stop measured from where it would be.
                     let rest = ((stop - x).max(x + label.text_indent) + (k - 1.0) * (stop - x))
                         .min(right - 18.0);
-                    let first = if x1 <= millipoints(right) - 10.0 {
+                    let first = if x1 <= edge - 10.0 {
                         first
                     } else {
                         label_alone = true;
@@ -878,9 +894,11 @@ impl TextSystem {
         } else {
             let column = space.width();
             if text.label().is_none() {
+                // Whatever the right indent, which gives way instead
+                // (step 19o of W1, 869 lines exact).
                 let left = format.left_indent.to_pt() as f32;
                 let first = left + format.first_line_indent.to_pt() as f32;
-                let left = left.min(right - 18.0);
+                let left = left.min(column - 18.0);
                 format.left_indent = desk_model::Length::from_pt(f64::from(left));
                 format.first_line_indent =
                     desk_model::Length::from_pt(f64::from(first.min(column - 18.0) - left));
@@ -934,6 +952,17 @@ impl TextSystem {
         let right = format.right_indent.to_pt() as f32;
         let column = space.width();
         let min_piece = space.min_piece();
+        // In print, the right indent of a paragraph outside a list gives
+        // way to leave each line 18 points, up to the edge of the column
+        // (step 19o of W1).
+        let gives_way = !screen_view && text.label().is_none();
+        let edge = |indent: f32| {
+            if gives_way {
+                (column - right).max(indent + 18.0).min(column)
+            } else {
+                column - right
+            }
+        };
 
         let mut placed: Vec<Placed> = Vec::new();
         let mut breaker = layout.break_lines();
@@ -954,7 +983,7 @@ impl TextSystem {
                 .into_iter()
                 .filter_map(|(x, w)| {
                     let x0 = x.max(indent);
-                    let x1 = (x + w).min(column - right);
+                    let x1 = (x + w).min(edge(indent));
                     (x1 - x0 >= min_piece).then_some((x0, x1 - x0))
                 })
                 .collect();
@@ -968,7 +997,7 @@ impl TextSystem {
                 }
                 // Nothing fits for a long way down, as when the indents are
                 // wider than the column: overflow rather than loop forever.
-                segments.push((indent, (column - right - indent).max(MIN_SEGMENT_WIDTH)));
+                segments.push((indent, (edge(indent) - indent).max(MIN_SEGMENT_WIDTH)));
             }
             searched_from = y;
             let saved: BreakerState = breaker.state().clone();
@@ -1012,7 +1041,7 @@ impl TextSystem {
                 // around it, as in a triangle or beside an object, goes
                 // lower, where the line may be wider, as in Pages '09 and
                 // 15.4 (B-046); a piece after text of the line stays empty.
-                let measure = column - right - indent;
+                let measure = edge(indent) - indent;
                 if end.is_none()
                     && next_break < breaks.len()
                     && width + 0.001 < measure

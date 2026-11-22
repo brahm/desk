@@ -120,11 +120,16 @@ fn lst_an_item_whose_stop_is_near_the_edge_has_its_label_alone() {
 /// A document of one list item with the text `text`, its label `label`
 /// points in and its text `indent` after it, and the tab stops `stops`.
 fn list_item(text: &str, label: f32, indent: f32, stops: &[f32]) -> Editor {
+    list_item_with("- ", text, label, indent, stops)
+}
+
+/// The same, with the marker typed before the text.
+fn list_item_with(marker: &str, text: &str, label: f32, indent: f32, stops: &[f32]) -> Editor {
     let mut editor = Editor::new(Document::new_word_processing());
     let start = editor.document().start();
     editor
         .edit("Typing", |edit| {
-            edit.insert_text(start, &format!("- {text}"))
+            edit.insert_text(start, &format!("{marker}{text}"))
         })
         .unwrap();
     let first = editor.document().body().get(0).unwrap().id();
@@ -224,4 +229,59 @@ fn pxv_01_screen_view_tabs_go_to_the_next_36_points() {
     let text = line.runs.last().unwrap();
     let two = text.glyphs[text.glyphs.len() - 3].x;
     assert!((two - 36.0).abs() < 0.01, "{two}");
+}
+
+#[test]
+fn lst_the_end_of_a_wide_label_decides_too() {
+    // The text 7 points after a label "1." 10.008 points wide starts at
+    // the end of the label, which keeps its text while it ends 10 points
+    // or more before the edge (step 19o of W1).
+    let width = column(&Document::new_word_processing());
+    for (room, alone) in [(20.018, false), (19.998, true)] {
+        let editor = list_item_with("1. ", "one", width - room, 7.0, &[]);
+        let mut system = TextSystem::new();
+        let print = paginate(editor.document(), &mut system);
+        let line = &print.pages[0].lines[0].line;
+        let (label, text) = (&line.runs[0], &line.runs[1]);
+        assert!((label.advance - 10.008).abs() < 0.001, "{}", label.advance);
+        assert_eq!(text.baseline > label.baseline + 1.0, alone, "{room}");
+    }
+}
+
+#[test]
+fn lst_a_margin_that_rounds_up_as_a_float_breaks_the_tie() {
+    // The same tie 10 points before the edge, on a page whose left margin
+    // is 72.1 points, which a float rounds down, or 72.3, which it rounds
+    // up: only the second takes the text off the line (step 19o of W1).
+    for (margin, alone) in [(72.1, false), (72.3, true)] {
+        let mut editor = list_item("one", 0.0, 60.0, &[]);
+        let mut page = *editor.document().page_setup();
+        page.margin_left = Length::from_pt(margin);
+        let width = (page.width - page.margin_left - page.margin_right).to_pt() as f32;
+        editor
+            .edit("Margins", |edit| {
+                edit.set_page_setup(page)?;
+                let style = edit
+                    .document()
+                    .body()
+                    .get(0)
+                    .unwrap()
+                    .attrs()
+                    .list_style
+                    .flatten()
+                    .unwrap();
+                let list = edit.document().styles().list(style).unwrap();
+                let level = ListLevel {
+                    label_indent: Length::from_pt(f64::from(width) - 70.0),
+                    ..list.level(0).clone()
+                };
+                edit.set_list_level(style, 0, level)
+            })
+            .unwrap();
+        let mut system = TextSystem::new();
+        let print = paginate(editor.document(), &mut system);
+        let line = &print.pages[0].lines[0].line;
+        let (label, text) = (&line.runs[0], &line.runs[1]);
+        assert_eq!(text.baseline > label.baseline + 1.0, alone, "{margin}");
+    }
 }

@@ -198,6 +198,9 @@ pub struct ParagraphText {
     /// How Screen View shows the paragraph, while the styles resolve
     /// formatting as it does (PXV-01).
     screen: Option<Screen>,
+    /// The left and right margins of the page, in points, which decide
+    /// a tie near the right edge of the text (step 19o of W1).
+    page_margins: (f64, f64),
 }
 
 /// What lays out a paragraph as Screen View of Pages 15.4 shows it.
@@ -288,6 +291,17 @@ impl ParagraphText {
     /// formatting as it does.
     pub fn screen(&self) -> Option<&Screen> {
         self.screen.as_ref()
+    }
+
+    /// Sets the left and right margins of the page the paragraph is on,
+    /// in points.
+    pub fn set_page_margins(&mut self, left: f64, right: f64) {
+        self.page_margins = (left, right);
+    }
+
+    /// The left and right margins of the page, in points.
+    pub fn page_margins(&self) -> (f64, f64) {
+        self.page_margins
     }
 
     /// Prepares a paragraph of a document that is an item of a list, as
@@ -457,6 +471,7 @@ impl ParagraphText {
             label: None,
             objects: Vec::new(),
             screen: None,
+            page_margins: (0.0, 0.0),
         };
         let mut model_offset = 0;
         let mut transformed = false;
@@ -675,6 +690,7 @@ impl ParagraphText {
             label: None,
             objects: self.objects.clone(),
             screen: self.screen.clone(),
+            page_margins: self.page_margins,
         }
     }
 

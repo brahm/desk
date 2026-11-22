@@ -775,7 +775,10 @@ fn obj_17_a_line_shorter_than_its_text_takes_only_its_own_height_from_an_object(
 }
 
 #[test]
-fn indents_wider_than_the_column_overflow_instead_of_hanging() {
+fn indents_wider_than_the_column_leave_each_line_18_points() {
+    // The right indent gives way, as in Pages 15.4: the line from the
+    // left indent at 150 is 18 points wide, and a word wider than that
+    // breaks inside (step 19o of W1).
     let mut system = TextSystem::new();
     let squeezed = ParaFormat {
         left_indent: Length::from_points(150),
@@ -783,7 +786,14 @@ fn indents_wider_than_the_column_overflow_instead_of_hanging() {
         ..ParaFormat::default()
     };
     let layout = plain(&mut system, squeezed, "word");
-    assert_eq!(layout.lines.len(), 1);
+    let line = &layout.lines[0];
+    assert!(
+        (line.x - 150.0).abs() < 0.01 && (line.width - 18.0).abs() < 0.01,
+        "{} {}",
+        line.x,
+        line.width
+    );
+    assert!(layout.lines.len() > 1);
 }
 
 #[test]

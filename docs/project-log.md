@@ -1627,6 +1627,27 @@ paragraph, and objects on a second page.
   shifts; no rule covers it. Seen outside the brief and not settled:
   where Pages drops a very large left indent from Word, and a tie on
   the end of the label rather than the stop.
+- The owner asked for those too (step 19o, 175 documents and 227 PDFs,
+  then 88 more). The shift of Times New Roman at 36 points in 19j never
+  happened: the parser of that round lost the lines of Times under
+  160 % and skipped them in silence, and the captures that survive are
+  the same, pixel for pixel, as those of 19n. A tie on the end of the
+  label is decided like the other: the label ends at its position as a
+  float plus its width at its own size, kerned inside but not with the
+  tab and without the letter spacing of Word, which Pages does not
+  draw; the edge is the width of the column less each margin of the
+  page where a float rounds it up and the right indent as a float
+  (6,530 items, 5,360 of them exact ties, none off). The Indents of
+  the inspector keep First, where the first line starts, and Left
+  between 0 and the column less Right less 18 points, and Right up to
+  the column less the larger of the two less 18; setting one leaves
+  the others alone (49 values). When the indents no longer fit, the
+  first line and the others start 18 points before the edge at most,
+  and the right indent gives way, line by line, to leave each line 18
+  points (869 lines). Desk does all of this. A Word file keeps each
+  indent in 16 signed bits of twips when Pages opens it, so one past
+  32,767 twips (1,638.35 points) turns negative; Desk opens Word files
+  in W5, which is where this belongs.
 
 ## Decisions, with their reasons and consequences
 
