@@ -1680,6 +1680,27 @@ paragraph, and objects on a second page.
   review, over T1 and S1, so that Writer goes on toward a usable app;
   the review highlight (W059) waits there.
 
+### 22 November: phase W2 starts, with its plan
+
+- The first pull request of W2, Writer review, is the plan the roadmap
+  asks for when a phase starts, [docs/phases/W2.md](phases/W2.md): its 9
+  rows (the 8 of the roadmap and the review highlight, W059, from W1) and
+  2 backlog items (B-039, B-045), the parity rows that test each one,
+  what is missing, what has to be seen on the Mac, the ODF each needs,
+  and the order of 17 small pull requests.
+- *What reading the rows showed:* comments, replies and tracked changes
+  do not exist in the text of Writer yet; a table cell has a comment of
+  plain text, the Comment button has no action, the Author preference is
+  not built, and an ODT opened loses its comments and keeps its changes
+  as accepted. Five rows of writing tools are done and only need the
+  check of the new window (W151 to W155). The parity rows `REV-01` to
+  `REV-08` were written for Pages '09 and are rewritten for 15.4 after
+  the session on the Mac.
+- *How the Mac is used:* one session at the start, announced to the
+  owner first, to see comments, highlights, tracking and authors in
+  Pages 15.4, with what Pages '09 tracked on its virtual machine, and
+  one at the end.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
