@@ -12,7 +12,7 @@ use std::ops::Range;
 
 use desk_model::{
     Capitalization, CharFormat, Length, Ligatures, LineStyle, ListItem, ListLabel, ParaFormat,
-    Paragraph, Picture, Styles, TextSettings,
+    Paragraph, Picture, Styles, TabStops, TextSettings,
 };
 
 use crate::fonts::pages_font;
@@ -96,6 +96,12 @@ pub struct Label {
     /// first, when it is `text_indent` whatever the width of the label,
     /// as in Screen View.
     pub continuation: Option<f32>,
+    /// The size of the text of the item, at which the width of a digit in
+    /// the font of the label decides whether its text goes to a tab stop
+    /// (step 19k of W1).
+    pub text_size: f32,
+    /// In Screen View, the label as it prints.
+    pub printed: Option<PrintedLabel>,
     /// The picture of an image bullet and its height, in points, drawn
     /// instead of the text (LST-03).
     pub image: Option<(Picture, f32)>,
@@ -197,6 +203,29 @@ pub struct Screen {
     /// font and size space the paragraph from its neighbours (step 19i of
     /// W1).
     pub style: CharFormat,
+    /// The paragraph formatting as it prints, and the size of its first
+    /// text as it prints, which decide whether the label of a list item
+    /// moves (step 19k of W1).
+    pub printed: ParaFormat,
+    /// The size of the first text of the paragraph as it prints.
+    pub size: f32,
+}
+
+/// A list label as it prints, for Screen View, which moves the label of
+/// an item whose text is pushed to a tab stop in print (step 19k of W1).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrintedLabel {
+    /// The distance from the edge of the text to the label.
+    pub position: f32,
+    /// The distance from the label to the text.
+    pub text_indent: f32,
+    /// The size of the text, at which a digit measures the room the label
+    /// needs.
+    pub size: f32,
+    /// The tab stops and the distance between the default ones.
+    pub tab_stops: TabStops,
+    /// The distance between the default tab stops.
+    pub default_tab_interval: f32,
 }
 
 impl ParagraphText {
@@ -227,9 +256,24 @@ impl ParagraphText {
             (run.text(), format)
         });
         let mut text = Self::from_runs_in(settings, values, format, base, runs);
-        text.screen = styles.screen().map(|zoom| Screen {
-            zoom: zoom as f32,
-            style: styles.printed_character(paragraph.style()),
+        text.screen = styles.screen().map(|zoom| {
+            let mut printed = styles.clone();
+            printed.set_screen(None);
+            let size = paragraph
+                .runs()
+                .next()
+                .map(|run| printed.resolve_character(paragraph.style(), run.style, &run.attrs))
+                .unwrap_or_else(|| {
+                    printed.resolve_character(paragraph.style(), None, &Default::default())
+                })
+                .font_size
+                .to_pt() as f32;
+            Screen {
+                zoom: zoom as f32,
+                style: styles.printed_character(paragraph.style()),
+                printed: printed.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+                size,
+            }
         });
         text
     }
@@ -326,6 +370,13 @@ impl ParagraphText {
                 None,
             ),
         };
+        let printed = self.screen.as_ref().map(|screen| PrintedLabel {
+            position: (screen.printed.left_indent + level.label_indent).to_pt() as f32,
+            text_indent: level.text_indent.to_pt() as f32,
+            size: screen.size,
+            tab_stops: screen.printed.tab_stops.clone(),
+            default_tab_interval: screen.printed.default_tab_interval.to_pt() as f32,
+        });
         self.label = Some(Label {
             image,
             text: item.label.clone(),
@@ -334,6 +385,8 @@ impl ParagraphText {
             text_indent,
             raise: level.raise.to_pt() as f32,
             continuation,
+            text_size,
+            printed,
         });
         self
     }

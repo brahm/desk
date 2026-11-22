@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use desk_model::{
     Alignment, Baseline, CharFormat, LINE_BREAK, Ligatures, LineSpacing, LineStyle, Rgba, Shadow,
+    TabStops,
 };
 use icu_segmenter::LineSegmenter;
 use icu_segmenter::options::LineBreakOptions;
@@ -236,6 +237,8 @@ pub struct TextSystem {
     /// The metrics of each font, by family, weight and slant, at a size of
     /// one point, for Screen View (PXV-01).
     unit_metrics: HashMap<(Arc<str>, u16, bool), parley::FontMetrics>,
+    /// The width of the digit 2 of each font, in ems.
+    digit_widths: HashMap<(Arc<str>, u16, bool), f32>,
 }
 
 impl Default for TextSystem {
@@ -315,6 +318,7 @@ impl TextSystem {
             layouts: LayoutContext::new(),
             choices: HashMap::new(),
             unit_metrics: HashMap::new(),
+            digit_widths: HashMap::new(),
         };
         for data in crate::fonts::BUNDLED {
             system.add_fonts(data.to_vec());
@@ -481,6 +485,34 @@ impl TextSystem {
             desk_model::Length::from_pt(f64::from(steps(format.space_after) * step));
     }
 
+    /// The width of the digit 2 in the font of a format, at its size: the
+    /// room a list label needs before its text (step 19k of W1).
+    fn digit_width(&mut self, format: &CharFormat) -> f32 {
+        let key = (
+            format.font_family.clone(),
+            format.weight.value(),
+            format.italic,
+        );
+        let size = format.font_size.to_pt() as f32;
+        if let Some(em) = self.digit_widths.get(&key) {
+            return em * size;
+        }
+        let mut sized = format.clone();
+        sized.font_size = desk_model::Length::from_pt(100.0);
+        let probe = ParagraphText::from_runs(
+            desk_model::ParaFormat::default(),
+            sized.clone(),
+            [("2", sized)],
+        );
+        let em = self
+            .layout(&probe, &crate::space::Column::new(LABEL_ROOM), 0.0)
+            .lines
+            .first()
+            .map_or(0.0, |line| line.advance / 100.0);
+        self.digit_widths.insert(key, em);
+        em * size
+    }
+
     /// The metrics of the font of a format at a size of one point.
     fn unit_metrics(&mut self, format: &CharFormat) -> Option<parley::FontMetrics> {
         let key = (
@@ -535,21 +567,65 @@ impl TextSystem {
         let mut format = text.paragraph().clone();
         // The label of a list item, laid out on its own: the text of the
         // item starts after it, on every line (LST-02).
-        let label = text.label().map(|label| {
+        let label = text.label().cloned().map(|label| {
             let label_format = text.formats()[label.format as usize].clone();
             let label_text = ParagraphText::from_runs(
                 desk_model::ParaFormat::default(),
                 label_format.clone(),
-                [(label.text.as_str(), label_format)],
+                [(label.text.as_str(), label_format.clone())],
             );
             let laid = self.layout(&label_text, &crate::space::Column::new(LABEL_ROOM), 0.0);
             let width = match &label.image {
                 Some((picture, height)) => *height * picture.aspect() as f32,
                 None => laid.lines.first().map_or(0.0, |l| l.advance),
             };
-            let x = format.left_indent.to_pt() as f32 + label.indent;
-            let first = label.text_indent.max(width);
-            let rest = label.continuation.unwrap_or(first);
+            let mut x = format.left_indent.to_pt() as f32 + label.indent;
+            let digit = |system: &mut Self, size: f32| {
+                let mut sized = label_format.clone();
+                sized.font_size = desk_model::Length::from_pt(f64::from(size));
+                system.digit_width(&sized)
+            };
+            let (first, rest) = match (label.continuation, &label.printed) {
+                (Some(rest), printed) => {
+                    let mut first = label.text_indent.max(width);
+                    // Screen View moves the label and the text of the first
+                    // line 36 points on the screen when the text is pushed
+                    // to a tab stop in print and the label is not at the
+                    // edge (step 19k of W1, 1,849 items exact).
+                    if let (Some(p), Some(screen)) = (printed, text.screen())
+                        && p.position > 0.0
+                    {
+                        let need = p.position + digit(self, p.size);
+                        let stop = list_text_stop(
+                            p.position,
+                            p.text_indent,
+                            need,
+                            &p.tab_stops,
+                            p.default_tab_interval,
+                        );
+                        if stop > p.position + p.text_indent {
+                            let shift = 36.0 / screen.zoom;
+                            x += shift;
+                            first += shift;
+                        }
+                    }
+                    (first, rest)
+                }
+                (None, _) => {
+                    // In print, the text goes to a tab stop when the room
+                    // after the label is no wider than a digit in its font
+                    // at the size of the text (step 19k of W1).
+                    let need = x + digit(self, label.text_size);
+                    let stop = list_text_stop(
+                        x,
+                        label.text_indent,
+                        need,
+                        &format.tab_stops,
+                        format.default_tab_interval.to_pt() as f32,
+                    );
+                    (stop.max(x + width) - x, label.text_indent.max(width))
+                }
+            };
             format.left_indent = desk_model::Length::from_pt(f64::from(x + rest));
             format.first_line_indent = desk_model::Length::from_pt(f64::from(first - rest));
             (laid, x, label.format, label.raise, label.image.clone())
@@ -952,7 +1028,9 @@ impl TextSystem {
                             commit(&mut breaker, text_top);
                             exact
                         }
-                        LineSpacing::Between(extra) => height + extra.to_pt() as f32,
+                        // Pages 15.4 adds at least a point (step 19k of W1): its
+                        // inspector makes less than one point one.
+                        LineSpacing::Between(extra) => height + (extra.to_pt() as f32).max(1.0),
                     }
                 };
                 if pitch > guess + 0.001 {
@@ -1740,6 +1818,30 @@ fn vertical_metrics(
             LeadingPlace::Around,
         ),
     }
+}
+
+/// Where Pages 15.4 starts the text of a list item after its label at
+/// `label`, `text_indent` after it by the indents of the list, when the
+/// label needs the room up to `need`, its position plus the width of the
+/// digit 2 of its font at the size of the text: at the indent when it is
+/// further than that, or a custom tab stop before it, otherwise at the
+/// first tab stop from there, custom or default (step 19k of W1, 1,849
+/// items exact). Positions are from the edge of the text.
+fn list_text_stop(label: f32, text_indent: f32, need: f32, tabs: &TabStops, interval: f32) -> f32 {
+    let indent = label + text_indent;
+    let custom = |from: f32| {
+        tabs.stops()
+            .iter()
+            .map(|stop| stop.position.to_pt() as f32)
+            .find(|&position| position >= from)
+    };
+    if indent > need {
+        return custom(need).filter(|&c| c < indent).unwrap_or(indent);
+    }
+    custom(need).unwrap_or_else(|| {
+        let interval = interval.max(1.0);
+        (need / interval).ceil().max(1.0) * interval
+    })
 }
 
 /// The line spacings of Screen View of Pages 15.4, as multiples of the

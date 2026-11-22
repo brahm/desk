@@ -553,3 +553,76 @@ fn pxv_01_screen_view_puts_list_labels_18_points_in_at_each_level() {
     );
     assert!((label(1) - 36.0 / zoom).abs() < 0.01, "{}", label(1));
 }
+
+#[test]
+fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
+    // Pages 15.4 (step 19k of W1): in print the text of an item goes to
+    // the next tab stop when the room after its label is no wider than
+    // the digit 2 of the label's font at the size of the text, 0.556 em
+    // in Helvetica; Screen View then moves the label and the first line
+    // 36 points on the screen.
+    let lay_out = |size: f64| {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Typing", |edit| edit.insert_text(start, "- one"))
+            .unwrap();
+        let first = editor.document().body().get(0).unwrap().id();
+        editor
+            .edit("List", |edit| edit.list_from_marker(first).map(|_| ()))
+            .unwrap();
+        editor
+            .edit("Indents", |edit| {
+                let style = edit
+                    .document()
+                    .body()
+                    .get(0)
+                    .unwrap()
+                    .attrs()
+                    .list_style
+                    .flatten()
+                    .unwrap();
+                let list = edit.document().styles().list(style).unwrap();
+                let level = desk_model::ListLevel {
+                    label_indent: Length::from_pt(18.0),
+                    text_indent: Length::from_pt(18.0),
+                    ..list.level(0).clone()
+                };
+                edit.set_list_level(style, 0, level)?;
+                let start = edit.document().start();
+                let end = desk_model::Position {
+                    paragraph: first,
+                    offset: 3,
+                };
+                edit.set_character_attrs(
+                    start,
+                    end,
+                    &desk_model::CharAttrs {
+                        font_family: Some("Helvetica".into()),
+                        font_size: Some(Length::from_pt(size)),
+                        ..desk_model::CharAttrs::default()
+                    },
+                )
+            })
+            .unwrap();
+        let mut system = TextSystem::new();
+        let print = paginate(editor.document(), &mut system);
+        let line = print.pages[0].lines[0].line.clone();
+        let printed = line.runs[1].x - line.runs[0].x;
+        let zoom = 1.25_f32;
+        let screen = paginate_screen(editor.document(), 1000.0, f64::from(zoom), &mut system);
+        let side = SCREEN_MARGIN.max((1000.0 - 664.0) / 2.0) as f32;
+        let placed = &screen.pages[0].lines[0];
+        let label = placed.origin.0 + placed.line.runs[0].x - side;
+        (printed, label, zoom)
+    };
+    // At 12 points the digit leaves room: the text is at the indent.
+    let (printed, label, _) = lay_out(12.0);
+    assert!((printed - 18.0).abs() < 0.01, "{printed}");
+    assert!(label.abs() < 0.01, "{label}");
+    // At 36 points it is 20 points wide: the text goes to the default
+    // stop at 72, and Screen View moves the label in.
+    let (printed, label, zoom) = lay_out(36.0);
+    assert!((printed - 54.0).abs() < 0.01, "{printed}");
+    assert!((label - 36.0 / zoom).abs() < 0.01, "{label}");
+}

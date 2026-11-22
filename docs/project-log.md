@@ -1554,13 +1554,25 @@ paragraph, and objects on a second page.
   and 1.75, ties to the lower; at least, exactly and between are
   compared with the unrounded line of the font on the screen (5,261
   values). Desk does all of this.
-- Still without an exact rule: on its first line only, a list label
-  moves to 36 points when the page view pushes its text to the next tab
-  stop, from between 32.5 and 33 points for the standard Word list in
-  Helvetica Neue but not in Times New Roman at 36, with no formula
-  found; which way a distance exactly on a cut falls; line spacing
-  under single; and between 0, which Pages drew as between 1. Desk
-  leaves these as single and does not move the label.
+- The owner asked for the last formula and the ties too (step 19k,
+  positions in print taken from PDFs that Pages exported, in steps of
+  0.05 point). The text of a list item goes to a tab stop in print when
+  the room after its label is no wider than the digit 2 of the label's
+  font at the size of the text (0.556 em in Helvetica Neue, 0.5 in
+  Times, 0.58 in Avenir, 0.55859 in Georgia): to the first stop from
+  there, custom or default, and a custom stop before the indent wins
+  over it (1,849 items exact). Screen View then moves the label and
+  the first line 36 points when the label is not at the edge. Times at
+  36 points is a tie, 18 points of digit in 18 of room, which goes to
+  the stop at 36, the indent itself, so the label does not move; its
+  one shift in 19j stays unexplained. A distance exactly on a cut goes
+  to the lower level, compared unrounded (1,213 values a twip either
+  side, none off), though Pages cannot store a value exactly on one;
+  lines under single show as single; between adds at least a point,
+  in print too. Desk does all of this. Not followed: a label after a
+  space or nothing instead of a tab, which Desk lists do not have, and
+  Pages scaling list indents when the text and the paragraph mark have
+  different sizes, which was only seen once.
 
 ## Decisions, with their reasons and consequences
 
