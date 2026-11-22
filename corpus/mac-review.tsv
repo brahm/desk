@@ -64,3 +64,31 @@ S008	2026-11-17	Show Adjust Image opens a window with levels, exposure, contrast
 S009	2026-11-17	Show Arrange Tools opens a window with Back, Front, Backward, Forward, size, position, rotation, lock and group	by decision	D-008: Arrange in the Arrange tab of the Inspector
 S010	2026-11-17	Show Warnings in the View menu	same	Document Warnings in the View menu; it opens once a presentation has warnings, which come with the files of S5
 S015	2026-11-17	Settings with General, Slideshow, Rulers, Remote and Auto-Correction	moved	The Slideshow and Remote settings to S4 (B-034)
+W041	2026-11-18	The table of contents of the sidebar follows the headings as they are typed	same	-
+W043	2026-11-22	Screen View: notice, Text Size 80% to 310%, objects by placement, the column, sizes, spacing, lists and tabs measured in rounds 19e to 19o	same	Measured to the exact rule in step 19 of W1
+W047	2026-11-18	Go to page from the View menu (Ctrl+Cmd+G)	same	-
+W048	2026-11-18	Steps only by page	by decision	D-003: Desk keeps the steps by kind of Pages '09
+W051	2026-11-18	Default font in Settings	same	-
+W052	2026-11-21	Gradient and image fills of text, over the lines of a paragraph or the entire page	same	-
+W054	2026-11-18	Capitalization: None, All Caps, Small Caps, Title Case, Start Case	same	-
+W059	2026-11-18	A highlight is a comment on a range	moved	W2 (B-039)
+W060	2026-11-18	Drop cap with its styles	same	The artistic border lines in W3 (B-044)
+W061	2026-11-21	Format Fractions Automatically; the first Undo brings back the typed fraction	same	-
+W062	2026-11-21	Smart quotes and dashes, quote styles, Replace in Selection makes em dashes	same	-
+W064	2026-11-22	A replacement list of its own beside that of macOS; capitals do not count; space, punctuation or Return; one Undo	same	Desk's list stands for both, since GNOME has no system list
+W071	2026-11-18	Right to left, vertical text and phonetic guide	moved	W6 (B-040)
+W072	2026-11-21	Language and Region; the language changes hyphenation and spelling	same	Languages other than English and Portuguese in W6 (B-043)
+W073	2026-11-18	Paragraph, character and list styles	same	-
+W080	2026-11-18	Table and chart styles in view	same	-
+W081	2026-11-21	Set as Default Text Box Appearance, for that document	same	-
+W088	2026-11-18	Reorder list items by dragging the bullet	same	-
+W089	2026-11-18	Columns on the selection	same	-
+W091	2026-11-18	Threads of linked text boxes	same	-
+W127	2026-11-18	Insert a table from the styles in view	same	-
+W130	2026-11-21	A table from dragged cells, with the title setting of its source	same	-
+W131	2026-11-21	Merging joins with a tab across and a line break down	same	Since the close of W1
+W132	2026-11-21	Custom cell formats, edited, renamed and deleted, with the Scale piece	same	-
+W133	2026-11-18	The functions of 15.4	moved	T2 (B-042)
+W138	2026-11-18	Table title	same	-
+W139	2026-11-18	Right to left table	moved	W6 (B-041)
+W140	2026-11-18	Lock table	same	-

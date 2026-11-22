@@ -486,8 +486,8 @@ feature	W043	done
 feature	W044	done
 feature	W045	done
 feature	W046	done
-feature	W047	review
-feature	W048	review
+feature	W047	done
+feature	W048	done
 feature	W049	done
 feature	W050	done
 feature	W051	done
@@ -512,7 +512,7 @@ feature	W069	out
 feature	W070	out
 feature	W071	missing
 feature	W072	done
-feature	W073	review
+feature	W073	done
 feature	W074	done
 feature	W075	done
 feature	W076	done
@@ -570,7 +570,7 @@ feature	W127	done
 feature	W128	done
 feature	W129	done
 feature	W130	done
-feature	W131	review
+feature	W131	done
 feature	W132	done
 feature	W133	partial
 feature	W134	done
@@ -626,8 +626,8 @@ phase	T2	not-started
 phase	T3	not-started
 phase	T4	not-started
 phase	T5	not-started
-phase	W1	in-progress
-phase	W2	not-started
+phase	W1	done
+phase	W2	in-progress
 phase	W3	not-started
 phase	W4	not-started
 phase	W5	not-started

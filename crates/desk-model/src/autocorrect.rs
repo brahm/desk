@@ -337,8 +337,14 @@ impl AutoCorrect {
                 .filter(|r| r.enabled && !r.from.is_empty() && Self::ends_with(word, &r.from))
                 .max_by_key(|r| r.from.len())
         {
+            // The whole word, whatever its capitals, or the end of it.
+            let typed = if Self::same(word, &found.from) {
+                word.len()
+            } else {
+                found.from.len()
+            };
             return Some(Correction {
-                range: before.len() - found.from.len()..before.len(),
+                range: before.len() - typed..before.len(),
                 text: found.to.clone(),
                 superscript: None,
             });
@@ -366,9 +372,17 @@ impl AutoCorrect {
     }
 
     /// Whether a word ends with the text of a replacement: the whole word,
-    /// or its end for text without letters or digits, as "...".
+    /// or its end for text without letters or digits, as "...". Capitals
+    /// do not count: "OMW" and "Omw" are "omw", as in Pages 15.4 (W064).
     fn ends_with(word: &str, from: &str) -> bool {
-        word == from || (word.ends_with(from) && !from.chars().any(char::is_alphanumeric))
+        Self::same(word, from) || (word.ends_with(from) && !from.chars().any(char::is_alphanumeric))
+    }
+
+    /// Whether two texts are the same but for their capitals.
+    fn same(a: &str, b: &str) -> bool {
+        a.chars()
+            .flat_map(char::to_lowercase)
+            .eq(b.chars().flat_map(char::to_lowercase))
     }
 
     /// The fraction character for the fraction that ends the text, when
@@ -554,6 +568,27 @@ mod tests {
         let mut off = all();
         off.replacements[0].enabled = false;
         assert!(off.correct("(c)").is_none());
+    }
+
+    #[test]
+    fn w064_the_table_does_not_mind_capitals() {
+        // As in Pages 15.4: "tm", "Tm", "(C)" and "C/O" are replaced by
+        // what the table holds, as it holds it.
+        assert_eq!(apply("Desk tm").as_deref(), Some("Desk ™"));
+        assert_eq!(apply("Desk Tm").as_deref(), Some("Desk ™"));
+        assert_eq!(apply("Desk (C)").as_deref(), Some("Desk ©"));
+        assert_eq!(apply("Desk C/O").as_deref(), Some("Desk ℅"));
+        let mut table = all();
+        table
+            .replacements
+            .push(Replacement::new("omw", "On my way!"));
+        for typed in ["omw", "Omw", "OMW", "oMW"] {
+            let correction = table.correct(typed).unwrap();
+            assert_eq!(
+                (correction.range, correction.text.as_str()),
+                (0..3, "On my way!")
+            );
+        }
     }
 
     #[test]

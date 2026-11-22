@@ -1368,14 +1368,14 @@ impl TextEditor {
                     let paragraph = document.paragraph(from.paragraph)?;
                     if paragraph.is_empty() {
                         edit.set_list_style(from, from, None)?;
-                        return Ok(Spot::of(edit.document(), from));
+                        return Ok((Spot::of(edit.document(), from), None));
                     }
                 }
                 let mut at = if start == end {
                     if preferences.detect_links {
                         detect_link(edit, from)?;
                     }
-                    autocorrect(edit, from, &preferences.autocorrect)?
+                    from
                 } else {
                     edit.delete(from, to)?
                 };
@@ -1383,10 +1383,22 @@ impl TextEditor {
                     at.offset = at.offset.saturating_sub(len);
                 }
                 let after = edit.split_paragraph(at)?;
-                Ok(Spot::of(edit.document(), after))
+                Ok((
+                    Spot::of(edit.document(), after),
+                    (start == end).then_some(at),
+                ))
             })
         };
+        let (result, word_end) = match result {
+            Ok((spot, word_end)) => (Ok(spot), word_end),
+            Err(error) => (Err(error), None),
+        };
         self.finish_edit(before, result);
+        // Return ends a word too, and its corrections are an action of
+        // their own, as after a space (W064).
+        if let Some(at) = word_end {
+            self.correct_word(at);
+        }
     }
 
     /// Puts a break at the cursor, or in place of the selection: the

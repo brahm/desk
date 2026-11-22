@@ -8,6 +8,14 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: Writer to the behaviour of 15 (W1) is done, checked on the
+  Mac with Pages 15.4; Writer review (W2) is the phase in progress.
+* Changed: lists, tabs and indents are laid out as Pages 15.4 lays them
+  out: a list item's text goes to a tab stop when its label needs the
+  room, its label stands alone on its line near the right edge, text on
+  a right, centred or decimal stop counts its kerning, tab stops stop
+  short of the edge, and the Indents of the inspector keep 18 points of
+  the column, with First where the first line starts.
 * Changed: Screen View places objects as Pages 15.4 does: those that
   move with the text show after their paragraph, centred at their size,
   with text boxes and rectangles with text across the column, and those

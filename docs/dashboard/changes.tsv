@@ -144,3 +144,9 @@ date	kind	id	from	to
 2026-11-21	backlog	B-047	new	open
 2026-11-21	backlog	B-047	open	done
 2026-11-21	backlog	B-046	open	done
+2026-11-22	feature	W047	review	done
+2026-11-22	feature	W048	review	done
+2026-11-22	feature	W073	review	done
+2026-11-22	feature	W131	review	done
+2026-11-22	phase	W1	in-progress	done
+2026-11-22	phase	W2	not-started	in-progress
