@@ -275,8 +275,9 @@ impl<T: CellText> Table<T> {
     }
 
     /// Merges the cells of an area into one (TAB-23). They must all be of
-    /// one region. The texts are joined, with tabs across and paragraphs
-    /// down, and the merged cell takes the look of the top left cell.
+    /// one region. The texts are joined, with tabs across and line breaks
+    /// down, as in Pages 15.4, and the merged cell takes the look of the
+    /// top left cell.
     pub fn merge(&mut self, area: Area) -> Result<(), TableError> {
         if area.row_end() > self.rows() || area.col_end() > self.cols() {
             return Err(TableError::OutOfRange);
@@ -674,7 +675,7 @@ mod tests {
         assert_eq!(t.source_text(1, 0, &Locale::en_us()), "c");
         let mut u = table(&[&["a", "b"], &["c", "d"]]);
         u.merge(Area::between((0, 0), (1, 1))).unwrap();
-        assert_eq!(u.source_text(0, 0, &Locale::en_us()), "a\tb\nc\td");
+        assert_eq!(u.source_text(0, 0, &Locale::en_us()), "a\tb\u{2028}c\td");
     }
 
     #[test]

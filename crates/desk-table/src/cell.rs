@@ -20,10 +20,11 @@ pub trait CellText: Clone + Debug + PartialEq + Eq + Hash {
     /// Text without formatting, with a paragraph for each line.
     fn from_plain(text: &str) -> Self;
 
-    /// The texts joined, with a tab between them when `across` or a
-    /// paragraph break otherwise, as merging cells joins them (TAB-23).
+    /// The texts joined, with a tab between them when `across` or a line
+    /// break (U+2028) otherwise, as merging cells joins them in Pages 15.4
+    /// (TAB-23, W131).
     fn join(parts: &[Self], across: bool) -> Self {
-        let sep = if across { "\t" } else { "\n" };
+        let sep = if across { "\t" } else { "\u{2028}" };
         let plain: Vec<String> = parts.iter().map(Self::plain).collect();
         Self::from_plain(&plain.join(sep))
     }

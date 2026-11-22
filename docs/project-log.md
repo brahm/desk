@@ -1649,6 +1649,37 @@ paragraph, and objects on a second page.
   32,767 twips (1,638.35 points) turns negative; Desk opens Word files
   in W5, which is where this belongs.
 
+### 22 November: W1 closed, W2 next
+
+- Phase W1 ended with its 24 rows done or moved, its backlog items done
+  (B-012, B-020 to B-025, B-038, and B-046 and B-047 found on the way),
+  and every row seen on the Mac with Pages 15.4: in the session of 18
+  November, in the rounds of step 19 (19a to 19o, from 21 to 22
+  November), and W064, the last, in a short check of its own.
+  `ci/check-backlog.py --phase W1` passes, and so does
+  `ci/check-all.sh` but for three steps this computer cannot run
+  (typing "ação" into the window, Java for the ODF validation, and
+  `reuse`), which the continuous integration ran on the same code.
+- It took six days, 17 to 22 November, against the four estimated: the
+  rounds of step 19 measured the layout of 15.4 to the exact rule,
+  which the estimate did not count. The estimate of the other phases
+  stays until each ends.
+- The close found one difference the validation had left as it was:
+  merged cells joined their texts down with a new paragraph, where Pages
+  15.4 puts a line break; they now join with a line break (W131). The
+  check of W064 found that Pages 15.4 replaces whatever the capitals of
+  what is typed, and on Return too, as an action of its own; Desk does
+  the same. Numbers and Keynote open on a screen whose button accepts
+  their licence, which is the owner's to accept, so whether they share
+  the list was not seen; T1 and S1 bring their typing. Rows
+  W059 to W2, W071 and W139 to W6, and W133 to T2 had moved when the
+  phase began (B-039 to B-042); the breaks of the dictionary of macOS
+  to W2 (B-045); the 16-bit indents of Word files belong to W5, which
+  opens them.
+- *Next:* asked which phase to start, the owner chose W2, Writer
+  review, over T1 and S1, so that Writer goes on toward a usable app;
+  the review highlight (W059) waits there.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -2048,7 +2079,10 @@ Phase B1 of the [roadmap](roadmap.md), the common base, ran from 16 to
 17 November: the M+ window in the three apps, automatic saving with
 versions, the reference cases redone on iWork 15.4, and the backlog
 carried from the replanning. The owner closed it on 17 November and
-chose W1, Writer to the behaviour of 15, as the next phase. The three
+chose W1, Writer to the behaviour of 15, as the next phase. W1 ran
+from 17 to 22 November and brought Writer to the behaviour of Pages
+15.4, checked on the Mac; the owner closed it and chose W2, Writer
+review, as the next phase. The three
 apps can advance side by side: six phases of Writer, five of Tables, five
 of Slides, and a last phase across the apps before version 1.0.
 

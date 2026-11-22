@@ -142,3 +142,19 @@ fn pxv_15_the_title_shows_centered_and_outlined() {
     assert_eq!((x, y, w), (0.0, 0.0, width));
     assert!(h > 0.0 && h <= titled.rows[0]);
 }
+
+#[test]
+fn tab_23_merged_cells_down_are_lines_of_one_paragraph() {
+    // Pages 15.4 joins the texts of merged cells down with a line break
+    // (W131): two lines in the cell, one paragraph in the file.
+    let pt = Locale::pt_br();
+    let mut table = Table::new(3, 2);
+    table.type_text(1, 0, "um", &pt);
+    table.type_text(2, 0, "dois", &pt);
+    table
+        .merge(desk_model::table::Area::between((1, 0), (2, 0)))
+        .unwrap();
+    assert_eq!(table.source_text(1, 0, &pt), "um\u{2028}dois");
+    let layout = lay_out(&table);
+    assert_eq!(cell(&layout, 1, 0).lines.len(), 2);
+}
