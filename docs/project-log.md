@@ -1572,9 +1572,24 @@ paragraph, and objects on a second page.
   in print too. Desk does all of this. After a space or nothing instead
   of a tab, the text starts where the digit ends, or after a wider
   label; Desk lists now keep what follows the label, as ODF writes it
-  (`text:label-followed-by`). Left for the next round: Pages scaling
-  list indents when the text and the paragraph mark have different
-  sizes, seen once.
+  (`text:label-followed-by`).
+- The owner asked for those cases too (step 19l, 234 documents, print
+  from PDFs and Screen View from captures). The digit is measured at
+  the size of the paragraph mark, M, and the label drawn at it, never
+  at the size of the text, T; the stop is chosen as before, and only
+  the distance from the label to it scales by M / T. After a jump the
+  other lines start at the larger of that distance and the indent,
+  even when T is M (13,907 items, under 0.0001 point off). After a
+  space or nothing the stop is where the digit ends, custom stops
+  ignored. Screen View measures its 18/17 by the mark, moves the label
+  36 points whatever M / T, also after a space or nothing, and draws a
+  label at its printed size when T and M differ (1,154 items). Desk
+  does all of this. The one shift of Times New Roman at 36 points in
+  19j did not come back in eight conditions tried; the rule says it
+  should not move. Seen outside the brief and not copied: near the
+  right margin, the other lines never start past the column less 18
+  points, with a limit of 457.5 points for the first line that has no
+  formula yet.
 
 ## Decisions, with their reasons and consequences
 

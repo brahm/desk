@@ -96,10 +96,13 @@ pub struct Label {
     /// first, when it is `text_indent` whatever the width of the label,
     /// as in Screen View.
     pub continuation: Option<f32>,
-    /// The size of the text of the item, at which the width of a digit in
-    /// the font of the label decides whether its text goes to a tab stop
-    /// (step 19k of W1).
+    /// The size of the first text of the item, T.
     pub text_size: f32,
+    /// The size of its paragraph mark, M, at which the width of a digit
+    /// in the font of the label decides whether its text goes to a tab
+    /// stop, and by which the distance to the stop scales as M / T (steps
+    /// 19k and 19l of W1).
+    pub mark_size: f32,
     /// In Screen View, the label as it prints.
     pub printed: Option<PrintedLabel>,
     /// What follows the label: with a space or nothing, the text never
@@ -222,8 +225,8 @@ pub struct PrintedLabel {
     pub position: f32,
     /// The distance from the label to the text.
     pub text_indent: f32,
-    /// The size of the text, at which a digit measures the room the label
-    /// needs.
+    /// The size of the paragraph mark, at which a digit measures the room
+    /// the label needs (step 19l of W1).
     pub size: f32,
     /// The tab stops and the distance between the default ones.
     pub tab_stops: TabStops,
@@ -332,12 +335,23 @@ impl ParagraphText {
             .map_or(&self.formats[0], |r| &self.formats[r.format as usize]);
         let mut format = first.clone();
         let text_size = first.font_size.to_pt() as f32;
-        let base = if level.scale_with_text {
-            first.font_size.to_pt()
-        } else {
-            12.0
-        };
+        // The label is drawn at the size of the paragraph mark, not of the
+        // text (step 19l of W1).
+        let mark = self.formats[0].font_size.to_pt();
+        let base = if level.scale_with_text { mark } else { 12.0 };
         format.font_size = Length::from_pt(base * f64::from(level.size) / 100.0);
+        // Screen View draws it at its printed size, whatever the Text
+        // Size, when the text and the mark differ in size.
+        if let Some(screen) = &self.screen
+            && level.scale_with_text
+            && screen.style.font_size.to_pt() as f32 != screen.size
+        {
+            format.font_size = Length::from_pt(
+                screen.style.font_size.to_pt() * f64::from(level.size)
+                    / 100.0
+                    / f64::from(screen.zoom),
+            );
+        }
         if let Some(color) = level.color {
             format.color = color;
         }
@@ -364,7 +378,8 @@ impl ParagraphText {
         // first always start there (step 19j, 6,624 positions exact).
         let (indent, text_indent, continuation) = match &self.screen {
             Some(screen) => {
-                let gap = 18.0 / 17.0 * text_size;
+                // 18/17 of the size of the mark on the screen (step 19l).
+                let gap = 18.0 / 17.0 * mark as f32;
                 (18.0 * f32::from(item.level) / screen.zoom, gap, Some(gap))
             }
             None => (
@@ -376,7 +391,7 @@ impl ParagraphText {
         let printed = self.screen.as_ref().map(|screen| PrintedLabel {
             position: (screen.printed.left_indent + level.label_indent).to_pt() as f32,
             text_indent: level.text_indent.to_pt() as f32,
-            size: screen.size,
+            size: screen.style.font_size.to_pt() as f32,
             tab_stops: screen.printed.tab_stops.clone(),
             default_tab_interval: screen.printed.default_tab_interval.to_pt() as f32,
         });
@@ -389,6 +404,7 @@ impl ParagraphText {
             raise: level.raise.to_pt() as f32,
             continuation,
             text_size,
+            mark_size: mark as f32,
             printed,
             followed_by: level.followed_by,
         });

@@ -604,6 +604,7 @@ impl TextSystem {
                             &p.tab_stops,
                             p.default_tab_interval,
                         );
+                        // Whatever M / T is, the move is 36 points (step 19l).
                         if stop > p.position + p.text_indent {
                             let shift = 36.0 / screen.zoom;
                             x += shift;
@@ -614,9 +615,13 @@ impl TextSystem {
                 }
                 (None, _) => {
                     // In print, the text goes to a tab stop when the room
-                    // after the label is no wider than a digit in its font
-                    // at the size of the text (step 19k of W1).
-                    let need = x + digit(self, label.text_size);
+                    // after the label is no wider than the digit 2 of its
+                    // font at the size of the paragraph mark, M. The
+                    // distance to the stop then scales by M over the size
+                    // of the text, T; the other lines start at the larger of
+                    // that distance and the indent, scaled alike (steps 19k
+                    // and 19l of W1, 13,907 items exact).
+                    let need = x + digit(self, label.mark_size);
                     let stop = list_text_stop(
                         label.followed_by,
                         x,
@@ -625,7 +630,10 @@ impl TextSystem {
                         &format.tab_stops,
                         format.default_tab_interval.to_pt() as f32,
                     );
-                    (stop.max(x + width) - x, label.text_indent.max(width))
+                    let k = label.mark_size / label.text_size.max(f32::MIN_POSITIVE);
+                    let first = (x + k * (stop - x)).max(x + width);
+                    let rest = (stop - x).max(x + label.text_indent) + (k - 1.0) * (stop - x);
+                    (first - x, rest - x)
                 }
             };
             format.left_indent = desk_model::Length::from_pt(f64::from(x + rest));

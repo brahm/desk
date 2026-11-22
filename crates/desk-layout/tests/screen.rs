@@ -561,7 +561,7 @@ fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
     // the digit 2 of the label's font at the size of the text, 0.556 em
     // in Helvetica; Screen View then moves the label and the first line
     // 36 points on the screen.
-    let lay_out = |size: f64, followed_by: desk_model::LabelFollow| {
+    let lay_out = |size: f64, mark: f64, followed_by: desk_model::LabelFollow| {
         let mut editor = Editor::new(Document::new_word_processing());
         let start = editor.document().start();
         editor
@@ -595,6 +595,18 @@ fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
                     paragraph: first,
                     offset: 3,
                 };
+                // The paragraph mark takes the size of the style.
+                edit.set_character_attrs(
+                    start,
+                    end,
+                    &desk_model::CharAttrs {
+                        font_family: Some("Helvetica".into()),
+                        font_size: Some(Length::from_pt(mark)),
+                        ..desk_model::CharAttrs::default()
+                    },
+                )?;
+                let body = edit.document().styles().default_paragraph();
+                edit.redefine_style(body, start, end)?;
                 edit.set_character_attrs(
                     start,
                     end,
@@ -619,18 +631,23 @@ fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
     };
     // At 12 points the digit leaves room: the text is at the indent.
     use desk_model::LabelFollow;
-    let (printed, label, _) = lay_out(12.0, LabelFollow::Tab);
+    let (printed, label, _) = lay_out(12.0, 12.0, LabelFollow::Tab);
     assert!((printed - 18.0).abs() < 0.01, "{printed}");
     assert!(label.abs() < 0.01, "{label}");
     // At 36 points it is 20 points wide: the text goes to the default
     // stop at 72, and Screen View moves the label in.
-    let (printed, label, zoom) = lay_out(36.0, LabelFollow::Tab);
+    let (printed, label, zoom) = lay_out(36.0, 36.0, LabelFollow::Tab);
     assert!((printed - 54.0).abs() < 0.01, "{printed}");
     assert!((label - 36.0 / zoom).abs() < 0.01, "{label}");
     // After a space or nothing the text starts where the digit ends.
     for follow in [LabelFollow::Space, LabelFollow::Nothing] {
-        let (printed, label, _) = lay_out(12.0, follow);
+        let (printed, label, _) = lay_out(12.0, 12.0, follow);
         assert!((printed - 0.556 * 12.0).abs() < 0.01, "{printed}");
         assert!(label.abs() < 0.01, "{label}");
     }
+    // Text at 12 points after a mark at 24 (step 19l): the digit, at the
+    // size of the mark, leaves room, and the distance to the indent
+    // scales by 24 / 12.
+    let (printed, _, _) = lay_out(12.0, 24.0, LabelFollow::Tab);
+    assert!((printed - 36.0).abs() < 0.01, "{printed}");
 }
