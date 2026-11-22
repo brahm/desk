@@ -15,7 +15,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   the middle of the window, a table in the text is that wide, and
   pictures and shapes keep their size on the screen. Text shows at the
   sizes Pages 15.4 shows it there, from 10 to 26 points at 100%, without
-  its left indent.
+  its left indent, with its line spacing in one of four steps, space
+  before and after in quarter lines, and tabs every 36 points.
 * Changed: documents are laid out as Pages 15.4 lays them out: text
   wraps tightly around the outline that Pages traces from the pixels of
   a picture, tables of contents, superscripts, text that overflows the

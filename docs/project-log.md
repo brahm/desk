@@ -1507,11 +1507,26 @@ paragraph, and objects on a second page.
   points on the screen whatever the Text Size (one value measured).
   Pictures, ovals and empty rectangles after their paragraph keep their
   size on the screen at 85, 100, 120 and 135%. Desk does all of this.
-- Not copied, for want of a rule: a single line is about 1.3 times the
-  size on the screen (1.19 to 1.35), against 1.2 in print; an exact line
-  spacing of 30 points follows nothing clear; 24 points of space before
-  or after became about 14.5 times the Text Size (one value). Tabs were
-  not measured.
+- That round left line spacing, the space between paragraphs and tabs
+  without a rule, and the owner chose to measure them still in W1 (step
+  19h, 520 lines, 263 gaps and the tabs of 47 documents at Text Sizes
+  of 80, 100, 135 and 160%). Screen View draws none of the values set:
+  every line spacing becomes a multiple of single, rounded to one of
+  four levels (single, 1.135, 1.35 and 1.79 times, from 1.16, 1.36 and
+  1.75); a fixed one (at least, exactly, between) is compared with the
+  line on the screen, so it falls a level as the Text Size grows, which
+  is why exactly 30 points looked ruleless; nothing is tighter than
+  single. Space before or after becomes up to four steps of a quarter
+  line on the screen (0.89 of it, 0.83 to 0.92 measured), as many as
+  the value holds 0.2425 printed lines, whatever the Text Size. Tabs go
+  to stops every 36 points on the screen, whatever the Text Size, the
+  size, the stops of the paragraph or its default interval; centre,
+  right and decimal stops act as left ones. Desk does all of this, with
+  a single line of 1.2 times the size, the measured one (about 1.29,
+  within 7%) having no clean rule; the font size counted is the one of
+  the paragraph's style. Not measured: space after and before of two
+  neighbours together, hanging indents, first line indents under 36
+  points.
 
 ## Decisions, with their reasons and consequences
 

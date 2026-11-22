@@ -373,3 +373,57 @@ fn pxv_01_screen_view_shows_text_and_objects_at_the_sizes_of_pages() {
         shape.width
     );
 }
+
+#[test]
+fn pxv_01_screen_view_spaces_lines_paragraphs_and_tabs_as_pages_15_does() {
+    // Pages 15.4 (step 19h of W1): a line spacing shows as one of four
+    // levels of single, a fixed one compared with the line on the screen;
+    // space before and after shows in up to four steps of a quarter line;
+    // tabs go to stops every 36 points on the screen, whatever the stops
+    // of the paragraph.
+    use desk_model::{LineSpacing, TabStop, TabStops, screen_font_size};
+    let mut document = Document::new_word_processing();
+    let style = document.styles().default_paragraph();
+    let size = document
+        .styles()
+        .resolve_character(style, None, &desk_model::CharAttrs::default())
+        .font_size
+        .to_pt();
+    let zoom = 1.6;
+    document.set_screen_styles(Some(zoom));
+    let screen_single = 1.2 * screen_font_size(size);
+    let resolve = |attrs: ParaAttrs| document.styles().resolve_paragraph(style, &attrs);
+    let spacing = |spacing| match resolve(ParaAttrs {
+        line_spacing: Some(spacing),
+        ..ParaAttrs::default()
+    })
+    .line_spacing
+    {
+        LineSpacing::Multiple { percent } => percent,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(spacing(LineSpacing::Multiple { percent: 80 }), 100);
+    assert_eq!(spacing(LineSpacing::Multiple { percent: 125 }), 114);
+    assert_eq!(spacing(LineSpacing::Multiple { percent: 150 }), 135);
+    assert_eq!(spacing(LineSpacing::DOUBLE), 179);
+    assert_eq!(spacing(LineSpacing::Multiple { percent: 250 }), 179);
+    // A fixed spacing of twice the line on the screen at this Text Size
+    // is double, and one shorter than single is single.
+    let twice = Length::from_pt(2.0 * screen_single * zoom);
+    assert_eq!(spacing(LineSpacing::Exactly(twice)), 179);
+    assert_eq!(spacing(LineSpacing::AtLeast(Length::from_pt(1.0))), 100);
+    let format = resolve(ParaAttrs {
+        space_before: Some(Length::from_pt(0.25 * 1.2 * size)),
+        space_after: Some(Length::from_pt(100.0 * size)),
+        left_indent: Some(Length::from_pt(50.0)),
+        tab_stops: Some(TabStops::new([TabStop::left(Length::from_pt(100.0))])),
+        default_tab_interval: Some(Length::from_pt(72.0)),
+        ..ParaAttrs::default()
+    });
+    let step = 0.89 / 4.0 * screen_single;
+    assert!((format.space_before.to_pt() - step).abs() < 0.01);
+    assert!((format.space_after.to_pt() - 4.0 * step).abs() < 0.01);
+    assert_eq!(format.left_indent, Length::ZERO);
+    assert_eq!(format.tab_stops, TabStops::none());
+    assert!((format.default_tab_interval.to_pt() - 36.0 / zoom).abs() < 0.01);
+}
