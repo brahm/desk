@@ -1607,6 +1607,26 @@ paragraph, and objects on a second page.
   second tab in an item whose text and mark sizes differ; and whether
   the 36 points of Screen View are the default tab interval or a
   constant.
+- The owner asked for those too (step 19n, 113 documents, print from
+  PDFs and Screen View from captures). Pages works the first line of a
+  list item out in single precision, the distance to the stop and that
+  over the size of the text each rounded to a float, so a tie 10 points
+  before the edge keeps the text only when the division is exact or
+  rounds down (2,638 items, and the 153 ties of 19m, none off). Text on
+  a right, centred or decimal stop is measured up to the start of what
+  follows it, a tab or the end of the paragraph, drawn as a space, so
+  the kerning of its last letter with a space counts; a decimal stop
+  holds the middle of the separator (8,760 items). Later tabs of a list
+  item are not scaled by M / T: past the custom stops one goes to a
+  hidden stop at the indent less the stop of the label, then to the
+  default ones (1,881 items). Screen View puts every tab on the next 36
+  points from the edge of the column, whatever the default interval,
+  the Text Size or the custom stops (369 tabs). Desk does all of this.
+  The one shift of Times New Roman at 36 points in 19j did not come
+  back in six more ways of opening its document, against a control that
+  shifts; no rule covers it. Seen outside the brief and not settled:
+  where Pages drops a very large left indent from Word, and a tie on
+  the end of the label rather than the stop.
 
 ## Decisions, with their reasons and consequences
 

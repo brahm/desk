@@ -116,3 +116,112 @@ fn lst_an_item_whose_stop_is_near_the_edge_has_its_label_alone() {
     assert!((text.baseline - line.baseline).abs() < 0.01);
     assert!((label.baseline - (line.baseline + 1.0)).abs() < 0.01);
 }
+
+/// A document of one list item with the text `text`, its label `label`
+/// points in and its text `indent` after it, and the tab stops `stops`.
+fn list_item(text: &str, label: f32, indent: f32, stops: &[f32]) -> Editor {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(start, &format!("- {text}"))
+        })
+        .unwrap();
+    let first = editor.document().body().get(0).unwrap().id();
+    editor
+        .edit("List", |edit| edit.list_from_marker(first).map(|_| ()))
+        .unwrap();
+    editor
+        .edit("Indents", |edit| {
+            let style = edit
+                .document()
+                .body()
+                .get(0)
+                .unwrap()
+                .attrs()
+                .list_style
+                .flatten()
+                .unwrap();
+            let list = edit.document().styles().list(style).unwrap();
+            let level = ListLevel {
+                label_indent: Length::from_pt(f64::from(label)),
+                text_indent: Length::from_pt(f64::from(indent)),
+                ..list.level(0).clone()
+            };
+            edit.set_list_level(style, 0, level)?;
+            let start = edit.document().start();
+            let end = Position {
+                paragraph: first,
+                offset: text.len(),
+            };
+            edit.set_character_attrs(
+                start,
+                end,
+                &CharAttrs {
+                    font_family: Some("Helvetica".into()),
+                    ..CharAttrs::default()
+                },
+            )?;
+            edit.set_paragraph_attrs(
+                start,
+                end,
+                &ParaAttrs {
+                    tab_stops: Some(TabStops::new(
+                        stops
+                            .iter()
+                            .map(|&p| TabStop::left(Length::from_pt(f64::from(p)))),
+                    )),
+                    ..ParaAttrs::default()
+                },
+            )
+        })
+        .unwrap();
+    editor
+}
+
+#[test]
+fn lst_a_first_line_exactly_10_points_before_the_edge_keeps_its_text() {
+    // The text indent ends 10 points before the edge, a tie, worked out
+    // in single precision as Pages does: 60 / 12 is exact and keeps the
+    // text on the line of the label, while 58 / 12 rounds up, past the
+    // limit, and leaves the label alone (step 19n of W1).
+    let width = column(&Document::new_word_processing());
+    for (indent, alone) in [(60.0, false), (58.0, true)] {
+        let editor = list_item("one", width - 10.0 - indent, indent, &[]);
+        let mut system = TextSystem::new();
+        let print = paginate(editor.document(), &mut system);
+        let line = &print.pages[0].lines[0].line;
+        let (label, text) = (&line.runs[0], &line.runs[1]);
+        let x = if alone { width - 18.0 } else { width - 10.0 };
+        assert!((text.x - x).abs() < 0.01, "{indent} {}", text.x);
+        assert_eq!(text.baseline > label.baseline + 1.0, alone, "{indent}");
+    }
+}
+
+#[test]
+fn lst_a_later_tab_goes_to_the_hidden_stop_of_the_item() {
+    // The label's tab takes the custom stop at 20, before the indent at
+    // 100; the next tab goes to 100 - 20 = 80, before the default stop at
+    // 72 that would come first (step 19n of W1).
+    let editor = list_item("one\ttwo", 0.0, 100.0, &[20.0]);
+    let mut system = TextSystem::new();
+    let print = paginate(editor.document(), &mut system);
+    let line = &print.pages[0].lines[0].line;
+    let text = line.runs.last().unwrap();
+    assert!((text.x - 20.0).abs() < 0.01, "{}", text.x);
+    let two = text.glyphs[text.glyphs.len() - 3].x;
+    assert!((two - 80.0).abs() < 0.01, "{two}");
+}
+
+#[test]
+fn pxv_01_screen_view_tabs_go_to_the_next_36_points() {
+    // Neither the custom stop, nor the indent, nor the hidden stop of the
+    // item: the next 36 points from the edge (step 19n of W1).
+    let editor = list_item("o\ttwo", 0.0, 100.0, &[20.0]);
+    let mut system = TextSystem::new();
+    let screen = paginate_screen(editor.document(), 1000.0, 1.0, &mut system);
+    let line = &screen.pages[0].lines[0].line;
+    let text = line.runs.last().unwrap();
+    let two = text.glyphs[text.glyphs.len() - 3].x;
+    assert!((two - 36.0).abs() < 0.01, "{two}");
+}
