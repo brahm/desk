@@ -179,6 +179,44 @@ impl Field {
     }
 }
 
+/// The largest indent the fields take, in points: as large as a page can
+/// be, since what limits an indent is the column (step 19o of W1).
+const INDENT_UPPER: f64 = 15_000.0;
+
+impl Field {
+    /// The attributes for a value of an indent field, as the Indents of
+    /// Pages 15.4 take it: First is where the first line starts, from the
+    /// edge of the text like Left, and each value is kept between 0 and
+    /// what leaves 18 points of the column, W: First and Left up to W less
+    /// Right, and Right up to W less the larger of the two. Setting one
+    /// leaves the others where they are (step 19o of W1, 49 values exact).
+    fn indent_attrs(self, value: f64, units: Units, format: &Format) -> ParaAttrs {
+        let page = &format.setup;
+        let column = (page.width - page.margin_left - page.margin_right).to_pt();
+        let paragraph = &format.paragraph;
+        let left = paragraph.left_indent.to_pt();
+        let first = left + paragraph.first_line_indent.to_pt();
+        let right = paragraph.right_indent.to_pt();
+        let value = tab_stops::from_units(value, units).to_pt();
+        let within = |upper: f64| Length::from_pt(value.min(upper).max(0.0));
+        let mut attrs = ParaAttrs::default();
+        match self {
+            Self::FirstLine => {
+                let first = within(column - right - 18.0);
+                attrs.first_line_indent = Some(first - paragraph.left_indent);
+            }
+            Self::Left => {
+                let left = within(column - right - 18.0);
+                attrs.left_indent = Some(left);
+                attrs.first_line_indent = Some(Length::from_pt(first) - left);
+            }
+            Self::Right => attrs.right_indent = Some(within(column - left.max(first) - 18.0)),
+            _ => return self.attrs(value, Units::Points),
+        }
+        attrs
+    }
+}
+
 impl Inspector {
     /// An Inspector for the editor of a window.
     pub fn new(editor: EditorOf) -> Rc<Self> {
@@ -502,7 +540,13 @@ impl Inspector {
                     return;
                 }
                 if let Some(editor) = editor() {
-                    let attrs = field.attrs(row.value(), this.units.get());
+                    let units = this.units.get();
+                    let attrs = match &*this.shown.borrow() {
+                        Some(format) if field.in_units() => {
+                            field.indent_attrs(row.value(), units, format)
+                        }
+                        _ => field.attrs(row.value(), units),
+                    };
                     editor.set_paragraph_attrs(field.name(), &attrs);
                 }
             });
@@ -612,9 +656,10 @@ impl Inspector {
     fn set_units(&self, units: Units) {
         self.updating.set(true);
         self.units.set(units);
-        tab_stops::set_units(&self.first_line, units, -1584.0, 1584.0);
-        tab_stops::set_units(&self.left, units, 0.0, 1584.0);
-        tab_stops::set_units(&self.right, units, 0.0, 1584.0);
+        // No fixed limit: what a column leaves (step 19o of W1).
+        tab_stops::set_units(&self.first_line, units, 0.0, INDENT_UPPER);
+        tab_stops::set_units(&self.left, units, 0.0, INDENT_UPPER);
+        tab_stops::set_units(&self.right, units, 0.0, INDENT_UPPER);
         self.updating.set(false);
         self.tabs.set_units(units);
         self.lists.set_units(units);
@@ -666,7 +711,7 @@ impl Inspector {
         let units = self.units.get();
         set(
             &self.first_line,
-            tab_stops::in_units(paragraph.first_line_indent, units),
+            tab_stops::in_units(paragraph.left_indent + paragraph.first_line_indent, units),
         );
         set(
             &self.left,
@@ -891,5 +936,43 @@ mod tests {
                 .left_indent
                 .is_none()
         );
+    }
+
+    #[test]
+    fn fmt_18_indents_leave_18_points_of_the_column() {
+        // Letter with margins of 72: a column of 468 points.
+        let mut format = Format::default();
+        format.paragraph.left_indent = Length::from_pt(100.0);
+        format.paragraph.first_line_indent = Length::from_pt(-40.0);
+        format.paragraph.right_indent = Length::from_pt(50.0);
+        let column =
+            (format.setup.width - format.setup.margin_left - format.setup.margin_right).to_pt();
+        let pt = |field: Field, value: f64| field.indent_attrs(value, Units::Points, &format);
+        // First is where the first line starts, kept from 0 to W - R - 18,
+        // and leaves Left alone.
+        assert_eq!(
+            pt(Field::FirstLine, -100.0).first_line_indent,
+            Some(Length::from_pt(-100.0))
+        );
+        let first = pt(Field::FirstLine, 1000.0);
+        assert_eq!(
+            first.first_line_indent,
+            Some(Length::from_pt(column - 50.0 - 18.0 - 100.0))
+        );
+        assert!(first.left_indent.is_none());
+        // Left keeps the first line where it was, at 60.
+        let left = pt(Field::Left, 1000.0);
+        let new_left = column - 50.0 - 18.0;
+        assert_eq!(left.left_indent, Some(Length::from_pt(new_left)));
+        assert_eq!(
+            left.first_line_indent,
+            Some(Length::from_pt(60.0 - new_left))
+        );
+        // Right up to W less the larger of Left and First.
+        assert_eq!(
+            pt(Field::Right, 1000.0).right_indent,
+            Some(Length::from_pt(column - 100.0 - 18.0))
+        );
+        assert_eq!(pt(Field::Right, -5.0).right_indent, Some(Length::ZERO));
     }
 }

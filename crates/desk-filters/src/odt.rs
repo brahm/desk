@@ -16,8 +16,8 @@ use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
     CharacterStyle, ChartStyle, DEFAULT_TAB_INTERVAL, Document, DropCap, DropCapShape,
     DropCapStyle, Fill, FontFeature, FontFeatures, FontWeight, ImageFill, LINE_BREAK, LIST_LEVELS,
-    Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, ListLabel, ListLevel,
-    ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder,
+    LabelFollow, Language, Length, Ligatures, LineColor, LineSpacing, LineStyle, ListLabel,
+    ListLevel, ListStyle, Metadata, ModelError, NumberFormat, Op, PageSetup, ParaAttrs, ParaBorder,
     ParaFormat, Paragraph, ParagraphSpacing, ParagraphStyle, Rgba, Run, Shadow, Style, StyleId,
     TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
@@ -976,6 +976,7 @@ fn list_levels(style: &odf::ListStyle, pictures: &[(String, Vec<u8>)]) -> [ListL
                             size: size.round().clamp(1.0, 1000.0) as u16,
                             scale_with_text: scale,
                             raise: raise.map_or(Length::ZERO, length),
+                            followed_by: follow(level.followed_by.as_deref()),
                             ..ListLevel::new(ListLabel::None, index, Length::ZERO)
                         }
                     }
@@ -983,6 +984,7 @@ fn list_levels(style: &odf::ListStyle, pictures: &[(String, Vec<u8>)]) -> [ListL
                         label: ListLabel::bullet("\u{2022}"),
                         label_indent: level.space_before.map_or(Length::ZERO, length),
                         text_indent: level.min_label_width.map_or(Length::ZERO, length),
+                        followed_by: follow(level.followed_by.as_deref()),
                         ..ListLevel::new(ListLabel::None, index, Length::ZERO)
                     },
                 };
@@ -1046,6 +1048,7 @@ fn list_levels(style: &odf::ListStyle, pictures: &[(String, Vec<u8>)]) -> [ListL
             scale_with_text: fixed.is_none(),
             raise,
             color: level.text.color.map(rgba),
+            followed_by: follow(level.followed_by.as_deref()),
         }
     })
 }
@@ -1131,6 +1134,11 @@ fn odf_list_style(
                 label,
                 space_before: Some(odf_length(level.label_indent)),
                 min_label_width: Some(odf_length(level.text_indent)),
+                followed_by: match level.followed_by {
+                    LabelFollow::Tab => None,
+                    LabelFollow::Space => Some("space".to_owned()),
+                    LabelFollow::Nothing => Some("nothing".to_owned()),
+                },
                 text: odf::TextProperties {
                     font_size_percent: sized.then_some(f64::from(level.size)),
                     font_size: (!level.scale_with_text)
@@ -3418,4 +3426,13 @@ fn fixed_guides(guides: &[String]) -> Vec<desk_model::FixedGuide> {
     out.sort();
     out.dedup();
     out
+}
+
+/// What follows a list label, from `text:label-followed-by`.
+fn follow(value: Option<&str>) -> LabelFollow {
+    match value {
+        Some("space") => LabelFollow::Space,
+        Some("nothing") => LabelFollow::Nothing,
+        _ => LabelFollow::Tab,
+    }
 }

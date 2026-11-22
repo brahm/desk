@@ -165,6 +165,7 @@ impl NotePlan {
                     values.get(i).cloned().unwrap_or_default(),
                 );
                 system.screen_spacing(&mut text);
+                text.set_page_margins(setup.margin_left.to_pt(), setup.margin_right.to_pt());
                 text
             })
             .collect();

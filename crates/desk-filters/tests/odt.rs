@@ -1110,6 +1110,71 @@ fn lst_lists_from_other_programs_are_read() {
 }
 
 #[test]
+fn lst_a_label_followed_by_a_space_or_nothing_is_kept() {
+    // As LibreOffice writes a list whose label is followed by a space, or
+    // by nothing, which Pages 15.4 lays out otherwise than after a tab
+    // (step 19k of W1).
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3">
+<office:automatic-styles>
+<text:list-style style:name="L1">
+<text:list-level-style-number text:level="1" style:num-suffix="." style:num-format="1">
+<style:list-level-properties text:list-level-position-and-space-mode="label-alignment">
+<style:list-level-label-alignment text:label-followed-by="space" fo:text-indent="-0.25in" fo:margin-left="0.5in"/>
+</style:list-level-properties>
+</text:list-level-style-number>
+<text:list-level-style-bullet text:level="2" text:bullet-char="-">
+<style:list-level-properties text:list-level-position-and-space-mode="label-alignment">
+<style:list-level-label-alignment text:label-followed-by="nothing" fo:text-indent="-0.25in" fo:margin-left="0.75in"/>
+</style:list-level-properties>
+</text:list-level-style-bullet>
+</text:list-style>
+</office:automatic-styles>
+<office:body><office:text>
+<text:list text:style-name="L1">
+<text:list-item><text:p>one</text:p>
+<text:list><text:list-item><text:p>sub</text:p></text:list-item></text:list>
+</text:list-item>
+</text:list>
+</office:text></office:body>
+</office:document-content>"#;
+    let source = odf::read_streams(content, None, None).unwrap();
+    let document = import(&source).unwrap();
+    let follows = |d: &Document| -> Vec<_> {
+        d.styles()
+            .list_items(d.body().iter())
+            .into_iter()
+            .flatten()
+            .map(|i| {
+                (
+                    i.definition.followed_by,
+                    i.definition.label_indent,
+                    i.definition.text_indent,
+                )
+            })
+            .collect()
+    };
+    let read = follows(&document);
+    assert_eq!(
+        read,
+        [
+            (
+                desk_model::LabelFollow::Space,
+                Length::from_points(18),
+                Length::from_points(18)
+            ),
+            (
+                desk_model::LabelFollow::Nothing,
+                Length::from_points(36),
+                Length::from_points(18)
+            ),
+        ]
+    );
+    let again = read_odt(&write_odt(&document).unwrap()).unwrap();
+    assert_eq!(follows(&again), read);
+}
+
+#[test]
 fn txt_09_hyphenation_of_styles_and_paragraphs_is_kept() {
     let mut document = Document::new_word_processing();
     let body = document.styles().default_paragraph();

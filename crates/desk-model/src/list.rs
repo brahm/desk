@@ -177,6 +177,23 @@ pub struct ListLevel {
     pub raise: Length,
     /// The color of the label, or the color of the text when `None`.
     pub color: Option<Rgba>,
+    /// What follows the label: a tab, as in the lists of Pages, or a
+    /// space or nothing, as a list from Word or ODF may have.
+    pub followed_by: LabelFollow,
+}
+
+/// What follows the label of a list item (`text:label-followed-by` of
+/// ODF, `w:suff` of Word).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum LabelFollow {
+    /// A tab: the text starts at the indent of the list, or at a tab stop
+    /// when the label leaves no room (step 19k of W1).
+    #[default]
+    Tab,
+    /// A space.
+    Space,
+    /// Nothing.
+    Nothing,
 }
 
 impl ListLevel {
@@ -192,6 +209,7 @@ impl ListLevel {
             scale_with_text: true,
             raise: Length::ZERO,
             color: None,
+            followed_by: LabelFollow::Tab,
         }
     }
 }

@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use desk_model::{
     Alignment, Baseline, CharFormat, LINE_BREAK, Ligatures, LineSpacing, LineStyle, Rgba, Shadow,
+    TabStops,
 };
 use icu_segmenter::LineSegmenter;
 use icu_segmenter::options::LineBreakOptions;
@@ -236,6 +237,11 @@ pub struct TextSystem {
     /// The metrics of each font, by family, weight and slant, at a size of
     /// one point, for Screen View (PXV-01).
     unit_metrics: HashMap<(Arc<str>, u16, bool), parley::FontMetrics>,
+    /// The width of the digit 2 of each font, in ems.
+    digit_widths: HashMap<(Arc<str>, u16, bool), f32>,
+    /// How each character of each font kerns with a space after it, in
+    /// ems.
+    space_kerns: HashMap<(Arc<str>, u16, bool, char), f32>,
 }
 
 impl Default for TextSystem {
@@ -250,6 +256,9 @@ struct Cluster {
     start: usize,
     advance: f32,
     run: usize,
+    /// How it kerns with a space after it, when a tab or the end of the
+    /// paragraph follows it (step 19n of W1).
+    kern: f32,
 }
 
 /// The box of a run on a line, in whole points as Pages rounds it: how far
@@ -315,6 +324,8 @@ impl TextSystem {
             layouts: LayoutContext::new(),
             choices: HashMap::new(),
             unit_metrics: HashMap::new(),
+            digit_widths: HashMap::new(),
+            space_kerns: HashMap::new(),
         };
         for data in crate::fonts::BUNDLED {
             system.add_fonts(data.to_vec());
@@ -481,6 +492,69 @@ impl TextSystem {
             desk_model::Length::from_pt(f64::from(steps(format.space_after) * step));
     }
 
+    /// The width of the digit 2 in the font of a format, at its size: the
+    /// room a list label needs before its text (step 19k of W1).
+    fn digit_width(&mut self, format: &CharFormat) -> f32 {
+        let key = (
+            format.font_family.clone(),
+            format.weight.value(),
+            format.italic,
+        );
+        let size = format.font_size.to_pt() as f32;
+        if let Some(em) = self.digit_widths.get(&key) {
+            return em * size;
+        }
+        let mut sized = format.clone();
+        sized.font_size = desk_model::Length::from_pt(100.0);
+        let probe = ParagraphText::from_runs(
+            desk_model::ParaFormat::default(),
+            sized.clone(),
+            [("2", sized)],
+        );
+        let em = self
+            .layout(&probe, &crate::space::Column::new(LABEL_ROOM), 0.0)
+            .lines
+            .first()
+            .map_or(0.0, |line| line.advance / 100.0);
+        self.digit_widths.insert(key, em);
+        em * size
+    }
+
+    /// How a character in the font of a format kerns with a space after
+    /// it, at `size` (step 19n of W1).
+    fn space_kern(&mut self, format: &CharFormat, c: char, size: f32) -> f32 {
+        let key = (
+            format.font_family.clone(),
+            format.weight.value(),
+            format.italic,
+            c,
+        );
+        if let Some(em) = self.space_kerns.get(&key) {
+            return em * size;
+        }
+        let mut sized = format.clone();
+        sized.font_size = desk_model::Length::from_pt(100.0);
+        sized.tracking = 0;
+        sized.baseline = Baseline::Normal;
+        let mut width = |s: &str| {
+            let probe = ParagraphText::from_runs(
+                desk_model::ParaFormat::default(),
+                sized.clone(),
+                [(s, sized.clone())],
+            );
+            self.layout(&probe, &crate::space::Column::new(LABEL_ROOM), 0.0)
+                .lines
+                .first()
+                .map_or(0.0, |line| line.advance)
+        };
+        let mut pair = String::from(c);
+        let alone = width(&pair);
+        pair.push(' ');
+        let em = (width(&pair) - alone - width(" ")) / 100.0;
+        self.space_kerns.insert(key, em);
+        em * size
+    }
+
     /// The metrics of the font of a format at a size of one point.
     fn unit_metrics(&mut self, format: &CharFormat) -> Option<parley::FontMetrics> {
         let key = (
@@ -535,21 +609,135 @@ impl TextSystem {
         let mut format = text.paragraph().clone();
         // The label of a list item, laid out on its own: the text of the
         // item starts after it, on every line (LST-02).
-        let label = text.label().map(|label| {
-            let label_format = text.formats()[label.format as usize].clone();
+        // The right edge of the text: the column less a right indent,
+        // which counts only to the right (step 19m of W1).
+        let right = space.width() - (format.right_indent.to_pt() as f32).max(0.0);
+        let screen_view = text.screen().is_some();
+        let mut label_alone = false;
+        let mut hidden_stop = None;
+        let label = text.label().cloned().map(|label| {
+            let mut label_format = text.formats()[label.format as usize].clone();
+            // Pages spaces no letters of a label apart (step 19o of W1).
+            label_format.tracking = 0;
             let label_text = ParagraphText::from_runs(
                 desk_model::ParaFormat::default(),
                 label_format.clone(),
-                [(label.text.as_str(), label_format)],
+                [(label.text.as_str(), label_format.clone())],
             );
             let laid = self.layout(&label_text, &crate::space::Column::new(LABEL_ROOM), 0.0);
             let width = match &label.image {
                 Some((picture, height)) => *height * picture.aspect() as f32,
                 None => laid.lines.first().map_or(0.0, |l| l.advance),
             };
-            let x = format.left_indent.to_pt() as f32 + label.indent;
-            let first = label.text_indent.max(width);
-            let rest = label.continuation.unwrap_or(first);
+            let mut x = format.left_indent.to_pt() as f32 + label.indent;
+            let digit = |system: &mut Self, size: f32| {
+                let mut sized = label_format.clone();
+                sized.font_size = desk_model::Length::from_pt(f64::from(size));
+                system.digit_width(&sized)
+            };
+            let (first, rest) = match (label.continuation, &label.printed) {
+                (Some(rest), printed) => {
+                    let mut first = label.text_indent.max(width);
+                    // Screen View moves the label and the text of the first
+                    // line 36 points on the screen when the text is pushed
+                    // to a tab stop in print and the label is not at the
+                    // edge (step 19k of W1, 1,849 items exact).
+                    if let (Some(p), Some(screen)) = (printed, text.screen())
+                        && p.position > 0.0
+                    {
+                        let need = p.position + digit(self, p.size);
+                        let stop = list_text_stop(
+                            label.followed_by,
+                            p.position,
+                            p.text_indent,
+                            need,
+                            &p.tab_stops,
+                            p.default_tab_interval,
+                        );
+                        // Whatever M / T is, the move is 36 points (step 19l).
+                        if stop > p.position + p.text_indent {
+                            let shift = 36.0 / screen.zoom;
+                            x += shift;
+                            first += shift;
+                        }
+                    }
+                    (first, rest)
+                }
+                (None, _) => {
+                    // In print, the text goes to a tab stop when the room
+                    // after the label is no wider than the digit 2 of its
+                    // font at the size of the paragraph mark, M. The
+                    // distance to the stop then scales by M over the size
+                    // of the text, T; the other lines start at the larger of
+                    // that distance and the indent, scaled alike (steps 19k
+                    // and 19l of W1, 13,907 items exact).
+                    let need = x + digit(self, label.mark_size);
+                    let stop = list_text_stop(
+                        label.followed_by,
+                        x,
+                        label.text_indent,
+                        need,
+                        &format.tab_stops,
+                        format.default_tab_interval.to_pt() as f32,
+                    );
+                    let k = label.mark_size / label.text_size.max(f32::MIN_POSITIVE);
+                    // Pages works the first line out in single precision:
+                    // the distance to the stop, then that over T, each
+                    // rounded to a float, times M in double. A first line
+                    // that ends up exactly 10 points before the edge keeps
+                    // its text (step 19n of W1, 2,638 items and the 5,478
+                    // of 19m exact).
+                    let s = if label.followed_by == desk_model::LabelFollow::Tab {
+                        millipoints(stop)
+                    } else {
+                        // Where a digit ends, which is no length of the
+                        // document.
+                        f64::from(stop)
+                    };
+                    let d = (s - millipoints(x)) as f32;
+                    let q = d / millipoints(label.text_size).max(0.001) as f32;
+                    // The end of the label is its position as a float plus
+                    // its width at its own size, kerned inside but not
+                    // with the tab; the edge is the column less the right
+                    // indent as a float (step 19o of W1, 2,164 items
+                    // exact).
+                    let label_end = f64::from(millipoints(x) as f32) + f64::from(width);
+                    let x1 = (millipoints(x) + f64::from(q) * millipoints(label.mark_size))
+                        .max(label_end);
+                    // Each margin of the page counts as a float where
+                    // that rounds it up, exactly otherwise (6,530 items).
+                    let (left_margin, right_margin) = text.page_margins();
+                    let up = |m: f64| (f64::from(m as f32) - m).max(0.0);
+                    let edge = millipoints(space.width())
+                        - up(left_margin)
+                        - up(right_margin)
+                        - f64::from(format.right_indent.to_pt().max(0.0) as f32);
+                    let first = x1 as f32;
+                    // Near the right edge (step 19m of W1, 5,325 items
+                    // exact): the other lines start 18 points before it at
+                    // most, and the first keeps its text only while it
+                    // starts more than 10 points before it, or else holds
+                    // the label alone. The label is drawn 20 points before
+                    // it at most, its stop measured from where it would be.
+                    let rest = ((stop - x).max(x + label.text_indent) + (k - 1.0) * (stop - x))
+                        .min(right - 18.0);
+                    let first = if x1 <= edge - 10.0 {
+                        first
+                    } else {
+                        label_alone = true;
+                        rest
+                    };
+                    // Later tabs are not scaled. Past the custom stops,
+                    // one goes to a hidden stop at the indent L less the
+                    // stop of the label, S, before the default ones (step
+                    // 19n of W1, 1,881 items exact).
+                    hidden_stop = Some(x + label.text_indent - stop);
+                    let drawn = x.min(right - 20.0);
+                    let (first, rest) = (first - drawn, rest - drawn);
+                    x = drawn;
+                    (first, rest)
+                }
+            };
             format.left_indent = desk_model::Length::from_pt(f64::from(x + rest));
             format.first_line_indent = desk_model::Length::from_pt(f64::from(first - rest));
             (laid, x, label.format, label.raise, label.image.clone())
@@ -561,6 +749,7 @@ impl TextSystem {
         // manual line break).
         layout.break_all_lines(None);
         let mut runs: Vec<(FontData, f32)> = Vec::new();
+        let mut brushes: Vec<u32> = Vec::new();
         // The tracking of each run, in points after each of its letters.
         let mut tracking: Vec<f32> = Vec::new();
         // The box of each run, rounded as the line heights are.
@@ -581,6 +770,7 @@ impl TextSystem {
                     let run = glyph_run.run();
                     runs.push((run.font().clone(), run.font_size()));
                     let brush = glyph_run.style().brush;
+                    brushes.push(brush);
                     let format = &text.formats()[brush as usize];
                     let object = text.object_box(brush).is_some();
                     tracking.push(if object {
@@ -630,6 +820,7 @@ impl TextSystem {
                             start: cluster.text_range().start,
                             advance: cluster.advance(),
                             run: runs.len() - 1,
+                            kern: 0.0,
                         });
                     }
                 }
@@ -637,6 +828,24 @@ impl TextSystem {
         }
         clusters.sort_by_key(|c| c.start);
         clusters.dedup_by_key(|c| c.start);
+        if source.contains('\t') {
+            for i in 0..clusters.len() {
+                let end = clusters.get(i + 1).map_or(source.len(), |c| c.start);
+                let next = source[end..].chars().next();
+                let run = clusters[i].run;
+                if objects[run] || !matches!(next, None | Some('\t')) {
+                    continue;
+                }
+                let Some(c) = source[clusters[i].start..end].chars().next_back() else {
+                    continue;
+                };
+                if c == '\t' {
+                    continue;
+                }
+                let format = text.formats()[brushes[run] as usize].clone();
+                clusters[i].kern = self.space_kern(&format, c, runs[run].1);
+            }
+        }
         // Pages '09 kept on a line the space that a font kerns with the
         // character before it, as Gill Sans does after a comma; Pages 15.4
         // lets it hang past the end of the line like any other space, so a
@@ -674,7 +883,39 @@ impl TextSystem {
             let (id, advance) = hyphen_glyph(&font, size)?;
             Some((font, size, id, advance))
         };
-        let ruler = TabRuler::new(&format);
+        // In print, a paragraph starts its first line 18 points before the
+        // edge of the column at most, and its other lines 18 points before
+        // its right edge; tab stops stop short of the edge of the column
+        // (step 19m of W1). Screen View has none of these limits.
+        let ruler = if screen_view {
+            // Every tab goes to the next 36 points on the screen from the
+            // edge of the column, whatever the indents (step 19n of W1).
+            TabRuler::new(&format).listed(None)
+        } else {
+            let column = space.width();
+            if text.label().is_none() {
+                // Whatever the right indent, which gives way instead
+                // (step 19o of W1, 869 lines exact).
+                let left = format.left_indent.to_pt() as f32;
+                let first = left + format.first_line_indent.to_pt() as f32;
+                let left = left.min(column - 18.0);
+                format.left_indent = desk_model::Length::from_pt(f64::from(left));
+                format.first_line_indent =
+                    desk_model::Length::from_pt(f64::from(first.min(column - 18.0) - left));
+            }
+            // A table of contents is an object of its own in Pages, whose
+            // page numbers end at the edge (B-022).
+            let ruler = if format.toc_entry.is_some() {
+                TabRuler::new(&format)
+            } else {
+                TabRuler::new(&format).clamped(column)
+            };
+            if text.label().is_some() {
+                ruler.listed(hidden_stop)
+            } else {
+                ruler
+            }
+        };
         let has_tabs = source.contains('\t');
         // The width of the text from `a` to `b` on a line from `x` to
         // `limit`, and how much wider its tabs are than as shaped.
@@ -693,6 +934,7 @@ impl TextSystem {
                 tab: first(c) == '\t',
                 advance: c.advance,
                 first: first(c),
+                kern: c.kern,
             });
             let (tabs, end) = ruler.lay(pieces, x, limit);
             let shaped: f32 = clusters
@@ -710,6 +952,17 @@ impl TextSystem {
         let right = format.right_indent.to_pt() as f32;
         let column = space.width();
         let min_piece = space.min_piece();
+        // In print, the right indent of a paragraph outside a list gives
+        // way to leave each line 18 points, up to the edge of the column
+        // (step 19o of W1).
+        let gives_way = !screen_view && text.label().is_none();
+        let edge = |indent: f32| {
+            if gives_way {
+                (column - right).max(indent + 18.0).min(column)
+            } else {
+                column - right
+            }
+        };
 
         let mut placed: Vec<Placed> = Vec::new();
         let mut breaker = layout.break_lines();
@@ -730,7 +983,7 @@ impl TextSystem {
                 .into_iter()
                 .filter_map(|(x, w)| {
                     let x0 = x.max(indent);
-                    let x1 = (x + w).min(column - right);
+                    let x1 = (x + w).min(edge(indent));
                     (x1 - x0 >= min_piece).then_some((x0, x1 - x0))
                 })
                 .collect();
@@ -744,7 +997,7 @@ impl TextSystem {
                 }
                 // Nothing fits for a long way down, as when the indents are
                 // wider than the column: overflow rather than loop forever.
-                segments.push((indent, (column - right - indent).max(MIN_SEGMENT_WIDTH)));
+                segments.push((indent, (edge(indent) - indent).max(MIN_SEGMENT_WIDTH)));
             }
             searched_from = y;
             let saved: BreakerState = breaker.state().clone();
@@ -788,7 +1041,7 @@ impl TextSystem {
                 // around it, as in a triangle or beside an object, goes
                 // lower, where the line may be wider, as in Pages '09 and
                 // 15.4 (B-046); a piece after text of the line stays empty.
-                let measure = column - right - indent;
+                let measure = edge(indent) - indent;
                 if end.is_none()
                     && next_break < breaks.len()
                     && width + 0.001 < measure
@@ -952,7 +1205,9 @@ impl TextSystem {
                             commit(&mut breaker, text_top);
                             exact
                         }
-                        LineSpacing::Between(extra) => height + extra.to_pt() as f32,
+                        // Pages 15.4 adds at least a point (step 19k of W1): its
+                        // inspector makes less than one point one.
+                        LineSpacing::Between(extra) => height + (extra.to_pt() as f32).max(1.0),
                     }
                 };
                 if pitch > guess + 0.001 {
@@ -1023,7 +1278,7 @@ impl TextSystem {
             // Where the tabs of the line go, from where Parley put the
             // text, and how far each moves what comes after it.
             let tabs = if has_tabs {
-                line_tabs(&line, source, &ruler, place.x + place.width)
+                line_tabs(&line, source, &ruler, &clusters, place.x + place.width)
             } else {
                 Vec::new()
             };
@@ -1304,8 +1559,35 @@ impl TextSystem {
                 drop_cap_shape: None,
             });
         }
+        if label_alone && let Some(pitch) = lines.first().map(|l| l.height) {
+            // The label has the first line to itself: the text starts on
+            // the next, and the first line holds both.
+            for line in &mut lines {
+                line.top += pitch;
+                line.baseline += pitch;
+                line.text_bottom += pitch;
+                for run in &mut line.runs {
+                    run.baseline += pitch;
+                    for glyph in &mut run.glyphs {
+                        glyph.y += pitch;
+                    }
+                }
+                for decoration in &mut line.decorations {
+                    decoration.y += pitch;
+                }
+            }
+            if let Some(first) = lines.first_mut() {
+                first.top -= pitch;
+                first.height += pitch;
+            }
+        }
+        let label_lift = if label_alone {
+            lines.first().map_or(0.0, |l| l.height / 2.0)
+        } else {
+            0.0
+        };
         if let (Some((laid, x, format, raise, image)), Some(first)) = (label, lines.first_mut()) {
-            let baseline = first.baseline - raise;
+            let baseline = first.baseline - raise - label_lift;
             if let Some((picture, height)) = image {
                 // As Pages draws it: a third of the picture below the
                 // baseline of the line, which the offset of the label
@@ -1315,7 +1597,7 @@ impl TextSystem {
                 first.label_image = Some(LabelImage {
                     picture,
                     x,
-                    y: first.baseline - height * 2.0 / 3.0,
+                    y: first.baseline - label_lift - height * 2.0 / 3.0,
                     width,
                     height,
                 });
@@ -1488,6 +1770,7 @@ fn line_tabs(
     line: &parley::Line<'_, u32>,
     source: &str,
     ruler: &TabRuler,
+    clusters: &[Cluster],
     limit: f32,
 ) -> Vec<LineTab> {
     let mut spans = Vec::new();
@@ -1507,6 +1790,9 @@ fn line_tabs(
         tab: first(s) == '\t',
         advance: s.right - s.x,
         first: first(s),
+        kern: clusters
+            .binary_search_by_key(&s.range.start, |c| c.start)
+            .map_or(0.0, |i| clusters[i].kern),
     });
     let (places, _) = ruler.lay(pieces, spans[0].x, limit);
     let mut moved = 0.0;
@@ -1740,6 +2026,48 @@ fn vertical_metrics(
             LeadingPlace::Around,
         ),
     }
+}
+
+/// A length of the document, kept in thousandths of a point, as a
+/// double again: what Pages computes with before it rounds to a float.
+fn millipoints(points: f32) -> f64 {
+    (f64::from(points) * 1000.0).round() / 1000.0
+}
+
+/// Where Pages 15.4 starts the text of a list item after its label at
+/// `label`, `text_indent` after it by the indents of the list, when the
+/// label needs the room up to `need`, its position plus the width of the
+/// digit 2 of its font at the size of the text: at the indent when it is
+/// further than that, or a custom tab stop before it, otherwise at the
+/// first tab stop from there, custom or default (step 19k of W1, 1,849
+/// items exact). Positions are from the edge of the text.
+fn list_text_stop(
+    followed_by: desk_model::LabelFollow,
+    label: f32,
+    text_indent: f32,
+    need: f32,
+    tabs: &TabStops,
+    interval: f32,
+) -> f32 {
+    // After a space or nothing, the text starts where the label needs it
+    // to, or after the label when it is wider (step 19k of W1).
+    if followed_by != desk_model::LabelFollow::Tab {
+        return need;
+    }
+    let indent = label + text_indent;
+    let custom = |from: f32| {
+        tabs.stops()
+            .iter()
+            .map(|stop| stop.position.to_pt() as f32)
+            .find(|&position| position >= from)
+    };
+    if indent > need {
+        return custom(need).filter(|&c| c < indent).unwrap_or(indent);
+    }
+    custom(need).unwrap_or_else(|| {
+        let interval = interval.max(1.0);
+        (need / interval).ceil().max(1.0) * interval
+    })
 }
 
 /// The line spacings of Screen View of Pages 15.4, as multiples of the

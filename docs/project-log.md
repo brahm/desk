@@ -1554,13 +1554,100 @@ paragraph, and objects on a second page.
   and 1.75, ties to the lower; at least, exactly and between are
   compared with the unrounded line of the font on the screen (5,261
   values). Desk does all of this.
-- Still without an exact rule: on its first line only, a list label
-  moves to 36 points when the page view pushes its text to the next tab
-  stop, from between 32.5 and 33 points for the standard Word list in
-  Helvetica Neue but not in Times New Roman at 36, with no formula
-  found; which way a distance exactly on a cut falls; line spacing
-  under single; and between 0, which Pages drew as between 1. Desk
-  leaves these as single and does not move the label.
+- The owner asked for the last formula and the ties too (step 19k,
+  positions in print taken from PDFs that Pages exported, in steps of
+  0.05 point). The text of a list item goes to a tab stop in print when
+  the room after its label is no wider than the digit 2 of the label's
+  font at the size of the text (0.556 em in Helvetica Neue, 0.5 in
+  Times, 0.58 in Avenir, 0.55859 in Georgia): to the first stop from
+  there, custom or default, and a custom stop before the indent wins
+  over it (1,849 items exact). Screen View then moves the label and
+  the first line 36 points when the label is not at the edge. Times at
+  36 points is a tie, 18 points of digit in 18 of room, which goes to
+  the stop at 36, the indent itself, so the label does not move; its
+  one shift in 19j stays unexplained. A distance exactly on a cut goes
+  to the lower level, compared unrounded (1,213 values a twip either
+  side, none off), though Pages cannot store a value exactly on one;
+  lines under single show as single; between adds at least a point,
+  in print too. Desk does all of this. After a space or nothing instead
+  of a tab, the text starts where the digit ends, or after a wider
+  label; Desk lists now keep what follows the label, as ODF writes it
+  (`text:label-followed-by`).
+- The owner asked for those cases too (step 19l, 234 documents, print
+  from PDFs and Screen View from captures). The digit is measured at
+  the size of the paragraph mark, M, and the label drawn at it, never
+  at the size of the text, T; the stop is chosen as before, and only
+  the distance from the label to it scales by M / T. After a jump the
+  other lines start at the larger of that distance and the indent,
+  even when T is M (13,907 items, under 0.0001 point off). After a
+  space or nothing the stop is where the digit ends, custom stops
+  ignored. Screen View measures its 18/17 by the mark, moves the label
+  36 points whatever M / T, also after a space or nothing, and draws a
+  label at its printed size when T and M differ (1,154 items). Desk
+  does all of this. The one shift of Times New Roman at 36 points in
+  19j did not come back in eight conditions tried; the rule says it
+  should not move. Seen outside the brief and not copied: near the
+  right margin, the other lines never start past the column less 18
+  points, with a limit of 457.5 points for the first line that has no
+  formula yet.
+- The owner asked for that limit too (step 19m, print from PDFs). The
+  column ends at its width less a right indent, if any, W'. The first
+  line of a list item keeps its text only while it would start more
+  than 10 points before W'; otherwise the label stands alone on it and
+  the text starts on the next line. The other lines start at most 18
+  points before W', and the label at most 20. Tab stops stop short of
+  the width of the column, whatever the right indent: a left stop by
+  25 points, a centred or decimal one by 12.5 and a right one by 1. A
+  paragraph outside a list starts its first line at most 18 points
+  before the width and its other lines 18 before W'. Screen View has
+  none of these limits, and the entries of a table of contents keep
+  their stops. Desk does all of this. Still without an exact rule: a
+  first line exactly 10 points before W', which no capture had; the
+  place of kerned text such as "WW" at a right or centred stop; a
+  second tab in an item whose text and mark sizes differ; and whether
+  the 36 points of Screen View are the default tab interval or a
+  constant.
+- The owner asked for those too (step 19n, 113 documents, print from
+  PDFs and Screen View from captures). Pages works the first line of a
+  list item out in single precision, the distance to the stop and that
+  over the size of the text each rounded to a float, so a tie 10 points
+  before the edge keeps the text only when the division is exact or
+  rounds down (2,638 items, and the 153 ties of 19m, none off). Text on
+  a right, centred or decimal stop is measured up to the start of what
+  follows it, a tab or the end of the paragraph, drawn as a space, so
+  the kerning of its last letter with a space counts; a decimal stop
+  holds the middle of the separator (8,760 items). Later tabs of a list
+  item are not scaled by M / T: past the custom stops one goes to a
+  hidden stop at the indent less the stop of the label, then to the
+  default ones (1,881 items). Screen View puts every tab on the next 36
+  points from the edge of the column, whatever the default interval,
+  the Text Size or the custom stops (369 tabs). Desk does all of this.
+  The one shift of Times New Roman at 36 points in 19j did not come
+  back in six more ways of opening its document, against a control that
+  shifts; no rule covers it. Seen outside the brief and not settled:
+  where Pages drops a very large left indent from Word, and a tie on
+  the end of the label rather than the stop.
+- The owner asked for those too (step 19o, 175 documents and 227 PDFs,
+  then 88 more). The shift of Times New Roman at 36 points in 19j never
+  happened: the parser of that round lost the lines of Times under
+  160 % and skipped them in silence, and the captures that survive are
+  the same, pixel for pixel, as those of 19n. A tie on the end of the
+  label is decided like the other: the label ends at its position as a
+  float plus its width at its own size, kerned inside but not with the
+  tab and without the letter spacing of Word, which Pages does not
+  draw; the edge is the width of the column less each margin of the
+  page where a float rounds it up and the right indent as a float
+  (6,530 items, 5,360 of them exact ties, none off). The Indents of
+  the inspector keep First, where the first line starts, and Left
+  between 0 and the column less Right less 18 points, and Right up to
+  the column less the larger of the two less 18; setting one leaves
+  the others alone (49 values). When the indents no longer fit, the
+  first line and the others start 18 points before the edge at most,
+  and the right indent gives way, line by line, to leave each line 18
+  points (869 lines). Desk does all of this. A Word file keeps each
+  indent in 16 signed bits of twips when Pages opens it, so one past
+  32,767 twips (1,638.35 points) turns negative; Desk opens Word files
+  in W5, which is where this belongs.
 
 ## Decisions, with their reasons and consequences
 

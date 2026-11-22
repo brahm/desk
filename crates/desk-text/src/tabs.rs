@@ -26,6 +26,9 @@ pub(crate) struct TabRuler {
     stops: Vec<Stop>,
     interval: f32,
     indent: f32,
+    /// A stop that comes after the custom ones and before the default
+    /// ones, as in a list item (step 19n of W1).
+    hidden: Option<f32>,
 }
 
 /// A stop, in points.
@@ -58,6 +61,10 @@ pub(crate) struct Piece {
     pub advance: f32,
     /// Its first character.
     pub first: char,
+    /// How a space after it would kern with it: Pages measures text
+    /// aligned on a stop up to the start of what follows, a tab or the
+    /// end of the paragraph, which it draws as a space (step 19n of W1).
+    pub kern: f32,
 }
 
 /// Where a tab went: where it starts and how wide it is.
@@ -74,8 +81,11 @@ struct Pending {
     stop: Stop,
     /// The width of the text after the tab so far.
     text: f32,
-    /// The width of that text before its decimal separator, once found.
+    /// The width of that text up to the middle of its decimal
+    /// separator, once found.
     before_decimal: Option<f32>,
+    /// How the last piece of that text kerns with a space after it.
+    kern: f32,
 }
 
 impl TabRuler {
@@ -95,7 +105,33 @@ impl TabRuler {
                 .collect(),
             interval: (format.default_tab_interval.to_pt() as f32).max(1.0),
             indent: format.left_indent.to_pt() as f32,
+            hidden: None,
         }
+    }
+
+    /// The same stops for a list item, or for Screen View: no stop at the
+    /// left indent, and a `hidden` one after the custom stops (step 19n of
+    /// W1).
+    pub fn listed(mut self, hidden: Option<f32>) -> Self {
+        self.indent = f32::NEG_INFINITY;
+        self.hidden = hidden;
+        self
+    }
+
+    /// The same stops, which Pages 15.4 keeps short of the edge of a
+    /// column `width` wide, whatever the right indent: a left stop 25
+    /// points before it at most, a centered or decimal one 12.5, a right
+    /// one 1 (step 19m of W1, in steps of a twip).
+    pub fn clamped(mut self, width: f32) -> Self {
+        for stop in &mut self.stops {
+            let room = match stop.alignment {
+                TabAlignment::Left => 25.0,
+                TabAlignment::Center | TabAlignment::Decimal => 12.5,
+                TabAlignment::Right => 1.0,
+            };
+            stop.position = stop.position.min(width - room);
+        }
+        self
     }
 
     /// The stop that a tab starting at `x` goes to.
@@ -108,9 +144,11 @@ impl TabRuler {
         if x + EPSILON < self.indent && custom.is_none_or(|s| s.position > self.indent) {
             return Stop::plain(self.indent);
         }
-        custom.unwrap_or_else(|| {
-            Stop::plain((((x + EPSILON) / self.interval).floor() + 1.0) * self.interval)
-        })
+        custom
+            .or_else(|| self.hidden.filter(|&h| h > x + EPSILON).map(Stop::plain))
+            .unwrap_or_else(|| {
+                Stop::plain((((x + EPSILON) / self.interval).floor() + 1.0) * self.interval)
+            })
     }
 
     /// Lays out the pieces of a line that starts at `x` and may reach
@@ -126,13 +164,14 @@ impl TabRuler {
         let mut pending: Option<Pending> = None;
         let resolve = |pending: Pending, tabs: &mut Vec<TabPlace>| -> f32 {
             let stop = pending.stop;
+            // The text up to the start of what follows it.
+            let aligned = pending.text + pending.kern;
             let start = match stop.alignment {
                 TabAlignment::Left => stop.position,
-                TabAlignment::Right => stop.position - pending.text,
-                TabAlignment::Center => stop.position - pending.text / 2.0,
-                TabAlignment::Decimal => {
-                    stop.position - pending.before_decimal.unwrap_or(pending.text)
-                }
+                TabAlignment::Right => stop.position - aligned,
+                TabAlignment::Center => stop.position - aligned / 2.0,
+                // On the middle of the separator, as kerned (step 19n).
+                TabAlignment::Decimal => stop.position - pending.before_decimal.unwrap_or(aligned),
             };
             // A tab never goes back, nor past the end of the line.
             let end = start.max(pending.start).min(limit.max(pending.start));
@@ -153,15 +192,17 @@ impl TabRuler {
                     stop: self.next(x),
                     text: 0.0,
                     before_decimal: None,
+                    kern: 0.0,
                 });
             } else if let Some(p) = &mut pending {
                 if p.stop.alignment == TabAlignment::Decimal
                     && p.before_decimal.is_none()
                     && piece.first == p.stop.decimal
                 {
-                    p.before_decimal = Some(p.text);
+                    p.before_decimal = Some(p.text + piece.advance / 2.0);
                 }
                 p.text += piece.advance;
+                p.kern = piece.kern;
             } else {
                 x += piece.advance;
             }
@@ -197,6 +238,7 @@ mod tests {
                 tab: c == '\t',
                 advance: 10.0,
                 first: c,
+                kern: 0.0,
             })
             .collect()
     }
@@ -211,9 +253,9 @@ mod tests {
         assert_eq!((tabs[0].width, end), (40.0, 100.0));
         let (tabs, end) = lay(TabAlignment::Center, "ab\tcdef");
         assert_eq!((tabs[0].width, end), (60.0, 120.0));
-        // The separator of "12,50" is at the stop.
+        // The middle of the separator of "12,50" is at the stop.
         let (tabs, end) = lay(TabAlignment::Decimal, "ab\t12,50");
-        assert_eq!((tabs[0].width, end), (60.0, 130.0));
+        assert_eq!((tabs[0].width, end), (55.0, 125.0));
         // Without a separator, the text ends at the stop.
         let (_, end) = lay(TabAlignment::Decimal, "ab\t1250");
         assert_eq!(end, 100.0);

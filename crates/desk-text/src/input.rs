@@ -12,7 +12,7 @@ use std::ops::Range;
 
 use desk_model::{
     Capitalization, CharFormat, Length, Ligatures, LineStyle, ListItem, ListLabel, ParaFormat,
-    Paragraph, Picture, Styles, TextSettings,
+    Paragraph, Picture, Styles, TabStops, TextSettings,
 };
 
 use crate::fonts::pages_font;
@@ -96,6 +96,18 @@ pub struct Label {
     /// first, when it is `text_indent` whatever the width of the label,
     /// as in Screen View.
     pub continuation: Option<f32>,
+    /// The size of the first text of the item, T.
+    pub text_size: f32,
+    /// The size of its paragraph mark, M, at which the width of a digit
+    /// in the font of the label decides whether its text goes to a tab
+    /// stop, and by which the distance to the stop scales as M / T (steps
+    /// 19k and 19l of W1).
+    pub mark_size: f32,
+    /// In Screen View, the label as it prints.
+    pub printed: Option<PrintedLabel>,
+    /// What follows the label: with a space or nothing, the text never
+    /// goes to a tab stop.
+    pub followed_by: desk_model::LabelFollow,
     /// The picture of an image bullet and its height, in points, drawn
     /// instead of the text (LST-03).
     pub image: Option<(Picture, f32)>,
@@ -186,6 +198,9 @@ pub struct ParagraphText {
     /// How Screen View shows the paragraph, while the styles resolve
     /// formatting as it does (PXV-01).
     screen: Option<Screen>,
+    /// The left and right margins of the page, in points, which decide
+    /// a tie near the right edge of the text (step 19o of W1).
+    page_margins: (f64, f64),
 }
 
 /// What lays out a paragraph as Screen View of Pages 15.4 shows it.
@@ -197,6 +212,29 @@ pub struct Screen {
     /// font and size space the paragraph from its neighbours (step 19i of
     /// W1).
     pub style: CharFormat,
+    /// The paragraph formatting as it prints, and the size of its first
+    /// text as it prints, which decide whether the label of a list item
+    /// moves (step 19k of W1).
+    pub printed: ParaFormat,
+    /// The size of the first text of the paragraph as it prints.
+    pub size: f32,
+}
+
+/// A list label as it prints, for Screen View, which moves the label of
+/// an item whose text is pushed to a tab stop in print (step 19k of W1).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrintedLabel {
+    /// The distance from the edge of the text to the label.
+    pub position: f32,
+    /// The distance from the label to the text.
+    pub text_indent: f32,
+    /// The size of the paragraph mark, at which a digit measures the room
+    /// the label needs (step 19l of W1).
+    pub size: f32,
+    /// The tab stops and the distance between the default ones.
+    pub tab_stops: TabStops,
+    /// The distance between the default tab stops.
+    pub default_tab_interval: f32,
 }
 
 impl ParagraphText {
@@ -227,9 +265,24 @@ impl ParagraphText {
             (run.text(), format)
         });
         let mut text = Self::from_runs_in(settings, values, format, base, runs);
-        text.screen = styles.screen().map(|zoom| Screen {
-            zoom: zoom as f32,
-            style: styles.printed_character(paragraph.style()),
+        text.screen = styles.screen().map(|zoom| {
+            let mut printed = styles.clone();
+            printed.set_screen(None);
+            let size = paragraph
+                .runs()
+                .next()
+                .map(|run| printed.resolve_character(paragraph.style(), run.style, &run.attrs))
+                .unwrap_or_else(|| {
+                    printed.resolve_character(paragraph.style(), None, &Default::default())
+                })
+                .font_size
+                .to_pt() as f32;
+            Screen {
+                zoom: zoom as f32,
+                style: styles.printed_character(paragraph.style()),
+                printed: printed.resolve_paragraph(paragraph.style(), paragraph.attrs()),
+                size,
+            }
         });
         text
     }
@@ -238,6 +291,17 @@ impl ParagraphText {
     /// formatting as it does.
     pub fn screen(&self) -> Option<&Screen> {
         self.screen.as_ref()
+    }
+
+    /// Sets the left and right margins of the page the paragraph is on,
+    /// in points.
+    pub fn set_page_margins(&mut self, left: f64, right: f64) {
+        self.page_margins = (left, right);
+    }
+
+    /// The left and right margins of the page, in points.
+    pub fn page_margins(&self) -> (f64, f64) {
+        self.page_margins
     }
 
     /// Prepares a paragraph of a document that is an item of a list, as
@@ -285,12 +349,23 @@ impl ParagraphText {
             .map_or(&self.formats[0], |r| &self.formats[r.format as usize]);
         let mut format = first.clone();
         let text_size = first.font_size.to_pt() as f32;
-        let base = if level.scale_with_text {
-            first.font_size.to_pt()
-        } else {
-            12.0
-        };
+        // The label is drawn at the size of the paragraph mark, not of the
+        // text (step 19l of W1).
+        let mark = self.formats[0].font_size.to_pt();
+        let base = if level.scale_with_text { mark } else { 12.0 };
         format.font_size = Length::from_pt(base * f64::from(level.size) / 100.0);
+        // Screen View draws it at its printed size, whatever the Text
+        // Size, when the text and the mark differ in size.
+        if let Some(screen) = &self.screen
+            && level.scale_with_text
+            && screen.style.font_size.to_pt() as f32 != screen.size
+        {
+            format.font_size = Length::from_pt(
+                screen.style.font_size.to_pt() * f64::from(level.size)
+                    / 100.0
+                    / f64::from(screen.zoom),
+            );
+        }
         if let Some(color) = level.color {
             format.color = color;
         }
@@ -317,7 +392,8 @@ impl ParagraphText {
         // first always start there (step 19j, 6,624 positions exact).
         let (indent, text_indent, continuation) = match &self.screen {
             Some(screen) => {
-                let gap = 18.0 / 17.0 * text_size;
+                // 18/17 of the size of the mark on the screen (step 19l).
+                let gap = 18.0 / 17.0 * mark as f32;
                 (18.0 * f32::from(item.level) / screen.zoom, gap, Some(gap))
             }
             None => (
@@ -326,6 +402,13 @@ impl ParagraphText {
                 None,
             ),
         };
+        let printed = self.screen.as_ref().map(|screen| PrintedLabel {
+            position: (screen.printed.left_indent + level.label_indent).to_pt() as f32,
+            text_indent: level.text_indent.to_pt() as f32,
+            size: screen.style.font_size.to_pt() as f32,
+            tab_stops: screen.printed.tab_stops.clone(),
+            default_tab_interval: screen.printed.default_tab_interval.to_pt() as f32,
+        });
         self.label = Some(Label {
             image,
             text: item.label.clone(),
@@ -334,6 +417,10 @@ impl ParagraphText {
             text_indent,
             raise: level.raise.to_pt() as f32,
             continuation,
+            text_size,
+            mark_size: mark as f32,
+            printed,
+            followed_by: level.followed_by,
         });
         self
     }
@@ -384,6 +471,7 @@ impl ParagraphText {
             label: None,
             objects: Vec::new(),
             screen: None,
+            page_margins: (0.0, 0.0),
         };
         let mut model_offset = 0;
         let mut transformed = false;
@@ -602,6 +690,7 @@ impl ParagraphText {
             label: None,
             objects: self.objects.clone(),
             screen: self.screen.clone(),
+            page_margins: self.page_margins,
         }
     }
 

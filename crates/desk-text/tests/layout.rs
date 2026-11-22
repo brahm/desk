@@ -775,7 +775,10 @@ fn obj_17_a_line_shorter_than_its_text_takes_only_its_own_height_from_an_object(
 }
 
 #[test]
-fn indents_wider_than_the_column_overflow_instead_of_hanging() {
+fn indents_wider_than_the_column_leave_each_line_18_points() {
+    // The right indent gives way, as in Pages 15.4: the line from the
+    // left indent at 150 is 18 points wide, and a word wider than that
+    // breaks inside (step 19o of W1).
     let mut system = TextSystem::new();
     let squeezed = ParaFormat {
         left_indent: Length::from_points(150),
@@ -783,7 +786,14 @@ fn indents_wider_than_the_column_overflow_instead_of_hanging() {
         ..ParaFormat::default()
     };
     let layout = plain(&mut system, squeezed, "word");
-    assert_eq!(layout.lines.len(), 1);
+    let line = &layout.lines[0];
+    assert!(
+        (line.x - 150.0).abs() < 0.01 && (line.width - 18.0).abs() < 0.01,
+        "{} {}",
+        line.x,
+        line.width
+    );
+    assert!(layout.lines.len() > 1);
 }
 
 #[test]
@@ -1074,6 +1084,58 @@ fn fmt_16_text_after_a_right_tab_in_another_format_moves_with_it() {
         "{first_glyph} {}",
         last.x
     );
+}
+
+#[test]
+fn fmt_16_text_on_a_stop_is_measured_up_to_a_space_after_it() {
+    // Pages measures text aligned on a stop up to the start of what
+    // follows it, which it draws as a space: the kerning of the last
+    // letter with that space counts (step 19n of W1).
+    let mut system = TextSystem::new();
+    let width =
+        |system: &mut TextSystem, s: &str| plain(system, ParaFormat::default(), s).lines[0].advance;
+    let kern = width(&mut system, "Y ") - width(&mut system, "Y") - width(&mut system, " ");
+    assert!(kern < -0.01, "{kern}");
+    for alignment in [
+        desk_model::TabAlignment::Right,
+        desk_model::TabAlignment::Center,
+    ] {
+        let paragraph = ParaFormat {
+            tab_stops: desk_model::TabStops::new([desk_model::TabStop {
+                alignment,
+                ..desk_model::TabStop::left(Length::from_points(150))
+            }]),
+            ..ParaFormat::default()
+        };
+        for (text, after) in [("a\tWY", 2), ("a\tWY\tb", 3)] {
+            let layout = plain(&mut system, paragraph.clone(), text);
+            let glyphs = &layout.lines[0].runs[0].glyphs;
+            // Where "W" starts.
+            let start = glyphs[glyphs.len() - after].x;
+            let wide = width(&mut system, "WY") + kern;
+            let expected = match alignment {
+                desk_model::TabAlignment::Right => 150.0 - wide,
+                _ => 150.0 - wide / 2.0,
+            };
+            assert!(
+                (start - expected).abs() < 0.001,
+                "{text:?} {start} {expected}"
+            );
+        }
+    }
+    // On a decimal stop, the middle of the separator is on it.
+    let paragraph = ParaFormat {
+        tab_stops: desk_model::TabStops::new([desk_model::TabStop {
+            alignment: desk_model::TabAlignment::Decimal,
+            decimal: ',',
+            ..desk_model::TabStop::left(Length::from_points(150))
+        }]),
+        ..ParaFormat::default()
+    };
+    let layout = plain(&mut system, paragraph, "a\t12,5");
+    let glyphs = &layout.lines[0].runs[0].glyphs;
+    let middle = (glyphs[3].x + glyphs[4].x) / 2.0;
+    assert!((middle - 150.0).abs() < 0.001, "{middle}");
 }
 
 #[test]

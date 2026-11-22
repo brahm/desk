@@ -260,6 +260,7 @@ impl Reader {
                 let get = |name: &str| properties.and_then(|p| length(p, TEXT, name));
                 let mut space_before = get("space-before");
                 let mut min_label_width = get("min-label-width");
+                let mut followed_by = None;
                 // The label alignment mode of LibreOffice: the text at the
                 // margin, the label at the margin plus the text indent.
                 if let Some(alignment) =
@@ -269,12 +270,14 @@ impl Reader {
                     let indent = length(alignment, FO, "text-indent").unwrap_or(Length(0.0));
                     space_before = Some(Length(margin.0 + indent.0));
                     min_label_width = Some(Length(-indent.0));
+                    followed_by = alignment.attr(TEXT, "label-followed-by").map(str::to_owned);
                 }
                 Some(ListLevelStyle {
                     level,
                     label,
                     space_before,
                     min_label_width,
+                    followed_by,
                     relative_size: e
                         .attr(TEXT, "bullet-relative-size")
                         .or_else(|| e.attr(DESK, "relative-size"))

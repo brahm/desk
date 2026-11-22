@@ -418,11 +418,31 @@ fn write_list_style(w: &mut Writer, style: &ListStyle) {
         }
         let image = matches!(level.label, ListLabel::Image { .. });
         w.start("style:list-level-properties");
-        len(w, "text:space-before", level.space_before);
-        len(w, "text:min-label-width", level.min_label_width);
+        // A label followed by a space or nothing needs the label alignment
+        // mode, which places the label and the text by a margin and a
+        // text indent.
+        let followed = level
+            .followed_by
+            .as_deref()
+            .filter(|follow| *follow != "listtab");
+        if followed.is_some() {
+            w.attr("text:list-level-position-and-space-mode", "label-alignment");
+        } else {
+            len(w, "text:space-before", level.space_before);
+            len(w, "text:min-label-width", level.min_label_width);
+        }
         if let ListLabel::Image { width, height, .. } = &level.label {
             len(w, "fo:width", *width);
             len(w, "fo:height", *height);
+        }
+        if let Some(follow) = followed {
+            let before = level.space_before.map_or(0.0, |l| l.0);
+            let width = level.min_label_width.map_or(0.0, |l| l.0);
+            w.start("style:list-level-label-alignment");
+            w.attr("text:label-followed-by", follow);
+            len(w, "fo:text-indent", Some(Length(-width)));
+            len(w, "fo:margin-left", Some(Length(before + width)));
+            w.end();
         }
         w.end();
         // A picture has no text properties.
