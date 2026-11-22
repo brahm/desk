@@ -1538,11 +1538,29 @@ paragraph, and objects on a second page.
   one at the edge with the other lines; a list label is 18 points in at
   each level whatever the indents of the list; a line with several
   sizes takes the tallest. Desk does all of this.
-- Still without an exact rule, for a next round: the distance from a
-  list label to its text (about 1.06 F, also depending on the printed
-  size), why a list at 36 and 72 points has its first level at 36, and
-  how a line of mixed sizes splits its height over and under the
-  baseline. Not measured: two neighbours with different styles.
+- A last round (step 19j, 397 documents and 2,136 captures, a rule
+  passing only if it puts every baseline of a capture on its pixel)
+  closed most of what was left. A list's text starts 18/17 of F after
+  its label, or right after a wider label, and its other lines always
+  there (6,624 positions; what 19i took for a dependence on the printed
+  size was Pages rounding each glyph to a pixel). A line of mixed sizes
+  and fonts takes the largest part over the baseline (H0 less the
+  unrounded descent), the largest descent and the largest leading (105
+  cases). All a level adds goes under the text, the first baseline
+  being the part over it down from the top (423 documents). Between
+  two paragraphs of different styles, each space is counted and drawn
+  in the style of its own paragraph, and the larger shows (156
+  captures). The levels change half way between them, at 1.175, 1.375
+  and 1.75, ties to the lower; at least, exactly and between are
+  compared with the unrounded line of the font on the screen (5,261
+  values). Desk does all of this.
+- Still without an exact rule: on its first line only, a list label
+  moves to 36 points when the page view pushes its text to the next tab
+  stop, from between 32.5 and 33 points for the standard Word list in
+  Helvetica Neue but not in Times New Roman at 36, with no formula
+  found; which way a distance exactly on a cut falls; line spacing
+  under single; and between 0, which Pages drew as between 1. Desk
+  leaves these as single and does not move the label.
 
 ## Decisions, with their reasons and consequences
 

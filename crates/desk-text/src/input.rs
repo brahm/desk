@@ -92,6 +92,10 @@ pub struct Label {
     pub text_indent: f32,
     /// How far the label is raised above the baseline.
     pub raise: f32,
+    /// The distance from the label to the start of the lines after the
+    /// first, when it is `text_indent` whatever the width of the label,
+    /// as in Screen View.
+    pub continuation: Option<f32>,
     /// The picture of an image bullet and its height, in points, drawn
     /// instead of the text (LST-03).
     pub image: Option<(Picture, f32)>,
@@ -280,6 +284,7 @@ impl ParagraphText {
             .first()
             .map_or(&self.formats[0], |r| &self.formats[r.format as usize]);
         let mut format = first.clone();
+        let text_size = first.font_size.to_pt() as f32;
         let base = if level.scale_with_text {
             first.font_size.to_pt()
         } else {
@@ -307,17 +312,28 @@ impl ParagraphText {
         };
         // Screen View puts the label 18 points on the screen further in at
         // each level, whatever the indents of the list (step 19i of W1).
-        let indent = match &self.screen {
-            Some(screen) => 18.0 * f32::from(item.level) / screen.zoom,
-            None => level.label_indent.to_pt() as f32,
+        // Its text starts 18/17 of the size of the text on the screen after
+        // it, or after the label when it is wider; the lines after the
+        // first always start there (step 19j, 6,624 positions exact).
+        let (indent, text_indent, continuation) = match &self.screen {
+            Some(screen) => {
+                let gap = 18.0 / 17.0 * text_size;
+                (18.0 * f32::from(item.level) / screen.zoom, gap, Some(gap))
+            }
+            None => (
+                level.label_indent.to_pt() as f32,
+                level.text_indent.to_pt() as f32,
+                None,
+            ),
         };
         self.label = Some(Label {
             image,
             text: item.label.clone(),
             format: index,
             indent,
-            text_indent: level.text_indent.to_pt() as f32,
+            text_indent,
             raise: level.raise.to_pt() as f32,
+            continuation,
         });
         self
     }

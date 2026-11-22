@@ -461,7 +461,7 @@ impl TextSystem {
                 leading: metrics.leading * size,
                 ..metrics
             };
-            screen_line(&screen.style, size, &scaled, 1.0).0
+            screen_line(&screen.style, size, &scaled, 1.0).height()
         };
         let printed = line(size);
         let shown =
@@ -548,9 +548,10 @@ impl TextSystem {
                 None => laid.lines.first().map_or(0.0, |l| l.advance),
             };
             let x = format.left_indent.to_pt() as f32 + label.indent;
-            format.left_indent =
-                desk_model::Length::from_pt(f64::from(x + label.text_indent.max(width)));
-            format.first_line_indent = desk_model::Length::ZERO;
+            let first = label.text_indent.max(width);
+            let rest = label.continuation.unwrap_or(first);
+            format.left_indent = desk_model::Length::from_pt(f64::from(x + rest));
+            format.first_line_indent = desk_model::Length::from_pt(f64::from(first - rest));
             (laid, x, label.format, label.raise, label.image.clone())
         });
         let mut layout = self.build(text);
@@ -572,7 +573,7 @@ impl TextSystem {
         // spacing scales and its leading, as Pages 15.4 rounds them on
         // the screen (step 19i of W1); none for an object.
         let zoom = text.screen().map(|screen| screen.zoom);
-        let mut screen_lines: Vec<Option<(f32, f32)>> = Vec::new();
+        let mut screen_lines: Vec<Option<ScreenLine>> = Vec::new();
         let mut clusters: Vec<Cluster> = Vec::new();
         for line in layout.lines() {
             for item in line.items() {
@@ -880,7 +881,7 @@ impl TextSystem {
                     let runs = span(pos, line_end);
                     // The tallest text on the line sets it; a line without
                     // text takes the first run of the paragraph.
-                    let (h0, leading) = runs
+                    let line = runs
                         .iter()
                         .filter_map(|c| screen_lines[c.run])
                         .chain(
@@ -890,23 +891,31 @@ impl TextSystem {
                                 .flatten()
                                 .filter(|_| runs.is_empty()),
                         )
-                        .fold(None, |tallest: Option<(f32, f32)>, line| match tallest {
-                            Some(t) if t.0 + t.1 >= line.0 + line.1 => Some(t),
-                            _ => Some(line),
-                        })?;
-                    let multiple =
-                        screen_multiple(format.line_spacing, (1.1 * h0 + leading) * zoom);
-                    let pitch = multiple * h0 + leading;
+                        .reduce(ScreenLine::max)?;
+                    let multiple = screen_multiple(format.line_spacing, line.natural * zoom);
+                    // What the level adds goes under the text: the first
+                    // baseline is the part over it down from the top
+                    // (step 19j, 423 documents).
+                    let pitch = multiple * line.height() + line.leading;
                     // An object taller than the text over the baseline makes
                     // the line taller by as much.
-                    let text_over = line_box.map_or(0.0, |b| b.over);
                     let object_over = runs
                         .iter()
                         .filter(|c| objects[c.run])
                         .map(|c| boxes[c.run].over)
-                        .fold(text_over, f32::max);
-                    Some(pitch + object_over - text_over)
+                        .fold(line.over, f32::max);
+                    Some((pitch + object_over - line.over, object_over))
                 });
+                if let (Some((_, over)), Some(b)) = (screen_pitch, line_box)
+                    && (over - b.over - b.rise).abs() > 0.0001
+                {
+                    // The baseline where Screen View puts it, which is
+                    // `text_top + over + rise` as the line is described.
+                    breaker.revert_to(before_line.clone());
+                    text_top = y + over - b.over - b.rise;
+                    commit(&mut breaker, text_top);
+                }
+                let screen_pitch = screen_pitch.map(|(pitch, _)| pitch);
                 let pitch = if let Some(pitch) = screen_pitch {
                     pitch
                 } else {
@@ -1733,43 +1742,79 @@ fn vertical_metrics(
     }
 }
 
-/// The multiples of the height of a single line without its leading that
-/// Screen View of Pages 15.4 spaces lines by, and the line spacing, as a
-/// multiple of single, from which each applies: whatever the paragraph
-/// sets, the line takes the level its spacing falls in (steps 19h and 19i
-/// of W1, 72 cases exact).
-const SCREEN_LINE_LEVELS: [(f32, f32); 4] = [(0.0, 1.1), (1.16, 1.25), (1.36, 1.5), (1.75, 2.0)];
+/// The line spacings of Screen View of Pages 15.4, as multiples of the
+/// height of a line without its leading, and the line spacing, as a
+/// multiple of single, up to which each applies, ties to the lower: the
+/// midpoints between them. Whatever the paragraph sets, the line takes the
+/// level its spacing falls in (step 19j of W1, 5,261 values swept in
+/// steps of 1/240 without a miss).
+const SCREEN_LINE_LEVELS: [(f32, f32); 3] = [(1.175, 1.1), (1.375, 1.25), (1.75, 1.5)];
 
 /// The multiple of the line without its leading that Screen View spaces a
-/// line by, for a line spacing and a single line of `single` points on the
-/// screen. A distance (at least, exactly, between) counts as a multiple of
-/// that line, so it falls a level as the Text Size grows (step 19h).
-fn screen_multiple(spacing: LineSpacing, single: f32) -> f32 {
+/// line by, for a line spacing and a line whose natural height, the
+/// ascent, descent and leading of its font unrounded, is `natural` points
+/// on the screen. A distance (at least, exactly, between) counts as a
+/// multiple of that height, so it may fall a level as the Text Size grows
+/// (step 19j).
+fn screen_multiple(spacing: LineSpacing, natural: f32) -> f32 {
     let lines = match spacing {
         LineSpacing::Multiple { percent } => percent as f32 / 100.0,
         LineSpacing::AtLeast(length)
         | LineSpacing::Exactly(length)
-        | LineSpacing::Between(length) => length.to_pt() as f32 / single.max(f32::MIN_POSITIVE),
+        | LineSpacing::Between(length) => length.to_pt() as f32 / natural.max(f32::MIN_POSITIVE),
     };
     SCREEN_LINE_LEVELS
         .iter()
-        .rev()
-        .find(|(from, _)| lines >= *from)
-        .map_or(1.1, |(_, multiple)| *multiple)
+        .find(|(to, _)| lines <= *to)
+        .map_or(2.0, |(_, multiple)| *multiple)
 }
 
-/// The height of a single line of a run without its leading, and its
-/// leading, as Screen View of Pages 15.4 has them at a Text Size of
-/// `zoom`, in points of the document: the ascent, the descent and the
-/// leading each rounded to a whole point on the screen, less the leading
-/// unrounded (step 19i of W1, 364 cases exact). `size` is the size of the
-/// run and `metrics` its font's metrics at that size.
+/// A run as Screen View of Pages 15.4 measures its line, in points of the
+/// document (steps 19i and 19j of W1, every baseline of 364 and 105
+/// captures to the pixel). The ascent, the descent and the leading are
+/// each rounded to a whole point on the screen; the line without its
+/// leading, H0, is their sum less the leading unrounded.
+#[derive(Clone, Copy)]
+struct ScreenLine {
+    /// The part of H0 over the baseline: H0 less the descent unrounded.
+    over: f32,
+    /// The descent, unrounded.
+    descent: f32,
+    /// The leading, unrounded.
+    leading: f32,
+    /// The ascent, descent and leading unrounded, which a distance of line
+    /// spacing is compared with.
+    natural: f32,
+}
+
+impl ScreenLine {
+    /// A line with runs of several sizes and fonts takes the largest of
+    /// each part (step 19j, 105 cases).
+    fn max(self, other: Self) -> Self {
+        Self {
+            over: self.over.max(other.over),
+            descent: self.descent.max(other.descent),
+            leading: self.leading.max(other.leading),
+            natural: self.natural.max(other.natural),
+        }
+    }
+
+    /// H0, which line spacing multiplies and which space between
+    /// paragraphs counts in quarters.
+    fn height(self) -> f32 {
+        self.over + self.descent
+    }
+}
+
+/// How Screen View measures the line of a run at a Text Size of `zoom`.
+/// `size` is the size of the run and `metrics` its font's metrics at that
+/// size.
 fn screen_line(
     format: &CharFormat,
     size: f32,
     metrics: &parley::FontMetrics,
     zoom: f32,
-) -> (f32, f32) {
+) -> ScreenLine {
     let scaled = parley::FontMetrics {
         ascent: metrics.ascent * zoom,
         descent: metrics.descent * zoom,
@@ -1778,7 +1823,12 @@ fn screen_line(
     };
     let (ascent, descent, leading, _) = vertical_metrics(format, size * zoom, &scaled);
     let whole = ascent.round() + descent.round() + leading.round();
-    ((whole - leading) / zoom, leading / zoom)
+    ScreenLine {
+        over: (whole - leading - descent) / zoom,
+        descent: descent / zoom,
+        leading: leading / zoom,
+        natural: (ascent + descent + leading) / zoom,
+    }
 }
 
 /// The box of a run, in whole points: Pages rounds the ascent, the descent

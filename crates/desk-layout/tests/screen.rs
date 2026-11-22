@@ -426,6 +426,9 @@ fn pxv_01_screen_view_spaces_lines_paragraphs_and_tabs_as_pages_15_does() {
         let last = lines.iter().rfind(|l| l.paragraph == 0).unwrap();
         let next = lines.iter().find(|l| l.paragraph == 1).unwrap();
         let gap = top(next) - (top(last) + last.line.height);
+        // What a level adds goes under the text.
+        let over = lines[1].line.baseline - lines[1].line.top;
+        assert!((over - 16.712 / zoom).abs() < 0.01, "{over}");
         (pitch, gap)
     };
     let close = |a: f32, b: f32| (a - b).abs() < 0.01;
@@ -437,6 +440,20 @@ fn pxv_01_screen_view_spaces_lines_paragraphs_and_tabs_as_pages_15_does() {
     assert!(close(gap, 2.0 * 21.68 / 4.0 / zoom), "{gap}");
     let (lines, _) = text(LineSpacing::Multiple { percent: 80 }, 0.0);
     assert!(close(lines, single), "{lines}");
+    // The levels change half way between them, ties to the lower one.
+    let (lines, _) = text(LineSpacing::Multiple { percent: 117 }, 0.0);
+    assert!(close(lines, single), "{lines}");
+    let (lines, _) = text(LineSpacing::Multiple { percent: 118 }, 0.0);
+    assert!(close(lines, (1.25 * 21.68 + 4.32) / zoom), "{lines}");
+    // A distance counts against the unrounded line of the font on the
+    // screen, 1.2 times 21.6 points.
+    let natural = 1.2 * 21.6;
+    let exactly = |lines: f32| LineSpacing::Exactly(Length::from_pt(f64::from(natural * lines)));
+    assert!(close(text(exactly(1.17), 0.0).0, single));
+    assert!(close(
+        text(exactly(1.2), 0.0).0,
+        (1.25 * 21.68 + 4.32) / zoom
+    ));
     // Exactly twice the single line on the screen is double; at least one
     // point is single.
     let twice = Length::from_pt(f64::from(2.0 * single * zoom));
@@ -527,5 +544,12 @@ fn pxv_01_screen_view_puts_list_labels_18_points_in_at_each_level() {
         line.origin.0 + line.line.runs[0].x - side
     };
     assert!(label(0).abs() < 0.01, "{}", label(0));
+    // The text 18/17 of its size on the screen after the label.
+    let line = &screen.pages[0].lines[0].line;
+    let gap = line.runs[1].x - line.runs[0].x;
+    assert!(
+        (gap - 18.0 / 17.0 * line.runs[1].size).abs() < 0.01,
+        "{gap}"
+    );
     assert!((label(1) - 36.0 / zoom).abs() < 0.01, "{}", label(1));
 }
