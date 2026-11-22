@@ -908,13 +908,14 @@ pub fn flow_text_boxes(
     let mut y = 0.0f32;
     let mut after = 0.0f32;
     for (i, paragraph) in paragraphs.iter().enumerate() {
-        let text = ParagraphText::new_in_document_with(
+        let mut text = ParagraphText::new_in_document_with(
             styles,
             settings,
             paragraph,
             items[i].as_ref(),
             Default::default(),
         );
+        system.screen_spacing(&mut text);
         let format = text.paragraph();
         if i > 0 && y > 0.0 {
             y += after.max(format.space_before.to_pt() as f32);
@@ -1372,13 +1373,14 @@ fn shape_lines_from(
     let mut out = Vec::new();
     let mut after = 0.0f32;
     for (i, paragraph) in paragraphs.iter().enumerate() {
-        let text = ParagraphText::new_in_document_with(
+        let mut text = ParagraphText::new_in_document_with(
             styles,
             settings,
             paragraph,
             items[i].as_ref(),
             Default::default(),
         );
+        system.screen_spacing(&mut text);
         let format = text.paragraph();
         if i > 0 {
             y += after.max(format.space_before.to_pt() as f32);

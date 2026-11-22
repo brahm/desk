@@ -157,13 +157,15 @@ impl NotePlan {
             .iter()
             .enumerate()
             .map(|(i, paragraph)| {
-                ParagraphText::new_in_document_with(
+                let mut text = ParagraphText::new_in_document_with(
                     styles,
                     settings,
                     paragraph,
                     items[i].as_ref(),
                     values.get(i).cloned().unwrap_or_default(),
-                )
+                );
+                system.screen_spacing(&mut text);
+                text
             })
             .collect();
         let room = crate::pages::MarginRoom::new(document, system);

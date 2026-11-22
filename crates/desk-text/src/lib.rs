@@ -40,7 +40,7 @@ mod space;
 mod tabs;
 
 pub use fonts::{FontChoice, FontMatch, PagesFont};
-pub use input::{FieldValues, ParagraphText, SMALL_CAPS_SCALE};
+pub use input::{FieldValues, ParagraphText, SMALL_CAPS_SCALE, Screen};
 pub use layout::{
     Decoration, DropCapBox, Glyph, GlyphRun, LabelImage, Line, MIN_SEGMENT_WIDTH, ParagraphLayout,
     SCRIPT_SCALE, SOFT_HYPHEN, TextSystem,

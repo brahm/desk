@@ -590,13 +590,14 @@ fn margin_block(
     let mut y = 0.0f32;
     let mut after = 0.0f32;
     for (i, paragraph) in paragraphs.iter().enumerate() {
-        let text = ParagraphText::new_in_document_with(
+        let mut text = ParagraphText::new_in_document_with(
             styles,
             settings,
             paragraph,
             items[i].as_ref(),
             values.clone(),
         );
+        system.screen_spacing(&mut text);
         let format = text.paragraph().clone();
         let laid = system.layout(&text, &Column::new(width), 0.0).lines;
         let Some(first) = laid.first() else {

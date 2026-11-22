@@ -1521,12 +1521,28 @@ paragraph, and objects on a second page.
   the value holds 0.2425 printed lines, whatever the Text Size. Tabs go
   to stops every 36 points on the screen, whatever the Text Size, the
   size, the stops of the paragraph or its default interval; centre,
-  right and decimal stops act as left ones. Desk does all of this, with
-  a single line of 1.2 times the size, the measured one (about 1.29,
-  within 7%) having no clean rule; the font size counted is the one of
-  the paragraph's style. Not measured: space after and before of two
-  neighbours together, hanging indents, first line indents under 36
-  points.
+  right and decimal stops act as left ones.
+- The owner asked for no approximations, and a further round (step
+  19i, 108 documents in four fonts, 977 captures at 12 Text Sizes, each
+  line on a whole pixel of the Retina screen) made the rules exact. With
+  F the size on the screen, the ascent, descent and leading of the font
+  are each rounded to a whole point at F, and H0 is their sum less the
+  unrounded leading: a line is m × H0 plus the leading, m being 1.1,
+  1.25, 1.5 and 2.0 for the four levels (364 and 72 cases, no error); in
+  print it is the same with m the multiple set. The space between two
+  paragraphs is the larger of the space after and before, never the sum,
+  in up to four steps of H0 / 4 on the screen, as many as 4v / H0 in
+  print, rounded half down; the font and size of the paragraph style
+  count, not those of its text, and line spacing does not (1,426 gaps,
+  no error). A first line indent above 0 shows at 36 points, a hanging
+  one at the edge with the other lines; a list label is 18 points in at
+  each level whatever the indents of the list; a line with several
+  sizes takes the tallest. Desk does all of this.
+- Still without an exact rule, for a next round: the distance from a
+  list label to its text (about 1.06 F, also depending on the printed
+  size), why a list at 36 and 72 points has its first level at 36, and
+  how a line of mixed sizes splits its height over and under the
+  baseline. Not measured: two neighbours with different styles.
 
 ## Decisions, with their reasons and consequences
 

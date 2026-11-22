@@ -14,7 +14,7 @@ use imbl::OrdMap;
 
 use crate::Length;
 use crate::error::ModelError;
-use crate::format::{CharAttrs, CharFormat, LineSpacing, ParaAttrs, ParaFormat, TabStops};
+use crate::format::{CharAttrs, CharFormat, ParaAttrs, ParaFormat, TabStops};
 use crate::id::NodeId;
 use crate::list::ListStyle;
 
@@ -416,36 +416,44 @@ impl Styles {
         }
         direct.apply_to(&mut format);
         // Screen View sets no left indent, and a first line indent of its
-        // own, 36 points on the screen whatever the Text Size (the Mac,
-        // step 19g of W1).
-        // A hanging first line, as of a list, keeps its indents: the Mac
-        // showed only a first line indented to the right.
-        if let Some(zoom) = self.screen
-            && format.first_line_indent >= Length::ZERO
-        {
-            format.left_indent = Length::ZERO;
-            if format.first_line_indent > Length::ZERO {
-                format.first_line_indent = Length::from_pt(36.0 * 1000.0 / f64::from(zoom));
-            }
-        }
+        // own, 36 points on the screen whatever the Text Size, when the
+        // paragraph has one to the right; a hanging first line starts at
+        // the edge with the others (the Mac, steps 19g and 19i of W1). Its
+        // tabs go every 36 points on the screen, whatever the stops of the
+        // paragraph (step 19h). Its line spacing and space before and
+        // after depend on the font, and the text system sets them.
         if let Some(zoom) = self.screen {
             let zoom = f64::from(zoom) / 1000.0;
-            let size = self.paragraph_font_size(&chain);
-            screen_spacing(&mut format, size, zoom);
+            format.left_indent = Length::ZERO;
+            format.first_line_indent = if format.first_line_indent > Length::ZERO {
+                Length::from_pt(SCREEN_TAB / zoom)
+            } else {
+                Length::ZERO
+            };
+            format.tab_stops = TabStops::none();
+            format.default_tab_interval = Length::from_pt(SCREEN_TAB / zoom);
         }
         format
     }
 
-    /// The font size, in points, that the style chain of a paragraph sets,
-    /// as it prints.
-    fn paragraph_font_size(&self, chain: &[&Style]) -> f64 {
+    /// The Text Size of Screen View while the styles resolve formatting
+    /// as it shows, 1 for 100%.
+    pub fn screen(&self) -> Option<f64> {
+        self.screen.map(|zoom| f64::from(zoom) / 1000.0)
+    }
+
+    /// The character formatting of a paragraph style as it prints, also
+    /// while the styles resolve formatting as Screen View shows it, which
+    /// spaces paragraphs by the font and size of their style (step 19i of
+    /// W1).
+    pub fn printed_character(&self, style: StyleId) -> CharFormat {
         let mut format = CharFormat::default();
-        for style in chain.iter().rev() {
+        for style in self.chain(style).collect::<Vec<_>>().iter().rev() {
             if let Style::Paragraph(style) = style {
                 style.character.apply_to(&mut format);
             }
         }
-        format.font_size.to_pt()
+        format
     }
 
     /// Resolves the character formatting of a run of text, from the style
@@ -493,71 +501,6 @@ pub fn screen_font_size(size: f64) -> f64 {
     }
 }
 
-/// The height of a single line of a font, in ems, that Screen View of
-/// Pages 15.4 counts with: about 1.20 for Helvetica Neue and 1.15 to 1.19
-/// for Times New Roman (step 19h of W1).
-const SCREEN_LINE_EMS: f64 = 1.2;
-
-/// The four line spacings Screen View of Pages 15.4 shows, as multiples of
-/// single in percent, with the multiple from which each starts: whatever
-/// the paragraph sets, it shows the level its multiple falls in (step 19h
-/// of W1, 520 measurements).
-const SCREEN_LINE_LEVELS: [(f64, u32); 4] = [(0.0, 100), (1.16, 114), (1.36, 135), (1.75, 179)];
-
-/// The share of a printed line that makes one step of space before or
-/// after a paragraph in Screen View, the most steps, and the size of a
-/// step as a share of the line on the screen (step 19h of W1, 263 gaps;
-/// the size of a step varied from 0.83 to 0.92 of a quarter line).
-const SCREEN_SPACE_STEP: f64 = 0.2425;
-const SCREEN_SPACE_STEPS: f64 = 4.0;
-const SCREEN_SPACE_SHARE: f64 = 0.89 / 4.0;
-
-/// The distance between the tab stops of Screen View, in points on the
-/// screen, whatever the Text Size, the font size or the stops that the
-/// paragraph sets (step 19h of W1).
+/// The distance between the tab stops of Screen View, and its first line
+/// indent, in points on the screen (steps 19g and 19h of W1).
 const SCREEN_TAB: f64 = 36.0;
-
-/// Sets the line spacing, the space before and after and the tabs of a
-/// paragraph whose text prints at `size` points as Screen View of Pages
-/// 15.4 shows them at a Text Size of `zoom`.
-fn screen_spacing(format: &mut ParaFormat, size: f64, zoom: f64) {
-    let single = SCREEN_LINE_EMS * size;
-    let screen_single = SCREEN_LINE_EMS * screen_font_size(size);
-    // The printed distance between baselines, which the space before and
-    // after count in.
-    let printed = match format.line_spacing {
-        LineSpacing::Multiple { percent } => single * f64::from(percent) / 100.0,
-        LineSpacing::AtLeast(at_least) => at_least.to_pt().max(single),
-        LineSpacing::Exactly(exactly) => exactly.to_pt(),
-        LineSpacing::Between(between) => single + between.to_pt(),
-    };
-    // A distance is compared with the line on the screen, in points on
-    // the screen, so a fixed one falls a level as the Text Size grows;
-    // "Between" counts as the whole line there.
-    let multiple = match format.line_spacing {
-        LineSpacing::Multiple { percent } => f64::from(percent) / 100.0,
-        LineSpacing::AtLeast(length)
-        | LineSpacing::Exactly(length)
-        | LineSpacing::Between(length) => length.to_pt() / (screen_single * zoom),
-    };
-    let percent = SCREEN_LINE_LEVELS
-        .iter()
-        .rev()
-        .find(|(from, _)| multiple >= *from)
-        .map_or(100, |(_, percent)| *percent);
-    format.line_spacing = LineSpacing::Multiple { percent };
-    let line = screen_single * f64::from(percent) / 100.0;
-    let space = |value: Length| {
-        if printed <= 0.0 {
-            return Length::ZERO;
-        }
-        let steps = (value.to_pt() / (SCREEN_SPACE_STEP * printed))
-            .round()
-            .clamp(0.0, SCREEN_SPACE_STEPS);
-        Length::from_pt(steps * SCREEN_SPACE_SHARE * line)
-    };
-    format.space_before = space(format.space_before);
-    format.space_after = space(format.space_after);
-    format.tab_stops = TabStops::none();
-    format.default_tab_interval = Length::from_pt(SCREEN_TAB / zoom);
-}

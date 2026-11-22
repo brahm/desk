@@ -179,6 +179,20 @@ pub struct ParagraphText {
     /// The objects in the text: the format of the mark of each, which is
     /// its own, and its width and height (OBJ-01).
     pub(crate) objects: Vec<(u32, f32, f32)>,
+    /// How Screen View shows the paragraph, while the styles resolve
+    /// formatting as it does (PXV-01).
+    screen: Option<Screen>,
+}
+
+/// What lays out a paragraph as Screen View of Pages 15.4 shows it.
+#[derive(Clone, Debug)]
+pub struct Screen {
+    /// The Text Size, 1 for 100%.
+    pub zoom: f32,
+    /// The character formatting of the paragraph style as it prints, whose
+    /// font and size space the paragraph from its neighbours (step 19i of
+    /// W1).
+    pub style: CharFormat,
 }
 
 impl ParagraphText {
@@ -208,7 +222,18 @@ impl ParagraphText {
             let format = styles.resolve_character(paragraph.style(), run.style, &run.attrs);
             (run.text(), format)
         });
-        Self::from_runs_in(settings, values, format, base, runs)
+        let mut text = Self::from_runs_in(settings, values, format, base, runs);
+        text.screen = styles.screen().map(|zoom| Screen {
+            zoom: zoom as f32,
+            style: styles.printed_character(paragraph.style()),
+        });
+        text
+    }
+
+    /// How Screen View shows the paragraph, while the styles resolve
+    /// formatting as it does.
+    pub fn screen(&self) -> Option<&Screen> {
+        self.screen.as_ref()
     }
 
     /// Prepares a paragraph of a document that is an item of a list, as
@@ -280,11 +305,17 @@ impl ParagraphText {
             ListLabel::Image(picture) => Some((picture.clone(), size)),
             _ => None,
         };
+        // Screen View puts the label 18 points on the screen further in at
+        // each level, whatever the indents of the list (step 19i of W1).
+        let indent = match &self.screen {
+            Some(screen) => 18.0 * f32::from(item.level) / screen.zoom,
+            None => level.label_indent.to_pt() as f32,
+        };
         self.label = Some(Label {
             image,
             text: item.label.clone(),
             format: index,
-            indent: level.label_indent.to_pt() as f32,
+            indent,
             text_indent: level.text_indent.to_pt() as f32,
             raise: level.raise.to_pt() as f32,
         });
@@ -336,6 +367,7 @@ impl ParagraphText {
             paragraph,
             label: None,
             objects: Vec::new(),
+            screen: None,
         };
         let mut model_offset = 0;
         let mut transformed = false;
@@ -553,6 +585,7 @@ impl ParagraphText {
             paragraph,
             label: None,
             objects: self.objects.clone(),
+            screen: self.screen.clone(),
         }
     }
 
