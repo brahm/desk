@@ -98,6 +98,22 @@ impl TabRuler {
         }
     }
 
+    /// The same stops, which Pages 15.4 keeps short of the edge of a
+    /// column `width` wide, whatever the right indent: a left stop 25
+    /// points before it at most, a centered or decimal one 12.5, a right
+    /// one 1 (step 19m of W1, in steps of a twip).
+    pub fn clamped(mut self, width: f32) -> Self {
+        for stop in &mut self.stops {
+            let room = match stop.alignment {
+                TabAlignment::Left => 25.0,
+                TabAlignment::Center | TabAlignment::Decimal => 12.5,
+                TabAlignment::Right => 1.0,
+            };
+            stop.position = stop.position.min(width - room);
+        }
+        self
+    }
+
     /// The stop that a tab starting at `x` goes to.
     pub fn next(&self, x: f32) -> Stop {
         let custom = self

@@ -1590,6 +1590,23 @@ paragraph, and objects on a second page.
   right margin, the other lines never start past the column less 18
   points, with a limit of 457.5 points for the first line that has no
   formula yet.
+- The owner asked for that limit too (step 19m, print from PDFs). The
+  column ends at its width less a right indent, if any, W'. The first
+  line of a list item keeps its text only while it would start more
+  than 10 points before W'; otherwise the label stands alone on it and
+  the text starts on the next line. The other lines start at most 18
+  points before W', and the label at most 20. Tab stops stop short of
+  the width of the column, whatever the right indent: a left stop by
+  25 points, a centred or decimal one by 12.5 and a right one by 1. A
+  paragraph outside a list starts its first line at most 18 points
+  before the width and its other lines 18 before W'. Screen View has
+  none of these limits, and the entries of a table of contents keep
+  their stops. Desk does all of this. Still without an exact rule: a
+  first line exactly 10 points before W', which no capture had; the
+  place of kerned text such as "WW" at a right or centred stop; a
+  second tab in an item whose text and mark sizes differ; and whether
+  the 36 points of Screen View are the default tab interval or a
+  constant.
 
 ## Decisions, with their reasons and consequences
 

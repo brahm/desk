@@ -567,6 +567,11 @@ impl TextSystem {
         let mut format = text.paragraph().clone();
         // The label of a list item, laid out on its own: the text of the
         // item starts after it, on every line (LST-02).
+        // The right edge of the text: the column less a right indent,
+        // which counts only to the right (step 19m of W1).
+        let right = space.width() - (format.right_indent.to_pt() as f32).max(0.0);
+        let screen_view = text.screen().is_some();
+        let mut label_alone = false;
         let label = text.label().cloned().map(|label| {
             let label_format = text.formats()[label.format as usize].clone();
             let label_text = ParagraphText::from_runs(
@@ -632,8 +637,24 @@ impl TextSystem {
                     );
                     let k = label.mark_size / label.text_size.max(f32::MIN_POSITIVE);
                     let first = (x + k * (stop - x)).max(x + width);
-                    let rest = (stop - x).max(x + label.text_indent) + (k - 1.0) * (stop - x);
-                    (first - x, rest - x)
+                    // Near the right edge (step 19m of W1, 5,325 items
+                    // exact): the other lines start 18 points before it at
+                    // most, and the first keeps its text only while it
+                    // starts more than 10 points before it, or else holds
+                    // the label alone. The label is drawn 20 points before
+                    // it at most, its stop measured from where it would be.
+                    let rest = ((stop - x).max(x + label.text_indent) + (k - 1.0) * (stop - x))
+                        .min(right - 18.0);
+                    let first = if first < right - 10.0 {
+                        first
+                    } else {
+                        label_alone = true;
+                        rest
+                    };
+                    let drawn = x.min(right - 20.0);
+                    let (first, rest) = (first - drawn, rest - drawn);
+                    x = drawn;
+                    (first, rest)
                 }
             };
             format.left_indent = desk_model::Length::from_pt(f64::from(x + rest));
@@ -760,7 +781,30 @@ impl TextSystem {
             let (id, advance) = hyphen_glyph(&font, size)?;
             Some((font, size, id, advance))
         };
-        let ruler = TabRuler::new(&format);
+        // In print, a paragraph starts its first line 18 points before the
+        // edge of the column at most, and its other lines 18 points before
+        // its right edge; tab stops stop short of the edge of the column
+        // (step 19m of W1). Screen View has none of these limits.
+        let ruler = if screen_view {
+            TabRuler::new(&format)
+        } else {
+            let column = space.width();
+            if text.label().is_none() {
+                let left = format.left_indent.to_pt() as f32;
+                let first = left + format.first_line_indent.to_pt() as f32;
+                let left = left.min(right - 18.0);
+                format.left_indent = desk_model::Length::from_pt(f64::from(left));
+                format.first_line_indent =
+                    desk_model::Length::from_pt(f64::from(first.min(column - 18.0) - left));
+            }
+            // A table of contents is an object of its own in Pages, whose
+            // page numbers end at the edge (B-022).
+            if format.toc_entry.is_some() {
+                TabRuler::new(&format)
+            } else {
+                TabRuler::new(&format).clamped(column)
+            }
+        };
         let has_tabs = source.contains('\t');
         // The width of the text from `a` to `b` on a line from `x` to
         // `limit`, and how much wider its tabs are than as shaped.
@@ -1392,8 +1436,35 @@ impl TextSystem {
                 drop_cap_shape: None,
             });
         }
+        if label_alone && let Some(pitch) = lines.first().map(|l| l.height) {
+            // The label has the first line to itself: the text starts on
+            // the next, and the first line holds both.
+            for line in &mut lines {
+                line.top += pitch;
+                line.baseline += pitch;
+                line.text_bottom += pitch;
+                for run in &mut line.runs {
+                    run.baseline += pitch;
+                    for glyph in &mut run.glyphs {
+                        glyph.y += pitch;
+                    }
+                }
+                for decoration in &mut line.decorations {
+                    decoration.y += pitch;
+                }
+            }
+            if let Some(first) = lines.first_mut() {
+                first.top -= pitch;
+                first.height += pitch;
+            }
+        }
+        let label_lift = if label_alone {
+            lines.first().map_or(0.0, |l| l.height / 2.0)
+        } else {
+            0.0
+        };
         if let (Some((laid, x, format, raise, image)), Some(first)) = (label, lines.first_mut()) {
-            let baseline = first.baseline - raise;
+            let baseline = first.baseline - raise - label_lift;
             if let Some((picture, height)) = image {
                 // As Pages draws it: a third of the picture below the
                 // baseline of the line, which the offset of the label
@@ -1403,7 +1474,7 @@ impl TextSystem {
                 first.label_image = Some(LabelImage {
                     picture,
                     x,
-                    y: first.baseline - height * 2.0 / 3.0,
+                    y: first.baseline - label_lift - height * 2.0 / 3.0,
                     width,
                     height,
                 });
