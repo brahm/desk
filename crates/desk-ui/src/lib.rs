@@ -288,9 +288,14 @@ pub(crate) fn lay_out(document: &Document) -> desk_layout::DocumentLayout {
     TEXT.with(|text| desk_layout::paginate(document, &mut text.borrow_mut()))
 }
 
-/// Lays out a document in Screen View, `width` points wide (PXV-01).
-pub(crate) fn lay_out_screen(document: &Document, width: f64) -> desk_layout::DocumentLayout {
-    TEXT.with(|text| desk_layout::paginate_screen(document, width, &mut text.borrow_mut()))
+/// Lays out a document in Screen View, `width` points wide at a Text
+/// Size of `zoom` (PXV-01).
+pub(crate) fn lay_out_screen(
+    document: &Document,
+    width: f64,
+    zoom: f64,
+) -> desk_layout::DocumentLayout {
+    TEXT.with(|text| desk_layout::paginate_screen(document, width, zoom, &mut text.borrow_mut()))
 }
 
 /// The document a path names. A Pages document can be a package folder,

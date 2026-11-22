@@ -1460,6 +1460,108 @@ Mojave VM and exported by Pages 15.4 on the owner's Mac.
 - B-022, B-023, B-024 and B-025 are closed; B-045 moved from W1 to W2.
 
 
+### 21 November: which objects Screen View shows (W043, PXV-01, step 19e of W1)
+
+Two Mac sessions had seen Screen View differently: a floating text box
+shown after its paragraph, then a floating shape gone. One Blank document
+in Pages 15.4 settled it, with a text box, shapes, a picture and a table
+in each placement and wrap, objects anchored to the first and the last
+paragraph, and objects on a second page.
+
+- Only the placement decides. Objects that stay on the page are hidden
+  on every page, as headers are, whatever their wrap; objects that move
+  with the text always show, with each of the five wraps. The two
+  sessions had a Move with Text box and a Stay on Page shape.
+- An object in the line stays in it at its size. With any other wrap it
+  goes after the paragraph that holds its anchor, centred, at its size;
+  objects of one paragraph go one under the other.
+- A text box, or a plain rectangle with text in it, takes the width of
+  the column and the height of its text. Ovals, rounded rectangles,
+  empty rectangles and pictures keep their size.
+- Desk now does the same: step 19 already hid the objects fixed on a
+  page, and this step centres the others, gives text boxes and
+  rectangles with text the column, and puts the objects of the last
+  paragraph below its text (crates/desk-layout/src/screen.rs). In Screen
+  View an object that moves with the text can be selected but not moved
+  or resized, as in Pages, whose placement and size controls are off
+  there; objects in the text are moved as on the pages.
+- Pages also moves an object's anchor to a paragraph near the object
+  when it is moved, so the paragraph beside an object is not always the
+  one it follows.
+- An inline table showed wider than the column (16.99 cm became
+  28.11 cm). Another round (step 19f) found the rule: the column of
+  Screen View is 664 points at most at a Text Size of 100%, in the
+  middle of a wider window, and a table in the text is always that wide
+  times the Text Size, whatever its own width, its columns in
+  proportion; in a narrower window it runs past the column. Pictures and
+  shapes in the text keep their size on the screen, whatever the Text
+  Size. The owner chose to follow Pages, overflow included, and Desk now
+  does all of this. Where the 664 points come from was not found; it
+  behaves as a constant.
+- A last round (step 19g) measured the text. Its size on the screen is
+  one curve of its size in print, times the Text Size, for every font,
+  in the body, text boxes, shapes and table cells: 10 points up to 8,
+  then s + 2 up to 11, 13 + (s − 11) / 2 up to 24, 19.5 + (s − 24) / 4
+  up to 50, and 26 above; 23 sizes from 4 to 96 points match within
+  0.1 point. The left indent goes, and a first line indent becomes 36
+  points on the screen whatever the Text Size (one value measured).
+  Pictures, ovals and empty rectangles after their paragraph keep their
+  size on the screen at 85, 100, 120 and 135%. Desk does all of this.
+- That round left line spacing, the space between paragraphs and tabs
+  without a rule, and the owner chose to measure them still in W1 (step
+  19h, 520 lines, 263 gaps and the tabs of 47 documents at Text Sizes
+  of 80, 100, 135 and 160%). Screen View draws none of the values set:
+  every line spacing becomes a multiple of single, rounded to one of
+  four levels (single, 1.135, 1.35 and 1.79 times, from 1.16, 1.36 and
+  1.75); a fixed one (at least, exactly, between) is compared with the
+  line on the screen, so it falls a level as the Text Size grows, which
+  is why exactly 30 points looked ruleless; nothing is tighter than
+  single. Space before or after becomes up to four steps of a quarter
+  line on the screen (0.89 of it, 0.83 to 0.92 measured), as many as
+  the value holds 0.2425 printed lines, whatever the Text Size. Tabs go
+  to stops every 36 points on the screen, whatever the Text Size, the
+  size, the stops of the paragraph or its default interval; centre,
+  right and decimal stops act as left ones.
+- The owner asked for no approximations, and a further round (step
+  19i, 108 documents in four fonts, 977 captures at 12 Text Sizes, each
+  line on a whole pixel of the Retina screen) made the rules exact. With
+  F the size on the screen, the ascent, descent and leading of the font
+  are each rounded to a whole point at F, and H0 is their sum less the
+  unrounded leading: a line is m × H0 plus the leading, m being 1.1,
+  1.25, 1.5 and 2.0 for the four levels (364 and 72 cases, no error); in
+  print it is the same with m the multiple set. The space between two
+  paragraphs is the larger of the space after and before, never the sum,
+  in up to four steps of H0 / 4 on the screen, as many as 4v / H0 in
+  print, rounded half down; the font and size of the paragraph style
+  count, not those of its text, and line spacing does not (1,426 gaps,
+  no error). A first line indent above 0 shows at 36 points, a hanging
+  one at the edge with the other lines; a list label is 18 points in at
+  each level whatever the indents of the list; a line with several
+  sizes takes the tallest. Desk does all of this.
+- A last round (step 19j, 397 documents and 2,136 captures, a rule
+  passing only if it puts every baseline of a capture on its pixel)
+  closed most of what was left. A list's text starts 18/17 of F after
+  its label, or right after a wider label, and its other lines always
+  there (6,624 positions; what 19i took for a dependence on the printed
+  size was Pages rounding each glyph to a pixel). A line of mixed sizes
+  and fonts takes the largest part over the baseline (H0 less the
+  unrounded descent), the largest descent and the largest leading (105
+  cases). All a level adds goes under the text, the first baseline
+  being the part over it down from the top (423 documents). Between
+  two paragraphs of different styles, each space is counted and drawn
+  in the style of its own paragraph, and the larger shows (156
+  captures). The levels change half way between them, at 1.175, 1.375
+  and 1.75, ties to the lower; at least, exactly and between are
+  compared with the unrounded line of the font on the screen (5,261
+  values). Desk does all of this.
+- Still without an exact rule: on its first line only, a list label
+  moves to 36 points when the page view pushes its text to the next tab
+  stop, from between 32.5 and 33 points for the standard Word list in
+  Helvetica Neue but not in Times New Roman at 36, with no formula
+  found; which way a distance exactly on a cut falls; line spacing
+  under single; and between 0, which Pages drew as between 1. Desk
+  leaves these as single and does not move the label.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -12,8 +12,9 @@ use std::sync::Arc;
 
 use imbl::OrdMap;
 
+use crate::Length;
 use crate::error::ModelError;
-use crate::format::{CharAttrs, CharFormat, ParaAttrs, ParaFormat};
+use crate::format::{CharAttrs, CharFormat, ParaAttrs, ParaFormat, TabStops};
 use crate::id::NodeId;
 use crate::list::ListStyle;
 
@@ -212,6 +213,9 @@ impl From<Box<CharacterStyle>> for Style {
 pub struct Styles {
     styles: OrdMap<StyleId, Style>,
     default_paragraph: StyleId,
+    /// The Text Size of Screen View, in thousandths, while the styles
+    /// resolve formatting as it shows (PXV-01); never saved.
+    screen: Option<u32>,
 }
 
 impl Styles {
@@ -223,7 +227,14 @@ impl Styles {
         Self {
             styles,
             default_paragraph: id,
+            screen: None,
         }
+    }
+
+    /// Resolves formatting as Screen View shows it at a Text Size of
+    /// `zoom`, 1 for 100%, or as the pages do: see [`screen_font_size`].
+    pub fn set_screen(&mut self, zoom: Option<f64>) {
+        self.screen = zoom.map(|z| (z * 1000.0).round().max(1.0) as u32);
     }
 
     /// The paragraph style of new paragraphs, which cannot be removed.
@@ -404,6 +415,44 @@ impl Styles {
             }
         }
         direct.apply_to(&mut format);
+        // Screen View sets no left indent, and a first line indent of its
+        // own, 36 points on the screen whatever the Text Size, when the
+        // paragraph has one to the right; a hanging first line starts at
+        // the edge with the others (the Mac, steps 19g and 19i of W1). Its
+        // tabs go every 36 points on the screen, whatever the stops of the
+        // paragraph (step 19h). Its line spacing and space before and
+        // after depend on the font, and the text system sets them.
+        if let Some(zoom) = self.screen {
+            let zoom = f64::from(zoom) / 1000.0;
+            format.left_indent = Length::ZERO;
+            format.first_line_indent = if format.first_line_indent > Length::ZERO {
+                Length::from_pt(SCREEN_TAB / zoom)
+            } else {
+                Length::ZERO
+            };
+            format.tab_stops = TabStops::none();
+            format.default_tab_interval = Length::from_pt(SCREEN_TAB / zoom);
+        }
+        format
+    }
+
+    /// The Text Size of Screen View while the styles resolve formatting
+    /// as it shows, 1 for 100%.
+    pub fn screen(&self) -> Option<f64> {
+        self.screen.map(|zoom| f64::from(zoom) / 1000.0)
+    }
+
+    /// The character formatting of a paragraph style as it prints, also
+    /// while the styles resolve formatting as Screen View shows it, which
+    /// spaces paragraphs by the font and size of their style (step 19i of
+    /// W1).
+    pub fn printed_character(&self, style: StyleId) -> CharFormat {
+        let mut format = CharFormat::default();
+        for style in self.chain(style).collect::<Vec<_>>().iter().rev() {
+            if let Style::Paragraph(style) = style {
+                style.character.apply_to(&mut format);
+            }
+        }
         format
     }
 
@@ -431,6 +480,27 @@ impl Styles {
             }
         }
         direct.apply_to(&mut format);
+        if self.screen.is_some() {
+            format.font_size = Length::from_pt(screen_font_size(format.font_size.to_pt()));
+        }
         format
     }
 }
+
+/// The size, in points at a Text Size of 100%, at which Screen View of
+/// Pages 15.4 shows text of a size: one curve for every font, with a floor
+/// of 10 points and a ceiling of 26, measured on the owner's Mac for 23
+/// sizes from 4 to 96 points within 0.1 point (step 19g of W1).
+pub fn screen_font_size(size: f64) -> f64 {
+    match size {
+        s if s <= 8.0 => 10.0,
+        s if s <= 11.0 => s + 2.0,
+        s if s <= 24.0 => 13.0 + (s - 11.0) / 2.0,
+        s if s <= 50.0 => 19.5 + (s - 24.0) / 4.0,
+        _ => 26.0,
+    }
+}
+
+/// The distance between the tab stops of Screen View, and its first line
+/// indent, in points on the screen (steps 19g and 19h of W1).
+const SCREEN_TAB: f64 = 36.0;

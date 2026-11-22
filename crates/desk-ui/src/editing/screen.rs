@@ -26,7 +26,7 @@ impl TextEditor {
             self.select_objects(Vec::new());
         }
         self.view.set_screen(on);
-        self.state.borrow_mut().screen = on.then(|| self.view.screen_width());
+        self.state.borrow_mut().screen = on.then(|| (self.view.screen_width(), self.view.zoom()));
         self.lay_out_again();
     }
 
@@ -55,11 +55,11 @@ impl TextEditor {
         let weak = self.downgrade();
         self.view.connect_width_changed(move || {
             let Some(this) = weak.upgrade() else { return };
-            let Some(width) = this.state.borrow().screen else {
+            let Some((width, zoom)) = this.state.borrow().screen else {
                 return;
             };
-            let now = this.view.screen_width();
-            if (now - width).abs() >= 0.5 {
+            let now = (this.view.screen_width(), this.view.zoom());
+            if (now.0 - width).abs() >= 0.5 || (now.1 - zoom).abs() > 1e-6 {
                 this.state.borrow_mut().screen = Some(now);
                 this.lay_out_again();
             }

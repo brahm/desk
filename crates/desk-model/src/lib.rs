@@ -141,7 +141,9 @@ pub use presentation::{SLIDE_SIZE, Slide, Topics};
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
 pub use shape_path::PathSegment;
 pub use story::Story;
-pub use style::{CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles};
+pub use style::{
+    CharacterStyle, ParagraphStyle, Style, StyleFamily, StyleId, Styles, screen_font_size,
+};
 pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides, StyleParts};
 pub use table_style::{TableLook, TableStyleEntry, TableStyles};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
