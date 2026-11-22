@@ -102,6 +102,9 @@ pub struct Label {
     pub text_size: f32,
     /// In Screen View, the label as it prints.
     pub printed: Option<PrintedLabel>,
+    /// What follows the label: with a space or nothing, the text never
+    /// goes to a tab stop.
+    pub followed_by: desk_model::LabelFollow,
     /// The picture of an image bullet and its height, in points, drawn
     /// instead of the text (LST-03).
     pub image: Option<(Picture, f32)>,
@@ -387,6 +390,7 @@ impl ParagraphText {
             continuation,
             text_size,
             printed,
+            followed_by: level.followed_by,
         });
         self
     }

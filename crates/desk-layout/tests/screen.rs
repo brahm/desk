@@ -561,7 +561,7 @@ fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
     // the digit 2 of the label's font at the size of the text, 0.556 em
     // in Helvetica; Screen View then moves the label and the first line
     // 36 points on the screen.
-    let lay_out = |size: f64| {
+    let lay_out = |size: f64, followed_by: desk_model::LabelFollow| {
         let mut editor = Editor::new(Document::new_word_processing());
         let start = editor.document().start();
         editor
@@ -586,6 +586,7 @@ fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
                 let level = desk_model::ListLevel {
                     label_indent: Length::from_pt(18.0),
                     text_indent: Length::from_pt(18.0),
+                    followed_by,
                     ..list.level(0).clone()
                 };
                 edit.set_list_level(style, 0, level)?;
@@ -617,12 +618,19 @@ fn pxv_01_list_text_goes_to_a_tab_stop_and_screen_view_moves_its_label() {
         (printed, label, zoom)
     };
     // At 12 points the digit leaves room: the text is at the indent.
-    let (printed, label, _) = lay_out(12.0);
+    use desk_model::LabelFollow;
+    let (printed, label, _) = lay_out(12.0, LabelFollow::Tab);
     assert!((printed - 18.0).abs() < 0.01, "{printed}");
     assert!(label.abs() < 0.01, "{label}");
     // At 36 points it is 20 points wide: the text goes to the default
     // stop at 72, and Screen View moves the label in.
-    let (printed, label, zoom) = lay_out(36.0);
+    let (printed, label, zoom) = lay_out(36.0, LabelFollow::Tab);
     assert!((printed - 54.0).abs() < 0.01, "{printed}");
     assert!((label - 36.0 / zoom).abs() < 0.01, "{label}");
+    // After a space or nothing the text starts where the digit ends.
+    for follow in [LabelFollow::Space, LabelFollow::Nothing] {
+        let (printed, label, _) = lay_out(12.0, follow);
+        assert!((printed - 0.556 * 12.0).abs() < 0.01, "{printed}");
+        assert!(label.abs() < 0.01, "{label}");
+    }
 }

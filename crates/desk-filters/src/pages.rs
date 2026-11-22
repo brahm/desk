@@ -753,6 +753,7 @@ fn list_levels(
             scale_with_text: geometry.is_none_or(|g| g.scale_with_text),
             raise: Length::from_pt(geometry.map_or(0.0, |g| g.offset)),
             color: None,
+            followed_by: desk_model::LabelFollow::Tab,
         }
     })
 }

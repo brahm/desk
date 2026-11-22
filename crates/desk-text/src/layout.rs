@@ -597,6 +597,7 @@ impl TextSystem {
                     {
                         let need = p.position + digit(self, p.size);
                         let stop = list_text_stop(
+                            label.followed_by,
                             p.position,
                             p.text_indent,
                             need,
@@ -617,6 +618,7 @@ impl TextSystem {
                     // at the size of the text (step 19k of W1).
                     let need = x + digit(self, label.text_size);
                     let stop = list_text_stop(
+                        label.followed_by,
                         x,
                         label.text_indent,
                         need,
@@ -1827,7 +1829,19 @@ fn vertical_metrics(
 /// further than that, or a custom tab stop before it, otherwise at the
 /// first tab stop from there, custom or default (step 19k of W1, 1,849
 /// items exact). Positions are from the edge of the text.
-fn list_text_stop(label: f32, text_indent: f32, need: f32, tabs: &TabStops, interval: f32) -> f32 {
+fn list_text_stop(
+    followed_by: desk_model::LabelFollow,
+    label: f32,
+    text_indent: f32,
+    need: f32,
+    tabs: &TabStops,
+    interval: f32,
+) -> f32 {
+    // After a space or nothing, the text starts where the label needs it
+    // to, or after the label when it is wider (step 19k of W1).
+    if followed_by != desk_model::LabelFollow::Tab {
+        return need;
+    }
     let indent = label + text_indent;
     let custom = |from: f32| {
         tabs.stops()

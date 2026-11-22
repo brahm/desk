@@ -363,6 +363,7 @@ fn full_document() -> TextDocument {
                     label: ListLabel::Bullet('\u{2022}'),
                     space_before: Some(Length(0.0)),
                     min_label_width: Some(Length(9.0)),
+                    followed_by: None,
                     relative_size: Some(150.0),
                     text: TextProperties {
                         font_size_percent: Some(150.0),
@@ -381,6 +382,7 @@ fn full_document() -> TextDocument {
                     },
                     space_before: Some(Length(18.0)),
                     min_label_width: Some(Length(18.0)),
+                    followed_by: None,
                     relative_size: None,
                     text: TextProperties::default(),
                 },
@@ -394,6 +396,7 @@ fn full_document() -> TextDocument {
                     },
                     space_before: Some(Length(36.0)),
                     min_label_width: Some(Length(18.0)),
+                    followed_by: None,
                     relative_size: Some(150.0),
                     text: TextProperties::default(),
                 },

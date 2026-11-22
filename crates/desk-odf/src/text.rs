@@ -382,6 +382,9 @@ pub struct ListLevelStyle {
     /// `text:min-label-width`: from the label to the text, or the width
     /// of the label when it is wider.
     pub min_label_width: Option<Length>,
+    /// `text:label-followed-by` of the label alignment mode: `listtab`,
+    /// `space` or `nothing`. Written in that mode when it is not a tab.
+    pub followed_by: Option<String>,
     /// `text:bullet-relative-size`, in percent; for a picture,
     /// `desk:relative-size`, its height in percent of the size of the text,
     /// which ODF has no attribute for.

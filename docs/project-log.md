@@ -1569,10 +1569,12 @@ paragraph, and objects on a second page.
   to the lower level, compared unrounded (1,213 values a twip either
   side, none off), though Pages cannot store a value exactly on one;
   lines under single show as single; between adds at least a point,
-  in print too. Desk does all of this. Not followed: a label after a
-  space or nothing instead of a tab, which Desk lists do not have, and
-  Pages scaling list indents when the text and the paragraph mark have
-  different sizes, which was only seen once.
+  in print too. Desk does all of this. After a space or nothing instead
+  of a tab, the text starts where the digit ends, or after a wider
+  label; Desk lists now keep what follows the label, as ODF writes it
+  (`text:label-followed-by`). Left for the next round: Pages scaling
+  list indents when the text and the paragraph mark have different
+  sizes, seen once.
 
 ## Decisions, with their reasons and consequences
 

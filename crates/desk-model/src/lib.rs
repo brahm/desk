@@ -115,8 +115,8 @@ pub use header::{
 };
 pub use id::NodeId;
 pub use list::{
-    LIST_LEVELS, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind, NumberFormat,
-    Numbering, detect_marker,
+    LIST_LEVELS, LabelFollow, ListItem, ListLabel, ListLevel, ListStyle, Marker, MarkerKind,
+    NumberFormat, Numbering, detect_marker,
 };
 pub use media::{Media, MediaFormat, Repeat};
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
