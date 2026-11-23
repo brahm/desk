@@ -1811,6 +1811,21 @@ paragraph, and objects on a second page.
   left out.
 - The window shows them in the next part.
 
+### 23 November: comments outside the body in the window (step 5 of W2, second part)
+
+- Comment works in the header, footer, note, text box or shape being
+  edited, on the selection or the word at the cursor, as in the body;
+  only a cell still has none, until the third part.
+- The text under those comments is marked on every page that shows it,
+  and those that are not highlights have their square in the left
+  margin, beside the line where their text starts.
+- The Comments page lists every comment of the document by page, as
+  Pages 15.4 does: on each page, those of its header, of the body in
+  its order, of its text boxes and shapes from the top, of its notes and
+  of its footer. Next and Previous Comment go through them in that
+  order, and a comment in another text takes the cursor there. A
+  comment deleted from outside its text goes with its marks.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -49,7 +49,6 @@ mod table_looks;
 mod tables;
 mod threads;
 
-pub use comments::commented_text;
 pub use navigate::Navigate;
 pub use objects::{NewShape, ObjectInfo, ObjectStylesInfo};
 pub use outline::OutlineRow;
