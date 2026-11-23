@@ -1,31 +1,172 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The comments on the text of the body, as the window adds, edits and
-//! goes to them (W149, REV-08): a new comment is on the selection, or on
-//! the word at the cursor, as in Pages 15.4; a comment emptied is
-//! deleted, and a highlight given text becomes a comment (PXV-19).
+//! The comments on the text, as the window adds, edits and goes to them
+//! (W149, REV-08): a new comment is on the selection, or on the word at
+//! the cursor, as in Pages 15.4, in the body or in a header, a footer, a
+//! note, a text box or a shape; a comment emptied is deleted, and a
+//! highlight given text becomes a comment (PXV-19).
 
 use std::sync::Arc;
 
-use desk_model::{Comment, Document, NodeId, Position, Reply};
+use desk_layout::DocumentLayout;
+use desk_model::{Comment, Document, NodeId, Paragraph, Position, Reply, Story};
 
+use super::stories::story_layout_everywhere;
 use super::{Selection, Spot, TextEditor, at_spot};
 use crate::text_nav::{self, SpanRect};
 
-/// The comments of the body, each with the text it is on as spots.
-fn comment_spots(document: &Document) -> Vec<(NodeId, Spot, Spot)> {
+/// A comment as the window shows it: the text it is in, none for the
+/// body, and the text it is on, as spots of that text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Placed {
+    id: NodeId,
+    story: Option<Story>,
+    start: Spot,
+    end: Spot,
+}
+
+/// Every comment of a document, with the text it is on.
+fn placed(document: &Document) -> Vec<Placed> {
     document
-        .comment_ranges()
+        .comment_places()
         .into_iter()
-        .filter_map(|(id, start, end)| {
-            Some((id, Spot::of(document, start)?, Spot::of(document, end)?))
+        .filter_map(|place| {
+            let (start, end) = match place.story {
+                None => (
+                    Spot::of(document, place.start)?,
+                    Spot::of(document, place.end)?,
+                ),
+                Some(story) => {
+                    let paragraphs = document.story_paragraphs(story);
+                    (
+                        spot_in(&paragraphs, place.start)?,
+                        spot_in(&paragraphs, place.end)?,
+                    )
+                }
+            };
+            Some(Placed {
+                id: place.id,
+                story: place.story,
+                start,
+                end,
+            })
         })
         .collect()
 }
 
+/// A position of a story as a spot of its text.
+fn spot_in(paragraphs: &[Paragraph], at: Position) -> Option<Spot> {
+    let index = paragraphs.iter().position(|p| p.id() == at.paragraph)?;
+    Some(Spot::new(index, at.offset))
+}
+
+/// The document laid out with the lines of each text that has comments,
+/// the body and the stories, as the pages show them.
+struct Texts<'a> {
+    main: &'a DocumentLayout,
+    stories: Vec<(Story, DocumentLayout)>,
+}
+
+impl<'a> Texts<'a> {
+    fn new(document: &Document, main: &'a DocumentLayout, places: &[Placed]) -> Self {
+        Self::with(document, main, places.iter().filter_map(|p| p.story))
+    }
+
+    /// The same, with the lines of these stories.
+    fn with(
+        document: &Document,
+        main: &'a DocumentLayout,
+        stories_of: impl IntoIterator<Item = Story>,
+    ) -> Self {
+        let mut stories: Vec<(Story, DocumentLayout)> = Vec::new();
+        for story in stories_of {
+            if stories.iter().any(|(s, _)| *s == story) {
+                continue;
+            }
+            let copy = document.with_body(document.story_paragraphs(story));
+            stories.push((story, story_layout_everywhere(main, story, &copy)));
+        }
+        Self { main, stories }
+    }
+
+    fn layout(&self, story: Option<Story>) -> Option<&DocumentLayout> {
+        match story {
+            None => Some(self.main),
+            Some(story) => self
+                .stories
+                .iter()
+                .find(|(s, _)| *s == story)
+                .map(|(_, l)| l),
+        }
+    }
+
+    /// Where the text of a comment is on the pages.
+    fn rects(&self, place: &Placed) -> Vec<SpanRect> {
+        self.layout(place.story).map_or_else(Vec::new, |layout| {
+            text_nav::selection_rects(
+                layout,
+                &Selection {
+                    anchor: place.start,
+                    focus: place.end,
+                },
+            )
+        })
+    }
+
+    /// The place of a text in the order of the comments, as Pages 15.4
+    /// lists them, by page: on each, those of its header, of the body in
+    /// its order, of its text boxes and shapes from the top, of its notes
+    /// and of its footer. A text that no page shows comes last.
+    fn key(&self, story: Option<Story>, start: Spot, end: Spot) -> Key {
+        let place = Placed {
+            id: NodeId::new(1).expect("not zero"),
+            story,
+            start,
+            end,
+        };
+        // An empty selection, the cursor, is where the cursor stands.
+        let first = self.rects(&place).into_iter().next().or_else(|| {
+            let caret = text_nav::caret(self.layout(story)?, start)?;
+            Some(SpanRect {
+                page: caret.page,
+                x0: caret.x,
+                y0: caret.top,
+                x1: caret.x,
+                y1: caret.bottom,
+            })
+        });
+        let page = first.map_or(usize::MAX, |r| r.page);
+        let group = match story {
+            Some(Story::Margin { place, .. }) => match place.kind {
+                desk_model::MarginKind::Header => 0,
+                desk_model::MarginKind::Footer => 4,
+            },
+            None => 1,
+            Some(Story::TextBox(_)) => 2,
+            Some(Story::Note(_)) => 3,
+        };
+        // Outside the body, by where the text is on the page.
+        let (y, x) = match (story, first) {
+            (Some(_), Some(r)) => ((r.y0 * 100.0) as u64, (r.x0 * 100.0) as u64),
+            _ => (0, 0),
+        };
+        (page, group, y, x, start, end)
+    }
+
+    /// The comments, in that order.
+    fn ordered(&self, mut places: Vec<Placed>) -> Vec<Placed> {
+        places.sort_by_cached_key(|p| self.key(p.story, p.start, p.end));
+        places
+    }
+}
+
+/// The place of a text in the order of the comments: its page, which of
+/// its texts, where it is on the page and where in the text.
+type Key = (usize, u8, u64, u64, Spot, Spot);
+
 /// The text that a comment is on, on one line, as its card quotes it.
-pub fn commented_text(document: &Document, start: Position, end: Position) -> String {
+fn commented_text(document: &Document, start: Position, end: Position) -> String {
     let Ok(ranges) = document.paragraph_ranges(start, end) else {
         return String::new();
     };
@@ -53,11 +194,12 @@ fn typed(text: &str) -> Arc<str> {
 
 impl TextEditor {
     /// The text that a new comment would be on: the selection, or the
-    /// word at the cursor when nothing is selected, as Pages 15.4 does.
-    /// None in headers, footers and notes, whose comments come with step 5
-    /// of the phase W2, and where there is no text.
+    /// word at the cursor when nothing is selected, as Pages 15.4 does, in
+    /// the body or in the header, footer, note, text box or shape being
+    /// edited. None in a cell, whose comments come with the comments on
+    /// objects and cells, and where there is no text.
     pub fn comment_range(&self) -> Option<(Spot, Spot)> {
-        if self.story().is_some() || self.cell_rects().is_some() {
+        if self.cell_rects().is_some() {
             return None;
         }
         let (start, end) = self.selection().ordered();
@@ -181,81 +323,142 @@ impl TextEditor {
         });
     }
 
-    /// Deletes a comment, with its replies, and takes it off its text.
+    /// Deletes a comment, with its replies, and takes it off its text. One
+    /// in another text than the one being edited is deleted from the
+    /// document, with the cursor back in the body.
     pub fn delete_comment(&self, id: NodeId) {
+        let place = self.place_of(id);
+        if let Some(editing) = self.story()
+            && place.is_some_and(|p| p.story != Some(editing))
+        {
+            self.leave_story(None);
+        }
         self.format_edit("Delete Comment", |edit| edit.remove_comment(id));
     }
 
-    /// Selects the text that a comment is on, and shows it.
-    pub fn select_comment(&self, id: NodeId) -> bool {
-        let found = comment_spots(&self.document())
+    /// Where a comment is in the document.
+    fn place_of(&self, id: NodeId) -> Option<Placed> {
+        let state = self.state.borrow();
+        placed(Self::main_document(&state))
             .into_iter()
-            .find(|(c, _, _)| *c == id);
-        let Some((_, start, end)) = found else {
+            .find(|p| p.id == id)
+    }
+
+    /// The comments of the document in the order that the Comments page
+    /// lists them and that Next Comment goes through them, by page, with
+    /// the text each is on (W149).
+    pub fn comments_in_order(&self) -> Vec<(NodeId, String)> {
+        let state = self.state.borrow();
+        let document = Self::main_document(&state);
+        let places = placed(document);
+        let texts = Texts::new(document, Self::main_layout(&state), &places);
+        texts
+            .ordered(places)
+            .into_iter()
+            .filter_map(|p| {
+                let place = document
+                    .comment_places()
+                    .into_iter()
+                    .find(|c| c.id == p.id)?;
+                let on = match place.story {
+                    None => commented_text(document, place.start, place.end),
+                    Some(story) => commented_text(
+                        &document.with_body(document.story_paragraphs(story)),
+                        place.start,
+                        place.end,
+                    ),
+                };
+                Some((p.id, on))
+            })
+            .collect()
+    }
+
+    /// Selects the text that a comment is on, and shows it: in the body,
+    /// or in the header, footer, note, text box or shape it is in.
+    pub fn select_comment(&self, id: NodeId) -> bool {
+        let Some(place) = self.place_of(id) else {
             return false;
         };
-        if self.story().is_some() {
-            self.leave_story(None);
+        let current = self.story();
+        match place.story {
+            None if current.is_some() => self.leave_story(None),
+            Some(story) if current != Some(story) => {
+                let page = {
+                    let state = self.state.borrow();
+                    let document = Self::main_document(&state);
+                    let texts = Texts::new(document, Self::main_layout(&state), &[place]);
+                    texts.rects(&place).first().map(|r| r.page)
+                };
+                match page {
+                    Some(page) => self.enter_story(story, page, Some(place.start)),
+                    None => self.go_to_story(Some(story)),
+                }
+                if self.story() != Some(story) {
+                    return false;
+                }
+            }
+            _ => {}
         }
-        self.move_to(start, false, false);
+        self.move_to(place.start, false, false);
         self.select(Selection {
-            anchor: start,
-            focus: end,
+            anchor: place.start,
+            focus: place.end,
         });
         true
     }
 
     /// Selects the text of the next comment after the selection, or of the
     /// one before it, as Next Comment and Previous Comment do in Pages
-    /// 15.4. Gives the comment, none at the last or the first.
+    /// 15.4, in the order of the pages. Gives the comment, none at the last
+    /// or the first.
     pub fn go_to_comment(&self, forward: bool) -> Option<NodeId> {
-        if self.story().is_some() {
-            return None;
-        }
-        let (start, end) = self.selection().ordered();
-        let spots = comment_spots(&self.document());
-        let found = if forward {
-            spots
+        let found = {
+            let state = self.state.borrow();
+            let document = Self::main_document(&state);
+            let places = placed(document);
+            let (start, end) = state.selection.ordered();
+            let story = state.story.as_ref().map(|m| m.story);
+            // With the text being edited, where the selection is.
+            let stories = places.iter().filter_map(|p| p.story).chain(story);
+            let texts = Texts::with(document, Self::main_layout(&state), stories);
+            let here = texts.key(story, start, end);
+            let keyed = places
                 .into_iter()
-                .filter(|(_, s, e)| *s > start || (*s == start && *e > end))
-                .min_by_key(|(_, s, e)| (*s, *e))
-        } else {
-            spots
-                .into_iter()
-                .filter(|(_, s, e)| *s < start || (*s == start && *e < end))
-                .max_by_key(|(_, s, e)| (*s, *e))
+                .map(|p| (texts.key(p.story, p.start, p.end), p.id));
+            if forward {
+                keyed.filter(|(k, _)| *k > here).min()
+            } else {
+                keyed.filter(|(k, _)| *k < here).max()
+            }
+            .map(|(_, id)| id)
         };
-        let (id, _, _) = found?;
+        let id = found?;
         self.select_comment(id).then_some(id)
     }
 
-    /// The comment that the cursor or the selection is in: the one that
-    /// starts last of those around it, as it is on the fewest words.
+    /// The comment that the cursor or the selection is in, in the text
+    /// being edited: the one that starts last of those around it, as it is
+    /// on the fewest words.
     pub fn comment_at_cursor(&self) -> Option<NodeId> {
-        if self.story().is_some() {
-            return None;
-        }
-        let (start, end) = self.selection().ordered();
-        comment_spots(&self.document())
+        let state = self.state.borrow();
+        let story = state.story.as_ref().map(|m| m.story);
+        let (start, end) = state.selection.ordered();
+        placed(Self::main_document(&state))
             .into_iter()
-            .filter(|(_, s, e)| *s <= start && end <= *e)
-            .max_by_key(|(_, s, _)| *s)
-            .map(|(id, _, _)| id)
+            .filter(|p| p.story == story && p.start <= start && end <= p.end)
+            .max_by_key(|p| p.start)
+            .map(|p| p.id)
     }
 
     /// Where the text under comments is on the pages, which shows it
-    /// marked: that of the body, also while a header, a footer or a note
-    /// is being edited.
+    /// marked: that of the body and of the headers, footers, notes, text
+    /// boxes and shapes, also while one of them is being edited.
     pub(super) fn comment_marks(&self) -> Vec<SpanRect> {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
-        let layout = Self::main_layout(&state);
-        comment_spots(document)
-            .into_iter()
-            .flat_map(|(_, anchor, focus)| {
-                text_nav::selection_rects(layout, &Selection { anchor, focus })
-            })
-            .collect()
+        let places = placed(document);
+        let texts = Texts::new(document, Self::main_layout(&state), &places);
+        places.iter().flat_map(|p| texts.rects(p)).collect()
     }
 
     /// The marks of the comments in the left margin of the pages, as Pages
@@ -264,47 +467,7 @@ impl TextEditor {
     /// Highlights have none (PXV-19).
     pub(super) fn comment_flags(&self) -> Vec<(NodeId, SpanRect)> {
         let state = self.state.borrow();
-        let document = Self::main_document(&state);
-        let layout = Self::main_layout(&state);
-        let mut flags: Vec<(NodeId, SpanRect)> = Vec::new();
-        for (id, start, _) in comment_spots(document) {
-            if document
-                .comments()
-                .get(id)
-                .is_none_or(Comment::is_highlight)
-            {
-                continue;
-            }
-            let found = layout.pages.iter().enumerate().find_map(|(page, p)| {
-                p.lines
-                    .iter()
-                    .find(|l| {
-                        l.paragraph == start.paragraph
-                            && l.line.range.start <= start.offset
-                            && start.offset <= l.line.range.end
-                    })
-                    .map(|l| (page, l))
-            });
-            let Some((page, line)) = found else { continue };
-            let (top, bottom) = (f64::from(line.top()), f64::from(line.bottom()));
-            let beside = flags
-                .iter()
-                .filter(|(_, f)| f.page == page && f.y0 >= top && f.y1 <= bottom)
-                .count();
-            let x1 = f64::from(line.origin.0) - FLAG_GAP - beside as f64 * (FLAG + 3.0);
-            let y0 = (top + bottom - FLAG) / 2.0;
-            flags.push((
-                id,
-                SpanRect {
-                    page,
-                    x0: x1 - FLAG,
-                    y0,
-                    x1,
-                    y1: y0 + FLAG,
-                },
-            ));
-        }
-        flags
+        flags(Self::main_document(&state), Self::main_layout(&state))
     }
 
     /// Calls `f` with the comment whose mark in the margin was clicked.
@@ -342,22 +505,70 @@ impl TextEditor {
     /// first piece of it, for its bubble to point at.
     pub fn comment_anchor(&self, id: NodeId) -> Option<SpanRect> {
         let state = self.state.borrow();
-        let (_, anchor, focus) = comment_spots(Self::main_document(&state))
-            .into_iter()
-            .find(|(c, _, _)| *c == id)?;
-        text_nav::selection_rects(Self::main_layout(&state), &Selection { anchor, focus })
-            .into_iter()
-            .next()
+        let document = Self::main_document(&state);
+        let place = placed(document).into_iter().find(|p| p.id == id)?;
+        let texts = Texts::new(document, Self::main_layout(&state), &[place]);
+        texts.rects(&place).into_iter().next()
     }
 
-    /// Where the text between two spots starts on the pages, for the bubble
-    /// of a new comment to point at.
+    /// Where the text between two spots of the text being edited starts
+    /// on the pages, for the bubble of a new comment to point at.
     pub fn range_anchor(&self, (anchor, focus): (Spot, Spot)) -> Option<SpanRect> {
         let state = self.state.borrow();
-        text_nav::selection_rects(Self::main_layout(&state), &Selection { anchor, focus })
+        text_nav::selection_rects(&state.layout, &Selection { anchor, focus })
             .into_iter()
             .next()
     }
+}
+
+/// The marks of the comments in the left margin, each beside the line
+/// where the text of its comment starts.
+fn flags(document: &Document, main: &DocumentLayout) -> Vec<(NodeId, SpanRect)> {
+    let places = placed(document);
+    let texts = Texts::new(document, main, &places);
+    let mut flags: Vec<(NodeId, SpanRect)> = Vec::new();
+    for place in &places {
+        if document
+            .comments()
+            .get(place.id)
+            .is_none_or(Comment::is_highlight)
+        {
+            continue;
+        }
+        let Some(layout) = texts.layout(place.story) else {
+            continue;
+        };
+        let start = place.start;
+        let found = layout.pages.iter().enumerate().find_map(|(page, p)| {
+            p.lines
+                .iter()
+                .find(|l| {
+                    l.paragraph == start.paragraph
+                        && l.line.range.start <= start.offset
+                        && start.offset <= l.line.range.end
+                })
+                .map(|l| (page, l))
+        });
+        let Some((page, line)) = found else { continue };
+        let (top, bottom) = (f64::from(line.top()), f64::from(line.bottom()));
+        let beside = flags
+            .iter()
+            .filter(|(_, f)| f.page == page && f.y0 >= top && f.y1 <= bottom)
+            .count();
+        let x1 = f64::from(line.origin.0) - FLAG_GAP - beside as f64 * (FLAG + 3.0);
+        let y0 = (top + bottom - FLAG) / 2.0;
+        flags.push((
+            place.id,
+            SpanRect {
+                page,
+                x0: x1 - FLAG,
+                y0,
+                x1,
+                y1: y0 + FLAG,
+            },
+        ));
+    }
+    flags
 }
 
 /// The side of the mark of a comment in the margin, in points.
@@ -420,6 +631,89 @@ mod tests {
             });
             assert_eq!(editor.document().comments().len(), 2);
             assert_eq!(editor.comment_flags().len(), 1);
+        });
+    }
+
+    #[test]
+    fn w149_a_comment_is_written_in_a_header_and_found_from_the_body() {
+        use desk_model::{MarginKind, MarginPages, MarginPlace, ParaAttrs, Run};
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let mut setup = *document.page_setup();
+            setup.headers = true;
+            let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+            document
+                .transact("Setup", |edit| {
+                    edit.set_page_setup(setup)?;
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three")?;
+                    let style = edit.document().styles().default_paragraph();
+                    let header = Paragraph::from_runs(
+                        edit.new_id(),
+                        style,
+                        ParaAttrs::default(),
+                        [Run::new("Header words")],
+                    )?;
+                    edit.set_header_footer(place, vec![header])
+                })
+                .unwrap();
+            let story = Story::Margin {
+                section: None,
+                place,
+            };
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            let body = editor
+                .add_comment((Spot::new(0, 4), Spot::new(0, 7)), "Ana", "In the body")
+                .unwrap();
+            // In the header, on the word at the cursor.
+            editor.enter_story(story, 0, Some(Spot::new(0, 1)));
+            let range = editor.comment_range().unwrap();
+            assert_eq!(range, (Spot::new(0, 0), Spot::new(0, 6)));
+            let header = editor.add_comment(range, "Bo", "In the header").unwrap();
+            assert_eq!(editor.comment_at_cursor(), Some(header));
+            editor.leave_story(None);
+            assert_eq!(editor.story(), None);
+            let document = editor.document();
+            assert_eq!(
+                document.comments().get(header).unwrap().text.as_ref(),
+                "In the header"
+            );
+            // Listed by page, the header first, with the text each is on.
+            assert_eq!(
+                editor.comments_in_order(),
+                [(header, "Header".to_owned()), (body, "two".to_owned())]
+            );
+            // Marked where the header is, above the body, with its mark in
+            // the margin.
+            let anchor = editor.comment_anchor(header).unwrap();
+            let top = f64::from(crate::lay_out(&document).pages[0].body.0);
+            assert!(anchor.y1 <= top);
+            assert_eq!(editor.comment_marks().len(), 2);
+            assert_eq!(editor.comment_flags().len(), 2);
+            // Previous Comment from the body goes into the header, and Next
+            // Comment back to the body.
+            editor.select(Selection {
+                anchor: Spot::new(0, 4),
+                focus: Spot::new(0, 7),
+            });
+            assert_eq!(editor.go_to_comment(false), Some(header));
+            assert_eq!(editor.story(), Some(story));
+            assert_eq!(editor.selection().ordered(), range);
+            assert_eq!(editor.go_to_comment(true), Some(body));
+            assert_eq!(editor.story(), None);
+            // From the cursor at the start of the body, too.
+            editor.select(Selection::cursor(Spot::new(0, 0)));
+            assert_eq!(editor.go_to_comment(true), Some(body));
+            // Deleted from the body, it goes from the header.
+            editor.delete_comment(header);
+            let document = editor.document();
+            assert!(document.comments().get(header).is_none());
+            assert!(
+                document.headers_footers().get(place)[0]
+                    .runs()
+                    .all(|r| r.attrs.comments.is_none())
+            );
+            assert_eq!(editor.comments_in_order().len(), 1);
         });
     }
 }

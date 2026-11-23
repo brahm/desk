@@ -105,7 +105,11 @@ pub fn story_layout(
 
 /// The document laid out with the lines of a story on every page that
 /// shows it, to mark its mistakes while the body is edited.
-fn story_layout_everywhere(main: &DocumentLayout, story: Story, copy: &Document) -> DocumentLayout {
+pub(super) fn story_layout_everywhere(
+    main: &DocumentLayout,
+    story: Story,
+    copy: &Document,
+) -> DocumentLayout {
     let pages: Vec<usize> = match story {
         Story::Note(_) => Vec::new(),
         Story::TextBox(id) => text_box_page(main, id).into_iter().collect(),

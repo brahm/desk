@@ -313,14 +313,13 @@ impl CommentsPage {
             self.list.append(&self.draft_card(range));
             rows.push(NodeId::new(u64::MAX).expect("not zero"));
         }
-        for (id, start, end) in document.comment_ranges() {
+        for (id, on) in editor.comments_in_order() {
             if self.bubble && self.only.get() != Some(id) {
                 continue;
             }
             let Some(comment) = document.comments().get(id) else {
                 continue;
             };
-            let on = crate::editing::commented_text(&document, start, end);
             self.list.append(&self.card(comment, &on, now.as_ref()));
             rows.push(id);
         }
