@@ -1738,6 +1738,32 @@ paragraph, and objects on a second page.
   headers, footers, text boxes, shapes and table cells, and those of
   Pages '09 files, which come in steps 4 and 5.
 
+### 23 November: comments in the window (step 4 of W2, first part)
+
+- Step 4 is done in three pull requests: this one, the bubbles in the
+  margin, and the comments of Pages '09 files. None of it moves to
+  another phase.
+- Comment, in the header bar, the Insert menu and on Ctrl+Shift+K (⇧⌘K of
+  Pages 15.4, rule 2 of the shortcuts), comments on the selection, or on
+  the word at the cursor, as Pages does. Its card opens at the top of the
+  Comments page of the sidebar, which lists a card for each comment in
+  the order of the text: author, when, the text it is on, its text and
+  its replies, each edited and deleted in place; Reply answers it. A
+  comment left empty is not added, and one emptied is deleted, as in
+  Pages 15.4; a highlight shows as a card without text.
+- The text under comments is marked in yellow on the page, as a
+  highlighter marks paper; the colour of each author comes with step 7.
+  A click on a card selects its text, and the card of the comment at the
+  cursor is the selected one. Next and Previous Comment (Ctrl+Alt+K and
+  Ctrl+Shift+Alt+K, ⌥⌘K and ⇧⌥⌘K of Pages) select the text of the next
+  one, and the arrows at the bottom of the window step through comments
+  too (W048).
+- Marking the comments showed a bug of the layout: where a format came
+  back on a line after another, as the text after a comment does, the
+  cursor stops after it were placed at the start of the text between,
+  so selections and marks there came out empty. Each glyph run now takes
+  only its own stretch of the text.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

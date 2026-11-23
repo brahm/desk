@@ -647,6 +647,43 @@ impl Document {
         ranges
     }
 
+    /// The word at a point of the body, which a comment made there is on,
+    /// as Pages 15.4 puts a comment made at the cursor: the letters and
+    /// digits around it, or the character after it, or before it, when
+    /// there are none. None in an empty paragraph.
+    pub fn word_at(&self, at: Position) -> Option<(Position, Position)> {
+        let paragraph = self.paragraph(at.paragraph).ok()?;
+        let text = paragraph.text();
+        let mut offset = at.offset.min(text.len());
+        while !text.is_char_boundary(offset) {
+            offset -= 1;
+        }
+        let word = |c: char| c.is_alphanumeric();
+        let start = text[..offset]
+            .char_indices()
+            .rev()
+            .take_while(|(_, c)| word(*c))
+            .last()
+            .map_or(offset, |(i, _)| i);
+        let end = offset
+            + text[offset..]
+                .char_indices()
+                .find(|(_, c)| !word(*c))
+                .map_or(text.len() - offset, |(i, _)| i);
+        let (start, end) = if start < end {
+            (start, end)
+        } else if let Some(c) = text[offset..].chars().next() {
+            (offset, offset + c.len_utf8())
+        } else {
+            let c = text[..offset].chars().next_back()?;
+            (offset - c.len_utf8(), offset)
+        };
+        Some((
+            Position::new(at.paragraph, start),
+            Position::new(at.paragraph, end),
+        ))
+    }
+
     /// Whether some text of the body is under a comment.
     pub fn has_comment_anchor(&self, comment: NodeId) -> bool {
         self.body().iter().any(|p| {

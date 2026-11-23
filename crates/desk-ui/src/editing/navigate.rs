@@ -18,6 +18,8 @@ pub enum Navigate {
     Section,
     /// The mark of the next footnote or endnote.
     Note,
+    /// The text of the next comment (W149).
+    Comment,
     /// The next link.
     Link,
     /// The next bookmark.
@@ -28,10 +30,11 @@ pub enum Navigate {
 
 impl Navigate {
     /// Every kind, in the order of the menu.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Page,
         Self::Section,
         Self::Note,
+        Self::Comment,
         Self::Link,
         Self::Bookmark,
         Self::Style,
@@ -43,6 +46,7 @@ impl Navigate {
             Self::Page => "page",
             Self::Section => "section",
             Self::Note => "note",
+            Self::Comment => "comment",
             Self::Link => "link",
             Self::Bookmark => "bookmark",
             Self::Style => "style",
@@ -62,7 +66,8 @@ impl Navigate {
 fn places(document: &Document, kind: Navigate, here: usize) -> Vec<Spot> {
     let body = document.body();
     match kind {
-        Navigate::Page => Vec::new(),
+        // Pages and comments are gone to in their own way.
+        Navigate::Page | Navigate::Comment => Vec::new(),
         Navigate::Section => document
             .section_ranges()
             .into_iter()
@@ -141,6 +146,10 @@ impl TextEditor {
                 self.go_to_page(page);
                 true
             });
+        }
+        // A comment is selected, as Next Comment does.
+        if kind == Navigate::Comment {
+            return self.go_to_comment(forward).is_some();
         }
         let (start, end) = self.selection().ordered();
         let from = if forward { end } else { start };

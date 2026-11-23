@@ -152,6 +152,18 @@ const SECTIONS: &[Section] = &[
         ],
     ),
     (
+        n_("Comments"),
+        true,
+        &[
+            (
+                "<Control><Shift>k",
+                n_("Comment on the selection or the word"),
+            ),
+            ("<Control><Alt>k", n_("Next comment")),
+            ("<Control><Shift><Alt>k", n_("Previous comment")),
+        ],
+    ),
+    (
         n_("View"),
         false,
         &[
@@ -193,12 +205,13 @@ const SLIDES: Section = (
 );
 
 /// The dialog of Desk Slides, which opens no files yet: the sections that
-/// need a document but not a file, and the slides.
+/// need a document but not a file, but for the comments, which Desk Slides
+/// has with phase S2 (S158), and the slides.
 pub fn slides_dialog() -> adw::ShortcutsDialog {
     let dialog = adw::ShortcutsDialog::new();
     for (title, _, shortcuts) in SECTIONS
         .iter()
-        .filter(|(title, _, _)| *title != "Documents")
+        .filter(|(title, _, _)| !["Documents", "Comments"].contains(title))
         .chain([&SLIDES])
     {
         let section = adw::ShortcutsSection::new(Some(&tr(title)));

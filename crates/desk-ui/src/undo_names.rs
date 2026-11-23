@@ -120,6 +120,12 @@ const NAMES: &[&str] = &[
     n_("Add Row Below"),
     n_("Add Column Before"),
     n_("Add Column After"),
+    n_("Add Comment"),
+    n_("Edit Comment"),
+    n_("Delete Comment"),
+    n_("Reply"),
+    n_("Edit Reply"),
+    n_("Delete Reply"),
 ];
 
 /// The name of a change in the language of the interface, if it has one

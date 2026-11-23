@@ -269,6 +269,7 @@ the Mac on 2026-11-16. Where the two agree, the table gives one column.
 | Skip this slide | No shortcut in '09 | Ctrl+Shift+H | 2 | As in the current Keynote |
 | Row above or below, column before or after | ⌥ and the arrows | Alt and the arrows | 2 | In Tables |
 | Formula list | ⌥⌘F in '09; in 15.4, Turn Filters On | Ctrl+Shift+F | 3 | Ctrl+Alt+F already opens the search results. Ctrl+Shift+F keeps the F of Numbers and is free in Desk and in GNOME |
+| Comment, next and previous comment | ⇧⌘K, ⌥⌘K and ⇧⌥⌘K in 15.4 | Ctrl+Shift+K, Ctrl+Alt+K and Ctrl+Shift+Alt+K | 2 | In Writer; Tables and Slides have them with their comments |
 
 The shortcuts that were proposals were confirmed on 2026-11-14, and the
 ten names and shortcuts of the table below again on 2026-11-15. The

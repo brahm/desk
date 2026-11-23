@@ -1313,10 +1313,11 @@ impl TextSystem {
                     Some(tab) => {
                         // Where Parley put the text after the tab, and how
                         // much it widened its spaces.
+                        let mut runs = GlyphRuns::default();
                         let spans: Vec<ClusterSpan> = line
                             .items()
                             .filter_map(|item| match item {
-                                PositionedLayoutItem::GlyphRun(g) => Some(cluster_spans(&g)),
+                                PositionedLayoutItem::GlyphRun(g) => Some(runs.spans(&g)),
                                 _ => None,
                             })
                             .flatten()
@@ -1362,6 +1363,7 @@ impl TextSystem {
                 tab + if j == 0 { 0.0 } else { spread[j - 1].1 }
             };
             let mut leaders = Vec::new();
+            let mut runs = GlyphRuns::default();
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
@@ -1371,7 +1373,7 @@ impl TextSystem {
                 let format = &text.formats()[format_index as usize];
                 let shift =
                     script_shift(format, run.font_size(), run.font_metrics(), run.font()) - delta;
-                let spans = cluster_spans(&glyph_run);
+                let spans = runs.spans(&glyph_run);
                 let positioned: Vec<_> = glyph_run.positioned_glyphs().collect();
                 let mut glyphs: Vec<Glyph> = Vec::with_capacity(positioned.len());
                 let mut next_glyph = 0;
@@ -1729,16 +1731,52 @@ struct ClusterSpan {
     glyphs: usize,
 }
 
-fn cluster_spans(glyph_run: &parley::GlyphRun<'_, u32>) -> Vec<ClusterSpan> {
+/// The glyph runs of a line met so far, to tell apart those of one run
+/// and one format: a run of one font can hold glyph runs of several
+/// formats, and a format can come back after another, as text under a
+/// comment does in the middle of text that is not, each time with a glyph
+/// run of its own.
+#[derive(Default)]
+struct GlyphRuns(HashMap<(usize, u16), usize>);
+
+impl GlyphRuns {
+    /// The clusters of the next glyph run of the line.
+    fn spans(&mut self, glyph_run: &parley::GlyphRun<'_, u32>) -> Vec<ClusterSpan> {
+        let seen = self
+            .0
+            .entry((glyph_run.run().index(), glyph_run.style_index()))
+            .or_default();
+        let block = *seen;
+        *seen += 1;
+        cluster_spans(glyph_run, block)
+    }
+}
+
+/// The clusters of a glyph run, the `block`th of the line with its run and
+/// its format: those of that format, in the `block`th stretch of them in
+/// visual order.
+fn cluster_spans(glyph_run: &parley::GlyphRun<'_, u32>, block: usize) -> Vec<ClusterSpan> {
     let xs: Vec<f32> = glyph_run.positioned_glyphs().map(|g| g.x).collect();
     let end = glyph_run.offset() + glyph_run.advance();
     let mut spans: Vec<ClusterSpan> = Vec::new();
     let mut next = 0;
-    // A run of one font can hold glyph runs of several formats.
     let style = glyph_run.style_index();
+    let mut stretch = 0;
+    let mut inside = false;
     for cluster in glyph_run.run().visual_clusters() {
         if cluster.style_index() != style {
+            if inside {
+                stretch += 1;
+                inside = false;
+            }
             continue;
+        }
+        inside = true;
+        if stretch < block {
+            continue;
+        }
+        if stretch > block {
+            break;
         }
         let glyphs = cluster.glyphs().count();
         spans.push(ClusterSpan {
@@ -1774,12 +1812,13 @@ fn line_tabs(
     limit: f32,
 ) -> Vec<LineTab> {
     let mut spans = Vec::new();
+    let mut runs = GlyphRuns::default();
     for item in line.items() {
         if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
             if glyph_run.run().is_rtl() {
                 return Vec::new();
             }
-            spans.extend(cluster_spans(&glyph_run));
+            spans.extend(runs.spans(&glyph_run));
         }
     }
     let first = |s: &ClusterSpan| source[s.range.start..].chars().next().unwrap_or(' ');

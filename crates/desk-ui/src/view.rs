@@ -50,6 +50,8 @@ struct State {
     invisibles_color: desk_model::Rgba,
     /// The lines under misspelled words and mistakes (TXT-10, TXT-11).
     squiggles: Vec<Squiggle>,
+    /// The text under comments, marked as with a highlighter (W149).
+    comment_marks: Vec<SpanRect>,
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
@@ -266,6 +268,7 @@ impl DocumentView {
             fixed_guides: Vec::new(),
             dragged_guide: None,
             squiggles: Vec::new(),
+            comment_marks: Vec::new(),
         }));
         let view = Self {
             scrolled,
@@ -457,6 +460,19 @@ impl DocumentView {
             let mut state = self.state.borrow_mut();
             let changed = state.squiggles != squiggles;
             state.squiggles = squiggles;
+            changed
+        };
+        if changed {
+            self.area.queue_draw();
+        }
+    }
+
+    /// Marks the text under comments (W149).
+    pub fn set_comment_marks(&self, marks: Vec<SpanRect>) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let changed = state.comment_marks != marks;
+            state.comment_marks = marks;
             changed
         };
         if changed {
@@ -1064,6 +1080,7 @@ fn draw_marks(
     scale: f64,
     focused: bool,
 ) {
+    draw_comments(cr, state, page, rect, scale);
     draw_invisibles(cr, state, page, rect, scale);
     draw_squiggles(cr, state, page, rect, scale);
     // The accent color of GNOME, lighter without focus.
@@ -1406,6 +1423,40 @@ fn draw_squiggles(
         cr.stroke().ok();
         cr.set_dash(&[], 0.0);
     }
+}
+
+/// The text under comments on a page, in yellow, which multiplies with
+/// the page so that the text stays as dark as it is, as a highlighter
+/// marks paper. The color of each author comes with step 7 of the phase
+/// W2 (W150).
+fn draw_comments(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
+    let mut marks = state
+        .comment_marks
+        .iter()
+        .filter(|s| s.page == page)
+        .peekable();
+    if marks.peek().is_none() {
+        return;
+    }
+    cr.save().ok();
+    cr.set_operator(gtk::cairo::Operator::Multiply);
+    cr.set_source_rgb(1.0, 0.91, 0.45);
+    for span in marks {
+        cr.rectangle(
+            rect.x + span.x0 * scale,
+            rect.y + span.y0 * scale,
+            (span.x1 - span.x0) * scale,
+            (span.y1 - span.y0) * scale,
+        );
+    }
+    cr.fill().ok();
+    cr.restore().ok();
 }
 
 /// The marks of the invisible characters of a page, in the blue of Pages.

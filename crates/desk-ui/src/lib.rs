@@ -22,6 +22,7 @@ mod chart_data;
 mod chart_pane;
 mod chart_styles;
 mod color_popover;
+mod comments_page;
 mod compact;
 mod contents_page;
 mod custom_format;
@@ -425,6 +426,10 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             ("win.spelling", &["<Control>colon"]),
             ("win.shortcuts", &["<Control>question"]),
             ("win.command-search", &["<Control>slash"]),
+            // ⇧⌘K, ⌥⌘K and ⇧⌥⌘K in Pages 15.4 (W149).
+            ("win.insert-comment", &["<Control><Shift>k"]),
+            ("win.next-comment", &["<Control><Alt>k"]),
+            ("win.previous-comment", &["<Control><Shift><Alt>k"]),
         ] {
             app.set_accels_for_action(action, keys);
         }

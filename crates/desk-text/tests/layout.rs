@@ -1016,6 +1016,31 @@ fn doc_05_helvetica_neue_lays_out_as_pages_lays_out_each_face() {
 }
 
 #[test]
+fn txt_03_a_cursor_stops_in_order_where_a_format_comes_back() {
+    // Text under a comment, in the middle of text that is not, is one
+    // run of the font with two glyph runs of one format around it.
+    let mut system = TextSystem::new();
+    let under = CharFormat {
+        comments: desk_model::CommentIds::of([desk_model::NodeId::new(1).unwrap()]),
+        ..sans()
+    };
+    let layout = lay(
+        &mut system,
+        ParaFormat::default(),
+        &[("one ", sans()), ("two", under), (" three", sans())],
+    );
+    let line = &layout.lines[0];
+    assert_eq!(line.carets.len(), "one two three".len() + 1);
+    assert!(
+        line.carets
+            .windows(2)
+            .all(|w| w[0].0 < w[1].0 && w[0].1 < w[1].1),
+        "{:?}",
+        line.carets
+    );
+}
+
+#[test]
 fn txt_03_a_cursor_stops_at_every_character_of_a_line() {
     let mut system = TextSystem::new();
     let layout = plain(&mut system, ParaFormat::default(), TEXT);

@@ -315,8 +315,9 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
 /// The Insert menu (GNM-10): what the Insert menu of Pages had besides the
 /// objects, which have buttons of their own: breaks, fields, notes,
 /// tables of contents, links and bookmarks (EST-04, EST-08, EST-09,
-/// EST-13, EST-15, EST-16, EST-22, EST-25, EST-26, EST-27); with `objects`, the objects
-/// too, as a window narrower than 720 px shows them.
+/// EST-13, EST-15, EST-16, EST-22, EST-25, EST-26, EST-27) and comments
+/// (W149); with `objects`, the objects too, as a window narrower than
+/// 720 px shows them.
 pub(super) fn insert_menu(objects: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     if objects {
@@ -329,7 +330,6 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
             Some(&tr("_Image, Movie or Sound…")),
             Some("win.insert-picture"),
         );
-        items.append(Some(&tr("Co_mment")), Some("win.insert-comment"));
         menu.append_section(None, &items);
     }
     let breaks = gio::Menu::new();
@@ -358,6 +358,11 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
     notes.append(Some(&tr("Ne_xt Note")), Some("win.next-note"));
     notes.append(Some(&tr("Pre_vious Note")), Some("win.previous-note"));
     menu.append_section(None, &notes);
+    let comments = gio::Menu::new();
+    comments.append(Some(&tr("Co_mment")), Some("win.insert-comment"));
+    comments.append(Some(&tr("Next Comment")), Some("win.next-comment"));
+    comments.append(Some(&tr("Previous Comment")), Some("win.previous-comment"));
+    menu.append_section(None, &comments);
     let structure = gio::Menu::new();
     structure.append(Some(&tr("_Table of Contents")), Some("win.insert-toc"));
     structure.append(
