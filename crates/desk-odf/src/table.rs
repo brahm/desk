@@ -79,8 +79,11 @@ pub struct TableCell {
     pub rows_spanned: u32,
     /// The text.
     pub paragraphs: Vec<Paragraph>,
-    /// The text of its `office:annotation`, its comment.
-    pub comment: Option<String>,
+    /// Its comment, its `office:annotation`, and the replies to it, each a
+    /// `desk:annotation` of the cell that names the comment in
+    /// `desk:parent-name`, since a cell has one `office:annotation`
+    /// (odf-extensions.md).
+    pub annotations: Vec<crate::Annotation>,
 }
 
 impl TableCell {
@@ -260,12 +263,11 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
                 .filter(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
                 .map(paragraph)
                 .collect(),
-            comment: c.child(OFFICE, "annotation").map(|a| {
-                a.children_named(TEXT, "p")
-                    .map(Element::text)
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            }),
+            annotations: c
+                .elements()
+                .filter(|a| a.name.is(OFFICE, "annotation") || a.name.is(DESK, "annotation"))
+                .map(crate::read::read_annotation)
+                .collect(),
         };
         let empty = cell.paragraphs.is_empty() && cell.value.is_none();
         let mut n = count(c, "number-columns-repeated");
@@ -366,12 +368,8 @@ fn write_cell(w: &mut Writer, cell: &TableCell, paragraph: &dyn Fn(&mut Writer, 
             w.attr(name, value);
         }
     }
-    if let Some(comment) = &cell.comment {
-        w.start("office:annotation");
-        for line in comment.split('\n') {
-            w.text_element("text:p", line);
-        }
-        w.end();
+    for (n, annotation) in cell.annotations.iter().enumerate() {
+        crate::write::write_annotation(w, n > 0, annotation);
     }
     for p in &cell.paragraphs {
         paragraph(w, p);

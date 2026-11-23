@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: the comment of a table cell in Desk Writer is a comment
+  like the others, with its author, date and replies, listed by page
+  and gone to from Next Comment; ODT keeps it as the annotation of the
+  cell.
 * Added: Desk Writer puts comments on objects, and opens those of Pages
   '09 documents on shapes.
 * Added: Desk Writer writes comments in headers, footers, notes, text

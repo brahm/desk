@@ -219,8 +219,9 @@ pub struct Cell<T> {
     pub style: CellStyle,
     /// The rules of conditional formatting (TAB-21).
     pub rules: Arc<[Rule]>,
-    /// A comment on it, as plain text (TAB-27).
-    pub comment: Option<String>,
+    /// The comment on it, by the identifier under which the app keeps it
+    /// with its other comments and their replies (TAB-27, W149).
+    pub comment: Option<std::num::NonZeroU64>,
 }
 
 impl<T> Default for Cell<T> {
@@ -246,7 +247,7 @@ impl<T> Cell<T> {
             format: self.format.clone(),
             style: self.style.clone(),
             rules: self.rules.clone(),
-            comment: self.comment.clone(),
+            comment: self.comment,
         }
     }
 }

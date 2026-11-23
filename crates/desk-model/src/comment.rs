@@ -38,6 +38,20 @@ pub struct CommentPlace {
     pub end: crate::Position,
 }
 
+/// A comment on a cell of a table: the comment, the table and the row and
+/// column of the cell (W149, TAB-27).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellComment {
+    /// The comment.
+    pub id: NodeId,
+    /// The table.
+    pub table: NodeId,
+    /// The row of the cell.
+    pub row: u32,
+    /// The column of the cell.
+    pub col: u32,
+}
+
 /// A comment, the first of its thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comment {

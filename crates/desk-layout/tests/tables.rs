@@ -69,7 +69,7 @@ fn tab_20_text_too_long_for_its_cell_is_marked() {
 #[test]
 fn tab_27_cells_with_a_comment_show_its_mark() {
     let mut table = Table::new(3, 3);
-    table.cell_mut(2, 2).comment = Some("Conferir com o balanço".into());
+    table.cell_mut(2, 2).comment = std::num::NonZeroU64::new(1);
     let layout = lay_out(&table);
     assert!(cell(&layout, 2, 2).comment);
     assert!(!cell(&layout, 1, 1).comment);

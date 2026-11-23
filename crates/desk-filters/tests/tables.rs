@@ -37,7 +37,6 @@ fn document() -> Document {
     };
     table.cell_mut(1, 0).style.fill = Some(CellFill::Color(Color::rgb(200, 30, 30)));
     table.cell_mut(1, 0).style.text.bold = true;
-    table.cell_mut(2, 2).comment = Some("Conferir".into());
     table
         .merge(Area {
             row: 0,
@@ -57,7 +56,24 @@ fn document() -> Document {
                 Frame::from_pt(72.0, 72.0, 216.0, 80.0),
             );
             o.anchor = Anchor::Page(0);
+            let table = o.id;
             edit.add_object(o)?;
+            edit.add_cell_comment(
+                table,
+                2,
+                2,
+                desk_model::Comment {
+                    id: table,
+                    author: "Ana".into(),
+                    date: Some("2026-11-23T10:00:00".into()),
+                    text: "Conferir".into(),
+                    replies: Arc::new([desk_model::Reply {
+                        author: "Rui".into(),
+                        date: None,
+                        text: "Conferido".into(),
+                    }]),
+                },
+            )?;
             let mut o = Object::new(
                 edit.new_id(),
                 ObjectKind::Chart(Arc::new(chart)),
@@ -68,6 +84,24 @@ fn document() -> Document {
         })
         .unwrap();
     editor.document().clone()
+}
+
+/// The comment of a cell of the table, with its replies.
+fn cell_comment(document: &Document, row: u32, col: u32) -> Option<desk_model::Comment> {
+    let place = document
+        .cell_comments()
+        .into_iter()
+        .find(|c| (c.row, c.col) == (row, col))?;
+    document.comments().get(place.id).cloned()
+}
+
+/// The table without the identifiers of the comments of its cells, which
+/// are those of its document.
+fn without_comments(mut table: desk_model::Table) -> desk_model::Table {
+    for ((r, c), _) in table.comments() {
+        table.cell_mut(r, c).comment = None;
+    }
+    table
 }
 
 fn table_of(document: &Document) -> desk_model::Table {
@@ -97,7 +131,21 @@ fn tab_01_grf_01_tables_and_charts_survive_odt() {
     let before = document();
     let bytes = write_odt(&before).unwrap();
     let after = read_odt(&bytes).unwrap();
-    assert_eq!(table_of(&after), table_of(&before));
+    assert_eq!(
+        without_comments(table_of(&after)),
+        without_comments(table_of(&before))
+    );
+    let comment = cell_comment(&after, 2, 2).unwrap();
+    let first = cell_comment(&before, 2, 2).unwrap();
+    assert_eq!(
+        (
+            &comment.author,
+            &comment.date,
+            &comment.text,
+            &comment.replies
+        ),
+        (&first.author, &first.date, &first.text, &first.replies)
+    );
     assert_eq!(chart_of(&after), chart_of(&before));
 }
 
@@ -151,7 +199,10 @@ fn iop_01_other_programs_read_the_cells_and_the_chart() {
         table.cell(1, 0).style.fill,
         Some(CellFill::Color(Color::rgb(200, 30, 30)))
     );
-    assert_eq!(table.cell(2, 2).comment.as_deref(), Some("Conferir"));
+    // The comment of the cell is its annotation, and the reply is in it.
+    let comment = cell_comment(&after, 2, 2).unwrap();
+    assert_eq!(&*comment.text, "Conferir");
+    assert_eq!(&*comment.replies[0].text, "Conferido");
     assert_eq!(table.header_rows(), 1);
     let chart = chart_of(&after);
     assert_eq!(chart.kind, ChartKind::StackedBar);

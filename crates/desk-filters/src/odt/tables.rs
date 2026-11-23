@@ -190,8 +190,20 @@ pub(crate) fn export_table(
     table: &Table,
     locale: &Locale,
     styles: &mut dyn TableStyles,
+    document: &Document,
 ) -> odf::Table {
     let values = table.values(today());
+    // The comments of the cells are their annotations; the identifiers
+    // the cells keep are those of this document only.
+    let kept = if table.comments().is_empty() {
+        None
+    } else {
+        let mut kept = table.clone();
+        for ((r, c), _) in table.comments() {
+            kept.cell_mut(r, c).comment = None;
+        }
+        Some(kept)
+    };
     let mut out = odf::Table {
         name: Some(if table.name.is_empty() {
             "Tabela".to_owned()
@@ -200,7 +212,7 @@ pub(crate) fn export_table(
         }),
         header_columns: table.header_cols() as usize,
         header_rows: table.header_rows() as usize,
-        desk: serde_json::to_string(table).ok(),
+        desk: serde_json::to_string(kept.as_ref().unwrap_or(table)).ok(),
         ..odf::Table::default()
     };
     out.style = Some(styles.table_style(
@@ -260,7 +272,7 @@ pub(crate) fn export_table(
                 columns_spanned: span.cols,
                 rows_spanned: span.rows,
                 paragraphs: text_paragraphs(&shown.text),
-                comment: cell.comment.clone(),
+                annotations: super::comments::cell_annotations(document, cell.comment),
                 ..odf::TableCell::default()
             };
             if let Content::Formula(f) = &cell.content
@@ -458,7 +470,6 @@ pub(crate) fn import_table(source: &odf::TextDocument, odf_table: &odf::Table) -
             };
             let target = table.cell_mut(r, c);
             target.content = content;
-            target.comment.clone_from(&cell.comment);
             match cell.value_type.as_deref() {
                 Some("percentage") => {
                     target.format = Format::Percent {

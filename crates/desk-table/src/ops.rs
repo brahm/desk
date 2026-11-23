@@ -708,7 +708,7 @@ mod tests {
         t.set_height(1, 30_000);
         t.distribute_rows(&[0, 1]);
         assert_eq!((t.height(0), t.height(1)), (20_000, 20_000));
-        t.cell_mut(0, 0).comment = Some("nota".into());
+        t.cell_mut(0, 0).comment = std::num::NonZeroU64::new(7);
         t.clear(Area::cell(0, 0), false);
         assert!(t.cell(0, 0).comment.is_some());
         t.clear(Area::cell(0, 0), true);

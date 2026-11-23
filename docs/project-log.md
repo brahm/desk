@@ -1844,6 +1844,33 @@ paragraph, and objects on a second page.
   come with step 8.
 - Step 5 takes a fourth pull request, for the comments on cells.
 
+### 23 November: comments on cells (step 5 of W2, fourth part)
+
+- The comment of a cell was a line of plain text that only the Table
+  pane showed. It is now a comment of the document, with its author,
+  date and replies: the cell keeps its identifier, so that it moves with
+  the cell when rows and columns come and go, when the table is sorted
+  or cells are dragged, and goes when the cell is cleared with Clear
+  All, as the text of the cell does. A copy of a table does not take the
+  comments of its cells. A cell has one comment, as in Pages 15.4:
+  Comment, on a cell that has one, goes to it.
+- Comment, with cells selected, writes one on the first of them; its
+  card quotes what the cell shows, or the name of the table; its mark is
+  the yellow corner of the cell, which a click opens, and going to it
+  selects the cell. The comments of cells come in the order of the page
+  with those of objects. The Comment line of the Table pane writes the
+  comment of each selected cell, and emptied, deletes it.
+- ODF has one `office:annotation` in a cell: it is the comment, with its
+  author and date now, and each reply is a `desk:annotation` of the cell
+  after it (odf-extensions.md). The identifiers that the table that
+  Desk keeps in `desk:table` would carry are taken out, since they are
+  those of one document.
+- The comments of cells of Pages '09 files are left out: Desk does not
+  read the tables of Pages '09 files yet (the inventory row W168 says
+  that iWork '09 files open, and the tables of those files are dropped
+  without a word). They go with the reading of those tables, B-048,
+  which the owner chose to do now, in a fifth pull request of step 5.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

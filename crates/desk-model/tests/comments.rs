@@ -270,3 +270,75 @@ fn rev_08_a_comment_on_an_object_is_kept_with_it() {
         .unwrap();
     assert!(editor.document().object_comments().is_empty());
 }
+
+#[test]
+fn rev_08_a_comment_on_a_cell_goes_with_the_cell() {
+    use desk_model::{CellComment, Frame, ModelError, Object, ObjectKind, Table};
+    let (mut editor, _) = typed("Body");
+    let table = editor
+        .edit("Table", |edit| {
+            let object = Object::new(
+                edit.new_id(),
+                ObjectKind::Table(Arc::new(Table::new(3, 3))),
+                Frame::from_pt(72.0, 72.0, 200.0, 60.0),
+            );
+            let id = object.id;
+            edit.add_object(object)?;
+            Ok(id)
+        })
+        .unwrap();
+    let id = editor
+        .edit("Comment", |edit| {
+            edit.add_cell_comment(table, 1, 2, comment("On the cell"))
+        })
+        .unwrap();
+    let on = |row, col| CellComment {
+        id,
+        table,
+        row,
+        col,
+    };
+    assert_eq!(editor.document().cell_comments(), [on(1, 2)]);
+    assert!(editor.document().object_comments().is_empty());
+    // A cell has one comment, whose thread takes the replies.
+    assert_eq!(
+        editor.edit("Comment", |edit| edit.add_cell_comment(
+            table,
+            1,
+            2,
+            comment("Again")
+        )),
+        Err(ModelError::CommentedCell(id))
+    );
+    // A row put above takes the cell, and its comment, down.
+    editor
+        .edit("Insert Row", |edit| {
+            let mut object = edit.document().objects().get(table).unwrap().clone();
+            let ObjectKind::Table(t) = &mut object.kind else {
+                unreachable!()
+            };
+            Arc::make_mut(t).insert_rows(0, 1).unwrap();
+            edit.replace_object(object)
+        })
+        .unwrap();
+    assert_eq!(editor.document().cell_comments(), [on(2, 2)]);
+    // A copy of the table is without it.
+    let copies = editor
+        .edit("Duplicate", |edit| {
+            edit.duplicate_objects(&[table], desk_model::Length::ZERO, desk_model::Length::ZERO)
+        })
+        .unwrap();
+    let ObjectKind::Table(copy) = &editor.document().objects().get(copies[0]).unwrap().kind else {
+        unreachable!()
+    };
+    assert!(copy.comments().is_empty());
+    assert_eq!(editor.document().cell_comments(), [on(2, 2)]);
+    // Deleted, it goes from the cell; undone, it is back.
+    editor
+        .edit("Delete Comment", |edit| edit.remove_comment(id))
+        .unwrap();
+    assert!(editor.document().cell_comments().is_empty());
+    assert!(editor.document().comments().is_empty());
+    editor.undo().unwrap();
+    assert_eq!(editor.document().cell_comments(), [on(2, 2)]);
+}

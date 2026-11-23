@@ -18,7 +18,7 @@ use crate::text_nav::{self, SpanRect};
 
 /// A comment as the window shows it: the text it is in, none for the
 /// body, and the text it is on, as spots of that text, or the object it
-/// is on.
+/// is on, or the table and the row and column of the cell it is on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Placed {
     id: NodeId,
@@ -26,16 +26,20 @@ struct Placed {
     start: Spot,
     end: Spot,
     object: Option<NodeId>,
+    cell: Option<(u32, u32)>,
 }
 
 /// What a new comment is on: the text between two spots of the text being
-/// edited, or an object, as Pages 15.4 comments a selected object (W149).
+/// edited, an object, or a cell, as Pages 15.4 comments a selected object
+/// or cell (W149, TAB-27).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommentTarget {
     /// Text.
     Text(Spot, Spot),
     /// An object.
     Object(NodeId),
+    /// A cell of a table, by row and column.
+    Cell(NodeId, u32, u32),
 }
 
 /// Every comment of a document, with the text it is on.
@@ -63,6 +67,7 @@ fn placed(document: &Document) -> Vec<Placed> {
                 start,
                 end,
                 object: None,
+                cell: None,
             })
         })
         .chain(
@@ -75,9 +80,49 @@ fn placed(document: &Document) -> Vec<Placed> {
                     start: Spot::default(),
                     end: Spot::default(),
                     object: Some(object),
+                    cell: None,
                 }),
         )
+        .chain(document.cell_comments().into_iter().map(|c| Placed {
+            id: c.id,
+            story: None,
+            start: Spot::default(),
+            end: Spot::default(),
+            object: Some(c.table),
+            cell: Some((c.row, c.col)),
+        }))
         .collect()
+}
+
+/// Where a cell of a table is on the pages.
+fn cell_rect(layout: &DocumentLayout, table: NodeId, (row, col): (u32, u32)) -> Option<SpanRect> {
+    let (page, placed) = super::objects::find(layout, table)?;
+    let (x, y, w, h) = placed.table.as_ref()?.cell_rect(row, col)?;
+    let (x0, y0) = (f64::from(placed.x), f64::from(placed.y));
+    Some(SpanRect {
+        page,
+        x0: x0 + f64::from(x),
+        y0: y0 + f64::from(y),
+        x1: x0 + f64::from(x + w),
+        y1: y0 + f64::from(y + h),
+    })
+}
+
+/// What the card of a comment on a cell quotes: the text the cell shows,
+/// or the name of the table when it shows none.
+fn cell_text(document: &Document, table: NodeId, (row, col): (u32, u32)) -> String {
+    let shown = document.objects().get(table).and_then(|o| match &o.kind {
+        ObjectKind::Table(t) => {
+            let locale = desk_layout::document_locale(document);
+            let values = t.values(desk_layout::today());
+            Some(t.shown(&values, row, col, &locale).text)
+        }
+        _ => None,
+    });
+    match shown {
+        Some(text) if !text.trim().is_empty() => text.replace('\n', " ").trim().to_owned(),
+        _ => object_name(document, table),
+    }
 }
 
 /// Where an object is on the pages, in a group too.
@@ -174,6 +219,9 @@ impl<'a> Texts<'a> {
 
     /// Where the text or the object of a comment is on the pages.
     fn rects(&self, place: &Placed) -> Vec<SpanRect> {
+        if let (Some(table), Some(cell)) = (place.object, place.cell) {
+            return cell_rect(self.main, table, cell).into_iter().collect();
+        }
         if let Some(object) = place.object {
             return object_rect(self.main, object).into_iter().collect();
         }
@@ -428,6 +476,9 @@ impl TextEditor {
             .ordered(places)
             .into_iter()
             .filter_map(|p| {
+                if let (Some(table), Some(cell)) = (p.object, p.cell) {
+                    return Some((p.id, cell_text(document, table, cell)));
+                }
                 if let Some(object) = p.object {
                     return Some((p.id, object_name(document, object)));
                 }
@@ -460,6 +511,10 @@ impl TextEditor {
                 self.leave_story(None);
             }
             self.select_objects(vec![object]);
+            if let Some(cell) = place.cell {
+                self.select_cell(object, cell);
+                return self.selected_cells().is_some_and(|c| c.focus == cell);
+            }
             return self.selected_objects() == [object];
         }
         match place.story {
@@ -507,12 +562,17 @@ impl TextEditor {
                 [object] if story.is_none() => Some(object),
                 _ => None,
             };
+            let cell = state
+                .cells
+                .filter(|c| Some(c.id) == object)
+                .map(|c| c.focus);
             let here = texts.key(&Placed {
                 id: NodeId::new(1).expect("not zero"),
                 story,
                 start,
                 end,
                 object,
+                cell,
             });
             let keyed = places.into_iter().map(|p| (texts.key(&p), p.id));
             if forward {
@@ -534,11 +594,13 @@ impl TextEditor {
         let story = state.story.as_ref().map(|m| m.story);
         let (start, end) = state.selection.ordered();
         let places = placed(Self::main_document(&state));
-        // A selected object, its comment.
+        // A selected object, its comment, or that of the cell selected in
+        // it.
         if let [object] = state.objects[..] {
+            let cell = state.cells.filter(|c| c.id == object).map(|c| c.focus);
             return places
                 .iter()
-                .find(|p| p.object == Some(object))
+                .find(|p| p.object == Some(object) && p.cell == cell)
                 .map(|p| p.id);
         }
         places
@@ -614,9 +676,15 @@ impl TextEditor {
         texts.rects(&place).into_iter().next()
     }
 
-    /// What a new comment would be on: the object selected, or the text
+    /// What a new comment would be on: the cell selected in a table, the
+    /// first of the cells selected, or the object selected, or the text
     /// that [`TextEditor::comment_range`] gives.
     pub fn comment_target(&self) -> Option<CommentTarget> {
+        if let Some((_, area)) = self.table_selection()
+            && let Some(cells) = self.selected_cells()
+        {
+            return Some(CommentTarget::Cell(cells.id, area.row, area.col));
+        }
         if self.story().is_none()
             && let [object] = self.selected_objects()[..]
         {
@@ -633,10 +701,9 @@ impl TextEditor {
         author: &str,
         text: &str,
     ) -> Option<NodeId> {
-        let object = match target {
-            CommentTarget::Text(start, end) => return self.add_comment((start, end), author, text),
-            CommentTarget::Object(object) => object,
-        };
+        if let CommentTarget::Text(start, end) = target {
+            return self.add_comment((start, end), author, text);
+        }
         let text = typed(text);
         if text.is_empty() {
             return None;
@@ -650,10 +717,117 @@ impl TextEditor {
         };
         let mut added = None;
         self.format_edit("Add Comment", |edit| {
-            added = Some(edit.add_object_comment(object, comment)?);
+            added = Some(match target {
+                CommentTarget::Cell(table, row, col) => {
+                    edit.add_cell_comment(table, row, col, comment)?
+                }
+                CommentTarget::Object(object) => edit.add_object_comment(object, comment)?,
+                CommentTarget::Text(..) => unreachable!("written above"),
+            });
             Ok(())
         });
         added
+    }
+
+    /// The comment that a target already has: a cell has one, whose
+    /// thread takes what more is said of it, as in Pages 15.4.
+    pub fn target_comment(&self, target: CommentTarget) -> Option<NodeId> {
+        let CommentTarget::Cell(table, row, col) = target else {
+            return None;
+        };
+        self.document()
+            .cell_comments()
+            .into_iter()
+            .find(|c| c.table == table && (c.row, c.col) == (row, col))
+            .map(|c| c.id)
+    }
+
+    /// Writes the comment of each selected cell, as the Table pane does:
+    /// a cell without one gets one by `author`, now, a cell with one has
+    /// its text changed, and the text emptied deletes it (TAB-27).
+    pub fn set_cell_comments(&self, author: &str, text: &str) {
+        let Some((table, area)) = self.table_selection() else {
+            return;
+        };
+        let Some(id) = self.selected_cells().map(|c| c.id).or_else(|| {
+            let [id] = self.selected_objects()[..] else {
+                return None;
+            };
+            Some(id)
+        }) else {
+            return;
+        };
+        let text = typed(text);
+        let comments = self.document().cell_comments();
+        let mut changes: Vec<(u32, u32, Comment)> = Vec::new();
+        for (r, c) in area.cells() {
+            if table.span(r, c).row != r || table.span(r, c).col != c {
+                continue;
+            }
+            let old = comments
+                .iter()
+                .find(|p| p.table == id && (p.row, p.col) == (r, c))
+                .and_then(|p| self.document().comments().get(p.id).cloned());
+            match (old, text.is_empty()) {
+                (Some(old), _) if old.text == text => {}
+                (Some(old), _) => changes.push((
+                    r,
+                    c,
+                    Comment {
+                        text: text.clone(),
+                        ..old
+                    },
+                )),
+                (None, true) => {}
+                (None, false) => changes.push((
+                    r,
+                    c,
+                    Comment {
+                        id: NodeId::new(1).expect("not zero"),
+                        author: author.into(),
+                        date: Some(crate::comments_page::now().into()),
+                        text: text.clone(),
+                        replies: Arc::new([]),
+                    },
+                )),
+            }
+        }
+        if changes.is_empty() {
+            return;
+        }
+        self.format_edit("Comment", |edit| {
+            for (r, c, comment) in changes {
+                let had = edit
+                    .document()
+                    .cell_comments()
+                    .into_iter()
+                    .find(|p| p.table == id && (p.row, p.col) == (r, c))
+                    .map(|p| p.id);
+                match had {
+                    Some(old) if comment.text.is_empty() => edit.remove_comment(old)?,
+                    Some(old) => edit.set_comment(old, Some(Comment { id: old, ..comment }))?,
+                    None => {
+                        edit.add_cell_comment(id, r, c, comment)?;
+                    }
+                }
+            }
+            Ok(())
+        });
+    }
+
+    /// The text of the comment of the first of the cells selected in the
+    /// selected table, for the Table pane.
+    pub fn cell_comment_text(&self) -> Option<Arc<str>> {
+        let (_, area) = self.table_selection()?;
+        let [table] = self.selected_objects()[..] else {
+            return None;
+        };
+        let document = self.document();
+        let place = document
+            .cell_comments()
+            .into_iter()
+            .find(|p| p.table == table && (p.row, p.col) == (area.row, area.col))?;
+        document.comments().get(place.id).map(|c| c.text.clone())
     }
 
     /// Where the target of a new comment is on the pages, for its bubble
@@ -663,6 +837,9 @@ impl TextEditor {
             CommentTarget::Text(start, end) => self.range_anchor((start, end)),
             CommentTarget::Object(object) => {
                 object_rect(Self::main_layout(&self.state.borrow()), object)
+            }
+            CommentTarget::Cell(table, row, col) => {
+                cell_rect(Self::main_layout(&self.state.borrow()), table, (row, col))
             }
         }
     }
@@ -689,6 +866,23 @@ fn flags(document: &Document, main: &DocumentLayout) -> Vec<(NodeId, SpanRect)> 
             .get(place.id)
             .is_none_or(Comment::is_highlight)
         {
+            continue;
+        }
+        // On a cell, over the corner of yellow at its top right that
+        // shows it (TAB-27).
+        if let (Some(table), Some(cell)) = (place.object, place.cell) {
+            if let Some(r) = cell_rect(main, table, cell) {
+                flags.push((
+                    place.id,
+                    SpanRect {
+                        page: r.page,
+                        x0: r.x1 - FLAG,
+                        y0: r.y0,
+                        x1: r.x1,
+                        y1: r.y0 + FLAG,
+                    },
+                ));
+            }
             continue;
         }
         // On an object, at its top left corner, outside it.
@@ -939,6 +1133,79 @@ mod tests {
             editor.delete_comment(id);
             assert!(editor.document().object_comments().is_empty());
             assert!(editor.comments_in_order().is_empty());
+        });
+    }
+
+    #[test]
+    fn w149_a_selected_cell_takes_a_comment_and_has_one() {
+        use desk_model::{Anchor, Frame, Object};
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let table = document
+                .transact("Table", |edit| {
+                    let mut table = desk_model::Table::new(3, 3);
+                    table.set_content(1, 1, desk_model::table::Content::Text("Norte".into()));
+                    let mut object = Object::new(
+                        edit.new_id(),
+                        ObjectKind::Table(Arc::new(table)),
+                        Frame::from_pt(100.0, 200.0, 240.0, 60.0),
+                    );
+                    object.anchor = Anchor::Page(0);
+                    let id = object.id;
+                    edit.add_object(object)?;
+                    Ok(id)
+                })
+                .unwrap()
+                .0;
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.select_objects(vec![table]);
+            editor.select_cell(table, (1, 1));
+            let target = editor.comment_target().unwrap();
+            assert_eq!(target, CommentTarget::Cell(table, 1, 1));
+            assert_eq!(editor.target_comment(target), None);
+            let at = editor.target_anchor(target).unwrap();
+            assert!(at.x0 > 100.0 && at.y0 > 200.0);
+            let id = editor.add_comment_on(target, "Ana", "Conferir").unwrap();
+            let on = desk_model::CellComment {
+                id,
+                table,
+                row: 1,
+                col: 1,
+            };
+            assert_eq!(editor.document().cell_comments(), [on]);
+            // A cell has one comment, which Comment goes to.
+            assert_eq!(editor.target_comment(target), Some(id));
+            assert_eq!(editor.comment_at_cursor(), Some(id));
+            assert_eq!(editor.comments_in_order(), [(id, "Norte".to_owned())]);
+            // Its mark is over the corner of the cell, not on text.
+            assert!(editor.comment_marks().is_empty());
+            let flags = editor.comment_flags();
+            assert_eq!(flags.len(), 1);
+            assert_eq!((flags[0].1.x1, flags[0].1.y0), (at.x1, at.y0));
+            assert_eq!(editor.comment_anchor(id), Some(at));
+            // Going to it selects the cell.
+            editor.select_objects(Vec::new());
+            assert!(editor.select_comment(id));
+            assert_eq!(editor.selected_cells().map(|c| c.focus), Some((1, 1)));
+            // The Table pane writes it, and emptied, it is deleted.
+            assert_eq!(editor.cell_comment_text().as_deref(), Some("Conferir"));
+            editor.set_cell_comments("Ana", "Conferido");
+            assert_eq!(editor.cell_comment_text().as_deref(), Some("Conferido"));
+            assert_eq!(editor.document().cell_comments(), [on]);
+            editor.set_cell_comments("Ana", "");
+            assert!(editor.document().cell_comments().is_empty());
+            assert!(editor.document().comments().is_empty());
+            // Written in the pane on a cell without one, it is a new one.
+            editor.set_cell_comments("Rui", "Novo");
+            let found = editor.document().cell_comments();
+            assert_eq!(found.len(), 1);
+            let comment = editor
+                .document()
+                .comments()
+                .get(found[0].id)
+                .cloned()
+                .unwrap();
+            assert_eq!((&*comment.author, &*comment.text), ("Rui", "Novo"));
         });
     }
 }
