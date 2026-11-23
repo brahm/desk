@@ -1694,6 +1694,8 @@ pub(super) struct Exporter<'a> {
     pub charts: Vec<(String, odf::ChartDocument)>,
     /// The gradients and pictures that fill letters.
     pub text_fills: &'a mut super::TextFills,
+    /// The annotations of the comments on their text (W149).
+    pub comments: &'a super::CommentMarks,
 }
 
 impl super::tables::TableStyles for Exporter<'_> {
@@ -1828,7 +1830,7 @@ impl Exporter<'_> {
             });
         }
         let mut names = runs.into_iter();
-        let spans = export_spans(paragraph, None, |_| names.next().flatten());
+        let spans = export_spans(paragraph, None, self.comments, |_| names.next().flatten());
         odf::Paragraph {
             style: Some(style),
             spans,
@@ -2450,6 +2452,7 @@ pub(super) fn export_master_objects(
     masters: &HashMap<NodeId, String>,
     pictures: &mut Vec<(String, Vec<u8>)>,
     text_fills: &mut super::TextFills,
+    comments: &super::CommentMarks,
     out: &mut odf::TextDocument,
 ) {
     let mut automatic = std::mem::take(&mut out.master_styles);
@@ -2463,6 +2466,7 @@ pub(super) fn export_master_objects(
         fill_images: std::mem::take(&mut out.fill_images),
         charts: Vec::new(),
         text_fills,
+        comments,
     };
     // The objects in the lines of the headers and footers (EST-12), with
     // the styles of the master pages.

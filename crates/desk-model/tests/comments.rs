@@ -151,3 +151,73 @@ fn rev_08_a_comment_at_the_cursor_is_on_the_word_there() {
     let (empty, q) = typed("");
     assert_eq!(empty.document().word_at(Position::new(q, 0)), None);
 }
+
+#[test]
+fn rev_08_a_comment_in_a_header_is_kept_with_its_text() {
+    use desk_model::{MarginKind, MarginPages, MarginPlace, Paragraph, Run, Story};
+    let (mut editor, _) = typed("Body");
+    let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    let story = Story::Margin {
+        section: None,
+        place,
+    };
+    let header = editor
+        .edit("Header", |edit| {
+            let id = edit.new_id();
+            let style = edit.document().styles().default_paragraph();
+            let paragraph = Paragraph::from_runs(
+                id,
+                style,
+                desk_model::ParaAttrs::default(),
+                [Run::new("Header text")],
+            )?;
+            edit.set_header_footer(place, vec![paragraph])?;
+            Ok(id)
+        })
+        .unwrap();
+    // A comment written in the copy whose body is the header.
+    let id = editor
+        .edit("Comment", |edit| {
+            edit.edit_story(story, |edit| {
+                edit.add_comment(
+                    Position::new(header, 0),
+                    Position::new(header, 6),
+                    comment("In the header"),
+                )
+            })
+        })
+        .unwrap();
+    let document = editor.document();
+    assert_eq!(
+        document.comments().get(id).unwrap().text.as_ref(),
+        "In the header"
+    );
+    assert!(document.comment_ranges().is_empty());
+    let places = document.comment_places();
+    assert_eq!(places.len(), 1);
+    assert_eq!(places[0].story, Some(story));
+    assert_eq!(
+        (places[0].start, places[0].end),
+        (Position::new(header, 0), Position::new(header, 6))
+    );
+    // Deleted from outside the header, it goes with its marks.
+    editor
+        .edit("Delete Comment", |edit| edit.remove_comment(id))
+        .unwrap();
+    let document = editor.document();
+    assert!(document.comments().is_empty());
+    assert!(document.comment_places().is_empty());
+    let runs = &document.headers_footers().get(place)[0];
+    assert!(runs.runs().all(|r| r.attrs.comments.is_none()));
+    // Its text deleted in the header, it goes too.
+    editor.undo().unwrap();
+    editor
+        .edit("Delete", |edit| {
+            edit.edit_story(story, |edit| {
+                edit.delete(Position::new(header, 0), Position::new(header, 7))
+                    .map(|_| ())
+            })
+        })
+        .unwrap();
+    assert!(editor.document().comments().is_empty());
+}

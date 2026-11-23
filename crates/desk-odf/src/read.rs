@@ -131,7 +131,7 @@ pub fn read_streams(
         .as_ref()
         .and_then(|s| s.child(OFFICE, "master-styles"))
     {
-        left_out(masters, false, &mut document.skipped);
+        left_out(masters, true, &mut document.skipped);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
         document.meta = read_meta(meta);
@@ -871,8 +871,9 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
 /// tables, whose text it reads as paragraphs, comments, tracked changes
 /// and the drawing objects it cannot read, as charts and embedded objects.
 ///
-/// The comments of the paragraphs of the body are read (`body`), those of
-/// notes, tables, drawing objects and headers and footers are not yet.
+/// The comments of the paragraphs of the body, of notes, of headers and
+/// footers and of text boxes and shapes are read (`body`), those of the
+/// paragraphs of tables and of the shapes of groups are not yet.
 fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
     for child in e.elements() {
         let name = &child.name;
@@ -902,8 +903,7 @@ fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
         }
         // The text of tables is read, and so is what is in it.
         if !matches!(skipped, Some("annotation" | "changed-region" | "object")) {
-            let body =
-                body && !(name.is(TABLE, "table") || name.is(TEXT, "note") || name.ns == DRAW);
+            let body = body && !(name.is(TABLE, "table") || name.is(DRAW, "g"));
             left_out(child, body, out);
         }
     }

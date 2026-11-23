@@ -1793,6 +1793,24 @@ paragraph, and objects on a second page.
   test of Desk Writer that checks the warning of the window uses the
   comment on a shape of `rev-08-comments.pages`.
 
+### 23 November: comments outside the body (step 5 of W2, first part)
+
+- A comment on the text of a note, a header, a footer, a text box or a
+  shape is kept as one on the body: that text carries it. It is changed
+  in a copy of the document whose body is that text, as the window
+  already edits those texts, and the copy gives the comments back with
+  the rest of what belongs to the whole document.
+- The document lists every comment with the text it is in: those of the
+  body first, then those of the headers and footers, the notes in the
+  order of their marks, and the text boxes and shapes from back to
+  front. A comment whose text is gone, as that of a note deleted, is not
+  listed, and is not written.
+- ODT reads and writes them as the `office:annotation` of that text, as
+  for the body; no extension is needed. The annotations of the
+  paragraphs of tables and of the shapes of groups are still listed as
+  left out.
+- The window shows them in the next part.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

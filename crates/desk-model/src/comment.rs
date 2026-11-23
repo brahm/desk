@@ -23,6 +23,21 @@ use imbl::OrdMap;
 
 use crate::id::NodeId;
 
+/// Where a comment is: the text it is on, the body or a story (a note,
+/// a header or footer, a text box or a shape), and the positions in it
+/// where the first piece of text it is on starts and where its last ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CommentPlace {
+    /// The comment.
+    pub id: NodeId,
+    /// The story it is in, none for the body.
+    pub story: Option<crate::Story>,
+    /// Where its text starts.
+    pub start: crate::Position,
+    /// Where its text ends.
+    pub end: crate::Position,
+}
+
 /// A comment, the first of its thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comment {
