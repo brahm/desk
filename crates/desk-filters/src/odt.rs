@@ -30,6 +30,7 @@ use desk_odf as odf;
 use crate::log::{Content, ImportLog, Warning};
 use crate::sections;
 
+mod comments;
 pub(crate) mod objects;
 mod tables;
 
@@ -333,6 +334,7 @@ fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) ->
         field: None,
         link: None,
         bookmark: None,
+        comments: None,
     }
 }
 
@@ -1456,7 +1458,11 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             marks.entry(mark.clone()).or_insert(*id);
         }
     }
+    // Where the comments of the body start and end, in order: the
+    // paragraph, the offset and the comment or its end (W149).
+    let mut comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
     for (index, paragraph) in source.body.iter().enumerate() {
+        let mut found = Vec::new();
         let mut built = import_paragraph(
             source,
             &mut document,
@@ -1465,7 +1471,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             paragraph,
             relative,
             &marks,
+            Some(&mut found),
         )?;
+        comments.extend(found.into_iter().map(|(at, f)| (body_ids[index], at, f)));
         // Its id, and whether it is an entry of a table of contents.
         {
             let mut attrs = built.attrs().clone();
@@ -1643,6 +1651,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     if !source.body.is_empty() {
         document.apply(Op::RemoveParagraph { paragraph: first })?;
     }
+    comments::import(&mut document, comments)?;
     // The stops of the styles move after those of the paragraphs, which
     // are measured from the indents the styles had as read.
     if relative {
@@ -1718,6 +1727,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     paragraph,
                     relative,
                     &Marks::new(),
+                    None,
                 )?);
             }
             // The objects in its lines (EST-12).
@@ -1735,6 +1745,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         paragraph,
                         relative,
                         &Marks::new(),
+                        None,
                     )
                 },
             )?;
@@ -1770,6 +1781,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             paragraph,
             relative,
             &Marks::new(),
+            None,
         )
     })?;
     // The objects of the masters of the sections (INT-05).
@@ -1811,6 +1823,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     paragraph,
                     relative,
                     &Marks::new(),
+                    None,
                 )
             },
         )?;
@@ -2037,6 +2050,7 @@ fn import_note(
             paragraph,
             relative,
             &Marks::new(),
+            None,
         )?;
         if i > 0 {
             paragraphs.push(built);
@@ -2073,6 +2087,7 @@ fn import_note(
                 paragraph,
                 relative,
                 &Marks::new(),
+                None,
             )
         },
     )?;
@@ -2132,14 +2147,17 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
             path: matches!(display.as_str(), "full" | "path"),
             extension: matches!(display.as_str(), "full" | "name-and-extension"),
         },
-        // Notes, page references and objects are read on their own.
-        odf::Field::Note(_) | odf::Field::PageOf { .. } | odf::Field::Object(_) => {
-            Field::FileName {
-                shown: shown.into(),
-                path: false,
-                extension: true,
-            }
-        }
+        // Notes, page references, objects and comments are read on their
+        // own.
+        odf::Field::Note(_)
+        | odf::Field::PageOf { .. }
+        | odf::Field::Object(_)
+        | odf::Field::Annotation(_)
+        | odf::Field::AnnotationEnd { .. } => Field::FileName {
+            shown: shown.into(),
+            path: false,
+            extension: true,
+        },
     }
 }
 
@@ -2203,6 +2221,7 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
 /// point, which page references name (EST-22).
 type Marks = HashMap<String, NodeId>;
 
+#[allow(clippy::too_many_arguments)]
 fn import_paragraph(
     source: &odf::TextDocument,
     document: &mut Document,
@@ -2211,6 +2230,7 @@ fn import_paragraph(
     paragraph: &odf::Paragraph,
     relative: bool,
     marks: &Marks,
+    mut comments: Option<&mut Vec<(usize, odf::Field)>>,
 ) -> Result<Paragraph, FilterError> {
     // A paragraph style that is automatic holds direct formatting over a
     // common style, its parent.
@@ -2243,8 +2263,18 @@ fn import_paragraph(
             attrs.tab_stops = Some(shifted(&resolved.tab_stops, resolved.left_indent));
         }
     }
-    let mut runs = Vec::with_capacity(paragraph.spans.len());
+    let mut runs: Vec<Run> = Vec::with_capacity(paragraph.spans.len());
     for span in &paragraph.spans {
+        // Comments, where the text they are on starts and ends: read where
+        // `comments` takes them, as in the body (W149).
+        if let Some(field @ (odf::Field::Annotation(_) | odf::Field::AnnotationEnd { .. })) =
+            &span.field
+        {
+            if let Some(comments) = comments.as_deref_mut() {
+                comments.push((runs.iter().map(Run::len).sum(), field.clone()));
+            }
+            continue;
+        }
         let mut run_style = None;
         let mut run_attrs = base.clone();
         if let Some(name) = &span.style {
@@ -2385,6 +2415,8 @@ struct NoteRefs<'a> {
     /// The names of the bookmarks of one point at the paragraphs that
     /// page references name.
     marks: HashMap<NodeId, String>,
+    /// The comments of the body, where they start and end (W149).
+    comments: HashMap<(NodeId, usize), Vec<odf::Span>>,
 }
 
 impl NoteRefs<'_> {
@@ -2432,7 +2464,30 @@ fn export_spans(
     mut style: impl FnMut(&Run) -> Option<String>,
 ) -> Vec<odf::Span> {
     let mut spans = Vec::new();
+    let mut offset = 0;
+    // The comments that start and end before a run, in the body (W149).
+    let marks = notes
+        .as_deref_mut()
+        .map(|n| std::mem::take(&mut n.comments));
+    let comments = |spans: &mut Vec<odf::Span>, at: usize, run: Option<&Run>| {
+        let Some(marks) = marks.as_ref().and_then(|m| m.get(&(paragraph.id(), at))) else {
+            return;
+        };
+        let link = run.and_then(|r| r.attrs.link.clone().flatten());
+        let bookmark = run.and_then(|r| r.attrs.bookmark.clone().flatten());
+        for mark in marks {
+            spans.push(odf::Span {
+                link: link.as_deref().map(str::to_owned),
+                bookmark: bookmark.as_deref().map(str::to_owned),
+                ..mark.clone()
+            });
+        }
+    };
+    let mut last = None;
     for run in paragraph.runs() {
+        comments(&mut spans, offset, Some(run));
+        offset += run.len();
+        last = Some(run);
         let name = style(run);
         let link = run.attrs.link.clone().flatten().map(|l| l.to_string());
         let bookmark = run.attrs.bookmark.clone().flatten().map(|b| b.to_string());
@@ -2495,6 +2550,10 @@ fn export_spans(
             span.link.clone_from(&link);
             span.bookmark.clone_from(&bookmark);
         }
+    }
+    comments(&mut spans, offset, last);
+    if let (Some(notes), Some(marks)) = (notes, marks) {
+        notes.comments = marks;
     }
     spans
 }
@@ -2964,6 +3023,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         document,
         order: Vec::new(),
         marks,
+        comments: comments::export(document),
     };
     // The master pages of the sections with headers and footers of their
     // own, by the paragraph that starts each (EST-16).

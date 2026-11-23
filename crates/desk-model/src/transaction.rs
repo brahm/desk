@@ -159,8 +159,18 @@ impl Edit {
         let mut marked: Vec<NodeId> = Vec::new();
         // And the objects in the text whose marks go (OBJ-01).
         let mut objects: Vec<NodeId> = Vec::new();
+        // And the comments on the text that goes: those on no text left go
+        // too (W149).
+        let mut comments: Vec<NodeId> = Vec::new();
         for (id, range) in self.doc.paragraph_ranges(start, end)? {
             for run in self.doc.paragraph(id)?.slice(range)? {
+                if let Some(ids) = &run.attrs.comments {
+                    for &comment in ids.ids() {
+                        if !comments.contains(&comment) {
+                            comments.push(comment);
+                        }
+                    }
+                }
                 match run.attrs.field {
                     Some(Some(crate::Field::NoteMark { note })) if !marked.contains(&note) => {
                         marked.push(note);
@@ -175,6 +185,11 @@ impl Edit {
         for note in marked {
             if self.doc.notes().get(note).is_some() && !self.doc.has_note_mark(note) {
                 self.set_note(note, None)?;
+            }
+        }
+        for comment in comments {
+            if self.doc.comments().get(comment).is_some() && !self.doc.has_comment_anchor(comment) {
+                self.set_comment(comment, None)?;
             }
         }
         Ok(at)
@@ -500,6 +515,59 @@ impl Edit {
             self.apply(Op::SetNote { id, note })?;
         }
         Ok(())
+    }
+
+    /// Adds, replaces or removes a comment, leaving the text it is on as
+    /// it is (W149).
+    pub fn set_comment(
+        &mut self,
+        id: crate::NodeId,
+        comment: Option<crate::Comment>,
+    ) -> Result<(), ModelError> {
+        if self.doc.comments().get(id) != comment.as_ref() {
+            self.apply(Op::SetComment { id, comment })?;
+        }
+        Ok(())
+    }
+
+    /// Puts a new comment on the text between two positions, which must
+    /// not be empty, and returns its identifier (W149). The identifier of
+    /// `comment` is replaced with a new one.
+    pub fn add_comment(
+        &mut self,
+        start: Position,
+        end: Position,
+        mut comment: crate::Comment,
+    ) -> Result<NodeId, ModelError> {
+        if start == end {
+            return Err(ModelError::EmptyRange);
+        }
+        let id = self.new_id();
+        comment.id = id;
+        self.set_comment(id, Some(comment))?;
+        self.map_runs(start, end, |run| {
+            let ids = run.attrs.comments.clone().unwrap_or_default();
+            run.attrs.comments = Some(ids.with(id));
+        })?;
+        Ok(id)
+    }
+
+    /// Removes a comment and takes it off the text it is on (W149).
+    pub fn remove_comment(&mut self, id: NodeId) -> Result<(), ModelError> {
+        if let Some((_, start, end)) = self
+            .doc
+            .comment_ranges()
+            .into_iter()
+            .find(|(c, _, _)| *c == id)
+        {
+            self.map_runs(start, end, |run| {
+                if let Some(ids) = &run.attrs.comments {
+                    let left = ids.without(id);
+                    run.attrs.comments = (!left.is_empty()).then_some(left);
+                }
+            })?;
+        }
+        self.set_comment(id, None)
     }
 
     /// Puts an object at a place from the back, among the objects of the

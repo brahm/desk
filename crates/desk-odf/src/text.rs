@@ -1056,6 +1056,35 @@ pub enum Field {
     /// A drawing object in the line of the text, anchored `as-char`; the
     /// text of the span is empty.
     Object(Box<crate::draw::DrawObject>),
+    /// `office:annotation`, a comment, where the text it is on starts;
+    /// the text of the span is empty.
+    Annotation(Box<Annotation>),
+    /// `office:annotation-end`, where the text of the comment of a name
+    /// ends; the text of the span is empty.
+    AnnotationEnd {
+        /// `office:name`.
+        name: String,
+    },
+}
+
+/// A comment (`office:annotation`). One with an `office:name` is on the
+/// text up to the `office:annotation-end` of that name; one without is at
+/// its point. A reply is a comment of its own, on the same text as the
+/// comment it answers, which `desk:parent-name` names (`loext:parent-name`
+/// as LibreOffice writes it).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Annotation {
+    /// `office:name`.
+    pub name: Option<String>,
+    /// `desk:parent-name`, or `loext:parent-name`: the name of the comment
+    /// it is a reply to.
+    pub parent: Option<String>,
+    /// `dc:creator`.
+    pub creator: Option<String>,
+    /// `dc:date`, as written.
+    pub date: Option<String>,
+    /// The text of its paragraphs, a line each, `\n` between them.
+    pub text: String,
 }
 
 /// A footnote or an endnote (`text:note`).

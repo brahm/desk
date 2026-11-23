@@ -268,8 +268,8 @@ impl Paragraph {
 
     /// The formatting that text typed at an offset takes: that of the
     /// character before it, or of the first character at the start, but
-    /// never its field. Text typed inside a link or a bookmark joins it;
-    /// at its ends it does not.
+    /// never its field. Text typed inside a link, a bookmark or a comment
+    /// joins it; at its ends it does not.
     pub fn format_at(&self, offset: usize) -> (Option<StyleId>, CharAttrs) {
         let mut start = 0;
         for run in &self.runs {
@@ -279,6 +279,7 @@ impl Paragraph {
                 if start < offset && offset < end && run.attrs.field.is_none() {
                     attrs.link = run.attrs.link.clone();
                     attrs.bookmark = run.attrs.bookmark.clone();
+                    attrs.comments = run.attrs.comments.clone();
                 }
                 return (run.style, attrs);
             }

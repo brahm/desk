@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer keeps the comments of ODT files, with their
+  replies, on the text they are on, and saves them.
 * Added: The plan of phase W2 of Desk Writer, which brings comments
   with replies, highlights and the tracking of changes of Pages 15.4.
 * Changed: Writer to the behaviour of 15 (W1) is done, checked on the

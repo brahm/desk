@@ -6,14 +6,14 @@
 use std::collections::HashMap;
 
 use crate::error::OdfError;
-use crate::ns::{CONFIG, DC, DESK, DRAW, FO, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK};
+use crate::ns::{CONFIG, DC, DESK, DRAW, FO, LOEXT, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK};
 use crate::text::{
-    Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground, Family,
-    Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor, LineHeight,
-    ListLabel, ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note, NotesConfiguration,
-    PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart, SectionStyle, Span,
-    Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties,
-    TextSettings, TextShadow, TextTransform, TocLevel,
+    Annotation, Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground,
+    Family, Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor,
+    LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note,
+    NotesConfiguration, PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart,
+    SectionStyle, Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument,
+    TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, TocLevel,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -125,13 +125,13 @@ pub fn read_streams(
             &mut document.page_objects,
         );
         document.toc_levels = toc_levels(text);
-        left_out(text, &mut document.skipped);
+        left_out(text, true, &mut document.skipped);
     }
     if let Some(masters) = styles
         .as_ref()
         .and_then(|s| s.child(OFFICE, "master-styles"))
     {
-        left_out(masters, &mut document.skipped);
+        left_out(masters, false, &mut document.skipped);
     }
     if let Some(meta) = meta.as_ref().and_then(|m| m.child(OFFICE, "meta")) {
         document.meta = read_meta(meta);
@@ -870,10 +870,16 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
 /// Counts what the reader leaves out of `e`, by the name of its element:
 /// tables, whose text it reads as paragraphs, comments, tracked changes
 /// and the drawing objects it cannot read, as charts and embedded objects.
-fn left_out(e: &Element, out: &mut Vec<(String, usize)>) {
+///
+/// The comments of the paragraphs of the body are read (`body`), those of
+/// notes, tables, drawing objects and headers and footers are not yet.
+fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
     for child in e.elements() {
         let name = &child.name;
         let skipped = if name.is(OFFICE, "annotation") {
+            if body {
+                continue;
+            }
             Some("annotation")
         } else if name.is(TEXT, "changed-region") {
             Some("changed-region")
@@ -896,7 +902,9 @@ fn left_out(e: &Element, out: &mut Vec<(String, usize)>) {
         }
         // The text of tables is read, and so is what is in it.
         if !matches!(skipped, Some("annotation" | "changed-region" | "object")) {
-            left_out(child, out);
+            let body =
+                body && !(name.is(TABLE, "table") || name.is(TEXT, "note") || name.ns == DRAW);
+            left_out(child, body, out);
         }
     }
 }
@@ -1274,6 +1282,33 @@ impl SpanBuilder {
         self.collapse = false;
     }
 
+    /// Adds a comment where the text it is on starts (W149). It leaves the
+    /// white space around it as if it were not there.
+    fn annotation(&mut self, e: &Element) {
+        let lines: Vec<String> = e
+            .elements()
+            .filter(|c| c.name.is(TEXT, "p") || c.name.is(TEXT, "h"))
+            .map(|c| paragraph(c).text())
+            .collect();
+        let element = |ns: &str, local: &str| e.child(ns, local).map(Element::text);
+        let annotation = Annotation {
+            name: e.attr(OFFICE, "name").map(str::to_owned),
+            parent: e
+                .attr(DESK, "parent-name")
+                .or_else(|| e.attr(LOEXT, "parent-name"))
+                .map(str::to_owned),
+            creator: element(DC, "creator"),
+            date: element(DC, "date"),
+            text: lines.join("\n"),
+        };
+        self.spans.push(Span {
+            field: Some(Field::Annotation(Box::new(annotation))),
+            link: self.link.clone(),
+            bookmark: self.bookmark.clone(),
+            ..Span::default()
+        });
+    }
+
     fn xml_text(&mut self, style: Option<&str>, text: &str) {
         let mut out = String::with_capacity(text.len());
         for c in text.chars() {
@@ -1395,7 +1430,18 @@ impl SpanBuilder {
             }
             return;
         }
-        if name.is(OFFICE, "annotation") || name.is(OFFICE, "annotation-end") {
+        if name.is(OFFICE, "annotation") {
+            return self.annotation(e);
+        }
+        if name.is(OFFICE, "annotation-end") {
+            self.spans.push(Span {
+                field: Some(Field::AnnotationEnd {
+                    name: e.attr(OFFICE, "name").unwrap_or_default().to_owned(),
+                }),
+                link: self.link.clone(),
+                bookmark: self.bookmark.clone(),
+                ..Span::default()
+            });
             return;
         }
         // Links, fields and anything else: their text.
