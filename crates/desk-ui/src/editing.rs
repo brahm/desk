@@ -30,6 +30,7 @@ use crate::view::{DocumentView, WeakView};
 
 mod cell_drag;
 mod chart_looks;
+mod comments;
 mod connections;
 mod copies;
 mod custom_formats;
@@ -48,6 +49,7 @@ mod table_looks;
 mod tables;
 mod threads;
 
+pub use comments::commented_text;
 pub use navigate::Navigate;
 pub use objects::{NewShape, ObjectInfo, ObjectStylesInfo};
 pub use outline::OutlineRow;
@@ -2720,6 +2722,7 @@ impl TextEditor {
         self.view.set_book(self.facing_pages());
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
+        self.view.set_comment_marks(self.comment_marks());
         self.show_outlines();
         self.show_guides();
         self.view.access().set_text(text.clone());

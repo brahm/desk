@@ -145,6 +145,7 @@ fn navigate_label(kind: Navigate) -> String {
         Navigate::Page => tr("Page"),
         Navigate::Section => tr("Section"),
         Navigate::Note => tr("Note"),
+        Navigate::Comment => tr("Comment"),
         Navigate::Link => tr("Link"),
         Navigate::Bookmark => tr("Bookmark"),
         Navigate::Style => tr("Paragraph Style"),
@@ -171,6 +172,7 @@ fn step_labels(kind: Navigate) -> (String, String) {
         Navigate::Page => (tr("_Previous Page"), tr("_Next Page")),
         Navigate::Section => (tr("_Previous Section"), tr("_Next Section")),
         Navigate::Note => (tr("_Previous Note"), tr("_Next Note")),
+        Navigate::Comment => (tr("_Previous Comment"), tr("_Next Comment")),
         Navigate::Link => (tr("_Previous Link"), tr("_Next Link")),
         Navigate::Bookmark => (tr("_Previous Bookmark"), tr("_Next Bookmark")),
         Navigate::Style => (

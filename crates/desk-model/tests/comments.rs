@@ -132,3 +132,22 @@ fn pxv_19_a_comment_needs_text_to_be_on() {
     );
     assert!(editor.document().comments().is_empty());
 }
+
+#[test]
+fn rev_08_a_comment_at_the_cursor_is_on_the_word_there() {
+    let (editor, p) = typed("One, two");
+    let document = editor.document();
+    let word = |offset| {
+        document
+            .word_at(Position::new(p, offset))
+            .map(|(s, e)| (s.offset, e.offset))
+    };
+    // Inside a word, at its start and at its end.
+    assert_eq!(word(1), Some((0, 3)));
+    assert_eq!(word(0), Some((0, 3)));
+    assert_eq!(word(8), Some((5, 8)));
+    // Between words, the character after the cursor.
+    assert_eq!(word(4), Some((4, 5)));
+    let (empty, q) = typed("");
+    assert_eq!(empty.document().word_at(Position::new(q, 0)), None);
+}

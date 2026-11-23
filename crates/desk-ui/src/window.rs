@@ -129,6 +129,8 @@ pub struct DocumentWindow {
     thumbnails: Rc<crate::thumbnails::Thumbnails>,
     /// The table of contents in the sidebar of Desk Writer (W011).
     contents: Rc<crate::contents_page::ContentsPage>,
+    /// The comments in the sidebar of Desk Writer (W149).
+    comments: Rc<crate::comments_page::CommentsPage>,
     outline: Rc<crate::outline_view::OutlineView>,
     /// The navigation sidebar, with the page thumbnails (GNM-12).
     nav: Rc<NavSidebar>,
@@ -181,7 +183,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 78] = [
+const DOCUMENT_ACTIONS: [&str; 81] = [
     "outline",
     "screen-view",
     "text-size",
@@ -237,6 +239,9 @@ const DOCUMENT_ACTIONS: [&str; 78] = [
     "insert-note",
     "next-note",
     "previous-note",
+    "insert-comment",
+    "next-comment",
+    "previous-comment",
     "insert-toc",
     "update-toc",
     "insert-link",
@@ -441,6 +446,7 @@ impl DocumentWindow {
         // GNM-12).
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
         let contents = crate::contents_page::ContentsPage::new(editor_of());
+        let comments = crate::comments_page::CommentsPage::new(editor_of());
         let nav = if let Some(slides) = &slides {
             // The navigator, the outline and the master slides of Keynote
             // (KINT-07, KINT-08, KGNM-13).
@@ -484,11 +490,17 @@ impl DocumentWindow {
         // The styles that were the Styles drawer of Pages (INT-18), the
         // comments, and the search results that were its search sidebar
         // (TXT-13), as pages of the sidebar of interface B.
+        // The comments of Desk Slides come with phase S2 (S158).
+        let comments_widget: gtk::Widget = if slides.is_some() {
+            comments_page().upcast()
+        } else {
+            comments.widget().clone().upcast()
+        };
         nav.add_page(
             "comments",
             &tr("Comments"),
             nav_sidebar::WIDTH,
-            &comments_page(),
+            &comments_widget,
         );
         nav.add_page(
             "search",
@@ -634,6 +646,7 @@ impl DocumentWindow {
             search_sidebar,
             thumbnails,
             contents,
+            comments,
             outline,
             nav,
             nav_split,
@@ -1049,6 +1062,7 @@ impl DocumentWindow {
                 this.search_sidebar.document_changed();
                 this.thumbnails.refresh();
                 this.contents.refresh();
+                this.comments.refresh();
                 this.outline.document_changed();
                 this.slides_changed();
             }
@@ -1058,6 +1072,10 @@ impl DocumentWindow {
             if let Some(this) = weak.upgrade() {
                 this.show_format();
                 this.show_count();
+                if this.nav_shows("comments") {
+                    this.comments
+                        .show_current(this.editor().and_then(|e| e.comment_at_cursor()));
+                }
             }
         });
         editor.set_show_invisibles(self.action_state("invisibles"));
@@ -1210,6 +1228,7 @@ impl DocumentWindow {
                     }
                 }
                 "contents" => self.contents.set_shown(on),
+                "comments" if self.slides.is_none() => self.comments.set_shown(on),
                 "styles" => self.show_format(),
                 "topics" => {
                     if let Some(slides) = &self.slides {
@@ -3003,6 +3022,7 @@ impl DocumentWindow {
             self.actions.add_action(&action);
         }
 
+        self.add_comment_actions();
         self.add_field_actions();
 
         // Tables of contents, links and bookmarks (EST-22, EST-25,
@@ -3073,6 +3093,54 @@ impl DocumentWindow {
         let page = self.side.visible_child_name();
         let on = shown && page.as_deref() == Some("inspector");
         formatting::set_state(&self.actions, "inspector", on.to_variant());
+    }
+
+    /// Comment, on the selection or the word at the cursor, which the
+    /// Comments page of the sidebar writes, and Next and Previous Comment
+    /// (W149). Desk Slides has its comments with phase S2 (S158).
+    fn add_comment_actions(self: &Rc<Self>) {
+        if self.slides.is_some() {
+            return;
+        }
+        let insert = gio::SimpleAction::new("insert-comment", None);
+        let weak = Rc::downgrade(self);
+        insert.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(range) = this.editor().and_then(|e| e.comment_range()) else {
+                this.window.error_bell();
+                return;
+            };
+            this.show_nav_page("comments");
+            this.comments.start_comment(range);
+        });
+        self.actions.add_action(&insert);
+        for (name, forward) in [("next-comment", true), ("previous-comment", false)] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                let Some(this) = weak.upgrade() else { return };
+                if this
+                    .editor()
+                    .and_then(|e| e.go_to_comment(forward))
+                    .is_none()
+                {
+                    this.window.error_bell();
+                }
+            });
+            self.actions.add_action(&action);
+        }
+    }
+
+    /// Shows a page of the navigation sidebar, by name.
+    fn show_nav_page(&self, page: &str) {
+        let action = self
+            .nav_pages()
+            .iter()
+            .find(|(p, _)| *p == page)
+            .map(|(_, action)| *action);
+        if let Some(action) = action {
+            self.actions.change_action_state(action, &true.to_variant());
+        }
     }
 
     /// The formats of the field at the cursor, from its context menu
@@ -3784,12 +3852,8 @@ fn from_template(target: &str) -> Document {
     document
 }
 
-/// The menu of the Add button of the navigation sidebar (GNM-12): a blank
-/// page, which in a page layout document is a page of its own, and a
-/// section break. The pages of the template join them with the templates
-/// of the gallery (INT-06).
-/// The Comments page of the sidebar. Desk has no comments yet (REV-08,
-/// phase 8 of the plan), so it says so.
+/// The Comments page of the sidebar of Desk Slides, whose comments come
+/// with phase S2 of the roadmap (S158), so it says there are none.
 fn comments_page() -> adw::StatusPage {
     adw::StatusPage::builder()
         .icon_name("desk-comment-symbolic")
@@ -3799,6 +3863,10 @@ fn comments_page() -> adw::StatusPage {
         .build()
 }
 
+/// The menu of the Add button of the navigation sidebar (GNM-12): a blank
+/// page, which in a page layout document is a page of its own, and a
+/// section break. The pages of the template join them with the templates
+/// of the gallery (INT-06).
 fn add_page_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("_Blank Page")), Some("win.insert-page-break"));

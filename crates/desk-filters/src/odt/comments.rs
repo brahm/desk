@@ -83,7 +83,7 @@ pub(super) fn import(
         for (first, replies) in &threads {
             let (start, end, annotation) = &found[*first];
             let Some((start, end)) = (if start == end {
-                word_at(edit.document(), *start)
+                edit.document().word_at(*start)
             } else {
                 Some((*start, *end))
             }) else {
@@ -118,38 +118,6 @@ pub(super) fn import(
 fn date(date: Option<&str>) -> Option<Arc<str>> {
     date.filter(|d| !d.is_empty() && !d.starts_with("0000"))
         .map(Into::into)
-}
-
-/// The word at a point of the body: the letters and digits around it, or
-/// the character after it, or before it, when there are none.
-fn word_at(document: &Document, at: Position) -> Option<(Position, Position)> {
-    let paragraph = document.paragraph(at.paragraph).ok()?;
-    let text = paragraph.text();
-    let offset = at.offset.min(text.len());
-    let word = |c: char| c.is_alphanumeric();
-    let start = text[..offset]
-        .char_indices()
-        .rev()
-        .take_while(|(_, c)| word(*c))
-        .last()
-        .map_or(offset, |(i, _)| i);
-    let end = offset
-        + text[offset..]
-            .char_indices()
-            .find(|(_, c)| !word(*c))
-            .map_or(text.len() - offset, |(i, _)| i);
-    let (start, end) = if start < end {
-        (start, end)
-    } else if let Some(c) = text[offset..].chars().next() {
-        (offset, offset + c.len_utf8())
-    } else {
-        let c = text[..offset].chars().next_back()?;
-        (offset - c.len_utf8(), offset)
-    };
-    Some((
-        Position::new(at.paragraph, start),
-        Position::new(at.paragraph, end),
-    ))
 }
 
 /// The annotations to write in the body, by the paragraph and the offset

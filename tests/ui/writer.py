@@ -2743,7 +2743,7 @@ def sidebar_pages(work):
     the styles that were the Styles drawer, the comments and the search
     results, one at a time; the View menu and their shortcuts choose them,
     and F9 hides and shows the sidebar with the page it had (INT-18,
-    TXT-13, GNM-12)."""
+    TXT-13, GNM-12). A comment is written there (W149)."""
     name = "Sidebar.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -2766,6 +2766,28 @@ def sidebar_pages(work):
             showing_named(app, "No Comments") is not None
             and showing_named(app, "Paragraph Styles") is None,
         )
+        # Ctrl+Shift+K comments on the selection, in a card of the page
+        # that takes the keyboard; Ctrl+Return is done with it, and it is
+        # saved as an annotation on its text (W149, REV-08).
+        press("ctrl+a", "ctrl+shift+k")
+        wait_for("the card of the new comment", lambda: showing_named(app, "New Comment"))
+        type_text("Why landscape?")
+        press("ctrl+Return")
+        wait_for(
+            "the card of the comment",
+            lambda: named_like(app, r"Comment by .+") and showing_named(app, "Why landscape?"),
+        )
+        check("Ctrl+Shift+K writes a comment on the selection in the sidebar (W149)", True)
+        press("ctrl+s")
+        wait_for(
+            "the saved comment",
+            lambda: saved_content(
+                letter,
+                r"<office:annotation office:name=\"c1\">.*Why landscape\?.*</office:annotation>US Letter"
+                r".*<office:annotation-end office:name=\"c1\"/>",
+            ),
+        )
+        check("and it is saved on its text (REV-08)", True)
         press("ctrl+alt+f")
         wait_for("the search results in the sidebar", lambda: shown_pages() == ["search"])
         check(

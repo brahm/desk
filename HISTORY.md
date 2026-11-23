@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer writes, answers, edits and deletes comments in the
+  Comments page of the sidebar, and marks the text under them.
+* Fixed: the cursor and the selection after text in another format, in
+  the middle of a line, no longer go back to before it.
 * Added: Desk Writer keeps the comments of ODT files, with their
   replies, on the text they are on, and saves them.
 * Added: The plan of phase W2 of Desk Writer, which brings comments
