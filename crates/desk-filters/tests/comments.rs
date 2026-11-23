@@ -184,3 +184,135 @@ fn rev_08_a_comment_at_a_point_is_on_the_word_there() {
     // No author reads as none, not as a name.
     assert!(document.comments().iter().any(|c| c.author.is_empty()));
 }
+
+#[test]
+fn rev_08_comments_of_notes_headers_and_text_boxes_are_kept_in_odt() {
+    use std::sync::Arc;
+
+    use desk_model::{
+        CharAttrs, FIELD_CHARACTER, Field, Frame, Length, MarginKind, MarginPages, MarginPlace,
+        Note, Object, ObjectKind, ParaAttrs, Paragraph, Run, Story, TextBox,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    let (note, header, boxed) = editor
+        .edit("Texts", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let paragraph = |edit: &mut desk_model::Edit, runs: Vec<Run>| {
+                Paragraph::from_runs(edit.new_id(), style, ParaAttrs::default(), runs)
+            };
+            // A footnote, its mark in the body.
+            let at = edit.insert_text(start, "Body")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            let text = paragraph(
+                edit,
+                vec![
+                    Run::with_attrs(&FIELD_CHARACTER.to_string(), None, mark),
+                    Run::new(" Note text"),
+                ],
+            )?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![text].into(),
+                }),
+            )?;
+            // A header.
+            let header = paragraph(edit, vec![Run::new("Header text")])?;
+            edit.set_header_footer(place, vec![header])?;
+            // A text box.
+            let text = paragraph(edit, vec![Run::new("Boxed text")])?;
+            let object = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox::new(Arc::from([text]), Length::from_points(4))),
+                Frame::from_pt(300.0, 400.0, 120.0, 60.0),
+            );
+            let boxed = object.id;
+            edit.add_object(object)?;
+            Ok((
+                note,
+                Story::Margin {
+                    section: None,
+                    place,
+                },
+                boxed,
+            ))
+        })
+        .unwrap();
+    // A comment in each, the one of the note with a reply.
+    for (story, from, to, made) in [
+        (
+            Story::Note(note),
+            4,
+            8,
+            comment("Ana", "On the note", &[("Bo", "Yes")]),
+        ),
+        (header, 0, 6, comment("Bo", "On the header", &[])),
+        (Story::TextBox(boxed), 6, 10, comment("Ana", "", &[])),
+    ] {
+        editor
+            .edit("Comment", |edit| {
+                edit.edit_story(story, |edit| {
+                    let p = edit.document().body().get(0).unwrap().id();
+                    edit.add_comment(Position::new(p, from), Position::new(p, to), made)
+                })
+            })
+            .unwrap();
+    }
+    let places = |document: &Document| -> Vec<String> {
+        document
+            .comment_places()
+            .into_iter()
+            .map(|place| {
+                let story = place.story.unwrap();
+                let paragraph = document
+                    .story_paragraphs(story)
+                    .into_iter()
+                    .find(|p| p.id() == place.start.paragraph)
+                    .unwrap();
+                let comment = document.comments().get(place.id).unwrap();
+                let kind = match story {
+                    Story::Note(_) => "note",
+                    Story::Margin { .. } => "header",
+                    Story::TextBox(_) => "box",
+                };
+                format!(
+                    "{kind} [{}] {}: {:?} {}",
+                    &paragraph.text()[place.start.offset..place.end.offset],
+                    comment.author,
+                    comment.text,
+                    comment.replies.len()
+                )
+            })
+            .collect()
+    };
+    let document = editor.document();
+    assert_eq!(
+        places(document),
+        [
+            r#"header [Header] Bo: "On the header" 0"#,
+            r#"note [Note] Ana: "On the note" 1"#,
+            r#"box [text] Ana: "" 0"#,
+        ]
+    );
+    let bytes = write_odt(document).unwrap();
+    keep("rev-08-comments-in-stories.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(places(&read), places(document));
+    // The texts are the same, without the comments.
+    assert_eq!(
+        read.notes().iter().next().unwrap().paragraphs[0].text(),
+        format!("{FIELD_CHARACTER} Note text")
+    );
+    assert_eq!(read.headers_footers().get(place)[0].text(), "Header text");
+}

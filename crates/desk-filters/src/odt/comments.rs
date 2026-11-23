@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The comments of the body to and from ODF annotations (W149, REV-08,
-//! PXV-19).
+//! The comments of the body and of the stories to and from ODF
+//! annotations (W149, REV-08, PXV-19).
 //!
 //! A comment is an `office:annotation` where the text it is on starts,
 //! named, and an `office:annotation-end` of its name where that text ends.
@@ -13,21 +13,69 @@
 //! without an end, as other programs write a comment at a point, is on the
 //! word there, as Pages 15.4 puts a comment made at the cursor.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use desk_model::{Comment, Document, NodeId, Position, Reply};
+use desk_model::{Comment, Document, Edit, ModelError, NodeId, Position, Reply, Story};
 use desk_odf as odf;
 
 use super::FilterError;
 
-/// Puts the comments found in the body on the text they are on: by
-/// paragraph and offset, in the order of the body, each comment and each
-/// end met.
-pub(super) fn import(
-    document: &mut Document,
-    events: Vec<(NodeId, usize, odf::Field)>,
-) -> Result<(), FilterError> {
+/// The comments and their ends met in some text, by paragraph and offset.
+pub(super) type Events = Vec<(NodeId, usize, odf::Field)>;
+
+/// Puts the comments found in a text of the document on the text they
+/// are on: by paragraph and offset, in the order of the text, each
+/// comment and each end met. The text is the body, a note, a header or a
+/// footer, or the text of a text box or a shape, whichever holds the
+/// paragraphs (W149).
+pub(super) fn import(document: &mut Document, events: Events) -> Result<(), FilterError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+    let body: HashSet<NodeId> = document.body().iter().map(|p| p.id()).collect();
+    let stories: Vec<(Story, HashSet<NodeId>)> = document
+        .stories()
+        .into_iter()
+        .chain(document.notes().iter().map(|n| Story::Note(n.id)))
+        .map(|story| {
+            let ids = document
+                .story_paragraphs(story)
+                .iter()
+                .map(|p| p.id())
+                .collect();
+            (story, ids)
+        })
+        .collect();
+    let mut texts: Vec<(Option<Story>, Events)> = Vec::new();
+    for event in events {
+        let story = if body.contains(&event.0) {
+            None
+        } else {
+            match stories.iter().find(|(_, ids)| ids.contains(&event.0)) {
+                Some((story, _)) => Some(*story),
+                None => continue,
+            }
+        };
+        match texts.iter_mut().find(|(s, _)| *s == story) {
+            Some((_, list)) => list.push(event),
+            None => texts.push((story, vec![event])),
+        }
+    }
+    document.transact("Comments", |edit| {
+        for (story, events) in texts {
+            match story {
+                None => add(edit, events)?,
+                Some(story) => edit.edit_story(story, |edit| add(edit, events))?,
+            }
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Puts the comments found in the body on the text they are on.
+fn add(edit: &mut Edit, events: Events) -> Result<(), ModelError> {
     // Each annotation with the text it is on, in the order of the file.
     let mut open: Vec<(String, Position, odf::Annotation)> = Vec::new();
     let mut found: Vec<(Position, Position, odf::Annotation)> = Vec::new();
@@ -79,37 +127,34 @@ pub(super) fn import(
         }
     }
     threads.sort_by_key(|(r, _)| *r);
-    document.transact("Comments", |edit| {
-        for (first, replies) in &threads {
-            let (start, end, annotation) = &found[*first];
-            let Some((start, end)) = (if start == end {
-                edit.document().word_at(*start)
-            } else {
-                Some((*start, *end))
-            }) else {
-                continue;
-            };
-            let comment = Comment {
-                id: NodeId::new(1).expect("not zero"),
-                author: annotation.creator.as_deref().unwrap_or_default().into(),
-                date: date(annotation.date.as_deref()),
-                text: annotation.text.as_str().into(),
-                replies: replies
-                    .iter()
-                    .map(|i| {
-                        let reply = &found[*i].2;
-                        Reply {
-                            author: reply.creator.as_deref().unwrap_or_default().into(),
-                            date: date(reply.date.as_deref()),
-                            text: reply.text.as_str().into(),
-                        }
-                    })
-                    .collect(),
-            };
-            edit.add_comment(start, end, comment)?;
-        }
-        Ok(())
-    })?;
+    for (first, replies) in &threads {
+        let (start, end, annotation) = &found[*first];
+        let Some((start, end)) = (if start == end {
+            edit.document().word_at(*start)
+        } else {
+            Some((*start, *end))
+        }) else {
+            continue;
+        };
+        let comment = Comment {
+            id: NodeId::new(1).expect("not zero"),
+            author: annotation.creator.as_deref().unwrap_or_default().into(),
+            date: date(annotation.date.as_deref()),
+            text: annotation.text.as_str().into(),
+            replies: replies
+                .iter()
+                .map(|i| {
+                    let reply = &found[*i].2;
+                    Reply {
+                        author: reply.creator.as_deref().unwrap_or_default().into(),
+                        date: date(reply.date.as_deref()),
+                        text: reply.text.as_str().into(),
+                    }
+                })
+                .collect(),
+        };
+        edit.add_comment(start, end, comment)?;
+    }
     Ok(())
 }
 
@@ -120,8 +165,8 @@ fn date(date: Option<&str>) -> Option<Arc<str>> {
         .map(Into::into)
 }
 
-/// The annotations to write in the body, by the paragraph and the offset
-/// where they go: at the start of the text of each comment, the comment
+/// The annotations to write in the body and the stories, by the
+/// paragraph and the offset where they go: at the start of the text of each comment, the comment
 /// and its replies; at its end, the end of each.
 pub(super) fn export(document: &Document) -> HashMap<(NodeId, usize), Vec<odf::Span>> {
     let mut ends: HashMap<(NodeId, usize), Vec<odf::Span>> = HashMap::new();
@@ -130,7 +175,8 @@ pub(super) fn export(document: &Document) -> HashMap<(NodeId, usize), Vec<odf::S
         field: Some(field),
         ..odf::Span::default()
     };
-    for (n, (id, start, end)) in document.comment_ranges().into_iter().enumerate() {
+    for (n, place) in document.comment_places().into_iter().enumerate() {
+        let (id, start, end) = (place.id, place.start, place.end);
         let Some(comment) = document.comments().get(id) else {
             continue;
         };

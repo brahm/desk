@@ -627,24 +627,35 @@ impl Document {
     /// starts and where its last ends. A comment on pieces apart is on
     /// everything between them.
     pub fn comment_ranges(&self) -> Vec<(NodeId, Position, Position)> {
-        let mut ranges: Vec<(NodeId, Position, Position)> = Vec::new();
-        for paragraph in self.body().iter() {
-            let mut offset = 0;
-            for run in paragraph.runs() {
-                let end = offset + run.len();
-                if let Some(ids) = &run.attrs.comments {
-                    for &id in ids.ids() {
-                        let to = Position::new(paragraph.id(), end);
-                        match ranges.iter_mut().find(|(c, _, _)| *c == id) {
-                            Some(range) => range.2 = to,
-                            None => ranges.push((id, Position::new(paragraph.id(), offset), to)),
-                        }
-                    }
+        comment_ranges_in(self.body().iter())
+    }
+
+    /// Where every comment of the document is: those of the body, in its
+    /// order, and then those of each of its stories, in the order of
+    /// [`Document::stories`]. A comment is on one text; a comment
+    /// whose text is gone, as that of a note deleted, is not listed.
+    pub fn comment_places(&self) -> Vec<crate::CommentPlace> {
+        let mut places: Vec<crate::CommentPlace> = Vec::new();
+        let mut add = |story: Option<crate::Story>, ranges: Vec<(NodeId, Position, Position)>| {
+            for (id, start, end) in ranges {
+                // A comment is on one text: the first that has it.
+                if !places.iter().any(|p| p.id == id) {
+                    places.push(crate::CommentPlace {
+                        id,
+                        story,
+                        start,
+                        end,
+                    });
                 }
-                offset = end;
             }
+        };
+        add(None, self.comment_ranges());
+        for story in self.stories() {
+            let paragraphs = self.story_paragraphs(story);
+            add(Some(story), comment_ranges_in(paragraphs.iter()));
         }
-        ranges
+        places.retain(|p| self.comments().get(p.id).is_some());
+        places
     }
 
     /// The word at a point of the body, which a comment made there is on,
@@ -684,7 +695,8 @@ impl Document {
         ))
     }
 
-    /// Whether some text of the body is under a comment.
+    /// Whether some text of the body is under a comment. A comment is
+    /// on one text, so one on the body whose text is deleted goes.
     pub fn has_comment_anchor(&self, comment: NodeId) -> bool {
         self.body().iter().any(|p| {
             p.runs().any(|r| {
@@ -1174,6 +1186,32 @@ fn object_colors(object: &Object, add: &mut impl FnMut(crate::Rgba)) {
             object_colors(object, add);
         }
     }
+}
+
+/// Where each comment of some paragraphs is, in their order: the
+/// comment and the positions where the first piece of text it is on
+/// starts and where its last ends.
+fn comment_ranges_in<'a>(
+    paragraphs: impl Iterator<Item = &'a Paragraph>,
+) -> Vec<(NodeId, Position, Position)> {
+    let mut ranges: Vec<(NodeId, Position, Position)> = Vec::new();
+    for paragraph in paragraphs {
+        let mut offset = 0;
+        for run in paragraph.runs() {
+            let end = offset + run.len();
+            if let Some(ids) = &run.attrs.comments {
+                for &id in ids.ids() {
+                    let to = Position::new(paragraph.id(), end);
+                    match ranges.iter_mut().find(|(c, _, _)| *c == id) {
+                        Some(range) => range.2 = to,
+                        None => ranges.push((id, Position::new(paragraph.id(), offset), to)),
+                    }
+                }
+            }
+            offset = end;
+        }
+    }
+    ranges
 }
 
 #[cfg(test)]

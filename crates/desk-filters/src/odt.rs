@@ -1718,8 +1718,11 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 continue;
             };
             let mut paragraphs = Vec::new();
+            // Its comments, put on its text once it is there (W149).
+            let mut comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
             for paragraph in &part.paragraphs {
-                paragraphs.push(import_paragraph(
+                let mut found = Vec::new();
+                let built = import_paragraph(
                     &styled,
                     &mut document,
                     &ids,
@@ -1727,8 +1730,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     paragraph,
                     relative,
                     &Marks::new(),
-                    None,
-                )?);
+                    Some(&mut found),
+                )?;
+                comments.extend(found.into_iter().map(|(at, f)| (built.id(), at, f)));
+                paragraphs.push(built);
             }
             // The objects in its lines (EST-12).
             objects::import_story_inline_objects(
@@ -1766,14 +1771,18 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 place,
                 paragraphs,
             })?;
+            comments::import(&mut document, comments)?;
         }
     }
 
     document.apply(Op::SetPageSetup { page: setup })?;
 
-    // The objects, once the body and the pages they go on are there.
+    // The objects, once the body and the pages they go on are there, and
+    // the comments of their text (W149).
+    let mut object_comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
     objects::import_objects(source, &mut document, &mut |document, paragraph| {
-        import_paragraph(
+        let mut found = Vec::new();
+        let built = import_paragraph(
             source,
             document,
             &ids,
@@ -1781,8 +1790,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             paragraph,
             relative,
             &Marks::new(),
-            None,
-        )
+            Some(&mut found),
+        )?;
+        object_comments.extend(found.into_iter().map(|(at, f)| (built.id(), at, f)));
+        Ok(built)
     })?;
     // The objects of the masters of the sections (INT-05).
     let setup = *document.page_setup();
@@ -1815,7 +1826,8 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             &framed,
             &mut document,
             &mut |document, paragraph| {
-                import_paragraph(
+                let mut found = Vec::new();
+                let built = import_paragraph(
                     &styled,
                     document,
                     &ids,
@@ -1823,11 +1835,14 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     paragraph,
                     relative,
                     &Marks::new(),
-                    None,
-                )
+                    Some(&mut found),
+                )?;
+                object_comments.extend(found.into_iter().map(|(at, f)| (built.id(), at, f)));
+                Ok(built)
             },
         )?;
     }
+    comments::import(&mut document, object_comments)?;
 
     let text = &source.text_settings;
     document.apply(Op::SetTextSettings {
@@ -2041,7 +2056,10 @@ fn import_note(
 ) -> Result<NodeId, FilterError> {
     let id = document.new_id();
     let mut paragraphs = Vec::with_capacity(note.body.len().max(1));
+    // Its comments, after its mark in its first paragraph (W149).
+    let mut comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
     for (i, paragraph) in note.body.iter().enumerate() {
+        let mut found = Vec::new();
         let built = import_paragraph(
             source,
             document,
@@ -2050,8 +2068,14 @@ fn import_note(
             paragraph,
             relative,
             &Marks::new(),
-            None,
+            Some(&mut found),
         )?;
+        let shift = if i == 0 {
+            FIELD_CHARACTER.len_utf8()
+        } else {
+            0
+        };
+        comments.extend(found.into_iter().map(|(at, f)| (built.id(), at + shift, f)));
         if i > 0 {
             paragraphs.push(built);
             continue;
@@ -2102,6 +2126,7 @@ fn import_note(
             paragraphs: paragraphs.into(),
         }),
     })?;
+    comments::import(document, comments)?;
     Ok(id)
 }
 
@@ -2415,8 +2440,6 @@ struct NoteRefs<'a> {
     /// The names of the bookmarks of one point at the paragraphs that
     /// page references name.
     marks: HashMap<NodeId, String>,
-    /// The comments of the body, where they start and end (W149).
-    comments: HashMap<(NodeId, usize), Vec<odf::Span>>,
 }
 
 impl NoteRefs<'_> {
@@ -2461,16 +2484,14 @@ impl NoteRefs<'_> {
 fn export_spans(
     paragraph: &Paragraph,
     mut notes: Option<&mut NoteRefs<'_>>,
+    marks: &CommentMarks,
     mut style: impl FnMut(&Run) -> Option<String>,
 ) -> Vec<odf::Span> {
     let mut spans = Vec::new();
     let mut offset = 0;
-    // The comments that start and end before a run, in the body (W149).
-    let marks = notes
-        .as_deref_mut()
-        .map(|n| std::mem::take(&mut n.comments));
+    // The comments that start and end before a run (W149).
     let comments = |spans: &mut Vec<odf::Span>, at: usize, run: Option<&Run>| {
-        let Some(marks) = marks.as_ref().and_then(|m| m.get(&(paragraph.id(), at))) else {
+        let Some(marks) = marks.get(&(paragraph.id(), at)) else {
             return;
         };
         let link = run.and_then(|r| r.attrs.link.clone().flatten());
@@ -2552,11 +2573,12 @@ fn export_spans(
         }
     }
     comments(&mut spans, offset, last);
-    if let (Some(notes), Some(marks)) = (notes, marks) {
-        notes.comments = marks;
-    }
     spans
 }
+
+/// The annotations of the comments, by the paragraph and the offset where
+/// they go (W149).
+type CommentMarks = HashMap<(NodeId, usize), Vec<odf::Span>>;
 
 /// The body of a page layout document, which has none of its own: as
 /// many empty paragraphs as it has pages, each but the first after a page
@@ -2616,6 +2638,7 @@ fn export_margins(
     document: &Document,
     names: &HashMap<StyleId, String>,
     fills: &mut TextFills,
+    comments: &CommentMarks,
     out: &mut odf::TextDocument,
 ) {
     let styles = document.styles();
@@ -2681,7 +2704,7 @@ fn export_margins(
                     },
                 )
             };
-            let spans = export_spans(paragraph, None, |run| {
+            let spans = export_spans(paragraph, None, comments, |run| {
                 let attrs = run.attrs.without_field();
                 let named = run.style.map(|id| names[&id].clone());
                 if attrs.is_empty() {
@@ -3023,8 +3046,8 @@ pub fn export(document: &Document) -> odf::TextDocument {
         document,
         order: Vec::new(),
         marks,
-        comments: comments::export(document),
     };
+    let comment_marks = comments::export(document);
     // The master pages of the sections with headers and footers of their
     // own, by the paragraph that starts each (EST-16).
     let masters = section_masters(document);
@@ -3105,7 +3128,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         if let Some(master) = masters.get(&paragraph.id()) {
             with_master.push((out.body.len(), master.clone()));
         }
-        let spans = export_spans(paragraph, Some(&mut note_refs), |run| {
+        let spans = export_spans(paragraph, Some(&mut note_refs), &comment_marks, |run| {
             let named = run.style.map(|id| names[&id].clone());
             let attrs = run.attrs.without_field();
             if attrs.is_empty() {
@@ -3213,7 +3236,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     },
                 )
             };
-            let spans = export_spans(paragraph, None, |run| {
+            let spans = export_spans(paragraph, None, &comment_marks, |run| {
                 let named = run.style.map(|id| names[&id].clone());
                 let attrs = run.attrs.without_field();
                 if attrs.is_empty() {
@@ -3279,6 +3302,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             fill_images: Vec::new(),
             charts: Vec::new(),
             text_fills: &mut fills,
+            comments: &comment_marks,
         },
         &mut out,
     );
@@ -3287,13 +3311,14 @@ pub fn export(document: &Document) -> odf::TextDocument {
     }
     out.automatic_styles = automatic;
     out.section_styles = section_styles;
-    export_margins(document, &names, &mut fills, &mut out);
+    export_margins(document, &names, &mut fills, &comment_marks, &mut out);
     objects::export_master_objects(
         document,
         &names,
         &section_masters(document),
         &mut pictures,
         &mut fills,
+        &comment_marks,
         &mut out,
     );
     fills.finish(&mut out, &mut pictures);

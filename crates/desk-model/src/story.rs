@@ -155,6 +155,33 @@ impl Document {
             .collect()
     }
 
+    /// Every story of the document with text: the headers and footers of
+    /// each section, in the order of [`MarginPlace::ALL`], the notes in
+    /// the order of their marks in the body, and the text boxes and the
+    /// shapes with text, from back to front.
+    pub fn stories(&self) -> Vec<Story> {
+        let mut out = Vec::new();
+        for (section, margins) in self.all_headers_footers() {
+            for place in MarginPlace::ALL {
+                if !margins.get(place).is_empty() {
+                    out.push(Story::Margin { section, place });
+                }
+            }
+        }
+        for paragraph in self.body().iter() {
+            for run in paragraph.runs() {
+                if let Some(Some(crate::Field::NoteMark { note })) = run.attrs.field {
+                    let story = Story::Note(note);
+                    if self.notes().get(note).is_some() && !out.contains(&story) {
+                        out.push(story);
+                    }
+                }
+            }
+        }
+        out.extend(self.text_box_stories());
+        out
+    }
+
     /// The same document with other paragraphs in its body, to edit the
     /// text of a story with the tools of the body. With no paragraphs, it
     /// keeps its body.
@@ -241,6 +268,32 @@ impl Edit {
         }
     }
 
+    /// Changes the text of a story with the tools of the body, in a copy
+    /// of the document whose body is that text, and writes it back with
+    /// what belongs to the whole document, as its comments (W149). A
+    /// story without paragraphs, as an empty header, has no text to
+    /// change.
+    pub fn edit_story<T>(
+        &mut self,
+        story: Story,
+        change: impl FnOnce(&mut Edit) -> Result<T, ModelError>,
+    ) -> Result<T, ModelError> {
+        let paragraphs = self.document().story_paragraphs(story);
+        if paragraphs.is_empty() {
+            return Err(match story {
+                Story::TextBox(id) => ModelError::UnknownObject(id),
+                Story::Note(id) => ModelError::UnknownParagraph(id),
+                Story::Margin { .. } => ModelError::EmptyRange,
+            });
+        }
+        let mut copy = self.document().with_body(paragraphs);
+        let (value, _) = copy.transact("Edit", change)?;
+        self.adopt_document_settings(&copy)?;
+        let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+        self.set_story(story, paragraphs)?;
+        Ok(value)
+    }
+
     /// Sets the paragraphs of a story. A note keeps its mark of its own,
     /// and a header or footer whose paragraphs are all empty becomes
     /// empty.
@@ -305,7 +358,7 @@ impl Edit {
     /// of it: its styles, page setup, text settings and information, and
     /// the identifiers handed out. A
     /// story edited in a copy of the document changes them with the tools
-    /// of the body (see [`Document::with_body`]).
+    /// of the body (see [`Document::with_body`]), and its comments.
     pub fn adopt_document_settings(&mut self, from: &Document) -> Result<(), ModelError> {
         self.follow_ids(from);
         for style in from.styles().iter() {
@@ -328,7 +381,22 @@ impl Edit {
         }
         self.set_page_setup(*from.page_setup())?;
         self.set_text_settings(from.text_settings().clone())?;
-        self.set_metadata(from.metadata().clone())
+        self.set_metadata(from.metadata().clone())?;
+        // The comments, added, changed or deleted in the story (W149).
+        for comment in from.comments().iter() {
+            self.set_comment(comment.id, Some(comment.clone()))?;
+        }
+        let gone: Vec<NodeId> = self
+            .document()
+            .comments()
+            .iter()
+            .map(|c| c.id)
+            .filter(|id| from.comments().get(*id).is_none())
+            .collect();
+        for id in gone {
+            self.set_comment(id, None)?;
+        }
+        Ok(())
     }
 }
 

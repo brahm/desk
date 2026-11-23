@@ -552,8 +552,18 @@ impl Edit {
         Ok(id)
     }
 
-    /// Removes a comment and takes it off the text it is on (W149).
+    /// Removes a comment and takes it off the text it is on, in the body
+    /// or in a story (W149).
     pub fn remove_comment(&mut self, id: NodeId) -> Result<(), ModelError> {
+        let story = self
+            .doc
+            .comment_places()
+            .into_iter()
+            .find(|p| p.id == id)
+            .and_then(|p| p.story);
+        if let Some(story) = story {
+            return self.edit_story(story, |edit| edit.remove_comment(id));
+        }
         if let Some((_, start, end)) = self
             .doc
             .comment_ranges()
