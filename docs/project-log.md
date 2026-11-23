@@ -1869,7 +1869,7 @@ paragraph, and objects on a second page.
   read the tables of Pages '09 files yet (the inventory row W168 says
   that iWork '09 files open, and the tables of those files are dropped
   without a word). They go with the reading of those tables, B-048,
-  which the owner places.
+  which the owner chose to do now, in a fifth pull request of step 5.
 
 ## Decisions, with their reasons and consequences
 
