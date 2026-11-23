@@ -94,19 +94,49 @@ pub struct CommentsPage {
     due: Cell<bool>,
     shown: Cell<bool>,
     pending: Cell<bool>,
+    /// Whether it is the bubble of one comment at its text, rather than
+    /// the page of the sidebar, and the comment it shows.
+    bubble: bool,
+    only: Cell<Option<NodeId>>,
+    /// What to call when the bubble has nothing left to show.
+    on_empty: RefCell<Option<Rc<dyn Fn()>>>,
 }
 
 impl CommentsPage {
+    /// The page of the sidebar.
     pub fn new(editor: EditorOf) -> Rc<Self> {
+        Self::build(editor, false)
+    }
+
+    /// The bubble of a comment, which shows at its text as in Pages 15.4:
+    /// the card of the comment, and the buttons that go to the comment
+    /// before and after it.
+    pub fn bubble(editor: EditorOf) -> Rc<Self> {
+        Self::build(editor, true)
+    }
+
+    fn build(editor: EditorOf, bubble: bool) -> Rc<Self> {
         let list = gtk::ListBox::builder()
-            .selection_mode(gtk::SelectionMode::Single)
-            .css_classes(["boxed-list-separate", "desk-comments"])
+            .selection_mode(if bubble {
+                gtk::SelectionMode::None
+            } else {
+                gtk::SelectionMode::Single
+            })
+            .css_classes(if bubble {
+                ["desk-comment-bubble", "background"]
+            } else {
+                ["boxed-list-separate", "desk-comments"]
+            })
             .margin_start(6)
             .margin_end(6)
             .margin_top(6)
             .margin_bottom(6)
             .build();
-        list.update_property(&[gtk::accessible::Property::Label(&tr("Comments"))]);
+        list.update_property(&[gtk::accessible::Property::Label(&if bubble {
+            tr("Comment")
+        } else {
+            tr("Comments")
+        })]);
         let empty = adw::StatusPage::builder()
             .icon_name("desk-comment-symbolic")
             .title(tr("No Comments"))
@@ -119,6 +149,30 @@ impl CommentsPage {
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
             .build();
+        let root = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .build();
+        if bubble {
+            // As tall as its card, up to a size that a screen of 720
+            // pixels shows whole.
+            scrolled.set_propagate_natural_height(true);
+            scrolled.set_max_content_height(420);
+            scrolled.set_width_request(300);
+            let previous = icon_button("go-previous-symbolic", &tr("Previous Comment"));
+            previous.set_action_name(Some("win.previous-comment"));
+            let next = icon_button("go-next-symbolic", &tr("Next Comment"));
+            next.set_action_name(Some("win.next-comment"));
+            let buttons = gtk::Box::builder()
+                .spacing(6)
+                .halign(gtk::Align::End)
+                .margin_end(6)
+                .margin_bottom(6)
+                .build();
+            buttons.append(&previous);
+            buttons.append(&next);
+            root.append(&scrolled);
+            root.append(&buttons);
+        }
         let add = gtk::Button::builder()
             .label(tr("_Add Comment"))
             .use_underline(true)
@@ -133,13 +187,12 @@ impl CommentsPage {
             .margin_bottom(6)
             .build();
         buttons.append(&add);
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .build();
-        root.append(&scrolled);
-        root.append(&empty);
-        root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-        root.append(&buttons);
+        if !bubble {
+            root.append(&scrolled);
+            root.append(&empty);
+            root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+            root.append(&buttons);
+        }
         let this = Rc::new(Self {
             root,
             list,
@@ -151,6 +204,9 @@ impl CommentsPage {
             due: Cell::new(false),
             shown: Cell::new(false),
             pending: Cell::new(false),
+            bubble,
+            only: Cell::new(None),
+            on_empty: RefCell::new(None),
         });
         let weak = Rc::downgrade(&this);
         this.list.connect_row_activated(move |_, row| {
@@ -204,9 +260,23 @@ impl CommentsPage {
         });
     }
 
+    /// Shows a comment, in the bubble.
+    pub fn show_comment(self: &Rc<Self>, id: NodeId) {
+        self.only.set(Some(id));
+        self.draft.take();
+        self.rebuild();
+    }
+
+    /// Calls `f` when the bubble has nothing left to show: its comment was
+    /// deleted, or the new one was not written.
+    pub fn connect_empty(&self, f: impl Fn() + 'static) {
+        *self.on_empty.borrow_mut() = Some(Rc::new(f));
+    }
+
     /// Starts a new comment on the text between two spots: its card, at
     /// the top, takes the keyboard.
     pub fn start_comment(self: &Rc<Self>, range: (Spot, Spot)) {
+        self.only.set(None);
         *self.draft.borrow_mut() = Some(range);
         self.writing.set(false);
         self.rebuild();
@@ -244,6 +314,9 @@ impl CommentsPage {
             rows.push(NodeId::new(u64::MAX).expect("not zero"));
         }
         for (id, start, end) in document.comment_ranges() {
+            if self.bubble && self.only.get() != Some(id) {
+                continue;
+            }
             let Some(comment) = document.comments().get(id) else {
                 continue;
             };
@@ -253,6 +326,15 @@ impl CommentsPage {
         }
         let any = !rows.is_empty();
         *self.rows.borrow_mut() = rows;
+        if self.bubble {
+            if !any {
+                let empty = self.on_empty.borrow().clone();
+                if let Some(empty) = empty {
+                    empty();
+                }
+            }
+            return;
+        }
         self.list.set_visible(any);
         self.empty.set_visible(!any);
         if draft.is_none() {
@@ -275,6 +357,7 @@ impl CommentsPage {
                 this.draft.take();
                 if let Some(editor) = (this.editor)() {
                     let added = editor.add_comment(range, &author(), text);
+                    this.only.set(added);
                     this.rebuild();
                     this.show_current(added);
                     editor.focus();

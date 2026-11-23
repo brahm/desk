@@ -257,4 +257,169 @@ impl TextEditor {
             })
             .collect()
     }
+
+    /// The marks of the comments in the left margin of the pages, as Pages
+    /// 15.4 puts them: a small square beside the line where the text of
+    /// each comment starts, side by side when several start on one line.
+    /// Highlights have none (PXV-19).
+    pub(super) fn comment_flags(&self) -> Vec<(NodeId, SpanRect)> {
+        let state = self.state.borrow();
+        let document = Self::main_document(&state);
+        let layout = Self::main_layout(&state);
+        let mut flags: Vec<(NodeId, SpanRect)> = Vec::new();
+        for (id, start, _) in comment_spots(document) {
+            if document
+                .comments()
+                .get(id)
+                .is_none_or(Comment::is_highlight)
+            {
+                continue;
+            }
+            let found = layout.pages.iter().enumerate().find_map(|(page, p)| {
+                p.lines
+                    .iter()
+                    .find(|l| {
+                        l.paragraph == start.paragraph
+                            && l.line.range.start <= start.offset
+                            && start.offset <= l.line.range.end
+                    })
+                    .map(|l| (page, l))
+            });
+            let Some((page, line)) = found else { continue };
+            let (top, bottom) = (f64::from(line.top()), f64::from(line.bottom()));
+            let beside = flags
+                .iter()
+                .filter(|(_, f)| f.page == page && f.y0 >= top && f.y1 <= bottom)
+                .count();
+            let x1 = f64::from(line.origin.0) - FLAG_GAP - beside as f64 * (FLAG + 3.0);
+            let y0 = (top + bottom - FLAG) / 2.0;
+            flags.push((
+                id,
+                SpanRect {
+                    page,
+                    x0: x1 - FLAG,
+                    y0,
+                    x1,
+                    y1: y0 + FLAG,
+                },
+            ));
+        }
+        flags
+    }
+
+    /// Calls `f` with the comment whose mark in the margin was clicked.
+    pub fn connect_comment_clicked(&self, f: impl Fn(NodeId) + 'static) {
+        self.state.borrow_mut().on_comment.push(std::rc::Rc::new(f));
+    }
+
+    /// A press on the mark of a comment in the margin: selects its text,
+    /// and tells those who show its bubble.
+    pub(super) fn press_comment_mark(&self, x: f64, y: f64) -> bool {
+        let Some((page, px, py)) = self.view.page_at(x, y) else {
+            return false;
+        };
+        // A little room around the square, which is small.
+        let slop = 2.0;
+        let hit = self.comment_flags().into_iter().find(|(_, f)| {
+            f.page == page
+                && f.x0 - slop <= px
+                && px <= f.x1 + slop
+                && f.y0 - slop <= py
+                && py <= f.y1 + slop
+        });
+        let Some((id, _)) = hit else {
+            return false;
+        };
+        self.select_comment(id);
+        let callbacks = self.state.borrow().on_comment.clone();
+        for callback in callbacks {
+            callback(id);
+        }
+        true
+    }
+
+    /// Where the text of a comment starts on the pages: the page and the
+    /// first piece of it, for its bubble to point at.
+    pub fn comment_anchor(&self, id: NodeId) -> Option<SpanRect> {
+        let state = self.state.borrow();
+        let (_, anchor, focus) = comment_spots(Self::main_document(&state))
+            .into_iter()
+            .find(|(c, _, _)| *c == id)?;
+        text_nav::selection_rects(Self::main_layout(&state), &Selection { anchor, focus })
+            .into_iter()
+            .next()
+    }
+
+    /// Where the text between two spots starts on the pages, for the bubble
+    /// of a new comment to point at.
+    pub fn range_anchor(&self, (anchor, focus): (Spot, Spot)) -> Option<SpanRect> {
+        let state = self.state.borrow();
+        text_nav::selection_rects(Self::main_layout(&state), &Selection { anchor, focus })
+            .into_iter()
+            .next()
+    }
+}
+
+/// The side of the mark of a comment in the margin, in points.
+const FLAG: f64 = 7.0;
+/// How far it is from the text, in points.
+const FLAG_GAP: f64 = 9.0;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn w149_a_comment_has_a_mark_in_the_margin_and_a_highlight_none() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            document
+                .transact("Typing", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three").map(|_| ())
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            let one = editor
+                .add_comment((Spot::new(0, 0), Spot::new(0, 3)), "Ana", "a")
+                .unwrap();
+            let two = editor
+                .add_comment((Spot::new(0, 4), Spot::new(0, 7)), "Bo", "b")
+                .unwrap();
+            let flags = editor.comment_flags();
+            assert_eq!(
+                flags.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+                [one, two]
+            );
+            // In the margin, left of the text, the second beside the first.
+            let anchor = editor.comment_anchor(one).unwrap();
+            let (first, second) = (flags[0].1, flags[1].1);
+            assert!(first.x1 < anchor.x0 && second.x1 < first.x0);
+            assert!(first.y0 >= anchor.y0 && first.y1 <= anchor.y1);
+            assert!(
+                editor
+                    .range_anchor((Spot::new(0, 8), Spot::new(0, 13)))
+                    .is_some_and(|r| r.x0 > anchor.x1)
+            );
+            // A highlight has no mark.
+            editor.set_comment_text(two, "");
+            let _ = editor.format_edit_quiet("Highlight", |edit| {
+                let id = edit.document().body().get(0).unwrap().id();
+                edit.add_comment(
+                    Position::new(id, 8),
+                    Position::new(id, 13),
+                    Comment {
+                        id,
+                        author: "Ana".into(),
+                        date: None,
+                        text: "".into(),
+                        replies: Arc::new([]),
+                    },
+                )
+                .map(|_| ())
+            });
+            assert_eq!(editor.document().comments().len(), 2);
+            assert_eq!(editor.comment_flags().len(), 1);
+        });
+    }
 }

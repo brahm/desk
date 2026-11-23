@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer marks each comment in the margin and shows it in a
+  bubble at its text, where a new comment is written too.
 * Added: Desk Writer writes, answers, edits and deletes comments in the
   Comments page of the sidebar, and marks the text under them.
 * Fixed: the cursor and the selection after text in another format, in

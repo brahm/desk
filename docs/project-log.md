@@ -1764,6 +1764,19 @@ paragraph, and objects on a second page.
   so selections and marks there came out empty. Each glyph run now takes
   only its own stretch of the text.
 
+### 23 November: the bubbles of comments (step 4 of W2, second part)
+
+- A small square in the left margin, beside the line where its text
+  starts, marks each comment, side by side when several start on one
+  line; a highlight has none, as in Pages 15.4. A click on the square
+  selects the text of the comment and shows it in a bubble at the text,
+  with its card as in the Comments page and the buttons to the comment
+  before and after it.
+- Next and Previous Comment show the comment in the bubble, and Comment
+  writes the new one there, while the Comments page of the sidebar is
+  not showing; when it shows, the page does both. The bubble goes when
+  its comment is deleted, and gives the keyboard back to the document.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

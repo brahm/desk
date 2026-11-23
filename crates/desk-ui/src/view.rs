@@ -52,6 +52,8 @@ struct State {
     squiggles: Vec<Squiggle>,
     /// The text under comments, marked as with a highlighter (W149).
     comment_marks: Vec<SpanRect>,
+    /// The marks of the comments in the margin (W149).
+    comment_flags: Vec<SpanRect>,
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
@@ -269,6 +271,7 @@ impl DocumentView {
             dragged_guide: None,
             squiggles: Vec::new(),
             comment_marks: Vec::new(),
+            comment_flags: Vec::new(),
         }));
         let view = Self {
             scrolled,
@@ -473,6 +476,19 @@ impl DocumentView {
             let mut state = self.state.borrow_mut();
             let changed = state.comment_marks != marks;
             state.comment_marks = marks;
+            changed
+        };
+        if changed {
+            self.area.queue_draw();
+        }
+    }
+
+    /// Puts the marks of the comments in the margin (W149).
+    pub fn set_comment_flags(&self, flags: Vec<SpanRect>) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let changed = state.comment_flags != flags;
+            state.comment_flags = flags;
             changed
         };
         if changed {
@@ -1427,8 +1443,8 @@ fn draw_squiggles(
 
 /// The text under comments on a page, in yellow, which multiplies with
 /// the page so that the text stays as dark as it is, as a highlighter
-/// marks paper. The color of each author comes with step 7 of the phase
-/// W2 (W150).
+/// marks paper, and the mark of each comment in the margin. The color of
+/// each author comes with step 7 of the phase W2 (W150).
 fn draw_comments(
     cr: &gtk::cairo::Context,
     state: &State,
@@ -1457,6 +1473,20 @@ fn draw_comments(
     }
     cr.fill().ok();
     cr.restore().ok();
+    // The squares in the margin, with an edge that shows on white.
+    for flag in state.comment_flags.iter().filter(|s| s.page == page) {
+        cr.rectangle(
+            (rect.x + flag.x0 * scale).round() + 0.5,
+            (rect.y + flag.y0 * scale).round() + 0.5,
+            ((flag.x1 - flag.x0) * scale).round(),
+            ((flag.y1 - flag.y0) * scale).round(),
+        );
+    }
+    cr.set_source_rgb(1.0, 0.82, 0.2);
+    cr.fill_preserve().ok();
+    cr.set_source_rgba(0.55, 0.42, 0.0, 0.8);
+    cr.set_line_width(1.0);
+    cr.stroke().ok();
 }
 
 /// The marks of the invisible characters of a page, in the blue of Pages.
