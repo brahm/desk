@@ -405,6 +405,9 @@ struct State {
     /// The text as screen readers read it.
     access: AccessText,
     on_change: Vec<Rc<dyn Fn()>>,
+    /// What to call when the mark of a comment in the margin is clicked
+    /// (W149).
+    on_comment: Vec<Rc<dyn Fn(desk_model::NodeId)>>,
     /// The text of a word or paragraph that a double or triple click
     /// selected, which a drag then extends by whole words or paragraphs.
     unit: Unit,
@@ -599,6 +602,7 @@ impl TextEditor {
                 next_action: 0,
                 saved: None,
                 on_change: Vec::new(),
+                on_comment: Vec::new(),
                 unit: Unit::Character,
                 drag_from: None,
                 item_drag: None,
@@ -2723,6 +2727,8 @@ impl TextEditor {
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
         self.view.set_comment_marks(self.comment_marks());
+        self.view
+            .set_comment_flags(self.comment_flags().into_iter().map(|(_, r)| r).collect());
         self.show_outlines();
         self.show_guides();
         self.view.access().set_text(text.clone());
@@ -3940,6 +3946,12 @@ impl TextEditor {
             if this.press_thread(x, y)
                 || this.press_object(presses, x, y, gesture.current_event_state())
             {
+                this.state.borrow_mut().drag_from = None;
+                return;
+            }
+            // A click on the mark of a comment in the margin selects its
+            // text and shows its bubble (W149).
+            if presses == 1 && this.press_comment_mark(x, y) {
                 this.state.borrow_mut().drag_from = None;
                 return;
             }

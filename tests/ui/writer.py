@@ -2743,7 +2743,8 @@ def sidebar_pages(work):
     the styles that were the Styles drawer, the comments and the search
     results, one at a time; the View menu and their shortcuts choose them,
     and F9 hides and shows the sidebar with the page it had (INT-18,
-    TXT-13, GNM-12). A comment is written there (W149)."""
+    TXT-13, GNM-12). A comment is written there, and shows in a bubble at
+    its text (W149)."""
     name = "Sidebar.odt"
     letter = work / name
     subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
@@ -2807,6 +2808,17 @@ def sidebar_pages(work):
             lambda: any(n.get_name() == "Page 1" and showing(n) for n in walk(app)),
         )
         check("Page Thumbnails turns the sidebar back to the pages (INT-19)", True)
+        # Without the Comments page, Next Comment shows the comment in a
+        # bubble at its text, and Escape takes it away (W149).
+        press("ctrl+Home", "ctrl+alt+k")
+        wait_for(
+            "the bubble of the comment",
+            lambda: showing_named(app, "Previous Comment") and showing_named(app, "Why landscape?"),
+        )
+        check("Next Comment shows the comment in a bubble at its text (W149)", True)
+        press("Escape")
+        wait_for("the bubble to go", lambda: showing_named(app, "Why landscape?") is None)
+        check("and Escape takes the bubble away", True)
     finally:
         writer.terminate()
         writer.wait(timeout=10)

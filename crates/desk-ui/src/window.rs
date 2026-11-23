@@ -131,6 +131,11 @@ pub struct DocumentWindow {
     contents: Rc<crate::contents_page::ContentsPage>,
     /// The comments in the sidebar of Desk Writer (W149).
     comments: Rc<crate::comments_page::CommentsPage>,
+    /// The bubble of a comment at its text, the popover it is in, and the
+    /// comment and the text it points at (W149).
+    bubble: Rc<crate::comments_page::CommentsPage>,
+    bubble_popover: gtk::Popover,
+    bubble_at: Cell<Option<(Option<desk_model::NodeId>, crate::text_nav::SpanRect)>>,
     outline: Rc<crate::outline_view::OutlineView>,
     /// The navigation sidebar, with the page thumbnails (GNM-12).
     nav: Rc<NavSidebar>,
@@ -447,6 +452,13 @@ impl DocumentWindow {
         let thumbnails = crate::thumbnails::Thumbnails::new(&view, editor_of());
         let contents = crate::contents_page::ContentsPage::new(editor_of());
         let comments = crate::comments_page::CommentsPage::new(editor_of());
+        let bubble = crate::comments_page::CommentsPage::bubble(editor_of());
+        let bubble_popover = gtk::Popover::builder()
+            .child(bubble.widget())
+            .position(gtk::PositionType::Bottom)
+            .css_classes(["desk-comment-popover"])
+            .build();
+        bubble_popover.set_parent(view.area());
         let nav = if let Some(slides) = &slides {
             // The navigator, the outline and the master slides of Keynote
             // (KINT-07, KINT-08, KGNM-13).
@@ -647,6 +659,9 @@ impl DocumentWindow {
             thumbnails,
             contents,
             comments,
+            bubble,
+            bubble_popover,
+            bubble_at: Cell::new(None),
             outline,
             nav,
             nav_split,
@@ -715,6 +730,25 @@ impl DocumentWindow {
             this.view.connect_moved(move || {
                 if let Some(this) = weak.upgrade() {
                     this.show_position();
+                    this.place_bubble();
+                }
+            });
+            // The bubble of a comment goes when it has nothing to show, and
+            // gives the keyboard back to the document when it goes.
+            let weak = Rc::downgrade(&this);
+            this.bubble.connect_empty(move || {
+                if let Some(this) = weak.upgrade() {
+                    this.bubble_popover.popdown();
+                }
+            });
+            let weak = Rc::downgrade(&this);
+            this.bubble_popover.connect_closed(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.bubble.set_shown(false);
+                    this.bubble_at.set(None);
+                    if let Some(editor) = this.editor() {
+                        editor.focus();
+                    }
                 }
             });
             let weak = Rc::downgrade(&this);
@@ -1063,8 +1097,15 @@ impl DocumentWindow {
                 this.thumbnails.refresh();
                 this.contents.refresh();
                 this.comments.refresh();
+                this.bubble.refresh();
                 this.outline.document_changed();
                 this.slides_changed();
+            }
+        });
+        let weak = Rc::downgrade(self);
+        editor.connect_comment_clicked(move |id| {
+            if let Some(this) = weak.upgrade() {
+                this.show_bubble(id);
             }
         });
         let weak = Rc::downgrade(self);
@@ -3110,8 +3151,17 @@ impl DocumentWindow {
                 this.window.error_bell();
                 return;
             };
-            this.show_nav_page("comments");
-            this.comments.start_comment(range);
+            // In the Comments page when it shows, or else in a bubble at
+            // the text, as Pages 15.4 writes it.
+            if this.nav_shows("comments") {
+                this.comments.start_comment(range);
+            } else if let Some(at) = this.editor().and_then(|e| e.range_anchor(range)) {
+                this.bubble.start_comment(range);
+                this.show_bubble_at(at, None);
+            } else {
+                this.show_nav_page("comments");
+                this.comments.start_comment(range);
+            }
         });
         self.actions.add_action(&insert);
         for (name, forward) in [("next-comment", true), ("previous-comment", false)] {
@@ -3119,16 +3169,58 @@ impl DocumentWindow {
             let weak = Rc::downgrade(self);
             action.connect_activate(move |_, _| {
                 let Some(this) = weak.upgrade() else { return };
-                if this
-                    .editor()
-                    .and_then(|e| e.go_to_comment(forward))
-                    .is_none()
-                {
-                    this.window.error_bell();
+                match this.editor().and_then(|e| e.go_to_comment(forward)) {
+                    Some(id) if !this.nav_shows("comments") => this.show_bubble(id),
+                    Some(_) => {}
+                    None => this.window.error_bell(),
                 }
             });
             self.actions.add_action(&action);
         }
+    }
+
+    /// Shows the bubble of a comment at its text (W149).
+    fn show_bubble(&self, id: desk_model::NodeId) {
+        let Some(at) = self.editor().and_then(|e| e.comment_anchor(id)) else {
+            return;
+        };
+        self.bubble.show_comment(id);
+        self.show_bubble_at(at, Some(id));
+    }
+
+    /// Points the bubble at a piece of text on a page and shows it: that
+    /// of a comment, or of a new one.
+    fn show_bubble_at(&self, at: crate::text_nav::SpanRect, id: Option<desk_model::NodeId>) {
+        self.bubble_at.set(Some((id, at)));
+        self.place_bubble();
+        self.bubble.set_shown(true);
+        self.bubble_popover.popup();
+    }
+
+    /// Points the bubble at its text again, after the pages moved.
+    fn place_bubble(&self) {
+        let Some((id, mut at)) = self.bubble_at.get() else {
+            return;
+        };
+        if let Some(id) = id
+            && let Some(now) = self.editor().and_then(|e| e.comment_anchor(id))
+        {
+            at = now;
+            self.bubble_at.set(Some((Some(id), at)));
+        }
+        let (Some((x0, y0)), Some((x1, y1))) = (
+            self.view.to_area(at.page, at.x0, at.y0),
+            self.view.to_area(at.page, at.x1, at.y1),
+        ) else {
+            return;
+        };
+        let rect = gtk::gdk::Rectangle::new(
+            x0 as i32,
+            y0 as i32,
+            ((x1 - x0) as i32).max(1),
+            ((y1 - y0) as i32).max(1),
+        );
+        self.bubble_popover.set_pointing_to(Some(&rect));
     }
 
     /// Shows a page of the navigation sidebar, by name.
