@@ -1701,6 +1701,25 @@ paragraph, and objects on a second page.
   Pages 15.4, with what Pages '09 tracked on its virtual machine, and
   one at the end.
 
+### 22 November: review in Pages 15.4 (step 2 of W2)
+
+- A session on the owner's Mac saw comments, highlights, authors and the
+  tracking of changes in Pages 15.4, and the tracking of Pages '09 on its
+  virtual machine. Its notes are in the project folder
+  (`w2-mac/notes.md`); the parity rows `REV-01` to `REV-08` were written
+  again from it, with the phase W2, and the highlight got `PXV-19`.
+- Comments anchor on the word at the cursor, a range, an object or a
+  cell, take replies, have no resolve and no styles, and list in a pane
+  of cards; in a PDF they become a numbered column beside the scaled
+  page. A highlight is a comment without text. There is one local
+  author, shown under the name set now, in a colour of the document.
+- Pages 15.4 tracks only text added and deleted, and has no copy as
+  final. Pages '09 also tracked formatting, cells, objects moved or
+  resized and images added, showed formatting bubbles and saved a copy
+  as final; Desk keeps all of it (D-003).
+- 15.4 has no Proofreader and no list of search results; Desk keeps
+  those of '09.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
