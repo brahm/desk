@@ -616,6 +616,25 @@ menu stays on the cells that have it. Other programs ignore the item.
 - **Fallback:** the text of the field, the date as it was formatted when
   the document was saved; `text:fixed` says whether it updates.
 
+### Text: comments (`office:annotation`)
+
+A comment is the standard `office:annotation` where the text it is on
+starts, with its `office:name`, `dc:creator` and `dc:date`, and the
+`office:annotation-end` of that name where the text ends; its text is a
+`text:p` for each line, since comments take no styles in Pages 15.4.
+A highlight is an annotation whose one paragraph is empty (PXV-19).
+
+#### `desk:parent-name`
+
+- **Feature:** a reply in the thread of a comment (W149, REV-08).
+- **On:** `office:annotation`.
+- **Value:** the `office:name` of the comment it answers. The reply is an
+  annotation of its own on the same text, named, with its own
+  `office:annotation-end`, written after its comment. Desk also reads
+  `loext:parent-name`, which LibreOffice writes the same way.
+- **Fallback:** the replies are comments of their own, on the same text,
+  one after the other, as a reader without the extension shows them.
+
 ### Sections (`style:section-properties`)
 
 Desk writes a section of Pages, which starts on a page of its own and
@@ -674,7 +693,7 @@ specified here, by the rules above, in the phase that implements it.
 | Drop caps beyond the ODF model, automatic fractions, phonetic guide details | Writer | ODF covers part of each | The ODF drop cap, the literal characters, ODF ruby |
 | Page templates (pages of the template to add), section masters | Writer | ODF master pages have no "page to insert" with placeholders | Ordinary master pages |
 | Placeholder text and media placeholders | All | ODF has a placeholder field for text only | Ordinary content |
-| Comment threads with replies and highlights | All | ODF 1.3 annotations have no reply relation | Flat annotations, in order |
+| Replies of comments in Tables and Slides | Tables, Slides | ODF 1.3 annotations have no reply relation; Writer uses `desk:parent-name` (above) | Flat annotations, in order |
 | Tracking of format and table-cell changes | Writer | ODF tracks insertions, deletions and some format changes only | The changes ODF can express |
 | Several free tables on a sheet, each with its name, headers and footers | Tables | An ODF sheet is one grid | Each table as a range of the sheet, as today in `desk:table` |
 | Categories (grouped rows with summaries) | Tables | ODF has outline groups and subtotals, not categories | Outline groups and subtotal rows |

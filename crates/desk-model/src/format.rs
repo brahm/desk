@@ -433,6 +433,9 @@ formatting! {
         /// The name of the bookmark that the text is (EST-26). A bookmark
         /// is the text that carries its name, which belongs to the text.
         bookmark: Option<Arc<str>> = None,
+        /// The comments that the text is under (W149, REV-08), which
+        /// belong to the text, as bookmarks do.
+        comments: crate::CommentIds = crate::CommentIds::none(),
     }
 }
 
@@ -852,6 +855,7 @@ impl CharAttrs {
             field: None,
             link: None,
             bookmark: None,
+            comments: None,
             ..self.clone()
         }
     }
@@ -863,6 +867,7 @@ impl CharAttrs {
             field: self.field.clone(),
             link: self.link.clone(),
             bookmark: self.bookmark.clone(),
+            comments: self.comments.clone(),
             ..Self::default()
         }
     }

@@ -59,6 +59,8 @@ pub enum ModelError {
     LastParagraph,
     /// The two positions are not in order.
     BackwardRange,
+    /// A comment needs some text to be on (W149).
+    EmptyRange,
 }
 
 impl fmt::Display for ModelError {
@@ -87,6 +89,7 @@ impl fmt::Display for ModelError {
             }
             Self::LastParagraph => write!(f, "a text flow keeps at least one paragraph"),
             Self::BackwardRange => write!(f, "the start of the range is after its end"),
+            Self::EmptyRange => write!(f, "the range holds no text"),
         }
     }
 }

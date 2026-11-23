@@ -50,6 +50,7 @@ mod auto_numbers;
 mod autocorrect;
 mod case_change;
 mod chart_style;
+mod comment;
 mod connection;
 mod convert_quotes;
 mod custom_format;
@@ -95,6 +96,7 @@ pub use autocorrect::{
 };
 pub use case_change::CaseChange;
 pub use chart_style::ChartStyle;
+pub use comment::{Comment, CommentIds, Comments, Reply};
 pub use connection::{Connection, bend_through, bent_controls, bent_middle, connect, flattened};
 pub use document::{
     Container, Document, FixedGuide, Metadata, OutlineOptions, PageSetup, PagedFlow,

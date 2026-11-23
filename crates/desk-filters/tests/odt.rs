@@ -3557,9 +3557,14 @@ fn int_22_what_a_file_of_another_program_loses_is_listed() {
         found,
         [
             (Warning::Content(Content::AcceptedChanges), 2),
-            (Warning::Content(Content::Comments), 1),
             (Warning::Content(Content::UnreadObjects), 1),
         ]
+    );
+    // The comment of the body is read, on the word before it (W149).
+    let comment = document.comments().iter().next().unwrap();
+    assert_eq!(
+        (comment.author.as_ref(), comment.text.as_ref()),
+        ("Ana", "A note")
     );
     // The table is read as a table, in a paragraph of its own.
     let tables: Vec<_> = document

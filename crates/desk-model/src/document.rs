@@ -5,6 +5,7 @@
 
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::comment::{Comment, Comments};
 use crate::error::ModelError;
 use crate::header::HeadersFooters;
 use crate::id::{IdAllocator, NodeId};
@@ -311,6 +312,8 @@ pub struct PagedFlow {
     pub section_margins: imbl::OrdMap<NodeId, HeadersFooters>,
     /// The footnotes or endnotes (EST-13).
     pub notes: Notes,
+    /// The comments on the text (W149).
+    pub comments: Comments,
     /// The objects on the pages, from back to front (OBJ-01).
     pub objects: Objects,
 }
@@ -433,6 +436,7 @@ impl Document {
                 margins: HeadersFooters::default(),
                 section_margins: imbl::OrdMap::new(),
                 notes: Notes::default(),
+                comments: Comments::default(),
                 objects: Objects::default(),
             }),
             slides: None,
@@ -609,6 +613,50 @@ impl Document {
         match &self.container {
             Container::Pages(flow) => &flow.notes,
         }
+    }
+
+    /// The comments on the text (W149).
+    pub fn comments(&self) -> &Comments {
+        match &self.container {
+            Container::Pages(flow) => &flow.comments,
+        }
+    }
+
+    /// Where each comment of the body is, in the order of the body: the
+    /// comment and the positions where the first piece of text it is on
+    /// starts and where its last ends. A comment on pieces apart is on
+    /// everything between them.
+    pub fn comment_ranges(&self) -> Vec<(NodeId, Position, Position)> {
+        let mut ranges: Vec<(NodeId, Position, Position)> = Vec::new();
+        for paragraph in self.body().iter() {
+            let mut offset = 0;
+            for run in paragraph.runs() {
+                let end = offset + run.len();
+                if let Some(ids) = &run.attrs.comments {
+                    for &id in ids.ids() {
+                        let to = Position::new(paragraph.id(), end);
+                        match ranges.iter_mut().find(|(c, _, _)| *c == id) {
+                            Some(range) => range.2 = to,
+                            None => ranges.push((id, Position::new(paragraph.id(), offset), to)),
+                        }
+                    }
+                }
+                offset = end;
+            }
+        }
+        ranges
+    }
+
+    /// Whether some text of the body is under a comment.
+    pub fn has_comment_anchor(&self, comment: NodeId) -> bool {
+        self.body().iter().any(|p| {
+            p.runs().any(|r| {
+                r.attrs
+                    .comments
+                    .as_ref()
+                    .is_some_and(|ids| ids.contains(comment))
+            })
+        })
     }
 
     /// The objects on the pages, from back to front.
@@ -972,6 +1020,17 @@ impl Document {
                 let Container::Pages(flow) = &mut self.container;
                 let old: Option<Note> = flow.notes.replace(id, note);
                 Ok(Op::SetNote { id, note: old })
+            }
+            Op::SetComment { id, comment } => {
+                if let Some(comment) = &comment {
+                    if comment.id != id {
+                        return Err(ModelError::DuplicateId(id));
+                    }
+                    self.ids.observe(id);
+                }
+                let Container::Pages(flow) = &mut self.container;
+                let old: Option<Comment> = flow.comments.replace(id, comment);
+                Ok(Op::SetComment { id, comment: old })
             }
             Op::InsertObject { index, object } => {
                 let len = self.objects().len();

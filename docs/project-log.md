@@ -1720,6 +1720,24 @@ paragraph, and objects on a second page.
 - 15.4 has no Proofreader and no list of search results; Desk keeps
   those of '09.
 
+### 23 November: the model of comments (step 3 of W2)
+
+- Comments are kept with the document, each with its author, date, text
+  and replies, and the text they are on carries them, as bookmarks are
+  carried: comments may overlap and run over several paragraphs, text
+  typed inside one joins it, and deleting all its text deletes it, which
+  undo brings back. A highlight is a comment without text.
+- In ODT a comment is the standard annotation with its end, and each
+  reply an annotation of its own on the same text that names its comment
+  in `desk:parent-name`. LibreOffice 24.2 writes replies the same way
+  with `loext:parent-name`, which Desk reads; a comment at a point, as
+  other programs write one, is on the word there. LibreOffice opens the
+  file Desk writes with every comment on its text, the replies as
+  comments one after the other.
+- Still listed as left out when a file opens: the comments of notes,
+  headers, footers, text boxes, shapes and table cells, and those of
+  Pages '09 files, which come in steps 4 and 5.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

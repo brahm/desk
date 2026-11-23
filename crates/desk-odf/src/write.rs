@@ -1204,7 +1204,13 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
         if span.style.is_some() {
             w.end();
         }
-        if span.field.is_some() {
+        // A comment and its end leave the white space around them alone.
+        if span.field.is_some()
+            && !matches!(
+                span.field,
+                Some(Field::Annotation(_) | Field::AnnotationEnd { .. })
+            )
+        {
             text.after_space = false;
         }
     }
@@ -1221,6 +1227,32 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
     match field {
         Field::Object(object) => {
             crate::draw::write_draw_object(w, object, &write_paragraph);
+            return;
+        }
+        Field::Annotation(annotation) => {
+            // A reply names its comment in `desk:parent-name`
+            // (odf-extensions.md).
+            w.start("office:annotation");
+            w.attr_opt("office:name", annotation.name.as_deref());
+            w.attr_opt("desk:parent-name", annotation.parent.as_deref());
+            if let Some(creator) = &annotation.creator {
+                w.text_element("dc:creator", creator);
+            }
+            if let Some(date) = &annotation.date {
+                w.text_element("dc:date", date);
+            }
+            for line in annotation.text.split('\n') {
+                w.start("text:p");
+                TextWriter { after_space: true }.write(w, line);
+                w.end();
+            }
+            w.end();
+            return;
+        }
+        Field::AnnotationEnd { name } => {
+            w.start("office:annotation-end")
+                .attr("office:name", name)
+                .end();
             return;
         }
         Field::PageNumber { num_format } => {

@@ -5,6 +5,7 @@
 
 use std::ops::Range;
 
+use crate::comment::Comment;
 use crate::document::{Metadata, PageSetup, TextSettings};
 use crate::format::ParaAttrs;
 use crate::header::MarginPlace;
@@ -102,6 +103,13 @@ pub enum Op {
         id: NodeId,
         /// The note; none to remove it.
         note: Option<Note>,
+    },
+    /// Adds, replaces or removes a comment (W149).
+    SetComment {
+        /// The comment.
+        id: NodeId,
+        /// The comment; none to remove it.
+        comment: Option<Comment>,
     },
     /// Puts an object among the objects of the document (OBJ-01).
     InsertObject {
