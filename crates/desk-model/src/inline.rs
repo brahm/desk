@@ -216,8 +216,17 @@ impl Edit {
     pub(crate) fn renumbered_object(&mut self, object: &Object) -> Result<Object, ModelError> {
         let mut copy = object.clone();
         copy.id = self.new_id();
-        // A copy is a new object, without the comments of the first.
+        // A copy is a new object, without the comments of the first, on
+        // it or on its cells.
         copy.comments = crate::CommentIds::none();
+        if let crate::ObjectKind::Table(table) = &mut copy.kind
+            && !table.comments().is_empty()
+        {
+            let table = std::sync::Arc::make_mut(table);
+            for ((r, c), _) in table.comments() {
+                table.cell_mut(r, c).comment = None;
+            }
+        }
         let renumber = |edit: &mut Self, text: &mut crate::TextBox| -> Result<(), ModelError> {
             let paragraphs = text
                 .paragraphs

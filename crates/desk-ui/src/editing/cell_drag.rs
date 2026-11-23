@@ -196,7 +196,7 @@ impl TextEditor {
     }
 
     /// Selects one cell of a table, as a click on it does.
-    fn select_cell(&self, id: NodeId, cell: (u32, u32)) {
+    pub(super) fn select_cell(&self, id: NodeId, cell: (u32, u32)) {
         self.state.borrow_mut().cells = Some(CellSelection {
             id,
             anchor: cell,

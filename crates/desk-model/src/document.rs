@@ -682,6 +682,42 @@ impl Document {
         out
     }
 
+    /// The comments on cells of tables, table by table as
+    /// [`Document::object_comments`] lists objects, and row by row in each
+    /// (W149, TAB-27). A comment is on one cell, the first that has it; a
+    /// comment that is gone is not listed.
+    pub fn cell_comments(&self) -> Vec<crate::CellComment> {
+        fn visit(object: &Object, out: &mut Vec<crate::CellComment>) {
+            match &object.kind {
+                crate::ObjectKind::Table(table) => {
+                    for ((row, col), id) in table.comments() {
+                        let id = NodeId::new(id.get()).expect("not zero");
+                        if !out.iter().any(|c| c.id == id) {
+                            out.push(crate::CellComment {
+                                id,
+                                table: object.id,
+                                row,
+                                col,
+                            });
+                        }
+                    }
+                }
+                crate::ObjectKind::Group(members) => {
+                    for member in members.iter() {
+                        visit(member, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut out = Vec::new();
+        for object in self.objects().iter() {
+            visit(object, &mut out);
+        }
+        out.retain(|c| self.comments().get(c.id).is_some());
+        out
+    }
+
     /// The word at a point of the body, which a comment made there is on,
     /// as Pages 15.4 puts a comment made at the cursor: the letters and
     /// digits around it, or the character after it, or before it, when

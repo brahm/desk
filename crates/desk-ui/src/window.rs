@@ -3151,6 +3151,15 @@ impl DocumentWindow {
                 this.window.error_bell();
                 return;
             };
+            // A cell has one comment: Comment goes to it.
+            if let Some(id) = this.editor().and_then(|e| e.target_comment(range)) {
+                if this.nav_shows("comments") {
+                    this.comments.show_current(Some(id));
+                } else {
+                    this.show_bubble(id);
+                }
+                return;
+            }
             // In the Comments page when it shows, or else in a bubble at
             // the text, as Pages 15.4 writes it.
             if this.nav_shows("comments") {

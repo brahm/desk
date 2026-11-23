@@ -61,6 +61,11 @@ pub enum ModelError {
     BackwardRange,
     /// A comment needs some text to be on (W149).
     EmptyRange,
+    /// A cell has one comment, this one, whose thread takes the replies
+    /// (W149).
+    CommentedCell(NodeId),
+    /// The object is not a table.
+    NotATable(NodeId),
 }
 
 impl fmt::Display for ModelError {
@@ -90,6 +95,8 @@ impl fmt::Display for ModelError {
             Self::LastParagraph => write!(f, "a text flow keeps at least one paragraph"),
             Self::BackwardRange => write!(f, "the start of the range is after its end"),
             Self::EmptyRange => write!(f, "the range holds no text"),
+            Self::CommentedCell(id) => write!(f, "the cell already has the comment {id}"),
+            Self::NotATable(id) => write!(f, "the object {id} is not a table"),
         }
     }
 }

@@ -639,15 +639,19 @@ A highlight is an annotation whose one paragraph is empty (PXV-19).
 #### `desk:annotation`
 
 - **Feature:** a comment on an object itself, as Pages 15.4 puts one on
-  a selected shape, picture, text box or table (W149, REV-08).
+  a selected shape, picture, text box or table (W149, REV-08), and a
+  reply to the comment of a table cell (W149, TAB-27).
 - **On:** any drawing object written by `write_draw_object`, as its
   child, one for the comment and one after it for each reply. ODF has
-  `office:annotation` only in paragraphs and table cells.
+  `office:annotation` only in paragraphs and table cells. In a
+  `table:table-cell`, after its `office:annotation`, one for each reply
+  to it, since a cell has one `office:annotation`.
 - **Value:** what an `office:annotation` holds: `dc:creator`, `dc:date`
   and a `text:p` for each line, named in `desk:name`, with the reply
   naming its comment in `desk:parent-name`.
-- **Fallback:** none; other programs have no comments on objects, and
-  show the object without it.
+- **Fallback:** none on an object; other programs have no comments on
+  objects, and show the object without it. In a cell, other programs
+  show the comment, its `office:annotation`, without the replies.
 
 #### `desk:name`
 

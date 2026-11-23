@@ -703,8 +703,7 @@ impl TableGroups {
                 self,
                 Box::new(|this, editor| {
                     let text = this.comment.text().to_string();
-                    let comment = (!text.trim().is_empty()).then_some(text);
-                    editor.change_cells("Comment", |c| c.comment = comment.clone());
+                    editor.set_cell_comments(&crate::comments_page::author(), &text);
                 }),
             );
             self.comment.connect_apply(move |_| f());
@@ -953,7 +952,10 @@ impl TableGroups {
             self.fill.set_rgba(&to_gdk(*c));
         }
         set_switch(&self.wrap, style.wrap);
-        let comment = cell.comment.clone().unwrap_or_default();
+        let comment = editor
+            .cell_comment_text()
+            .map(|t| t.to_string())
+            .unwrap_or_default();
         if self.comment.text() != comment {
             self.comment.set_text(&comment);
         }

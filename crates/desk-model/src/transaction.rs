@@ -568,11 +568,74 @@ impl Edit {
         Ok(id)
     }
 
+    /// Puts a new comment on a cell of a table, as Pages 15.4 comments a
+    /// selected cell, and returns its identifier (W149, TAB-27). The
+    /// identifier of `comment` is replaced with a new one. A cell has one
+    /// comment: a second is refused with the first, whose thread takes the
+    /// replies.
+    pub fn add_cell_comment(
+        &mut self,
+        table: NodeId,
+        row: u32,
+        col: u32,
+        mut comment: crate::Comment,
+    ) -> Result<NodeId, ModelError> {
+        if let Some(c) = self
+            .doc
+            .cell_comments()
+            .into_iter()
+            .find(|c| c.table == table && (c.row, c.col) == (row, col))
+        {
+            return Err(ModelError::CommentedCell(c.id));
+        }
+        let id = self.new_id();
+        comment.id = id;
+        self.set_comment(id, Some(comment))?;
+        self.change_cell_comment(table, row, col, Some(id))?;
+        Ok(id)
+    }
+
+    /// Sets the comment of a cell of a table, at the top or in a group.
+    fn change_cell_comment(
+        &mut self,
+        table: NodeId,
+        row: u32,
+        col: u32,
+        comment: Option<NodeId>,
+    ) -> Result<(), ModelError> {
+        self.change_object(table, |object| {
+            let crate::ObjectKind::Table(t) = &mut object.kind else {
+                return Err(ModelError::NotATable(table));
+            };
+            if row >= t.rows() || col >= t.cols() {
+                return Err(ModelError::IndexOutOfBounds {
+                    index: (if row >= t.rows() { row } else { col }) as usize,
+                    len: (if row >= t.rows() { t.rows() } else { t.cols() }) as usize,
+                });
+            }
+            std::sync::Arc::make_mut(t).cell_mut(row, col).comment =
+                comment.and_then(|id| std::num::NonZeroU64::new(id.get()));
+            Ok(())
+        })
+    }
+
     /// Changes the comments of an object, at the top or in a group.
     fn change_object_comments(
         &mut self,
         object: NodeId,
         change: impl Fn(&crate::CommentIds) -> crate::CommentIds,
+    ) -> Result<(), ModelError> {
+        self.change_object(object, |o| {
+            o.comments = change(&o.comments);
+            Ok(())
+        })
+    }
+
+    /// Changes an object, at the top or in a group.
+    fn change_object(
+        &mut self,
+        object: NodeId,
+        change: impl FnOnce(&mut crate::Object) -> Result<(), ModelError>,
     ) -> Result<(), ModelError> {
         fn find(o: &mut crate::Object, id: NodeId) -> Option<&mut crate::Object> {
             if o.id == id {
@@ -594,13 +657,17 @@ impl Edit {
             .ok_or(ModelError::UnknownObject(object))?;
         let mut changed = top;
         let target = find(&mut changed, object).ok_or(ModelError::UnknownObject(object))?;
-        target.comments = change(&target.comments);
+        change(target)?;
         self.replace_object(changed)
     }
 
-    /// Removes a comment and takes it off the text or the object it is
-    /// on, in the body or in a story (W149).
+    /// Removes a comment and takes it off the text, the object or the
+    /// cell it is on, in the body or in a story (W149).
     pub fn remove_comment(&mut self, id: NodeId) -> Result<(), ModelError> {
+        if let Some(c) = self.doc.cell_comments().into_iter().find(|c| c.id == id) {
+            self.change_cell_comment(c.table, c.row, c.col, None)?;
+            return self.set_comment(id, None);
+        }
         if let Some((_, object)) = self
             .doc
             .object_comments()

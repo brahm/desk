@@ -927,7 +927,9 @@ fn kind(
             })
         }
         odf::DrawKind::Table(table) => {
-            ObjectKind::Table(Arc::new(super::tables::import_table(source, table)))
+            let mut built = super::tables::import_table(source, table);
+            super::comments::import_cell_comments(document, &mut built, table)?;
+            ObjectKind::Table(Arc::new(built))
         }
         odf::DrawKind::Object { href, desk } => {
             let chart = source
@@ -2156,7 +2158,8 @@ impl Exporter<'_> {
             }
             ObjectKind::Table(table) => {
                 let locale = super::tables::locale(self.document);
-                odf::DrawKind::Table(super::tables::export_table(table, &locale, self))
+                let document = self.document;
+                odf::DrawKind::Table(super::tables::export_table(table, &locale, self, document))
             }
             ObjectKind::Chart(chart) => {
                 let href = format!("./Object {}", self.charts.len() + 1);

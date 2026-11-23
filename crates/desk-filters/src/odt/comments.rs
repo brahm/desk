@@ -210,6 +210,72 @@ pub(super) fn object_annotations(
     out
 }
 
+/// Puts the comments of the cells of a table, from their annotations, in
+/// the document, and on the cells of the table read from it (W149,
+/// TAB-27). The identifiers that a table that Desk wrote keeps on its
+/// cells are those of the document it was in, and give way.
+pub(super) fn import_cell_comments(
+    document: &mut Document,
+    table: &mut desk_model::Table,
+    odf_table: &odf::Table,
+) -> Result<(), FilterError> {
+    for ((r, c), _) in table.comments() {
+        table.cell_mut(r, c).comment = None;
+    }
+    for (r, row) in odf_table.rows.iter().enumerate() {
+        for (c, cell) in row.cells.iter().enumerate() {
+            let (r, c) = (r as u32, c as u32);
+            if cell.covered || cell.annotations.is_empty() || r >= table.rows() || c >= table.cols()
+            {
+                continue;
+            }
+            let refs: Vec<&odf::Annotation> = cell.annotations.iter().collect();
+            // A cell has one comment: the first, with every other
+            // annotation of the cell as its replies.
+            let comment = thread_comment(refs[0], refs[1..].iter().copied());
+            let id = document.new_id();
+            document.apply(desk_model::Op::SetComment {
+                id,
+                comment: Some(Comment { id, ..comment }),
+            })?;
+            table.cell_mut(r, c).comment = std::num::NonZeroU64::new(id.get());
+        }
+    }
+    Ok(())
+}
+
+/// The annotations of a cell: its comment, named after it, and its
+/// replies, which name it.
+pub(super) fn cell_annotations(
+    document: &Document,
+    comment: Option<std::num::NonZeroU64>,
+) -> Vec<odf::Annotation> {
+    let Some(comment) = comment
+        .and_then(|id| NodeId::new(id.get()))
+        .and_then(|id| document.comments().get(id))
+    else {
+        return Vec::new();
+    };
+    let name = format!("k{}", comment.id.get());
+    let mut out = vec![odf::Annotation {
+        name: Some(name.clone()),
+        parent: None,
+        creator: Some(comment.author.to_string()),
+        date: comment.date.as_deref().map(str::to_owned),
+        text: comment.text.to_string(),
+    }];
+    for (k, reply) in comment.replies.iter().enumerate() {
+        out.push(odf::Annotation {
+            name: Some(format!("{name}r{}", k + 1)),
+            parent: Some(name.clone()),
+            creator: Some(reply.author.to_string()),
+            date: reply.date.as_deref().map(str::to_owned),
+            text: reply.text.to_string(),
+        });
+    }
+    out
+}
+
 /// A date of ODF as the model keeps it: none for the empty date that
 /// LibreOffice writes when it has none.
 fn date(date: Option<&str>) -> Option<Arc<str>> {

@@ -4,8 +4,6 @@
 //! The table: its grid of cells, the sizes of its rows and columns, its
 //! headers and footer, merged cells and borders.
 
-use std::sync::Arc;
-
 use desk_formula::{Axis, Formula};
 
 use crate::cell::{Cell, CellText, Color, Content};
@@ -915,13 +913,13 @@ impl<T: CellText> Table<T> {
         self.cells = cells;
     }
 
-    /// The comments, by cell.
-    pub fn comments(&self) -> Vec<((u32, u32), Arc<str>)> {
+    /// The comments, by cell, row by row.
+    pub fn comments(&self) -> Vec<((u32, u32), std::num::NonZeroU64)> {
         let mut out = Vec::new();
         for r in 0..self.rows() {
             for c in 0..self.cols() {
-                if let Some(text) = &self.cell(r, c).comment {
-                    out.push(((r, c), Arc::from(text.as_str())));
+                if let Some(id) = self.cell(r, c).comment {
+                    out.push(((r, c), id));
                 }
             }
         }
