@@ -140,8 +140,9 @@ and compare the documents with the PDF of Pages word by word (FMT-12).
 
 The tests of `desk-filters` open every one of them and check that the
 import names what it leaves out. `lossy-import.pages` has one of each
-thing that Desk does not import yet, such as headers, images, footnotes,
-comments and fields, and its log is checked entry by entry.
+thing that Desk did not import when it was made, such as headers, images,
+footnotes, comments and fields, and its log is checked entry by entry;
+Desk reads all of them now.
 
 ## Running it
 
