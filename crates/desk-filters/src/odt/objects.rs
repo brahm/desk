@@ -1407,6 +1407,16 @@ fn import_one(
         .origin
         .as_deref()
         .and_then(|o| u64::from_str_radix(o, 16).ok());
+    // The comments on the object (W149).
+    for mut comment in super::comments::object_comments(&object.annotations) {
+        let id = document.new_id();
+        comment.id = id;
+        document.apply(Op::SetComment {
+            id,
+            comment: Some(comment),
+        })?;
+        built.comments = built.comments.with(id);
+    }
     let mirror = g.mirror.as_deref().unwrap_or_default();
     built.flip_horizontal = mirror.contains("horizontal");
     built.flip_vertical = mirror.contains("vertical");
@@ -2216,6 +2226,8 @@ impl Exporter<'_> {
         out.style = Some(style);
         out.text = text;
         out.origin = object.origin.map(|o| format!("{o:016x}"));
+        // The comments on the object (W149).
+        out.annotations = super::comments::object_annotations(self.document, object);
         if !matches!(object.kind, ObjectKind::Shape(_)) {
             out.contour = object.contour.as_deref().map(<[_]>::to_vec);
             out.contour_parts = object.contour_parts.iter().map(|p| p.to_vec()).collect();

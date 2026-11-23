@@ -216,6 +216,8 @@ impl Edit {
     pub(crate) fn renumbered_object(&mut self, object: &Object) -> Result<Object, ModelError> {
         let mut copy = object.clone();
         copy.id = self.new_id();
+        // A copy is a new object, without the comments of the first.
+        copy.comments = crate::CommentIds::none();
         let renumber = |edit: &mut Self, text: &mut crate::TextBox| -> Result<(), ModelError> {
             let paragraphs = text
                 .paragraphs

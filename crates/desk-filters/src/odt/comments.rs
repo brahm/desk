@@ -100,16 +100,34 @@ fn add(edit: &mut Edit, events: Events) -> Result<(), ModelError> {
     if found.is_empty() {
         return Ok(());
     }
-    // The comments, and their replies: a reply names the comment it
-    // answers, or another reply of its thread.
-    let names: HashMap<&str, usize> = found
+    let annotations: Vec<&odf::Annotation> = found.iter().map(|(_, _, a)| a).collect();
+    for (first, replies) in threads(&annotations) {
+        let (start, end, _) = &found[first];
+        let Some((start, end)) = (if start == end {
+            edit.document().word_at(*start)
+        } else {
+            Some((*start, *end))
+        }) else {
+            continue;
+        };
+        let comment = thread_comment(annotations[first], replies.iter().map(|i| annotations[*i]));
+        edit.add_comment(start, end, comment)?;
+    }
+    Ok(())
+}
+
+/// The threads of some annotations, in order: the place of each comment
+/// with the places of its replies. A reply names the comment it answers,
+/// or another reply of its thread.
+fn threads(annotations: &[&odf::Annotation]) -> Vec<(usize, Vec<usize>)> {
+    let names: HashMap<&str, usize> = annotations
         .iter()
         .enumerate()
-        .filter_map(|(i, (_, _, a))| a.name.as_deref().map(|n| (n, i)))
+        .filter_map(|(i, a)| a.name.as_deref().map(|n| (n, i)))
         .collect();
     let root = |mut i: usize| {
-        for _ in 0..found.len() {
-            match found[i].2.parent.as_deref().and_then(|p| names.get(p)) {
+        for _ in 0..annotations.len() {
+            match annotations[i].parent.as_deref().and_then(|p| names.get(p)) {
                 Some(&parent) if parent != i => i = parent,
                 _ => break,
             }
@@ -117,7 +135,7 @@ fn add(edit: &mut Edit, events: Events) -> Result<(), ModelError> {
         i
     };
     let mut threads: Vec<(usize, Vec<usize>)> = Vec::new();
-    for i in 0..found.len() {
+    for i in 0..annotations.len() {
         let r = root(i);
         match threads.iter_mut().find(|(t, _)| *t == r) {
             Some((_, replies)) if r != i => replies.push(i),
@@ -127,35 +145,69 @@ fn add(edit: &mut Edit, events: Events) -> Result<(), ModelError> {
         }
     }
     threads.sort_by_key(|(r, _)| *r);
-    for (first, replies) in &threads {
-        let (start, end, annotation) = &found[*first];
-        let Some((start, end)) = (if start == end {
-            edit.document().word_at(*start)
-        } else {
-            Some((*start, *end))
-        }) else {
+    threads
+}
+
+/// A comment with its replies, from their annotations.
+fn thread_comment<'a>(
+    first: &odf::Annotation,
+    replies: impl Iterator<Item = &'a odf::Annotation>,
+) -> Comment {
+    Comment {
+        id: NodeId::new(1).expect("not zero"),
+        author: first.creator.as_deref().unwrap_or_default().into(),
+        date: date(first.date.as_deref()),
+        text: first.text.as_str().into(),
+        replies: replies
+            .map(|reply| Reply {
+                author: reply.creator.as_deref().unwrap_or_default().into(),
+                date: date(reply.date.as_deref()),
+                text: reply.text.as_str().into(),
+            })
+            .collect(),
+    }
+}
+
+/// The comments on a drawing object, from its `desk:annotation`s
+/// (odf-extensions.md), each with its replies.
+pub(super) fn object_comments(annotations: &[odf::Annotation]) -> Vec<Comment> {
+    let refs: Vec<&odf::Annotation> = annotations.iter().collect();
+    threads(&refs)
+        .into_iter()
+        .map(|(first, replies)| thread_comment(refs[first], replies.iter().map(|i| refs[*i])))
+        .collect()
+}
+
+/// The `desk:annotation`s of an object: each of its comments, named after
+/// the object, and its replies, which name it.
+pub(super) fn object_annotations(
+    document: &Document,
+    object: &desk_model::Object,
+) -> Vec<odf::Annotation> {
+    let mut out = Vec::new();
+    for (n, id) in object.comments.ids().iter().enumerate() {
+        let Some(comment) = document.comments().get(*id) else {
             continue;
         };
-        let comment = Comment {
-            id: NodeId::new(1).expect("not zero"),
-            author: annotation.creator.as_deref().unwrap_or_default().into(),
-            date: date(annotation.date.as_deref()),
-            text: annotation.text.as_str().into(),
-            replies: replies
-                .iter()
-                .map(|i| {
-                    let reply = &found[*i].2;
-                    Reply {
-                        author: reply.creator.as_deref().unwrap_or_default().into(),
-                        date: date(reply.date.as_deref()),
-                        text: reply.text.as_str().into(),
-                    }
-                })
-                .collect(),
-        };
-        edit.add_comment(start, end, comment)?;
+        let name = format!("o{}c{}", object.id, n + 1);
+        out.push(odf::Annotation {
+            name: Some(name.clone()),
+            parent: None,
+            creator: Some(comment.author.to_string()),
+            date: comment.date.as_deref().map(str::to_owned),
+            text: comment.text.to_string(),
+        });
+        for (k, reply) in comment.replies.iter().enumerate() {
+            out.push(odf::Annotation {
+                name: Some(format!("{name}r{}", k + 1)),
+                parent: Some(name.clone()),
+                creator: Some(reply.author.to_string()),
+                date: reply.date.as_deref().map(str::to_owned),
+                text: reply.text.to_string(),
+            });
+        }
     }
-    Ok(())
+    out
 }
 
 /// A date of ODF as the model keeps it: none for the empty date that

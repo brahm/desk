@@ -77,6 +77,9 @@ pub struct Object {
     /// How a picture is masked and adjusted; the defaults for any other
     /// object (OBJ-04, OBJ-06, OBJ-07).
     pub picture: PictureSettings,
+    /// The comments on the object itself, as Pages 15.4 puts one on a
+    /// selected object, by identifier (W149).
+    pub comments: crate::CommentIds,
 }
 
 /// How a picture shows in its frame: masked, with colors taken out, and
@@ -236,6 +239,7 @@ impl Object {
             origin: None,
             text: None,
             picture: PictureSettings::default(),
+            comments: crate::CommentIds::none(),
         }
     }
 

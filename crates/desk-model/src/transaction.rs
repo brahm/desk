@@ -552,9 +552,64 @@ impl Edit {
         Ok(id)
     }
 
-    /// Removes a comment and takes it off the text it is on, in the body
-    /// or in a story (W149).
+    /// Puts a new comment on an object, as Pages 15.4 comments a selected
+    /// object, and returns its identifier (W149). The identifier of
+    /// `comment` is replaced with a new one. An object in a group is found
+    /// in it.
+    pub fn add_object_comment(
+        &mut self,
+        object: NodeId,
+        mut comment: crate::Comment,
+    ) -> Result<NodeId, ModelError> {
+        let id = self.new_id();
+        comment.id = id;
+        self.set_comment(id, Some(comment))?;
+        self.change_object_comments(object, |ids| ids.with(id))?;
+        Ok(id)
+    }
+
+    /// Changes the comments of an object, at the top or in a group.
+    fn change_object_comments(
+        &mut self,
+        object: NodeId,
+        change: impl Fn(&crate::CommentIds) -> crate::CommentIds,
+    ) -> Result<(), ModelError> {
+        fn find(o: &mut crate::Object, id: NodeId) -> Option<&mut crate::Object> {
+            if o.id == id {
+                return Some(o);
+            }
+            match &mut o.kind {
+                crate::ObjectKind::Group(members) => std::sync::Arc::make_mut(members)
+                    .iter_mut()
+                    .find_map(|m| find(m, id)),
+                _ => None,
+            }
+        }
+        let top = self
+            .doc
+            .objects()
+            .iter()
+            .find(|o| o.ids().contains(&object))
+            .cloned()
+            .ok_or(ModelError::UnknownObject(object))?;
+        let mut changed = top;
+        let target = find(&mut changed, object).ok_or(ModelError::UnknownObject(object))?;
+        target.comments = change(&target.comments);
+        self.replace_object(changed)
+    }
+
+    /// Removes a comment and takes it off the text or the object it is
+    /// on, in the body or in a story (W149).
     pub fn remove_comment(&mut self, id: NodeId) -> Result<(), ModelError> {
+        if let Some((_, object)) = self
+            .doc
+            .object_comments()
+            .into_iter()
+            .find(|(c, _)| *c == id)
+        {
+            self.change_object_comments(object, |ids| ids.without(id))?;
+            return self.set_comment(id, None);
+        }
         let story = self
             .doc
             .comment_places()

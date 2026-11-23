@@ -221,3 +221,52 @@ fn rev_08_a_comment_in_a_header_is_kept_with_its_text() {
         .unwrap();
     assert!(editor.document().comments().is_empty());
 }
+
+#[test]
+fn rev_08_a_comment_on_an_object_is_kept_with_it() {
+    use desk_model::{Frame, Object, ObjectKind, Shape};
+    let (mut editor, _) = typed("Body");
+    let object = editor
+        .edit("Shape", |edit| {
+            let object = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(72.0, 72.0, 100.0, 50.0),
+            );
+            let id = object.id;
+            edit.add_object(object)?;
+            Ok(id)
+        })
+        .unwrap();
+    let id = editor
+        .edit("Comment", |edit| {
+            edit.add_object_comment(object, comment("On the shape"))
+        })
+        .unwrap();
+    let document = editor.document();
+    assert_eq!(document.object_comments(), [(id, object)]);
+    assert!(document.comment_places().is_empty());
+    assert_eq!(document.objects().get(object).unwrap().comments.ids(), [id]);
+    // Deleted, it goes from the object; undone, it is back on it.
+    editor
+        .edit("Delete Comment", |edit| edit.remove_comment(id))
+        .unwrap();
+    assert!(editor.document().object_comments().is_empty());
+    assert!(editor.document().comments().is_empty());
+    assert!(
+        editor
+            .document()
+            .objects()
+            .get(object)
+            .unwrap()
+            .comments
+            .is_empty()
+    );
+    editor.undo().unwrap();
+    assert_eq!(editor.document().object_comments(), [(id, object)]);
+    // The object deleted, its comment is not listed.
+    editor
+        .edit("Delete", |edit| edit.remove_object(object))
+        .unwrap();
+    assert!(editor.document().object_comments().is_empty());
+}

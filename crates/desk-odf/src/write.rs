@@ -1223,6 +1223,33 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
     w.end();
 }
 
+/// A comment: an `office:annotation` in the text, or the
+/// `desk:annotation` of a drawing object (`desk`), with its name in
+/// `desk:name`. A reply names its comment in `desk:parent-name`
+/// (odf-extensions.md).
+pub(crate) fn write_annotation(w: &mut Writer, desk: bool, annotation: &crate::Annotation) {
+    let (element, name) = if desk {
+        ("desk:annotation", "desk:name")
+    } else {
+        ("office:annotation", "office:name")
+    };
+    w.start(element);
+    w.attr_opt(name, annotation.name.as_deref());
+    w.attr_opt("desk:parent-name", annotation.parent.as_deref());
+    if let Some(creator) = &annotation.creator {
+        w.text_element("dc:creator", creator);
+    }
+    if let Some(date) = &annotation.date {
+        w.text_element("dc:date", date);
+    }
+    for line in annotation.text.split('\n') {
+        w.start("text:p");
+        TextWriter { after_space: true }.write(w, line);
+        w.end();
+    }
+    w.end();
+}
+
 fn write_field(w: &mut Writer, field: &Field, shown: &str) {
     match field {
         Field::Object(object) => {
@@ -1230,23 +1257,7 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             return;
         }
         Field::Annotation(annotation) => {
-            // A reply names its comment in `desk:parent-name`
-            // (odf-extensions.md).
-            w.start("office:annotation");
-            w.attr_opt("office:name", annotation.name.as_deref());
-            w.attr_opt("desk:parent-name", annotation.parent.as_deref());
-            if let Some(creator) = &annotation.creator {
-                w.text_element("dc:creator", creator);
-            }
-            if let Some(date) = &annotation.date {
-                w.text_element("dc:date", date);
-            }
-            for line in annotation.text.split('\n') {
-                w.start("text:p");
-                TextWriter { after_space: true }.write(w, line);
-                w.end();
-            }
-            w.end();
+            write_annotation(w, false, annotation);
             return;
         }
         Field::AnnotationEnd { name } => {

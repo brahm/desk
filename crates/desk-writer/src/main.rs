@@ -128,10 +128,10 @@ mod tests {
         let bytes = super::save(&opened.document, None).unwrap();
         let saved = desk_filters::read_odt(&bytes).unwrap();
         assert_eq!(saved.statistics().words, opened.document.statistics().words);
-        // Everything in it is read now; the comment on a shape of
-        // another fixture is still left out, and the window says so.
+        // Everything in it is read now; the tracked changes of another
+        // fixture are still left out, and the window says so.
         assert!(opened.warnings.is_empty(), "{:?}", opened.warnings);
-        let lossy = super::open(&dir.join("rev-08-comments.pages")).unwrap();
+        let lossy = super::open(&dir.join("rev-01-04-tracked-changes.pages")).unwrap();
         assert!(!lossy.warnings.is_empty());
         assert!(lossy.warnings[0].starts_with("Left out"));
         assert!(super::open(&dir.join("manifest.tsv")).is_err());

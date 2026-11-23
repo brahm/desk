@@ -667,10 +667,12 @@ struct Importer<'a> {
     in_margin: bool,
     inline: Vec<(NodeId, String)>,
     /// The comments on the text of the body, by the `sfa:ID` of the field
-    /// around their text, and those met elsewhere, which the model keeps
-    /// with step 5 of the phase W2 (W149).
+    /// around their text, and those met elsewhere, which are left out
+    /// (W149).
     comments: HashMap<String, NodeId>,
     comments_elsewhere: std::collections::HashSet<String>,
+    /// The object IDs of the objects whose comments are kept on them.
+    comments_on_objects: std::collections::HashSet<String>,
 }
 
 /// The levels of a list style of Pages, through its parents.
@@ -786,6 +788,7 @@ impl<'a> Importer<'a> {
             in_margin: false,
             comments: HashMap::new(),
             comments_elsewhere: std::collections::HashSet::new(),
+            comments_on_objects: std::collections::HashSet::new(),
             inline: Vec::new(),
         };
         importer.styles()?;
@@ -1698,9 +1701,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         objects::import_objects(&mut importer, source, first_style, &own_sections)?;
     log.add(Warning::Content(Content::FloatingObjects), floating);
     log.add(Warning::Content(Content::InlineObjects), inline);
-    // The comments on the text of the body. Pages '09 keeps no author,
-    // date or replies for them; one without its text is a highlight. Those
-    // on headers, footers, notes, objects and cells are left out.
+    // The comments on the text of the body; those on objects are on them
+    // already. Pages '09 keeps no author, date or replies for them; one
+    // without its text is a highlight. Those on headers, footers, notes,
+    // the text of objects and cells are left out.
     let mut on_body: Vec<(&String, NodeId)> =
         importer.comments.iter().map(|(f, i)| (f, *i)).collect();
     on_body.sort_by_key(|(_, id)| *id);
@@ -1724,7 +1728,10 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
     let elsewhere = source
         .annotations
         .iter()
-        .filter(|a| !importer.comments.contains_key(&a.target))
+        .filter(|a| {
+            !importer.comments.contains_key(&a.target)
+                && !importer.comments_on_objects.contains(&a.target)
+        })
         .count()
         .max(importer.comments_elsewhere.len());
     log.add(Warning::Content(Content::Comments), elsewhere);

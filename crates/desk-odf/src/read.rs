@@ -1285,22 +1285,7 @@ impl SpanBuilder {
     /// Adds a comment where the text it is on starts (W149). It leaves the
     /// white space around it as if it were not there.
     fn annotation(&mut self, e: &Element) {
-        let lines: Vec<String> = e
-            .elements()
-            .filter(|c| c.name.is(TEXT, "p") || c.name.is(TEXT, "h"))
-            .map(|c| paragraph(c).text())
-            .collect();
-        let element = |ns: &str, local: &str| e.child(ns, local).map(Element::text);
-        let annotation = Annotation {
-            name: e.attr(OFFICE, "name").map(str::to_owned),
-            parent: e
-                .attr(DESK, "parent-name")
-                .or_else(|| e.attr(LOEXT, "parent-name"))
-                .map(str::to_owned),
-            creator: element(DC, "creator"),
-            date: element(DC, "date"),
-            text: lines.join("\n"),
-        };
+        let annotation = read_annotation(e);
         self.spans.push(Span {
             field: Some(Field::Annotation(Box::new(annotation))),
             link: self.link.clone(),
@@ -1446,6 +1431,30 @@ impl SpanBuilder {
         }
         // Links, fields and anything else: their text.
         self.content(e, style);
+    }
+}
+
+/// A comment: an `office:annotation`, or the `desk:annotation` of a
+/// drawing object (odf-extensions.md), whose name is `desk:name`.
+pub(crate) fn read_annotation(e: &Element) -> Annotation {
+    let lines: Vec<String> = e
+        .elements()
+        .filter(|c| c.name.is(TEXT, "p") || c.name.is(TEXT, "h"))
+        .map(|c| paragraph(c).text())
+        .collect();
+    let element = |ns: &str, local: &str| e.child(ns, local).map(Element::text);
+    Annotation {
+        name: e
+            .attr(OFFICE, "name")
+            .or_else(|| e.attr(DESK, "name"))
+            .map(str::to_owned),
+        parent: e
+            .attr(DESK, "parent-name")
+            .or_else(|| e.attr(LOEXT, "parent-name"))
+            .map(str::to_owned),
+        creator: element(DC, "creator"),
+        date: element(DC, "date"),
+        text: lines.join("\n"),
     }
 }
 

@@ -3147,7 +3147,7 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         insert.connect_activate(move |_, _| {
             let Some(this) = weak.upgrade() else { return };
-            let Some(range) = this.editor().and_then(|e| e.comment_range()) else {
+            let Some(range) = this.editor().and_then(|e| e.comment_target()) else {
                 this.window.error_bell();
                 return;
             };
@@ -3155,7 +3155,7 @@ impl DocumentWindow {
             // the text, as Pages 15.4 writes it.
             if this.nav_shows("comments") {
                 this.comments.start_comment(range);
-            } else if let Some(at) = this.editor().and_then(|e| e.range_anchor(range)) {
+            } else if let Some(at) = this.editor().and_then(|e| e.target_anchor(range)) {
                 this.bubble.start_comment(range);
                 this.show_bubble_at(at, None);
             } else {

@@ -634,6 +634,28 @@ A highlight is an annotation whose one paragraph is empty (PXV-19).
   `loext:parent-name`, which LibreOffice writes the same way.
 - **Fallback:** the replies are comments of their own, on the same text,
   one after the other, as a reader without the extension shows them.
+  It is also written on `desk:annotation`.
+
+#### `desk:annotation`
+
+- **Feature:** a comment on an object itself, as Pages 15.4 puts one on
+  a selected shape, picture, text box or table (W149, REV-08).
+- **On:** any drawing object written by `write_draw_object`, as its
+  child, one for the comment and one after it for each reply. ODF has
+  `office:annotation` only in paragraphs and table cells.
+- **Value:** what an `office:annotation` holds: `dc:creator`, `dc:date`
+  and a `text:p` for each line, named in `desk:name`, with the reply
+  naming its comment in `desk:parent-name`.
+- **Fallback:** none; other programs have no comments on objects, and
+  show the object without it.
+
+#### `desk:name`
+
+- **Feature:** the name of a comment on an object, which its replies
+  name (W149).
+- **On:** `desk:annotation`.
+- **Value:** a name unique in the document.
+- **Fallback:** none, as for `desk:annotation`.
 
 ### Sections (`style:section-properties`)
 
