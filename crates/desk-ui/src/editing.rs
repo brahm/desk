@@ -31,6 +31,7 @@ use crate::view::{DocumentView, WeakView};
 mod cell_drag;
 mod chart_looks;
 mod comments;
+pub use comments::CommentTarget;
 mod connections;
 mod copies;
 mod custom_formats;

@@ -24,8 +24,10 @@ use adw::prelude::*;
 use desk_model::{Comment, NodeId};
 use gtk::glib;
 
+use crate::editing::CommentTarget;
 use crate::formatting::{EditorOf, labelled};
 use crate::i18n::tr;
+#[cfg(test)]
 use crate::text_nav::Spot;
 
 /// The name that new comments and replies are written under: the full
@@ -87,7 +89,7 @@ pub struct CommentsPage {
     /// The comments of the cards, in order, after the new one.
     rows: RefCell<Vec<NodeId>>,
     /// The text that a new comment being written is on.
-    draft: RefCell<Option<(Spot, Spot)>>,
+    draft: RefCell<Option<CommentTarget>>,
     /// Whether text is being written in a card, which making the page
     /// again would lose, and whether it is due once that ends.
     writing: Cell<bool>,
@@ -273,9 +275,9 @@ impl CommentsPage {
         *self.on_empty.borrow_mut() = Some(Rc::new(f));
     }
 
-    /// Starts a new comment on the text between two spots: its card, at
-    /// the top, takes the keyboard.
-    pub fn start_comment(self: &Rc<Self>, range: (Spot, Spot)) {
+    /// Starts a new comment on the text between two spots or on an
+    /// object: its card, at the top, takes the keyboard.
+    pub fn start_comment(self: &Rc<Self>, range: CommentTarget) {
         self.only.set(None);
         *self.draft.borrow_mut() = Some(range);
         self.writing.set(false);
@@ -342,7 +344,7 @@ impl CommentsPage {
     }
 
     /// The card of a new comment, with its text being written.
-    fn draft_card(self: &Rc<Self>, range: (Spot, Spot)) -> gtk::ListBoxRow {
+    fn draft_card(self: &Rc<Self>, range: CommentTarget) -> gtk::ListBoxRow {
         let card = card_box();
         card.append(&heading(&author(), None, &[]));
         let weak = Rc::downgrade(self);
@@ -355,7 +357,7 @@ impl CommentsPage {
                 let Some(this) = weak.upgrade() else { return };
                 this.draft.take();
                 if let Some(editor) = (this.editor)() {
-                    let added = editor.add_comment(range, &author(), text);
+                    let added = editor.add_comment_on(range, &author(), text);
                     this.only.set(added);
                     this.rebuild();
                     this.show_current(added);

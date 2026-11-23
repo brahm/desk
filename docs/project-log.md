@@ -1826,6 +1826,24 @@ paragraph, and objects on a second page.
   order, and a comment in another text takes the cursor there. A
   comment deleted from outside its text goes with its marks.
 
+### 23 November: comments on objects (step 5 of W2, third part)
+
+- An object carries the comments on itself, as text carries those on
+  it. Comment, with one object selected, writes one on it, as Pages 15.4
+  does; its card quotes the kind of object, its mark is a square at the
+  top left corner of the object, and going to it selects the object. A
+  copy of an object does not take its comments.
+- ODF has `office:annotation` only in paragraphs and table cells, so a
+  comment on an object is a `desk:annotation` of the object, with its
+  replies, defined in odf-extensions.md; other programs show the object
+  without it.
+- A comment of Pages '09 names the object ID of its shape, and opens on
+  that shape. With that, `rev-08-comments.pages` opens with nothing left
+  out, and the test of Desk Writer that checks the warning of the window
+  uses the tracked changes of `rev-01-04-tracked-changes.pages`, which
+  come with step 8.
+- Step 5 takes a fourth pull request, for the comments on cells.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

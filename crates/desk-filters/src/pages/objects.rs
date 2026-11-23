@@ -850,6 +850,7 @@ pub(super) fn import_objects(
         ) {
             object.wrap = Wrap::Behind;
         }
+        comment_object(builder.importer, source, drawable, &mut object)?;
         let index = builder.importer.document.objects().len();
         builder
             .importer
@@ -860,14 +861,16 @@ pub(super) fn import_objects(
     let inline = std::mem::take(&mut builder.importer.inline);
     let mut inline_left_out = 0;
     for (id, attachment) in inline {
-        let built = source
+        let drawable = source
             .attachments
             .iter()
             .find(|(a, _)| *a == attachment)
-            .map(|(_, d)| builder.object(d, Anchor::InText, (0.0, 0.0)))
+            .map(|(_, d)| d);
+        let built = drawable
+            .map(|d| builder.object(d, Anchor::InText, (0.0, 0.0)))
             .transpose()?
             .flatten();
-        let Some(mut object) = built else {
+        let (Some(mut object), Some(drawable)) = (built, drawable) else {
             inline_left_out += 1;
             remove_mark(&mut builder.importer.document, id)?;
             continue;
@@ -877,6 +880,7 @@ pub(super) fn import_objects(
         object.frame.y = Length::ZERO;
         object.rotation = 0;
         object.wrap = Wrap::Both;
+        comment_object(builder.importer, source, drawable, &mut object)?;
         let index = builder.importer.document.objects().len();
         builder
             .importer
@@ -884,6 +888,36 @@ pub(super) fn import_objects(
             .apply(Op::InsertObject { index, object })?;
     }
     Ok((left_out, inline_left_out))
+}
+
+/// Puts on an object the comments of Pages '09 on it, which name its
+/// object ID; they have no author, date or replies, as those on the text
+/// (W149).
+fn comment_object(
+    importer: &mut Importer<'_>,
+    source: &iwork::PagesDocument,
+    drawable: &Drawable,
+    object: &mut Object,
+) -> Result<(), FilterError> {
+    let Some(target) = &drawable.id else {
+        return Ok(());
+    };
+    for annotation in source.annotations.iter().filter(|a| &a.target == target) {
+        let id = importer.document.new_id();
+        importer.document.apply(Op::SetComment {
+            id,
+            comment: Some(desk_model::Comment {
+                id,
+                author: "".into(),
+                date: None,
+                text: annotation.text.as_str().into(),
+                replies: std::sync::Arc::new([]),
+            }),
+        })?;
+        object.comments = object.comments.with(id);
+        importer.comments_on_objects.insert(target.clone());
+    }
+    Ok(())
 }
 
 /// Takes out of the body the mark of an object that is left out.

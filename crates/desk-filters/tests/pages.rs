@@ -1520,16 +1520,26 @@ fn rev_08_the_comments_of_pages_09_are_kept_on_their_text() {
             ),
         ]
     );
-    // The comment on the shape comes with step 5 of the phase W2.
+    // The comment on the shape is on the shape.
     let entries: Vec<(Warning, usize)> = log
         .entries()
         .iter()
         .map(|e| (e.warning.clone(), e.count))
         .collect();
     assert!(
-        entries.contains(&(Warning::Content(Content::Comments), 1)),
+        !entries
+            .iter()
+            .any(|(w, _)| *w == Warning::Content(Content::Comments)),
         "{entries:?}"
     );
+    let on_objects = document.object_comments();
+    assert_eq!(on_objects.len(), 1);
+    let (comment, shape) = on_objects[0];
+    assert!(!document.comments().get(comment).unwrap().text.is_empty());
+    assert!(matches!(
+        document.objects().get(shape).unwrap().kind,
+        desk_model::ObjectKind::Shape(_)
+    ));
     assert_eq!(
         document.body().get(0).unwrap().text(),
         "Comment on a selection here"

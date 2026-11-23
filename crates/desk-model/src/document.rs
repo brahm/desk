@@ -658,6 +658,30 @@ impl Document {
         places
     }
 
+    /// The comments on objects, each with the object it is on, from back
+    /// to front and in groups after their group (W149). A comment whose
+    /// object is gone is not listed.
+    pub fn object_comments(&self) -> Vec<(NodeId, NodeId)> {
+        fn visit(object: &Object, out: &mut Vec<(NodeId, NodeId)>) {
+            for &id in object.comments.ids() {
+                if !out.iter().any(|(c, _)| *c == id) {
+                    out.push((id, object.id));
+                }
+            }
+            if let crate::ObjectKind::Group(members) = &object.kind {
+                for member in members.iter() {
+                    visit(member, out);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        for object in self.objects().iter() {
+            visit(object, &mut out);
+        }
+        out.retain(|(c, _)| self.comments().get(*c).is_some());
+        out
+    }
+
     /// The word at a point of the body, which a comment made there is on,
     /// as Pages 15.4 puts a comment made at the cursor: the letters and
     /// digits around it, or the character after it, or before it, when

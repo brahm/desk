@@ -316,3 +316,51 @@ fn rev_08_comments_of_notes_headers_and_text_boxes_are_kept_in_odt() {
     );
     assert_eq!(read.headers_footers().get(place)[0].text(), "Header text");
 }
+
+#[test]
+fn rev_08_a_comment_on_an_object_is_kept_in_odt() {
+    use desk_model::{Frame, Object, ObjectKind, Shape};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let (shape, id) = editor
+        .edit("Shape", |edit| {
+            edit.insert_text(start, "Body")?;
+            let object = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(72.0, 72.0, 100.0, 50.0),
+            );
+            let shape = object.id;
+            edit.add_object(object)?;
+            let id = edit
+                .add_object_comment(shape, comment("Ana", "On the shape", &[("Bo", "Agreed")]))?;
+            Ok((shape, id))
+        })
+        .unwrap();
+    let document = editor.document();
+    assert_eq!(document.object_comments(), [(id, shape)]);
+    let bytes = write_odt(document).unwrap();
+    keep("rev-08-comment-on-an-object.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let found = read.object_comments();
+    assert_eq!(found.len(), 1);
+    let comment = read.comments().get(found[0].0).unwrap();
+    assert_eq!(
+        (comment.author.as_ref(), comment.text.as_ref()),
+        ("Ana", "On the shape")
+    );
+    assert_eq!(comment.replies.len(), 1);
+    assert_eq!(comment.replies[0].text.as_ref(), "Agreed");
+    assert!(matches!(
+        read.objects().get(found[0].1).unwrap().kind,
+        ObjectKind::Shape(Shape::Rectangle)
+    ));
+    // In the extension, which a reader without it leaves out.
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("content.xml").unwrap(), &mut content)
+        .unwrap();
+    assert!(content.contains("<desk:annotation desk:name="), "{content}");
+    assert!(!content.contains("<office:annotation"));
+}

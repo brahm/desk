@@ -389,6 +389,9 @@ pub struct DrawObject {
     /// `desk:origin`: what the copies of one object share, which Magic
     /// Move of Desk Slides matches (IOP-33).
     pub origin: Option<String>,
+    /// The `desk:annotation`s in it: the comments on the object itself,
+    /// each with its replies after it (W149, odf-extensions.md).
+    pub annotations: Vec<crate::Annotation>,
 }
 
 /// The `svg:viewBox` side that Desk writes a `draw:contour-polygon` in.
@@ -417,6 +420,7 @@ impl DrawObject {
             contour: None,
             contour_parts: Vec::new(),
             origin: None,
+            annotations: Vec::new(),
         }
     }
 
@@ -1012,6 +1016,11 @@ fn draw_object_at(
         contour,
         contour_parts,
         origin: e.attr(DESK, "origin").map(str::to_owned),
+        annotations: e
+            .elements()
+            .filter(|c| c.name.is(DESK, "annotation"))
+            .map(crate::read::read_annotation)
+            .collect(),
     })
 }
 
@@ -1375,6 +1384,9 @@ pub(crate) fn write_draw_object(
         for p in &object.text {
             paragraph(w, p);
         }
+    }
+    for annotation in &object.annotations {
+        crate::write::write_annotation(w, true, annotation);
     }
     w.end();
 }

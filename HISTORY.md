@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer puts comments on objects, and opens those of Pages
+  '09 documents on shapes.
 * Added: Desk Writer writes comments in headers, footers, notes, text
   boxes and shapes, and lists every comment by page.
 * Added: Desk Writer keeps the comments of notes, headers, footers,

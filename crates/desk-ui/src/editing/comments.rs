@@ -10,20 +10,32 @@
 use std::sync::Arc;
 
 use desk_layout::DocumentLayout;
-use desk_model::{Comment, Document, NodeId, Paragraph, Position, Reply, Story};
+use desk_model::{Comment, Document, NodeId, ObjectKind, Paragraph, Position, Reply, Story};
 
 use super::stories::story_layout_everywhere;
 use super::{Selection, Spot, TextEditor, at_spot};
 use crate::text_nav::{self, SpanRect};
 
 /// A comment as the window shows it: the text it is in, none for the
-/// body, and the text it is on, as spots of that text.
+/// body, and the text it is on, as spots of that text, or the object it
+/// is on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Placed {
     id: NodeId,
     story: Option<Story>,
     start: Spot,
     end: Spot,
+    object: Option<NodeId>,
+}
+
+/// What a new comment is on: the text between two spots of the text being
+/// edited, or an object, as Pages 15.4 comments a selected object (W149).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CommentTarget {
+    /// Text.
+    Text(Spot, Spot),
+    /// An object.
+    Object(NodeId),
 }
 
 /// Every comment of a document, with the text it is on.
@@ -50,9 +62,68 @@ fn placed(document: &Document) -> Vec<Placed> {
                 story: place.story,
                 start,
                 end,
+                object: None,
             })
         })
+        .chain(
+            document
+                .object_comments()
+                .into_iter()
+                .map(|(id, object)| Placed {
+                    id,
+                    story: None,
+                    start: Spot::default(),
+                    end: Spot::default(),
+                    object: Some(object),
+                }),
+        )
         .collect()
+}
+
+/// Where an object is on the pages, in a group too.
+fn object_rect(layout: &DocumentLayout, id: NodeId) -> Option<SpanRect> {
+    fn find(placed: &desk_layout::PlacedObject, id: NodeId) -> Option<&desk_layout::PlacedObject> {
+        if placed.object.id == id {
+            return Some(placed);
+        }
+        placed.children.iter().find_map(|c| find(c, id))
+    }
+    layout.pages.iter().enumerate().find_map(|(page, p)| {
+        let o = p.objects.iter().find_map(|o| find(o, id))?;
+        Some(SpanRect {
+            page,
+            x0: f64::from(o.x),
+            y0: f64::from(o.y),
+            x1: f64::from(o.x + o.width),
+            y1: f64::from(o.y + o.height),
+        })
+    })
+}
+
+/// The name of an object, which the card of a comment on it quotes.
+fn object_name(document: &Document, id: NodeId) -> String {
+    fn find(o: &desk_model::Object, id: NodeId) -> Option<&desk_model::Object> {
+        if o.id == id {
+            return Some(o);
+        }
+        match &o.kind {
+            ObjectKind::Group(members) => members.iter().find_map(|m| find(m, id)),
+            _ => None,
+        }
+    }
+    let kind = document
+        .objects()
+        .iter()
+        .find_map(|o| find(o, id))
+        .map(|o| &o.kind);
+    crate::i18n::tr(match kind {
+        Some(ObjectKind::TextBox(_)) => "Text Box",
+        Some(ObjectKind::Image(_)) => "Image",
+        Some(ObjectKind::Media(_)) => "Movie",
+        Some(ObjectKind::Table(_)) => "Table",
+        Some(ObjectKind::Chart(_)) => "Chart",
+        _ => "Shape",
+    })
 }
 
 /// A position of a story as a spot of its text.
@@ -101,8 +172,11 @@ impl<'a> Texts<'a> {
         }
     }
 
-    /// Where the text of a comment is on the pages.
+    /// Where the text or the object of a comment is on the pages.
     fn rects(&self, place: &Placed) -> Vec<SpanRect> {
+        if let Some(object) = place.object {
+            return object_rect(self.main, object).into_iter().collect();
+        }
         self.layout(place.story).map_or_else(Vec::new, |layout| {
             text_nav::selection_rects(
                 layout,
@@ -118,15 +192,10 @@ impl<'a> Texts<'a> {
     /// lists them, by page: on each, those of its header, of the body in
     /// its order, of its text boxes and shapes from the top, of its notes
     /// and of its footer. A text that no page shows comes last.
-    fn key(&self, story: Option<Story>, start: Spot, end: Spot) -> Key {
-        let place = Placed {
-            id: NodeId::new(1).expect("not zero"),
-            story,
-            start,
-            end,
-        };
+    fn key(&self, place: &Placed) -> Key {
+        let (story, start, end) = (place.story, place.start, place.end);
         // An empty selection, the cursor, is where the cursor stands.
-        let first = self.rects(&place).into_iter().next().or_else(|| {
+        let first = self.rects(place).into_iter().next().or_else(|| {
             let caret = text_nav::caret(self.layout(story)?, start)?;
             Some(SpanRect {
                 page: caret.page,
@@ -142,13 +211,16 @@ impl<'a> Texts<'a> {
                 desk_model::MarginKind::Header => 0,
                 desk_model::MarginKind::Footer => 4,
             },
+            None if place.object.is_some() => 2,
             None => 1,
             Some(Story::TextBox(_)) => 2,
             Some(Story::Note(_)) => 3,
         };
-        // Outside the body, by where the text is on the page.
-        let (y, x) = match (story, first) {
-            (Some(_), Some(r)) => ((r.y0 * 100.0) as u64, (r.x0 * 100.0) as u64),
+        // Outside the body, by where the text or the object is on the
+        // page.
+        let outside = story.is_some() || place.object.is_some();
+        let (y, x) = match first {
+            Some(r) if outside => ((r.y0 * 100.0) as u64, (r.x0 * 100.0) as u64),
             _ => (0, 0),
         };
         (page, group, y, x, start, end)
@@ -156,7 +228,7 @@ impl<'a> Texts<'a> {
 
     /// The comments, in that order.
     fn ordered(&self, mut places: Vec<Placed>) -> Vec<Placed> {
-        places.sort_by_cached_key(|p| self.key(p.story, p.start, p.end));
+        places.sort_by_cached_key(|p| self.key(p));
         places
     }
 }
@@ -329,7 +401,7 @@ impl TextEditor {
     pub fn delete_comment(&self, id: NodeId) {
         let place = self.place_of(id);
         if let Some(editing) = self.story()
-            && place.is_some_and(|p| p.story != Some(editing))
+            && place.is_some_and(|p| p.story != Some(editing) || p.object.is_some())
         {
             self.leave_story(None);
         }
@@ -356,6 +428,9 @@ impl TextEditor {
             .ordered(places)
             .into_iter()
             .filter_map(|p| {
+                if let Some(object) = p.object {
+                    return Some((p.id, object_name(document, object)));
+                }
                 let place = document
                     .comment_places()
                     .into_iter()
@@ -380,6 +455,13 @@ impl TextEditor {
             return false;
         };
         let current = self.story();
+        if let Some(object) = place.object {
+            if current.is_some() {
+                self.leave_story(None);
+            }
+            self.select_objects(vec![object]);
+            return self.selected_objects() == [object];
+        }
         match place.story {
             None if current.is_some() => self.leave_story(None),
             Some(story) if current != Some(story) => {
@@ -421,10 +503,18 @@ impl TextEditor {
             // With the text being edited, where the selection is.
             let stories = places.iter().filter_map(|p| p.story).chain(story);
             let texts = Texts::with(document, Self::main_layout(&state), stories);
-            let here = texts.key(story, start, end);
-            let keyed = places
-                .into_iter()
-                .map(|p| (texts.key(p.story, p.start, p.end), p.id));
+            let object = match state.objects[..] {
+                [object] if story.is_none() => Some(object),
+                _ => None,
+            };
+            let here = texts.key(&Placed {
+                id: NodeId::new(1).expect("not zero"),
+                story,
+                start,
+                end,
+                object,
+            });
+            let keyed = places.into_iter().map(|p| (texts.key(&p), p.id));
             if forward {
                 keyed.filter(|(k, _)| *k > here).min()
             } else {
@@ -443,8 +533,17 @@ impl TextEditor {
         let state = self.state.borrow();
         let story = state.story.as_ref().map(|m| m.story);
         let (start, end) = state.selection.ordered();
-        placed(Self::main_document(&state))
+        let places = placed(Self::main_document(&state));
+        // A selected object, its comment.
+        if let [object] = state.objects[..] {
+            return places
+                .iter()
+                .find(|p| p.object == Some(object))
+                .map(|p| p.id);
+        }
+        places
             .into_iter()
+            .filter(|p| p.object.is_none())
             .filter(|p| p.story == story && p.start <= start && end <= p.end)
             .max_by_key(|p| p.start)
             .map(|p| p.id)
@@ -458,7 +557,11 @@ impl TextEditor {
         let document = Self::main_document(&state);
         let places = placed(document);
         let texts = Texts::new(document, Self::main_layout(&state), &places);
-        places.iter().flat_map(|p| texts.rects(p)).collect()
+        places
+            .iter()
+            .filter(|p| p.object.is_none())
+            .flat_map(|p| texts.rects(p))
+            .collect()
     }
 
     /// The marks of the comments in the left margin of the pages, as Pages
@@ -511,6 +614,59 @@ impl TextEditor {
         texts.rects(&place).into_iter().next()
     }
 
+    /// What a new comment would be on: the object selected, or the text
+    /// that [`TextEditor::comment_range`] gives.
+    pub fn comment_target(&self) -> Option<CommentTarget> {
+        if self.story().is_none()
+            && let [object] = self.selected_objects()[..]
+        {
+            return Some(CommentTarget::Object(object));
+        }
+        self.comment_range().map(|(s, e)| CommentTarget::Text(s, e))
+    }
+
+    /// Puts a new comment on its target, by `author`, now; nothing when
+    /// its text is empty. Gives the new comment.
+    pub fn add_comment_on(
+        &self,
+        target: CommentTarget,
+        author: &str,
+        text: &str,
+    ) -> Option<NodeId> {
+        let object = match target {
+            CommentTarget::Text(start, end) => return self.add_comment((start, end), author, text),
+            CommentTarget::Object(object) => object,
+        };
+        let text = typed(text);
+        if text.is_empty() {
+            return None;
+        }
+        let comment = Comment {
+            id: NodeId::new(1).expect("not zero"),
+            author: author.into(),
+            date: Some(crate::comments_page::now().into()),
+            text,
+            replies: Arc::new([]),
+        };
+        let mut added = None;
+        self.format_edit("Add Comment", |edit| {
+            added = Some(edit.add_object_comment(object, comment)?);
+            Ok(())
+        });
+        added
+    }
+
+    /// Where the target of a new comment is on the pages, for its bubble
+    /// to point at.
+    pub fn target_anchor(&self, target: CommentTarget) -> Option<SpanRect> {
+        match target {
+            CommentTarget::Text(start, end) => self.range_anchor((start, end)),
+            CommentTarget::Object(object) => {
+                object_rect(Self::main_layout(&self.state.borrow()), object)
+            }
+        }
+    }
+
     /// Where the text between two spots of the text being edited starts
     /// on the pages, for the bubble of a new comment to point at.
     pub fn range_anchor(&self, (anchor, focus): (Spot, Spot)) -> Option<SpanRect> {
@@ -533,6 +689,27 @@ fn flags(document: &Document, main: &DocumentLayout) -> Vec<(NodeId, SpanRect)> 
             .get(place.id)
             .is_none_or(Comment::is_highlight)
         {
+            continue;
+        }
+        // On an object, at its top left corner, outside it.
+        if let Some(object) = place.object {
+            if let Some(r) = object_rect(main, object) {
+                let beside = flags
+                    .iter()
+                    .filter(|(_, f)| f.page == r.page && f.y0 == r.y0)
+                    .count();
+                let x1 = r.x0 - 3.0 - beside as f64 * (FLAG + 3.0);
+                flags.push((
+                    place.id,
+                    SpanRect {
+                        page: r.page,
+                        x0: x1 - FLAG,
+                        y0: r.y0,
+                        x1,
+                        y1: r.y0 + FLAG,
+                    },
+                ));
+            }
             continue;
         }
         let Some(layout) = texts.layout(place.story) else {
@@ -714,6 +891,54 @@ mod tests {
                     .all(|r| r.attrs.comments.is_none())
             );
             assert_eq!(editor.comments_in_order().len(), 1);
+        });
+    }
+
+    #[test]
+    fn w149_a_selected_object_takes_a_comment() {
+        use desk_model::{Frame, Object, Shape};
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let shape = document
+                .transact("Shape", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three")?;
+                    let object = Object::new(
+                        edit.new_id(),
+                        ObjectKind::Shape(Shape::Rectangle),
+                        Frame::from_pt(200.0, 300.0, 100.0, 50.0),
+                    );
+                    let id = object.id;
+                    edit.add_object(object)?;
+                    Ok(id)
+                })
+                .unwrap()
+                .0;
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.select_objects(vec![shape]);
+            let target = editor.comment_target().unwrap();
+            assert_eq!(target, CommentTarget::Object(shape));
+            let at = editor.target_anchor(target).unwrap();
+            assert_eq!((at.x0, at.y0), (200.0, 300.0));
+            let id = editor
+                .add_comment_on(target, "Ana", "On the shape")
+                .unwrap();
+            assert_eq!(editor.document().object_comments(), [(id, shape)]);
+            assert_eq!(editor.comment_at_cursor(), Some(id));
+            assert_eq!(editor.comments_in_order(), [(id, crate::i18n::tr("Shape"))]);
+            // Its mark is at the top left corner of the object, not on text.
+            assert!(editor.comment_marks().is_empty());
+            let flags = editor.comment_flags();
+            assert_eq!(flags.len(), 1);
+            assert!(flags[0].1.x1 <= 200.0 && flags[0].1.y0 == 300.0);
+            assert_eq!(editor.comment_anchor(id), Some(at));
+            // Going to it selects the object.
+            editor.select_objects(Vec::new());
+            assert!(editor.select_comment(id));
+            assert_eq!(editor.selected_objects(), [shape]);
+            editor.delete_comment(id);
+            assert!(editor.document().object_comments().is_empty());
+            assert!(editor.comments_in_order().is_empty());
         });
     }
 }
