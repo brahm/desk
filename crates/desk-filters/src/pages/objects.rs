@@ -709,6 +709,7 @@ impl Builder<'_, '_> {
                 media.volume = (volume * 100.0).round().clamp(0.0, 100.0) as u8;
                 ObjectKind::Media(media)
             }
+            DrawableKind::Table(table) => ObjectKind::Table(Arc::new(table_of(table))),
             DrawableKind::Other(_) => return Ok(None),
         };
         let (wrap, wrap_margin) = wrap(drawable);
@@ -851,6 +852,7 @@ pub(super) fn import_objects(
             object.wrap = Wrap::Behind;
         }
         comment_object(builder.importer, source, drawable, &mut object)?;
+        comment_cells(builder.importer, source, drawable, &mut object)?;
         let index = builder.importer.document.objects().len();
         builder
             .importer
@@ -881,6 +883,7 @@ pub(super) fn import_objects(
         object.rotation = 0;
         object.wrap = Wrap::Both;
         comment_object(builder.importer, source, drawable, &mut object)?;
+        comment_cells(builder.importer, source, drawable, &mut object)?;
         let index = builder.importer.document.objects().len();
         builder
             .importer
@@ -915,6 +918,85 @@ fn comment_object(
             }),
         })?;
         object.comments = object.comments.with(id);
+        importer.comments_on_objects.insert(target.clone());
+    }
+    Ok(())
+}
+
+/// A table of Pages '09 as a table of the model: its grid, the sizes of
+/// its rows and columns, its headers and footers, what its cells hold and
+/// its merged cells (B-048, TAB-01). The cells look as those of a new
+/// table; the styles of Pages '09 are left out.
+fn table_of(source: &iwork::Table) -> desk_model::Table {
+    use desk_model::table::{Area, Content, Num};
+    let mut table = desk_model::Table::new(source.rows(), source.cols());
+    table.name = source.name.clone();
+    table.options.show_name = source.name_shown;
+    let thousandths = |pt: f64| (pt * 1000.0).round().clamp(1000.0, f64::from(u32::MAX)) as u32;
+    for (c, width) in source.widths.iter().enumerate() {
+        table.set_width(c as u32, thousandths(*width));
+    }
+    for (r, height) in source.heights.iter().enumerate() {
+        table.set_height(r as u32, thousandths(*height));
+    }
+    let _ = table.set_header_rows(source.header_rows.min(5));
+    let _ = table.set_header_cols(source.header_cols.min(5));
+    let _ = table.set_footer_rows(source.footer_rows.min(5));
+    for cell in &source.cells {
+        let content = match &cell.content {
+            iwork::CellContent::Empty => Content::Empty,
+            iwork::CellContent::Text(text) => Content::Text(text.clone()),
+            iwork::CellContent::Number(n) => Content::Number(Num(*n)),
+            iwork::CellContent::Date(d) => Content::Date(Num(*d)),
+            iwork::CellContent::Duration(d) => Content::Duration(Num(*d)),
+            iwork::CellContent::Formula(f) => Content::Formula(f.clone()),
+        };
+        table.set_content(cell.row, cell.col, content);
+    }
+    for cell in source.cells.iter().filter(|c| c.rows > 1 || c.cols > 1) {
+        let _ = table.merge(Area {
+            row: cell.row,
+            col: cell.col,
+            rows: cell.rows,
+            cols: cell.cols,
+        });
+    }
+    table
+}
+
+/// Puts on the cells of a table the comments of Pages '09 on them, which
+/// name the object ID of the cell in `sl:cell-annotations` (W149,
+/// TAB-27).
+fn comment_cells(
+    importer: &mut Importer<'_>,
+    source: &iwork::PagesDocument,
+    drawable: &Drawable,
+    object: &mut Object,
+) -> Result<(), FilterError> {
+    let (DrawableKind::Table(cells), ObjectKind::Table(table)) = (&drawable.kind, &mut object.kind)
+    else {
+        return Ok(());
+    };
+    for (row, col, target) in &cells.comments {
+        let Some(annotation) = source.annotations.iter().find(|a| &a.target == target) else {
+            continue;
+        };
+        let (row, col) = (table.span(*row, *col).row, table.span(*row, *col).col);
+        if Arc::make_mut(table).cell(row, col).comment.is_some() {
+            continue;
+        }
+        let id = importer.document.new_id();
+        importer.document.apply(Op::SetComment {
+            id,
+            comment: Some(desk_model::Comment {
+                id,
+                author: "".into(),
+                date: None,
+                text: annotation.text.as_str().into(),
+                replies: std::sync::Arc::new([]),
+            }),
+        })?;
+        Arc::make_mut(table).cell_mut(row, col).comment = std::num::NonZeroU64::new(id.get());
         importer.comments_on_objects.insert(target.clone());
     }
     Ok(())

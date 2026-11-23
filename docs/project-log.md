@@ -1871,6 +1871,24 @@ paragraph, and objects on a second page.
   without a word). They go with the reading of those tables, B-048,
   which the owner chose to do now, in a fifth pull request of step 5.
 
+### 23 November: the tables of Pages '09 files (step 5 of W2, fifth part)
+
+- Desk dropped the tables in the text of Pages '09 files without a
+  word. They now open, read from the documents that the project made
+  with Pages '09 (D-011): the grid of `sf:tabular-model` gives the
+  rows, the columns and their sizes, and its cells come row by row, one
+  element each, `sf:t`, `sf:n`, `sf:d`, `sf:du`, `sf:f`, `sf:g` and
+  `sf:s`, each in the column after the one before unless its `sf:ct`
+  says how many columns to go, as a signed byte, a column at or before
+  the last starting the next row. Dates count seconds from 2001. The
+  merged cells, the header rows and columns, the footer rows and the
+  name come along, and a formula keeps what Pages wrote.
+- The comments of cells, in `sl:cell-annotations`, open on their cells,
+  which closes B-048.
+- The tables look as new tables of Desk do: the styles of Pages '09,
+  of the table and of its cells, are B-049, a sixth pull request of
+  step 5, as the owner chose to read the tables in W2.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

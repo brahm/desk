@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: Desk Writer opens the tables in the text of Pages '09
+  documents, which it dropped, with their cells, formulas, merged cells
+  and the comments of their cells.
 * Changed: the comment of a table cell in Desk Writer is a comment
   like the others, with its author, date and replies, listed by page
   and gone to from Next Comment; ODT keeps it as the annotation of the
