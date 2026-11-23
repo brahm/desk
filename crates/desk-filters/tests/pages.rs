@@ -274,11 +274,15 @@ fn doc_22_a_document_saved_by_pages_logs_what_it_loses() {
         .iter()
         .map(|e| (e.warning.clone(), e.count))
         .collect();
-    // Its floating picture and the one in its text are read.
-    assert_eq!(entries, [(Warning::Content(Content::Comments), 1)]);
+    // Its floating picture and the one in its text are read, and its
+    // comment is kept (W149).
+    assert!(entries.is_empty(), "{entries:?}");
+    let comments: Vec<&str> = document.comments().iter().map(|c| &*c.text).collect();
+    assert_eq!(comments.len(), 1);
+    assert!(!comments[0].is_empty());
     assert_eq!(document.objects().len(), 2);
     // The text of the body is kept, without that of the footnote, which
-    // is a note of its own (EST-13), and the comment.
+    // is a note of its own (EST-13), and of the comment.
     let text: Vec<String> = document.body().iter().map(|p| p.text()).collect();
     assert!(
         text.iter()
@@ -1477,4 +1481,57 @@ fn obj_28_the_guides_of_each_page_stay_on_it() {
         ]
     );
     assert!(guides[0].is_on(0) && !guides[0].is_on(2));
+}
+
+#[test]
+fn rev_08_the_comments_of_pages_09_are_kept_on_their_text() {
+    // Saved by Pages '09 on the reference machine: a comment on a
+    // selection, one made at the cursor, which Pages '09 puts on the
+    // space there, and one on a shape.
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages/rev-08-comments.pages");
+    let (document, log) = desk_filters::read_pages_at_logged(&path).unwrap();
+    let on: Vec<(String, String, String)> = document
+        .comment_ranges()
+        .into_iter()
+        .map(|(id, start, end)| {
+            let comment = document.comments().get(id).unwrap();
+            let paragraph = document.paragraph(start.paragraph).unwrap();
+            assert_eq!(start.paragraph, end.paragraph);
+            (
+                paragraph.text()[start.offset..end.offset].to_owned(),
+                comment.text.to_string(),
+                comment.author.to_string(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        on,
+        [
+            (
+                "a selecti".to_owned(),
+                "Comment on selected text.".to_owned(),
+                String::new()
+            ),
+            (
+                " ".to_owned(),
+                "Comment at the cursor.".to_owned(),
+                String::new()
+            ),
+        ]
+    );
+    // The comment on the shape comes with step 5 of the phase W2.
+    let entries: Vec<(Warning, usize)> = log
+        .entries()
+        .iter()
+        .map(|e| (e.warning.clone(), e.count))
+        .collect();
+    assert!(
+        entries.contains(&(Warning::Content(Content::Comments), 1)),
+        "{entries:?}"
+    );
+    assert_eq!(
+        document.body().get(0).unwrap().text(),
+        "Comment on a selection here"
+    );
 }

@@ -173,6 +173,9 @@ pub struct Run {
     pub link: Option<String>,
     /// `sf:name` of the `sf:bookmark` that the run is in (EST-26).
     pub bookmark: Option<String>,
+    /// `sfa:ID` of the `sf:annotation-field` that the run is in: the
+    /// comment on it is the [`Annotation`] with that target (W149).
+    pub comment: Option<String>,
     /// The text, with breaks as [`LINE_BREAK`], [`PAGE_BREAK`],
     /// [`COLUMN_BREAK`] and tabs as `\t`. A column break that ends a
     /// paragraph is not kept: the next paragraph starts a new column.
@@ -205,6 +208,17 @@ pub struct Paragraph {
     pub toc: bool,
     /// The text, in runs.
     pub runs: Vec<Run>,
+}
+
+/// A comment (`sf:annotation`): what it is on and its text. Pages '09
+/// keeps no author, date or replies for a comment.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Annotation {
+    /// `sf:target`: the `sfa:ID` of the `sf:annotation-field` around the
+    /// text it is on, or of the object or table cell it is on.
+    pub target: String,
+    /// The text, its paragraphs as lines.
+    pub text: String,
 }
 
 /// A Pages document.
@@ -264,6 +278,8 @@ pub struct PagesDocument {
     pub has_body: bool,
     /// How many pages the document has, by the pages of its sections.
     pub pages: u32,
+    /// The comments (`sf:annotations`), on text, objects and table cells.
+    pub annotations: Vec<Annotation>,
     /// The files of the package that the document uses, by path, with
     /// their bytes: the pictures of image bullets. Only reading a package
     /// fills them, not parsing an index.
@@ -419,6 +435,23 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         toc_links: publication_flag(&root, "kSFWPTOCLinksEnabledProperty").unwrap_or(true),
         ..PagesDocument::default()
     };
+    // The comments, which the text, the objects and the cells they are on
+    // name.
+    document.annotations = root
+        .children_named(SF, "annotations")
+        .flat_map(|a| a.children_named(SF, "annotation"))
+        .map(|a| Annotation {
+            target: a.attr(SF, "target").unwrap_or_default().to_owned(),
+            text: a
+                .descendants()
+                .filter(|e| e.name.is(SF, "p"))
+                .map(Element::text)
+                .collect::<Vec<_>>()
+                .join("\n")
+                .trim_end()
+                .to_owned(),
+        })
+        .collect();
     // The floating objects, and those of them the reader cannot read yet.
     let skipped = drawables::read(&ids, &root, &mut document);
     document.skipped.extend(skipped);
@@ -508,6 +541,7 @@ fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Ve
         in_toc: false,
         link: None,
         bookmark: None,
+        comment: None,
         marks: Vec::new(),
         note_break: false,
         note_ends: Vec::new(),
@@ -629,6 +663,8 @@ struct BodyReader<'a, 'b> {
     link: Option<String>,
     bookmark: Option<String>,
     marks: Vec<String>,
+    /// The comment field that the text read now is in (W149).
+    comment: Option<String>,
     /// Whether the paragraph being read ends a note.
     note_break: bool,
     /// The number of paragraphs read when each note ended.
@@ -755,6 +791,13 @@ impl BodyReader<'_, '_> {
                             self.inline(child, style, runs);
                             self.bookmark = outer;
                         }
+                        // Text under a comment, which the comment names.
+                        "annotation-field" => {
+                            let outer = self.comment.take();
+                            self.comment = child.attr(SFA, "ID").map(str::to_owned);
+                            self.inline(child, style, runs);
+                            self.comment = outer;
+                        }
                         "toc-bookmark" => {
                             if let Some(name) = child.attr(SF, "name") {
                                 self.marks.push(name.to_owned());
@@ -831,15 +874,16 @@ impl BodyReader<'_, '_> {
 }
 
 impl BodyReader<'_, '_> {
-    /// Adds text to the last run when it has the same style, link and
-    /// bookmark and is not a field.
+    /// Adds text to the last run when it has the same style, link,
+    /// bookmark and comment and is not a field.
     fn push(&self, runs: &mut Vec<Run>, style: Option<&str>, text: &str) {
         match runs.last_mut() {
             Some(last)
                 if last.style.as_deref() == style
                     && last.field.is_none()
                     && last.link == self.link
-                    && last.bookmark == self.bookmark =>
+                    && last.bookmark == self.bookmark
+                    && last.comment == self.comment =>
             {
                 last.text.push_str(text);
             }
@@ -848,6 +892,7 @@ impl BodyReader<'_, '_> {
                 field: None,
                 link: self.link.clone(),
                 bookmark: self.bookmark.clone(),
+                comment: self.comment.clone(),
                 text: text.to_owned(),
             }),
         }
@@ -860,6 +905,7 @@ impl BodyReader<'_, '_> {
             field: Some(field),
             link: self.link.clone(),
             bookmark: self.bookmark.clone(),
+            comment: self.comment.clone(),
             text: FIELD.to_string(),
         });
     }

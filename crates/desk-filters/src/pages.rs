@@ -666,6 +666,11 @@ struct Importer<'a> {
     /// in their lines too.
     in_margin: bool,
     inline: Vec<(NodeId, String)>,
+    /// The comments on the text of the body, by the `sfa:ID` of the field
+    /// around their text, and those met elsewhere, which the model keeps
+    /// with step 5 of the phase W2 (W149).
+    comments: HashMap<String, NodeId>,
+    comments_elsewhere: std::collections::HashSet<String>,
 }
 
 /// The levels of a list style of Pages, through its parents.
@@ -779,6 +784,8 @@ impl<'a> Importer<'a> {
             next_id: None,
             in_body: false,
             in_margin: false,
+            comments: HashMap::new(),
+            comments_elsewhere: std::collections::HashSet::new(),
             inline: Vec::new(),
         };
         importer.styles()?;
@@ -1103,6 +1110,21 @@ impl<'a> Importer<'a> {
             }
             if let Some(bookmark) = &run.bookmark {
                 run_attrs.bookmark = Some(Some(bookmark.as_str().into()));
+            }
+            if let Some(field) = &run.comment {
+                if self.in_body {
+                    let id = match self.comments.get(field) {
+                        Some(id) => *id,
+                        None => {
+                            let id = self.document.new_id();
+                            self.comments.insert(field.clone(), id);
+                            id
+                        }
+                    };
+                    run_attrs.comments = Some(desk_model::CommentIds::of([id]));
+                } else {
+                    self.comments_elsewhere.insert(field.clone());
+                }
             }
             if let Some(field) = &run.field {
                 let field = match field {
@@ -1676,6 +1698,36 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         objects::import_objects(&mut importer, source, first_style, &own_sections)?;
     log.add(Warning::Content(Content::FloatingObjects), floating);
     log.add(Warning::Content(Content::InlineObjects), inline);
+    // The comments on the text of the body. Pages '09 keeps no author,
+    // date or replies for them; one without its text is a highlight. Those
+    // on headers, footers, notes, objects and cells are left out.
+    let mut on_body: Vec<(&String, NodeId)> =
+        importer.comments.iter().map(|(f, i)| (f, *i)).collect();
+    on_body.sort_by_key(|(_, id)| *id);
+    for (field, id) in on_body {
+        let text = source
+            .annotations
+            .iter()
+            .find(|a| &a.target == field)
+            .map_or("", |a| a.text.as_str());
+        importer.document.apply(Op::SetComment {
+            id,
+            comment: Some(desk_model::Comment {
+                id,
+                author: "".into(),
+                date: None,
+                text: text.into(),
+                replies: std::sync::Arc::new([]),
+            }),
+        })?;
+    }
+    let elsewhere = source
+        .annotations
+        .iter()
+        .filter(|a| !importer.comments.contains_key(&a.target))
+        .count()
+        .max(importer.comments_elsewhere.len());
+    log.add(Warning::Content(Content::Comments), elsewhere);
     let toc_ids = importer.ids.clone();
     let mut document = importer.document;
     if index > 1 {

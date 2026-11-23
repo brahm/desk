@@ -1777,6 +1777,22 @@ paragraph, and objects on a second page.
   not showing; when it shows, the page does both. The bubble goes when
   its comment is deleted, and gives the keyboard back to the document.
 
+### 23 November: comments of Pages '09 files (step 4 of W2, third part)
+
+- Pages '09 wraps the text of a comment in an `sf:annotation-field` of
+  the body and keeps what the comment says in `sf:annotations` at the
+  root of the document, by the id of the field. Desk reads both and
+  puts the comment on that text, in the order of the ids. A comment
+  made at the cursor wraps the space there, and stays on it.
+- Those files hold no author, date or replies. The author stays empty,
+  shown as Unknown Author, rather than the "Author" that Pages 15.4
+  shows for them, so nothing is made up.
+- A comment on a shape, a text box or a cell is still listed as left
+  out when the file opens, until step 5 brings comments on objects.
+  With that, `lossy-import.pages` opens with nothing left out, and the
+  test of Desk Writer that checks the warning of the window uses the
+  comment on a shape of `rev-08-comments.pages`.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
