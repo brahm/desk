@@ -620,6 +620,9 @@ pub struct InvisibleMark {
 pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<InvisibleMark> {
     let mut marks = Vec::new();
     let body: Vec<&desk_model::Paragraph> = document.body().iter().collect();
+    // The heads of the boxes, found once: each by itself goes through all
+    // the objects.
+    let heads = document.text_box_heads();
     for (page, p) in layout.pages.iter().enumerate() {
         for line in &p.lines {
             line_invisibles(&mut marks, page, line, &body);
@@ -632,7 +635,8 @@ pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<Invisible
             if placed.lines.is_empty() || placed.object.rotation != 0 {
                 continue;
             }
-            let head = document.text_box_head(placed.object.id);
+            let id = placed.object.id;
+            let head = heads.get(&id).copied().unwrap_or(id);
             let Some(text) = document.objects().get(head).and_then(|o| o.text_box()) else {
                 continue;
             };

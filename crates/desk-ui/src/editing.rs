@@ -1225,6 +1225,8 @@ impl TextEditor {
             return;
         }
         let typing = name == "Typing" && start == end;
+        // An edit that changes nothing enters no history, joined or not.
+        let recorded = self.state.borrow().editor.recorded();
         let result = {
             let mut state = self.state.borrow_mut();
             let continuing = typing && state.typing;
@@ -1302,7 +1304,10 @@ impl TextEditor {
                 }
                 self.after_change(after);
             }
-            Ok((spot, false)) => self.finish_edit(before, Ok(spot)),
+            Ok((spot, false)) => {
+                let entered = self.state.borrow().editor.recorded() > recorded;
+                self.finish_edit(before, Ok(spot.filter(|_| entered)));
+            }
             Ok((None, true)) => {}
             Err(error) => self.finish_edit(before, Err(error)),
         }
@@ -2908,6 +2913,7 @@ impl TextEditor {
                 return false;
             }
             let document = state.editor.document();
+            let all_heads = document.text_box_heads();
             let mut heads: Vec<desk_model::NodeId> = state
                 .objects
                 .iter()
@@ -2917,7 +2923,7 @@ impl TextEditor {
                         .get(**id)
                         .is_some_and(|o| o.holds_text() && !o.locked)
                 })
-                .map(|id| document.text_box_head(*id))
+                .map(|id| all_heads.get(id).copied().unwrap_or(*id))
                 .collect();
             heads.dedup();
             heads

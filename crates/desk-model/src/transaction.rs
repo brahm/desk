@@ -908,12 +908,13 @@ impl Editor {
         let Some(transaction) = self.undo.pop() else {
             return Ok(false);
         };
+        // Even when it fails, what comes next is a new action.
+        self.joinable = false;
         if let Err(error) = self.document.revert(&transaction) {
             self.undo.push(transaction);
             return Err(error);
         }
         self.redo.push(transaction);
-        self.joinable = false;
         Ok(true)
     }
 
@@ -922,12 +923,12 @@ impl Editor {
         let Some(transaction) = self.redo.pop() else {
             return Ok(false);
         };
+        self.joinable = false;
         if let Err(error) = self.document.replay(&transaction) {
             self.redo.push(transaction);
             return Err(error);
         }
         self.undo.push(transaction);
-        self.joinable = false;
         Ok(true)
     }
 

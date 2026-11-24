@@ -442,6 +442,22 @@ fn table(body: &[u8], width: usize) -> Option<Vec<&[u8]>> {
     Some(rows.chunks_exact(width).collect())
 }
 
+/// What is left of a file for the samples of the tracks still to read:
+/// each takes a byte at least, and none shares its bytes.
+struct Left {
+    samples: usize,
+    bytes: usize,
+}
+
+impl Left {
+    fn of(file: &[u8]) -> Self {
+        Self {
+            samples: file.len(),
+            bytes: file.len(),
+        }
+    }
+}
+
 /// The samples of a track, and the part of them kept.
 struct Track<'a> {
     stbl: Vec<Atom<'a>>,
@@ -456,7 +472,11 @@ struct Track<'a> {
 }
 
 impl<'a> Track<'a> {
-    fn read(trak: &'a [u8], file: &[u8]) -> Option<Self> {
+    /// Reads a track. `left` is what is left of the file for the tracks
+    /// read after the others: the samples of all of them, and their bytes,
+    /// fit in the file, as they do not share bytes. Each track spends its
+    /// part before anything is made of its counts.
+    fn read(trak: &'a [u8], file: &[u8], left: &mut Left) -> Option<Self> {
         let mdia = atoms(find(&atoms(trak)?, b"mdia")?)?;
         let scale = time_scale(find(&mdia, b"mdhd")?)?;
         let minf = atoms(find(&mdia, b"minf")?)?;
@@ -483,9 +503,24 @@ impl<'a> Track<'a> {
         let timed = stts
             .iter()
             .try_fold(0usize, |n, row| n.checked_add(be32(row, 0)? as usize))?;
-        if count != timed || count > file.len() {
+        if count != timed {
             return None;
         }
+        left.samples = left.samples.checked_sub(count)?;
+        // Samples do not share bytes: more of them than the file has would
+        // be copied over and over, a few thousand rows making gigabytes.
+        let total = if fixed != 0 {
+            fixed.checked_mul(count)?
+        } else {
+            stsz.get(12..12 + count.checked_mul(4)?)?
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .try_fold(0usize, |t, r| {
+                    t.checked_add(u32::from_be_bytes(*r) as usize)
+                })?
+        };
+        left.bytes = left.bytes.checked_sub(total)?;
         let mut times = Vec::with_capacity(count);
         let mut time: u64 = 0;
         for row in stts {
@@ -505,14 +540,6 @@ impl<'a> Track<'a> {
                 .map(|r| u32::from_be_bytes(*r) as usize)
                 .collect()
         };
-        // Samples do not share bytes: more of them than the file has would
-        // be copied over and over, a few thousand rows making gigabytes.
-        let total = sizes
-            .iter()
-            .try_fold(0usize, |total, &size| total.checked_add(size))?;
-        if total > file.len() {
-            return None;
-        }
         let chunks: Vec<u64> = if let Some(stco) = find(&stbl, b"stco") {
             table(stco, 4)?
                 .iter()
@@ -754,9 +781,10 @@ fn mp4(data: &[u8], cut: &Cut) -> Option<Kept> {
         .filter(|a| &a.kind == b"trak")
         .map(|a| a.body)
         .collect();
+    let mut left = Left::of(data);
     let mut tracks: Vec<Track> = traks
         .iter()
-        .map(|t| Track::read(t, data))
+        .map(|t| Track::read(t, data, &mut left))
         .collect::<Option<_>>()?;
     if tracks.is_empty() {
         return None;
@@ -795,15 +823,6 @@ fn mp4(data: &[u8], cut: &Cut) -> Option<Kept> {
         }
         Some(atom(b"moov", &out))
     };
-    // The tracks do not share bytes either.
-    let kept = tracks.iter().try_fold(0usize, |total, t| {
-        t.kept_samples()
-            .iter()
-            .try_fold(total, |total, s| total.checked_add(s.3))
-    })?;
-    if kept > data.len() {
-        return None;
-    }
     let ftyp = find(&top, b"ftyp").map(|f| atom(b"ftyp", f));
     let head = ftyp.as_ref().map_or(0, Vec::len);
     let bodies: Vec<Vec<u8>> = tracks.iter().map(|t| t.data(data)).collect();
@@ -1117,7 +1136,7 @@ mod tests {
             .into_iter()
             .filter(|a| &a.kind == b"trak")
             .collect();
-        let video = Track::read(traks[0].body, &data).unwrap();
+        let video = Track::read(traks[0].body, &data, &mut Left::of(&data)).unwrap();
         assert_eq!(&data[video.samples[7].2..video.samples[7].2 + 2], [1, 7]);
         media.start = 1_200;
         media.stop = Some(2_000);
@@ -1134,8 +1153,8 @@ mod tests {
         assert_eq!(kinds, [*b"ftyp", *b"moov", *b"mdat"]);
         let moov = atoms(find(&top, b"moov").unwrap()).unwrap();
         let traks: Vec<_> = moov.iter().filter(|a| &a.kind == b"trak").collect();
-        let video = Track::read(traks[0].body, data).unwrap();
-        let sound = Track::read(traks[1].body, data).unwrap();
+        let video = Track::read(traks[0].body, data, &mut Left::of(data)).unwrap();
+        let sound = Track::read(traks[1].body, data, &mut Left::of(data)).unwrap();
         assert_eq!((video.samples.len(), sound.samples.len()), (10, 20));
         assert_eq!(video.sync, Some(vec![0, 5]));
         let first = |t: &Track| data[t.samples[0].2..t.samples[0].2 + 2].to_vec();
@@ -1183,10 +1202,37 @@ mod tests {
         let top = atoms(&data).unwrap();
         let moov = atoms(find(&top, b"moov").unwrap()).unwrap();
         let trak = moov.iter().find(|a| &a.kind == b"trak").unwrap();
-        assert!(Track::read(trak.body, &data).is_none());
+        assert!(Track::read(trak.body, &data, &mut Left::of(&data)).is_none());
         let mut media = Media::from_bytes(data.clone()).unwrap();
         media.start = 1_000;
         assert!(media.reduced().is_none());
+    }
+
+    #[test]
+    fn the_tracks_of_a_movie_share_the_bytes_of_its_file() {
+        // Review of RV batch 3: thousands of tracks, each within the file,
+        // together made hundreds of gigabytes before the sum was checked.
+        let data = movie();
+        let top = atoms(&data).unwrap();
+        let traks: Vec<_> = atoms(find(&top, b"moov").unwrap())
+            .unwrap()
+            .into_iter()
+            .filter(|a| &a.kind == b"trak")
+            .collect();
+        // The video has 120 bytes of samples and the sound 240.
+        let mut left = Left {
+            samples: data.len(),
+            bytes: 120 + 239,
+        };
+        assert!(Track::read(traks[0].body, &data, &mut left).is_some());
+        assert_eq!(left.bytes, 239);
+        assert!(Track::read(traks[1].body, &data, &mut left).is_none());
+        let mut left = Left {
+            samples: 30 + 59,
+            bytes: data.len(),
+        };
+        assert!(Track::read(traks[0].body, &data, &mut left).is_some());
+        assert!(Track::read(traks[1].body, &data, &mut left).is_none());
     }
 
     #[test]

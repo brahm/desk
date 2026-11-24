@@ -136,6 +136,8 @@ impl TextEditor {
             let state = self.state.borrow();
             state.typing && before.is_empty() && before.focus.paragraph == index
         };
+        // An edit that changes nothing enters no history, joined or not.
+        let recorded = self.state.borrow().editor.recorded();
         let result = {
             let mut state = self.state.borrow_mut();
             let write = |edit: &mut desk_model::Edit| {
@@ -151,7 +153,7 @@ impl TextEditor {
         match result {
             Ok((spot, joined)) => {
                 let after = Selection::cursor(spot);
-                if !joined {
+                if !joined && self.state.borrow().editor.recorded() > recorded {
                     let mut state = self.state.borrow_mut();
                     let action = state.next_action;
                     state.next_action += 1;

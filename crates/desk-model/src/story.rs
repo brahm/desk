@@ -59,9 +59,8 @@ impl Document {
     }
 
     /// The text box whose text a text box shows: the first of the boxes
-    /// linked to it, or itself (OBJ-13). A box in a group has the head of
-    /// the box linked to it too. In a loop of links, the head is the last
-    /// box met going back before the loop closes.
+    /// linked to it, or itself (OBJ-13). In a loop of links, the head is
+    /// the last box met going back before the loop closes.
     pub fn text_box_head(&self, id: NodeId) -> NodeId {
         let before = self.text_box_before();
         let mut head = id;
@@ -75,14 +74,18 @@ impl Document {
         head
     }
 
-    /// The box linked to each linked box: the first, from the back, whose
-    /// next it is.
+    /// The box linked to each linked box of the page: the first, from the
+    /// back, whose next it is. A box in a group is its own head, as the
+    /// chains and the layout of linked boxes go through the boxes of the
+    /// page only, until they go through groups too.
     fn text_box_before(&self) -> HashMap<NodeId, NodeId> {
+        let top: HashSet<NodeId> = self.objects().iter().map(|o| o.id).collect();
         let mut before = HashMap::new();
         for o in self.objects().iter() {
             if let ObjectKind::TextBox(TextBox {
                 next: Some(next), ..
             }) = &o.kind
+                && top.contains(next)
             {
                 before.entry(*next).or_insert(o.id);
             }
@@ -90,17 +93,16 @@ impl Document {
         before
     }
 
-    /// [`Document::text_box_head`] of every object of the page and of
-    /// every box linked to, in a group too, found together in time of the
-    /// number of objects: a file can link thousands of boxes. Going back
+    /// [`Document::text_box_head`] of every object of the page, found
+    /// together in time of the number of objects: a file can link
+    /// thousands of boxes. Going back
     /// from a box ends at a box with none before it, its head, or at a box
     /// met already, in a loop of links, and the head is then the last box
     /// before it. An object not in the map is its own head.
     pub fn text_box_heads(&self) -> HashMap<NodeId, NodeId> {
         let before = self.text_box_before();
         let mut heads: HashMap<NodeId, NodeId> = HashMap::new();
-        let ids = self.objects().iter().map(|o| o.id);
-        for id in ids.chain(before.keys().copied()) {
+        for id in self.objects().iter().map(|o| o.id) {
             if heads.contains_key(&id) {
                 continue;
             }
@@ -726,9 +728,11 @@ mod chain_tests {
     }
 
     #[test]
-    fn a_box_in_a_group_has_the_head_of_the_box_linked_to_it() {
-        // Review of RV batch 3: the heads of the objects of the page left
-        // out a box in a group that a box outside it links to.
+    fn a_box_in_a_group_is_its_own_head() {
+        // Review of RV batch 3: a box in a group that a box outside it
+        // links to shows its own text, as the chains and the layout go
+        // through the boxes of the page only; its head is itself, so that
+        // editing it does not change the text of the other.
         let mut editor = Editor::new(Document::new_word_processing());
         let ids = editor
             .edit("Add", |e| {
@@ -762,9 +766,8 @@ mod chain_tests {
             .unwrap();
         let document = editor.into_document();
         assert!(document.objects().iter().all(|o| o.id != ids[1]));
-        assert_eq!(document.text_box_head(ids[1]), ids[0]);
-        assert_eq!(document.text_box_heads().get(&ids[1]), Some(&ids[0]));
-        assert_eq!(head_one_by_one(&document, ids[1]), ids[0]);
+        assert_eq!(document.text_box_head(ids[1]), ids[1]);
+        assert_eq!(document.text_box_head(ids[0]), ids[0]);
     }
 
     #[test]
