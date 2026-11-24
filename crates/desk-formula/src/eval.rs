@@ -133,7 +133,10 @@ impl Eval<'_> {
             Expr::Cell(c) => self.context.cell(*c),
             Expr::Range(..) | Expr::Header(_) => match self.arg(expr) {
                 Arg::Scalar(v) => v,
-                Arg::Range { values, .. } if values.len() == 1 => values[0].clone(),
+                Arg::Range { values, .. } if values.len() == 1 => values
+                    .into_iter()
+                    .next()
+                    .unwrap_or(Value::Error(ErrorKind::Value)),
                 Arg::Range { .. } => Value::Error(ErrorKind::Value),
             },
             Expr::Unary(op, a) => {

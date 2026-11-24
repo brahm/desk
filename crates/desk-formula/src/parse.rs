@@ -40,7 +40,7 @@ impl CellRef {
             i += 1;
         }
         let letters_start = i;
-        while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+        while bytes.get(i).is_some_and(u8::is_ascii_alphabetic) {
             i += 1;
         }
         let letters = &name[letters_start..i];
@@ -517,30 +517,30 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
         at,
         message: message.to_owned(),
     };
-    while i < chars.len() {
-        let (at, c) = chars[i];
+    // The character at an index, or none past the end.
+    let ch = |i: usize| chars.get(i).map_or('\0', |c| c.1);
+    while let Some(&(at, c)) = chars.get(i) {
         match c {
             c if c.is_whitespace() => i += 1,
             '0'..='9' | '.' => {
-                let start = i;
-                while i < chars.len() && (chars[i].1.is_ascii_digit() || chars[i].1 == '.') {
+                while ch(i).is_ascii_digit() || ch(i) == '.' {
                     i += 1;
                 }
-                if i < chars.len() && matches!(chars[i].1, 'e' | 'E') {
+                if matches!(ch(i), 'e' | 'E') {
                     let mut j = i + 1;
-                    if j < chars.len() && matches!(chars[j].1, '+' | '-') {
+                    if matches!(ch(j), '+' | '-') {
                         j += 1;
                     }
-                    if j < chars.len() && chars[j].1.is_ascii_digit() {
+                    if ch(j).is_ascii_digit() {
                         i = j;
-                        while i < chars.len() && chars[i].1.is_ascii_digit() {
+                        while ch(i).is_ascii_digit() {
                             i += 1;
                         }
                     }
                 }
                 // A name that starts with digits, as 2006Q1, is a header.
-                if i < chars.len() && (chars[i].1.is_alphabetic() || chars[i].1 == '_') {
-                    while i < chars.len() && is_name_char(chars[i].1) {
+                if ch(i).is_alphabetic() || ch(i) == '_' {
+                    while is_name_char(ch(i)) {
                         i += 1;
                     }
                     let end = chars.get(i).map_or(text.len(), |c| c.0);
@@ -548,9 +548,7 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                     continue;
                 }
                 let end = chars.get(i).map_or(text.len(), |c| c.0);
-                let n: f64 = text[chars[start].0..end]
-                    .parse()
-                    .map_err(|_| err(at, "bad number"))?;
+                let n: f64 = text[at..end].parse().map_err(|_| err(at, "bad number"))?;
                 out.push((at, Token::Number(n)));
             }
             '"' | '\'' => {
@@ -582,15 +580,12 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                 ));
             }
             '#' => {
-                let start = i;
                 i += 1;
-                while i < chars.len()
-                    && (chars[i].1.is_ascii_alphanumeric() || "/!?".contains(chars[i].1))
-                {
+                while ch(i).is_ascii_alphanumeric() || "/!?".contains(ch(i)) {
                     i += 1;
                 }
                 let end = chars.get(i).map_or(text.len(), |c| c.0);
-                let code = &text[chars[start].0..end];
+                let code = &text[at..end];
                 let kind = ErrorKind::from_code(code).ok_or_else(|| err(at, "unknown error"))?;
                 out.push((at, Token::Error(kind)));
             }
@@ -650,7 +645,7 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                 i += 1;
             }
             c if is_name_char(c) => {
-                while i < chars.len() && is_name_char(chars[i].1) {
+                while is_name_char(ch(i)) {
                     i += 1;
                 }
                 let end = chars.get(i).map_or(text.len(), |c| c.0);

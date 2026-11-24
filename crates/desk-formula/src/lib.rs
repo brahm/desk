@@ -20,6 +20,10 @@
 //! checks this rule.
 
 #![forbid(unsafe_code)]
+// A formula comes from a file Desk did not write: no index or unwrap may
+// panic on it (D-028).
+#![deny(clippy::indexing_slicing, clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]
 
 mod eval;
 mod functions;
