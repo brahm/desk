@@ -2067,6 +2067,34 @@ paragraph, and objects on a second page.
   (balanced columns) and B-057 (PDF pictures, lines with tabs) to W6,
   and B-056 (merged cells) to T1.
 
+### 24 November: batch 5 of the review, the interface and the apps (RV)
+
+- `/code-review` and `/security-review` read `desk-ui`, the app crates,
+  `desk-lang` and the Flatpak manifest, and found 21 problems; 17 are
+  fixed and the report is [review/batch-5.md](review/batch-5.md).
+- The worst: a click on any link of a document launched it, whatever it
+  pointed to. The owner decided how links open (D-030):
+  - a link to a bookmark or to another document opens at once;
+  - a link to the web follows a new preference (open at once, ask first,
+    or never open), which the first such click asks for;
+  - any other link shows its address and asks;
+  - the address of a link shows while the pointer is over it.
+- Saving lost less:
+  - a recovered draft stays until the document is saved;
+  - drafts are offered back after a crash in Flatpak;
+  - autosave does not write over a file whose original it could not keep;
+  - Revert keeps the changes as a version and restores the original bytes;
+  - Save As asks before replacing a file;
+  - a tab dragged to another window still asks before it closes;
+  - files are written through a temporary file no one can guess.
+- Leaks and limits: an editor takes its controllers away with it, rows of
+  the panes are freed, the undo history of Tables is bounded, and the
+  clipboard, dropped pictures, dictionaries and tab stops are bounded.
+- *Consequences:* four findings moved to the backlog: B-058 (autosave on
+  the thread of the window) and B-061 (autosave over a file read with
+  losses, for the owner) to W5, B-059 (thumbnails and outline) to W6, and
+  B-060 (the Flatpak build) to batch 6.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -8,6 +8,14 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: a link to the web opens at once, asks first or never opens, as
+  a new preference says, which the first such link asks for; other links
+  outside the document ask, and the address of a link shows under the
+  pointer (D-030).
+* Fixed: drafts are offered back after a crash in Flatpak, autosave no
+  longer writes over a file whose original it cannot keep, Revert keeps
+  the changes as a version, and Save As asks before replacing a file
+  (review RV, batch 5).
 * Fixed: Desk no longer hangs or runs out of memory on narrow table
   columns, tiny fonts, huge wrap margins, huge PNG pictures or text
   shadows, nor closes on charts without categories or with extreme
