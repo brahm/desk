@@ -116,53 +116,82 @@ impl AuthorColor {
     }
 }
 
+/// The colour of every author of a document, for the author of this
+/// computer (W150), worked out once.
+#[derive(Clone, Debug, Default)]
+pub struct AuthorPalette {
+    colors: std::collections::HashMap<String, AuthorColor>,
+    /// The colours no author chose.
+    free: Vec<AuthorColor>,
+    /// How many authors took a free colour.
+    placed: usize,
+}
+
+impl AuthorPalette {
+    /// The colour of an author: the one chosen for them, or else a free
+    /// one; a name the document does not have takes the next free colour.
+    pub fn color(&self, author: &str) -> AuthorColor {
+        self.colors
+            .get(author)
+            .copied()
+            .unwrap_or_else(|| free_color(&self.free, self.placed))
+    }
+}
+
+fn free_color(free: &[AuthorColor], place: usize) -> AuthorColor {
+    if free.is_empty() {
+        AuthorColor::ALL[place % AuthorColor::ALL.len()]
+    } else {
+        free[place % free.len()]
+    }
+}
+
 impl crate::Document {
     /// The colours that authors chose for this document, by name.
     pub fn author_colors(&self) -> &[(String, AuthorColor)] {
         &self.text_settings().author_colors
     }
 
-    /// The colour of an author, with `local` the name of the author of
-    /// this computer: the one chosen for them, or yellow for the local
-    /// author, or the first colour not taken for another, in the order of
-    /// their first comment or reply.
-    pub fn author_color(&self, author: &str, local: &str) -> AuthorColor {
+    /// The colours of the authors, with `local` the name of the author of
+    /// this computer: the one chosen for each; for the others the colours
+    /// no one chose, in their order (yellow first), the local author
+    /// first and then the others by name. The order of names, unlike the
+    /// identifiers of comments, is the same once the document is saved
+    /// and opened again.
+    pub fn author_palette(&self, local: &str) -> AuthorPalette {
         let chosen = self.author_colors();
-        if let Some((_, color)) = chosen.iter().find(|(name, _)| name == author) {
-            return *color;
-        }
-        if author == local {
-            return AuthorColor::Yellow;
-        }
-        let mut taken: Vec<AuthorColor> = chosen.iter().map(|(_, c)| *c).collect();
-        if !chosen.iter().any(|(name, _)| name == local) {
-            taken.push(AuthorColor::Yellow);
-        }
-        let mut others: Vec<&str> = Vec::new();
+        let mut colors: std::collections::HashMap<String, AuthorColor> =
+            chosen.iter().cloned().collect();
+        let free: Vec<AuthorColor> = AuthorColor::ALL
+            .into_iter()
+            .filter(|c| !chosen.iter().any(|(_, t)| t == c))
+            .collect();
+        let mut others = std::collections::BTreeSet::new();
         for comment in self.comments().iter() {
-            let names =
-                std::iter::once(&*comment.author).chain(comment.replies.iter().map(|r| &*r.author));
-            for name in names {
-                if name != local
-                    && !chosen.iter().any(|(n, _)| n == name)
-                    && !others.contains(&name)
-                {
-                    others.push(name);
+            for name in
+                std::iter::once(&comment.author).chain(comment.replies.iter().map(|r| &r.author))
+            {
+                if &**name != local && !colors.contains_key(&**name) {
+                    others.insert(&**name);
                 }
             }
         }
-        let place = others
-            .iter()
-            .position(|n| *n == author)
-            .unwrap_or(others.len());
-        let free: Vec<AuthorColor> = AuthorColor::ALL
-            .into_iter()
-            .filter(|c| !taken.contains(c))
-            .collect();
-        if free.is_empty() {
-            return AuthorColor::ALL[place % AuthorColor::ALL.len()];
+        let mut placed = 0;
+        let unchosen = (!colors.contains_key(local)).then_some(local);
+        for name in unchosen.into_iter().chain(others) {
+            colors.insert(name.to_owned(), free_color(&free, placed));
+            placed += 1;
         }
-        free[place % free.len()]
+        AuthorPalette {
+            colors,
+            free,
+            placed,
+        }
+    }
+
+    /// The colour of one author, as [`Document::author_palette`] gives it.
+    pub fn author_color(&self, author: &str, local: &str) -> AuthorColor {
+        self.author_palette(local).color(author)
     }
 }
 
@@ -222,10 +251,10 @@ mod tests {
         comment_by(&mut document, "Ana");
         comment_by(&mut document, "Bo");
         // The local author is yellow; the others take the colours after
-        // it, in the order of their first comment.
+        // it, by name, which saving and opening again does not change.
         assert_eq!(document.author_color("Ana", "Ana"), AuthorColor::Yellow);
-        assert_eq!(document.author_color("Desk", "Ana"), AuthorColor::Green);
-        assert_eq!(document.author_color("Bo", "Ana"), AuthorColor::Blue);
+        assert_eq!(document.author_color("Bo", "Ana"), AuthorColor::Green);
+        assert_eq!(document.author_color("Desk", "Ana"), AuthorColor::Blue);
         // Choosing green for the local author gives the others what is
         // free, and the choice is kept in the document, in its undo.
         document
@@ -234,12 +263,23 @@ mod tests {
             })
             .unwrap();
         assert_eq!(document.author_color("Ana", "Ana"), AuthorColor::Green);
-        assert_eq!(document.author_color("Desk", "Ana"), AuthorColor::Yellow);
-        assert_eq!(document.author_color("Bo", "Ana"), AuthorColor::Blue);
+        assert_eq!(document.author_color("Bo", "Ana"), AuthorColor::Yellow);
+        assert_eq!(document.author_color("Desk", "Ana"), AuthorColor::Blue);
         assert_eq!(
             document.author_colors(),
             [("Ana".to_owned(), AuthorColor::Green)]
         );
+        // Another user of the file, who chose nothing, does not share the
+        // colour Ana chose: they take the first one free.
+        assert_eq!(document.author_color("Cy", "Cy"), AuthorColor::Yellow);
+        document
+            .transact("Author Color", |edit| {
+                edit.set_author_color("Bo", AuthorColor::Yellow)
+            })
+            .unwrap();
+        assert_eq!(document.author_color("Cy", "Cy"), AuthorColor::Blue);
+        assert_eq!(document.author_color("Bo", "Cy"), AuthorColor::Yellow);
+        assert_eq!(document.author_color("Ana", "Cy"), AuthorColor::Green);
         for color in AuthorColor::ALL {
             assert_eq!(AuthorColor::from_key(color.key()), Some(color));
         }

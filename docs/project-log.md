@@ -2177,8 +2177,10 @@ paragraph, and objects on a second page.
   pink, purple, teal, orange, red, brown, gray blue) for the user's
   items in this document. As in Pages the choice belongs to the
   document: it is kept in the `AuthorColors` item of its settings,
-  which other programs ignore. Other authors take the first colour no
-  one has, in the order their comments come, so each reads apart.
+  which other programs ignore. Other authors take the colours no one
+  chose, by name, so each reads apart and keeps its colour once the
+  file is saved and opened again; the user takes yellow unless another
+  author chose it.
 - Marks and highlights are tinted in their author's colour, blended so
   the text stays legible, and the flags and the headings of the
   Comments page carry the same colour.

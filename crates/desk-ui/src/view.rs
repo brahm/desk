@@ -1462,16 +1462,28 @@ fn draw_comments(
     };
     cr.save().ok();
     cr.set_operator(gtk::cairo::Operator::Multiply);
-    for (span, color) in state.comment_marks.iter().filter(|(s, _)| s.page == page) {
-        let (r, g, b) = rgb(color.highlight());
-        cr.set_source_rgb(r, g, b);
-        cr.rectangle(
-            rect.x + span.x0 * scale,
-            rect.y + span.y0 * scale,
-            (span.x1 - span.x0) * scale,
-            (span.y1 - span.y0) * scale,
-        );
-        cr.fill().ok();
+    // One path for each colour, so that marks of an author that overlap
+    // are tinted once; marks of two authors that overlap blend.
+    for color in desk_model::AuthorColor::ALL {
+        let mut any = false;
+        for (span, _) in state
+            .comment_marks
+            .iter()
+            .filter(|(s, c)| s.page == page && *c == color)
+        {
+            cr.rectangle(
+                rect.x + span.x0 * scale,
+                rect.y + span.y0 * scale,
+                (span.x1 - span.x0) * scale,
+                (span.y1 - span.y0) * scale,
+            );
+            any = true;
+        }
+        if any {
+            let (r, g, b) = rgb(color.highlight());
+            cr.set_source_rgb(r, g, b);
+            cr.fill().ok();
+        }
     }
     cr.restore().ok();
     // The squares in the margin, with an edge that shows on white.

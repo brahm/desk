@@ -595,8 +595,9 @@ written only when an author chose one. Each line is one author, as a
 JSON object with `author`, the name as comments carry it in `dc:creator`,
 and `color`, one of `yellow`, `green`, `blue`, `pink`, `purple`, `teal`,
 `orange`, `red`, `brown` and `gray-blue`. An author without a line takes
-yellow when it is the user, and otherwise the first colour no other
-author has, in the order their first comments come in the document.
+the colours no author chose, in the order of the menu: the user first,
+which is yellow unless someone chose it, then the others by name, an
+order that saving and opening again keeps.
 Other programs ignore the item and colour comments their own way.
 
 ### Text: lists (`text:list-level-style-image`)

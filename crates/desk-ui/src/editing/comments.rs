@@ -722,25 +722,13 @@ impl TextEditor {
         local: &str,
     ) -> impl Fn(NodeId) -> desk_model::AuthorColor + use<> {
         let document = self.document();
-        let mut by_author: Vec<(Arc<str>, desk_model::AuthorColor)> = Vec::new();
-        let mut of: Vec<(NodeId, desk_model::AuthorColor)> = Vec::new();
-        for comment in document.comments().iter() {
-            let color = match by_author.iter().find(|(a, _)| *a == comment.author) {
-                Some((_, c)) => *c,
-                None => {
-                    let c = document.author_color(&comment.author, local);
-                    by_author.push((comment.author.clone(), c));
-                    c
-                }
-            };
-            of.push((comment.id, color));
-        }
-        move |id| {
-            of.iter()
-                .find(|(i, _)| *i == id)
-                .map(|(_, c)| *c)
-                .unwrap_or_default()
-        }
+        let palette = document.author_palette(local);
+        let of: std::collections::HashMap<NodeId, desk_model::AuthorColor> = document
+            .comments()
+            .iter()
+            .map(|comment| (comment.id, palette.color(&comment.author)))
+            .collect();
+        move |id| of.get(&id).copied().unwrap_or_default()
     }
 
     /// The colour of the author of this computer in the document (W150).

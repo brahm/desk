@@ -788,9 +788,17 @@ impl DocumentWindow {
                     p.proofread.to_variant(),
                 );
                 if let Some(editor) = this.editor() {
+                    // The author's name may have changed, and with it
+                    // their colour (W150).
                     editor.show_comment_marks();
+                    formatting::set_state(
+                        &this.actions,
+                        "author-color",
+                        editor.local_author_color().key().to_variant(),
+                    );
                     editor.update_squiggles();
                 }
+                this.comments.refresh();
             }
         });
         {
@@ -3610,7 +3618,8 @@ impl DocumentWindow {
             };
             if let Some(editor) = this.editor() {
                 editor.set_local_author_color(color);
-                action.set_state(&color.key().to_variant());
+                // What the document has, should the edit be refused.
+                action.set_state(&editor.local_author_color().key().to_variant());
             }
         });
         self.actions.add_action(&color);

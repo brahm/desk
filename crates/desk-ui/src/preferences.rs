@@ -897,10 +897,17 @@ fn author_group() -> adw::PreferencesGroup {
         .text(get().author)
         .show_apply_button(true)
         .build();
-    row.connect_apply(|row| {
+    // Kept on Return or the apply button, and when the window closes, so
+    // that a name typed is not lost, as the other settings take effect at
+    // once.
+    let keep = |row: &adw::EntryRow| {
         let name = row.text().trim().to_owned();
-        change(|p| p.author = name.clone());
-    });
+        if name != get().author {
+            change(|p| p.author = name.clone());
+        }
+    };
+    row.connect_apply(keep);
+    row.connect_unmap(keep);
     let group = adw::PreferencesGroup::builder()
         .title(tr("Comments and Changes"))
         .description(tr("The name used for comments and tracked changes"))
