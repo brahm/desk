@@ -11,6 +11,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Fixed: Desk no longer closes or hangs on movies and sounds made to
   break Reduce Media, nor on documents of thousands of linked text boxes,
   paragraphs or objects (review RV, batch 3).
+* Fixed: Undo keeps the selection of each action after a thousand of
+  them, and typing after a Redo is a new step (review RV, batch 3).
 * Fixed: typing after an Undo is a new step of Undo, and conditional
   formatting rules copied into new rows and columns compare with the
   right cells.

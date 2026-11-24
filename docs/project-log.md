@@ -2029,6 +2029,15 @@ paragraph, and objects on a second page.
 - *Consequences:* the modules of `desk-model` that read bytes deny
   unchecked indexing (D-028). The history keeps 1000 actions; keeping
   only the cells changed by an edit of a table is B-054, for phase T1.
+- The review of the pull request (#204, merged after two rounds) found
+  six more, findings 13 to 18: past 1000 actions the window took every
+  edit for one that changed nothing; typing after a Redo joined the
+  typing redone; the heads of linked boxes were found again for each box;
+  MP4 samples sharing their bytes, or thousands of tracks, could make
+  Reduce Media copy hundreds of gigabytes; chunk rows were searched in
+  full; and a WAVE with a second data chunk was not reduced.
+- *Consequences:* a text box in a group is its own head until the chains
+  and the layout of linked boxes reach into groups.
 
 ## Decisions, with their reasons and consequences
 
