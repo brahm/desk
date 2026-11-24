@@ -61,7 +61,35 @@ struct Line {
     subtitle: gtk::Label,
 }
 
+/// A line that its own signal handlers hold without keeping it alive: a
+/// row that held itself in a handler of its own widgets was never freed
+/// (review RV, batch 5).
+#[derive(Clone)]
+struct WeakLine {
+    root: glib::WeakRef<gtk::Box>,
+    title: glib::WeakRef<gtk::Label>,
+    subtitle: glib::WeakRef<gtk::Label>,
+}
+
+impl WeakLine {
+    fn upgrade(&self) -> Option<Line> {
+        Some(Line {
+            root: self.root.upgrade()?,
+            title: self.title.upgrade()?,
+            subtitle: self.subtitle.upgrade()?,
+        })
+    }
+}
+
 impl Line {
+    fn downgrade(&self) -> WeakLine {
+        WeakLine {
+            root: self.root.downgrade(),
+            title: self.title.downgrade(),
+            subtitle: self.subtitle.downgrade(),
+        }
+    }
+
     fn new(title: &str) -> Self {
         let root = gtk::Box::builder()
             .spacing(8)
@@ -796,9 +824,23 @@ impl ActionRow {
 
     /// Calls `f` when the row is clicked.
     pub fn connect_activated(&self, f: impl Fn(&Self) + 'static) {
-        let this = self.clone();
+        let (line, prefixes, suffixes) = (
+            self.line.downgrade(),
+            self.prefixes.downgrade(),
+            self.suffixes.downgrade(),
+        );
         let click = gtk::GestureClick::new();
-        click.connect_released(move |_, _, _, _| f(&this));
+        click.connect_released(move |_, _, _, _| {
+            if let (Some(line), Some(prefixes), Some(suffixes)) =
+                (line.upgrade(), prefixes.upgrade(), suffixes.upgrade())
+            {
+                f(&Self {
+                    line,
+                    prefixes,
+                    suffixes,
+                });
+            }
+        });
         self.line.root.add_controller(click);
     }
 }
@@ -908,13 +950,26 @@ impl EntryRow {
     /// Calls `f` when the text is confirmed with Enter or by leaving the
     /// entry, as the apply button of Libadwaita does.
     pub fn connect_apply(&self, f: impl Fn(&Self) + 'static) {
+        let (line, entry) = (self.line.downgrade(), self.entry.downgrade());
+        let row = move || {
+            Some(Self {
+                line: line.upgrade()?,
+                entry: entry.upgrade()?,
+            })
+        };
         let f = std::rc::Rc::new(f);
-        let this = self.clone();
-        let apply = f.clone();
-        self.entry.connect_activate(move |_| apply(&this));
-        let this = self.clone();
+        let (apply, again) = (f.clone(), row.clone());
+        self.entry.connect_activate(move |_| {
+            if let Some(this) = again() {
+                apply(&this);
+            }
+        });
         let focus = gtk::EventControllerFocus::new();
-        focus.connect_leave(move |_| f(&this));
+        focus.connect_leave(move |_| {
+            if let Some(this) = row() {
+                f(&this);
+            }
+        });
         self.entry.add_controller(focus);
     }
 }
@@ -1146,6 +1201,24 @@ impl Row for gtk::Widget {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rows_with_handlers_are_freed() {
+        // Review RV, batch 5: a row held itself in the handlers of its own
+        // widgets, and rows built again for each document stayed.
+        crate::with_gtk(|| {
+            let action = ActionRow::new();
+            action.connect_activated(|_| {});
+            let action_root = action.line.root.downgrade();
+            drop(action);
+            assert!(action_root.upgrade().is_none());
+            let entry = EntryRow::new();
+            entry.connect_apply(|_| {});
+            let entry_root = entry.line.root.downgrade();
+            drop(entry);
+            assert!(entry_root.upgrade().is_none());
+        });
+    }
 
     #[test]
     fn rows_line_up_and_keep_their_values() {
