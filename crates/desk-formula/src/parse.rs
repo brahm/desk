@@ -1030,7 +1030,7 @@ mod tests {
         }
         // The largest of each form that is read.
         let largest = |form: &dyn Fn(usize) -> String| {
-            let (mut low, mut high) = (1, 5_000);
+            let (mut low, mut high) = (1_usize, 5_000);
             while low < high {
                 let mid = (low + high).div_ceil(2);
                 if Formula::parse(&form(mid)).is_ok() {
