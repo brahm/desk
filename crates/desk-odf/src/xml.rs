@@ -210,9 +210,20 @@ fn push_text(stack: &mut [Element], text: &str) {
 /// escaping what must be escaped. A reader turns a carriage return into a
 /// line feed, and tabs and line ends in attribute values into spaces, so
 /// those are written as character references to come back as they were.
+///
+/// The characters that XML 1.0 does not allow at all, the other C0
+/// controls and U+FFFE and U+FFFF, are left out: written as they are, or
+/// as references, they make a file that no reader opens. Pasted text can
+/// carry them.
 pub(crate) fn escape(out: &mut String, text: &str, attribute: bool) {
     for c in text.chars() {
         match c {
+            '\u{0}'..='\u{8}'
+            | '\u{b}'
+            | '\u{c}'
+            | '\u{e}'..='\u{1f}'
+            | '\u{fffe}'
+            | '\u{ffff}' => {}
             '&' => out.push_str("&amp;"),
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
@@ -303,5 +314,24 @@ impl Writer {
         assert!(self.open.is_empty(), "elements left open");
         self.close_tag();
         self.out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn characters_that_xml_does_not_allow_are_left_out() {
+        // A control character pasted into the text made content.xml a
+        // file that no reader opens (review RV, batch 1).
+        let mut out = String::new();
+        escape(&mut out, "a\u{1}b\u{b}c\u{fffe}d\te\r", false);
+        assert_eq!(out, "abcd\te&#13;");
+        let mut w = Writer::new();
+        w.start("text:p");
+        w.text("x\u{0}y");
+        w.end();
+        assert!(parse(&w.finish()).is_ok());
     }
 }
