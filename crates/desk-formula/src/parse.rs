@@ -461,7 +461,13 @@ impl fmt::Display for ExprDisplay<'_> {
             Expr::Unary(UnaryOp::Percent, a) => write!(f, "{}%", ExprDisplay(a, 7)),
             Expr::Unary(op, a) => {
                 let sign = if *op == UnaryOp::Negate { "-" } else { "+" };
-                write!(f, "{sign}{}", ExprDisplay(a, 6))
+                // A sign under a percent takes parentheses: -(1)% reads
+                // as the sign of the percent.
+                if parent > 6 {
+                    write!(f, "({sign}{})", ExprDisplay(a, 6))
+                } else {
+                    write!(f, "{sign}{}", ExprDisplay(a, 6))
+                }
             }
             Expr::Binary(op, a, b) => {
                 let p = op.precedence();
@@ -895,6 +901,17 @@ mod tests {
         assert_eq!(CellRef::column_name(26), "AA");
         assert_eq!(CellRef::parse("AA10"), Some(CellRef::new(26, 9)));
         assert_eq!(CellRef::parse("A0"), None);
+    }
+
+    #[test]
+    fn a_sign_under_a_percent_keeps_its_parentheses() {
+        // Found by fuzzing formula_parse: written as =--(1+2)%, it read
+        // back as the sign of the percent.
+        for text in ["=-(-(1+2))%", "=(-A1)%", "=-A1%"] {
+            let f = Formula::parse(text).unwrap();
+            assert_eq!(Formula::parse(&f.to_string()).unwrap(), f, "{text}");
+        }
+        assert_eq!(Formula::parse("=(-A1)%").unwrap().to_string(), "=(-A1)%");
     }
 
     #[test]
