@@ -20,6 +20,10 @@
 //! checks this rule.
 
 #![forbid(unsafe_code)]
+// A formula comes from a file Desk did not write: no index or unwrap may
+// panic on it (D-028).
+#![deny(clippy::indexing_slicing, clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]
 
 mod eval;
 mod functions;
@@ -27,7 +31,7 @@ mod odf;
 mod parse;
 mod value;
 
-pub use eval::{Context, evaluate};
+pub use eval::{Context, MAX_TEXT, evaluate};
 pub use functions::{FUNCTIONS, FunctionInfo, function};
-pub use parse::{Axis, BinaryOp, CellRef, Expr, Formula, ParseError, UnaryOp};
+pub use parse::{Axis, BinaryOp, CellRef, Expr, Formula, MAX_NESTING, ParseError, UnaryOp};
 pub use value::{ErrorKind, Value, date_from_days, days_from_date};

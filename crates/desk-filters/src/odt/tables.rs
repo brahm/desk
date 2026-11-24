@@ -32,6 +32,23 @@ pub(crate) fn locale(document: &Document) -> Locale {
     }
 }
 
+/// The language of the text of an ODF document, from its default style,
+/// which the numbers of its merged cells are written in; without one, the
+/// language of the system, as [`locale`] takes.
+fn odf_locale(source: &odf::TextDocument) -> Locale {
+    let text = &source.default_style.text;
+    match text.language.as_deref() {
+        Some(language) if !language.is_empty() && !matches!(language, "zxx" | "und") => {
+            let tag = text
+                .country
+                .as_deref()
+                .map_or_else(|| language.to_owned(), |c| format!("{language}-{c}"));
+            Locale::from_tag(&tag)
+        }
+        _ => Locale::from_tag(&std::env::var("LANG").unwrap_or_default()),
+    }
+}
+
 /// The day now, for TODAY and NOW.
 fn today() -> f64 {
     let secs = std::time::SystemTime::now()
@@ -564,8 +581,9 @@ pub(crate) fn import_table(source: &odf::TextDocument, odf_table: &odf::Table) -
             }
         }
     }
+    let locale = odf_locale(source);
     for area in merges {
-        let _ = table.merge(area);
+        let _ = table.merge(area, &locale);
     }
     table
 }
@@ -847,5 +865,26 @@ mod tests {
         assert_eq!(parse_iso_date("2025-01-01T12:00:00"), Some(45_658.5));
         assert_eq!(parse_iso_duration(&iso_duration(1.25)), Some(1.25));
         assert_eq!(parse_iso_duration("PT1H30M"), Some(1.5 / 24.0));
+    }
+
+    #[test]
+    fn merged_cells_are_joined_in_the_language_of_the_document() {
+        let mut source = odf::TextDocument::default();
+        source.default_style.text.language = Some("pt".into());
+        source.default_style.text.country = Some("BR".into());
+        let locale = odf_locale(&source);
+        let mut table = Table::new(1, 2);
+        table.set_header_rows(0).unwrap();
+        table.set_header_cols(0).unwrap();
+        table.type_text(0, 0, "Preço", &locale);
+        table.type_text(0, 1, "2,5", &locale);
+        table
+            .merge(desk_model::table::Area::between((0, 0), (0, 1)), &locale)
+            .unwrap();
+        assert_eq!(table.source_text(0, 0, &locale), "Preço\t2,5");
+        // An undetermined language is none, as in the model.
+        source.default_style.text.language = Some("und".into());
+        let system = Locale::from_tag(&std::env::var("LANG").unwrap_or_default());
+        assert_eq!(odf_locale(&source), system);
     }
 }

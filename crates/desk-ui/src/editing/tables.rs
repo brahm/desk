@@ -482,6 +482,7 @@ impl TextEditor {
 
     /// Merges the selected cells, or unmerges a merged cell (TAB-23, TAB-24).
     pub fn merge_cells(&self) {
+        let locale = self.locale();
         self.change_table("Merge Cells", |table, cells| {
             let area = cells.area(table);
             if area.rows == 1 && area.cols == 1 {
@@ -489,7 +490,7 @@ impl TextEditor {
             }
             if table.merge_at(area.row, area.col) == Some(area) {
                 table.unmerge(area.row, area.col);
-            } else if table.merge(area).is_ok() {
+            } else if table.merge(area, &locale).is_ok() {
                 cells.anchor = (area.row, area.col);
                 cells.focus = cells.anchor;
             }
@@ -515,7 +516,7 @@ impl TextEditor {
         self.change_table("Sort", |table, cells| {
             let area = cells.area(table);
             let rows = (area.rows > 1).then(|| (area.row, area.row_end()));
-            table.sort(cells.focus.1, ascending, rows);
+            table.sort(cells.focus.1, ascending, rows, desk_layout::today());
         });
     }
 
@@ -800,14 +801,16 @@ impl TextEditor {
         let Some((table, _)) = self.table_selection() else {
             return;
         };
-        let (rows, cols) = (table.rows(), table.cols());
+        let cols = table.cols();
         let at = match table.step(cells.focus, step) {
             Landing::Cell(r, c) => (r, c),
             Landing::AddRow => {
+                // A new row of the body, before the footer if there is one.
                 self.change_table("Add Row", |table, cells| {
-                    if table.insert_rows(rows, 1).is_ok() {
-                        cells.anchor = (rows, 0);
-                        cells.focus = (rows, 0);
+                    let at = table.body_end();
+                    if table.insert_rows(at, 1).is_ok() {
+                        cells.anchor = (at, 0);
+                        cells.focus = (at, 0);
                     }
                 });
                 return;

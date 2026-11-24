@@ -562,7 +562,8 @@ impl TableGroups {
             (&self.rows, "Rows", |this, t| {
                 let n = this.rows.value() as u32;
                 if n > t.rows() {
-                    let _ = t.insert_rows(t.rows(), n - t.rows());
+                    // Body rows, above the footer.
+                    let _ = t.insert_rows(t.body_end(), n - t.rows());
                 } else if n < t.rows() {
                     let _ = t.delete_rows(n, t.rows() - n);
                 }

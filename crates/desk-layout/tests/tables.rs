@@ -152,7 +152,7 @@ fn tab_23_merged_cells_down_are_lines_of_one_paragraph() {
     table.type_text(1, 0, "um", &pt);
     table.type_text(2, 0, "dois", &pt);
     table
-        .merge(desk_model::table::Area::between((1, 0), (2, 0)))
+        .merge(desk_model::table::Area::between((1, 0), (2, 0)), &pt)
         .unwrap();
     assert_eq!(table.source_text(1, 0, &pt), "um\u{2028}dois");
     let layout = lay_out(&table);

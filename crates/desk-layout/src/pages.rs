@@ -217,6 +217,8 @@ impl DocumentLayout {
 /// pages: the body is laid out once to know them and again with them
 /// (EST-27). Notes numbered again on each page need the same.
 pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout {
+    // Every layout of the document, with its tables, shares one budget.
+    let _work = desk_model::table::share_work();
     let settings = document.text_settings();
     let setup = *document.page_setup();
     let sum = settings.spacing == ParagraphSpacing::Sum;

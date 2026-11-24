@@ -557,6 +557,20 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
     }
 }
 
+/// The locale of the numbers of the system, as `pt_BR`, read from the
+/// locale variables as the C library does.
+pub(crate) fn system_locale_tag() -> String {
+    let locale = ["LC_ALL", "LC_NUMERIC", "LANG"]
+        .iter()
+        .find_map(|name| std::env::var(name).ok().filter(|v| !v.is_empty()))
+        .unwrap_or_default();
+    locale
+        .split(['.', '@'])
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
 /// The decimal separator of the system, which Pages lines decimal tab
 /// stops up on unless the document says otherwise: a comma in most
 /// languages of Europe and South America, and a point elsewhere. It is read
@@ -570,11 +584,8 @@ fn decimal_separator() -> char {
     ];
     // Countries where these languages write a point.
     const POINT: &[&str] = &["de_CH", "es_MX", "es_US", "it_CH"];
-    let locale = ["LC_ALL", "LC_NUMERIC", "LANG"]
-        .iter()
-        .find_map(|name| std::env::var(name).ok().filter(|v| !v.is_empty()))
-        .unwrap_or_default();
-    let tag = locale.split(['.', '@']).next().unwrap_or_default();
+    let locale = system_locale_tag();
+    let tag = locale.as_str();
     let language = tag.split(['_', '-']).next().unwrap_or_default();
     if COMMA.contains(&language) && !POINT.contains(&tag) {
         ','

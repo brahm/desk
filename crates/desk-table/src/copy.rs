@@ -11,7 +11,10 @@
 //! than the room left. A format of the suite that also keeps formulas and
 //! styles, and HTML for other programs, are left for phase X1.
 
-use crate::{Area, CellText, Locale, Table, Values};
+use crate::{Area, CellText, Locale, MAX_CELLS, Table, Values};
+
+/// The cells a table may grow to when text is pasted into it.
+const MAX_PASTED_CELLS: u64 = 1 << 20;
 
 impl<T: CellText> Table<T> {
     /// The cells of `area` as text: a line per row, the values of a row
@@ -38,22 +41,42 @@ impl<T: CellText> Table<T> {
     /// are taken as well.
     pub fn paste_text(&mut self, at: (u32, u32), text: &str, locale: &Locale) -> Area {
         let (r0, c0) = at;
-        let lines: Vec<&str> = text.trim_end_matches(['\n', '\r']).split('\n').collect();
-        let mut width = 1;
-        for (i, line) in lines.iter().enumerate() {
-            let r = r0 + i as u32;
-            if r >= self.rows() {
-                let _ = self.insert_rows(self.rows(), 1);
-            }
-            let values: Vec<&str> = line.trim_end_matches('\r').split('\t').collect();
-            width = width.max(values.len() as u32);
+        let lines: Vec<Vec<&str>> = text
+            .trim_end_matches(['\n', '\r'])
+            .split('\n')
+            .map(|line| line.trim_end_matches('\r').split('\t').collect())
+            .collect();
+        let width = lines.iter().map(Vec::len).max().unwrap_or(1).max(1) as u32;
+        // The rows and columns are added at once: one at a time, each moved
+        // the whole table, and a long text pasted took minutes. A table
+        // grows to a million cells at most, so that a short text of many
+        // lines and tabs cannot ask for billions.
+        let (rows, cols) = (self.rows(), self.cols());
+        let most = MAX_PASTED_CELLS.max(u64::from(rows) * u64::from(cols));
+        let reach = r0.saturating_add(lines.len() as u32);
+        let (row_at, add) = self.rows_to_reach(r0, reach);
+        let mut new_rows = rows + add;
+        let mut new_cols = c0.saturating_add(width).clamp(cols, MAX_CELLS);
+        if u64::from(new_rows) * u64::from(new_cols) > most {
+            let fit = |n: u32| u32::try_from(most / u64::from(n)).unwrap_or(MAX_CELLS);
+            new_cols = fit(new_rows).clamp(cols, new_cols);
+            new_rows = fit(new_cols).clamp(rows, new_rows);
+        }
+        if new_rows > rows {
+            let _ = self.insert_rows(row_at, new_rows - rows);
+        }
+        // Text pasted in the body of a table with a footer, past the rows
+        // it could add, leaves the footer as it is.
+        let last_row = self.last_row_for(r0);
+        if new_cols > cols {
+            let _ = self.insert_cols(cols, new_cols - cols);
+        }
+        for (i, values) in lines.iter().enumerate() {
+            let r = r0.saturating_add(i as u32);
             for (j, value) in values.iter().enumerate() {
-                let c = c0 + j as u32;
-                if c >= self.cols() {
-                    let _ = self.insert_cols(self.cols(), 1);
-                }
+                let c = c0.saturating_add(j as u32);
                 // A table at its largest leaves the rest out.
-                if r < self.rows() && c < self.cols() {
+                if r < last_row && c < self.cols() {
                     self.type_text(r, c, value, locale);
                 }
             }
@@ -61,8 +84,8 @@ impl<T: CellText> Table<T> {
         Area::between(
             (r0, c0),
             (
-                (r0 + lines.len() as u32 - 1).min(self.rows() - 1),
-                (c0 + width - 1).min(self.cols() - 1),
+                (r0.saturating_add(lines.len() as u32) - 1).min(last_row.max(r0 + 1) - 1),
+                (c0.saturating_add(width) - 1).min(self.cols() - 1),
             ),
         )
     }
@@ -100,6 +123,55 @@ mod tests {
         assert_eq!(t.cell(3, 1).content, Content::Number(Num(7.0)));
         // A short line leaves the cells after it as they were.
         assert_eq!(t.cell(3, 2).content, Content::Empty);
+    }
+
+    #[test]
+    fn a_short_text_of_many_lines_and_tabs_grows_the_table_to_a_million_cells() {
+        let pt = Locale::pt_br();
+        let mut t: Table<String> = Table::new(2, 2);
+        // 60,000 tabs on the first line and 60,000 lines.
+        let text = format!("{}{}", "x\t".repeat(60_000), "\ny".repeat(60_000));
+        let area = t.paste_text((0, 0), &text, &pt);
+        assert!(u64::from(t.rows()) * u64::from(t.cols()) <= MAX_PASTED_CELLS);
+        assert_eq!((t.rows(), t.cols()), (60_001, 17));
+        assert_eq!(area, Area::between((0, 0), (t.rows() - 1, t.cols() - 1)));
+        assert_eq!(t.cell(1, 0).content, Content::Text("y".into()));
+    }
+
+    #[test]
+    fn text_pasted_past_the_body_goes_before_the_footer() {
+        let pt = Locale::pt_br();
+        let mut t: Table<String> = Table::new(4, 2);
+        t.type_text(3, 1, "=SUM(B2:B3)", &pt);
+        t.set_footer_rows(1).unwrap();
+        let area = t.paste_text((2, 1), "1\n2\n3\n", &pt);
+        assert_eq!(area, Area::between((2, 1), (4, 1)));
+        assert_eq!(t.footer_rows(), 1);
+        assert_eq!(t.rows(), 6);
+        assert_eq!(t.cell(4, 1).content, Content::Number(Num(3.0)));
+        // The totals stay the footer, not written over.
+        assert_eq!(t.cell(5, 1).content, Content::Formula("=SUM(B2:B3)".into()));
+        // Lines that end within the table, past the body, still go before
+        // the footer: 9 lines in a table of 10 rows with 2 of footer
+        // (review of the pull request of RV batch 2).
+        let mut t: Table<String> = Table::new(10, 1);
+        t.type_text(8, 0, "Total", &pt);
+        t.type_text(9, 0, "Average", &pt);
+        t.set_footer_rows(2).unwrap();
+        let text: String = (1..=9).map(|n| format!("{n}\n")).collect();
+        t.paste_text((1, 0), &text, &pt);
+        assert_eq!((t.rows(), t.footer_rows()), (12, 2));
+        assert_eq!(t.cell(9, 0).content, Content::Number(Num(9.0)));
+        assert_eq!(t.cell(10, 0).content, Content::Text("Total".into()));
+        assert_eq!(t.cell(11, 0).content, Content::Text("Average".into()));
+        // The selection is what was written.
+        let mut u: Table<String> = Table::new(4, 1);
+        u.set_footer_rows(1).unwrap();
+        let area = u.paste_text((2, 0), "1", &pt);
+        assert_eq!(area, Area::cell(2, 0));
+        // Lines within the body add nothing.
+        t.paste_text((1, 0), "5\n6\n", &pt);
+        assert_eq!(t.rows(), 12);
     }
 
     #[test]

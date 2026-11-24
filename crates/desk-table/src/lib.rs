@@ -27,7 +27,7 @@ pub use cell::{
     Cell, CellFill, CellStyle, CellText, Color, Content, HAlign, Num, TextStyle, VAlign,
 };
 pub use conditional::{Condition, Operand, Rule, RuleStyle};
-pub use eval::{Values, header_range};
+pub use eval::{Values, WorkScope, header_range, share_work};
 pub use format::{
     CustomFormat, DateStyle, DurationStyle, Format, FractionPrecision, HUNDREDS, LANGUAGES, Locale,
     Negative, PERCENT, REGIONS, Shown, TimeStyle, is_date_pattern, parse_date, parse_input,

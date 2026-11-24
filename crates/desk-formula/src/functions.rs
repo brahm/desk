@@ -6,7 +6,7 @@
 
 use std::cmp::Ordering;
 
-use crate::eval::{Eval, compare};
+use crate::eval::{Eval, MAX_TEXT, compare};
 use crate::parse::Expr;
 use crate::value::{ErrorKind, Value, date_from_days, days_from_date};
 
@@ -85,7 +85,8 @@ fn numbers(e: &Eval<'_>, args: &[Expr]) -> Result<Vec<f64>> {
                 }
             }
         } else {
-            out.push(arg.values()[0].to_number()?);
+            let first = arg.values().into_iter().next();
+            out.push(first.ok_or(ErrorKind::Value)?.to_number()?);
         }
     }
     Ok(out)
@@ -111,15 +112,38 @@ fn numbers_a(e: &Eval<'_>, args: &[Expr]) -> Result<Vec<f64>> {
     Ok(out)
 }
 
+/// An argument; a missing one is an error of value, though the count of
+/// arguments was checked before.
+fn at(a: &[Expr], i: usize) -> Result<&Expr> {
+    a.get(i).ok_or(ErrorKind::Value)
+}
+
 fn int(e: &Eval<'_>, x: &Expr) -> Result<i64> {
     Ok(num(e, x)?.trunc() as i64)
 }
 
+/// A number cut to 15 significant digits, as many as spreadsheets keep:
+/// the decimal digits a binary number misses come back, as 2.675 is
+/// stored a little under it, and 0.1 + 0.2 a little over 0.3.
+fn significant(n: f64) -> f64 {
+    // A whole number has no error of binary fractions to take away, and
+    // 15 significant digits would cut 1234567890123456.
+    if !n.is_finite() || n.fract() == 0.0 {
+        return n;
+    }
+    format!("{n:.14e}").parse().unwrap_or(n)
+}
+
 fn round_to(n: f64, digits: i64, mode: fn(f64) -> f64) -> f64 {
     let factor = 10f64.powi(digits.clamp(-15, 15) as i32);
-    // Round the decimal digits a binary number misses, as 2.675.
-    let scaled = (n * factor * 1e9).round() / 1e9;
-    mode(scaled) / factor
+    let scaled = n * factor;
+    // A number so large has no such digits to round.
+    if !scaled.is_finite() {
+        return n;
+    }
+    // Relative to the number, not to its digits: rounding to a fixed
+    // number of decimals first pushed 1.9999999999 up to 2 before TRUNC.
+    mode(significant(scaled)) / factor
 }
 
 fn round_half_away(x: f64) -> f64 {
@@ -194,29 +218,90 @@ fn matches(value: &Value, criterion: &Value) -> bool {
 fn wildcard(pattern: &str, text: &str) -> bool {
     let p: Vec<char> = pattern.chars().collect();
     let t: Vec<char> = text.chars().collect();
-    let (mut pi, mut ti) = (0, 0);
-    let (mut star, mut mark) = (None, 0);
-    while ti < t.len() {
-        if pi < p.len() && (p[pi] == '?' || p[pi] == t[ti]) {
-            pi += 1;
-            ti += 1;
-        } else if pi < p.len() && p[pi] == '*' {
-            star = Some(pi);
-            mark = ti;
-            pi += 1;
-        } else if let Some(s) = star {
-            pi = s + 1;
-            mark += 1;
-            ti = mark;
-        } else {
-            return false;
-        }
-    }
-    while pi < p.len() && p[pi] == '*' {
-        pi += 1;
-    }
-    pi == p.len()
+    wildcard_chars(&p, &t)
 }
+
+/// Whether `part`, with `?` for any character, matches `text` at `at`.
+fn part_at(part: &[char], text: &[char], at: usize) -> bool {
+    text.get(at..at + part.len())
+        .is_some_and(|t| part.iter().zip(t).all(|(p, c)| *p == '?' || p == c))
+}
+
+/// Where `part` first matches `text` from `from`.
+fn find_part(part: &[char], text: &[char], from: usize) -> Option<usize> {
+    (from..=text.len().saturating_sub(part.len())).find(|&i| part_at(part, text, i))
+}
+
+/// Where the parts of a pattern between its `*` match, one after the
+/// other, in `text` from `from`, each at the first place it can: the end
+/// of the last, or None. Taking each part as early as it comes leaves the
+/// most text to those after it, so no other choice matches when this one
+/// does not, and the work is at most the pattern by the text.
+fn parts_in_order(parts: &[&[char]], text: &[char], from: usize) -> Option<usize> {
+    let mut at = from;
+    for part in parts {
+        at = find_part(part, text, at)? + part.len();
+    }
+    Some(at)
+}
+
+/// [`wildcard`] on characters, in time of the pattern by the text at most.
+fn wildcard_chars(p: &[char], t: &[char]) -> bool {
+    let parts: Vec<&[char]> = p.split(|c| *c == '*').collect();
+    let (Some(first), Some(last)) = (parts.first(), parts.last()) else {
+        return t.is_empty();
+    };
+    if parts.len() == 1 {
+        return first.len() == t.len() && part_at(first, t, 0);
+    }
+    // The first part starts the text and the last ends it, apart.
+    if first.len() + last.len() > t.len()
+        || !part_at(first, t, 0)
+        || !part_at(last, t, t.len() - last.len())
+    {
+        return false;
+    }
+    let middle = parts.get(1..parts.len() - 1).unwrap_or_default();
+    let inner = t.get(..t.len() - last.len()).unwrap_or_default();
+    parts_in_order(middle, inner, first.len()).is_some()
+}
+
+/// Takes from the work of the table what matching or comparing a pattern
+/// with texts costs at most. Each text is put in lower case and the
+/// pattern prepared for it: the pattern and the text, for each. When the
+/// pattern holds one of `wild`, matching tries it from many places: the
+/// pattern by each text.
+fn spend_matching(e: &Eval<'_>, pattern: &Value, texts: &[Value], wild: &[char]) -> Result<()> {
+    let Value::Text(p) = pattern else {
+        return Ok(());
+    };
+    let p = p.len() as u64 + 1;
+    let total: u64 = texts
+        .iter()
+        .map(|v| match v {
+            Value::Text(t) => t.len() as u64 + 1,
+            _ => 1,
+        })
+        .sum();
+    let work = if p > 1 && pattern_has(pattern, wild) {
+        p.saturating_mul(total)
+    } else {
+        p.saturating_mul(texts.len() as u64).saturating_add(total)
+    };
+    if e.context.spend(work) {
+        Ok(())
+    } else {
+        Err(ErrorKind::Value)
+    }
+}
+
+fn pattern_has(pattern: &Value, wild: &[char]) -> bool {
+    matches!(pattern, Value::Text(t) if t.contains(wild))
+}
+
+/// The characters with which matching a whole text tries a pattern from
+/// many places.
+const ANCHORED: &[char] = &['*'];
 
 fn date_parts(e: &Eval<'_>, x: &Expr) -> Result<(i32, u32, u32, f64)> {
     let n = num(e, x)?;
@@ -269,9 +354,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 3)?;
             Ok(Value::Date(days_from_date(
-                int(e, &a[0])? as i32,
-                int(e, &a[1])? as i32,
-                int(e, &a[2])? as i32,
+                int(e, at(a, 0)?)? as i32,
+                int(e, at(a, 1)?)? as i32,
+                int(e, at(a, 2)?)? as i32,
             ) as f64))
         }
     ),
@@ -282,7 +367,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "A time of day.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 3)?;
-            let s = num(e, &a[0])? * 3600.0 + num(e, &a[1])? * 60.0 + num(e, &a[2])?;
+            let s = num(e, at(a, 0)?)? * 3600.0 + num(e, at(a, 1)?)? * 60.0 + num(e, at(a, 2)?)?;
             Ok(Value::Date((s / 86_400.0).rem_euclid(1.0)))
         }
     ),
@@ -313,7 +398,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The year of a date.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(f64::from(date_parts(e, &a[0])?.0)))
+            Ok(Value::Number(f64::from(date_parts(e, at(a, 0)?)?.0)))
         }
     ),
     f!(
@@ -323,7 +408,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The month of a date, from 1 to 12.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(f64::from(date_parts(e, &a[0])?.1)))
+            Ok(Value::Number(f64::from(date_parts(e, at(a, 0)?)?.1)))
         }
     ),
     f!(
@@ -333,7 +418,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The day of the month of a date.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(f64::from(date_parts(e, &a[0])?.2)))
+            Ok(Value::Number(f64::from(date_parts(e, at(a, 0)?)?.2)))
         }
     ),
     f!(
@@ -344,7 +429,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
             Ok(Value::Number(
-                (date_parts(e, &a[0])?.3 * 24.0 + 1e-9).floor(),
+                (date_parts(e, at(a, 0)?)?.3 * 24.0 + 1e-9).floor(),
             ))
         }
     ),
@@ -356,7 +441,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
             Ok(Value::Number(
-                ((date_parts(e, &a[0])?.3 * 1440.0 + 1e-7).floor()) % 60.0,
+                ((date_parts(e, at(a, 0)?)?.3 * 1440.0 + 1e-7).floor()) % 60.0,
             ))
         }
     ),
@@ -368,7 +453,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
             Ok(Value::Number(
-                ((date_parts(e, &a[0])?.3 * 86_400.0).round()) % 60.0,
+                ((date_parts(e, at(a, 0)?)?.3 * 86_400.0).round()) % 60.0,
             ))
         }
     ),
@@ -379,9 +464,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The day of the week, from 1 for Sunday.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let d = num(e, &a[0])?.floor() as i64;
+            let d = num(e, at(a, 0)?)?.floor() as i64;
             let sunday_based = (d + 6).rem_euclid(7) + 1;
-            let kind = if a.len() > 1 { int(e, &a[1])? } else { 1 };
+            let kind = if a.len() > 1 { int(e, at(a, 1)?)? } else { 1 };
             Ok(Value::Number(match kind {
                 1 => sunday_based,
                 2 => (d + 5).rem_euclid(7) + 1,
@@ -397,8 +482,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The days between two dates in a year of 360 days.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            let (y1, m1, mut d1, _) = date_parts(e, &a[0])?;
-            let (y2, m2, mut d2, _) = date_parts(e, &a[1])?;
+            let (y1, m1, mut d1, _) = date_parts(e, at(a, 0)?)?;
+            let (y2, m2, mut d2, _) = date_parts(e, at(a, 1)?)?;
             d1 = d1.min(30);
             if d2 == 31 && d1 == 30 {
                 d2 = 30;
@@ -415,8 +500,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The years, months or days between two dates.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 3)?;
-            let s = num(e, &a[0])?.floor();
-            let t = num(e, &a[1])?.floor();
+            let s = num(e, at(a, 0)?)?.floor();
+            let t = num(e, at(a, 1)?)?.floor();
             if t < s {
                 return Err(ErrorKind::Number);
             }
@@ -424,7 +509,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let (y2, m2, d2) = date_from_days(t as i64);
             let months = (y2 - y1) * 12 + m2 as i32 - m1 as i32 - i32::from(d2 < d1);
             Ok(Value::Number(
-                match text(e, &a[2])?.to_uppercase().as_str() {
+                match text(e, at(a, 2)?)?.to_uppercase().as_str() {
                     "D" => t - s,
                     "M" => f64::from(months),
                     "Y" => f64::from(months / 12),
@@ -446,8 +531,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The date some months before or after.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let (y, m, d, _) = date_parts(e, &a[0])?;
-            let months = int(e, &a[1])?;
+            let (y, m, d, _) = date_parts(e, at(a, 0)?)?;
+            let months = int(e, at(a, 1)?)?;
             let target_first = days_from_date(y, m as i32 + months as i32, 1);
             let (ty, tm, _) = date_from_days(target_first);
             let last = date_from_days(days_from_date(ty, tm as i32 + 1, 1) - 1).2;
@@ -464,11 +549,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The payment of a loan for each period.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 5)?;
-            let rate = num(e, &a[0])?;
-            let n = num(e, &a[1])?;
-            let pv = num(e, &a[2])?;
-            let fv = if a.len() > 3 { num(e, &a[3])? } else { 0.0 };
-            let when = if a.len() > 4 { num(e, &a[4])? } else { 0.0 };
+            let rate = num(e, at(a, 0)?)?;
+            let n = num(e, at(a, 1)?)?;
+            let pv = num(e, at(a, 2)?)?;
+            let fv = if a.len() > 3 { num(e, at(a, 3)?)? } else { 0.0 };
+            let when = if a.len() > 4 { num(e, at(a, 4)?)? } else { 0.0 };
             if n == 0.0 {
                 return Err(ErrorKind::Number);
             }
@@ -488,11 +573,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The future value of an investment.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 5)?;
-            let rate = num(e, &a[0])?;
-            let n = num(e, &a[1])?;
-            let pmt = num(e, &a[2])?;
-            let pv = if a.len() > 3 { num(e, &a[3])? } else { 0.0 };
-            let when = if a.len() > 4 { num(e, &a[4])? } else { 0.0 };
+            let rate = num(e, at(a, 0)?)?;
+            let n = num(e, at(a, 1)?)?;
+            let pmt = num(e, at(a, 2)?)?;
+            let pv = if a.len() > 3 { num(e, at(a, 3)?)? } else { 0.0 };
+            let when = if a.len() > 4 { num(e, at(a, 4)?)? } else { 0.0 };
             if rate == 0.0 {
                 return Ok(Value::Number(-(pv + pmt * n)));
             }
@@ -509,11 +594,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The present value of an investment.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 5)?;
-            let rate = num(e, &a[0])?;
-            let n = num(e, &a[1])?;
-            let pmt = num(e, &a[2])?;
-            let fv = if a.len() > 3 { num(e, &a[3])? } else { 0.0 };
-            let when = if a.len() > 4 { num(e, &a[4])? } else { 0.0 };
+            let rate = num(e, at(a, 0)?)?;
+            let n = num(e, at(a, 1)?)?;
+            let pmt = num(e, at(a, 2)?)?;
+            let fv = if a.len() > 3 { num(e, at(a, 3)?)? } else { 0.0 };
+            let when = if a.len() > 4 { num(e, at(a, 4)?)? } else { 0.0 };
             if rate == 0.0 {
                 return Ok(Value::Number(-(fv + pmt * n)));
             }
@@ -532,8 +617,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             if a.len() < 2 {
                 return Err(ErrorKind::Value);
             }
-            let rate = num(e, &a[0])?;
-            let flows = numbers(e, &a[1..])?;
+            let rate = num(e, at(a, 0)?)?;
+            let flows = numbers(e, a.get(1..).unwrap_or_default())?;
             Ok(Value::Number(
                 flows
                     .iter()
@@ -551,10 +636,10 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "One value or another, as a condition is true.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            if boolean(e, &a[0])? {
-                Ok(e.scalar(&a[1]))
+            if boolean(e, at(a, 0)?)? {
+                Ok(e.scalar(at(a, 1)?))
             } else if a.len() > 2 {
-                Ok(e.scalar(&a[2]))
+                Ok(e.scalar(at(a, 2)?))
             } else {
                 Ok(Value::Bool(false))
             }
@@ -567,8 +652,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "A value, or another when it is an error.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            match e.scalar(&a[0]) {
-                Value::Error(_) => Ok(e.scalar(&a[1])),
+            match e.scalar(at(a, 0)?) {
+                Value::Error(_) => Ok(e.scalar(at(a, 1)?)),
                 v => Ok(v),
             }
         }
@@ -614,7 +699,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The opposite of a condition.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(!boolean(e, &a[0])?))
+            Ok(Value::Bool(!boolean(e, at(a, 0)?)?))
         }
     ),
     f!(
@@ -644,7 +729,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether a cell is empty.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(matches!(e.scalar(&a[0]), Value::Empty)))
+            Ok(Value::Bool(matches!(e.scalar(at(a, 0)?), Value::Empty)))
         }
     ),
     f!(
@@ -654,7 +739,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether a value is an error.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(matches!(e.scalar(&a[0]), Value::Error(_))))
+            Ok(Value::Bool(matches!(e.scalar(at(a, 0)?), Value::Error(_))))
         }
     ),
     f!(
@@ -664,7 +749,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether a value is a number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(e.scalar(&a[0]).is_numeric()))
+            Ok(Value::Bool(e.scalar(at(a, 0)?).is_numeric()))
         }
     ),
     f!(
@@ -674,7 +759,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether a value is text.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(matches!(e.scalar(&a[0]), Value::Text(_))))
+            Ok(Value::Bool(matches!(e.scalar(at(a, 0)?), Value::Text(_))))
         }
     ),
     f!(
@@ -684,7 +769,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether a number is even.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(int(e, &a[0])? % 2 == 0))
+            Ok(Value::Bool(int(e, at(a, 0)?)? % 2 == 0))
         }
     ),
     f!(
@@ -694,7 +779,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether a number is odd.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Bool(int(e, &a[0])? % 2 != 0))
+            Ok(Value::Bool(int(e, at(a, 0)?)? % 2 != 0))
         }
     ),
     // Numeric.
@@ -705,7 +790,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number without its sign.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.abs()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.abs()))
         }
     ),
     f!(
@@ -715,8 +800,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded up to a multiple.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let n = num(e, &a[0])?;
-            let m = if a.len() > 1 { num(e, &a[1])? } else { 1.0 };
+            let n = num(e, at(a, 0)?)?;
+            let m = if a.len() > 1 { num(e, at(a, 1)?)? } else { 1.0 };
             if m == 0.0 {
                 return Ok(Value::Number(0.0));
             }
@@ -730,8 +815,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded down to a multiple.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let n = num(e, &a[0])?;
-            let m = if a.len() > 1 { num(e, &a[1])? } else { 1.0 };
+            let n = num(e, at(a, 0)?)?;
+            let m = if a.len() > 1 { num(e, at(a, 1)?)? } else { 1.0 };
             if m == 0.0 {
                 return Err(ErrorKind::DivisionByZero);
             }
@@ -745,7 +830,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded away from 0 to an even number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = num(e, &a[0])?;
+            let n = num(e, at(a, 0)?)?;
             let r = (n.abs() / 2.0).ceil() * 2.0;
             Ok(Value::Number(r.copysign(n)))
         }
@@ -757,7 +842,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded away from 0 to an odd number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = num(e, &a[0])?;
+            let n = num(e, at(a, 0)?)?;
             let r = ((n.abs() - 1.0) / 2.0).ceil().max(0.0) * 2.0 + 1.0;
             Ok(Value::Number(r.copysign(n)))
         }
@@ -769,7 +854,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "e raised to a number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.exp()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.exp()))
         }
     ),
     f!(
@@ -779,7 +864,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The factorial of a number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = int(e, &a[0])?;
+            let n = int(e, at(a, 0)?)?;
             if !(0..=170).contains(&n) {
                 return Err(ErrorKind::Number);
             }
@@ -793,7 +878,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded down to a whole number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.floor()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.floor()))
         }
     ),
     f!(
@@ -803,7 +888,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The natural logarithm.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = num(e, &a[0])?;
+            let n = num(e, at(a, 0)?)?;
             if n <= 0.0 {
                 return Err(ErrorKind::Number);
             }
@@ -817,8 +902,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The logarithm in a base, 10 when none is given.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let n = num(e, &a[0])?;
-            let b = if a.len() > 1 { num(e, &a[1])? } else { 10.0 };
+            let n = num(e, at(a, 0)?)?;
+            let b = if a.len() > 1 {
+                num(e, at(a, 1)?)?
+            } else {
+                10.0
+            };
             if n <= 0.0 || b <= 0.0 || b == 1.0 {
                 return Err(ErrorKind::Number);
             }
@@ -832,7 +921,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The logarithm in base 10.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = num(e, &a[0])?;
+            let n = num(e, at(a, 0)?)?;
             if n <= 0.0 {
                 return Err(ErrorKind::Number);
             }
@@ -846,8 +935,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The remainder of a division, with the sign of the divisor.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let n = num(e, &a[0])?;
-            let d = num(e, &a[1])?;
+            let n = num(e, at(a, 0)?)?;
+            let d = num(e, at(a, 1)?)?;
             if d == 0.0 {
                 return Err(ErrorKind::DivisionByZero);
             }
@@ -871,7 +960,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "A number raised to a power.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            Ok(Value::Number(num(e, &a[0])?.powf(num(e, &a[1])?)))
+            Ok(Value::Number(num(e, at(a, 0)?)?.powf(num(e, at(a, 1)?)?)))
         }
     ),
     f!(
@@ -888,11 +977,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The whole part of a division.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let d = num(e, &a[1])?;
+            let d = num(e, at(a, 1)?)?;
             if d == 0.0 {
                 return Err(ErrorKind::DivisionByZero);
             }
-            Ok(Value::Number((num(e, &a[0])? / d).trunc()))
+            Ok(Value::Number((num(e, at(a, 0)?)? / d).trunc()))
         }
     ),
     f!(
@@ -902,8 +991,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded to some decimal places.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let d = if a.len() > 1 { int(e, &a[1])? } else { 0 };
-            Ok(Value::Number(round_to(num(e, &a[0])?, d, round_half_away)))
+            let d = if a.len() > 1 { int(e, at(a, 1)?)? } else { 0 };
+            Ok(Value::Number(round_to(
+                num(e, at(a, 0)?)?,
+                d,
+                round_half_away,
+            )))
         }
     ),
     f!(
@@ -913,8 +1006,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded toward 0.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let d = if a.len() > 1 { int(e, &a[1])? } else { 0 };
-            Ok(Value::Number(round_to(num(e, &a[0])?, d, f64::trunc)))
+            let d = if a.len() > 1 { int(e, at(a, 1)?)? } else { 0 };
+            Ok(Value::Number(round_to(num(e, at(a, 0)?)?, d, f64::trunc)))
         }
     ),
     f!(
@@ -924,8 +1017,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number rounded away from 0.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let d = if a.len() > 1 { int(e, &a[1])? } else { 0 };
-            Ok(Value::Number(round_to(num(e, &a[0])?, d, |x| {
+            let d = if a.len() > 1 { int(e, at(a, 1)?)? } else { 0 };
+            Ok(Value::Number(round_to(num(e, at(a, 0)?)?, d, |x| {
                 x.abs().ceil().copysign(x)
             })))
         }
@@ -937,7 +1030,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "1, 0 or -1, by the sign of the number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = num(e, &a[0])?;
+            let n = num(e, at(a, 0)?)?;
             Ok(Value::Number(if n > 0.0 {
                 1.0
             } else if n < 0.0 {
@@ -954,7 +1047,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The square root.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let n = num(e, &a[0])?;
+            let n = num(e, at(a, 0)?)?;
             if n < 0.0 {
                 return Err(ErrorKind::Number);
             }
@@ -969,7 +1062,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             let v = numbers(e, a)?;
             let s: f64 = v.iter().sum();
-            Ok(Value::Number(round_to(s, 12, round_half_away)))
+            Ok(Value::Number(significant(s)))
         }
     ),
     f!(
@@ -979,13 +1072,14 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The sum of the cells that meet a condition.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            let test = e.arg(&a[0]).values();
-            let crit = e.scalar(&a[1]);
+            let test = e.arg(at(a, 0)?).values();
+            let crit = e.scalar(at(a, 1)?);
             let sum = if a.len() > 2 {
-                e.arg(&a[2]).values()
+                e.arg(at(a, 2)?).values()
             } else {
                 test.clone()
             };
+            spend_matching(e, &crit, &test, ANCHORED)?;
             let mut s = 0.0;
             for (i, v) in test.iter().enumerate() {
                 if matches(v, &crit)
@@ -1007,7 +1101,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Value);
             }
             let ranges: Vec<Vec<Value>> = a.iter().map(|x| e.arg(x).values()).collect();
-            let n = ranges[0].len();
+            let n = ranges.first().map_or(0, Vec::len);
             if ranges.iter().any(|r| r.len() != n) {
                 return Err(ErrorKind::Value);
             }
@@ -1015,7 +1109,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             for i in 0..n {
                 let mut p = 1.0;
                 for r in &ranges {
-                    p *= match &r[i] {
+                    p *= match r.get(i).ok_or(ErrorKind::Value)? {
                         Value::Number(x) | Value::Date(x) | Value::Duration(x) => *x,
                         Value::Error(err) => return Err(*err),
                         _ => 0.0,
@@ -1042,8 +1136,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number cut to some decimal places.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let d = if a.len() > 1 { int(e, &a[1])? } else { 0 };
-            Ok(Value::Number(round_to(num(e, &a[0])?, d, f64::trunc)))
+            let d = if a.len() > 1 { int(e, at(a, 1)?)? } else { 0 };
+            Ok(Value::Number(round_to(num(e, at(a, 0)?)?, d, f64::trunc)))
         }
     ),
     // Statistical.
@@ -1068,13 +1162,14 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The mean of the cells that meet a condition.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            let test = e.arg(&a[0]).values();
-            let crit = e.scalar(&a[1]);
+            let test = e.arg(at(a, 0)?).values();
+            let crit = e.scalar(at(a, 1)?);
             let vals = if a.len() > 2 {
-                e.arg(&a[2]).values()
+                e.arg(at(a, 2)?).values()
             } else {
                 test.clone()
             };
+            spend_matching(e, &crit, &test, ANCHORED)?;
             let picked: Vec<f64> = test
                 .iter()
                 .enumerate()
@@ -1133,13 +1228,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "How many cells meet a condition.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let crit = e.scalar(&a[1]);
+            let crit = e.scalar(at(a, 1)?);
+            let test = e.arg(at(a, 0)?).values();
+            spend_matching(e, &crit, &test, ANCHORED)?;
             Ok(Value::Number(
-                e.arg(&a[0])
-                    .values()
-                    .iter()
-                    .filter(|v| matches(v, &crit))
-                    .count() as f64,
+                test.iter().filter(|v| matches(v, &crit)).count() as f64,
             ))
         }
     ),
@@ -1150,8 +1243,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The nth largest number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let mut v = numbers(e, &a[..1])?;
-            let k = int(e, &a[1])?;
+            let mut v = numbers(e, a.get(..1).ok_or(ErrorKind::Value)?)?;
+            let k = int(e, at(a, 1)?)?;
             v.sort_by(|x, y| y.partial_cmp(x).unwrap_or(Ordering::Equal));
             usize::try_from(k - 1)
                 .ok()
@@ -1167,8 +1260,8 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The nth smallest number.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let mut v = numbers(e, &a[..1])?;
-            let k = int(e, &a[1])?;
+            let mut v = numbers(e, a.get(..1).ok_or(ErrorKind::Value)?)?;
+            let k = int(e, at(a, 1)?)?;
             v.sort_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal));
             usize::try_from(k - 1)
                 .ok()
@@ -1244,11 +1337,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Number);
             }
             v.sort_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal));
-            let n = v.len();
-            Ok(Value::Number(if n % 2 == 1 {
-                v[n / 2]
-            } else {
-                (v[n / 2 - 1] + v[n / 2]) / 2.0
+            let (low, high) = v.split_at(v.len() / 2);
+            let middle = high.first().copied().ok_or(ErrorKind::Number)?;
+            Ok(Value::Number(match low.last() {
+                Some(below) if v.len() % 2 == 0 => (below + middle) / 2.0,
+                _ => middle,
             }))
         }
     ),
@@ -1277,9 +1370,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The position of a number in a list.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            let n = num(e, &a[0])?;
-            let v = numbers(e, &a[1..2])?;
-            let ascending = a.len() > 2 && boolean(e, &a[2])?;
+            let n = num(e, at(a, 0)?)?;
+            let v = numbers(e, a.get(1..2).ok_or(ErrorKind::Value)?)?;
+            let ascending = a.len() > 2 && boolean(e, at(a, 2)?)?;
             if !v.contains(&n) {
                 return Err(ErrorKind::NotAvailable);
             }
@@ -1328,11 +1421,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             if a.len() < 2 {
                 return Err(ErrorKind::Value);
             }
-            let i = int(e, &a[0])?;
+            let i = int(e, at(a, 0)?)?;
             usize::try_from(i)
                 .ok()
-                .filter(|i| *i >= 1 && *i < a.len())
-                .map(|i| e.scalar(&a[i]))
+                .filter(|i| *i >= 1)
+                .and_then(|i| a.get(i))
+                .map(|x| e.scalar(x))
                 .ok_or(ErrorKind::Value)
         }
     ),
@@ -1343,10 +1437,10 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The value at a row and a column of a range.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            let r = e.arg(&a[0]);
+            let r = e.arg(at(a, 0)?);
             let (rows, cols) = r.shape();
-            let mut row = int(e, &a[1])?;
-            let mut col = if a.len() > 2 { int(e, &a[2])? } else { 1 };
+            let mut row = int(e, at(a, 1)?)?;
+            let mut col = if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 };
             if rows == 1 && a.len() == 2 {
                 col = row;
                 row = 1;
@@ -1364,9 +1458,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The position of a value in a range.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
-            let needle = e.scalar(&a[0]);
-            let hay = e.arg(&a[1]).values();
-            let kind = if a.len() > 2 { int(e, &a[2])? } else { 1 };
+            let needle = e.scalar(at(a, 0)?);
+            let hay = e.arg(at(a, 1)?).values();
+            let kind = if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 };
+            // Approximate, the needle is compared with each value.
+            let wild = if kind == 0 { ANCHORED } else { &[] };
+            spend_matching(e, &needle, &hay, wild)?;
             let pos = match kind {
                 0 => lookup_position(&needle, &hay, true),
                 -1 => hay
@@ -1388,15 +1485,16 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "A value from a column, in the row where the first column has a value.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 4)?;
-            let needle = e.scalar(&a[0]);
-            let r = e.arg(&a[1]);
-            let col = int(e, &a[2])?;
-            let approx = a.len() < 4 || boolean(e, &a[3])?;
+            let needle = e.scalar(at(a, 0)?);
+            let r = e.arg(at(a, 1)?);
+            let col = int(e, at(a, 2)?)?;
+            let approx = a.len() < 4 || boolean(e, at(a, 3)?)?;
             let (rows, cols) = r.shape();
             if col < 1 || col as usize > cols {
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..rows).map(|i| r.at(i, 0)).collect();
+            spend_matching(e, &needle, &first, if approx { &[] } else { ANCHORED })?;
             let row = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row, col as usize - 1))
         }
@@ -1408,15 +1506,16 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "A value from a row, in the column where the first row has a value.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 4)?;
-            let needle = e.scalar(&a[0]);
-            let r = e.arg(&a[1]);
-            let row = int(e, &a[2])?;
-            let approx = a.len() < 4 || boolean(e, &a[3])?;
+            let needle = e.scalar(at(a, 0)?);
+            let r = e.arg(at(a, 1)?);
+            let row = int(e, at(a, 2)?)?;
+            let approx = a.len() < 4 || boolean(e, at(a, 3)?)?;
             let (rows, cols) = r.shape();
             if row < 1 || row as usize > rows {
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..cols).map(|i| r.at(0, i)).collect();
+            spend_matching(e, &needle, &first, if approx { &[] } else { ANCHORED })?;
             let col = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row as usize - 1, col))
         }
@@ -1428,7 +1527,17 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "How many rows a range has.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(e.arg(&a[0]).shape().0 as f64))
+            // The size of a range is in its reference: its cells are
+            // not read.
+            let (rows, _) = match at(a, 0)? {
+                Expr::Cell(_) => (1, 1),
+                Expr::Range(p, q) => (
+                    p.row.abs_diff(q.row) as usize + 1,
+                    p.col.abs_diff(q.col) as usize + 1,
+                ),
+                other => e.arg(other).shape(),
+            };
+            Ok(Value::Number(rows as f64))
         }
     ),
     f!(
@@ -1438,7 +1547,17 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "How many columns a range has.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(e.arg(&a[0]).shape().1 as f64))
+            // The size of a range is in its reference: its cells are
+            // not read.
+            let (_, cols) = match at(a, 0)? {
+                Expr::Cell(_) => (1, 1),
+                Expr::Range(p, q) => (
+                    p.row.abs_diff(q.row) as usize + 1,
+                    p.col.abs_diff(q.col) as usize + 1,
+                ),
+                other => e.arg(other).shape(),
+            };
+            Ok(Value::Number(cols as f64))
         }
     ),
     f!(
@@ -1448,7 +1567,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number of the row of a cell.",
         |_e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            match &a[0] {
+            match at(a, 0)? {
                 Expr::Cell(c) | Expr::Range(c, _) => Ok(Value::Number(f64::from(c.row + 1))),
                 _ => Err(ErrorKind::Value),
             }
@@ -1461,7 +1580,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number of the column of a cell.",
         |_e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            match &a[0] {
+            match at(a, 0)? {
                 Expr::Cell(c) | Expr::Range(c, _) => Ok(Value::Number(f64::from(c.col + 1))),
                 _ => Err(ErrorKind::Value),
             }
@@ -1475,7 +1594,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The character of a code.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let c = u32::try_from(int(e, &a[0])?)
+            let c = u32::try_from(int(e, at(a, 0)?)?)
                 .ok()
                 .and_then(char::from_u32)
                 .ok_or(ErrorKind::Value)?;
@@ -1489,7 +1608,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The code of the first character.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            let c = text(e, &a[0])?.chars().next().ok_or(ErrorKind::Value)?;
+            let c = text(e, at(a, 0)?)?.chars().next().ok_or(ErrorKind::Value)?;
             Ok(Value::Number(f64::from(u32::from(c))))
         }
     ),
@@ -1501,7 +1620,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
             Ok(Value::Text(
-                text(e, &a[0])?
+                text(e, at(a, 0)?)?
                     .chars()
                     .filter(|c| !c.is_control())
                     .collect(),
@@ -1517,6 +1636,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let mut s = String::new();
             for x in a {
                 s += &text(e, x)?;
+                if s.len() > MAX_TEXT {
+                    return Err(ErrorKind::Value);
+                }
             }
             Ok(Value::Text(s))
         }
@@ -1528,7 +1650,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Whether two texts are the same, in the same case.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            Ok(Value::Bool(text(e, &a[0])? == text(e, &a[1])?))
+            Ok(Value::Bool(text(e, at(a, 0)?)? == text(e, at(a, 1)?)?))
         }
     ),
     f!(
@@ -1538,10 +1660,17 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Where a text starts in another, in the same case.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
+            let (needle, hay) = (text(e, at(a, 0)?)?, text(e, at(a, 1)?)?);
+            spend_matching(
+                e,
+                &Value::Text(needle.clone()),
+                &[Value::Text(hay.clone())],
+                &[],
+            )?;
             find(
-                &text(e, &a[0])?,
-                &text(e, &a[1])?,
-                if a.len() > 2 { int(e, &a[2])? } else { 1 },
+                &needle,
+                &hay,
+                if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 },
                 false,
             )
         }
@@ -1553,10 +1682,17 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Where a text starts in another, in any case.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
+            let (needle, hay) = (text(e, at(a, 0)?)?, text(e, at(a, 1)?)?);
+            spend_matching(
+                e,
+                &Value::Text(needle.clone()),
+                &[Value::Text(hay.clone())],
+                &['*', '?'],
+            )?;
             find(
-                &text(e, &a[0])?,
-                &text(e, &a[1])?,
-                if a.len() > 2 { int(e, &a[2])? } else { 1 },
+                &needle,
+                &hay,
+                if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 },
                 true,
             )
         }
@@ -1569,12 +1705,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 3)?;
             let d = if a.len() > 1 {
-                int(e, &a[1])?.clamp(0, 15) as usize
+                int(e, at(a, 1)?)?.clamp(0, 15) as usize
             } else {
                 2
             };
-            let plain = a.len() > 2 && boolean(e, &a[2])?;
-            let s = format!("{:.*}", d, num(e, &a[0])?);
+            let plain = a.len() > 2 && boolean(e, at(a, 2)?)?;
+            let s = format!("{:.*}", d, num(e, at(a, 0)?)?);
             Ok(Value::Text(if plain { s } else { group_thousands(&s) }))
         }
     ),
@@ -1585,9 +1721,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The first characters of a text.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let n = if a.len() > 1 { int(e, &a[1])? } else { 1 };
+            let n = if a.len() > 1 { int(e, at(a, 1)?)? } else { 1 };
             let n = usize::try_from(n).map_err(|_| ErrorKind::Value)?;
-            Ok(Value::Text(text(e, &a[0])?.chars().take(n).collect()))
+            Ok(Value::Text(text(e, at(a, 0)?)?.chars().take(n).collect()))
         }
     ),
     f!(
@@ -1597,10 +1733,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The last characters of a text.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 2)?;
-            let n = if a.len() > 1 { int(e, &a[1])? } else { 1 };
+            let n = if a.len() > 1 { int(e, at(a, 1)?)? } else { 1 };
             let n = usize::try_from(n).map_err(|_| ErrorKind::Value)?;
-            let t: Vec<char> = text(e, &a[0])?.chars().collect();
-            Ok(Value::Text(t[t.len().saturating_sub(n)..].iter().collect()))
+            let t: Vec<char> = text(e, at(a, 0)?)?.chars().collect();
+            let from = t.len().saturating_sub(n);
+            Ok(Value::Text(t.iter().skip(from).collect()))
         }
     ),
     f!(
@@ -1610,10 +1747,10 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Some characters from the middle of a text.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 3)?;
-            let start = usize::try_from(int(e, &a[1])? - 1).map_err(|_| ErrorKind::Value)?;
-            let n = usize::try_from(int(e, &a[2])?).map_err(|_| ErrorKind::Value)?;
+            let start = usize::try_from(int(e, at(a, 1)?)? - 1).map_err(|_| ErrorKind::Value)?;
+            let n = usize::try_from(int(e, at(a, 2)?)?).map_err(|_| ErrorKind::Value)?;
             Ok(Value::Text(
-                text(e, &a[0])?.chars().skip(start).take(n).collect(),
+                text(e, at(a, 0)?)?.chars().skip(start).take(n).collect(),
             ))
         }
     ),
@@ -1624,7 +1761,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "How many characters a text has.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(text(e, &a[0])?.chars().count() as f64))
+            Ok(Value::Number(text(e, at(a, 0)?)?.chars().count() as f64))
         }
     ),
     f!(
@@ -1634,7 +1771,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The text in lower case.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Text(text(e, &a[0])?.to_lowercase()))
+            Ok(Value::Text(text(e, at(a, 0)?)?.to_lowercase()))
         }
     ),
     f!(
@@ -1644,7 +1781,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The text in capitals.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Text(text(e, &a[0])?.to_uppercase()))
+            Ok(Value::Text(text(e, at(a, 0)?)?.to_uppercase()))
         }
     ),
     f!(
@@ -1656,7 +1793,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             count(a, 1, 1)?;
             let mut out = String::new();
             let mut start = true;
-            for c in text(e, &a[0])?.chars() {
+            for c in text(e, at(a, 0)?)?.chars() {
                 if c.is_alphabetic() {
                     if start {
                         out.extend(c.to_uppercase());
@@ -1679,9 +1816,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The text repeated.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
-            let n = usize::try_from(int(e, &a[1])?).map_err(|_| ErrorKind::Value)?;
-            let t = text(e, &a[0])?;
-            if t.len().saturating_mul(n) > 32_767 {
+            let n = usize::try_from(int(e, at(a, 1)?)?).map_err(|_| ErrorKind::Value)?;
+            let t = text(e, at(a, 0)?)?;
+            if t.len().saturating_mul(n) > MAX_TEXT {
                 return Err(ErrorKind::Value);
             }
             Ok(Value::Text(t.repeat(n)))
@@ -1694,14 +1831,27 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The text with a part replaced.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 3, 4)?;
-            let t = text(e, &a[0])?;
-            let old = text(e, &a[1])?;
-            let new = text(e, &a[2])?;
+            let t = text(e, at(a, 0)?)?;
+            let old = text(e, at(a, 1)?)?;
+            let new = text(e, at(a, 2)?)?;
             if old.is_empty() {
                 return Ok(Value::Text(t));
             }
+            // A long text with a long replacement for each character
+            // would be gigabytes: its length is known first.
+            if new.len() > old.len() {
+                let times = if a.len() > 3 {
+                    1
+                } else {
+                    t.matches(&old).count()
+                };
+                let len = t.len() + times.saturating_mul(new.len() - old.len());
+                if len > MAX_TEXT {
+                    return Err(ErrorKind::Value);
+                }
+            }
             if a.len() > 3 {
-                let k = usize::try_from(int(e, &a[3])?).map_err(|_| ErrorKind::Value)?;
+                let k = usize::try_from(int(e, at(a, 3)?)?).map_err(|_| ErrorKind::Value)?;
                 if let Some((i, _)) = t.match_indices(&old).nth(k.saturating_sub(1)) {
                     return Ok(Value::Text(format!(
                         "{}{}{}",
@@ -1723,7 +1873,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
             Ok(Value::Text(
-                text(e, &a[0])?
+                text(e, at(a, 0)?)?
                     .split_whitespace()
                     .collect::<Vec<_>>()
                     .join(" "),
@@ -1737,7 +1887,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The number that a text writes.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(Value::Text(text(e, &a[0])?).to_number()?))
+            Ok(Value::Number(Value::Text(text(e, at(a, 0)?)?).to_number()?))
         }
     ),
     // Trigonometric.
@@ -1748,7 +1898,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The sine of an angle in radians.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.sin()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.sin()))
         }
     ),
     f!(
@@ -1758,7 +1908,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The cosine of an angle in radians.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.cos()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.cos()))
         }
     ),
     f!(
@@ -1768,7 +1918,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The tangent of an angle in radians.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.tan()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.tan()))
         }
     ),
     f!(
@@ -1778,7 +1928,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "The angle of a tangent, in radians.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.atan()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.atan()))
         }
     ),
     f!(
@@ -1788,7 +1938,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "An angle in degrees.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.to_degrees()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.to_degrees()))
         }
     ),
     f!(
@@ -1798,7 +1948,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "An angle in radians.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(num(e, &a[0])?.to_radians()))
+            Ok(Value::Number(num(e, at(a, 0)?)?.to_radians()))
         }
     ),
 ];
@@ -1817,11 +1967,15 @@ fn find(needle: &str, hay: &str, start: i64, any_case: bool) -> Result<Value> {
         None => return Err(ErrorKind::Value),
     };
     let found = if any_case && (needle.contains('*') || needle.contains('?')) {
-        (start..chars.len()).find(|&i| {
-            let rest: String = chars[i..].iter().map(|c| c.1).collect();
-            (1..=rest.chars().count())
-                .any(|n| wildcard(&needle, &rest.chars().take(n).collect::<String>()))
-        })
+        // The text matches from where the first part of the pattern first
+        // does, if the other parts follow it; from no later place
+        // otherwise, which leaves them less text.
+        let pattern: Vec<char> = needle.chars().collect();
+        let text: Vec<char> = chars.iter().map(|c| c.1).collect();
+        let parts: Vec<&[char]> = pattern.split(|c| *c == '*').collect();
+        let (first, rest) = parts.split_first().ok_or(ErrorKind::Value)?;
+        find_part(first, &text, start)
+            .filter(|&i| i < text.len() && parts_in_order(rest, &text, i + first.len()).is_some())
     } else {
         hay[byte_start..]
             .find(&needle)
@@ -1929,6 +2083,65 @@ mod tests {
     }
 
     #[test]
+    fn search_with_wildcards_finds_the_first_match_quickly() {
+        let s = sheet();
+        assert_eq!(run(&s, "=SEARCH(\"b?d\",\"abcdbxd\")"), Value::Number(2.0));
+        assert_eq!(run(&s, "=SEARCH(\"c*x\",\"abcdbxd\")"), Value::Number(3.0));
+        assert_eq!(run(&s, "=SEARCH(\"*\",\"abc\",2)"), Value::Number(2.0));
+        assert_eq!(
+            run(&s, "=SEARCH(\"z*\",\"abc\")"),
+            Value::Error(ErrorKind::Value)
+        );
+        // Text of a few thousand characters took minutes when every start
+        // tried every length.
+        let long = "a".repeat(4000);
+        let formula = format!("=SEARCH(\"*b\",\"{long}\")");
+        assert_eq!(run(&s, &formula), Value::Error(ErrorKind::Value));
+    }
+
+    #[test]
+    fn patterns_match_by_their_parts() {
+        for (pattern, text, hit) in [
+            ("a*b", "ab", true),
+            ("a*b", "axxb", true),
+            ("a*b", "axxbc", false),
+            ("a?c", "abc", true),
+            ("*", "", true),
+            ("", "", true),
+            ("", "a", false),
+            ("a*a", "a", false),
+            ("*ab*ab*", "xabyab", true),
+            ("*ab*ab*", "xaby", false),
+            ("??", "çã", true),
+            ("a**b", "ab", true),
+        ] {
+            assert_eq!(super::wildcard(pattern, text), hit, "{pattern} {text}");
+        }
+        let s = sheet();
+        assert_eq!(run(&s, "=COUNTIF(B1:B3,\"b*\")"), Value::Number(1.0));
+        // A pattern that once took steps of the pattern by the text from
+        // every start (review of the pull request of RV batch 2).
+        let slow = "=SEARCH(\"*\"&REPT(\"a\",1000)&\"b\",REPT(\"a\",30000))";
+        assert_eq!(run(&s, slow), Value::Error(ErrorKind::Value));
+    }
+
+    #[test]
+    fn median_and_right_take_the_middle_and_the_end() {
+        let s = sheet();
+        assert_eq!(run(&s, "=MEDIAN(3,1,2)"), Value::Number(2.0));
+        assert_eq!(run(&s, "=MEDIAN(4,1,2,3)"), Value::Number(2.5));
+        assert_eq!(run(&s, "=MEDIAN(7)"), Value::Number(7.0));
+        assert_eq!(run(&s, "=RIGHT(\"maçã\",2)"), Value::Text("çã".into()));
+        assert_eq!(run(&s, "=RIGHT(\"ab\",5)"), Value::Text("ab".into()));
+        assert_eq!(run(&s, "=SUMPRODUCT(A1:A2,A1:A2)"), run(&s, "=A1*A1+A2*A2"));
+        assert_eq!(run(&s, "=CHOOSE(2,\"a\",\"b\")"), Value::Text("b".into()));
+        assert_eq!(
+            run(&s, "=CHOOSE(3,\"a\",\"b\")"),
+            Value::Error(ErrorKind::Value)
+        );
+    }
+
+    #[test]
     fn tab_32_dates_and_money() {
         let s = sheet();
         assert_eq!(run(&s, "=DATE(2009,1,6)"), Value::Date(39_819.0));
@@ -1949,5 +2162,34 @@ mod tests {
             panic!()
         };
         assert!((p + 88.848_788_6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn rounding_keeps_the_digits_of_the_number() {
+        let s0 = sheet();
+        // A whole number keeps all its digits (review of the pull
+        // request of RV batch 2).
+        assert_eq!(
+            run(&s0, "=SUM(1234567890123456)"),
+            Value::Number(1_234_567_890_123_456.0)
+        );
+        assert_eq!(
+            run(&s0, "=ROUND(1234567890123456,0)"),
+            Value::Number(1_234_567_890_123_456.0)
+        );
+        assert_eq!(run(&s0, "=SUM(0.1,0.2)"), Value::Number(0.3));
+        // Rounding to nine decimals first carried numbers close to an
+        // integer over it, the product overflowed for large numbers, and
+        // SUM lost totals under 1E-12 (review RV, batch 2).
+        let s = Sheet::default();
+        assert_eq!(run(&s, "=TRUNC(1.9999999999)"), Value::Number(1.0));
+        assert_eq!(run(&s, "=ROUNDUP(2.0000000001,0)"), Value::Number(3.0));
+        assert_eq!(run(&s, "=ROUNDDOWN(-1.9999999999,0)"), Value::Number(-1.0));
+        assert_eq!(run(&s, "=ROUND(1E300,0)"), Value::Number(1e300));
+        assert_eq!(run(&s, "=ROUND(1E300,2)"), Value::Number(1e300));
+        assert_eq!(run(&s, "=SUM(1E-13)"), Value::Number(1e-13));
+        assert_eq!(run(&s, "=ROUND(2.675,2)"), Value::Number(2.68));
+        assert_eq!(run(&s, "=ROUND(-2.5,0)"), Value::Number(-3.0));
+        assert_eq!(run(&s, "=ROUNDUP(0.1*3,1)"), Value::Number(0.3));
     }
 }

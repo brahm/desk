@@ -38,12 +38,15 @@ fn document() -> Document {
     table.cell_mut(1, 0).style.fill = Some(CellFill::Color(Color::rgb(200, 30, 30)));
     table.cell_mut(1, 0).style.text.bold = true;
     table
-        .merge(Area {
-            row: 0,
-            col: 1,
-            rows: 1,
-            cols: 2,
-        })
+        .merge(
+            Area {
+                row: 0,
+                col: 1,
+                rows: 1,
+                cols: 2,
+            },
+            &desk_table::Locale::en_us(),
+        )
         .unwrap();
     let mut chart = Chart::new(ChartKind::StackedBar);
     chart.title = Some("Vendas por região".into());

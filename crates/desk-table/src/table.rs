@@ -297,7 +297,9 @@ impl<T: CellText> Table<T> {
     pub fn new(rows: u32, cols: u32) -> Self {
         let rows = rows.clamp(1, MAX_CELLS);
         let cols = cols.clamp(1, MAX_CELLS);
-        let n = (rows * cols) as usize;
+        // In usize: the product of the largest sizes only just fits u32.
+        let (r, c) = (rows as usize, cols as usize);
+        let n = r * c;
         Self {
             name: String::new(),
             widths: vec![72_000; cols as usize],
@@ -307,8 +309,8 @@ impl<T: CellText> Table<T> {
             header_cols: u32::from(cols > 1),
             footer_rows: 0,
             merges: Vec::new(),
-            h_borders: vec![Some(DEFAULT_BORDER); ((rows + 1) * cols) as usize],
-            v_borders: vec![Some(DEFAULT_BORDER); (rows * (cols + 1)) as usize],
+            h_borders: vec![Some(DEFAULT_BORDER); (r + 1) * c],
+            v_borders: vec![Some(DEFAULT_BORDER); r * (c + 1)],
             style: TableStyle::default(),
             options: TableOptions::default(),
         }
@@ -617,6 +619,14 @@ impl<T: CellText> Table<T> {
             for c in 0..cols {
                 let mut cell = self.cell(model_row, c).cleared();
                 cell.comment = None;
+                // The references of the row copied were just moved: at
+                // the top, it is itself `count` rows down now.
+                let from = if at == 0 {
+                    model_row + count
+                } else {
+                    model_row
+                };
+                cell.move_references(0, i64::from(at + k) - i64::from(from));
                 if let Some(f) = &repeated[c as usize]
                     && let Ok(formula) = Formula::parse(f)
                 {
@@ -652,10 +662,45 @@ impl<T: CellText> Table<T> {
         }
         if at < self.header_rows {
             self.header_rows = (self.header_rows + count).min(MAX_HEADERS);
-        } else if at > self.rows() - count - self.footer_rows && at < self.rows() - count {
+        } else if self.footer_rows > 0 && at > self.rows() - count - self.footer_rows {
+            // Inside the footer, or after it at the end: the footer takes
+            // the new rows. At the end they would otherwise become the
+            // footer, and the footer rows they push up, as a row of
+            // totals, the body.
             self.footer_rows = (self.footer_rows + count).min(MAX_HEADERS);
         }
         Ok(())
+    }
+
+    /// Adds the rows that cells put from row `start` down to row `end`,
+    /// excluded, need. Below the body of a table with a footer, they are
+    /// added to the body, so that the footer stays the last rows and is
+    /// not written over; put in the footer, they join it.
+    pub(crate) fn add_rows_to_reach(&mut self, start: u32, end: u32) {
+        let (at, add) = self.rows_to_reach(start, end);
+        if add > 0 {
+            let _ = self.insert_rows(at, add);
+        }
+    }
+
+    /// The row after the last that cells put from row `start` may fill:
+    /// the end of the body when they start in it and the table has a
+    /// footer, which they leave as it is; the end of the table otherwise.
+    pub(crate) fn last_row_for(&self, start: u32) -> u32 {
+        if self.footer_rows > 0 && start < self.body_end() {
+            self.body_end()
+        } else {
+            self.rows()
+        }
+    }
+
+    /// Where [`Table::add_rows_to_reach`] adds rows, and how many: past
+    /// the end of the body when cells put from the body would reach the
+    /// footer, past the end of the table otherwise.
+    pub(crate) fn rows_to_reach(&self, start: u32, end: u32) -> (u32, u32) {
+        let end = end.min(MAX_CELLS);
+        let last = self.last_row_for(start);
+        (last, end.saturating_sub(last).min(MAX_CELLS - self.rows()))
     }
 
     /// The formula that the cells of a column repeat down to row `at`,
@@ -834,12 +879,24 @@ impl<T: CellText> Table<T> {
     }
 
     fn shift_formulas(&mut self, axis: Axis, at: u32, count: i64) {
+        // A cell a rule compares with moves as a formula's reference does,
+        // and is deleted with its row or column.
+        let mut shift = |r: desk_formula::CellRef| match (Formula {
+            expr: desk_formula::Expr::Cell(r),
+        })
+        .shifted(axis, at, count)
+        .expr
+        {
+            desk_formula::Expr::Cell(r) => Some(r),
+            _ => None,
+        };
         for cell in &mut self.cells {
             if let Content::Formula(text) = &cell.content
                 && let Ok(f) = Formula::parse(text)
             {
                 cell.content = Content::Formula(f.shifted(axis, at, count).to_string());
             }
+            cell.rules = crate::conditional::map_rule_cells(&cell.rules, &mut shift);
         }
     }
 
@@ -917,18 +974,28 @@ impl<T: CellText> Table<T> {
             return None;
         }
         let lower = typed.to_lowercase();
-        let found: Vec<String> = self
-            .column_texts(col)
-            .into_iter()
-            .enumerate()
-            .filter(|(i, t)| {
-                *i as u32 + self.body_start() != row
-                    && t.to_lowercase().starts_with(&lower)
+        // The texts of the other cells of the column, by row: the list of
+        // the column skips empty cells and repeats, so its index is no
+        // row (review RV, batch 2).
+        let mut found: Vec<String> = Vec::new();
+        for r in self.body_start()..self.body_end() {
+            if r == row {
+                continue;
+            }
+            if let Content::Text(t) = &self.cell(r, col).content {
+                let t = t.plain();
+                if t.to_lowercase().starts_with(&lower)
                     && t.len() > typed.len()
-            })
-            .map(|(_, t)| t)
-            .collect();
-        (found.len() == 1).then(|| found[0].clone())
+                    && !found.contains(&t)
+                {
+                    found.push(t);
+                }
+            }
+        }
+        match found.as_slice() {
+            [one] => Some(one.clone()),
+            _ => None,
+        }
     }
 
     /// The table with the cells of a column moved, for operations.
@@ -1018,7 +1085,9 @@ mod tests {
     fn tables_made_here_are_consistent_and_broken_ones_are_not() {
         let mut table = t(3, 2);
         assert!(table.is_consistent());
-        table.merge(Area::between((1, 1), (2, 1))).unwrap();
+        table
+            .merge(Area::between((1, 1), (2, 1)), &crate::Locale::en_us())
+            .unwrap();
         assert!(table.is_consistent());
         let mut short = t(3, 2);
         short.cells.pop();
@@ -1067,6 +1136,13 @@ mod tests {
             Content::Formula("=SUM(C2:C4)".into())
         );
         assert_eq!(table.footer_rows(), 1);
+        // Rows added at the end of a table with a footer join the footer:
+        // the totals stayed in the footer, not the new empty row (review
+        // RV, batch 2).
+        let rows = table.rows();
+        table.insert_rows(rows, 1).unwrap();
+        assert_eq!(table.footer_rows(), 2);
+        assert_eq!(table.region(rows - 1, 2), Region::Footer);
     }
 
     #[test]
@@ -1122,6 +1198,13 @@ mod tests {
         table.type_text(2, 1, "Banana", &en);
         assert_eq!(table.suggestion(3, 1, "ma"), Some("Maçã".into()));
         assert_eq!(table.suggestion(3, 1, "x"), None);
+        // An empty cell above: the suggestion still comes, from the row
+        // below (review RV, batch 2). The cell typed in is not its own
+        // suggestion.
+        let mut other = t(4, 2);
+        other.type_text(2, 1, "Maçã", &en);
+        assert_eq!(other.suggestion(1, 1, "ma"), Some("Maçã".into()));
+        assert_eq!(other.suggestion(2, 1, "ma"), None);
         table.options.autocomplete = false;
         assert_eq!(table.suggestion(3, 1, "ma"), None);
     }

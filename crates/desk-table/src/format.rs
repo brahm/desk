@@ -821,10 +821,10 @@ fn number_by_pattern(n: f64, pattern: &str, locale: &Locale) -> String {
     while fp.len() > min_decimals && fp.ends_with('0') {
         fp.pop();
     }
-    let mut ip = ip.trim_start_matches('0').to_owned();
-    while ip.len() < min_int {
-        ip.insert(0, '0');
-    }
+    // The zeros the pattern asks for, put at once: one at a time, a long
+    // pattern from a file took quadratic time.
+    let ip = ip.trim_start_matches('0');
+    let ip = "0".repeat(min_int.saturating_sub(ip.len())) + ip;
     let mut out = digits_with_groups(&ip, grouped.then_some(locale.group));
     if !fp.is_empty() {
         out.push(locale.decimal);
@@ -1298,6 +1298,14 @@ fn grouped_by(s: &str, sep: char) -> bool {
             .all(|p| p.len() == 3 && p.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// The year it is now, by the clock of the system in UTC.
+fn this_year() -> i32 {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    date_from_days(25_569 + (secs / 86_400) as i64).0
+}
+
 /// A date or a time typed with slashes, hyphens or colons, in days from
 /// 30 December 1899.
 pub fn parse_date(text: &str, locale: &Locale) -> Option<f64> {
@@ -1329,7 +1337,8 @@ pub fn parse_date(text: &str, locale: &Locale) -> Option<f64> {
             let y = match nums.get(2) {
                 Some(y) if parts[2].len() <= 2 => 2000 + y - if *y > 50 { 100 } else { 0 },
                 Some(y) => *y,
-                None => 2000,
+                // A date without a year is of this year, as in Numbers.
+                None => this_year(),
             };
             (y, m, day)
         };
@@ -1374,6 +1383,17 @@ mod tests {
 
     fn show(f: &Format, v: Value) -> String {
         f.show(&v, &Locale::pt_br()).text
+    }
+
+    #[test]
+    fn a_date_typed_without_a_year_is_of_this_year() {
+        let pt = Locale::pt_br();
+        let typed = parse_date("15/03", &pt).unwrap();
+        let (year, month, day) = date_from_days(typed as i64);
+        assert_eq!((year, month, day), (this_year(), 3, 15));
+        assert!(this_year() >= 2026);
+        let full = parse_date("15/03/2001", &pt).unwrap();
+        assert_eq!(date_from_days(full as i64), (2001, 3, 15));
     }
 
     #[test]
@@ -1532,6 +1552,17 @@ mod tests {
         );
         assert_eq!(show(&Format::Automatic, Value::Number(0.1 + 0.2)), "0,3");
         assert!(n.show(&Value::Number(-1.0), &pt).numeric);
+    }
+
+    #[test]
+    fn a_long_pattern_of_zeros_is_shown_in_linear_time() {
+        let zeros = Format::Custom(CustomFormat {
+            name: "Zeros".into(),
+            pattern: "0".repeat(200_000).into(),
+        });
+        let text = show(&zeros, Value::Number(12.0));
+        assert_eq!(text.len(), 200_000);
+        assert!(text.ends_with("012"));
     }
 
     #[test]

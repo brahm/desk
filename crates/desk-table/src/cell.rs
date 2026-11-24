@@ -240,6 +240,17 @@ impl<T> Default for Cell<T> {
 }
 
 impl<T> Cell<T> {
+    /// The cell moved `cols` columns and `rows` rows: the relative
+    /// references of its formula and of its rules move along.
+    pub(crate) fn move_references(&mut self, cols: i64, rows: i64) {
+        if let Content::Formula(f) = &self.content
+            && let Ok(parsed) = desk_formula::Formula::parse(f)
+        {
+            self.content = Content::Formula(parsed.moved(cols, rows).to_string());
+        }
+        self.rules = crate::conditional::map_rule_cells(&self.rules, &mut |r| r.moved(cols, rows));
+    }
+
     /// An empty cell that looks like this one: what "Clear" leaves.
     pub fn cleared(&self) -> Self {
         Self {

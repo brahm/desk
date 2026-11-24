@@ -48,6 +48,18 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
+    /// Every error.
+    pub const ALL: [Self; 8] = [
+        Self::DivisionByZero,
+        Self::Value,
+        Self::Reference,
+        Self::Name,
+        Self::Number,
+        Self::NotAvailable,
+        Self::Circular,
+        Self::Syntax,
+    ];
+
     /// The error as a cell shows it.
     pub fn code(self) -> &'static str {
         match self {
@@ -165,8 +177,25 @@ pub(crate) fn format_number(n: f64) -> String {
     out
 }
 
+/// A number as a formula writes it: in full, so that it reads back the
+/// same. Very small and very large numbers take an exponent; the 15
+/// digits of [`format_number`] are for showing a value, and a formula
+/// written back with them lost a small constant, as `1E-16` became `0`.
+pub(crate) fn formula_number(n: f64) -> String {
+    if n == n.trunc() && n.abs() < 1e15 {
+        return format!("{}", n as i64);
+    }
+    if n.is_finite() && (1e-5..1e15).contains(&n.abs()) {
+        format!("{n}")
+    } else {
+        format!("{n:E}")
+    }
+}
+
 /// The year, month and day of a day counted from 30 December 1899.
 pub fn date_from_days(days: i64) -> (i32, u32, u32) {
+    // Far enough for any year an i32 holds, and short of overflow below.
+    let days = days.clamp(-(1 << 39), 1 << 39);
     // Days from 1 March of year 0, by the algorithm of Howard Hinnant.
     let z = days - 25_569 + 719_468;
     let era = z.div_euclid(146_097);
@@ -199,6 +228,14 @@ pub fn days_from_date(year: i32, month: i32, day: i32) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn days_far_from_any_year_do_not_overflow() {
+        // YEAR(1E300) reached here as i64::MAX, and the sum overflowed.
+        let (y, m, d) = date_from_days(i64::MAX);
+        assert!(y > 1_000_000_000 && (1..=12).contains(&m) && (1..=31).contains(&d));
+        assert!(date_from_days(i64::MIN).0 < -1_000_000_000);
+    }
 
     #[test]
     fn dates_go_both_ways() {

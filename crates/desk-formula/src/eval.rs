@@ -26,7 +26,29 @@ pub trait Context {
     fn now(&self) -> f64 {
         0.0
     }
+
+    /// Takes `work` from what the evaluation of the table may still do:
+    /// one for each cell of a range read and for each byte of text made.
+    /// False when too little is left, and the formula gives `#VALUE!`, so
+    /// that formulas a file repeats cannot hold the app for minutes or
+    /// fill its memory. No limit by default.
+    fn spend(&self, work: u64) -> bool {
+        let _ = work;
+        true
+    }
+
+    /// Takes `work` already done, as a text copied, from what is left:
+    /// all of it when too little is left, so that the formulas after it
+    /// are not computed to be refused in turn. False then, as
+    /// [`Context::spend`].
+    fn spend_done(&self, work: u64) -> bool {
+        self.spend(work)
+    }
 }
+
+/// The longest text a formula makes, in bytes, as the 32,767 characters
+/// of a cell in other spreadsheets.
+pub const MAX_TEXT: usize = 32_767;
 
 /// Computes a formula.
 pub fn evaluate(formula: &Formula, context: &dyn Context) -> Value {
@@ -88,18 +110,44 @@ pub(crate) struct Eval<'a> {
 }
 
 impl Eval<'_> {
+    /// The value of a cell, whose text is copied: a million cells that
+    /// each repeat a long text would fill the memory.
+    fn cell(&self, at: CellRef) -> Value {
+        match self.context.cell(at) {
+            Value::Text(t) if !self.context.spend_done(t.len() as u64) => {
+                Value::Error(ErrorKind::Value)
+            }
+            v => v,
+        }
+    }
+
     fn range(&self, a: CellRef, b: CellRef) -> Arg {
         let (c0, c1) = (a.col.min(b.col), a.col.max(b.col));
         let (r0, r1) = (a.row.min(b.row), a.row.max(b.row));
         // A range larger than any table is a mistake; keep it bounded.
-        if u64::from(c1 - c0 + 1) * u64::from(r1 - r0 + 1) > 1_000_000 {
+        let cells = u64::from(c1 - c0 + 1) * u64::from(r1 - r0 + 1);
+        if cells > 1_000_000 {
             return Arg::Scalar(Value::Error(ErrorKind::Reference));
+        }
+        if !self.context.spend(cells) {
+            return Arg::Scalar(Value::Error(ErrorKind::Value));
         }
         let mut values = Vec::new();
         for row in r0..=r1 {
             for col in c0..=c1 {
                 values.push(self.context.cell(CellRef::new(col, row)));
             }
+        }
+        // The texts of the range are copied.
+        let bytes: usize = values
+            .iter()
+            .map(|v| match v {
+                Value::Text(t) => t.len(),
+                _ => 0,
+            })
+            .sum();
+        if !self.context.spend_done(bytes as u64) {
+            return Arg::Scalar(Value::Error(ErrorKind::Value));
         }
         Arg::Range {
             values,
@@ -112,7 +160,7 @@ impl Eval<'_> {
         match expr {
             Expr::Range(a, b) => self.range(*a, *b),
             Expr::Cell(c) => Arg::Range {
-                values: vec![self.context.cell(*c)],
+                values: vec![self.cell(*c)],
                 cols: 1,
             },
             Expr::Header(name) => match self.context.header(name) {
@@ -130,10 +178,13 @@ impl Eval<'_> {
             Expr::Text(t) => Value::Text(t.clone()),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::Error(e) => Value::Error(*e),
-            Expr::Cell(c) => self.context.cell(*c),
+            Expr::Cell(c) => self.cell(*c),
             Expr::Range(..) | Expr::Header(_) => match self.arg(expr) {
                 Arg::Scalar(v) => v,
-                Arg::Range { values, .. } if values.len() == 1 => values[0].clone(),
+                Arg::Range { values, .. } if values.len() == 1 => values
+                    .into_iter()
+                    .next()
+                    .unwrap_or(Value::Error(ErrorKind::Value)),
                 Arg::Range { .. } => Value::Error(ErrorKind::Value),
             },
             Expr::Unary(op, a) => {
@@ -153,7 +204,12 @@ impl Eval<'_> {
             }
             Expr::Binary(op, a, b) => self.binary(*op, &self.scalar(a), &self.scalar(b)),
             Expr::Call(name, args) => match functions::function(name) {
-                Some(f) => (f.run)(self, args),
+                Some(f) => match (f.run)(self, args) {
+                    Value::Text(t) if !self.context.spend_done(t.len() as u64) => {
+                        Value::Error(ErrorKind::Value)
+                    }
+                    v => v,
+                },
                 None => Value::Error(ErrorKind::Name),
             },
         }
@@ -168,7 +224,13 @@ impl Eval<'_> {
         }
         match op {
             BinaryOp::Concat => match (a.to_text(), b.to_text()) {
-                (Ok(x), Ok(y)) => Value::Text(x + &y),
+                (Ok(x), Ok(y)) => {
+                    let len = x.len() + y.len();
+                    if len > MAX_TEXT || !self.context.spend(len as u64) {
+                        return Value::Error(ErrorKind::Value);
+                    }
+                    Value::Text(x + &y)
+                }
                 (Err(e), _) | (_, Err(e)) => Value::Error(e),
             },
             BinaryOp::Equal

@@ -17,6 +17,9 @@ pub enum Operand {
     Text(String),
     /// The value of a cell of the same table.
     Cell(#[serde(with = "cell_ref")] CellRef),
+    /// A cell that was deleted with its row or column: no rule that
+    /// compares with it applies.
+    Deleted,
 }
 
 /// A cell reference, saved as its column, row and whether each stays.
@@ -121,6 +124,103 @@ pub struct Rule {
     pub style: RuleStyle,
 }
 
+impl Operand {
+    fn map_cell(&self, f: &mut dyn FnMut(CellRef) -> Option<CellRef>) -> Self {
+        match self {
+            Self::Cell(r) => f(*r).map_or(Self::Deleted, Self::Cell),
+            other => other.clone(),
+        }
+    }
+}
+
+impl Condition {
+    /// The operands of the condition.
+    fn operands(&self) -> Vec<&Operand> {
+        match self {
+            Self::Equal(o)
+            | Self::NotEqual(o)
+            | Self::Greater(o)
+            | Self::GreaterOrEqual(o)
+            | Self::Less(o)
+            | Self::LessOrEqual(o) => vec![o],
+            Self::Between(a, b) | Self::NotBetween(a, b) => vec![a, b],
+            _ => Vec::new(),
+        }
+    }
+
+    fn map_cells(&self, f: &mut dyn FnMut(CellRef) -> Option<CellRef>) -> Self {
+        match self {
+            Self::Equal(o) => Self::Equal(o.map_cell(f)),
+            Self::NotEqual(o) => Self::NotEqual(o.map_cell(f)),
+            Self::Greater(o) => Self::Greater(o.map_cell(f)),
+            Self::GreaterOrEqual(o) => Self::GreaterOrEqual(o.map_cell(f)),
+            Self::Less(o) => Self::Less(o.map_cell(f)),
+            Self::LessOrEqual(o) => Self::LessOrEqual(o.map_cell(f)),
+            Self::Between(a, b) => Self::Between(a.map_cell(f), b.map_cell(f)),
+            Self::NotBetween(a, b) => Self::NotBetween(a.map_cell(f), b.map_cell(f)),
+            other => other.clone(),
+        }
+    }
+}
+
+/// The rules with the cells their operands name changed by `f`, as a
+/// formula's references are when rows or columns are added or deleted, or
+/// the cell is copied or moved; a cell `f` gives none for was deleted.
+/// The same rules when none names a cell.
+pub(crate) fn map_rule_cells(
+    rules: &std::sync::Arc<[Rule]>,
+    f: &mut dyn FnMut(CellRef) -> Option<CellRef>,
+) -> std::sync::Arc<[Rule]> {
+    let names_cells = rules.iter().any(|rule| {
+        rule.condition
+            .operands()
+            .iter()
+            .any(|o| matches!(o, Operand::Cell(_)))
+    });
+    if !names_cells {
+        return rules.clone();
+    }
+    rules
+        .iter()
+        .map(|rule| Rule {
+            condition: rule.condition.map_cells(f),
+            style: rule.style.clone(),
+        })
+        .collect()
+}
+
+/// What checking `rules` against `value` costs, apart from the cells they
+/// compare with: the texts compared, which are put in lower case, for
+/// each rule.
+pub(crate) fn text_work(rules: &[Rule], value: &Value) -> u64 {
+    let own = match value {
+        Value::Text(t) => t.len() as u64,
+        _ => 0,
+    };
+    rules
+        .iter()
+        .map(|rule| {
+            let theirs: usize = match &rule.condition {
+                Condition::TextIs(t)
+                | Condition::TextIsNot(t)
+                | Condition::StartsWith(t)
+                | Condition::EndsWith(t)
+                | Condition::Contains(t)
+                | Condition::DoesNotContain(t) => t.len(),
+                other => other
+                    .operands()
+                    .iter()
+                    .map(|o| match o {
+                        Operand::Text(t) => t.len(),
+                        _ => 0,
+                    })
+                    .sum(),
+            };
+            1 + own + theirs as u64
+        })
+        .fold(0, u64::saturating_add)
+}
+
 fn number(v: &Value) -> Option<f64> {
     match v {
         Value::Number(n) | Value::Date(n) | Value::Duration(n) => Some(*n),
@@ -132,10 +232,20 @@ impl Condition {
     /// Whether a value meets the condition, with `cell` giving the values
     /// of the cells that the operands name and `today` the day now.
     pub fn holds(&self, value: &Value, cell: &dyn Fn(CellRef) -> Value, today: f64) -> bool {
+        // A rule whose cell was deleted no longer applies, "not equal"
+        // included.
+        if self
+            .operands()
+            .iter()
+            .any(|o| matches!(o, Operand::Deleted))
+        {
+            return false;
+        }
         let operand = |o: &Operand| match o {
             Operand::Number(n) => Value::Number(n.0),
             Operand::Text(t) => Value::Text(t.clone()),
             Operand::Cell(r) => cell(*r),
+            Operand::Deleted => Value::Error(desk_formula::ErrorKind::Reference),
         };
         let cmp = |o: &Operand| -> Option<std::cmp::Ordering> {
             let other = operand(o);
@@ -245,5 +355,72 @@ mod tests {
         assert_eq!(s, RuleStyle::default());
         assert!(Condition::Contains("ab".into()).holds(&Value::Text("xABy".into()), &cell, 0.0));
         assert!(Condition::Today.holds(&Value::Date(45_000.3), &cell, 45_000.9));
+    }
+
+    #[test]
+    fn a_row_added_at_the_top_copies_the_rules_of_the_first_once() {
+        // The rules of the row copied were moved down with it, then moved
+        // again: the new first row compared with the cell below the one
+        // it should (review of the pull request of RV batch 2).
+        use crate::{Locale, Table};
+        let mut t: Table<String> = Table::new(3, 1);
+        t.set_header_rows(0).unwrap();
+        t.type_text(1, 0, "5", &Locale::en_us());
+        let rule = Rule {
+            condition: Condition::Greater(Operand::Cell(CellRef::new(0, 1))),
+            style: RuleStyle::default(),
+        };
+        t.cell_mut(0, 0).rules = std::sync::Arc::from([rule]);
+        t.insert_rows(0, 2).unwrap();
+        let operand = |r| match &t.cell(r, 0).rules[0].condition {
+            Condition::Greater(o) => o.clone(),
+            other => panic!("{other:?}"),
+        };
+        // The first row as it was compares with its old neighbour, now
+        // row 4; the new rows each with the row below them.
+        assert_eq!(operand(2), Operand::Cell(CellRef::new(0, 3)));
+        assert_eq!(operand(0), Operand::Cell(CellRef::new(0, 1)));
+        assert_eq!(operand(1), Operand::Cell(CellRef::new(0, 2)));
+    }
+
+    #[test]
+    fn the_cell_a_rule_compares_with_follows_rows_added_and_deleted() {
+        // A rule "greater than A1" still read row 1 once a row was added
+        // above, so it compared with the new empty row (review RV,
+        // batch 2).
+        use crate::{Locale, Table};
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(5, 2);
+        t.type_text(0, 0, "10", &en);
+        t.type_text(4, 1, "20", &en);
+        let rule = Rule {
+            condition: Condition::Greater(Operand::Cell(CellRef::new(0, 0))),
+            style: RuleStyle {
+                bold: Some(true),
+                ..RuleStyle::default()
+            },
+        };
+        t.cell_mut(4, 1).rules = std::sync::Arc::from([rule]);
+        t.insert_rows(0, 1).unwrap();
+        let operand = |t: &Table<String>, r, c| match &t.cell(r, c).rules[0].condition {
+            Condition::Greater(o) => o.clone(),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(operand(&t, 5, 1), Operand::Cell(CellRef::new(0, 1)));
+        let v = t.values(0.0);
+        assert_eq!(t.rule_style(&v, 5, 1).bold, Some(true));
+        // Copied down a row, a relative reference moves with it.
+        t.fill(crate::Area::cell(5, 1), crate::FillDirection::Up, 1);
+        assert_eq!(operand(&t, 4, 1), Operand::Cell(CellRef::new(0, 0)));
+        // Deleted with its row, the rule no longer applies.
+        t.delete_rows(1, 1).unwrap();
+        assert_eq!(operand(&t, 4, 1), Operand::Deleted);
+        let v = t.values(0.0);
+        assert_eq!(t.rule_style(&v, 4, 1).bold, None);
+        // Nor does "not equal", which every value would meet.
+        let deleted = Condition::NotEqual(Operand::Deleted);
+        assert!(!deleted.holds(&Value::Number(1.0), &|_| Value::Empty, 0.0));
+        let between = Condition::Between(Operand::Number(Num(0.0)), Operand::Deleted);
+        assert!(!between.holds(&Value::Number(1.0), &|_| Value::Empty, 0.0));
     }
 }

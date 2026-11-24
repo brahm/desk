@@ -1,0 +1,128 @@
+# Batch 2: formulas and tables
+
+The crates that compute: `desk-formula` (the parser and evaluator of
+formulas) and `desk-table` (the table model, its operations, formats and
+evaluation). Reviewed on 24 November 2026 from commit `145c979`, with
+`/code-review` at level high over the two crates, `/security-review`
+(D-029), the risk lints of D-028 and a new fuzz target for formulas.
+
+## Findings
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 1 | A | `desk-formula/src/parse.rs` | A formula of many parentheses, signs or operators overflowed the stack of the parser, which aborts the app | Nesting is bounded (`MAX_NESTING`, 2,048, of which an operator of a chain costs 2 and a parenthesis, sign, percent or call 8); deeper formulas are a syntax error; the deepest of each form is computed in a test thread |
+| 2 | A | `desk-table/src/eval.rs` | A chain of formulas that each refer to the next, as a running balance from the bottom up, overflowed the stack | What a formula depends on is computed first with a stack of its own, and every cell of a cycle is circular; test with a chain of 20,000 |
+| 3 | A | `desk-formula/src/parse.rs`, `value.rs` | A formula written back after a row was inserted lost its small constants: `=A1*1E-16` became `=A2*0` | Constants are written in full (`formula_number`); test |
+| 4 | A | `desk-formula/src/eval.rs`, `functions.rs`, `desk-table/src/eval.rs` | *Security.* A file could hold formulas that each read a large range, or texts that double from cell to cell (`=A1&A1`) or grow by `SUBSTITUTE`, so that opening it held the app for minutes or filled its memory | A formula makes at most 32,767 bytes of text (`MAX_TEXT`); one evaluation of a table reads at most 2^27 cells of ranges, header cells, bytes of text and steps of matching, and the tables of a document laid out or saved share 2^28; the formulas past it give `#VALUE!`; the worst table measured stops in under two seconds; tests |
+| 5 | A | `desk-table/src/copy.rs` | *Security.* Pasted text grew the table one row and one column at a time, moving the whole table each time, so a long text took minutes; one line of many tabs and many lines, a short text, asked for billions of cells | The table grows once, to a million cells at most; test |
+| 6 | B | `desk-table/src/format.rs` | *Security.* A custom number format of many zeros, from a file, padded the number one zero at a time, in quadratic time for every cell shown | The zeros are put at once; test with 200,000 |
+| 7 | C | `desk-formula/src/functions.rs` | `SEARCH` with `*` or `?` built every prefix of the text from every start, in cubic time: a text of a few thousand characters took minutes | The pattern followed by `*` is matched once from each start; test |
+| 8 | B | `desk-formula/src/odf.rs` | `LOG10(100)` went to ODF as `[.LOG10](100)`, a cell reference no reader takes | A name before a parenthesis stays a function; test |
+| 9 | B | `desk-formula/src/odf.rs` | A header named in quotes with a bracket, such as `'Price [R$]'`, was read back from ODF as a reference to another sheet, `#REF!` | Quotes are followed when reading; test |
+| 10 | B | `desk-formula/src/functions.rs` | `ROUND`, `TRUNC` and `SUM` rounded to a fixed number of decimals, losing the digits of very small or very large numbers | They round relative to the number (14 significant digits); test |
+| 11 | B | `desk-table/src/table.rs`, `desk-ui/src/table_pane.rs` | Rows added after the footer did not join it: the new rows became the footer and the totals moved into the body | The footer grows; the Rows field adds body rows; test |
+| 12 | B | `desk-table/src/ops.rs` | Splitting a cell shrank the merges that crossed the split row, and those that ended on it did not grow | Only the cells beside it that end on the split row grow; test |
+| 13 | B | `desk-table/src/ops.rs` | A fill of `Jan, Feb` went on in Portuguese, the first series that held `Jan` | A fill goes by the series that holds every name it starts from; test |
+| 14 | B | `desk-table/src/table.rs` | Autocomplete skipped the cell typed in by its place in the list of the column's texts, which leaves out empty cells and repeats, so it could skip another cell or suggest the cell's own text | It goes by row; test |
+| 15 | B | `desk-table/src/conditional.rs`, `ops.rs`, `drag.rs` | A conditional rule that compares with another cell kept pointing at the same place when rows and columns were added or deleted, and when cells were filled, copied, dragged or sorted | The cell of a rule moves as a formula's reference does; deleted with its row or column, the rule no longer applies; test |
+| 16 | B | `desk-table/src/ops.rs` | Sort and Convert to Text computed formulas on day 0, so `TODAY` and `NOW` sorted as 1899 | They take the day it is; test |
+| 17 | B | `desk-table/src/ops.rs` | Merge joined numbers with text in en_US, so `2,5` became `2.5` in a Brazilian document | Numbers are written as they are typed in the locale of the document; test |
+| 18 | B | `desk-table/src/format.rs` | A date typed without a year, `15/03`, was 15 March 2000 | It is of the current year, as in Numbers; test |
+| 19 | B | `desk-formula/src/value.rs` | `YEAR(1E300)` passed the largest `i64` to `date_from_days`, whose first sum overflowed: a panic in debug builds, a wrong date in release | Days are clamped to well past the years an `i32` holds; test |
+| 20 | B | `desk-formula/src/parse.rs` | A sign under a percent lost its parentheses when written: `=(-A1)%` became `=-A1%`, which reads as the sign of the percent (found by fuzzing `formula_parse`) | Written with its parentheses; test |
+| 21 | B | `desk-formula/src/parse.rs` | `1E999` was read as infinity, written back as `inf` and read again as a header (found by fuzzing `formula_parse`) | A number past the largest is a syntax error; test |
+| 22 | B | `desk-formula/src/parse.rs` | The name of a function was put in capitals by Unicode, so `ǰ` became `J` and a combining caron, which no name holds, and the formula written could not be read again (found by fuzzing `formula_parse`) | Names of functions, which are ASCII, are put in capitals by ASCII; test |
+| 23 | B | `desk-formula/src/parse.rs` | An error code followed by an operator, as `#REF! /0`, was written `#REF!/0` and read again as one unknown code (found by fuzzing `formula_parse`) | The longest code the text starts with is read; test |
+| 24 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
+
+Class A: data lost, a panic, a hang or memory exhausted. B: wrong
+behaviour. C: performance. D: clean-up. See [README.md](README.md).
+
+No finding of the batch was moved to the backlog; one of the review of its pull request was (B-053, below).
+
+## Review of the pull request
+
+`/code-review` and `/security-review` of pull request #203 found more,
+fixed in the same pull request:
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 25 | A | `desk-formula/src/parse.rs` | Every operator of a flat chain counted as a level of nesting, so `=A1+…+A600`, as other spreadsheets write, was refused and lost on importing ODT | An operator of a chain costs less than a parenthesis; chains of a thousand operators are read; test |
+| 26 | A | `desk-formula/src/functions.rs` | *Security.* Matching `*` and `?` in COUNTIF, SUMIF, AVERAGEIF, MATCH and the lookups backtracked, and SEARCH tried every start: one cell could take hundreds of billions of steps | The parts between the stars are found one after the other; matching spends the work of the table; test |
+| 27 | A | `desk-formula/src/eval.rs` | *Security.* `=$A$1` in many cells, with a long text in A1, copied it each time without a charge | Text read from a cell spends the work; test |
+| 28 | A | `desk-table/src/eval.rs`, `desk-layout`, `desk-filters/src/odt.rs` | *Security.* The budget was per table, and the layout evaluates them all: thousands of small tables could hold the opening for hours | The tables of a document laid out or saved share one budget (`share_work`); test |
+| 29 | B | `desk-table/src/eval.rs` | A range larger than any a formula reads emptied the work of the table, so every formula after it gave `#VALUE!`; `=ROW(A2)` in A2 was circular | A refused charge spends nothing; ROW, COLUMN, ROWS and COLUMNS depend on the place only; tests |
+| 30 | B | `desk-table/src/conditional.rs` | A rule whose cell was deleted, with "not equal", held for every cell | A rule with a deleted cell does not apply; test |
+| 31 | B | `desk-table/src/table.rs` | A row added at the top copied the references of the rule after they had moved | They are copied from where they were; test |
+| 32 | B | `desk-table/src/copy.rs`, `drag.rs`, `desk-ui` | Text pasted, cells dragged and Tab from the last cell added rows after the footer | They go to the end of the body; tests |
+| 33 | B | `desk-formula/src/functions.rs` | Rounding to 15 significant digits cut whole numbers: `=SUM(1234567890123456)` gave `1234567890123460` | Whole numbers are kept; test |
+| 34 | B | `desk-filters` | Merge joined numbers in the locale of `LANG` | An ODT in the language of its default style, Pages '09 in that of the system's numbers; test |
+
+A second review of the fixes found more, also fixed here:
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 35 | A | `desk-formula/src/eval.rs`, `desk-table/src/eval.rs` | *Security.* A text copied and then refused spent nothing, so every formula after it copied it again, undoing 27 and 28 | A charge for work already done (`spend_done`) takes what is left when it does not fit; test |
+| 36 | A | `desk-table/src/eval.rs`, `conditional.rs` | *Security.* Conditional rules put the texts they compare in lower case for each rule and each cell shown, without a charge | Their work is taken from the budget of the document; past it the rules do not apply; test |
+| 37 | B | `desk-formula/src/functions.rs` | Matching was charged the pattern by the texts without a `*` too, so a thousand rows of `=COUNTIF($A$1:$A$1000,A1)` gave `#VALUE!` | The pattern by the texts only with `*` (or `?` in SEARCH), the texts otherwise, nothing for approximate lookups; test |
+| 38 | B | `desk-table/src/eval.rs`, `desk-ui` | A layout evaluates a table on each pass, so the budget shared by a document was charged several times, and a large table was right on the first pass and `#VALUE!` on the second; the comment list evaluated a table once for each comment | Within a scope the values of a table are kept by its cells, headers and time; test |
+| 39 | B | `desk-table/src/table.rs`, `copy.rs`, `drag.rs` | Rows were added before the footer only past the end of the table, so 9 lines pasted in a table of 10 rows with 2 of footer wrote over the totals | They are added past the end of the body; test |
+| 40 | B | `desk-filters/src/odt/tables.rs` | An ODT whose language is `und` was read as that tag | It is no language, as in the model; test |
+
+A third review found seven more, fixed too, and asked for a simpler
+budget: one per document, taken once for each table, with the rules
+apart. That is what it now is.
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 41 | A | `desk-formula/src/functions.rs` | *Security.* Approximate lookups compared long texts, each put in lower case, without a charge | They are charged the needle and each text; test |
+| 42 | B | `desk-formula/src/functions.rs` | Matching without `*` was charged the texts only, though the pattern is prepared for each | The pattern for each text and the texts; test |
+| 43 | B | `desk-table/src/eval.rs` | The time was in the key of the values kept, so a table laid out a second later was evaluated and charged again | The time of a scope is the first asked for; test |
+| 44 | A | `desk-table/src/eval.rs` | *Security.* The values were kept by a hash with fixed keys, which a file could make collide to show the values of another table | The keys are random for each scope |
+| 45 | B | `desk-table/src/eval.rs` | Rules spent the budget of the formulas, so a table with many rules left the next tables with `#VALUE!` | Rules have a budget of their own; test |
+| 46 | B | `desk-table/src/drag.rs` | Cells moved past the body were taken before the rows were added, so a moved formula that pointed at the total pointed at the new row | The table grows first; test |
+| 47 | B | `desk-table/src/drag.rs`, `copy.rs` | Cells dragged from the body could still write into the footer, and the selection of a paste took footer rows it did not write | Both stop at the end of the body; tests |
+
+A refused copy still stops the table and takes what was left of its
+work: the copy that was refused was larger than that, so it is the work
+done, not more.
+
+A row or column added in the middle copies the rules of the one before
+it after their references were moved, so a rule comparing with a cell
+below the new rows points too far down. It moved to the backlog as
+B-053, for batch 3, whose property tests check each operation against
+its inverse.
+A formula in a branch of `IF` that refers to its own cell stays circular,
+whichever branch is taken, as in Numbers: the dependencies are read from
+the formula, not from the branch taken, which keeps them computable
+without recursion.
+
+## Security (D-029)
+
+`/security-review` read the two crates for what a formula or a table from
+a file, or text pasted from elsewhere, can make Desk do. Formulas compute
+values only: no function reads files, the network, the environment or
+other documents, and references to other sheets become `#REF!`. What a
+formula can do is spend time and memory, which findings 1, 2, 4, 5 and 6
+now bound. The rest it checked: a range is bounded to a million cells and
+a table to 65,535 rows and columns; `REPT` was bounded already;
+`FIXED` and the number formats bound their decimals.
+
+## Lints (D-028)
+
+`desk-formula` denies `clippy::indexing_slicing` and `clippy::unwrap_used`
+in its library code. Its arguments are taken with `at`, which gives
+`#VALUE!` for one missing, and the tokenizer, the wildcard matcher,
+`MEDIAN`, `SUMPRODUCT`, `CHOOSE` and `RIGHT` use checked access.
+
+## Fuzzing
+
+A new target, `formula_parse`, reads any text as a formula, writes it as
+text and as OpenFormula and reads both back the same, and evaluates it in
+a table. It stopped on findings 20 to 23; after
+their fixes it ran its hour, 4.5 million formulas, without a failure. Its results are in the pull request.
+
+`proptest`, which the plan named for formulas against known values, was
+not needed here: the round trip of the fuzz target checks the writers,
+and the tests check each function against known values. It is used in
+batch 3, for each operation of the model and its inverse.

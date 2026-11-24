@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use crate::value::{ErrorKind, format_number};
+use crate::value::{ErrorKind, formula_number};
 
 /// A cell that a formula names, by its column and row from 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -40,7 +40,7 @@ impl CellRef {
             i += 1;
         }
         let letters_start = i;
-        while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+        while bytes.get(i).is_some_and(u8::is_ascii_alphabetic) {
             i += 1;
         }
         let letters = &name[letters_start..i];
@@ -266,6 +266,7 @@ impl Formula {
         let mut parser = Parser {
             tokens: &tokens,
             pos: 0,
+            depth: 0,
         };
         let expr = parser.expr(0).map_err(|mut e| {
             e.at += offset;
@@ -450,7 +451,7 @@ impl fmt::Display for ExprDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let parent = self.1;
         match self.0 {
-            Expr::Number(n) => f.write_str(&format_number(*n)),
+            Expr::Number(n) => f.write_str(&formula_number(*n)),
             Expr::Text(t) => write!(f, "\"{}\"", t.replace('"', "\"\"")),
             Expr::Bool(b) => f.write_str(if *b { "TRUE" } else { "FALSE" }),
             Expr::Error(e) => f.write_str(e.code()),
@@ -460,7 +461,13 @@ impl fmt::Display for ExprDisplay<'_> {
             Expr::Unary(UnaryOp::Percent, a) => write!(f, "{}%", ExprDisplay(a, 7)),
             Expr::Unary(op, a) => {
                 let sign = if *op == UnaryOp::Negate { "-" } else { "+" };
-                write!(f, "{sign}{}", ExprDisplay(a, 6))
+                // A sign under a percent takes parentheses: -(1)% reads
+                // as the sign of the percent.
+                if parent > 6 {
+                    write!(f, "({sign}{})", ExprDisplay(a, 6))
+                } else {
+                    write!(f, "{sign}{}", ExprDisplay(a, 6))
+                }
             }
             Expr::Binary(op, a, b) => {
                 let p = op.precedence();
@@ -516,30 +523,30 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
         at,
         message: message.to_owned(),
     };
-    while i < chars.len() {
-        let (at, c) = chars[i];
+    // The character at an index, or none past the end.
+    let ch = |i: usize| chars.get(i).map_or('\0', |c| c.1);
+    while let Some(&(at, c)) = chars.get(i) {
         match c {
             c if c.is_whitespace() => i += 1,
             '0'..='9' | '.' => {
-                let start = i;
-                while i < chars.len() && (chars[i].1.is_ascii_digit() || chars[i].1 == '.') {
+                while ch(i).is_ascii_digit() || ch(i) == '.' {
                     i += 1;
                 }
-                if i < chars.len() && matches!(chars[i].1, 'e' | 'E') {
+                if matches!(ch(i), 'e' | 'E') {
                     let mut j = i + 1;
-                    if j < chars.len() && matches!(chars[j].1, '+' | '-') {
+                    if matches!(ch(j), '+' | '-') {
                         j += 1;
                     }
-                    if j < chars.len() && chars[j].1.is_ascii_digit() {
+                    if ch(j).is_ascii_digit() {
                         i = j;
-                        while i < chars.len() && chars[i].1.is_ascii_digit() {
+                        while ch(i).is_ascii_digit() {
                             i += 1;
                         }
                     }
                 }
                 // A name that starts with digits, as 2006Q1, is a header.
-                if i < chars.len() && (chars[i].1.is_alphabetic() || chars[i].1 == '_') {
-                    while i < chars.len() && is_name_char(chars[i].1) {
+                if ch(i).is_alphabetic() || ch(i) == '_' {
+                    while is_name_char(ch(i)) {
                         i += 1;
                     }
                     let end = chars.get(i).map_or(text.len(), |c| c.0);
@@ -547,9 +554,12 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                     continue;
                 }
                 let end = chars.get(i).map_or(text.len(), |c| c.0);
-                let n: f64 = text[chars[start].0..end]
-                    .parse()
-                    .map_err(|_| err(at, "bad number"))?;
+                let n: f64 = text[at..end].parse().map_err(|_| err(at, "bad number"))?;
+                // 1E999 is past the largest number, and could not be
+                // written back.
+                if !n.is_finite() {
+                    return Err(err(at, "number too large"));
+                }
                 out.push((at, Token::Number(n)));
             }
             '"' | '\'' => {
@@ -580,17 +590,22 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                     },
                 ));
             }
+            // The longest code the text starts with: read up to the last
+            // character a code may hold, #REF!/0 was one unknown code.
             '#' => {
-                let start = i;
-                i += 1;
-                while i < chars.len()
-                    && (chars[i].1.is_ascii_alphanumeric() || "/!?".contains(chars[i].1))
-                {
-                    i += 1;
-                }
-                let end = chars.get(i).map_or(text.len(), |c| c.0);
-                let code = &text[chars[start].0..end];
-                let kind = ErrorKind::from_code(code).ok_or_else(|| err(at, "unknown error"))?;
+                let rest = text.get(at..).unwrap_or_default();
+                let (kind, len) = ErrorKind::ALL
+                    .iter()
+                    .map(|k| (*k, k.code()))
+                    .filter(|(_, code)| {
+                        rest.get(..code.len())
+                            .is_some_and(|p| p.eq_ignore_ascii_case(code))
+                    })
+                    .map(|(k, code)| (k, code.len()))
+                    .max_by_key(|(_, len)| *len)
+                    .ok_or_else(|| err(at, "unknown error"))?;
+                // Codes are ASCII: as many characters as bytes.
+                i += len;
                 out.push((at, Token::Error(kind)));
             }
             '(' => {
@@ -649,7 +664,7 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                 i += 1;
             }
             c if is_name_char(c) => {
-                while i < chars.len() && is_name_char(chars[i].1) {
+                while is_name_char(ch(i)) {
                     i += 1;
                 }
                 let end = chars.get(i).map_or(text.len(), |c| c.0);
@@ -665,9 +680,26 @@ fn is_name_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '$' || c == '.'
 }
 
+/// How deep a formula may nest before it is refused: deeper, the parser
+/// and then the evaluator and the writer, which recurse, would overflow
+/// the stack. A file can hold any formula. An operator after another, as
+/// in =A1+A2+...+A1000, costs `OPERATOR_COST`; a parenthesis, a sign, a
+/// percent or a function, which the parser recurses for too, cost
+/// `NESTING_COST`.
+pub const MAX_NESTING: usize = 2048;
+
+/// What an operator of a chain costs of [`MAX_NESTING`].
+pub const OPERATOR_COST: usize = 2;
+
+/// What a parenthesis, a sign, a percent or a function costs of
+/// [`MAX_NESTING`].
+pub const NESTING_COST: usize = 8;
+
 struct Parser<'a> {
     tokens: &'a [(usize, Token)],
     pos: usize,
+    /// How deep the expression being read now is.
+    depth: usize,
 }
 
 impl Parser<'_> {
@@ -709,21 +741,41 @@ impl Parser<'_> {
         })
     }
 
+    /// Goes one level deeper, or refuses a formula that nests too deep.
+    fn enter(&mut self, cost: usize) -> Result<(), ParseError> {
+        self.depth += cost;
+        if self.depth > MAX_NESTING {
+            return Err(self.error("the formula nests too deep"));
+        }
+        Ok(())
+    }
+
     fn expr(&mut self, min: u8) -> Result<Expr, ParseError> {
+        let depth = self.depth;
         let mut left = self.unary()?;
         while let Some(op) = self.binary_op() {
             let p = op.precedence();
             if p < min.max(1) {
                 break;
             }
+            // Each operator puts what came before one level deeper.
+            self.enter(OPERATOR_COST)?;
             self.pos += 1;
             let right = self.expr(p + 1)?;
             left = Expr::Binary(op, Box::new(left), Box::new(right));
         }
+        self.depth = depth;
         Ok(left)
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
+        self.enter(NESTING_COST)?;
+        let e = self.unary_inner();
+        self.depth -= NESTING_COST;
+        e
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             Some(Token::Op("-")) => {
                 self.pos += 1;
@@ -738,11 +790,14 @@ impl Parser<'_> {
     }
 
     fn postfix(&mut self) -> Result<Expr, ParseError> {
+        let depth = self.depth;
         let mut e = self.primary()?;
         while self.peek() == Some(&Token::Op("%")) {
+            self.enter(NESTING_COST)?;
             self.pos += 1;
             e = Expr::Unary(UnaryOp::Percent, Box::new(e));
         }
+        self.depth = depth;
         Ok(e)
     }
 
@@ -757,7 +812,11 @@ impl Parser<'_> {
             Token::Quoted(q) => Ok(Expr::Header(q)),
             Token::Error(e) => Ok(Expr::Error(e)),
             Token::Open => {
+                // With the sign or the operand around it, a parenthesis
+                // costs twice.
+                self.enter(NESTING_COST)?;
                 let e = self.expr(0)?;
+                self.depth -= NESTING_COST;
                 if self.peek() != Some(&Token::Close) {
                     return Err(self.error("missing )"));
                 }
@@ -767,6 +826,7 @@ impl Parser<'_> {
             Token::Name(name) => {
                 if self.peek() == Some(&Token::Open) {
                     self.pos += 1;
+                    self.enter(NESTING_COST)?;
                     let mut args = Vec::new();
                     if self.peek() == Some(&Token::Close) {
                         self.pos += 1;
@@ -783,7 +843,11 @@ impl Parser<'_> {
                             }
                         }
                     }
-                    return Ok(Expr::Call(name.to_uppercase(), args));
+                    self.depth -= NESTING_COST;
+                    // The names of functions are ASCII: the capital of
+                    // another letter, such as ǰ, may be two characters
+                    // that no name holds.
+                    return Ok(Expr::Call(name.to_ascii_uppercase(), args));
                 }
                 if let Some(a) = CellRef::parse(&name) {
                     if self.peek() == Some(&Token::Colon) {
@@ -862,5 +926,138 @@ mod tests {
         assert_eq!(CellRef::column_name(26), "AA");
         assert_eq!(CellRef::parse("AA10"), Some(CellRef::new(26, 9)));
         assert_eq!(CellRef::parse("A0"), None);
+    }
+
+    #[test]
+    fn a_call_of_a_name_that_is_not_ascii_is_written_back_as_read() {
+        // Found by fuzzing formula_parse: ǰ became J and a combining caron.
+        let f = Formula::parse("=ǰ$TE()").unwrap();
+        assert_eq!(Formula::parse(&f.to_string()).unwrap(), f);
+        assert_eq!(Formula::parse("=sum(1)").unwrap().to_string(), "=SUM(1)");
+    }
+
+    #[test]
+    fn an_error_followed_by_an_operator_is_written_back_as_read() {
+        // Found by fuzzing formula_parse: #REF! /0 was written #REF!/0,
+        // read as one unknown code.
+        for text in ["=#REF! /0", "=#N/A /2", "=#div/0!+1"] {
+            let f = Formula::parse(text).unwrap();
+            assert_eq!(Formula::parse(&f.to_string()).unwrap(), f, "{text}");
+        }
+        assert!(Formula::parse("=#NOPE!").is_err());
+    }
+
+    #[test]
+    fn a_number_past_the_largest_is_refused() {
+        // Found by fuzzing formula_parse: 1E999 was read as infinity,
+        // written as inf and read back as a header.
+        assert!(Formula::parse("=1E999+1").is_err());
+        assert!(Formula::parse("=1E308").is_ok());
+    }
+
+    #[test]
+    fn a_sign_under_a_percent_keeps_its_parentheses() {
+        // Found by fuzzing formula_parse: written as =--(1+2)%, it read
+        // back as the sign of the percent.
+        for text in ["=-(-(1+2))%", "=(-A1)%", "=-A1%"] {
+            let f = Formula::parse(text).unwrap();
+            assert_eq!(Formula::parse(&f.to_string()).unwrap(), f, "{text}");
+        }
+        assert_eq!(Formula::parse("=(-A1)%").unwrap().to_string(), "=(-A1)%");
+    }
+
+    #[test]
+    fn small_and_large_constants_are_written_in_full() {
+        // A formula written back after a row was inserted lost its small
+        // constants: =A1*1E-16 became =A2*0 (review RV, batch 2).
+        assert_eq!(
+            Formula::parse("=A1*1E-16").unwrap().moved(0, 1).to_string(),
+            "=A2*1E-16"
+        );
+        for text in [
+            "=1.2345E-14",
+            "=0.1",
+            "=123.456",
+            "=1E300",
+            "=0.00001",
+            "=3",
+        ] {
+            let once = round_trip(text);
+            let n = |t: &str| match Formula::parse(t).unwrap().expr {
+                Expr::Number(n) => n,
+                other => panic!("{other:?}"),
+            };
+            assert_eq!(n(&once).to_bits(), n(text).to_bits(), "{text} -> {once}");
+        }
+    }
+
+    #[test]
+    fn formulas_that_nest_too_deep_are_refused() {
+        // 200,000 parentheses, signs or operators overflowed the stack of
+        // the parser, and then of the evaluator (review RV, batch 2).
+        let deep = format!("={}1{}", "(".repeat(200_000), ")".repeat(200_000));
+        assert!(Formula::parse(&deep).is_err());
+        assert!(Formula::parse(&format!("={}1", "-".repeat(200_000))).is_err());
+        assert!(Formula::parse(&format!("=1{}", "%".repeat(200_000))).is_err());
+        assert!(Formula::parse(&format!("=1{}", "+1".repeat(200_000))).is_err());
+        assert!(
+            Formula::parse_odf(&format!(
+                "of:={}1{}",
+                "(".repeat(200_000),
+                ")".repeat(200_000)
+            ))
+            .is_err()
+        );
+        let within = format!("={}1{}", "(".repeat(100), ")".repeat(100));
+        assert!(Formula::parse(&within).is_ok());
+        // A long sum of cells, as people write, stays within.
+        let sum = format!("=A1{}", "+A1".repeat(400));
+        assert!(Formula::parse(&sum).is_ok());
+    }
+
+    #[test]
+    fn the_deepest_formula_allowed_is_evaluated_and_written() {
+        // In a thread with a small stack, as the tests have, in a build
+        // without optimization.
+        struct Cells;
+        impl crate::Context for Cells {
+            fn cell(&self, _: CellRef) -> crate::Value {
+                crate::Value::Number(1.0)
+            }
+            fn header(&self, _: &str) -> Option<(CellRef, CellRef)> {
+                None
+            }
+        }
+        // The largest of each form that is read.
+        let largest = |form: &dyn Fn(usize) -> String| {
+            let (mut low, mut high) = (1_usize, 5_000);
+            while low < high {
+                let mid = (low + high).div_ceil(2);
+                if Formula::parse(&form(mid)).is_ok() {
+                    low = mid;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            form(low)
+        };
+        let forms: [&dyn Fn(usize) -> String; 6] = [
+            &|n| format!("={}A1{}", "(-".repeat(n), ")".repeat(n)),
+            &|n| format!("={}A1{}", "ABS(".repeat(n), ")".repeat(n)),
+            &|n| format!("={}A1{}", "(".repeat(n), ")".repeat(n)),
+            &|n| format!("=A1{}", "^A1".repeat(n)),
+            &|n| format!("=A1{}", "-A1".repeat(n)),
+            &|n| format!("=A1{}", "%".repeat(n)),
+        ];
+        for text in forms.iter().map(|form| largest(*form)) {
+            let formula = Formula::parse(&text).unwrap();
+            assert!(!formula.to_string().is_empty());
+            let _ = crate::evaluate(&formula, &Cells);
+            let _ = formula.moved(0, 1).to_odf();
+        }
+        // A chain of a thousand cells added, as other spreadsheets write
+        // them, is read (review of the pull request of RV batch 2).
+        let sum = format!("=A1{}", "+A1".repeat(999));
+        assert!(Formula::parse(&sum).is_ok());
     }
 }
