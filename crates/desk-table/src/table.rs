@@ -617,6 +617,7 @@ impl<T: CellText> Table<T> {
             for c in 0..cols {
                 let mut cell = self.cell(model_row, c).cleared();
                 cell.comment = None;
+                cell.move_references(0, i64::from(at + k) - i64::from(model_row));
                 if let Some(f) = &repeated[c as usize]
                     && let Ok(formula) = Formula::parse(f)
                 {
@@ -838,12 +839,24 @@ impl<T: CellText> Table<T> {
     }
 
     fn shift_formulas(&mut self, axis: Axis, at: u32, count: i64) {
+        // A cell a rule compares with moves as a formula's reference does,
+        // and is deleted with its row or column.
+        let mut shift = |r: desk_formula::CellRef| match (Formula {
+            expr: desk_formula::Expr::Cell(r),
+        })
+        .shifted(axis, at, count)
+        .expr
+        {
+            desk_formula::Expr::Cell(r) => Some(r),
+            _ => None,
+        };
         for cell in &mut self.cells {
             if let Content::Formula(text) = &cell.content
                 && let Ok(f) = Formula::parse(text)
             {
                 cell.content = Content::Formula(f.shifted(axis, at, count).to_string());
             }
+            cell.rules = crate::conditional::map_rule_cells(&cell.rules, &mut shift);
         }
     }
 
@@ -921,18 +934,28 @@ impl<T: CellText> Table<T> {
             return None;
         }
         let lower = typed.to_lowercase();
-        let found: Vec<String> = self
-            .column_texts(col)
-            .into_iter()
-            .enumerate()
-            .filter(|(i, t)| {
-                *i as u32 + self.body_start() != row
-                    && t.to_lowercase().starts_with(&lower)
+        // The texts of the other cells of the column, by row: the list of
+        // the column skips empty cells and repeats, so its index is no
+        // row (review RV, batch 2).
+        let mut found: Vec<String> = Vec::new();
+        for r in self.body_start()..self.body_end() {
+            if r == row {
+                continue;
+            }
+            if let Content::Text(t) = &self.cell(r, col).content {
+                let t = t.plain();
+                if t.to_lowercase().starts_with(&lower)
                     && t.len() > typed.len()
-            })
-            .map(|(_, t)| t)
-            .collect();
-        (found.len() == 1).then(|| found[0].clone())
+                    && !found.contains(&t)
+                {
+                    found.push(t);
+                }
+            }
+        }
+        match found.as_slice() {
+            [one] => Some(one.clone()),
+            _ => None,
+        }
     }
 
     /// The table with the cells of a column moved, for operations.
@@ -1133,6 +1156,13 @@ mod tests {
         table.type_text(2, 1, "Banana", &en);
         assert_eq!(table.suggestion(3, 1, "ma"), Some("Maçã".into()));
         assert_eq!(table.suggestion(3, 1, "x"), None);
+        // An empty cell above: the suggestion still comes, from the row
+        // below (review RV, batch 2). The cell typed in is not its own
+        // suggestion.
+        let mut other = t(4, 2);
+        other.type_text(2, 1, "Maçã", &en);
+        assert_eq!(other.suggestion(1, 1, "ma"), Some("Maçã".into()));
+        assert_eq!(other.suggestion(2, 1, "ma"), None);
         table.options.autocomplete = false;
         assert_eq!(table.suggestion(3, 1, "ma"), None);
     }

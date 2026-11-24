@@ -12,8 +12,6 @@
 //! Merged cells stay as they were in the source and are not made at the
 //! destination.
 
-use desk_formula::Formula;
-
 use crate::cell::{Cell, CellText, Content};
 use crate::table::{Area, Table};
 
@@ -21,11 +19,7 @@ use crate::table::{Area, Table};
 /// references of its formula moved along.
 fn carried<T: CellText>(cell: &Cell<T>, rows: i64, cols: i64) -> Cell<T> {
     let mut cell = cell.clone();
-    if let Content::Formula(f) = &cell.content
-        && let Ok(parsed) = Formula::parse(f)
-    {
-        cell.content = Content::Formula(parsed.moved(cols, rows).to_string());
-    }
+    cell.move_references(cols, rows);
     cell
 }
 

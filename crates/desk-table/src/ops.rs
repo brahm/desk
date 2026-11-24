@@ -180,16 +180,8 @@ impl<T: CellText> Table<T> {
             let to = start + i as u32;
             for c in 0..cols {
                 let mut cell = old[(from * cols + c) as usize].clone();
-                // A formula moves with its row.
-                if let Content::Formula(f) = &cell.content
-                    && let Ok(parsed) = Formula::parse(f)
-                {
-                    cell.content = Content::Formula(
-                        parsed
-                            .moved(0, i64::from(to) - i64::from(*from))
-                            .to_string(),
-                    );
-                }
+                // A formula and the rules move with their row.
+                cell.move_references(0, i64::from(to) - i64::from(*from));
                 cells[(to * cols + c) as usize] = cell;
             }
             new_heights[to as usize] = heights[*from as usize];
@@ -278,6 +270,9 @@ impl<T: CellText> Table<T> {
                     },
                     _ => from.content.clone(),
                 };
+                cell.rules = crate::conditional::map_rule_cells(&cell.rules, &mut |at| {
+                    at.moved(i64::from(c) - i64::from(fc), i64::from(r) - i64::from(fr))
+                });
                 *self.cell_mut(r, c) = cell;
             }
         }
