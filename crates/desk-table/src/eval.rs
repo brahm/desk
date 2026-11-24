@@ -45,14 +45,22 @@ const MAX_WORK: u64 = 1 << 27;
 /// tables, each within [`MAX_WORK`], holds the app no longer than two.
 const MAX_DOCUMENT_WORK: u64 = 1 << 28;
 
+/// The work left and the tables evaluated while a [`WorkScope`] lives.
+struct SharedWork {
+    left: u64,
+    /// The values of the tables evaluated, by what they depend on: a
+    /// layout lays a table out more than once, and its work is taken once.
+    done: HashMap<u64, Values>,
+}
+
 thread_local! {
-    /// What is left of [`MAX_DOCUMENT_WORK`] while a [`WorkScope`] lives.
-    static SHARED_WORK: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    static SHARED_WORK: RefCell<Option<SharedWork>> = const { RefCell::new(None) };
 }
 
 /// While it lives, the tables evaluated on this thread share one budget
-/// of work, as those of a document laid out or saved do. Scopes opened
-/// inside it share the same budget.
+/// of work, as those of a document laid out or saved do, and a table
+/// evaluated again gives the values it gave. Scopes opened inside it
+/// share the same budget.
 #[must_use = "the budget is shared only while the scope lives"]
 pub struct WorkScope {
     outermost: bool,
@@ -61,9 +69,13 @@ pub struct WorkScope {
 /// Opens a [`WorkScope`].
 pub fn share_work() -> WorkScope {
     let outermost = SHARED_WORK.with(|w| {
-        let none = w.get().is_none();
+        let mut w = w.borrow_mut();
+        let none = w.is_none();
         if none {
-            w.set(Some(MAX_DOCUMENT_WORK));
+            *w = Some(SharedWork {
+                left: MAX_DOCUMENT_WORK,
+                done: HashMap::new(),
+            });
         }
         none
     });
@@ -73,7 +85,7 @@ pub fn share_work() -> WorkScope {
 impl Drop for WorkScope {
     fn drop(&mut self) {
         if self.outermost {
-            SHARED_WORK.with(|w| w.set(None));
+            SHARED_WORK.with(|w| *w.borrow_mut() = None);
         }
     }
 }
@@ -299,6 +311,14 @@ impl<T: CellText> Context for Evaluator<'_, T> {
             None => false,
         }
     }
+
+    fn spend_done(&self, work: u64) -> bool {
+        let fits = self.spend(work);
+        if !fits {
+            self.work_left.set(0);
+        }
+        fits
+    }
 }
 
 /// The body cells that the text of a header names: the column under a
@@ -337,13 +357,48 @@ impl<T: CellText> Table<T> {
     /// The values of all the cells, with the formulas computed; `now` is
     /// the date and time for TODAY and NOW, in days from 30 December 1899.
     pub fn values(&self, now: f64) -> Values {
-        self.values_within(now, MAX_WORK)
+        let Some(left) = SHARED_WORK.with(|w| w.borrow().as_ref().map(|w| w.left)) else {
+            return self.values_within(now, MAX_WORK);
+        };
+        let key = self.fingerprint(now);
+        let done =
+            SHARED_WORK.with(|w| w.borrow().as_ref().and_then(|w| w.done.get(&key).cloned()));
+        if let Some(values) = done {
+            return values;
+        }
+        let (values, spent) = self.values_spent(now, MAX_WORK.min(left));
+        SHARED_WORK.with(|w| {
+            if let Some(w) = w.borrow_mut().as_mut() {
+                w.left = w.left.saturating_sub(spent);
+                w.done.insert(key, values.clone());
+            }
+        });
+        values
+    }
+
+    /// What the values of the table depend on: its cells, its headers
+    /// and footers, and the time.
+    fn fingerprint(&self, now: f64) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (self.rows(), self.cols()).hash(&mut h);
+        (self.header_rows(), self.header_cols(), self.footer_rows()).hash(&mut h);
+        now.to_bits().hash(&mut h);
+        for r in 0..self.rows() {
+            for c in 0..self.cols() {
+                self.cell(r, c).content.hash(&mut h);
+            }
+        }
+        h.finish()
     }
 
     /// [`Table::values`] with `work` for the formulas to do.
     fn values_within(&self, now: f64, work: u64) -> Values {
-        let shared = SHARED_WORK.with(std::cell::Cell::get);
-        let work = shared.map_or(work, |left| work.min(left));
+        self.values_spent(now, work).0
+    }
+
+    /// [`Table::values_within`], with the work spent.
+    fn values_spent(&self, now: f64, work: u64) -> (Values, u64) {
         let eval = Evaluator {
             table: self,
             cache: RefCell::new(HashMap::new()),
@@ -357,15 +412,13 @@ impl<T: CellText> Table<T> {
                 values.push(eval.value(r, c));
             }
         }
-        if let Some(left) = shared {
-            let spent = work - eval.work_left.get();
-            SHARED_WORK.with(|w| w.set(Some(left - spent)));
-        }
-        Values {
+        let spent = work - eval.work_left.get();
+        let values = Values {
             cols: self.cols(),
             values,
             now,
-        }
+        };
+        (values, spent)
     }
 
     /// A cell as it shows: its value in its format.
@@ -449,24 +502,52 @@ mod tests {
     #[test]
     fn the_tables_of_a_document_share_their_work() {
         let en = Locale::en_us();
-        let mut t: Table<String> = Table::new(12, 2);
-        for r in 0..12 {
-            t.type_text(r, 0, "1", &en);
-            t.type_text(r, 1, "=SUM(A1:A65535)", &en);
-        }
+        let table = |n: &str| {
+            let mut t: Table<String> = Table::new(12, 2);
+            for r in 0..12 {
+                t.type_text(r, 0, n, &en);
+                t.type_text(r, 1, "=SUM(A1:A65535)", &en);
+            }
+            t
+        };
+        let (one, two) = (table("1"), table("2"));
         {
             let _scope = share_work();
-            SHARED_WORK.with(|w| w.set(Some(1 << 20)));
+            SHARED_WORK.with(|w| {
+                if let Some(w) = w.borrow_mut().as_mut() {
+                    w.left = 1 << 20;
+                }
+            });
             // A scope opened inside shares the same budget.
             let _inner = share_work();
-            let first = t.values(0.0);
+            let first = one.values(0.0);
             assert_eq!(first.get(11, 1), &Value::Number(12.0));
-            let second = t.values(0.0);
+            // The same table again, as a layout does, takes no more work.
+            assert_eq!(one.values(0.0), first);
+            assert_eq!(one.clone().values(0.0), first);
+            let second = two.values(0.0);
             assert_eq!(second.get(11, 1), &Value::Error(ErrorKind::Value));
         }
         // Out of the scope, each table has its own work again.
-        assert_eq!(SHARED_WORK.with(std::cell::Cell::get), None);
-        assert_eq!(t.values(0.0).get(11, 1), &Value::Number(12.0));
+        assert!(SHARED_WORK.with(|w| w.borrow().is_none()));
+        assert_eq!(two.values(0.0).get(11, 1), &Value::Number(24.0));
+    }
+
+    #[test]
+    fn matching_without_stars_spends_little() {
+        // A thousand rows that each count their name among the others
+        // (review of the pull request of RV batch 2).
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(1000, 3);
+        for r in 0..1000 {
+            let row = r + 1;
+            t.type_text(r, 0, &format!("{:a>20}", r), &en);
+            t.type_text(r, 1, &format!("=COUNTIF($A$1:$A$1000,A{row})"), &en);
+            t.type_text(r, 2, &format!("=MATCH(A{row},$A$1:$A$1000,0)"), &en);
+        }
+        let v = t.values(0.0);
+        assert_eq!(v.get(999, 1), &Value::Number(1.0));
+        assert_eq!(v.get(999, 2), &Value::Number(1000.0));
     }
 
     #[test]
@@ -474,14 +555,18 @@ mod tests {
         // A long text and many cells that each repeat it (review of the
         // pull request of RV batch 2).
         let en = Locale::en_us();
-        let mut t: Table<String> = Table::new(200, 1);
+        let mut t: Table<String> = Table::new(200, 2);
         t.type_text(0, 0, &"a".repeat(30_000), &en);
         for r in 1..200 {
             t.type_text(r, 0, "=$A$1", &en);
         }
+        t.type_text(199, 1, "=1+1", &en);
         let v = t.values_within(0.0, 1 << 20);
         assert!(matches!(v.get(1, 0), Value::Text(_)));
         assert_eq!(v.get(199, 0), &Value::Error(ErrorKind::Value));
+        // A text copied and refused spends the rest, so the formulas after
+        // it do not each copy it to be refused.
+        assert_eq!(v.get(199, 1), &Value::Error(ErrorKind::Value));
     }
 
     #[test]

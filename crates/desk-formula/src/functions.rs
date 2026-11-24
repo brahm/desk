@@ -267,8 +267,10 @@ fn wildcard_chars(p: &[char], t: &[char]) -> bool {
 }
 
 /// Takes from the work of the table what matching a pattern against
-/// texts costs at most: the pattern by the texts.
-fn spend_matching(e: &Eval<'_>, pattern: &Value, texts: &[Value]) -> Result<()> {
+/// texts costs at most: the pattern by the texts when the pattern holds
+/// one of `wild`, whose matching tries the pattern from many places, and
+/// the texts otherwise.
+fn spend_matching(e: &Eval<'_>, pattern: &Value, texts: &[Value], wild: &[char]) -> Result<()> {
     let Value::Text(p) = pattern else {
         return Ok(());
     };
@@ -279,13 +281,21 @@ fn spend_matching(e: &Eval<'_>, pattern: &Value, texts: &[Value]) -> Result<()> 
             _ => 1,
         })
         .sum();
-    let work = (p.len() as u64 + 1).saturating_mul(total as u64);
+    let work = if p.contains(wild) {
+        (p.len() as u64 + 1).saturating_mul(total as u64)
+    } else {
+        total as u64
+    };
     if e.context.spend(work) {
         Ok(())
     } else {
         Err(ErrorKind::Value)
     }
 }
+
+/// The characters with which matching a whole text tries a pattern from
+/// many places.
+const ANCHORED: &[char] = &['*'];
 
 fn date_parts(e: &Eval<'_>, x: &Expr) -> Result<(i32, u32, u32, f64)> {
     let n = num(e, x)?;
@@ -1063,7 +1073,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             } else {
                 test.clone()
             };
-            spend_matching(e, &crit, &test)?;
+            spend_matching(e, &crit, &test, ANCHORED)?;
             let mut s = 0.0;
             for (i, v) in test.iter().enumerate() {
                 if matches(v, &crit)
@@ -1153,7 +1163,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             } else {
                 test.clone()
             };
-            spend_matching(e, &crit, &test)?;
+            spend_matching(e, &crit, &test, ANCHORED)?;
             let picked: Vec<f64> = test
                 .iter()
                 .enumerate()
@@ -1214,7 +1224,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             count(a, 2, 2)?;
             let crit = e.scalar(at(a, 1)?);
             let test = e.arg(at(a, 0)?).values();
-            spend_matching(e, &crit, &test)?;
+            spend_matching(e, &crit, &test, ANCHORED)?;
             Ok(Value::Number(
                 test.iter().filter(|v| matches(v, &crit)).count() as f64,
             ))
@@ -1445,7 +1455,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let needle = e.scalar(at(a, 0)?);
             let hay = e.arg(at(a, 1)?).values();
             let kind = if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 };
-            spend_matching(e, &needle, &hay)?;
+            if kind == 0 {
+                spend_matching(e, &needle, &hay, ANCHORED)?;
+            }
             let pos = match kind {
                 0 => lookup_position(&needle, &hay, true),
                 -1 => hay
@@ -1476,7 +1488,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..rows).map(|i| r.at(i, 0)).collect();
-            spend_matching(e, &needle, &first)?;
+            if !approx {
+                spend_matching(e, &needle, &first, ANCHORED)?;
+            }
             let row = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row, col as usize - 1))
         }
@@ -1497,7 +1511,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..cols).map(|i| r.at(0, i)).collect();
-            spend_matching(e, &needle, &first)?;
+            if !approx {
+                spend_matching(e, &needle, &first, ANCHORED)?;
+            }
             let col = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row as usize - 1, col))
         }
@@ -1643,7 +1659,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
             let (needle, hay) = (text(e, at(a, 0)?)?, text(e, at(a, 1)?)?);
-            spend_matching(e, &Value::Text(needle.clone()), &[Value::Text(hay.clone())])?;
+            spend_matching(
+                e,
+                &Value::Text(needle.clone()),
+                &[Value::Text(hay.clone())],
+                &[],
+            )?;
             find(
                 &needle,
                 &hay,
@@ -1660,7 +1681,12 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
             let (needle, hay) = (text(e, at(a, 0)?)?, text(e, at(a, 1)?)?);
-            spend_matching(e, &Value::Text(needle.clone()), &[Value::Text(hay.clone())])?;
+            spend_matching(
+                e,
+                &Value::Text(needle.clone()),
+                &[Value::Text(hay.clone())],
+                &['*', '?'],
+            )?;
             find(
                 &needle,
                 &hay,

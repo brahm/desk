@@ -36,6 +36,14 @@ pub trait Context {
         let _ = work;
         true
     }
+
+    /// Takes `work` already done, as a text copied, from what is left:
+    /// all of it when too little is left, so that the formulas after it
+    /// are not computed to be refused in turn. False then, as
+    /// [`Context::spend`].
+    fn spend_done(&self, work: u64) -> bool {
+        self.spend(work)
+    }
 }
 
 /// The longest text a formula makes, in bytes, as the 32,767 characters
@@ -106,7 +114,9 @@ impl Eval<'_> {
     /// each repeat a long text would fill the memory.
     fn cell(&self, at: CellRef) -> Value {
         match self.context.cell(at) {
-            Value::Text(t) if !self.context.spend(t.len() as u64) => Value::Error(ErrorKind::Value),
+            Value::Text(t) if !self.context.spend_done(t.len() as u64) => {
+                Value::Error(ErrorKind::Value)
+            }
             v => v,
         }
     }
@@ -136,7 +146,7 @@ impl Eval<'_> {
                 _ => 0,
             })
             .sum();
-        if !self.context.spend(bytes as u64) {
+        if !self.context.spend_done(bytes as u64) {
             return Arg::Scalar(Value::Error(ErrorKind::Value));
         }
         Arg::Range {
@@ -195,7 +205,7 @@ impl Eval<'_> {
             Expr::Binary(op, a, b) => self.binary(*op, &self.scalar(a), &self.scalar(b)),
             Expr::Call(name, args) => match functions::function(name) {
                 Some(f) => match (f.run)(self, args) {
-                    Value::Text(t) if !self.context.spend(t.len() as u64) => {
+                    Value::Text(t) if !self.context.spend_done(t.len() as u64) => {
                         Value::Error(ErrorKind::Value)
                     }
                     v => v,
