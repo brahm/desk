@@ -35,6 +35,7 @@ dict_of() {
     case $1 in
         pages_*) echo iwork.dict ;;
         html_*) echo html.dict ;;
+        formula_*) echo formula.dict ;;
         *) echo odf.dict ;;
     esac
 }

@@ -153,8 +153,10 @@ name = "desk-fuzz"
 version = "0.0.0"
 dependencies = [
  "desk-filters",
+ "desk-formula",
  "desk-model",
  "desk-odf",
+ "desk-table",
  "libfuzzer-sys",
 ]
 
