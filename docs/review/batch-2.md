@@ -10,10 +10,10 @@ evaluation). Reviewed on 24 November 2026 from commit `145c979`, with
 
 | # | Class | Where | What failed | What was done |
 | --- | --- | --- | --- | --- |
-| 1 | A | `desk-formula/src/parse.rs` | A formula of many parentheses, signs or operators overflowed the stack of the parser, which aborts the app | Nesting is bounded (`MAX_NESTING`, 512 levels, parentheses and calls counting twice); deeper formulas are a syntax error; tests at the limit and past it |
+| 1 | A | `desk-formula/src/parse.rs` | A formula of many parentheses, signs or operators overflowed the stack of the parser, which aborts the app | Nesting is bounded (`MAX_NESTING`, 2,048, of which an operator of a chain costs 2 and a parenthesis, sign, percent or call 8); deeper formulas are a syntax error; the deepest of each form is computed in a test thread |
 | 2 | A | `desk-table/src/eval.rs` | A chain of formulas that each refer to the next, as a running balance from the bottom up, overflowed the stack | What a formula depends on is computed first with a stack of its own, and every cell of a cycle is circular; test with a chain of 20,000 |
 | 3 | A | `desk-formula/src/parse.rs`, `value.rs` | A formula written back after a row was inserted lost its small constants: `=A1*1E-16` became `=A2*0` | Constants are written in full (`formula_number`); test |
-| 4 | A | `desk-formula/src/eval.rs`, `functions.rs`, `desk-table/src/eval.rs` | *Security.* A file could hold formulas that each read a large range, or texts that double from cell to cell (`=A1&A1`) or grow by `SUBSTITUTE`, so that opening it held the app for minutes or filled its memory | A formula makes at most 32,767 bytes of text (`MAX_TEXT`); one evaluation of a table reads at most 2^27 cells of ranges, header cells and bytes of text, and the formulas past it give `#VALUE!`; the worst table measured stops in under two seconds; tests |
+| 4 | A | `desk-formula/src/eval.rs`, `functions.rs`, `desk-table/src/eval.rs` | *Security.* A file could hold formulas that each read a large range, or texts that double from cell to cell (`=A1&A1`) or grow by `SUBSTITUTE`, so that opening it held the app for minutes or filled its memory | A formula makes at most 32,767 bytes of text (`MAX_TEXT`); one evaluation of a table reads at most 2^27 cells of ranges, header cells, bytes of text and steps of matching, and the tables of a document laid out or saved share 2^28; the formulas past it give `#VALUE!`; the worst table measured stops in under two seconds; tests |
 | 5 | A | `desk-table/src/copy.rs` | *Security.* Pasted text grew the table one row and one column at a time, moving the whole table each time, so a long text took minutes; one line of many tabs and many lines, a short text, asked for billions of cells | The table grows once, to a million cells at most; test |
 | 6 | B | `desk-table/src/format.rs` | *Security.* A custom number format of many zeros, from a file, padded the number one zero at a time, in quadratic time for every cell shown | The zeros are put at once; test with 200,000 |
 | 7 | C | `desk-formula/src/functions.rs` | `SEARCH` with `*` or `?` built every prefix of the text from every start, in cubic time: a text of a few thousand characters took minutes | The pattern followed by `*` is matched once from each start; test |
@@ -39,6 +39,29 @@ Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
 
 No finding of the batch was moved to the backlog.
+
+## Review of the pull request
+
+`/code-review` and `/security-review` of pull request #203 found more,
+fixed in the same pull request:
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 25 | A | `desk-formula/src/parse.rs` | Every operator of a flat chain counted as a level of nesting, so `=A1+…+A600`, as other spreadsheets write, was refused and lost on importing ODT | An operator of a chain costs less than a parenthesis; chains of a thousand operators are read; test |
+| 26 | A | `desk-formula/src/functions.rs` | *Security.* Matching `*` and `?` in COUNTIF, SUMIF, AVERAGEIF, MATCH and the lookups backtracked, and SEARCH tried every start: one cell could take hundreds of billions of steps | The parts between the stars are found one after the other; matching spends the work of the table; test |
+| 27 | A | `desk-formula/src/eval.rs` | *Security.* `=$A$1` in many cells, with a long text in A1, copied it each time without a charge | Text read from a cell spends the work; test |
+| 28 | A | `desk-table/src/eval.rs`, `desk-layout`, `desk-filters/src/odt.rs` | *Security.* The budget was per table, and the layout evaluates them all: thousands of small tables could hold the opening for hours | The tables of a document laid out or saved share one budget (`share_work`); test |
+| 29 | B | `desk-table/src/eval.rs` | A range larger than any a formula reads emptied the work of the table, so every formula after it gave `#VALUE!`; `=ROW(A2)` in A2 was circular | A refused charge spends nothing; ROW, COLUMN, ROWS and COLUMNS depend on the place only; tests |
+| 30 | B | `desk-table/src/conditional.rs` | A rule whose cell was deleted, with "not equal", held for every cell | A rule with a deleted cell does not apply; test |
+| 31 | B | `desk-table/src/table.rs` | A row added at the top copied the references of the rule after they had moved | They are copied from where they were; test |
+| 32 | B | `desk-table/src/copy.rs`, `drag.rs`, `desk-ui` | Text pasted, cells dragged and Tab from the last cell added rows after the footer | They go to the end of the body; tests |
+| 33 | B | `desk-formula/src/functions.rs` | Rounding to 15 significant digits cut whole numbers: `=SUM(1234567890123456)` gave `1234567890123460` | Whole numbers are kept; test |
+| 34 | B | `desk-filters` | Merge joined numbers in the locale of `LANG` | An ODT in the language of its default style, Pages '09 in that of the system's numbers; test |
+
+A formula in a branch of `IF` that refers to its own cell stays circular,
+whichever branch is taken, as in Numbers: the dependencies are read from
+the formula, not from the branch taken, which keeps them computable
+without recursion.
 
 ## Security (D-029)
 

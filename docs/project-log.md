@@ -1992,6 +1992,13 @@ paragraph, and objects on a second page.
   (D-028), as the format libraries do. Formulas give `#VALUE!` past the
   budget of a table, which no table of normal size reaches. No finding
   went to the backlog.
+- The review of the pull request found ten more, fixed in it (findings
+  25 to 34): a sum of hundreds of cells, as other spreadsheets write it,
+  was refused as too deep; matching `*` in COUNTIF and the lookups, text
+  copied from one cell to many, and documents of thousands of tables
+  could still hold the app, so matching and copies now spend the budget
+  and the tables of a document share one; and six wrong results, among
+  them rows added after a footer and whole numbers rounded.
 
 ## Decisions, with their reasons and consequences
 

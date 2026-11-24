@@ -18,6 +18,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   dates typed without a year use the right day, language and year.
 * Fixed: rows added after a footer join it, splitting a cell keeps the
   merged cells beside it, and Jan, Feb fills on in English.
+* Fixed: sums of hundreds of cells written by other spreadsheets open,
+  and documents of many tables, or with wildcard searches over long
+  texts, no longer hold Desk while they open.
 * Fixed: Desk no longer closes, or runs out of memory, on Pages '09 and
   ODT files made to loop or to repeat cells without end, nor on GIF
   pictures that declare a huge size (review RV, batch 1).
