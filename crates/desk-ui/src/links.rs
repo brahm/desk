@@ -250,9 +250,55 @@ pub fn document_file(
     Some((path, bookmark.to_owned()))
 }
 
+/// The most characters of an address that a tooltip or a dialog shows.
+const MAX_SHOWN: usize = 300;
+
+/// An address as a tooltip or a dialog shows it: the characters that are
+/// not seen, or that turn the text around, written as a URL writes them,
+/// so that the address shown is the one opened; and a long one cut short
+/// (second review of RV batch 5).
+pub fn shown(link: &str) -> String {
+    let hidden = |c: char| {
+        c.is_control()
+            || matches!(c, '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}'
+                | '\u{2060}'..='\u{2069}' | '\u{061C}' | '\u{FEFF}')
+    };
+    let mut out = String::new();
+    for (count, c) in link.chars().enumerate() {
+        if count == MAX_SHOWN {
+            out.push('…');
+            break;
+        }
+        if hidden(c) {
+            let mut bytes = [0; 4];
+            for byte in c.encode_utf8(&mut bytes).bytes() {
+                out.push_str(&format!("%{byte:02X}"));
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_address_shows_what_it_opens() {
+        // Second review of RV batch 5: a link could hide or turn around
+        // part of its address in the tooltip and the dialog.
+        assert_eq!(shown("https://a.org/x"), "https://a.org/x");
+        assert_eq!(
+            shown("https://a.org/\u{202E}fdp.exe"),
+            "https://a.org/%E2%80%AEfdp.exe"
+        );
+        assert_eq!(shown("a\nb\u{200B}"), "a%0Ab%E2%80%8B");
+        let long = format!("https://a.org/{}", "x".repeat(1000));
+        assert_eq!(shown(&long).chars().count(), MAX_SHOWN + 1);
+        assert!(shown(&long).ends_with('…'));
+    }
 
     #[test]
     fn links_outside_the_document_follow_the_preferences() {

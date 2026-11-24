@@ -981,14 +981,13 @@ impl TextEditor {
         // Into selected cells, from the focused one (IOP-19).
         if self.selected_cells().is_some() {
             let weak = self.downgrade();
-            self.view.area().clipboard().read_text_async(
-                gtk::gio::Cancellable::NONE,
-                move |result| {
-                    if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
-                        this.paste_in_cells(&text);
-                    }
-                },
-            );
+            let clipboard = self.view.area().clipboard();
+            gtk::glib::spawn_future_local(async move {
+                if let (Some(text), Some(this)) = (clipboard_text(&clipboard).await, weak.upgrade())
+                {
+                    this.paste_in_cells(&text);
+                }
+            });
             return;
         }
         if self.paste_objects() {
@@ -1004,28 +1003,27 @@ impl TextEditor {
             return;
         }
         let weak = self.downgrade();
-        self.view
-            .area()
-            .clipboard()
-            .read_text_async(gtk::gio::Cancellable::NONE, move |result| {
-                let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) else {
-                    return;
-                };
-                let fragment = keep
-                    .then(|| {
-                        COPIED.with(|c| {
-                            c.borrow()
-                                .as_ref()
-                                .filter(|(copied, _)| copied.as_str() == text.as_str())
-                                .map(|(_, f)| f.clone())
-                        })
+        let clipboard = self.view.area().clipboard();
+        gtk::glib::spawn_future_local(async move {
+            let (Some(text), Some(this)) = (clipboard_text(&clipboard).await, weak.upgrade())
+            else {
+                return;
+            };
+            let fragment = keep
+                .then(|| {
+                    COPIED.with(|c| {
+                        c.borrow()
+                            .as_ref()
+                            .filter(|(copied, _)| copied.as_str() == text.as_str())
+                            .map(|(_, f)| f.clone())
                     })
-                    .flatten();
-                match fragment {
-                    Some(fragment) => this.paste_fragment(&fragment),
-                    None => this.replace_selection("Paste", &text),
-                }
-            });
+                })
+                .flatten();
+            match fragment {
+                Some(fragment) => this.paste_fragment(&fragment),
+                None => this.replace_selection("Paste", &text),
+            }
+        });
     }
 
     /// Pastes the text with its styles that another app of Desk put on the
@@ -1088,11 +1086,9 @@ impl TextEditor {
                 Ok(fragment) if !fragment.text().is_empty() => this.paste_fragment(&fragment),
                 // Nothing to read: the text alone.
                 _ => {
-                    clipboard.read_text_async(gtk::gio::Cancellable::NONE, move |result| {
-                        if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
-                            this.replace_selection("Paste", &text);
-                        }
-                    });
+                    if let Some(text) = clipboard_text(&clipboard).await {
+                        this.replace_selection("Paste", &text);
+                    }
                 }
             }
         });
@@ -1111,22 +1107,32 @@ impl TextEditor {
         {
             return false;
         }
+        // PNG if it is offered, as it is kept as it is read.
+        let types = formats.mime_types();
+        let Some(media_type) = types
+            .iter()
+            .find(|t| t.as_str() == "image/png")
+            .or_else(|| types.iter().find(|t| t.starts_with("image/")))
+            .map(|t| t.to_string())
+        else {
+            return false;
+        };
         let weak = self.downgrade();
-        clipboard.read_texture_async(gtk::gio::Cancellable::NONE, move |result| {
-            let (Ok(Some(texture)), Some(this)) = (result, weak.upgrade()) else {
-                return;
+        gtk::glib::spawn_future_local(async move {
+            // Read with a bound, and refused by the size its header gives
+            // before its pixels are made: a picture larger than the pages
+            // draw was decoded whole first (second review of RV batch 5).
+            let picture = match clipboard_bytes(&clipboard, &media_type).await {
+                Ok(bytes) => picture_of_image(&bytes, &media_type, MAX_PASTED_PIXELS),
+                Err(error) => Err(error),
             };
-            // A picture larger than the pages draw is not made into a PNG
-            // on the thread of the window (review RV, batch 5).
-            let pixels = i64::from(texture.width()) * i64::from(texture.height());
-            if pixels > 8192 * 8192 {
-                this.view.area().error_bell();
-                return;
-            }
-            let png = texture.save_to_png_bytes();
-            match desk_model::Picture::from_png(png.to_vec()) {
-                Some(picture) => this.insert_picture_in_line(picture),
-                None => gtk::glib::g_warning!("desk", "cannot paste the picture"),
+            let Some(this) = weak.upgrade() else { return };
+            match picture {
+                Ok(picture) => this.insert_picture_in_line(picture),
+                Err(error) => {
+                    gtk::glib::g_warning!("desk", "cannot paste the picture: {error}");
+                    this.view.area().error_bell();
+                }
             }
         });
         true
@@ -4189,7 +4195,7 @@ impl TextEditor {
             };
             match link {
                 Some(link) => {
-                    tooltip.set_text(Some(&link));
+                    tooltip.set_text(Some(&crate::links::shown(&link)));
                     true
                 }
                 None => false,
@@ -4258,7 +4264,10 @@ fn follow_outside(window: Option<&gtk::Window>, link: &str) {
             return;
         }
         Follow::Confirm => {
-            let dialog = adw::AlertDialog::new(Some(&tr("Open This Link?")), Some(link));
+            let dialog = adw::AlertDialog::new(
+                Some(&tr("Open This Link?")),
+                Some(&crate::links::shown(link)),
+            );
             dialog.add_response("cancel", &tr("_Cancel"));
             dialog.add_response("open", &tr("_Open"));
             dialog.set_default_response(Some("cancel"));
@@ -4266,7 +4275,7 @@ fn follow_outside(window: Option<&gtk::Window>, link: &str) {
         }
         Follow::Choose => {
             let body = tr("{link}\n\nDesk can open links of documents to the web at once, ask first each time, or never open them. Links to other documents always open. You can change this in Preferences.")
-                .replace("{link}", link);
+                .replace("{link}", &crate::links::shown(link));
             let dialog = adw::AlertDialog::new(Some(&tr("Open Links to the Web?")), Some(&body));
             dialog.add_response("never", &tr("_Never Open"));
             dialog.add_response("ask", &tr("_Ask First"));
@@ -4345,6 +4354,84 @@ pub(super) async fn clipboard_bytes(
     read_bounded(&stream, MAX_CLIPBOARD_BYTES).await
 }
 
+/// The text of the clipboard, read as [`clipboard_bytes`] are when
+/// another app offers it: the text alone was read whole, whatever its
+/// size (second review of RV batch 5).
+async fn clipboard_text(clipboard: &gdk::Clipboard) -> Option<String> {
+    if clipboard.is_local() {
+        return clipboard
+            .read_text_future()
+            .await
+            .ok()
+            .flatten()
+            .map(String::from);
+    }
+    const PLAIN: [&str; 3] = ["text/plain;charset=utf-8", "UTF8_STRING", "text/plain"];
+    let formats = clipboard.formats();
+    let media_type = PLAIN.iter().find(|t| formats.contain_mime_type(t))?;
+    match clipboard_bytes(clipboard, media_type).await {
+        Ok(bytes) => Some(plain_text(&bytes)),
+        Err(error) => {
+            gtk::glib::g_warning!("desk", "cannot paste the text: {error}");
+            None
+        }
+    }
+}
+
+/// The text of the bytes of a plain text, without the null that some
+/// apps end it with.
+fn plain_text(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    text.trim_end_matches('\0').to_string()
+}
+
+/// The most pixels of a picture pasted from another program: those of the
+/// largest the pages draw.
+const MAX_PASTED_PIXELS: i64 = 8192 * 8192;
+
+/// The picture of the bytes of an image of `media_type`, as a PNG, unless
+/// its header gives it more than `most` pixels: then its pixels are never
+/// made.
+fn picture_of_image(
+    bytes: &[u8],
+    media_type: &str,
+    most: i64,
+) -> Result<desk_model::Picture, String> {
+    use gtk::gdk_pixbuf::prelude::*;
+    let too_large = move |width: i32, height: i32| i64::from(width) * i64::from(height) > most;
+    let loader =
+        gtk::gdk_pixbuf::PixbufLoader::with_mime_type(media_type).map_err(|e| e.to_string())?;
+    let refused = std::rc::Rc::new(std::cell::Cell::new(false));
+    let flag = refused.clone();
+    loader.connect_size_prepared(move |loader, width, height| {
+        if too_large(width, height) {
+            flag.set(true);
+            // So that the pixels made before the next check are few.
+            loader.set_size(1, 1);
+        }
+    });
+    let mut written = Ok(());
+    for chunk in bytes.chunks(1 << 12) {
+        written = loader.write(chunk).map_err(|e| e.to_string());
+        if written.is_err() || refused.get() {
+            break;
+        }
+    }
+    let closed = loader.close().map_err(|e| e.to_string());
+    if refused.get() {
+        return Err("the picture is too large".to_string());
+    }
+    written.and(closed)?;
+    let pixbuf = loader.pixbuf().ok_or("no picture")?;
+    if too_large(pixbuf.width(), pixbuf.height()) {
+        return Err("the picture is too large".to_string());
+    }
+    let png = pixbuf
+        .save_to_bufferv("png", &[])
+        .map_err(|e| e.to_string())?;
+    desk_model::Picture::from_png(png).ok_or_else(|| "not a picture".to_string())
+}
+
 /// The bytes of a stream, read without blocking, or an error past `most`.
 async fn read_bounded(
     stream: &impl IsA<gtk::gio::InputStream>,
@@ -4388,6 +4475,22 @@ mod tests {
         let small = read(vec![7; 200_000], 300_000).unwrap();
         assert_eq!(small.len(), 200_000);
         assert!(read(vec![7; 400_000], 300_000).is_err());
+    }
+
+    #[test]
+    fn a_picture_pasted_is_refused_by_its_size_before_it_is_decoded() {
+        // Second review of RV batch 5: the picture of another program was
+        // decoded whole before its size was checked.
+        let pixbuf =
+            gtk::gdk_pixbuf::Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 64, 48)
+                .unwrap();
+        pixbuf.fill(0x3366_99ff);
+        let png = pixbuf.save_to_bufferv("png", &[]).unwrap();
+        let picture = picture_of_image(&png, "image/png", 64 * 48).unwrap();
+        assert_eq!((picture.width(), picture.height()), (64, 48));
+        assert!(picture_of_image(&png, "image/png", 64 * 48 - 1).is_err());
+        assert!(picture_of_image(b"not a picture", "image/png", 1 << 20).is_err());
+        assert_eq!(plain_text(b"text\0"), "text");
     }
 
     #[test]

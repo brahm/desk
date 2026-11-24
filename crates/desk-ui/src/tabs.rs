@@ -158,16 +158,7 @@ impl Frame {
         self.pages
             .borrow_mut()
             .push((tab.clone(), child.as_ref().clone(), page));
-        // The title of the window is that of the tab in sight.
-        let window = self.window.downgrade();
-        let view = self.view.downgrade();
-        tab.connect_title_notify(move |tab| {
-            if let (Some(window), Some(view)) = (window.upgrade(), view.upgrade())
-                && view.selected_page().as_ref() == Some(tab)
-            {
-                window.set_title(Some(&tab.title()));
-            }
-        });
+        self.follow_title(&tab);
         self.view.set_selected_page(&tab);
         self.route_actions();
         tab
@@ -191,6 +182,19 @@ impl Frame {
     /// in this window, whose tab the function gives back.
     pub(crate) fn set_new_tab(&self, open: impl Fn() -> Option<adw::TabPage> + 'static) {
         *self.new_tab.borrow_mut() = Some(Box::new(open));
+    }
+
+    /// Gives the window the title of a tab while it is the one in sight.
+    fn follow_title(&self, tab: &adw::TabPage) {
+        let window = self.window.downgrade();
+        let view = self.view.downgrade();
+        tab.connect_title_notify(move |tab| {
+            if let (Some(window), Some(view)) = (window.upgrade(), view.upgrade())
+                && view.selected_page().as_ref() == Some(tab)
+            {
+                window.set_title(Some(&tab.title()));
+            }
+        });
     }
 
     fn page_of(&self, tab: &adw::TabPage) -> Option<Rc<dyn FramePage>> {
@@ -354,12 +358,20 @@ impl Frame {
             }
         });
         // The window goes with its last tab.
+        // Not at once: the last tab dragged to another window leaves this
+        // one before it arrives there, and the window that holds it must
+        // still be listed then (review of RV batch 5).
         let weak = Rc::downgrade(self);
         self.view.connect_n_pages_notify(move |view| {
-            if view.n_pages() == 0
-                && let Some(this) = weak.upgrade()
-            {
-                this.window.destroy();
+            if view.n_pages() == 0 {
+                let weak = weak.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(this) = weak.upgrade()
+                        && this.view.n_pages() == 0
+                    {
+                        this.window.destroy();
+                    }
+                });
             }
         });
         // Closing the window closes each tab, which asks its document.
@@ -408,6 +420,7 @@ impl Frame {
         let Some(entry) = entry else { return };
         let page = entry.2.clone();
         self.pages.borrow_mut().push(entry);
+        self.follow_title(tab);
         page.moved_to(self);
         self.route_actions();
     }
@@ -471,6 +484,15 @@ mod tests {
                 moved: moved.clone(),
             });
             let tab = a.add(&gtk::Label::new(Some("x")), page);
+            // A second document in A, so that A stays after the first goes.
+            let other = a.add(
+                &gtk::Label::new(Some("y")),
+                Rc::new(Counted {
+                    actions: gio::SimpleActionGroup::new(),
+                    asked: Rc::new(Cell::new(0)),
+                    moved: Rc::new(Cell::new(0)),
+                }),
+            );
             a.view.transfer_page(&tab, &b.view, 0);
             assert!(a.page_of(&tab).is_none());
             assert!(b.page_of(&tab).is_some());
@@ -478,6 +500,11 @@ mod tests {
             b.view.close_page(&tab);
             assert_eq!(asked.get(), 1);
             assert_eq!(b.view.n_pages(), 1);
+            // The last tab of a window: the window empties before the tab
+            // arrives in the other (second review of RV batch 5).
+            a.view.transfer_page(&other, &b.view, 0);
+            assert_eq!(a.view.n_pages(), 0);
+            assert!(b.page_of(&other).is_some());
             a.window.destroy();
             b.window.destroy();
         });

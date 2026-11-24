@@ -83,11 +83,10 @@ type EditorAction = fn(&TextEditor);
 
 /// A window and the document it shows, if any.
 pub struct DocumentWindow {
-    /// The window that holds the tab of the document, shared with the
-    /// other documents of that window.
-    window: adw::ApplicationWindow,
     /// The window that holds the tab of the document.
     frame: RefCell<Rc<Frame>>,
+    /// The controllers the document added to that window.
+    window_controllers: RefCell<Vec<gtk::EventController>>,
     /// The tab of the document: everything the document shows, with its
     /// own breakpoints, since the window has the tabs of other documents.
     root: adw::BreakpointBin,
@@ -163,6 +162,10 @@ pub struct DocumentWindow {
     ruler_corner: gtk::Box,
     /// The recovery draft of the document, once one is written.
     draft: RefCell<Option<crate::recovery::Draft>>,
+    /// The name the draft keeps of a recovered document that is not saved
+    /// yet: the one it had, not its title, so that a second recovery does
+    /// not add to it (second review of RV batch 5).
+    draft_name: RefCell<Option<String>>,
     /// What Desk Slides adds to the window; none in Desk Writer.
     slides: Option<Rc<slides::Slides>>,
     /// Whether the document changed since the last draft.
@@ -296,6 +299,19 @@ impl DocumentWindow {
     /// The window that holds the tab of the document now.
     fn frame(&self) -> Rc<Frame> {
         self.frame.borrow().clone()
+    }
+
+    /// The GTK window that holds the tab of the document now.
+    pub fn window(&self) -> adw::ApplicationWindow {
+        self.frame.borrow().window().clone()
+    }
+
+    /// Adds a controller to the window that holds the tab, which moves
+    /// with the tab to another window.
+    fn add_window_controller(&self, controller: impl IsA<gtk::EventController>) {
+        let controller = controller.upcast();
+        self.window().add_controller(controller.clone());
+        self.window_controllers.borrow_mut().push(controller);
     }
 
     /// A new, empty document in a tab of the window in front, or in a new
@@ -593,7 +609,6 @@ impl DocumentWindow {
             .show_sidebar(false)
             .build();
 
-        let window = frame.window().clone();
         let root = adw::BreakpointBin::builder()
             .child(&nav_split)
             .width_request(360)
@@ -640,8 +655,8 @@ impl DocumentWindow {
         }
 
         let this = Rc::new(Self {
-            window,
             frame: RefCell::new(frame.clone()),
+            window_controllers: RefCell::new(Vec::new()),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -686,6 +701,7 @@ impl DocumentWindow {
             vertical_ruler,
             ruler_corner,
             draft: RefCell::new(None),
+            draft_name: RefCell::new(None),
             draft_due: Cell::new(false),
             toasts,
             before_screen: Cell::new(None),
@@ -699,7 +715,7 @@ impl DocumentWindow {
         this.connect_header(&find_toggle);
         this.add_rename();
         this.add_slides_actions();
-        warn_small_screen(&this.window, &screen_banner);
+        warn_small_screen(&this.window(), &screen_banner);
         this.show_rulers();
         {
             let current = preferences::get();
@@ -781,7 +797,7 @@ impl DocumentWindow {
                     editor.go_to_page(page - 1);
                     editor.focus();
                 } else {
-                    this.window.error_bell();
+                    this.window().error_bell();
                 }
             });
             // Go to Page shows the page in sight, ready to be typed over.
@@ -810,7 +826,7 @@ impl DocumentWindow {
         this.connect_fullscreen(&leave_fullscreen, &backdrop);
         this.connect_context_menu();
         {
-            let window = this.window.downgrade();
+            let window = this.window().downgrade();
             let opens = opener.is_some();
             let shortcuts = gio::SimpleAction::new("shortcuts", None);
             shortcuts.connect_activate(move |_, _| {
@@ -836,7 +852,7 @@ impl DocumentWindow {
         }
         {
             let weak = Rc::downgrade(&this);
-            this.window.connect_visible_dialog_notify(move |_| {
+            this.window().connect_visible_dialog_notify(move |_| {
                 // Once the dialog has gone.
                 let weak = weak.clone();
                 glib::idle_add_local_once(move || {
@@ -872,7 +888,7 @@ impl DocumentWindow {
         if let Some(tab) = self.tab.get() {
             self.frame().view().set_selected_page(tab);
         }
-        self.window.present();
+        self.window().present();
     }
 
     /// The name of the document on its tab, which the window shows as its
@@ -882,11 +898,6 @@ impl DocumentWindow {
             tab.set_title(title);
             tab.set_tooltip(title);
         }
-    }
-
-    /// The GTK window.
-    pub fn window(&self) -> &adw::ApplicationWindow {
-        &self.window
     }
 
     /// Whether the window shows no document.
@@ -1288,7 +1299,7 @@ impl DocumentWindow {
                 continue;
             }
             match name {
-                "pages" => self.thumbnails.set_shown(on, self.window.upcast_ref()),
+                "pages" => self.thumbnails.set_shown(on, self.window().upcast_ref()),
                 "search" => {
                     self.search_sidebar.set_shown(on);
                     if !on && let Some(editor) = self.editor() {
@@ -1315,7 +1326,7 @@ impl DocumentWindow {
             return;
         };
         let kind = self
-            .window
+            .window()
             .lookup_action("count")
             .and_then(|a| a.state())
             .and_then(|s| s.get::<String>())
@@ -1389,7 +1400,7 @@ impl DocumentWindow {
         }
         // A dialog over the window keeps the keys of editing, such as
         // Ctrl+A in a field, from reaching the document.
-        let free = self.window.visible_dialog().is_none();
+        let free = self.window().visible_dialog().is_none();
         let has_document = editor.is_some() && free;
         let modified = editor.as_ref().is_some_and(TextEditor::is_modified);
         for (action, enabled) in [
@@ -1451,7 +1462,7 @@ impl DocumentWindow {
 
     fn enable(&self, name: &str, enabled: bool) {
         if let Some(action) = self
-            .window
+            .window()
             .lookup_action(name)
             .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
         {
@@ -1487,7 +1498,7 @@ impl DocumentWindow {
             }
         };
         crate::warnings::show(
-            &self.window,
+            &self.window(),
             &self.name.borrow(),
             &self.warnings.borrow(),
             Rc::new(replace),
@@ -1498,7 +1509,7 @@ impl DocumentWindow {
     fn alert(&self, heading: &str, body: &str) {
         let dialog = adw::AlertDialog::new(Some(heading), Some(body));
         dialog.add_response("close", &tr("_Close"));
-        dialog.present(Some(&self.window));
+        dialog.present(Some(&self.window()));
     }
 
     /// Whether a file can be saved over as it is: one of the kind the app
@@ -1607,7 +1618,12 @@ impl DocumentWindow {
             .borrow_mut()
             .get_or_insert_with(|| crate::recovery::Draft::new(opener.saves.1))
             .clone();
-        let written = draft.name_file(&self.name.borrow()).is_ok()
+        let name = self
+            .draft_name
+            .borrow()
+            .clone()
+            .unwrap_or_else(|| self.name.borrow().clone());
+        let written = draft.name_file(&name).is_ok()
             && crate::save_document(opener, &editor.document(), None, &draft.path).is_ok();
         if written {
             self.draft_due.set(false);
@@ -1617,7 +1633,7 @@ impl DocumentWindow {
     /// Document Warnings is there when the document has warnings.
     fn enable_warnings(&self) {
         if let Some(action) = self
-            .window
+            .window()
             .lookup_action("warnings")
             .and_downcast::<gio::SimpleAction>()
         {
@@ -1642,15 +1658,16 @@ impl DocumentWindow {
         match crate::open_document(opener, &draft.path) {
             Ok(shown) => {
                 let name = draft.name();
-                let name = if name.is_empty() {
+                let shown_name = if name.is_empty() {
                     tr("Untitled")
                 } else {
-                    name
+                    name.clone()
                 };
                 self.load_untitled(
                     shown.document,
-                    tr("{name} (recovered)").replace("{name}", &name),
+                    tr("{name} (recovered)").replace("{name}", &shown_name),
                 );
+                *self.draft_name.borrow_mut() = Some(name);
                 // The draft stays the draft of this window until the
                 // document is saved or given up: a second crash before an
                 // edit would otherwise lose it (review RV, batch 5).
@@ -1663,6 +1680,7 @@ impl DocumentWindow {
 
     fn saved_as(&self, path: &Path) {
         self.drop_draft();
+        self.draft_name.borrow_mut().take();
         // The file is new: its first version is what was saved now.
         self.opened_kept.set(false);
         self.in_place_refused.set(false);
@@ -1703,8 +1721,8 @@ impl DocumentWindow {
         if let Some(folder) = path.as_deref().and_then(Path::parent) {
             dialog.set_initial_folder(Some(&gio::File::for_path(folder)));
         }
-        let window = self.window.clone();
-        dialog.save(Some(&self.window), gio::Cancellable::NONE, move |result| {
+        let window = self.window().clone();
+        dialog.save(Some(&self.window()), gio::Cancellable::NONE, move |result| {
             let Some(picked) = result.ok().and_then(|file| file.path()) else {
                 chosen(None);
                 return;
@@ -1751,19 +1769,23 @@ impl DocumentWindow {
             .default_filter(&all)
             .build();
         let weak = Rc::downgrade(self);
-        dialog.open(Some(&self.window), gio::Cancellable::NONE, move |result| {
-            let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
-                return;
-            };
-            let Some(path) = file.path() else { return };
-            match (opener.open)(&crate::package_of(&path)) {
-                Ok(opened) => this.choose_styles(opened.document, &display_name(&path)),
-                Err(message) => this.alert(
-                    &tr("Cannot open {name}").replace("{name}", &display_name(&path)),
-                    &message,
-                ),
-            }
-        });
+        dialog.open(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |result| {
+                let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
+                    return;
+                };
+                let Some(path) = file.path() else { return };
+                match (opener.open)(&crate::package_of(&path)) {
+                    Ok(opened) => this.choose_styles(opened.document, &display_name(&path)),
+                    Err(message) => this.alert(
+                        &tr("Cannot open {name}").replace("{name}", &display_name(&path)),
+                        &message,
+                    ),
+                }
+            },
+        );
     }
 
     /// Asks which styles of a document to import.
@@ -1900,7 +1922,7 @@ impl DocumentWindow {
                 editor.focus();
             }
         });
-        dialog.present(Some(&self.window));
+        dialog.present(Some(&self.window()));
     }
 
     /// Opens the document that a link points to, in its window if it is
@@ -1936,7 +1958,7 @@ impl DocumentWindow {
             None => {
                 let (Some(opener), Some(app)) = (
                     self.opener,
-                    self.window
+                    self.window()
                         .application()
                         .and_then(|a| a.downcast::<adw::Application>().ok()),
                 ) else {
@@ -1959,7 +1981,7 @@ impl DocumentWindow {
     fn duplicate(&self) {
         let (Some(editor), Some(app)) = (
             self.editor(),
-            self.window
+            self.window()
                 .application()
                 .and_then(|a| a.downcast::<adw::Application>().ok()),
         ) else {
@@ -1977,7 +1999,7 @@ impl DocumentWindow {
         let copy = DocumentWindow::new(&app, self.info, self.opener);
         copy.load_untitled(editor.document(), copy_name(&stem));
         copy.view.set_zoom(self.view.zoom());
-        copy.window.present();
+        copy.window().present();
     }
 
     /// Shows the document as an outline, or as pages (TXT-14).
@@ -2021,7 +2043,7 @@ impl DocumentWindow {
             }
             // The text starts at Text Size ▸ Auto.
             self.view
-                .set_zoom(geometry::text_size_auto(f64::from(self.window.width())));
+                .set_zoom(geometry::text_size_auto(f64::from(self.window().width())));
             editor.set_screen_view(true);
             // Pages 15.4 always says so, and says what it hides when it
             // hides something (PXV-01).
@@ -2086,7 +2108,7 @@ impl DocumentWindow {
         dialog.set_close_response("cancel");
         let weak = Rc::downgrade(self);
         dialog.choose(
-            Some(&self.window),
+            Some(&self.window()),
             gio::Cancellable::NONE,
             move |response| {
                 if let (Some(this), "delete") = (weak.upgrade(), response.as_str())
@@ -2166,7 +2188,7 @@ impl DocumentWindow {
     pub(crate) fn open_version_copy(&self, version: &crate::versions::Version, name: String) {
         let (Some(opener), Some(app)) = (
             self.opener,
-            self.window
+            self.window()
                 .application()
                 .and_then(|a| a.downcast::<adw::Application>().ok()),
         ) else {
@@ -2176,7 +2198,7 @@ impl DocumentWindow {
             Ok(shown) => {
                 let copy = DocumentWindow::new(&app, self.info, self.opener);
                 copy.load_untitled(shown.document, name);
-                copy.window.present();
+                copy.window().present();
             }
             Err(message) => self.alert(&tr("Cannot Open the Version"), &message),
         }
@@ -2221,7 +2243,7 @@ impl DocumentWindow {
         dialog.set_close_response("cancel");
         let weak = Rc::downgrade(self);
         dialog.choose(
-            Some(&self.window),
+            Some(&self.window()),
             gio::Cancellable::NONE,
             move |response| {
                 let Some(this) = weak.upgrade() else {
@@ -2255,7 +2277,7 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         let leave = leave.downgrade();
         let button = backdrop.downgrade();
-        self.window.connect_fullscreened_notify(move |window| {
+        self.window().connect_fullscreened_notify(move |window| {
             let Some(this) = weak.upgrade() else { return };
             let fullscreen = window.is_fullscreen();
             this.toolbar_view.set_reveal_top_bars(!fullscreen);
@@ -2280,7 +2302,7 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         backdrop.connect_rgba_notify(move |button| {
             let Some(this) = weak.upgrade() else { return };
-            if this.window.is_fullscreen() {
+            if this.window().is_fullscreen() {
                 this.view
                     .set_backdrop(Some(formatting::from_gdk(&button.rgba())));
             }
@@ -2290,7 +2312,7 @@ impl DocumentWindow {
         let weak: Weak<Self> = Rc::downgrade(self);
         motion.connect_motion(move |_, _, y| {
             let Some(this) = weak.upgrade() else { return };
-            if !this.window.is_fullscreen() {
+            if !this.window().is_fullscreen() {
                 return;
             }
             let revealed = this.toolbar_view.reveals_top_bars();
@@ -2300,11 +2322,11 @@ impl DocumentWindow {
                 this.toolbar_view.set_reveal_top_bars(false);
             }
         });
-        self.window.add_controller(motion);
+        self.add_window_controller(motion);
 
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let window = self.window.downgrade();
+        let window = self.window().downgrade();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
             let Some(window) = window.upgrade() else {
                 return glib::Propagation::Proceed;
@@ -2319,7 +2341,7 @@ impl DocumentWindow {
             }
             glib::Propagation::Proceed
         });
-        self.window.add_controller(keys);
+        self.add_window_controller(keys);
     }
 
     /// Puts Find and Media in the header bar to work, and adds Search
@@ -2449,7 +2471,7 @@ impl DocumentWindow {
             if this.slides.is_some() {
                 menus.push((tr("Slide"), slides::slide_menu().upcast()));
             }
-            command_search::present(&this.window, this.actions.upcast_ref(), &menus);
+            command_search::present(&this.window(), this.actions.upcast_ref(), &menus);
         });
         self.actions.add_action(&search);
     }
@@ -2472,19 +2494,19 @@ impl DocumentWindow {
             ("revert", Self::revert),
             ("properties", |this| {
                 if let Some(path) = this.path.borrow().as_deref() {
-                    crate::properties::show(&this.window, path);
+                    crate::properties::show(&this.window(), path);
                 }
             }),
             ("language-region", |this| {
                 if let Some(editor) = this.editor() {
-                    crate::language_region::present(&this.window, &editor);
+                    crate::language_region::present(&this.window(), &editor);
                 }
             }),
             ("fullscreen", |this| {
-                if this.window.is_fullscreen() {
-                    this.window.unfullscreen();
+                if this.window().is_fullscreen() {
+                    this.window().unfullscreen();
                 } else {
-                    this.window.fullscreen();
+                    this.window().fullscreen();
                 }
             }),
             // Ctrl+W closes the tab, as in GNOME.
@@ -2540,7 +2562,7 @@ impl DocumentWindow {
                 "selection" => {
                     match view.selection_bounds() {
                         Some((page, bounds)) => view.zoom_to_box(page, bounds),
-                        None => this.window.error_bell(),
+                        None => this.window().error_bell(),
                     }
                     return;
                 }
@@ -2800,7 +2822,7 @@ impl DocumentWindow {
                 return;
             };
             let kind = this
-                .window
+                .window()
                 .lookup_action("navigate-by")
                 .and_then(|a| a.state())
                 .and_then(|s| s.get::<String>())
@@ -2810,7 +2832,7 @@ impl DocumentWindow {
             if let Some(editor) = this.editor()
                 && !editor.navigate(kind, forward)
             {
-                this.window.error_bell();
+                this.window().error_bell();
             }
         });
         self.actions.add_action(&navigate);
@@ -2920,7 +2942,7 @@ impl DocumentWindow {
             this.view.set_zoom(match value.as_str() {
                 "bigger" => geometry::text_bigger(zoom),
                 "smaller" => geometry::text_smaller(zoom),
-                _ => geometry::text_size_auto(f64::from(this.window.width())),
+                _ => geometry::text_size_auto(f64::from(this.window().width())),
             });
         });
         self.actions.add_action(&text_size);
@@ -3093,7 +3115,7 @@ impl DocumentWindow {
             if let Some(this) = weak.upgrade()
                 && let Some(editor) = this.editor()
             {
-                crate::auto_numbers::present(&this.window, &editor);
+                crate::auto_numbers::present(&this.window(), &editor);
             }
         });
         self.actions.add_action(&auto);
@@ -3212,7 +3234,7 @@ impl DocumentWindow {
         insert.connect_activate(move |_, _| {
             let Some(this) = weak.upgrade() else { return };
             let Some(range) = this.editor().and_then(|e| e.comment_target()) else {
-                this.window.error_bell();
+                this.window().error_bell();
                 return;
             };
             // A cell has one comment: Comment goes to it.
@@ -3245,7 +3267,7 @@ impl DocumentWindow {
                 match this.editor().and_then(|e| e.go_to_comment(forward)) {
                     Some(id) if !this.nav_shows("comments") => this.show_bubble(id),
                     Some(_) => {}
-                    None => this.window.error_bell(),
+                    None => this.window().error_bell(),
                 }
             });
             self.actions.add_action(&action);
@@ -3460,7 +3482,7 @@ impl DocumentWindow {
                     let (all, selected) = editor.statistics();
                     let (lines, selected_lines) = editor.line_counts();
                     writing_tools::show_statistics(
-                        &this.window,
+                        &this.window(),
                         (&all, lines),
                         selected.as_ref().map(|s| (s, selected_lines.unwrap_or(0))),
                         this.view.page_count(),
@@ -3590,7 +3612,7 @@ impl DocumentWindow {
     /// Looks the selection, or the word at the cursor, up (INT-20).
     fn look_up(&self, lookup: Lookup) {
         if let Some(editor) = self.editor() {
-            writing_tools::look_up(&self.window, lookup, &editor.lookup_text());
+            writing_tools::look_up(&self.window(), lookup, &editor.lookup_text());
         }
     }
 
@@ -3664,7 +3686,7 @@ impl DocumentWindow {
         let menu_hyphenation = hyphenation.clone();
         let menu_field = field.clone();
         let menu_undo = undo.clone();
-        let window = self.window.downgrade();
+        let window = self.window().downgrade();
         click.connect_pressed(move |gesture, _, x, y| {
             if let Some(popover) = menu_popover.upgrade() {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
@@ -3691,7 +3713,7 @@ impl DocumentWindow {
         let menu_popover = popover.downgrade();
         let area = self.view.area().downgrade();
         let editor = self.editor.clone();
-        let window = self.window.downgrade();
+        let window = self.window().downgrade();
         keys.connect_key_pressed(move |_, key, keycode, modifiers| {
             // The shortcuts of styles: Ctrl+1 to Ctrl+8 in place of F1 to
             // F8 of Pages, with Shift to drop the formatting set over the
@@ -3745,7 +3767,17 @@ impl FramePage for DocumentWindow {
     }
 
     fn moved_to(&self, frame: &Rc<Frame>) {
+        // The controllers on the window go with the tab to its new one.
+        let old = self.window();
+        let controllers = self.window_controllers.borrow().clone();
+        for controller in &controllers {
+            old.remove_controller(controller);
+        }
         *self.frame.borrow_mut() = frame.clone();
+        let new = self.window();
+        for controller in controllers {
+            new.add_controller(controller);
+        }
     }
 
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {

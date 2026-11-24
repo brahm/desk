@@ -28,12 +28,22 @@ dropped file or a link can make the interface do.
 | 14 | A | `desk-lang/src/lib.rs` | *Security.* A file naming thousands of language tags loaded the same dictionary again for each, on the thread of the window | Dictionaries are found by what of the tag picks them and loaded once by their file; test |
 | 15 | A | `desk-ui/src/editing.rs`, `bullet_pictures.rs` | *Security.* What the clipboard offered, and a picture dropped on the document, were read whole whatever their size | At most 256 MB, read without blocking; pictures pasted larger than 8192 by 8192 pixels are refused; test |
 | 16 | B | `desk-model/src/format.rs` | *Security.* A paragraph could have thousands of tab stops, and the Tabs pane built rows for each | At most 100; test |
-| 17 | D | `desk-ui/src/versions.rs` | A document renamed to the name of a deleted file showed that file's versions | They are set aside; test |
+| 17 | D | `desk-ui/src/versions.rs` | A document renamed to the name of a deleted file showed that file's versions | They are removed; test |
+| 18 | B | `desk-ui/src/editing.rs`, `window.rs`, `tables/window.rs` | *Review of the pull request.* Keys and pointer controllers stayed on the window a tab left when it was dragged to another, and a window left with no tab stayed open | They move with the tab; the empty window closes; test |
+| 19 | A | `desk-ui/src/lib.rs` | *Review of the pull request.* A document with a name near the longest a file can have could not be saved, as the temporary file beside it had a longer name | The temporary name is cut to fit; test |
+| 20 | A | `desk-ui/src/editing.rs` | *Security, review of the pull request.* Plain text pasted from another app was read whole, and a picture was decoded before its size was checked | Both read with the bound; a picture is refused by its header; test |
+| 21 | B | `desk-ui/src/fields.rs` | *Review of the pull request.* A table of contents that could not be updated kept the fields of the saved copy from refreshing | Each updated on its own |
+| 22 | B | `desk-ui/src/window.rs` | *Review of the pull request.* A document recovered twice was named "(recovered) (recovered)" | The draft keeps the name it had |
+| 23 | B | `desk-ui/src/preferences.rs` | *Review of the pull request.* Before links to the web were chosen, Preferences showed Ask First, which then could not be chosen | The row shows that nothing is chosen yet; test |
+| 24 | B | `desk-ui/src/tab_stops.rs`, `ruler.rs` | *Review of the pull request.* A stop added past the hundredth was left out without a word | The addition is refused with a beep; test |
+| 25 | D | `desk-ui/src/versions.rs` | *Review of the pull request.* The versions set aside by finding 17 piled up with nothing to show them | Removed; test |
+| 26 | B | `desk-ui/src/bullet_pictures.rs` | *Review of the pull request.* A picture or movie whose size its place does not give was refused | Read up to the bound; test |
+| 27 | A | `desk-ui/src/links.rs` | *Security, review of the pull request.* A link could hide or turn around part of its address in the tooltip and the dialog that asks before opening it | Such characters are shown as a URL writes them, and a long address is cut short; test |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
 
-Four findings moved to the backlog:
+Six findings moved to the backlog:
 - B-058: autosave writes on the thread of the window, to phase W5.
 - B-059: the Thumbnails pane and the Outline view build a row for
   everything, to phase W6.
@@ -42,10 +52,14 @@ Four findings moved to the backlog:
 - B-061: a file opened with content Desk does not read is saved over on
   its own. The original stays as the version kept when it opened. Not
   saving over it changes D-001, so it is for the owner. Phase W5.
+- B-062: the CI runs the tests that need GTK without a display, so they
+  are skipped there, to batch 6 of this review.
+- B-063: language tags that name no dictionary each scan the dictionary
+  folders again, to batch 6 of this review.
 
 ## Security (D-029)
 
-Findings 1, 3, 6, 7, 9, 14, 15 and 16 came from the security review.
+Findings 1, 3, 6, 7, 9, 14, 15, 16, 20 and 27 came from the security review.
 
 These paths were checked and found safe:
 - The crates run no command and no shell.

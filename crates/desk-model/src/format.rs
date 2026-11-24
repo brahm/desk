@@ -594,6 +594,13 @@ impl TabStops {
         self.0.is_empty()
     }
 
+    /// Whether a stop at `position` can be added: one is there to be
+    /// replaced, or there are fewer than `MAX_TAB_STOPS`, past which
+    /// [`TabStops::with`] leaves out the last one.
+    pub fn can_take(&self, position: Length) -> bool {
+        self.0.len() < MAX_TAB_STOPS || self.0.iter().any(|s| s.position == position)
+    }
+
     /// These stops with one added, or put in place of the one at its
     /// position.
     pub fn with(&self, stop: TabStop) -> Self {
@@ -965,6 +972,15 @@ mod tests {
         );
         assert_eq!(stops.stops().len(), MAX_TAB_STOPS);
         assert_eq!(stops.stops()[0].position, Length::from_points(1));
+        // Second review: one more is refused before it is left out, and
+        // one in place of a stop is still taken.
+        assert!(!stops.can_take(Length::from_points(1000)));
+        assert!(stops.can_take(Length::from_points(1)));
+        assert!(
+            stops
+                .without(Length::from_points(1))
+                .can_take(Length::from_points(1000))
+        );
     }
 
     #[test]

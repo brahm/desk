@@ -142,7 +142,7 @@ impl TabStopsGroup {
             });
         });
         let weak = Rc::downgrade(&this);
-        add.connect_clicked(move |_| {
+        add.connect_clicked(move |button| {
             let Some(this) = weak.upgrade() else { return };
             let stops = this.stops.borrow().clone();
             // One unit past the last stop, or at the first default stop.
@@ -151,6 +151,12 @@ impl TabStopsGroup {
                 || Length::from_pt(this.default_interval.value() * units.points()),
                 |last| last.position + Length::from_pt(units.points()),
             );
+            // A stop past the most a paragraph keeps would be left out
+            // without a word (second review of RV batch 5).
+            if !stops.can_take(position) {
+                button.error_bell();
+                return;
+            }
             this.set_stops(stops.with(TabStop::left(position)));
         });
         this

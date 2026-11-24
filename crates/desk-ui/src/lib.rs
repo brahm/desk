@@ -221,18 +221,9 @@ pub(crate) fn save_document(
 /// one or the other whole (review RV, batch 5).
 pub(crate) fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let name = path.file_name().unwrap_or_default().to_string_lossy();
-    let temporary = path.with_file_name(format!(
-        ".{name}.desk-{}",
-        gtk::glib::uuid_string_random().replace('-', "")
-    ));
-    let result = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&temporary)
-        .and_then(|mut file| {
+    let (temporary, file) = temporary_beside(path)?;
+    let result = Ok(file)
+        .and_then(|mut file: std::fs::File| {
             file.write_all(bytes)?;
             // Keep the permissions of the file it replaces, or those of a
             // new file.
@@ -254,6 +245,40 @@ pub(crate) fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> 
         Err(error) => {
             let _ = std::fs::remove_file(&temporary);
             Err(error)
+        }
+    }
+}
+
+/// A new file beside `path`, of a name no one can guess that fits the
+/// limit of a file name with the name of `path` in it, made only if no
+/// file has that name.
+fn temporary_beside(path: &Path) -> std::io::Result<(PathBuf, std::fs::File)> {
+    use std::os::unix::fs::OpenOptionsExt;
+    // Names of up to 255 bytes, as most file systems take: the name of the
+    // file is cut short to leave room for the dot and the suffix
+    // (second review of RV batch 5).
+    const NAME_MAX: usize = 255;
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let mut kept = NAME_MAX - ".".len() - ".desk-".len() - 8;
+    while !name.is_char_boundary(kept.min(name.len())) {
+        kept -= 1;
+    }
+    let short = &name[..kept.min(name.len())];
+    let mut tries = 0;
+    loop {
+        let token = gtk::glib::random_int();
+        let temporary = path.with_file_name(format!(".{short}.desk-{token:08x}"));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temporary)
+        {
+            Ok(file) => return Ok((temporary, file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists && tries < 16 => {
+                tries += 1;
+            }
+            Err(error) => return Err(error),
         }
     }
 }
@@ -708,7 +733,7 @@ fn offer_recovery(
     let app = app.clone();
     let first = over.clone();
     dialog.choose(
-        Some(over.window()),
+        Some(&over.window()),
         gio::Cancellable::NONE,
         move |response| {
             if response == "discard" {
@@ -857,6 +882,11 @@ mod tests {
         assert_eq!(mode & 0o777, 0o640);
         // Nothing is left beside it but the link.
         assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 3);
+        // A name as long as a file system takes still saves (second review
+        // of RV batch 5).
+        let long = folder.join(format!("{}.odt", "é".repeat(125)));
+        write_replacing(&long, b"long").unwrap();
+        assert_eq!(std::fs::read(&long).unwrap(), b"long");
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

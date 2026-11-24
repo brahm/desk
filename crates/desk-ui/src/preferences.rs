@@ -920,10 +920,15 @@ fn default_font_row(current: &Preferences) -> adw::ExpanderRow {
 }
 
 /// What a click on a link to the web does. Until it is chosen, here or
-/// at the first such click, it shows Ask First, which is what the first
-/// click does.
+/// at the first such click, the row shows that it is not chosen yet: it
+/// showed Ask First, which then could not be chosen (second review of RV
+/// batch 5).
 fn open_links_row(current: Option<OpenLinks>) -> adw::ComboRow {
-    let labels: Vec<String> = OpenLinks::ALL.iter().map(|c| c.label()).collect();
+    let choices = open_links_choices(current);
+    let labels: Vec<String> = choices
+        .iter()
+        .map(|c| c.map_or_else(|| tr("Choose at the First Link"), OpenLinks::label))
+        .collect();
     let row = adw::ComboRow::builder()
         .title(tr("Links to the Web"))
         .subtitle(tr(
@@ -932,19 +937,25 @@ fn open_links_row(current: Option<OpenLinks>) -> adw::ComboRow {
         .model(&gtk::StringList::new(
             &labels.iter().map(String::as_str).collect::<Vec<_>>(),
         ))
-        .selected(
-            OpenLinks::ALL
-                .iter()
-                .position(|c| Some(*c) == current)
-                .unwrap_or(0) as u32,
-        )
+        .selected(choices.iter().position(|c| *c == current).unwrap_or(0) as u32)
         .build();
-    row.connect_selected_notify(|row| {
-        if let Some(choice) = OpenLinks::ALL.get(row.selected() as usize) {
-            change(|p| p.open_links = Some(*choice));
+    row.connect_selected_notify(move |row| {
+        if let Some(choice) = choices.get(row.selected() as usize) {
+            change(|p| p.open_links = *choice);
         }
     });
     row
+}
+
+/// The choices of the row of links to the web: the three, after "not
+/// chosen yet" while that is the preference.
+fn open_links_choices(current: Option<OpenLinks>) -> Vec<Option<OpenLinks>> {
+    current
+        .is_none()
+        .then_some(None)
+        .into_iter()
+        .chain(OpenLinks::ALL.map(Some))
+        .collect()
 }
 
 /// A list of the quotes that smart quotes can make (PXV-08).
@@ -1135,6 +1146,14 @@ mod tests {
         assert!(Preferences::read(&empty).show_size_and_position);
         assert!(Preferences::read(&empty).move_objects_aside);
         assert_eq!(Preferences::read(&empty).open_links, None);
+        // Second review of RV batch 5: not chosen yet, the row showed Ask
+        // First, which then could not be chosen.
+        assert_eq!(open_links_choices(None)[0], None);
+        assert_eq!(open_links_choices(None)[1], Some(OpenLinks::Ask));
+        assert_eq!(
+            open_links_choices(Some(OpenLinks::Ask)),
+            OpenLinks::ALL.map(Some).to_vec()
+        );
         assert_eq!(
             Preferences::read(&empty).autocorrect,
             AutoCorrect::default()

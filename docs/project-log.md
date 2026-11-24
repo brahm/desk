@@ -2094,6 +2094,15 @@ paragraph, and objects on a second page.
   the thread of the window) and B-061 (autosave over a file read with
   losses, for the owner) to W5, B-059 (thumbnails and outline) to W6, and
   B-060 (the Flatpak build) to batch 6.
+- The review of the pull request found ten more, fixed in it (findings
+  18 to 27): the controllers of a tab dragged to another window, long file
+  names, plain text and pictures pasted read with a bound, the name of a
+  document recovered twice, the links row of Preferences before a choice,
+  the hundredth tab stop, old versions left behind, files of unknown size,
+  and addresses that hid characters in the tooltip and the dialog.
+  *Consequences:* two more rows to batch 6, B-062 (the CI skips the tests
+  that need a display) and B-063 (dictionary folders scanned again per
+  tag).
 
 ## Decisions, with their reasons and consequences
 

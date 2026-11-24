@@ -183,13 +183,12 @@ impl Store {
         let parent = self.folder.parent().map(Path::to_owned).unwrap_or_default();
         let moved = Self::in_root(&parent, document);
         if self.folder.exists() && self.folder != moved.folder {
-            // Versions left by a file of that name that is gone are set
-            // aside, not shown as those of this document (review RV,
-            // batch 5).
+            // Versions left by a file of that name that is gone are not
+            // shown as those of this document (review RV, batch 5), and
+            // are removed rather than set aside, where they piled up with
+            // nothing to show them (second review).
             if moved.folder.exists() {
-                let mut aside = moved.folder.clone().into_os_string();
-                aside.push(format!(".replaced-{}", now()));
-                let _ = std::fs::rename(&moved.folder, aside);
+                let _ = std::fs::remove_dir_all(&moved.folder);
             }
             let _ = std::fs::rename(&self.folder, &moved.folder);
         }
@@ -317,6 +316,9 @@ mod tests {
             std::fs::read_to_string(&versions[0].path).unwrap(),
             "letter"
         );
+        // Nothing is left of the versions of the file gone.
+        let folders = std::fs::read_dir(&root).unwrap().count();
+        assert_eq!(folders, 1);
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

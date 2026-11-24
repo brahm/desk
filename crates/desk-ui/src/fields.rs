@@ -93,10 +93,12 @@ pub fn saved(document: desk_model::Document, file: &str) -> desk_model::Document
     // Tables of contents are up to date in what is kept, as Pages updates
     // them when a document closes (EST-22): in the copy saved, so that
     // saving, and autosaving, never changes the undo history.
-    if let Err(error) = editor.edit("Save", |edit| {
-        edit.update_tables_of_contents()?;
-        edit.refresh_fields(file, None)
-    }) {
+    // Each in its own edit, so that a table of contents that cannot be
+    // updated leaves the fields refreshed (second review of RV batch 5).
+    if let Err(error) = editor.edit("Save", |edit| edit.update_tables_of_contents()) {
+        glib::g_warning!("desk", "cannot update the tables of contents: {error}");
+    }
+    if let Err(error) = editor.edit("Save", |edit| edit.refresh_fields(file, None)) {
         glib::g_warning!("desk", "cannot update the fields: {error}");
     }
     editor.into_document()

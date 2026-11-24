@@ -123,10 +123,10 @@ enum MenuTarget {
 
 /// A window and its document.
 pub(super) struct TablesWindow {
-    /// The window that holds the tab of the document (see tabs.rs).
-    window: adw::ApplicationWindow,
     /// The window that holds the tab of the document.
     frame: RefCell<Rc<crate::tabs::Frame>>,
+    /// The controllers the document added to that window.
+    window_controllers: RefCell<Vec<gtk::EventController>>,
     /// The tab of the document, with its own breakpoints.
     root: adw::BreakpointBin,
     tab: std::cell::OnceCell<adw::TabPage>,
@@ -174,6 +174,19 @@ impl TablesWindow {
     /// The window that holds the tab of the document now.
     fn frame(&self) -> Rc<crate::tabs::Frame> {
         self.frame.borrow().clone()
+    }
+
+    /// The GTK window that holds the tab of the document now.
+    fn window(&self) -> adw::ApplicationWindow {
+        self.frame.borrow().window().clone()
+    }
+
+    /// Adds a controller to the window that holds the tab, which moves
+    /// with the tab to another window.
+    fn add_window_controller(&self, controller: impl IsA<gtk::EventController>) {
+        let controller = controller.upcast();
+        self.window().add_controller(controller.clone());
+        self.window_controllers.borrow_mut().push(controller);
     }
 
     /// A new window with a document of the Blank template.
@@ -314,7 +327,6 @@ impl TablesWindow {
             .max_sidebar_width(nav_sidebar::WIDTH)
             .show_sidebar(true)
             .build();
-        let window = frame.window().clone();
         let root = adw::BreakpointBin::builder()
             .child(&nav_split)
             .width_request(360)
@@ -361,8 +373,8 @@ impl TablesWindow {
         context_menu.set_parent(canvas.area());
 
         let this = Rc::new(Self {
-            window,
             frame: RefCell::new(frame.clone()),
+            window_controllers: RefCell::new(Vec::new()),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -394,7 +406,7 @@ impl TablesWindow {
         this.connect_sidebar();
         this.connect_canvas();
         this.connect_fullscreen(&leave_fullscreen);
-        warn_small_screen(&this.window, &screen_banner);
+        warn_small_screen(&this.window(), &screen_banner);
         this.refresh();
         // The first table of a new document has the focus, in its first
         // cell, ready to type in, as in Numbers.
@@ -424,7 +436,7 @@ impl TablesWindow {
         if let Some(tab) = self.tab.get() {
             self.frame().view().set_selected_page(tab);
         }
-        self.window.present();
+        self.window().present();
     }
 
     /// Shows the document, the sheet and the selection everywhere.
@@ -674,7 +686,7 @@ impl TablesWindow {
                 true
             }
             Err(_) => {
-                self.window.error_bell();
+                self.window().error_bell();
                 false
             }
         }
@@ -796,7 +808,7 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         let field = entry.clone();
         dialog.choose(
-            Some(&self.window),
+            Some(&self.window()),
             gio::Cancellable::NONE,
             move |response| {
                 if let (Some(this), "rename") = (weak.upgrade(), response.as_str()) {
@@ -1027,7 +1039,7 @@ impl TablesWindow {
                 Some(index + 1)
             };
             let Some(to) = to else {
-                this.window.error_bell();
+                this.window().error_bell();
                 return;
             };
             this.change(&tr("Move Sheet"), |book, current, selection| {
@@ -1108,7 +1120,7 @@ impl TablesWindow {
                         Some(zoom) => {
                             crate::document_controls::show_zoom(&this.bottom.zoom, zoom);
                         }
-                        None => this.window.error_bell(),
+                        None => this.window().error_bell(),
                     }
                     return;
                 }
@@ -1190,7 +1202,7 @@ impl TablesWindow {
         });
 
         let shortcuts = gio::SimpleAction::new("shortcuts", None);
-        let window = self.window.downgrade();
+        let window = self.window().downgrade();
         shortcuts.connect_activate(move |_, _| {
             if let Some(window) = window.upgrade() {
                 super::shortcuts::dialog().present(Some(&window));
@@ -1214,7 +1226,11 @@ impl TablesWindow {
             .into_iter()
             .map(|(name, menu)| (name, menu.upcast()))
             .collect();
-            crate::window::command_search::present(&this.window, this.actions.upcast_ref(), &menus);
+            crate::window::command_search::present(
+                &this.window(),
+                this.actions.upcast_ref(),
+                &menus,
+            );
         });
         self.actions.add_action(&search);
         self.sync_nav();
@@ -1261,13 +1277,13 @@ impl TablesWindow {
                 return;
             };
             action.set_state(&on.to_variant());
-            this.window.set_fullscreened(on);
+            this.window().set_fullscreened(on);
         });
         self.actions.add_action(&action);
         let leave = leave.downgrade();
         let weak = Rc::downgrade(self);
         let before = Rc::new(Cell::new(false));
-        self.window.connect_fullscreened_notify(move |window| {
+        self.window().connect_fullscreened_notify(move |window| {
             let Some(this) = weak.upgrade() else { return };
             let on = window.is_fullscreen();
             formatting::set_state(window, "fullscreen", on.to_variant());
@@ -1283,7 +1299,7 @@ impl TablesWindow {
         });
         let escape = gtk::ShortcutController::new();
         escape.set_scope(gtk::ShortcutScope::Managed);
-        let weak = self.window.downgrade();
+        let weak = self.window().downgrade();
         escape.add_shortcut(gtk::Shortcut::new(
             gtk::ShortcutTrigger::parse_string("Escape"),
             Some(gtk::CallbackAction::new(move |_, _| {
@@ -1299,7 +1315,7 @@ impl TablesWindow {
                 }
             })),
         ));
-        self.window.add_controller(escape);
+        self.add_window_controller(escape);
     }
 }
 
@@ -1402,7 +1418,17 @@ impl crate::tabs::FramePage for TablesWindow {
     }
 
     fn moved_to(&self, frame: &Rc<crate::tabs::Frame>) {
+        // The controllers on the window go with the tab to its new one.
+        let old = self.window();
+        let controllers = self.window_controllers.borrow().clone();
+        for controller in &controllers {
+            old.remove_controller(controller);
+        }
         *self.frame.borrow_mut() = frame.clone();
+        let new = self.window();
+        for controller in controllers {
+            new.add_controller(controller);
+        }
     }
 
     /// Desk Tables does not save documents yet, so a tab closes at once.

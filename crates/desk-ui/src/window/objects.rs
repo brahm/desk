@@ -177,23 +177,27 @@ impl DocumentWindow {
             .filters(&filters)
             .build();
         let weak = Rc::downgrade(self);
-        dialog.open(Some(&self.window), gio::Cancellable::NONE, move |result| {
-            let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
-                return;
-            };
-            let Some(editor) = this.editor() else { return };
-            if !editor.insert_file(&file, None) {
-                this.alert(
-                    &tr("Cannot open {name}").replace(
-                        "{name}",
-                        &file
-                            .basename()
-                            .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
-                    ),
-                    &tr("The file is not an image, movie or sound that Desk can read."),
-                );
-            }
-        });
+        dialog.open(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |result| {
+                let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
+                    return;
+                };
+                let Some(editor) = this.editor() else { return };
+                if !editor.insert_file(&file, None) {
+                    this.alert(
+                        &tr("Cannot open {name}").replace(
+                            "{name}",
+                            &file
+                                .basename()
+                                .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
+                        ),
+                        &tr("The file is not an image, movie or sound that Desk can read."),
+                    );
+                }
+            },
+        );
     }
 }
 

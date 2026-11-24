@@ -125,7 +125,7 @@ impl DocumentWindow {
         action.connect_activate(move |_, _| {
             let Some(this) = weak.upgrade() else { return };
             let Some(editor) = this.editor() else { return };
-            let window = this.window.clone().upcast::<gtk::Window>();
+            let window = this.window().clone().upcast::<gtk::Window>();
             crate::function_browser::open(Some(&window), move |text| {
                 if !editor.insert_in_cell(text) && editor.selected_cells().is_some() {
                     editor.edit_cell(Some(&format!("={text}")));
