@@ -821,10 +821,10 @@ fn number_by_pattern(n: f64, pattern: &str, locale: &Locale) -> String {
     while fp.len() > min_decimals && fp.ends_with('0') {
         fp.pop();
     }
-    let mut ip = ip.trim_start_matches('0').to_owned();
-    while ip.len() < min_int {
-        ip.insert(0, '0');
-    }
+    // The zeros the pattern asks for, put at once: one at a time, a long
+    // pattern from a file took quadratic time.
+    let ip = ip.trim_start_matches('0');
+    let ip = "0".repeat(min_int.saturating_sub(ip.len())) + ip;
     let mut out = digits_with_groups(&ip, grouped.then_some(locale.group));
     if !fp.is_empty() {
         out.push(locale.decimal);
@@ -1552,6 +1552,17 @@ mod tests {
         );
         assert_eq!(show(&Format::Automatic, Value::Number(0.1 + 0.2)), "0,3");
         assert!(n.show(&Value::Number(-1.0), &pt).numeric);
+    }
+
+    #[test]
+    fn a_long_pattern_of_zeros_is_shown_in_linear_time() {
+        let zeros = Format::Custom(CustomFormat {
+            name: "Zeros".into(),
+            pattern: "0".repeat(200_000).into(),
+        });
+        let text = show(&zeros, Value::Number(12.0));
+        assert_eq!(text.len(), 200_000);
+        assert!(text.ends_with("012"));
     }
 
     #[test]
