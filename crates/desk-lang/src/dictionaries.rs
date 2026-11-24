@@ -156,31 +156,47 @@ fn fit(wanted: &Parts, locale: &str) -> Option<(u8, bool, u8)> {
     Some((script, have.variant != wanted.variant, region))
 }
 
-/// The best dictionary of a kind for a language among the files of some
-/// folders, by `fit`, then the first folder, then the first by name.
-fn best_in(kind: Kind, tag: &str, folders: &[PathBuf]) -> Option<PathBuf> {
-    let wanted = parts(tag)?;
-    let mut best: Option<((u8, bool, u8), usize, PathBuf)> = None;
+/// The dictionaries of a kind in some folders, each with the index of its
+/// folder: what [`best_among`] chooses from, listed once (review RV, batch
+/// 6, B-063: each tag that no dictionary fits listed the folders again).
+pub(crate) fn listing(kind: Kind, folders: &[PathBuf]) -> Vec<(usize, PathBuf)> {
+    let mut files = Vec::new();
     for (index, folder) in folders.iter().enumerate() {
         let Ok(entries) = std::fs::read_dir(folder) else {
             continue;
         };
         for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
-            let Some(score) = path
+            let named = path
                 .file_name()
                 .and_then(|n| n.to_str())
                 .and_then(|n| kind.locale_of(n))
-                .and_then(|locale| fit(&wanted, locale))
-            else {
-                continue;
-            };
-            let candidate = (score, index, path);
-            if best.as_ref().is_none_or(|b| candidate < *b) && candidate.2.is_file() {
-                best = Some(candidate);
+                .is_some();
+            if named && path.is_file() {
+                files.push((index, path));
             }
         }
     }
-    best.map(|(_, _, path)| path)
+    files
+}
+
+/// The best dictionary of a kind for a language among the files of a
+/// [`listing`], by `fit`, then the first folder, then the first by name.
+pub(crate) fn best_among(kind: Kind, tag: &str, files: &[(usize, PathBuf)]) -> Option<PathBuf> {
+    let wanted = parts(tag)?;
+    files
+        .iter()
+        .filter_map(|(index, path)| {
+            let locale = kind.locale_of(path.file_name()?.to_str()?)?;
+            Some((fit(&wanted, locale)?, *index, path))
+        })
+        .min()
+        .map(|(_, _, path)| path.clone())
+}
+
+/// The best dictionary of a kind for a language among the files of some
+/// folders.
+fn best_in(kind: Kind, tag: &str, folders: &[PathBuf]) -> Option<PathBuf> {
+    best_among(kind, tag, &listing(kind, folders))
 }
 
 /// What of a BCP 47 tag picks a dictionary, as `pt-BR` for `pt_br` or

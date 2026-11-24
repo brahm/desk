@@ -66,9 +66,7 @@ glib = "0.22.10"
 poppler-rs = { version = "0.26.0", features = ["v0_82"] }
 zune-jpeg = "0.5.15"
 
-desk-anim = { path = "crates/desk-anim" }
 desk-chart = { path = "crates/desk-chart" }
-desk-contacts = { path = "crates/desk-contacts" }
 desk-filters = { path = "crates/desk-filters" }
 desk-formula = { path = "crates/desk-formula" }
 desk-iwork = { path = "crates/desk-iwork" }
@@ -78,7 +76,6 @@ desk-model = { path = "crates/desk-model" }
 desk-odf = { path = "crates/desk-odf" }
 desk-render = { path = "crates/desk-render" }
 desk-table = { path = "crates/desk-table" }
-desk-testkit = { path = "crates/desk-testkit" }
 desk-text = { path = "crates/desk-text" }
 desk-ui = { path = "crates/desk-ui" }
 

@@ -2110,6 +2110,24 @@ paragraph, and objects on a second page.
   its window, the name of a recovered document renamed, and text in other
   character sets.
 
+### 24 November: batch 6 of the review, across the crates (RV)
+
+- Batch 5 merged as #206 after three rounds of review. Then batch 6 read
+  the whole workspace, the CI, the fuzz targets and the Flatpak manifest.
+  It found eight problems, all fixed. The report is
+  [review/batch-6.md](review/batch-6.md).
+- Security: the actions of the workflows are pinned by commit, as the
+  build that the project signs ran an action from a branch. The Flatpak
+  build no longer has network access: its crates are vendored from
+  `Cargo.lock`, and Poppler reads JPEG 2000 through OpenJPEG (B-060).
+- The CI runs the tests that need a display under `xvfb-run` (B-062).
+  The dictionary folders are listed once (B-063).
+- Nine unused dependencies are gone. The two windows share how they
+  move their controllers with a tab. A fuzz target covers the picture
+  converters.
+- *Consequences:* the coverage per crate could not be measured in the
+  session and moved to the backlog as B-064, for W6.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -85,11 +85,9 @@ type EditorAction = fn(&TextEditor);
 pub struct DocumentWindow {
     /// The window that holds the tab of the document.
     frame: RefCell<Rc<Frame>>,
-    /// The controllers the document added to that window.
-    window_controllers: RefCell<Vec<gtk::EventController>>,
-    /// What the document follows of the window that holds it, which
-    /// moves with the tab (third review of RV batch 5).
-    window_notifies: crate::tabs::WindowNotifies,
+    /// The controllers and handlers it put on that window, which move
+    /// with the tab.
+    on_window: crate::tabs::WindowBindings,
     /// The tab of the document: everything the document shows, with its
     /// own breakpoints, since the window has the tabs of other documents.
     root: adw::BreakpointBin,
@@ -313,9 +311,7 @@ impl DocumentWindow {
     /// Adds a controller to the window that holds the tab, which moves
     /// with the tab to another window.
     fn add_window_controller(&self, controller: impl IsA<gtk::EventController>) {
-        let controller = controller.upcast();
-        self.window().add_controller(controller.clone());
-        self.window_controllers.borrow_mut().push(controller);
+        self.on_window.add_controller(&self.window(), controller);
     }
 
     /// A new, empty document in a tab of the window in front, or in a new
@@ -660,8 +656,7 @@ impl DocumentWindow {
 
         let this = Rc::new(Self {
             frame: RefCell::new(frame.clone()),
-            window_controllers: RefCell::new(Vec::new()),
-            window_notifies: crate::tabs::WindowNotifies::default(),
+            on_window: crate::tabs::WindowBindings::default(),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -859,7 +854,7 @@ impl DocumentWindow {
         }
         {
             let weak = Rc::downgrade(&this);
-            this.window_notifies
+            this.on_window
                 .connect(&this.window(), "visible-dialog", move |_| {
                     // Once the dialog has gone.
                     let weak = weak.clone();
@@ -2279,7 +2274,7 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         let leave = leave.downgrade();
         let button = backdrop.downgrade();
-        self.window_notifies
+        self.on_window
             .connect(&self.window(), "fullscreened", move |window| {
                 let Some(this) = weak.upgrade() else { return };
                 let fullscreen = window.is_fullscreen();
@@ -3769,18 +3764,10 @@ impl FramePage for DocumentWindow {
     }
 
     fn moved_to(&self, frame: &Rc<Frame>) {
-        // The controllers on the window go with the tab to its new one.
+        // What is on the window goes with the tab to its new one.
         let old = self.window();
-        let controllers = self.window_controllers.borrow().clone();
-        for controller in &controllers {
-            old.remove_controller(controller);
-        }
         *self.frame.borrow_mut() = frame.clone();
-        let new = self.window();
-        for controller in controllers {
-            new.add_controller(controller);
-        }
-        self.window_notifies.move_to(&old, &new);
+        self.on_window.move_to(&old, &self.window());
     }
 
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
