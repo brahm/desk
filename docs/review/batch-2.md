@@ -32,7 +32,8 @@ evaluation). Reviewed on 24 November 2026 from commit `145c979`, with
 | 20 | B | `desk-formula/src/parse.rs` | A sign under a percent lost its parentheses when written: `=(-A1)%` became `=-A1%`, which reads as the sign of the percent (found by fuzzing `formula_parse`) | Written with its parentheses; test |
 | 21 | B | `desk-formula/src/parse.rs` | `1E999` was read as infinity, written back as `inf` and read again as a header (found by fuzzing `formula_parse`) | A number past the largest is a syntax error; test |
 | 22 | B | `desk-formula/src/parse.rs` | The name of a function was put in capitals by Unicode, so `ǰ` became `J` and a combining caron, which no name holds, and the formula written could not be read again (found by fuzzing `formula_parse`) | Names of functions, which are ASCII, are put in capitals by ASCII; test |
-| 23 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
+| 23 | B | `desk-formula/src/parse.rs` | An error code followed by an operator, as `#REF! /0`, was written `#REF!/0` and read again as one unknown code (found by fuzzing `formula_parse`) | The longest code the text starts with is read; test |
+| 24 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
@@ -61,7 +62,7 @@ in its library code. Its arguments are taken with `at`, which gives
 
 A new target, `formula_parse`, reads any text as a formula, writes it as
 text and as OpenFormula and reads both back the same, and evaluates it in
-a table. It stopped on findings 20, 21 and 22; after
+a table. It stopped on findings 20 to 23; after
 their fixes it ran its hour. Its results are in the pull request.
 
 `proptest`, which the plan named for formulas against known values, was

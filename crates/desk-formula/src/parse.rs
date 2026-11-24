@@ -590,14 +590,22 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                     },
                 ));
             }
+            // The longest code the text starts with: read up to the last
+            // character a code may hold, #REF!/0 was one unknown code.
             '#' => {
-                i += 1;
-                while ch(i).is_ascii_alphanumeric() || "/!?".contains(ch(i)) {
-                    i += 1;
-                }
-                let end = chars.get(i).map_or(text.len(), |c| c.0);
-                let code = &text[at..end];
-                let kind = ErrorKind::from_code(code).ok_or_else(|| err(at, "unknown error"))?;
+                let rest = text.get(at..).unwrap_or_default();
+                let (kind, len) = ErrorKind::ALL
+                    .iter()
+                    .map(|k| (*k, k.code()))
+                    .filter(|(_, code)| {
+                        rest.get(..code.len())
+                            .is_some_and(|p| p.eq_ignore_ascii_case(code))
+                    })
+                    .map(|(k, code)| (k, code.len()))
+                    .max_by_key(|(_, len)| *len)
+                    .ok_or_else(|| err(at, "unknown error"))?;
+                // Codes are ASCII: as many characters as bytes.
+                i += len;
                 out.push((at, Token::Error(kind)));
             }
             '(' => {
@@ -917,6 +925,17 @@ mod tests {
         let f = Formula::parse("=ǰ$TE()").unwrap();
         assert_eq!(Formula::parse(&f.to_string()).unwrap(), f);
         assert_eq!(Formula::parse("=sum(1)").unwrap().to_string(), "=SUM(1)");
+    }
+
+    #[test]
+    fn an_error_followed_by_an_operator_is_written_back_as_read() {
+        // Found by fuzzing formula_parse: #REF! /0 was written #REF!/0,
+        // read as one unknown code.
+        for text in ["=#REF! /0", "=#N/A /2", "=#div/0!+1"] {
+            let f = Formula::parse(text).unwrap();
+            assert_eq!(Formula::parse(&f.to_string()).unwrap(), f, "{text}");
+        }
+        assert!(Formula::parse("=#NOPE!").is_err());
     }
 
     #[test]

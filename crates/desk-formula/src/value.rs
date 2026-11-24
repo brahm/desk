@@ -48,6 +48,18 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
+    /// Every error.
+    pub const ALL: [Self; 8] = [
+        Self::DivisionByZero,
+        Self::Value,
+        Self::Reference,
+        Self::Name,
+        Self::Number,
+        Self::NotAvailable,
+        Self::Circular,
+        Self::Syntax,
+    ];
+
     /// The error as a cell shows it.
     pub fn code(self) -> &'static str {
         match self {
