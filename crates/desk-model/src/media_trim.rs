@@ -98,8 +98,15 @@ fn ticks(ms: u32, scale: u64) -> u64 {
     u64::from(ms) * scale / 1000
 }
 
+/// `value` in `to` ticks a second rather than `from`, at most the largest
+/// a file holds.
+fn scaled(value: u64, to: u64, from: u64) -> u64 {
+    let v = u128::from(value) * u128::from(to) / u128::from(from.max(1));
+    u64::try_from(v).unwrap_or(u64::MAX)
+}
+
 fn millis(ticks: u64, scale: u64) -> u32 {
-    (ticks * 1000 / scale.max(1)).min(u64::from(u32::MAX)) as u32
+    (u128::from(ticks) * 1000 / u128::from(scale.max(1))).min(u128::from(u32::MAX)) as u32
 }
 
 fn be16(b: &[u8], at: usize) -> Option<u16> {
@@ -217,6 +224,10 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
     for (id, body) in chunks {
         let owned;
         let body: &[u8] = match &id {
+            // Of chunks given twice, the first, which was read, is kept.
+            b"COMM" | b"SSND" if !std::ptr::eq(body, common) && !std::ptr::eq(body, sound) => {
+                continue;
+            }
             b"COMM" => {
                 let mut c = body.to_vec();
                 c[2..6].copy_from_slice(&((last - first) as u32).to_be_bytes());
@@ -456,20 +467,26 @@ impl<'a> Track<'a> {
         if be32(stsd, 4)? != 1 {
             return None;
         }
-        let mut times = Vec::new();
-        let mut time = 0;
-        for row in table(find(&stbl, b"stts")?, 8)? {
-            let (count, delta) = (be32(row, 0)?, u64::from(be32(row, 4)?));
-            for _ in 0..count {
-                times.push((time, delta));
-                time += delta;
-            }
-        }
+        let stts = table(find(&stbl, b"stts")?, 8)?;
         let stsz = find(&stbl, b"stsz")?;
         let fixed = be32(stsz, 4)? as usize;
         let count = be32(stsz, 8)? as usize;
-        if count != times.len() {
+        // Each sample takes a byte of the file at least: the counts a file
+        // gives are checked before anything is made of them.
+        let timed = stts
+            .iter()
+            .try_fold(0usize, |n, row| n.checked_add(be32(row, 0)? as usize))?;
+        if count != timed || count > file.len() {
             return None;
+        }
+        let mut times = Vec::with_capacity(count);
+        let mut time: u64 = 0;
+        for row in stts {
+            let (n, delta) = (be32(row, 0)?, u64::from(be32(row, 4)?));
+            for _ in 0..n {
+                times.push((time, delta));
+                time = time.saturating_add(delta);
+            }
         }
         let sizes: Vec<usize> = if fixed != 0 {
             vec![fixed; count]
@@ -509,7 +526,7 @@ impl<'a> Track<'a> {
                     break;
                 };
                 offsets.push(at);
-                at += size;
+                at = at.checked_add(size)?;
             }
         }
         if offsets.len() != count {
@@ -518,7 +535,10 @@ impl<'a> Track<'a> {
         let samples: Vec<_> = (0..count)
             .map(|i| (times[i].0, times[i].1, offsets[i], sizes[i]))
             .collect();
-        if samples.iter().any(|s| s.2 + s.3 > file.len()) {
+        if samples
+            .iter()
+            .any(|s| s.2.checked_add(s.3).is_none_or(|end| end > file.len()))
+        {
             return None;
         }
         let sync = match find(&stbl, b"stss") {
@@ -613,11 +633,11 @@ impl<'a> Track<'a> {
                     out.extend(full_atom(b"stts", &rows_of(&rows)));
                 }
                 b"ctts" => {
-                    let mut all = Vec::new();
+                    // Only the offsets of the samples there are are made.
+                    let mut all = Vec::with_capacity(self.samples.len());
                     for row in table(a.body, 8)? {
-                        for _ in 0..be32(row, 0)? {
-                            all.push(be32(row, 4)?);
-                        }
+                        let n = (be32(row, 0)? as usize).min(self.samples.len() - all.len());
+                        all.extend(std::iter::repeat_n(be32(row, 4)?, n));
                     }
                     let mut rows: Vec<(u32, u32)> = Vec::new();
                     for &o in all.get(self.kept.clone())? {
@@ -626,7 +646,7 @@ impl<'a> Track<'a> {
                             _ => rows.push((1, o)),
                         }
                     }
-                    let mut body = a.body[..4].to_vec();
+                    let mut body = a.body.get(..4)?.to_vec();
                     body.extend(&rows_of(&rows)[..]);
                     out.extend(atom(b"ctts", &body));
                 }
@@ -775,7 +795,7 @@ fn trak(body: &[u8], track: &Track, offset: u64, movie_scale: u64) -> Option<Vec
         match &a.kind {
             b"tkhd" => out.extend(atom(
                 b"tkhd",
-                &with_duration(a.body, b"tkhd", duration * movie_scale / track.scale.max(1)),
+                &with_duration(a.body, b"tkhd", scaled(duration, movie_scale, track.scale)),
             )),
             // The edits name times of the file as it was.
             b"edts" => {}
@@ -879,6 +899,17 @@ mod tests {
             data.extend((body.len() as u32).to_be_bytes());
             data.extend(body);
         }
+        // A second COMM and SSND too short to rewrite are left out (review
+        // RV, batch 3).
+        let mut twice = data.clone();
+        for id in [b"COMM", b"SSND"] {
+            twice.extend(id);
+            twice.extend(2u32.to_be_bytes());
+            twice.extend([0, 1]);
+        }
+        let mut media = Media::from_bytes(twice).unwrap();
+        media.start = 500;
+        assert!(media.reduced().is_some());
         let mut media = Media::from_bytes(data).unwrap();
         media.start = 500;
         let reduced = media.reduced().unwrap();
@@ -1067,6 +1098,20 @@ mod tests {
         );
         assert_eq!(be32(find(&moov, b"mvhd").unwrap(), 16), Some(600));
         assert!(data.len() < media.data().len());
+    }
+
+    #[test]
+    fn a_movie_whose_times_name_billions_of_samples_is_not_cut() {
+        // A row of stts that counts 2^32 - 1 samples made four billion
+        // entries before they were checked (review RV, batch 3).
+        let mut data = movie();
+        let at = data.windows(4).position(|w| w == b"stts").unwrap();
+        data[at + 12..at + 16].copy_from_slice(&u32::MAX.to_be_bytes());
+        let mut media = Media::from_bytes(data).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_none());
+        assert_eq!(scaled(u64::MAX, 600, 1), u64::MAX);
+        assert_eq!(millis(u64::MAX, 1), u32::MAX);
     }
 
     #[test]
