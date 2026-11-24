@@ -380,3 +380,62 @@ fn every_table_of_the_fixtures_reads_every_cell() {
         }
     }
 }
+
+/// The index of a document of `corpus/fixtures/pages`, as text.
+fn fixture_index(name: &str) -> String {
+    use std::io::Read;
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages")
+        .join(name)
+        .join("index.xml.gz");
+    let mut xml = String::new();
+    flate2::read::GzDecoder::new(std::fs::File::open(path).unwrap())
+        .read_to_string(&mut xml)
+        .unwrap();
+    xml
+}
+
+#[test]
+fn references_that_lead_back_to_themselves_end() {
+    // A span that refers to itself, and a group that holds a reference
+    // to itself: without a guard each looped until the stack overflowed
+    // (review RV, batch 1).
+    let xml = fixture_index("obj-30-group.pages");
+    let paragraph = r#"<sf:p sf:style="paragraph-style-38">"#;
+    let group = r#"<sf:group sl:order="0" sfa:ID="SLGroupInfo-0">"#;
+    assert!(xml.contains(paragraph) && xml.contains(group));
+    let xml = xml
+        .replacen(
+            paragraph,
+            &format!(
+                r#"{paragraph}<sf:span sfa:ID="loop">a<sf:span-ref sfa:IDREF="loop"/></sf:span>"#
+            ),
+            1,
+        )
+        .replacen(
+            group,
+            &format!(r#"{group}<sf:group sfa:IDREF="SLGroupInfo-0"/>"#),
+            1,
+        );
+    let document = desk_iwork::pages::parse_pages(&xml).unwrap();
+    assert!(!document.body.is_empty());
+}
+
+#[test]
+fn references_that_branch_at_every_level_end() {
+    // Each span refers twice to the next, 40 levels deep: read in full
+    // at every use, that is 2^40 spans. The reader stops after the
+    // references it allows.
+    let xml = fixture_index("obj-30-group.pages");
+    let paragraph = r#"<sf:p sf:style="paragraph-style-38">"#;
+    let mut spans = String::new();
+    for level in 0..40 {
+        let next = level + 1;
+        spans.push_str(&format!(
+            r#"<sf:span sfa:ID="s{level}">x<sf:span-ref sfa:IDREF="s{next}"/><sf:span-ref sfa:IDREF="s{next}"/></sf:span>"#
+        ));
+    }
+    let xml = xml.replacen(paragraph, &format!("{paragraph}{spans}"), 1);
+    let document = desk_iwork::pages::parse_pages(&xml).unwrap();
+    assert!(!document.body.is_empty());
+}

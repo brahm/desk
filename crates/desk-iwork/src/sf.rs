@@ -26,7 +26,11 @@ impl<'a> Ids<'a> {
             if let Some(id) = element.attr(SFA, "ID") {
                 ids.entry(id).or_insert(element);
             }
+            // Reversed, so that the first child comes off the stack first
+            // and, of two objects with the same ID, the first is kept.
+            let start = stack.len();
             stack.extend(element.elements());
+            stack[start..].reverse();
         }
         Self(ids)
     }
@@ -42,6 +46,71 @@ impl<'a> Ids<'a> {
         match element.attr(SFA, "IDREF") {
             Some(id) => self.get(id).unwrap_or(element),
             None => element,
+        }
+    }
+}
+
+/// How deep the readers of text and of groups go, references included.
+/// The XML of an index is at most 256 elements deep, so a document that
+/// goes deeper does it through a reference back to an element being read.
+pub(crate) const MAX_READ_DEPTH: u32 = 320;
+
+/// How many references a reader follows in one document. References that
+/// point to references, each read in full wherever it is used, can double
+/// the work at every level; this bounds the total.
+pub(crate) const MAX_REFERENCES: u32 = 100_000;
+
+/// Keeps a recursive reader from looping on a reference that leads back
+/// to an element it is reading, and from following references without
+/// end, which would overflow the stack or never finish.
+pub(crate) struct Guard {
+    depth: u32,
+    references: u32,
+}
+
+impl Default for Guard {
+    fn default() -> Self {
+        Self {
+            depth: 0,
+            references: MAX_REFERENCES,
+        }
+    }
+}
+
+impl Guard {
+    /// Enters an element. False when it is too deep and must be skipped;
+    /// otherwise [`Guard::leave`] is called once the element is read.
+    pub fn enter(&mut self) -> bool {
+        if self.depth >= MAX_READ_DEPTH {
+            return false;
+        }
+        self.depth += 1;
+        true
+    }
+
+    /// Leaves the element entered last.
+    pub fn leave(&mut self) {
+        self.depth = self.depth.saturating_sub(1);
+    }
+
+    /// Counts a reference about to be followed. False when the document
+    /// has used up the references allowed, and the reference is skipped.
+    pub fn follow(&mut self) -> bool {
+        if self.references == 0 {
+            return false;
+        }
+        self.references -= 1;
+        true
+    }
+
+    /// The element a child stands for: itself, or the one it refers to.
+    /// `None` when the reference must not be followed.
+    pub fn deref<'a>(&mut self, ids: &Ids<'a>, element: &'a Element) -> Option<&'a Element> {
+        let target = ids.deref(element);
+        if std::ptr::eq(target, element) || self.follow() {
+            Some(target)
+        } else {
+            None
         }
     }
 }
@@ -949,5 +1018,20 @@ impl Stylesheet {
             chain.push(parent);
         }
         chain
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn of_two_objects_with_the_same_id_the_first_is_kept() {
+        let root = crate::xml::parse(&format!(
+            r#"<r xmlns:sfa="{SFA}"><a sfa:ID="x" n="1"/><b><a sfa:ID="x" n="2"/></b><a sfa:ID="x" n="3"/></r>"#
+        ))
+        .unwrap();
+        let ids = Ids::new(&root);
+        assert_eq!(ids.get("x").and_then(|e| e.attr("", "n")), Some("1"));
     }
 }
