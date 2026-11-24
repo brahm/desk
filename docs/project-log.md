@@ -2152,6 +2152,22 @@ paragraph, and objects on a second page.
   folder others could read. All fixed, and a third round made a Revert
   or restore that fails say so and keep the recovery draft.
 
+### 24 November: the review highlight (step 6 of W2)
+
+- The model, the bubble, the Comments page and ODT already knew a
+  highlight, a comment without text, from step 5. What was missing was
+  making one: Insert > Highlight, with Ctrl+Shift+H as ⇧⌘H in Pages
+  15.4, on the text selected only, since Pages turns it off without a
+  selection. Desk Slides keeps Ctrl+Shift+H for Skip Slide (KGNM-11),
+  so the shortcut is set for the other apps only.
+- Remove Highlights and Comments, Pages' Edit menu item, is in the menu
+  of the text, since the window of GNOME has no Edit menu (D-008). It
+  takes those that the selection meets, or the one the cursor is in,
+  in one step that Undo takes back.
+- A highlight is drawn as comments are until step 7 gives each author a
+  colour (W150). W059 is done and B-039 closed; the comments (W149) are
+  partial until their printing in step 15.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
