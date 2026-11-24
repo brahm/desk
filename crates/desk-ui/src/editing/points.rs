@@ -490,7 +490,7 @@ impl TextEditor {
         continuing: bool,
     ) {
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let mut changed = with_points(object, points, closed);
         super::objects::refresh_contour(&mut changed, object);
         let edits = |edit: &mut desk_model::Edit| edit.replace_object(changed);
@@ -506,7 +506,7 @@ impl TextEditor {
             gtk::glib::g_warning!("desk", "cannot edit the points: {error}");
             return;
         }
-        if self.state.borrow().editor.undo_depth() > depth {
+        if self.state.borrow().editor.recorded() > depth {
             let mut state = self.state.borrow_mut();
             let action = state.next_action;
             state.next_action += 1;

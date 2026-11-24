@@ -31,13 +31,13 @@ pub(super) struct StoryMode {
     pub main: Editor,
     /// The document laid out, as the pages show it.
     pub main_layout: DocumentLayout,
-    /// How many actions the document had when the visit started.
-    pub depth: usize,
+    /// How many actions the document had recorded when the visit started.
+    pub depth: u64,
     /// The selection of the body to go back to.
     pub body: Selection,
     /// The history of the selections of the body, kept for the return.
-    pub undo: Vec<(Selection, Selection, u64)>,
-    pub redo: Vec<(Selection, Selection, u64)>,
+    pub undo: super::Selections,
+    pub redo: super::Selections,
 }
 
 impl StoryMode {
@@ -474,7 +474,7 @@ impl TextEditor {
                 let layout = story_layout(&state.layout, story, page, &copy);
                 let main = std::mem::replace(&mut state.editor, Editor::new(copy));
                 let main_layout = std::mem::replace(&mut state.layout, layout);
-                let depth = main.undo_depth();
+                let depth = main.recorded();
                 state.story = Some(StoryMode {
                     story,
                     page,
@@ -528,7 +528,7 @@ impl TextEditor {
         state.typing = false;
         state.others.clear();
         state.spelling_scope = None;
-        if state.editor.undo_depth() > mode.depth {
+        if state.editor.recorded() > mode.depth {
             // The whole visit is one action of the body.
             let action = state.next_action;
             state.next_action += 1;
@@ -559,7 +559,7 @@ impl TextEditor {
             edit.adopt_story_objects(&copy, &before)
         };
         let name = mode.action_name();
-        let result = if mode.main.undo_depth() > mode.depth {
+        let result = if mode.main.recorded() > mode.depth {
             mode.main.edit_continuing(name, write).map(|_| ())
         } else {
             mode.main.edit(name, write)
@@ -873,7 +873,7 @@ mod tests {
         // Two changes in the copy, written back each time, are one action
         // of the document.
         let mut sub = Editor::new(copy);
-        let depth = editor.undo_depth();
+        let depth = editor.recorded();
         for text in ["Ver", " p. 3"] {
             let end = {
                 let p = sub.document().body().get(0).unwrap();
@@ -887,13 +887,13 @@ mod tests {
                 edit.adopt_document_settings(&copy)?;
                 edit.set_story(story, paragraphs.clone())
             };
-            if editor.undo_depth() > depth {
+            if editor.recorded() > depth {
                 editor.edit_continuing("Edit Note", write).unwrap();
             } else {
                 editor.edit("Edit Note", write).unwrap();
             }
         }
-        assert_eq!(editor.undo_depth(), depth + 1);
+        assert_eq!(editor.recorded(), depth + 1);
         let text = editor.document().notes().get(note).unwrap().paragraphs[0]
             .text()
             .to_string();

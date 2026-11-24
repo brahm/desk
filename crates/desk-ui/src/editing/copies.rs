@@ -246,7 +246,7 @@ impl TextEditor {
             .map(|o| o.anchor == Anchor::InText)
             .collect();
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let result = self.state.borrow_mut().editor.edit("Paste", |edit| {
             let objects = edit.adopt_object_styles(&copied.document, &objects)?;
             let ids = edit.add_copies(&objects)?;
@@ -259,7 +259,7 @@ impl TextEditor {
             Ok(ids)
         });
         match result {
-            Ok(ids) if self.state.borrow().editor.undo_depth() > depth => {
+            Ok(ids) if self.state.borrow().editor.recorded() > depth => {
                 {
                     let mut state = self.state.borrow_mut();
                     let action = state.next_action;

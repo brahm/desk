@@ -789,12 +789,21 @@ impl Document {
     }
 }
 
+/// The most actions that Undo can take back.
+pub const MAX_UNDO: usize = 1000;
+
 /// A document with its undo and redo history.
 #[derive(Clone, Debug)]
 pub struct Editor {
     document: Document,
     undo: Vec<Transaction>,
     redo: Vec<Transaction>,
+    /// The actions that entered the history, which goes on counting when
+    /// the oldest leave it.
+    recorded: u64,
+    /// Whether the next action may join the last one: false after an
+    /// Undo or a Redo.
+    joinable: bool,
 }
 
 impl Editor {
@@ -804,6 +813,8 @@ impl Editor {
             document,
             undo: Vec::new(),
             redo: Vec::new(),
+            recorded: 0,
+            joinable: false,
         }
     }
 
@@ -827,6 +838,13 @@ impl Editor {
         self.undo.len()
     }
 
+    /// The number of actions that have entered the history since editing
+    /// began. An edit entered it when this grows; the depth of the history
+    /// stops growing at [`MAX_UNDO`], and does not tell.
+    pub fn recorded(&self) -> u64 {
+        self.recorded
+    }
+
     /// Runs a user action as a transaction, which Undo can take back.
     /// An action that changes nothing does not enter the history.
     pub fn edit<T>(
@@ -836,7 +854,7 @@ impl Editor {
     ) -> Result<T, ModelError> {
         let (value, transaction) = self.document.transact(name, edits)?;
         if !transaction.is_empty() {
-            self.undo.push(transaction);
+            self.push_undo(transaction);
             self.redo.clear();
         }
         Ok(value)
@@ -856,18 +874,33 @@ impl Editor {
         if transaction.is_empty() {
             return Ok((value, false));
         }
+        // After an Undo or a Redo, the action is a new one, not the end of
+        // the one before.
+        let joinable = self.joinable;
         self.redo.clear();
         match self.undo.last_mut() {
-            Some(last) if last.name == transaction.name => {
+            Some(last) if joinable && last.name == transaction.name => {
                 last.ops.extend(transaction.ops);
                 last.inverse.extend(transaction.inverse);
                 Ok((value, true))
             }
             _ => {
-                self.undo.push(transaction);
+                self.push_undo(transaction);
                 Ok((value, false))
             }
         }
+    }
+
+    /// Adds an action to the history, which keeps the last
+    /// [`MAX_UNDO`]: each keeps what it changed, a whole table for an edit
+    /// of its cells, and a long session would hold them all.
+    fn push_undo(&mut self, transaction: Transaction) {
+        if self.undo.len() >= MAX_UNDO {
+            self.undo.remove(0);
+        }
+        self.undo.push(transaction);
+        self.recorded += 1;
+        self.joinable = true;
     }
 
     /// Undoes the last action. Returns false when there was none.
@@ -875,6 +908,8 @@ impl Editor {
         let Some(transaction) = self.undo.pop() else {
             return Ok(false);
         };
+        // Even when it fails, what comes next is a new action.
+        self.joinable = false;
         if let Err(error) = self.document.revert(&transaction) {
             self.undo.push(transaction);
             return Err(error);
@@ -888,6 +923,7 @@ impl Editor {
         let Some(transaction) = self.redo.pop() else {
             return Ok(false);
         };
+        self.joinable = false;
         if let Err(error) = self.document.replay(&transaction) {
             self.redo.push(transaction);
             return Err(error);

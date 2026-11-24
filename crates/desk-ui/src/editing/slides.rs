@@ -95,11 +95,11 @@ impl TextEditor {
         change: impl FnOnce(&mut desk_model::Edit) -> Result<(), desk_model::ModelError>,
     ) {
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let result = self.state.borrow_mut().editor.edit(name, change);
         self.state.borrow_mut().typing = false;
         match result {
-            Ok(()) if self.state.borrow().editor.undo_depth() > depth => {
+            Ok(()) if self.state.borrow().editor.recorded() > depth => {
                 {
                     let mut state = self.state.borrow_mut();
                     let action = state.next_action;

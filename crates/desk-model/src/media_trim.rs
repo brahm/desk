@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg_attr(not(test), deny(clippy::indexing_slicing, clippy::unwrap_used))]
+
 //! Reduce Media (OBJ-20): a movie or a sound cut down to the part between
 //! its start and its stop, without coding it again. A sound of samples
 //! (WAVE, AIFF) is cut at the samples, an MP3 at its frames, and a
@@ -98,8 +100,15 @@ fn ticks(ms: u32, scale: u64) -> u64 {
     u64::from(ms) * scale / 1000
 }
 
+/// `value` in `to` ticks a second rather than `from`, at most the largest
+/// a file holds.
+fn scaled(value: u64, to: u64, from: u64) -> u64 {
+    let v = u128::from(value) * u128::from(to) / u128::from(from.max(1));
+    u64::try_from(v).unwrap_or(u64::MAX)
+}
+
 fn millis(ticks: u64, scale: u64) -> u32 {
-    (ticks * 1000 / scale.max(1)).min(u64::from(u32::MAX)) as u32
+    (u128::from(ticks) * 1000 / u128::from(scale.max(1))).min(u128::from(u32::MAX)) as u32
 }
 
 fn be16(b: &[u8], at: usize) -> Option<u16> {
@@ -134,7 +143,7 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
     let mut at = 12;
     let mut chunks = Vec::new();
     while at + 8 <= data.len() {
-        let id: [u8; 4] = data[at..at + 4].try_into().ok()?;
+        let id: [u8; 4] = data.get(at..at + 4)?.try_into().ok()?;
         let size = le32(data, at + 4)? as usize;
         let body = data.get(at + 8..(at + 8 + size).min(data.len()))?;
         chunks.push((id, body));
@@ -152,12 +161,16 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
     let (first, last) = frame_range(cut, rate, frames)?;
     let mut out = b"RIFF\0\0\0\0WAVE".to_vec();
     for (id, body) in chunks {
-        // How many frames there are, which the new data says.
-        if &id == b"fact" {
+        // How many frames there are, which the new data says; and of
+        // chunks given twice, the first, which was read, is kept.
+        let again = matches!(&id, b"fmt " | b"data")
+            && !std::ptr::eq(body, format)
+            && !std::ptr::eq(body, samples);
+        if &id == b"fact" || again {
             continue;
         }
         let body = if &id == b"data" {
-            &body[first as usize * align..last as usize * align]
+            body.get(first as usize * align..last as usize * align)?
         } else {
             body
         };
@@ -169,7 +182,7 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
         }
     }
     let size = (out.len() - 8) as u32;
-    out[4..8].copy_from_slice(&size.to_le_bytes());
+    out.get_mut(4..8)?.copy_from_slice(&size.to_le_bytes());
     Some(Kept {
         data: out,
         from: millis(first, rate),
@@ -190,7 +203,7 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
     let mut at = 12;
     let mut chunks = Vec::new();
     while at + 8 <= data.len() {
-        let id: [u8; 4] = data[at..at + 4].try_into().ok()?;
+        let id: [u8; 4] = data.get(at..at + 4)?.try_into().ok()?;
         let size = be32(data, at + 4)? as usize;
         let body = data.get(at + 8..(at + 8 + size).min(data.len()))?;
         chunks.push((id, body));
@@ -213,20 +226,25 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
     let samples = sound.get(8 + offset..)?;
     let frames = u64::from(be32(common, 2)?).min((samples.len() / align) as u64);
     let (first, last) = frame_range(cut, rate, frames)?;
-    let mut out = data[..12].to_vec();
+    let mut out = data.get(..12)?.to_vec();
     for (id, body) in chunks {
         let owned;
         let body: &[u8] = match &id {
+            // Of chunks given twice, the first, which was read, is kept.
+            b"COMM" | b"SSND" if !std::ptr::eq(body, common) && !std::ptr::eq(body, sound) => {
+                continue;
+            }
             b"COMM" => {
                 let mut c = body.to_vec();
-                c[2..6].copy_from_slice(&((last - first) as u32).to_be_bytes());
+                c.get_mut(2..6)?
+                    .copy_from_slice(&((last - first) as u32).to_be_bytes());
                 owned = c;
                 &owned
             }
             b"SSND" => {
                 let mut c = vec![0; 8];
-                c[4..8].copy_from_slice(&body[4..8]);
-                c.extend(&samples[first as usize * align..last as usize * align]);
+                c.get_mut(4..8)?.copy_from_slice(body.get(4..8)?);
+                c.extend(samples.get(first as usize * align..last as usize * align)?);
                 owned = c;
                 &owned
             }
@@ -242,7 +260,7 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
         }
     }
     let size = (out.len() - 8) as u32;
-    out[4..8].copy_from_slice(&size.to_be_bytes());
+    out.get_mut(4..8)?.copy_from_slice(&size.to_be_bytes());
     Some(Kept {
         data: out,
         from: millis(first, rate),
@@ -267,8 +285,8 @@ fn mp3_frame(header: u32) -> Option<(usize, u64, u64)> {
         0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320,
     ];
     const V2: [u64; 15] = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
-    let kbps = if mpeg1 { V1 } else { V2 }[bitrate as usize];
-    let base = [44_100, 48_000, 32_000][rate as usize];
+    let kbps = *if mpeg1 { V1 } else { V2 }.get(bitrate as usize)?;
+    let base = *[44_100, 48_000, 32_000].get(rate as usize)?;
     let rate = match version {
         3 => base,
         2 => base / 2,
@@ -292,11 +310,11 @@ fn mp3(data: &[u8], cut: &Cut) -> Option<Kept> {
         let footer = if data.get(5)? & 0x10 != 0 { 10 } else { 0 };
         at = 10 + size + footer;
     }
-    let tag = &data[..at.min(data.len())];
+    let tag = data.get(..at.min(data.len()))?;
     let trailer = data
         .len()
         .checked_sub(128)
-        .filter(|&t| t >= at && &data[t..t + 3] == b"TAG");
+        .filter(|&t| t >= at && data.get(t..t + 3) == Some(b"TAG"));
     let end = trailer.unwrap_or(data.len());
     let mut out = tag.to_vec();
     let (mut time, mut from, mut kept, mut rate) = (0u64, None, 0u64, 0u64);
@@ -331,7 +349,7 @@ fn mp3(data: &[u8], cut: &Cut) -> Option<Kept> {
     }
     let from = from?;
     if let Some(t) = trailer {
-        out.extend(&data[t..]);
+        out.extend(data.get(t..)?);
     }
     Some(Kept {
         data: out,
@@ -352,7 +370,7 @@ fn atoms(mut data: &[u8]) -> Option<Vec<Atom<'_>>> {
     let mut all = Vec::new();
     while data.len() >= 8 {
         let size = be32(data, 0)? as u64;
-        let kind: [u8; 4] = data[4..8].try_into().ok()?;
+        let kind: [u8; 4] = data.get(4..8)?.try_into().ok()?;
         let (header, size) = match size {
             0 => (8, data.len() as u64),
             1 => (16, be64(data, 8)?),
@@ -364,9 +382,9 @@ fn atoms(mut data: &[u8]) -> Option<Vec<Atom<'_>>> {
         }
         all.push(Atom {
             kind,
-            body: &data[header..size],
+            body: data.get(header..size)?,
         });
-        data = &data[size..];
+        data = data.get(size..)?;
     }
     Some(all)
 }
@@ -424,6 +442,22 @@ fn table(body: &[u8], width: usize) -> Option<Vec<&[u8]>> {
     Some(rows.chunks_exact(width).collect())
 }
 
+/// What is left of a file for the samples of the tracks still to read:
+/// each takes a byte at least, and none shares its bytes.
+struct Left {
+    samples: usize,
+    bytes: usize,
+}
+
+impl Left {
+    fn of(file: &[u8]) -> Self {
+        Self {
+            samples: file.len(),
+            bytes: file.len(),
+        }
+    }
+}
+
 /// The samples of a track, and the part of them kept.
 struct Track<'a> {
     stbl: Vec<Atom<'a>>,
@@ -438,7 +472,11 @@ struct Track<'a> {
 }
 
 impl<'a> Track<'a> {
-    fn read(trak: &'a [u8], file: &[u8]) -> Option<Self> {
+    /// Reads a track. `left` is what is left of the file for the tracks
+    /// read after the others: the samples of all of them, and their bytes,
+    /// fit in the file, as they do not share bytes. Each track spends its
+    /// part before anything is made of its counts.
+    fn read(trak: &'a [u8], file: &[u8], left: &mut Left) -> Option<Self> {
         let mdia = atoms(find(&atoms(trak)?, b"mdia")?)?;
         let scale = time_scale(find(&mdia, b"mdhd")?)?;
         let minf = atoms(find(&mdia, b"minf")?)?;
@@ -456,20 +494,41 @@ impl<'a> Track<'a> {
         if be32(stsd, 4)? != 1 {
             return None;
         }
-        let mut times = Vec::new();
-        let mut time = 0;
-        for row in table(find(&stbl, b"stts")?, 8)? {
-            let (count, delta) = (be32(row, 0)?, u64::from(be32(row, 4)?));
-            for _ in 0..count {
-                times.push((time, delta));
-                time += delta;
-            }
-        }
+        let stts = table(find(&stbl, b"stts")?, 8)?;
         let stsz = find(&stbl, b"stsz")?;
         let fixed = be32(stsz, 4)? as usize;
         let count = be32(stsz, 8)? as usize;
-        if count != times.len() {
+        // Each sample takes a byte of the file at least: the counts a file
+        // gives are checked before anything is made of them.
+        let timed = stts
+            .iter()
+            .try_fold(0usize, |n, row| n.checked_add(be32(row, 0)? as usize))?;
+        if count != timed {
             return None;
+        }
+        left.samples = left.samples.checked_sub(count)?;
+        // Samples do not share bytes: more of them than the file has would
+        // be copied over and over, a few thousand rows making gigabytes.
+        let total = if fixed != 0 {
+            fixed.checked_mul(count)?
+        } else {
+            stsz.get(12..12 + count.checked_mul(4)?)?
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .try_fold(0usize, |t, r| {
+                    t.checked_add(u32::from_be_bytes(*r) as usize)
+                })?
+        };
+        left.bytes = left.bytes.checked_sub(total)?;
+        let mut times = Vec::with_capacity(count);
+        let mut time: u64 = 0;
+        for row in stts {
+            let (n, delta) = (be32(row, 0)?, u64::from(be32(row, 4)?));
+            for _ in 0..n {
+                times.push((time, delta));
+                time = time.saturating_add(delta);
+            }
         }
         let sizes: Vec<usize> = if fixed != 0 {
             vec![fixed; count]
@@ -496,12 +555,17 @@ impl<'a> Track<'a> {
             .iter()
             .map(|r| Some((be32(r, 0)? as usize, be32(r, 4)? as usize)))
             .collect::<Option<_>>()?;
+        // The rows are in the order of their first chunks, which lets each
+        // chunk find its row by halves.
+        if !runs.is_sorted_by_key(|(first, _)| *first) {
+            return None;
+        }
         let mut offsets = Vec::with_capacity(count);
         for (i, &chunk) in chunks.iter().enumerate() {
-            let per = runs
-                .iter()
-                .rev()
-                .find(|(first, _)| *first <= i + 1)
+            let row = runs.partition_point(|(first, _)| *first <= i + 1);
+            let per = row
+                .checked_sub(1)
+                .and_then(|r| runs.get(r))
                 .map_or(0, |r| r.1);
             let mut at = usize::try_from(chunk).ok()?;
             for _ in 0..per {
@@ -509,16 +573,26 @@ impl<'a> Track<'a> {
                     break;
                 };
                 offsets.push(at);
-                at += size;
+                at = at.checked_add(size)?;
             }
         }
         if offsets.len() != count {
             return None;
         }
         let samples: Vec<_> = (0..count)
-            .map(|i| (times[i].0, times[i].1, offsets[i], sizes[i]))
-            .collect();
-        if samples.iter().any(|s| s.2 + s.3 > file.len()) {
+            .map(|i| {
+                Some((
+                    times.get(i)?.0,
+                    times.get(i)?.1,
+                    *offsets.get(i)?,
+                    *sizes.get(i)?,
+                ))
+            })
+            .collect::<Option<_>>()?;
+        if samples
+            .iter()
+            .any(|s| s.2.checked_add(s.3).is_none_or(|end| end > file.len()))
+        {
             return None;
         }
         let sync = match find(&stbl, b"stss") {
@@ -579,15 +653,21 @@ impl<'a> Track<'a> {
         self.kept = first..last.max(first + 1).min(self.samples.len());
     }
 
+    /// The samples kept: none when the range is not of them, which
+    /// [`Track::keep`] does not make.
+    fn kept_samples(&self) -> &[(u64, u64, usize, usize)] {
+        self.samples.get(self.kept.clone()).unwrap_or_default()
+    }
+
     fn duration(&self) -> u64 {
-        self.samples[self.kept.clone()].iter().map(|s| s.1).sum()
+        self.kept_samples().iter().map(|s| s.1).sum()
     }
 
     /// The bytes of the samples kept.
     fn data(&self, file: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        for s in &self.samples[self.kept.clone()] {
-            out.extend(&file[s.2..s.2 + s.3]);
+        for s in self.kept_samples() {
+            out.extend(file.get(s.2..s.2 + s.3).unwrap_or_default());
         }
         out
     }
@@ -595,7 +675,7 @@ impl<'a> Track<'a> {
     /// The new sample table, with the samples kept in one chunk at
     /// `offset` of the file.
     fn stbl(&self, offset: u64) -> Option<Vec<u8>> {
-        let kept = &self.samples[self.kept.clone()];
+        let kept = self.kept_samples();
         let n = kept.len() as u32;
         let mut out = Vec::new();
         for a in &self.stbl {
@@ -613,11 +693,11 @@ impl<'a> Track<'a> {
                     out.extend(full_atom(b"stts", &rows_of(&rows)));
                 }
                 b"ctts" => {
-                    let mut all = Vec::new();
+                    // Only the offsets of the samples there are are made.
+                    let mut all = Vec::with_capacity(self.samples.len());
                     for row in table(a.body, 8)? {
-                        for _ in 0..be32(row, 0)? {
-                            all.push(be32(row, 4)?);
-                        }
+                        let n = (be32(row, 0)? as usize).min(self.samples.len() - all.len());
+                        all.extend(std::iter::repeat_n(be32(row, 4)?, n));
                     }
                     let mut rows: Vec<(u32, u32)> = Vec::new();
                     for &o in all.get(self.kept.clone())? {
@@ -626,7 +706,7 @@ impl<'a> Track<'a> {
                             _ => rows.push((1, o)),
                         }
                     }
-                    let mut body = a.body[..4].to_vec();
+                    let mut body = a.body.get(..4)?.to_vec();
                     body.extend(&rows_of(&rows)[..]);
                     out.extend(atom(b"ctts", &body));
                 }
@@ -701,9 +781,10 @@ fn mp4(data: &[u8], cut: &Cut) -> Option<Kept> {
         .filter(|a| &a.kind == b"trak")
         .map(|a| a.body)
         .collect();
+    let mut left = Left::of(data);
     let mut tracks: Vec<Track> = traks
         .iter()
-        .map(|t| Track::read(t, data))
+        .map(|t| Track::read(t, data, &mut left))
         .collect::<Option<_>>()?;
     if tracks.is_empty() {
         return None;
@@ -733,8 +814,8 @@ fn mp4(data: &[u8], cut: &Cut) -> Option<Kept> {
                     &with_duration(a.body, b"mvhd", ticks(length, scale)),
                 )),
                 b"trak" => {
-                    let track = &tracks[index];
-                    out.extend(trak(a.body, track, offsets[index], scale)?);
+                    let track = tracks.get(index)?;
+                    out.extend(trak(a.body, track, *offsets.get(index)?, scale)?);
                     index += 1;
                 }
                 kind => out.extend(atom(kind, a.body)),
@@ -775,7 +856,7 @@ fn trak(body: &[u8], track: &Track, offset: u64, movie_scale: u64) -> Option<Vec
         match &a.kind {
             b"tkhd" => out.extend(atom(
                 b"tkhd",
-                &with_duration(a.body, b"tkhd", duration * movie_scale / track.scale.max(1)),
+                &with_duration(a.body, b"tkhd", scaled(duration, movie_scale, track.scale)),
             )),
             // The edits name times of the file as it was.
             b"edts" => {}
@@ -835,6 +916,14 @@ mod tests {
 
     #[test]
     fn obj_20_a_wave_sound_keeps_the_samples_from_its_start_to_its_stop() {
+        // A second data chunk too short to cut is left out, as AIFF's is.
+        let mut twice = wave(1000, 10_000);
+        twice.extend(b"data");
+        twice.extend(2u32.to_le_bytes());
+        twice.extend([0, 1]);
+        let mut media = Media::from_bytes(twice).unwrap();
+        media.start = 2_000;
+        assert!(media.reduced().is_some());
         let mut media = Media::from_bytes(wave(1000, 10_000)).unwrap();
         assert!(!media.reducible());
         assert!(media.reduced().is_none());
@@ -879,6 +968,17 @@ mod tests {
             data.extend((body.len() as u32).to_be_bytes());
             data.extend(body);
         }
+        // A second COMM and SSND too short to rewrite are left out (review
+        // RV, batch 3).
+        let mut twice = data.clone();
+        for id in [b"COMM", b"SSND"] {
+            twice.extend(id);
+            twice.extend(2u32.to_be_bytes());
+            twice.extend([0, 1]);
+        }
+        let mut media = Media::from_bytes(twice).unwrap();
+        media.start = 500;
+        assert!(media.reduced().is_some());
         let mut media = Media::from_bytes(data).unwrap();
         media.start = 500;
         let reduced = media.reduced().unwrap();
@@ -952,8 +1052,9 @@ mod tests {
         for _ in 0..count {
             stsz.extend(4u32.to_be_bytes());
         }
-        let mut stsc = 1u32.to_be_bytes().to_vec();
-        for n in [1u32, 2, 1] {
+        // Two rows that say the same: two samples in each chunk.
+        let mut stsc = 2u32.to_be_bytes().to_vec();
+        for n in [1u32, 2, 1, 2, 2, 1] {
             stsc.extend(n.to_be_bytes());
         }
         let mut stco = (chunks.len() as u32).to_be_bytes().to_vec();
@@ -1035,7 +1136,7 @@ mod tests {
             .into_iter()
             .filter(|a| &a.kind == b"trak")
             .collect();
-        let video = Track::read(traks[0].body, &data).unwrap();
+        let video = Track::read(traks[0].body, &data, &mut Left::of(&data)).unwrap();
         assert_eq!(&data[video.samples[7].2..video.samples[7].2 + 2], [1, 7]);
         media.start = 1_200;
         media.stop = Some(2_000);
@@ -1052,8 +1153,8 @@ mod tests {
         assert_eq!(kinds, [*b"ftyp", *b"moov", *b"mdat"]);
         let moov = atoms(find(&top, b"moov").unwrap()).unwrap();
         let traks: Vec<_> = moov.iter().filter(|a| &a.kind == b"trak").collect();
-        let video = Track::read(traks[0].body, data).unwrap();
-        let sound = Track::read(traks[1].body, data).unwrap();
+        let video = Track::read(traks[0].body, data, &mut Left::of(data)).unwrap();
+        let sound = Track::read(traks[1].body, data, &mut Left::of(data)).unwrap();
         assert_eq!((video.samples.len(), sound.samples.len()), (10, 20));
         assert_eq!(video.sync, Some(vec![0, 5]));
         let first = |t: &Track| data[t.samples[0].2..t.samples[0].2 + 2].to_vec();
@@ -1067,6 +1168,85 @@ mod tests {
         );
         assert_eq!(be32(find(&moov, b"mvhd").unwrap(), 16), Some(600));
         assert!(data.len() < media.data().len());
+    }
+
+    #[test]
+    fn a_movie_whose_times_name_billions_of_samples_is_not_cut() {
+        // A row of stts that counts 2^32 - 1 samples made four billion
+        // entries before they were checked (review RV, batch 3).
+        let mut data = movie();
+        let at = data.windows(4).position(|w| w == b"stts").unwrap();
+        data[at + 12..at + 16].copy_from_slice(&u32::MAX.to_be_bytes());
+        let mut media = Media::from_bytes(data).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_none());
+        assert_eq!(scaled(u64::MAX, 600, 1), u64::MAX);
+        assert_eq!(millis(u64::MAX, 1), u32::MAX);
+    }
+
+    #[test]
+    fn a_movie_whose_samples_share_their_bytes_is_not_cut() {
+        // Review of RV batch 3: chunks all at one place, with large
+        // samples, were copied once for each, a few thousand rows making
+        // gigabytes.
+        let mut data = movie();
+        let stco = data.windows(4).position(|w| w == b"stco").unwrap();
+        let first: [u8; 4] = data[stco + 12..stco + 16].try_into().unwrap();
+        for c in 0..15 {
+            data[stco + 12 + c * 4..stco + 16 + c * 4].copy_from_slice(&first);
+        }
+        let stsz = data.windows(4).position(|w| w == b"stsz").unwrap();
+        for i in 0..30 {
+            data[stsz + 16 + i * 4..stsz + 20 + i * 4].copy_from_slice(&100u32.to_be_bytes());
+        }
+        let top = atoms(&data).unwrap();
+        let moov = atoms(find(&top, b"moov").unwrap()).unwrap();
+        let trak = moov.iter().find(|a| &a.kind == b"trak").unwrap();
+        assert!(Track::read(trak.body, &data, &mut Left::of(&data)).is_none());
+        let mut media = Media::from_bytes(data.clone()).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_none());
+    }
+
+    #[test]
+    fn the_tracks_of_a_movie_share_the_bytes_of_its_file() {
+        // Review of RV batch 3: thousands of tracks, each within the file,
+        // together made hundreds of gigabytes before the sum was checked.
+        let data = movie();
+        let top = atoms(&data).unwrap();
+        let traks: Vec<_> = atoms(find(&top, b"moov").unwrap())
+            .unwrap()
+            .into_iter()
+            .filter(|a| &a.kind == b"trak")
+            .collect();
+        // The video has 120 bytes of samples and the sound 240.
+        let mut left = Left {
+            samples: data.len(),
+            bytes: 120 + 239,
+        };
+        assert!(Track::read(traks[0].body, &data, &mut left).is_some());
+        assert_eq!(left.bytes, 239);
+        assert!(Track::read(traks[1].body, &data, &mut left).is_none());
+        let mut left = Left {
+            samples: 30 + 59,
+            bytes: data.len(),
+        };
+        assert!(Track::read(traks[0].body, &data, &mut left).is_some());
+        assert!(Track::read(traks[1].body, &data, &mut left).is_none());
+    }
+
+    #[test]
+    fn a_movie_whose_chunk_rows_are_out_of_order_is_not_cut() {
+        // Each chunk finds its row by halves, which needs them in order.
+        let mut data = movie();
+        let mut media = Media::from_bytes(data.clone()).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_some());
+        let stsc = data.windows(4).position(|w| w == b"stsc").unwrap();
+        data[stsc + 24..stsc + 28].copy_from_slice(&0u32.to_be_bytes());
+        let mut media = Media::from_bytes(data).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_none());
     }
 
     #[test]

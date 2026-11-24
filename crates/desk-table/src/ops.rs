@@ -772,5 +772,9 @@ mod tests {
         assert!(t.cell(0, 0).comment.is_none());
         t.scale_width(288_000);
         assert_eq!(t.total_width(), 288_000);
+        // Widths from a file past the largest sum stop at it.
+        t.set_width(0, u32::MAX);
+        t.set_width(1, u32::MAX);
+        assert_eq!(t.total_width(), u32::MAX);
     }
 }

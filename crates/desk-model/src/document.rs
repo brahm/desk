@@ -786,11 +786,14 @@ impl Document {
         }
         let ids = object.ids();
         let mut seen = std::collections::HashSet::new();
-        let kept: Vec<NodeId> = replacing.map(Object::ids).unwrap_or_default();
+        let kept: std::collections::HashSet<NodeId> = replacing
+            .map(Object::ids)
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
         for id in ids {
-            let elsewhere = !kept.contains(&id)
-                && (self.objects().iter().any(|o| o.ids().contains(&id))
-                    || self.body().paragraph(id).is_some());
+            let elsewhere =
+                !kept.contains(&id) && (self.objects().holds_id(id) || self.body().contains(id));
             if !seen.insert(id) || elsewhere {
                 return Err(ModelError::DuplicateId(id));
             }
@@ -825,7 +828,7 @@ impl Document {
         for paragraph in self.body().iter() {
             statistics.add_text(&paragraph.text());
         }
-        let continued: Vec<NodeId> = self
+        let continued: std::collections::HashSet<NodeId> = self
             .objects()
             .iter()
             .filter_map(|o| o.text_box()?.next)
