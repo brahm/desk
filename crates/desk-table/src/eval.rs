@@ -82,6 +82,22 @@ pub fn share_work() -> WorkScope {
     WorkScope { outermost }
 }
 
+/// Takes `work` from the budget of the scope, if one lives: all that is
+/// left when too little is.
+fn spend_shared(work: u64) -> bool {
+    SHARED_WORK.with(|w| match w.borrow_mut().as_mut() {
+        None => true,
+        Some(w) if w.left >= work => {
+            w.left -= work;
+            true
+        }
+        Some(w) => {
+            w.left = 0;
+            false
+        }
+    })
+}
+
 impl Drop for WorkScope {
     fn drop(&mut self) {
         if self.outermost {
@@ -435,12 +451,30 @@ impl<T: CellText> Table<T> {
         if cell.rules.is_empty() {
             return RuleStyle::default();
         }
-        conditional::apply(
+        // The texts that rules compare, put in lower case for each, are
+        // taken from the work of the document laid out: a file can give a
+        // million cells many rules that each compare long texts.
+        let value = values.get(row, col);
+        if !spend_shared(conditional::text_work(&cell.rules, value)) {
+            return RuleStyle::default();
+        }
+        let refused = std::cell::Cell::new(false);
+        let style = conditional::apply(
             &cell.rules,
-            values.get(row, col),
-            &|r: CellRef| values.get(r.row, r.col).clone(),
+            value,
+            &|r: CellRef| match values.get(r.row, r.col) {
+                Value::Text(t) if !spend_shared(t.len() as u64) => {
+                    refused.set(true);
+                    Value::Empty
+                }
+                v => v.clone(),
+            },
             values.now,
-        )
+        );
+        if refused.get() {
+            return RuleStyle::default();
+        }
+        style
     }
 
     /// The cells whose rules of conditional formatting are the same as
@@ -548,6 +582,35 @@ mod tests {
         let v = t.values(0.0);
         assert_eq!(v.get(999, 1), &Value::Number(1.0));
         assert_eq!(v.get(999, 2), &Value::Number(1000.0));
+    }
+
+    #[test]
+    fn rules_compare_long_texts_within_the_work_of_the_document() {
+        use crate::conditional::{Condition, Operand, Rule};
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(1, 2);
+        t.type_text(0, 0, &"a".repeat(30_000), &en);
+        t.type_text(0, 1, &"a".repeat(30_000), &en);
+        let rule = Rule {
+            condition: Condition::Equal(Operand::Cell(CellRef::new(0, 0))),
+            style: RuleStyle {
+                bold: Some(true),
+                ..RuleStyle::default()
+            },
+        };
+        t.cell_mut(0, 1).rules = std::sync::Arc::from(vec![rule; 10]);
+        let v = t.values(0.0);
+        assert_eq!(t.rule_style(&v, 0, 1).bold, Some(true));
+        let _scope = share_work();
+        assert_eq!(t.rule_style(&v, 0, 1).bold, Some(true));
+        SHARED_WORK.with(|w| {
+            if let Some(w) = w.borrow_mut().as_mut() {
+                w.left = 700_000;
+            }
+        });
+        // The first time fits, the second does not.
+        assert_eq!(t.rule_style(&v, 0, 1).bold, Some(true));
+        assert_eq!(t.rule_style(&v, 0, 1).bold, None);
     }
 
     #[test]

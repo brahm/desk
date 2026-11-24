@@ -38,7 +38,7 @@ pub(crate) fn locale(document: &Document) -> Locale {
 fn odf_locale(source: &odf::TextDocument) -> Locale {
     let text = &source.default_style.text;
     match text.language.as_deref() {
-        Some(language) if !language.is_empty() && language != "zxx" => {
+        Some(language) if !language.is_empty() && !matches!(language, "zxx" | "und") => {
             let tag = text
                 .country
                 .as_deref()
@@ -882,5 +882,9 @@ mod tests {
             .merge(desk_model::table::Area::between((0, 0), (0, 1)), &locale)
             .unwrap();
         assert_eq!(table.source_text(0, 0, &locale), "Preço\t2,5");
+        // An undetermined language is none, as in the model.
+        source.default_style.text.language = Some("und".into());
+        let system = Locale::from_tag(&std::env::var("LANG").unwrap_or_default());
+        assert_eq!(odf_locale(&source), system);
     }
 }

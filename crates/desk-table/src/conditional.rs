@@ -189,6 +189,38 @@ pub(crate) fn map_rule_cells(
         .collect()
 }
 
+/// What checking `rules` against `value` costs, apart from the cells they
+/// compare with: the texts compared, which are put in lower case, for
+/// each rule.
+pub(crate) fn text_work(rules: &[Rule], value: &Value) -> u64 {
+    let own = match value {
+        Value::Text(t) => t.len() as u64,
+        _ => 0,
+    };
+    rules
+        .iter()
+        .map(|rule| {
+            let theirs: usize = match &rule.condition {
+                Condition::TextIs(t)
+                | Condition::TextIsNot(t)
+                | Condition::StartsWith(t)
+                | Condition::EndsWith(t)
+                | Condition::Contains(t)
+                | Condition::DoesNotContain(t) => t.len(),
+                other => other
+                    .operands()
+                    .iter()
+                    .map(|o| match o {
+                        Operand::Text(t) => t.len(),
+                        _ => 0,
+                    })
+                    .sum(),
+            };
+            1 + own + theirs as u64
+        })
+        .fold(0, u64::saturating_add)
+}
+
 fn number(v: &Value) -> Option<f64> {
     match v {
         Value::Number(n) | Value::Date(n) | Value::Duration(n) => Some(*n),

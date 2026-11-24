@@ -472,6 +472,9 @@ impl TextEditor {
         let document = Self::main_document(&state);
         let places = placed(document);
         let texts = Texts::new(document, Self::main_layout(&state), &places);
+        // A table with comments on many cells is computed once, within
+        // the work of the document.
+        let _work = desk_model::table::share_work();
         texts
             .ordered(places)
             .into_iter()
