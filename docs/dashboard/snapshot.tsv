@@ -48,6 +48,9 @@ backlog	B-044	open
 backlog	B-045	open
 backlog	B-046	done
 backlog	B-047	done
+backlog	B-048	done
+backlog	B-049	done
+backlog	B-050	open
 feature	S001	done
 feature	S002	done
 feature	S003	done
@@ -616,6 +619,7 @@ feature	W173	partial
 feature	W174	missing
 phase	B1	done
 phase	R	done
+phase	RV	in-progress
 phase	S1	not-started
 phase	S2	not-started
 phase	S3	not-started
@@ -627,7 +631,7 @@ phase	T3	not-started
 phase	T4	not-started
 phase	T5	not-started
 phase	W1	done
-phase	W2	in-progress
+phase	W2	paused
 phase	W3	not-started
 phase	W4	not-started
 phase	W5	not-started

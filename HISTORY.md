@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: development is paused for a review of all the code for bugs
+  and optimizations (phase RV); Writer review (W2) resumes after it.
 * Fixed: the tables of Pages '09 documents open in Desk Writer with
   their fills, lines, alternating rows, text styles, cell formats and
   conditional formatting, as Pages shows them.

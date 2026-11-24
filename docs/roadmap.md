@@ -40,10 +40,20 @@ flowchart LR
     B1 --> T1 --> T2 --> T3 --> T4 --> T5
     B1 --> S1 --> S2 --> S3 --> S4 --> S5
     W6 & T5 & S5 --> X1[X1 · Across the apps and 1.0]
+    W2 -. paused for .-> RV[RV · Code review] -. back to .-> W2
 ```
 
 The three app tracks can run side by side after B1. The estimate counts
 them one after the other.
+
+On 24 November the owner paused W2 after pull request 200 for **RV**, a
+review of all the code written so far for bugs and optimizations, before
+any phase goes on (D-027). W2 resumes where it stopped when RV ends. RV
+runs in six batches ordered by risk: the file readers (iWork '09, ODF
+and the filters), formulas and tables, the document model, text, layout
+and drawing, the interface, and a pass across the crates. Each batch
+opens with a report of findings in [`review/`](review/README.md) and
+ends in a pull request whose fixes each come with a test.
 
 | Phase | What it delivers | Inventory rows | Estimate (days) |
 | --- | --- | --- | --- |
@@ -65,16 +75,18 @@ them one after the other.
 | **S3** Slides: animation | The transition and build engine, Magic Move, the effects of '09 kept by D-003 | 9 | 5 |
 | **S4** Slides: presenting | Play full screen and in a window, presenter display, rehearsal, recording, links and kiosk options | 11 | 3 |
 | **S5** Slides: tables, charts, files, print | Tables and charts on slides; open `.pptx`, `.key` of '09 and current; export `.pptx` and PDF; handouts | 25 | 5 |
+| **RV** Code review | The code of every crate read for bugs and optimizations in six batches (D-027): panics on malformed files, data lost on the way in and out, wrong results, undo, performance, leaks in the interface, duplicated code; each fix with a regression test; the risk lints of the format libraries on in the CI (D-028) | - | 8 |
 | **X1** Across the apps and 1.0 | Live links of charts and tables between documents (D-002), copy and paste among the apps, comments of the existing code brought to the standard, final parity report | - | 3 |
 
-**Estimate: about 70 working days with the apps in sequence**, which puts
-parity near the end of January 2027; between 55 and 90 days (10 January to
-15 February) depending on the file readers, which are the least known
+**Estimate: about 78 working days with the apps in sequence**, which puts
+parity in early February 2027; between 60 and 100 days (15 January to
+24 February) depending on the file readers, which are the least known
 part. It starts from the estimate of 2026-11-16 (about 50 days at the pace
 of the first 17 days of the project) and adds what that estimate did not
 count: the change of window, the readers of current iWork and of Numbers
 and Keynote '09, the Office filters for three apps, the reference cases
-redone on 15.4, and the documentation. It is an estimate, not a
+redone on 15.4, and the documentation. On 24 November it gained the 8
+days of RV, the code review (5 to 10). It is an estimate, not a
 commitment, and each phase corrects it when it ends.
 
 ## Out of scope, kept on record

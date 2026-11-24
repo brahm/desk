@@ -1920,6 +1920,29 @@ paragraph, and objects on a second page.
   the units that are not zero, 5h where Pages writes 5h 0m 0s (NCEL-15,
   partial). B-049 is closed.
 
+### 24 November: development paused for a review of the code (RV, D-027)
+
+- After pull request 200 the owner paused development to review all the
+  code written so far for bugs and optimizations, before going back to
+  the planned phases: "vamos pausar o desenvolvimento e revisar todo o
+  código já produzido atrás de bugs e otimizações". W2 is paused, not
+  closed: its open rows stay in W2 and wait for the review.
+- The plan, which the owner approved the same morning, is in
+  [review/README.md](review/README.md): about 148,000 lines in 19 crates,
+  read in six batches ordered by risk (the file readers, formulas and
+  tables, the document model, text and layout, the interface, a pass
+  across the crates), each with a report of findings and a pull request
+  whose fixes come with regression tests. It is estimated at 8 days (5 to
+  10), which moves the forecast of parity to early February 2027.
+- *Why the readers first:* they read files Desk did not write, and Clippy
+  finds 360 indexes in the format crates and the model that panic on a
+  malformed file, which closes the app with the user's work.
+- *Why the lints stay on (D-028):* the owner chose to deny
+  `indexing_slicing` and `unwrap_used` in the format libraries after batch
+  1, so that what the review removes does not come back.
+- The dashboard learned the status `paused`, so that W2 shows as paused
+  beside RV in progress, and RV has a group of its own, Revisão.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -2288,6 +2311,22 @@ on the website.
 118), and a standing instruction to update it. This log joined the list of
 documents kept up to date on the same day.
 
+### The review of the code (24 November)
+
+**D-027: development pauses for a review of all the code (24 November).**
+*Why:* after a month of phases delivered one after the other, the owner
+wanted the code read as a whole for bugs and optimizations before it
+grows further, so that later phases do not build on hidden faults.
+*Consequences:* phase RV, of 8 days (5 to 10), between W2 and the rest
+of the plan; W2 paused with its rows in place; the forecast of parity
+moved from the end of January to early February 2027.
+
+**D-028: the risk lints stay on in the format libraries (24 November).**
+*Why:* a reader that indexes without checking closes the app on a
+malformed file, and only a lint keeps new code from doing it again.
+*Consequences:* after batch 1 of RV, `desk-odf`, `desk-iwork` and
+`desk-formula` deny `indexing_slicing` and `unwrap_used`.
+
 ## What changed direction, and what it cost
 
 | Date | Change | What was redone or set aside |
@@ -2301,6 +2340,7 @@ documents kept up to date on the same day.
 | 16 Nov | Interface B to M+ | The format bar, the bottom bar, the sheets of Tables in the sidebar |
 | 16 Nov | One reference for checking (iWork 15.4) to two (D-020) | Nothing redone: the cases of features only iWork '09 has stay on the Lion virtual machine |
 | 16 Nov | Portuguese to English for everything in the repository | Matrices, `docs/interface`, mockup scripts |
+| 24 Nov | Development paused after pull request 200 for a review of all the code (RV) | W2 waits; 8 days added to the plan |
 
 What did not change in seventeen days: Rust, GTK and Libadwaita; ODF with
 extensions as the native format; the shared engine under three apps; the
@@ -2322,7 +2362,8 @@ carried from the replanning. The owner closed it on 17 November and
 chose W1, Writer to the behaviour of 15, as the next phase. W1 ran
 from 17 to 22 November and brought Writer to the behaviour of Pages
 15.4, checked on the Mac; the owner closed it and chose W2, Writer
-review, as the next phase. The three
+review, as the next phase. On 24 November, after pull request 200, he
+paused W2 for RV, a review of all the code (D-027). The three
 apps can advance side by side: six phases of Writer, five of Tables, five
 of Slides, and a last phase across the apps before version 1.0.
 
