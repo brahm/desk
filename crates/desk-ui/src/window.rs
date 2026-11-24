@@ -1678,10 +1678,25 @@ impl DocumentWindow {
     /// Saves over the file, as the owner said to, and lets the document
     /// save itself from now on, even opened again (D-031).
     fn save_over(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
-        *self.save_over.borrow_mut() = self.path.borrow().clone();
+        // Saved now as any file is; the answer holds only once the file
+        // is written, so that a failed write does not let the document
+        // save itself over the file later without asking.
         self.lossy_pending.set(false);
-        self.refresh();
-        self.save(done);
+        let weak = Rc::downgrade(self);
+        let path = self.path.borrow().clone();
+        // Boxed, as Save may ask again and come back here.
+        let after: Box<dyn FnOnce(bool)> = Box::new(move |saved| {
+            if let Some(this) = weak.upgrade() {
+                if saved {
+                    *this.save_over.borrow_mut() = path;
+                } else {
+                    this.lossy_pending.set(true);
+                }
+                this.refresh();
+            }
+            done(saved);
+        });
+        self.save(after);
     }
 
     /// Keeps the changes of a document that waits to be asked before it
@@ -1696,13 +1711,21 @@ impl DocumentWindow {
             .extension()
             .map(|e| e.to_string_lossy().into_owned())
             .unwrap_or_default();
-        // A name no one can guess, in a folder of its own.
+        // A name no one can guess, in a folder that only its owner can
+        // read.
         let folder =
             std::env::temp_dir().join(format!("desk-changes-{}", glib::uuid_string_random()));
-        if std::fs::create_dir(&folder).is_err() {
+        if std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+            .create(&folder)
+            .is_err()
+        {
             return false;
         }
-        let file = folder.join(format!("changes.{extension}"));
+        // Named as the document, which the fields of its name show.
+        let file = match path.file_name() {
+            Some(name) => folder.join(name),
+            None => folder.join(format!("document.{extension}")),
+        };
         let kept = self.write_to(&file)
             && crate::versions::Store::for_document(path)
                 .keep(
@@ -1712,6 +1735,9 @@ impl DocumentWindow {
                 )
                 .is_ok();
         let _ = std::fs::remove_dir_all(&folder);
+        if kept {
+            self.drop_draft();
+        }
         kept
     }
 
@@ -2267,14 +2293,31 @@ impl DocumentWindow {
         // Changes not saved yet are saved first, which keeps the file as
         // it was opened as a version, and the changes as the version
         // before the revert (review RV, batch 5).
-        if (!self.opened_kept.get() && !self.editor().is_some_and(|e| e.is_modified()))
-            || self.lossy_pending.get()
-        {
-            // The file is still as it was opened: never saved over while
-            // it waits to be asked (D-031), its changes kept as a version.
-            if self.lossy_pending.get() && !self.keep_changes_as_version(&path) {
+        if self.lossy_pending.get() {
+            // Never saved over while it waits to be asked (D-031): its
+            // changes are kept as a version, and the file as it was opened
+            // comes back, from its version when another took its place.
+            if !self.keep_changes_as_version(&path) {
                 return;
             }
+            let opened = self
+                .opened_kept
+                .get()
+                .then(|| {
+                    crate::versions::Store::for_document(&path)
+                        .list()
+                        .into_iter()
+                        .find(|v| v.kind == crate::versions::Kind::Opened)
+                })
+                .flatten();
+            match opened {
+                Some(version) => self.put_in_place(opener, &path, &version),
+                None => self.load(opener, &path),
+            }
+            return;
+        }
+        if !self.opened_kept.get() && !self.editor().is_some_and(|e| e.is_modified()) {
+            // The file is still as it was opened.
             self.load(opener, &path);
             return;
         }
@@ -2296,23 +2339,42 @@ impl DocumentWindow {
         let (Some(opener), Some(path)) = (self.opener, self.path.borrow().clone()) else {
             return;
         };
-        // A file read with losses is still as it was opened (D-031): its
-        // changes are kept as a version, and the file is not saved over.
+        // A file read with losses is not saved over (D-031): its changes
+        // are kept as a version instead.
         let kept = if self.lossy_pending.get() {
             self.keep_changes_as_version(&path)
         } else {
             self.autosave()
         };
-        if !kept {
-            return;
+        if kept {
+            self.put_in_place(opener, &path, version);
         }
-        let store = crate::versions::Store::for_document(&path);
+    }
+
+    /// Puts the bytes of a version in place of the file, keeping the file
+    /// as a version first: as opened when it was not kept yet, which a
+    /// file read with losses never was. Nothing is replaced when it
+    /// cannot be kept.
+    fn put_in_place(
+        self: &Rc<Self>,
+        opener: &'static Opener,
+        path: &Path,
+        version: &crate::versions::Version,
+    ) {
+        let store = crate::versions::Store::for_document(path);
         if path.exists() {
-            let _ = store.keep(
-                &path,
-                crate::versions::Kind::Automatic,
-                crate::versions::now(),
-            );
+            let kind = if self.opened_kept.get() {
+                crate::versions::Kind::Automatic
+            } else {
+                crate::versions::Kind::Opened
+            };
+            if let Err(error) = store.keep(path, kind, crate::versions::now()) {
+                self.alert(&tr("Cannot Restore the Version"), &error.to_string());
+                return;
+            }
+            if kind == crate::versions::Kind::Opened {
+                self.opened_kept.set(true);
+            }
         }
         // The bytes of the version take the place of the file, not the
         // version as Desk reads and writes it again, which may leave out
@@ -2321,10 +2383,13 @@ impl DocumentWindow {
             self.alert(&tr("Cannot Restore the Version"), &message);
             return;
         }
-        match std::fs::read(&version.path).and_then(|bytes| crate::write_replacing(&path, &bytes)) {
+        match std::fs::read(&version.path).and_then(|bytes| crate::write_replacing(path, &bytes)) {
             Ok(()) => {
+                // Bytes Desk did not write: whether to save over what it
+                // does not read of them is asked again (D-031).
+                self.save_over.borrow_mut().take();
                 let opened = self.opened_kept.get();
-                self.load(opener, &path);
+                self.load(opener, path);
                 // The version as opened is kept already.
                 self.opened_kept.set(opened);
                 self.refresh();
@@ -2428,9 +2493,6 @@ impl DocumentWindow {
     /// whole before its tab closes, in one dialog: leave them out, save
     /// them as a new file, or save over the file (D-031).
     fn ask_to_close_unread(self: &Rc<Self>, done: Box<dyn FnOnce(bool)>) {
-        if let Some(tab) = self.tab.get() {
-            self.frame().view().set_selected_page(tab);
-        }
         let dialog = adw::AlertDialog::new(
             Some(&tr("Save Changes?")),
             Some(

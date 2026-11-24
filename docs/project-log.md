@@ -2144,6 +2144,12 @@ paragraph, and objects on a second page.
   of a file waiting to be asked; and that closing asked twice. All fixed:
   only content the reader left out counts, Save Over holds for the file,
   the changes are kept as a version, and closing asks once.
+- Its second review found that a version restored over a file waiting to
+  be asked did not keep that file as opened, nor stop when it could not;
+  that Save Over held even for bytes put back from a version, and before
+  the file was written; that Revert went back to the file on disk rather
+  than as opened; and that the changes kept for Revert went through a
+  folder others could read. All fixed.
 
 ## Decisions, with their reasons and consequences
 
