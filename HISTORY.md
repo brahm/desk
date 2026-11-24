@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: the author's name in Preferences, and View > Author Color in
   Desk Writer; comments and highlights are drawn in the colour of
-  their author (#PR).
+  their author (#215).
 * Added: Insert > Highlight (Ctrl+Shift+H) in Desk Writer marks the
   selected text for review, and Remove Highlights and Comments takes
   them off the selection (#214).
