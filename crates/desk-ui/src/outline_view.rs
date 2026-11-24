@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use gtk::{gdk, gio, glib};
+use gtk::{gdk, glib};
 
 use crate::editing::OutlineRow;
 use crate::formatting::{EditorOf, labelled};
@@ -182,17 +182,19 @@ impl OutlineView {
         let weak = Rc::downgrade(&this);
         paste.connect_clicked(move |button| {
             let weak = weak.clone();
-            button
-                .clipboard()
-                .read_text_async(gio::Cancellable::NONE, move |text| {
-                    if let (Some(this), Ok(Some(text))) = (weak.upgrade(), text)
-                        && let Some(editor) = (this.editor)()
-                    {
-                        let at = editor.topic_range(this.current.get()).end;
-                        this.focus.set(Some((at, 0)));
-                        editor.paste_outline(at, &text);
-                    }
-                });
+            let clipboard = button.clipboard();
+            // Read with a bound, as the editor reads it (third review of RV
+            // batch 5).
+            glib::spawn_future_local(async move {
+                if let Some(text) = crate::editing::clipboard_text(&clipboard).await
+                    && let Some(this) = weak.upgrade()
+                    && let Some(editor) = (this.editor)()
+                {
+                    let at = editor.topic_range(this.current.get()).end;
+                    this.focus.set(Some((at, 0)));
+                    editor.paste_outline(at, &text);
+                }
+            });
         });
         this
     }

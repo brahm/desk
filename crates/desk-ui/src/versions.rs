@@ -187,10 +187,31 @@ impl Store {
             // shown as those of this document (review RV, batch 5), and
             // are removed rather than set aside, where they piled up with
             // nothing to show them (second review).
+            // They are set aside first, and removed only once the versions
+            // of this document are in their place: if that fails, they are
+            // put back (third review). This runs once the document has
+            // taken the name, so no file of that name holds them any more.
+            let mut aside = moved.folder.clone().into_os_string();
+            aside.push(".replaced");
+            let aside = PathBuf::from(aside);
+            let set_aside = moved.folder.exists() && std::fs::rename(&moved.folder, &aside).is_ok();
             if moved.folder.exists() {
-                let _ = std::fs::remove_dir_all(&moved.folder);
+                // Not set aside: this document keeps its versions where
+                // they are rather than mixing them.
+                return self.clone();
             }
-            let _ = std::fs::rename(&self.folder, &moved.folder);
+            match std::fs::rename(&self.folder, &moved.folder) {
+                Ok(()) if set_aside => {
+                    let _ = std::fs::remove_dir_all(&aside);
+                }
+                Ok(()) => {}
+                Err(_) => {
+                    if set_aside {
+                        let _ = std::fs::rename(&aside, &moved.folder);
+                    }
+                    return self.clone();
+                }
+            }
         }
         moved
     }

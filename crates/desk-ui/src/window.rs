@@ -87,6 +87,9 @@ pub struct DocumentWindow {
     frame: RefCell<Rc<Frame>>,
     /// The controllers the document added to that window.
     window_controllers: RefCell<Vec<gtk::EventController>>,
+    /// What the document follows of the window that holds it, which
+    /// moves with the tab (third review of RV batch 5).
+    window_notifies: crate::tabs::WindowNotifies,
     /// The tab of the document: everything the document shows, with its
     /// own breakpoints, since the window has the tabs of other documents.
     root: adw::BreakpointBin,
@@ -162,10 +165,11 @@ pub struct DocumentWindow {
     ruler_corner: gtk::Box,
     /// The recovery draft of the document, once one is written.
     draft: RefCell<Option<crate::recovery::Draft>>,
-    /// The name the draft keeps of a recovered document that is not saved
-    /// yet: the one it had, not its title, so that a second recovery does
-    /// not add to it (second review of RV batch 5).
-    draft_name: RefCell<Option<String>>,
+    /// Of a recovered document, the title it shows and the name it had:
+    /// while it keeps that title, the draft keeps the name it had, so that
+    /// a second recovery does not add to it; once renamed or saved, the
+    /// new name (second and third reviews of RV batch 5).
+    draft_name: RefCell<Option<(String, String)>>,
     /// What Desk Slides adds to the window; none in Desk Writer.
     slides: Option<Rc<slides::Slides>>,
     /// Whether the document changed since the last draft.
@@ -657,6 +661,7 @@ impl DocumentWindow {
         let this = Rc::new(Self {
             frame: RefCell::new(frame.clone()),
             window_controllers: RefCell::new(Vec::new()),
+            window_notifies: crate::tabs::WindowNotifies::default(),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -826,11 +831,13 @@ impl DocumentWindow {
         this.connect_fullscreen(&leave_fullscreen, &backdrop);
         this.connect_context_menu();
         {
-            let window = this.window().downgrade();
+            // The window is looked up when the action runs, as the tab
+            // may have moved to another (third review of RV batch 5).
+            let weak = Rc::downgrade(&this);
             let opens = opener.is_some();
             let shortcuts = gio::SimpleAction::new("shortcuts", None);
             shortcuts.connect_activate(move |_, _| {
-                if let Some(window) = window.upgrade() {
+                if let Some(window) = weak.upgrade().map(|this| this.window()) {
                     if is_slides {
                         crate::shortcuts::slides_dialog().present(Some(&window));
                     } else {
@@ -852,15 +859,16 @@ impl DocumentWindow {
         }
         {
             let weak = Rc::downgrade(&this);
-            this.window().connect_visible_dialog_notify(move |_| {
-                // Once the dialog has gone.
-                let weak = weak.clone();
-                glib::idle_add_local_once(move || {
-                    if let Some(this) = weak.upgrade() {
-                        this.refresh();
-                    }
+            this.window_notifies
+                .connect(&this.window(), "visible-dialog", move |_| {
+                    // Once the dialog has gone.
+                    let weak = weak.clone();
+                    glib::idle_add_local_once(move || {
+                        if let Some(this) = weak.upgrade() {
+                            this.refresh();
+                        }
+                    });
                 });
-            });
         }
         // A window of Desk Slides starts a presentation at once, until the
         // theme chooser comes in phase 3.
@@ -1618,11 +1626,13 @@ impl DocumentWindow {
             .borrow_mut()
             .get_or_insert_with(|| crate::recovery::Draft::new(opener.saves.1))
             .clone();
-        let name = self
-            .draft_name
-            .borrow()
-            .clone()
-            .unwrap_or_else(|| self.name.borrow().clone());
+        let name = {
+            let shown = self.name.borrow().clone();
+            match &*self.draft_name.borrow() {
+                Some((title, had)) if *title == shown => had.clone(),
+                _ => shown,
+            }
+        };
         let written = draft.name_file(&name).is_ok()
             && crate::save_document(opener, &editor.document(), None, &draft.path).is_ok();
         if written {
@@ -1663,11 +1673,9 @@ impl DocumentWindow {
                 } else {
                     name.clone()
                 };
-                self.load_untitled(
-                    shown.document,
-                    tr("{name} (recovered)").replace("{name}", &shown_name),
-                );
-                *self.draft_name.borrow_mut() = Some(name);
+                let title = tr("{name} (recovered)").replace("{name}", &shown_name);
+                self.load_untitled(shown.document, title.clone());
+                *self.draft_name.borrow_mut() = Some((title, name));
                 // The draft stays the draft of this window until the
                 // document is saved or given up: a second crash before an
                 // edit would otherwise lose it (review RV, batch 5).
@@ -2277,28 +2285,29 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         let leave = leave.downgrade();
         let button = backdrop.downgrade();
-        self.window().connect_fullscreened_notify(move |window| {
-            let Some(this) = weak.upgrade() else { return };
-            let fullscreen = window.is_fullscreen();
-            this.toolbar_view.set_reveal_top_bars(!fullscreen);
-            // The navigation sidebar leaves room for the pages in full
-            // screen and comes back after (GNM-12).
-            if fullscreen {
-                this.nav_before_fullscreen
-                    .set(this.nav_split.shows_sidebar());
-                this.nav_split.set_show_sidebar(false);
-            } else if this.nav_before_fullscreen.replace(false) {
-                this.nav_split.set_show_sidebar(true);
-            }
-            if let Some(leave) = leave.upgrade() {
-                leave.set_visible(fullscreen);
-            }
-            if let Some(button) = button.upgrade() {
-                button.set_visible(fullscreen);
-                this.view
-                    .set_backdrop(fullscreen.then(|| formatting::from_gdk(&button.rgba())));
-            }
-        });
+        self.window_notifies
+            .connect(&self.window(), "fullscreened", move |window| {
+                let Some(this) = weak.upgrade() else { return };
+                let fullscreen = window.is_fullscreen();
+                this.toolbar_view.set_reveal_top_bars(!fullscreen);
+                // The navigation sidebar leaves room for the pages in full
+                // screen and comes back after (GNM-12).
+                if fullscreen {
+                    this.nav_before_fullscreen
+                        .set(this.nav_split.shows_sidebar());
+                    this.nav_split.set_show_sidebar(false);
+                } else if this.nav_before_fullscreen.replace(false) {
+                    this.nav_split.set_show_sidebar(true);
+                }
+                if let Some(leave) = leave.upgrade() {
+                    leave.set_visible(fullscreen);
+                }
+                if let Some(button) = button.upgrade() {
+                    button.set_visible(fullscreen);
+                    this.view
+                        .set_backdrop(fullscreen.then(|| formatting::from_gdk(&button.rgba())));
+                }
+            });
         let weak = Rc::downgrade(self);
         backdrop.connect_rgba_notify(move |button| {
             let Some(this) = weak.upgrade() else { return };
@@ -2326,9 +2335,9 @@ impl DocumentWindow {
 
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let window = self.window().downgrade();
+        let weak = Rc::downgrade(self);
         keys.connect_key_pressed(move |_, key, _, modifiers| {
-            let Some(window) = window.upgrade() else {
+            let Some(window) = weak.upgrade().map(|this| this.window()) else {
                 return glib::Propagation::Proceed;
             };
             if key == gdk::Key::Escape
@@ -3686,7 +3695,7 @@ impl DocumentWindow {
         let menu_hyphenation = hyphenation.clone();
         let menu_field = field.clone();
         let menu_undo = undo.clone();
-        let window = self.window().downgrade();
+        let area = self.view.area().downgrade();
         click.connect_pressed(move |gesture, _, x, y| {
             if let Some(popover) = menu_popover.upgrade() {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
@@ -3700,7 +3709,7 @@ impl DocumentWindow {
                 if let Some(editor) = &editor {
                     editor.select_field_at(x, y);
                 }
-                if let Some(window) = window.upgrade() {
+                if let Some(window) = area.upgrade().as_ref().and_then(window_of) {
                     fill_field(&menu_field, &window, editor.as_ref());
                 }
                 popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
@@ -3713,7 +3722,6 @@ impl DocumentWindow {
         let menu_popover = popover.downgrade();
         let area = self.view.area().downgrade();
         let editor = self.editor.clone();
-        let window = self.window().downgrade();
         keys.connect_key_pressed(move |_, key, keycode, modifiers| {
             // The shortcuts of styles: Ctrl+1 to Ctrl+8 in place of F1 to
             // F8 of Pages, with Shift to drop the formatting set over the
@@ -3744,7 +3752,7 @@ impl DocumentWindow {
                 );
                 fill_hyphenation(&hyphenation, current.as_ref());
                 fill_undo(&undo, current.as_ref());
-                if let Some(window) = window.upgrade() {
+                if let Some(window) = window_of(&area) {
                     fill_field(&field, &window, current.as_ref());
                 }
                 // At the middle of the visible area.
@@ -3778,6 +3786,7 @@ impl FramePage for DocumentWindow {
         for controller in controllers {
             new.add_controller(controller);
         }
+        self.window_notifies.move_to(&old, &new);
     }
 
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
@@ -3898,6 +3907,15 @@ fn fill_hyphenation(menu: &gio::Menu, editor: Option<&TextEditor>) {
 /// the cursor, and sets the states of its actions (EST-27): the format of
 /// a number of pages, of a date and whether it updates on open, and
 /// whether a file name shows its folder and extension.
+/// The window that holds a widget now: a tab can move to another window,
+/// so it is looked up rather than kept (third review of RV batch 5).
+fn window_of(widget: &impl IsA<gtk::Widget>) -> Option<adw::ApplicationWindow> {
+    widget
+        .as_ref()
+        .root()
+        .and_downcast::<adw::ApplicationWindow>()
+}
+
 fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<&TextEditor>) {
     menu.remove_all();
     let Some((_, field)) = editor.and_then(TextEditor::field_at_cursor) else {

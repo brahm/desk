@@ -1081,12 +1081,18 @@ impl TextEditor {
                 Ok(bytes) => (format.read_foreign_text)(media_type, &bytes),
                 Err(error) => Err(error),
             };
-            let Some(this) = weak.upgrade() else { return };
             match fragment {
-                Ok(fragment) if !fragment.text().is_empty() => this.paste_fragment(&fragment),
-                // Nothing to read: the text alone.
+                Ok(fragment) if !fragment.text().is_empty() => {
+                    if let Some(this) = weak.upgrade() {
+                        this.paste_fragment(&fragment);
+                    }
+                }
+                // Nothing to read: the text alone. The editor is not held
+                // while it is read.
                 _ => {
-                    if let Some(text) = clipboard_text(&clipboard).await {
+                    if let Some(text) = clipboard_text(&clipboard).await
+                        && let Some(this) = weak.upgrade()
+                    {
                         this.replace_selection("Paste", &text);
                     }
                 }
@@ -1107,23 +1113,34 @@ impl TextEditor {
         {
             return false;
         }
-        // PNG if it is offered, as it is kept as it is read.
-        let types = formats.mime_types();
-        let Some(media_type) = types
-            .iter()
-            .find(|t| t.as_str() == "image/png")
-            .or_else(|| types.iter().find(|t| t.starts_with("image/")))
-            .map(|t| t.to_string())
+        // PNG or JPEG, which a document keeps as they are read: of other
+        // kinds, some decoders make all the pixels before the size can be
+        // checked (second review of RV batch 5).
+        let Some(media_type) = ["image/png", "image/jpeg"]
+            .into_iter()
+            .find(|t| formats.contain_mime_type(t))
         else {
             return false;
         };
         let weak = self.downgrade();
         gtk::glib::spawn_future_local(async move {
-            // Read with a bound, and refused by the size its header gives
-            // before its pixels are made: a picture larger than the pages
-            // draw was decoded whole first (second review of RV batch 5).
-            let picture = match clipboard_bytes(&clipboard, &media_type).await {
-                Ok(bytes) => picture_of_image(&bytes, &media_type, MAX_PASTED_PIXELS),
+            // Read with a bound, refused by the size its header gives, and
+            // decoded once to check it away from the thread of the window.
+            let picture = match clipboard_bytes(&clipboard, media_type).await {
+                Ok(bytes) => match picture_of_image(&bytes, MAX_PASTED_PIXELS) {
+                    Ok(picture) => {
+                        let checked = picture.clone();
+                        match gtk::gio::spawn_blocking(move || {
+                            desk_render::picture_surface(&checked).is_some()
+                        })
+                        .await
+                        {
+                            Ok(true) => Ok(picture),
+                            _ => Err("cannot decode the picture".to_string()),
+                        }
+                    }
+                    Err(error) => Err(error),
+                },
                 Err(error) => Err(error),
             };
             let Some(this) = weak.upgrade() else { return };
@@ -4357,7 +4374,7 @@ pub(super) async fn clipboard_bytes(
 /// The text of the clipboard, read as [`clipboard_bytes`] are when
 /// another app offers it: the text alone was read whole, whatever its
 /// size (second review of RV batch 5).
-async fn clipboard_text(clipboard: &gdk::Clipboard) -> Option<String> {
+pub(crate) async fn clipboard_text(clipboard: &gdk::Clipboard) -> Option<String> {
     if clipboard.is_local() {
         return clipboard
             .read_text_future()
@@ -4366,11 +4383,10 @@ async fn clipboard_text(clipboard: &gdk::Clipboard) -> Option<String> {
             .flatten()
             .map(String::from);
     }
-    const PLAIN: [&str; 3] = ["text/plain;charset=utf-8", "UTF8_STRING", "text/plain"];
-    let formats = clipboard.formats();
-    let media_type = PLAIN.iter().find(|t| formats.contain_mime_type(t))?;
-    match clipboard_bytes(clipboard, media_type).await {
-        Ok(bytes) => Some(plain_text(&bytes)),
+    let types = clipboard.formats().mime_types();
+    let (media_type, charset) = text_type(types.iter().map(|t| t.as_str()))?;
+    match clipboard_bytes(clipboard, &media_type).await {
+        Ok(bytes) => Some(plain_text(&bytes, charset.as_deref())),
         Err(error) => {
             gtk::glib::g_warning!("desk", "cannot paste the text: {error}");
             None
@@ -4378,10 +4394,55 @@ async fn clipboard_text(clipboard: &gdk::Clipboard) -> Option<String> {
     }
 }
 
-/// The text of the bytes of a plain text, without the null that some
-/// apps end it with.
-fn plain_text(bytes: &[u8]) -> String {
-    let text = String::from_utf8_lossy(bytes);
+/// Of the types a clipboard offers, the one of plain text to read, with
+/// its character set when it gives one: UTF-8 first, in any case of
+/// letters, then another set, then text with no set.
+fn text_type<'a>(types: impl Iterator<Item = &'a str>) -> Option<(String, Option<String>)> {
+    let mut best: Option<(u8, String, Option<String>)> = None;
+    for media_type in types {
+        let lower = media_type.to_ascii_lowercase();
+        let (rank, charset) = if lower == "utf8_string" {
+            (0, Some("UTF-8".to_string()))
+        } else if let Some(params) = lower.strip_prefix("text/plain;") {
+            let Some(set) = params
+                .split(';')
+                .find_map(|p| p.trim().strip_prefix("charset="))
+            else {
+                continue;
+            };
+            let set = set.trim_matches('"').to_string();
+            let utf8 = set == "utf-8" || set == "utf8";
+            (if utf8 { 0 } else { 1 }, Some(set))
+        } else if lower == "text/plain" {
+            (2, None)
+        } else if lower == "string" {
+            (3, Some("ISO-8859-1".to_string()))
+        } else {
+            continue;
+        };
+        if best.as_ref().is_none_or(|(b, _, _)| rank < *b) {
+            best = Some((rank, media_type.to_string(), charset));
+        }
+    }
+    best.map(|(_, media_type, charset)| (media_type, charset))
+}
+
+/// The text of the bytes of a plain text in `charset`, without the null
+/// that some apps end it with. With no set, UTF-8, or Latin-1 when the
+/// bytes are not UTF-8.
+fn plain_text(bytes: &[u8], charset: Option<&str>) -> String {
+    let text = match charset {
+        Some(set) if !set.eq_ignore_ascii_case("utf-8") && !set.eq_ignore_ascii_case("utf8") => {
+            glib::convert(bytes, "UTF-8", set)
+                .map(|(converted, _)| String::from_utf8_lossy(&converted).into_owned())
+                .unwrap_or_else(|_| String::from_utf8_lossy(bytes).into_owned())
+        }
+        Some(_) => String::from_utf8_lossy(bytes).into_owned(),
+        None => match std::str::from_utf8(bytes) {
+            Ok(text) => text.to_string(),
+            Err(_) => bytes.iter().map(|&b| char::from(b)).collect(),
+        },
+    };
     text.trim_end_matches('\0').to_string()
 }
 
@@ -4389,47 +4450,14 @@ fn plain_text(bytes: &[u8]) -> String {
 /// largest the pages draw.
 const MAX_PASTED_PIXELS: i64 = 8192 * 8192;
 
-/// The picture of the bytes of an image of `media_type`, as a PNG, unless
-/// its header gives it more than `most` pixels: then its pixels are never
-/// made.
-fn picture_of_image(
-    bytes: &[u8],
-    media_type: &str,
-    most: i64,
-) -> Result<desk_model::Picture, String> {
-    use gtk::gdk_pixbuf::prelude::*;
-    let too_large = move |width: i32, height: i32| i64::from(width) * i64::from(height) > most;
-    let loader =
-        gtk::gdk_pixbuf::PixbufLoader::with_mime_type(media_type).map_err(|e| e.to_string())?;
-    let refused = std::rc::Rc::new(std::cell::Cell::new(false));
-    let flag = refused.clone();
-    loader.connect_size_prepared(move |loader, width, height| {
-        if too_large(width, height) {
-            flag.set(true);
-            // So that the pixels made before the next check are few.
-            loader.set_size(1, 1);
-        }
-    });
-    let mut written = Ok(());
-    for chunk in bytes.chunks(1 << 12) {
-        written = loader.write(chunk).map_err(|e| e.to_string());
-        if written.is_err() || refused.get() {
-            break;
-        }
-    }
-    let closed = loader.close().map_err(|e| e.to_string());
-    if refused.get() {
+/// The picture of the bytes of a PNG or a JPEG, kept as they are, unless
+/// its header gives it more than `most` pixels.
+fn picture_of_image(bytes: &[u8], most: i64) -> Result<desk_model::Picture, String> {
+    let picture = desk_model::Picture::from_bytes(bytes.to_vec()).ok_or("not a picture")?;
+    if i64::from(picture.width()) * i64::from(picture.height()) > most {
         return Err("the picture is too large".to_string());
     }
-    written.and(closed)?;
-    let pixbuf = loader.pixbuf().ok_or("no picture")?;
-    if too_large(pixbuf.width(), pixbuf.height()) {
-        return Err("the picture is too large".to_string());
-    }
-    let png = pixbuf
-        .save_to_bufferv("png", &[])
-        .map_err(|e| e.to_string())?;
-    desk_model::Picture::from_png(png).ok_or_else(|| "not a picture".to_string())
+    Ok(picture)
 }
 
 /// The bytes of a stream, read without blocking, or an error past `most`.
@@ -4486,11 +4514,35 @@ mod tests {
                 .unwrap();
         pixbuf.fill(0x3366_99ff);
         let png = pixbuf.save_to_bufferv("png", &[]).unwrap();
-        let picture = picture_of_image(&png, "image/png", 64 * 48).unwrap();
+        let picture = picture_of_image(&png, 64 * 48).unwrap();
         assert_eq!((picture.width(), picture.height()), (64, 48));
-        assert!(picture_of_image(&png, "image/png", 64 * 48 - 1).is_err());
-        assert!(picture_of_image(b"not a picture", "image/png", 1 << 20).is_err());
-        assert_eq!(plain_text(b"text\0"), "text");
+        // Kept as it is, not decoded and made again.
+        assert_eq!(picture.data(), &png[..]);
+        assert!(picture_of_image(&png, 64 * 48 - 1).is_err());
+        assert!(picture_of_image(b"not a picture", 1 << 20).is_err());
+    }
+
+    #[test]
+    fn plain_text_is_read_in_the_set_its_type_gives() {
+        // Third review of RV batch 5: only types written in lower case were
+        // read, and all as UTF-8.
+        let pick = |types: &[&str]| text_type(types.iter().copied());
+        assert_eq!(
+            pick(&["STRING", "text/plain;charset=UTF-8", "TEXT"]),
+            Some(("text/plain;charset=UTF-8".into(), Some("utf-8".into())))
+        );
+        assert_eq!(
+            pick(&["text/plain", "STRING"]),
+            Some(("text/plain".into(), None))
+        );
+        assert_eq!(
+            pick(&["STRING"]),
+            Some(("STRING".into(), Some("ISO-8859-1".into())))
+        );
+        assert_eq!(pick(&["image/png"]), None);
+        assert_eq!(plain_text(b"caf\xe9", Some("ISO-8859-1")), "café");
+        assert_eq!(plain_text(b"caf\xe9", None), "café");
+        assert_eq!(plain_text("café\0".as_bytes(), None), "café");
     }
 
     #[test]

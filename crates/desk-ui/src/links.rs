@@ -111,7 +111,10 @@ pub fn is_web(link: &str) -> bool {
         return false;
     };
     match scheme.to_ascii_lowercase().as_str() {
-        "http" | "https" => true,
+        // An address with a user name before its host is one only to
+        // show and ask about: the name can look like a host (third review
+        // of RV batch 5).
+        "http" | "https" => parts(link).is_some_and(|p| p.user.is_none()),
         "mailto" => rest.split_once('?').is_none_or(|(_, query)| {
             query.split('&').all(|pair| {
                 let key = pair.split_once('=').map_or(pair, |(k, _)| k);
@@ -250,35 +253,117 @@ pub fn document_file(
     Some((path, bookmark.to_owned()))
 }
 
-/// The most characters of an address that a tooltip or a dialog shows.
+/// The most characters of the path of an address that a tooltip or a
+/// dialog shows, and of the user name before its host.
 const MAX_SHOWN: usize = 300;
+const MAX_USER_SHOWN: usize = 40;
 
-/// An address as a tooltip or a dialog shows it: the characters that are
-/// not seen, or that turn the text around, written as a URL writes them,
-/// so that the address shown is the one opened; and a long one cut short
-/// (second review of RV batch 5).
-pub fn shown(link: &str) -> String {
-    let hidden = |c: char| {
-        c.is_control()
-            || matches!(c, '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}'
-                | '\u{2060}'..='\u{2069}' | '\u{061C}' | '\u{FEFF}')
+/// The parts of an address with a host: `scheme://user@host/rest`.
+struct Parts<'a> {
+    scheme: &'a str,
+    user: Option<&'a str>,
+    host: &'a str,
+    rest: &'a str,
+}
+
+fn parts(link: &str) -> Option<Parts<'_>> {
+    let (scheme, after) = link.split_once("://")?;
+    if scheme.is_empty()
+        || !scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
+    {
+        return None;
+    }
+    let end = after.find(['/', '?', '#']).unwrap_or(after.len());
+    let (authority, rest) = after.split_at(end);
+    let (user, host) = match authority.rsplit_once('@') {
+        Some((user, host)) => (Some(user), host),
+        None => (None, authority),
     };
+    Some(Parts {
+        scheme,
+        user,
+        host,
+        rest,
+    })
+}
+
+/// An address as a tooltip or a dialog shows it: its host first, in the
+/// letters of DNS when it has others; the characters that are not seen,
+/// or that turn the text around, written as `\u{…}`; and its path cut
+/// short, never its host (second and third reviews of RV batch 5).
+pub fn shown(link: &str) -> String {
+    let Some(parts) = parts(link) else {
+        return escaped(link, MAX_SHOWN);
+    };
+    let mut out = format!("{}://", escaped(parts.scheme, MAX_USER_SHOWN));
+    if let Some(user) = parts.user {
+        out.push_str(&escaped(user, MAX_USER_SHOWN));
+        out.push('@');
+    }
+    let host = match gtk::glib::hostname_to_ascii(parts.host) {
+        Some(ascii) if !parts.host.is_ascii() => ascii.to_string(),
+        _ => parts.host.to_string(),
+    };
+    out.push_str(&escaped(&host, 255));
+    out.push_str(&escaped(parts.rest, MAX_SHOWN));
+    out
+}
+
+/// `text` with the characters not seen written as `\u{…}`, and a `\`
+/// doubled, cut after `most` characters.
+fn escaped(text: &str, most: usize) -> String {
     let mut out = String::new();
-    for (count, c) in link.chars().enumerate() {
-        if count == MAX_SHOWN {
+    for (count, c) in text.chars().enumerate() {
+        if count == most {
             out.push('…');
             break;
         }
-        if hidden(c) {
-            let mut bytes = [0; 4];
-            for byte in c.encode_utf8(&mut bytes).bytes() {
-                out.push_str(&format!("%{byte:02X}"));
-            }
+        if c == '\\' {
+            out.push_str("\\\\");
+        } else if hidden(c) {
+            out.push_str(&format!("\\u{{{:X}}}", u32::from(c)));
         } else {
             out.push(c);
         }
     }
     out
+}
+
+/// Whether a character is not seen, joins or turns around others: the
+/// controls, the format characters (Unicode Cf), the line and paragraph
+/// separators, and the fillers and variation selectors drawn as nothing.
+fn hidden(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            u32::from(c),
+            0x00AD
+                | 0x034F
+                | 0x0600..=0x0605
+                | 0x061C
+                | 0x06DD
+                | 0x070F
+                | 0x0890..=0x0891
+                | 0x08E2
+                | 0x115F..=0x1160
+                | 0x17B4..=0x17B5
+                | 0x180B..=0x180F
+                | 0x200B..=0x200F
+                | 0x2028..=0x202E
+                | 0x2060..=0x206F
+                | 0x3164
+                | 0xFE00..=0xFE0F
+                | 0xFEFF
+                | 0xFFA0
+                | 0xFFF9..=0xFFFB
+                | 0x110BD
+                | 0x110CD
+                | 0x13430..=0x1343F
+                | 0x1BCA0..=0x1BCA3
+                | 0x1D173..=0x1D17A
+                | 0xE0000..=0xE0FFF
+        )
 }
 
 #[cfg(test)]
@@ -287,17 +372,37 @@ mod tests {
 
     #[test]
     fn an_address_shows_what_it_opens() {
-        // Second review of RV batch 5: a link could hide or turn around
-        // part of its address in the tooltip and the dialog.
-        assert_eq!(shown("https://a.org/x"), "https://a.org/x");
+        // Second and third reviews of RV batch 5: a link could hide or turn
+        // around part of its address, or push its host out of what shows.
+        assert_eq!(shown("https://a.org/x%20y"), "https://a.org/x%20y");
         assert_eq!(
             shown("https://a.org/\u{202E}fdp.exe"),
-            "https://a.org/%E2%80%AEfdp.exe"
+            "https://a.org/\\u{202E}fdp.exe"
         );
-        assert_eq!(shown("a\nb\u{200B}"), "a%0Ab%E2%80%8B");
+        assert_eq!(shown("a\nb\u{200B}\\"), "a\\u{A}b\\u{200B}\\\\");
+        for c in [
+            '\u{2028}',
+            '\u{AD}',
+            '\u{34F}',
+            '\u{3164}',
+            '\u{E0041}',
+            '\u{FE0F}',
+        ] {
+            assert!(shown(&format!("x{c}")).starts_with("x\\u{"), "{c:?}");
+        }
         let long = format!("https://a.org/{}", "x".repeat(1000));
-        assert_eq!(shown(&long).chars().count(), MAX_SHOWN + 1);
         assert!(shown(&long).ends_with('…'));
+        assert!(shown(&long).chars().count() < 400);
+        // The host shows, however long the user name before it.
+        let user = format!(
+            "https://www.paypal.com%2F{}@evil.example/",
+            "x".repeat(1000)
+        );
+        assert!(shown(&user).contains("…@evil.example/"));
+        assert!(!is_web(&user));
+        assert_eq!(follow(&user, Some(OpenLinks::Open)), Follow::Confirm);
+        // A host in other letters shows as DNS has it.
+        assert_eq!(shown("https://bücher.de/"), "https://xn--bcher-kva.de/");
     }
 
     #[test]

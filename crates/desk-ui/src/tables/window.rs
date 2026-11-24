@@ -127,6 +127,9 @@ pub(super) struct TablesWindow {
     frame: RefCell<Rc<crate::tabs::Frame>>,
     /// The controllers the document added to that window.
     window_controllers: RefCell<Vec<gtk::EventController>>,
+    /// What the workbook follows of the window that holds it, which moves
+    /// with the tab (third review of RV batch 5).
+    window_notifies: crate::tabs::WindowNotifies,
     /// The tab of the document, with its own breakpoints.
     root: adw::BreakpointBin,
     tab: std::cell::OnceCell<adw::TabPage>,
@@ -375,6 +378,7 @@ impl TablesWindow {
         let this = Rc::new(Self {
             frame: RefCell::new(frame.clone()),
             window_controllers: RefCell::new(Vec::new()),
+            window_notifies: crate::tabs::WindowNotifies::default(),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -1202,9 +1206,9 @@ impl TablesWindow {
         });
 
         let shortcuts = gio::SimpleAction::new("shortcuts", None);
-        let window = self.window().downgrade();
+        let weak = Rc::downgrade(self);
         shortcuts.connect_activate(move |_, _| {
-            if let Some(window) = window.upgrade() {
+            if let Some(window) = weak.upgrade().map(|this| this.window()) {
                 super::shortcuts::dialog().present(Some(&window));
             }
         });
@@ -1283,28 +1287,30 @@ impl TablesWindow {
         let leave = leave.downgrade();
         let weak = Rc::downgrade(self);
         let before = Rc::new(Cell::new(false));
-        self.window().connect_fullscreened_notify(move |window| {
-            let Some(this) = weak.upgrade() else { return };
-            let on = window.is_fullscreen();
-            formatting::set_state(window, "fullscreen", on.to_variant());
-            if let Some(leave) = leave.upgrade() {
-                leave.set_visible(on);
-            }
-            if on {
-                before.set(this.nav_split.shows_sidebar());
-                this.nav_split.set_show_sidebar(false);
-            } else if before.get() {
-                this.nav_split.set_show_sidebar(true);
-            }
-        });
+        self.window_notifies
+            .connect(&self.window(), "fullscreened", move |window| {
+                let Some(this) = weak.upgrade() else { return };
+                let on = window.is_fullscreen();
+                formatting::set_state(window, "fullscreen", on.to_variant());
+                if let Some(leave) = leave.upgrade() {
+                    leave.set_visible(on);
+                }
+                if on {
+                    before.set(this.nav_split.shows_sidebar());
+                    this.nav_split.set_show_sidebar(false);
+                } else if before.get() {
+                    this.nav_split.set_show_sidebar(true);
+                }
+            });
         let escape = gtk::ShortcutController::new();
         escape.set_scope(gtk::ShortcutScope::Managed);
-        let weak = self.window().downgrade();
+        let weak = Rc::downgrade(self);
         escape.add_shortcut(gtk::Shortcut::new(
             gtk::ShortcutTrigger::parse_string("Escape"),
             Some(gtk::CallbackAction::new(move |_, _| {
                 match weak
                     .upgrade()
+                    .map(|this| this.window())
                     .filter(gtk::prelude::GtkWindowExt::is_fullscreen)
                 {
                     Some(window) => {
@@ -1429,6 +1435,7 @@ impl crate::tabs::FramePage for TablesWindow {
         for controller in controllers {
             new.add_controller(controller);
         }
+        self.window_notifies.move_to(&old, &new);
     }
 
     /// Desk Tables does not save documents yet, so a tab closes at once.

@@ -2103,6 +2103,12 @@ paragraph, and objects on a second page.
   *Consequences:* two more rows to batch 6, B-062 (the CI skips the tests
   that need a display) and B-063 (dictionary folders scanned again per
   tag).
+- Its second review found seven more, fixed in it (findings 28 to 34):
+  pasted pictures limited to PNG and JPEG sized by their header, the
+  outline paste bounded, the host of an address always shown, versions
+  of a file gone removed only after the move, what a moved tab follows of
+  its window, the name of a recovered document renamed, and text in other
+  character sets.
 
 ## Decisions, with their reasons and consequences
 

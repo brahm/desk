@@ -46,6 +46,60 @@ pub(crate) trait FramePage {
     fn moved_to(&self, _frame: &Rc<Frame>) {}
 }
 
+/// What a document follows of the window that holds it: handlers of
+/// notifications of its properties, which move with the tab to another
+/// window and are told of the new one (third review of RV batch 5).
+#[derive(Default)]
+pub(crate) struct WindowNotifies {
+    handlers: RefCell<Vec<WindowNotify>>,
+}
+
+/// A property of the window, what follows it, and its handler there.
+type WindowNotify = (
+    &'static str,
+    Rc<dyn Fn(&adw::ApplicationWindow)>,
+    glib::SignalHandlerId,
+);
+
+impl WindowNotifies {
+    /// Calls `f` whenever `property` of `window` changes.
+    pub(crate) fn connect(
+        &self,
+        window: &adw::ApplicationWindow,
+        property: &'static str,
+        f: impl Fn(&adw::ApplicationWindow) + 'static,
+    ) {
+        let f: Rc<dyn Fn(&adw::ApplicationWindow)> = Rc::new(f);
+        let id = Self::attach(window, property, &f);
+        self.handlers.borrow_mut().push((property, f, id));
+    }
+
+    fn attach(
+        window: &adw::ApplicationWindow,
+        property: &str,
+        f: &Rc<dyn Fn(&adw::ApplicationWindow)>,
+    ) -> glib::SignalHandlerId {
+        let f = f.clone();
+        window.connect_notify_local(Some(property), move |window, _| f(window))
+    }
+
+    /// Follows `new` in place of `old`, and tells each handler of what it
+    /// shows, which may differ.
+    pub(crate) fn move_to(&self, old: &adw::ApplicationWindow, new: &adw::ApplicationWindow) {
+        let handlers: Vec<_> = {
+            let mut handlers = self.handlers.borrow_mut();
+            for (property, f, id) in handlers.iter_mut() {
+                let moved = Self::attach(new, property, f);
+                old.disconnect(std::mem::replace(id, moved));
+            }
+            handlers.iter().map(|(_, f, _)| f.clone()).collect()
+        };
+        for f in handlers {
+            f(new);
+        }
+    }
+}
+
 /// A tab, the widget it holds and its document.
 type Tab = (adw::TabPage, gtk::Widget, Rc<dyn FramePage>);
 /// What opens a new document in a tab and gives its tab back.
@@ -158,7 +212,7 @@ impl Frame {
         self.pages
             .borrow_mut()
             .push((tab.clone(), child.as_ref().clone(), page));
-        self.follow_title(&tab);
+        Self::follow_title(&tab);
         self.view.set_selected_page(&tab);
         self.route_actions();
         tab
@@ -185,12 +239,12 @@ impl Frame {
     }
 
     /// Gives the window the title of a tab while it is the one in sight.
-    fn follow_title(&self, tab: &adw::TabPage) {
-        let window = self.window.downgrade();
-        let view = self.view.downgrade();
-        tab.connect_title_notify(move |tab| {
-            if let (Some(window), Some(view)) = (window.upgrade(), view.upgrade())
-                && view.selected_page().as_ref() == Some(tab)
+    /// Connected once: the window is the one that holds the tab when the
+    /// title changes, as the tab may move (third review of RV batch 5).
+    fn follow_title(tab: &adw::TabPage) {
+        tab.connect_title_notify(|tab| {
+            if tab.is_selected()
+                && let Some(window) = tab.child().root().and_downcast::<gtk::Window>()
             {
                 window.set_title(Some(&tab.title()));
             }
@@ -420,7 +474,10 @@ impl Frame {
         let Some(entry) = entry else { return };
         let page = entry.2.clone();
         self.pages.borrow_mut().push(entry);
-        self.follow_title(tab);
+        // The title already follows the tab, wherever it is.
+        if tab.is_selected() {
+            self.window.set_title(Some(&tab.title()));
+        }
         page.moved_to(self);
         self.route_actions();
     }
@@ -505,8 +562,45 @@ mod tests {
             a.view.transfer_page(&other, &b.view, 0);
             assert_eq!(a.view.n_pages(), 0);
             assert!(b.page_of(&other).is_some());
+            // The title of the tab in sight is that of the window it is in
+            // now, and B follows it alone (third review).
+            b.view.set_selected_page(&other);
+            other.set_title("moved");
+            assert_eq!(b.window.title().as_deref(), Some("moved"));
+            a.window.set_title(Some("A"));
+            other.set_title("again");
+            assert_eq!(a.window.title().as_deref(), Some("A"));
             a.window.destroy();
             b.window.destroy();
+        });
+    }
+
+    #[test]
+    fn what_a_document_follows_of_its_window_moves_with_it() {
+        // Third review of RV batch 5: a tab dragged to another window
+        // followed full screen in the window it had left.
+        crate::with_gtk(|| {
+            let _ = adw::init();
+            let (a, b) = (
+                adw::ApplicationWindow::builder().build(),
+                adw::ApplicationWindow::builder().build(),
+            );
+            let seen = Rc::new(RefCell::new(Vec::new()));
+            let notifies = WindowNotifies::default();
+            let kept = seen.clone();
+            notifies.connect(&a, "title", move |w| {
+                kept.borrow_mut()
+                    .push(w.title().map(String::from).unwrap_or_default());
+            });
+            a.set_title(Some("a1"));
+            notifies.move_to(&a, &b);
+            a.set_title(Some("a2"));
+            b.set_title(Some("b1"));
+            // Told of the new window when it moves, then of its changes
+            // alone.
+            assert_eq!(*seen.borrow(), ["a1", "", "b1"]);
+            a.destroy();
+            b.destroy();
         });
     }
 }

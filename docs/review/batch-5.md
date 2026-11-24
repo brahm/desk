@@ -39,6 +39,13 @@ dropped file or a link can make the interface do.
 | 25 | D | `desk-ui/src/versions.rs` | *Review of the pull request.* The versions set aside by finding 17 piled up with nothing to show them | Removed; test |
 | 26 | B | `desk-ui/src/bullet_pictures.rs` | *Review of the pull request.* A picture or movie whose size its place does not give was refused | Read up to the bound; test |
 | 27 | A | `desk-ui/src/links.rs` | *Security, review of the pull request.* A link could hide or turn around part of its address in the tooltip and the dialog that asks before opening it | Such characters are shown as a URL writes them, and a long address is cut short; test |
+| 28 | A | `desk-ui/src/editing.rs` | *Security, second review of the pull request.* Some decoders (TIFF, GIF) make every pixel of a pasted picture before its size can be checked | Only PNG and JPEG are pasted, kept as they are, sized by their header and checked away from the thread of the window; test |
+| 29 | A | `desk-ui/src/outline_view.rs` | *Security, second review of the pull request.* Paste in the outline read the text whole | Read with the bound |
+| 30 | A | `desk-ui/src/links.rs` | *Security, second review of the pull request.* A long user name before the host pushed the host out of the address shown, and some characters not seen were not escaped | The host always shows, in DNS letters; an address with a user name always asks; every format character is escaped; test |
+| 31 | B | `desk-ui/src/versions.rs` | *Second review of the pull request.* The versions of a file gone were removed before those of the document were moved | Removed only once the move succeeds, put back otherwise |
+| 32 | B | `desk-ui/src/tabs.rs`, `window.rs`, `tables/window.rs` | *Second review of the pull request.* After a tab moved, full screen, dialogs, Escape, Shortcuts, the context menu and the title followed the window it had left | They follow the window that holds the tab; test |
+| 33 | B | `desk-ui/src/window.rs` | *Second review of the pull request.* A recovered document renamed went back to its old name at the next recovery | The draft keeps the name it has now; test |
+| 34 | B | `desk-ui/src/editing.rs` | *Second review of the pull request.* Text offered in upper case types, as `STRING`, or in another character set was not pasted | Types matched in any case, read in their set; test |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
@@ -59,7 +66,7 @@ Six findings moved to the backlog:
 
 ## Security (D-029)
 
-Findings 1, 3, 6, 7, 9, 14, 15, 16, 20 and 27 came from the security review.
+Findings 1, 3, 6, 7, 9, 14, 15, 16, 20, 27, 28, 29 and 30 came from the security review.
 
 These paths were checked and found safe:
 - The crates run no command and no shell.
