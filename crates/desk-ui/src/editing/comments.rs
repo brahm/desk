@@ -172,14 +172,14 @@ fn object_name(document: &Document, id: NodeId) -> String {
 }
 
 /// A position of a story as a spot of its text.
-fn spot_in(paragraphs: &[Paragraph], at: Position) -> Option<Spot> {
+pub(super) fn spot_in(paragraphs: &[Paragraph], at: Position) -> Option<Spot> {
     let index = paragraphs.iter().position(|p| p.id() == at.paragraph)?;
     Some(Spot::new(index, at.offset))
 }
 
 /// The document laid out with the lines of each text that has comments,
 /// the body and the stories, as the pages show them.
-struct Texts<'a> {
+pub(super) struct Texts<'a> {
     main: &'a DocumentLayout,
     stories: Vec<(Story, DocumentLayout)>,
 }
@@ -190,7 +190,7 @@ impl<'a> Texts<'a> {
     }
 
     /// The same, with the lines of these stories.
-    fn with(
+    pub(super) fn with(
         document: &Document,
         main: &'a DocumentLayout,
         stories_of: impl IntoIterator<Item = Story>,
@@ -206,7 +206,7 @@ impl<'a> Texts<'a> {
         Self { main, stories }
     }
 
-    fn layout(&self, story: Option<Story>) -> Option<&DocumentLayout> {
+    pub(super) fn layout(&self, story: Option<Story>) -> Option<&DocumentLayout> {
         match story {
             None => Some(self.main),
             Some(story) => self

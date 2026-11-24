@@ -646,6 +646,25 @@ impl Document {
         spans
     }
 
+    /// The pieces of every text of the document that tracked changes
+    /// cover (W148): those of the body, and then those of each of its
+    /// stories, in the order of [`Document::stories`], each with the story
+    /// it is in.
+    pub fn change_places(&self) -> Vec<(Option<crate::Story>, crate::ChangeSpan)> {
+        let mut places: Vec<(Option<crate::Story>, crate::ChangeSpan)> =
+            self.change_spans().into_iter().map(|s| (None, s)).collect();
+        for story in self.stories() {
+            let paragraphs = self.story_paragraphs(story);
+            places.extend(
+                crate::change::change_spans_in(paragraphs.iter())
+                    .into_iter()
+                    .filter(|s| self.changes().get(s.id).is_some())
+                    .map(|s| (Some(story), s)),
+            );
+        }
+        places
+    }
+
     /// Where each comment of the body is, in the order of the body: the
     /// comment and the positions where the first piece of text it is on
     /// starts and where its last ends. A comment on pieces apart is on

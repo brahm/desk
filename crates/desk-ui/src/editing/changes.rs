@@ -7,6 +7,7 @@
 
 use desk_model::ChangeKind;
 
+use super::comments::{Texts, spot_in};
 use super::{Selection, Spot, TextEditor};
 use crate::text_nav::{self, SpanRect};
 
@@ -20,19 +21,29 @@ impl TextEditor {
     ) -> Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)> {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
-        let spans = document.change_spans();
-        if spans.is_empty() {
+        let places = document.change_places();
+        if places.is_empty() {
             return Vec::new();
         }
-        let layout = Self::main_layout(&state);
+        // The body and the stories as the pages show them.
+        let texts = Texts::with(
+            document,
+            Self::main_layout(&state),
+            places.iter().filter_map(|(story, _)| *story),
+        );
         let palette = document.author_palette(local);
         let mut out = Vec::new();
-        for span in spans {
-            let (Some(change), Some(anchor), Some(focus)) = (
-                document.changes().get(span.id),
-                Spot::of(document, span.start),
-                Spot::of(document, span.end),
-            ) else {
+        for (story, span) in places {
+            let spots = match story {
+                None => Spot::of(document, span.start).zip(Spot::of(document, span.end)),
+                Some(story) => {
+                    let paragraphs = document.story_paragraphs(story);
+                    spot_in(&paragraphs, span.start).zip(spot_in(&paragraphs, span.end))
+                }
+            };
+            let (Some(change), Some((anchor, focus)), Some(layout)) =
+                (document.changes().get(span.id), spots, texts.layout(story))
+            else {
                 continue;
             };
             let color = palette.color(&change.author);

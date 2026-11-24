@@ -33,6 +33,23 @@ pub(super) fn import(document: &mut Document, events: Events) -> Result<(), Filt
     if events.is_empty() {
         return Ok(());
     }
+    let texts = by_text(document, events);
+    document.transact("Comments", |edit| {
+        for (story, events) in texts {
+            match story {
+                None => add(edit, events)?,
+                Some(story) => edit.edit_story(story, |edit| add(edit, events))?,
+            }
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Some events of the texts of a document, by the text they are in: the
+/// body, a note, a header or footer, or a text box or shape, which ever
+/// holds their paragraphs. Those of no text are left out.
+pub(super) fn by_text(document: &Document, events: Events) -> Vec<(Option<Story>, Events)> {
     let body: HashSet<NodeId> = document.body().iter().map(|p| p.id()).collect();
     let stories: Vec<(Story, HashSet<NodeId>)> = document
         .stories()
@@ -62,16 +79,7 @@ pub(super) fn import(document: &mut Document, events: Events) -> Result<(), Filt
             None => texts.push((story, vec![event])),
         }
     }
-    document.transact("Comments", |edit| {
-        for (story, events) in texts {
-            match story {
-                None => add(edit, events)?,
-                Some(story) => edit.edit_story(story, |edit| add(edit, events))?,
-            }
-        }
-        Ok(())
-    })?;
-    Ok(())
+    texts
 }
 
 /// Puts the comments found in the body on the text they are on.

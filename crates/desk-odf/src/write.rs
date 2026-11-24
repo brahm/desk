@@ -1275,9 +1275,8 @@ fn write_tracked_changes(w: &mut Writer, document: &TextDocument) {
             region.date.as_deref().unwrap_or(crate::UNKNOWN_DATE),
         );
         w.end();
-        for paragraph in &region.deleted {
-            write_paragraph(w, paragraph);
-        }
+        // The paragraphs it took, with their lists (B-067).
+        write_body(w, &region.deleted, &[]);
         w.end().end();
     }
     w.end();

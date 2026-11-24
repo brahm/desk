@@ -136,17 +136,16 @@ pub fn read_streams(
                 .filter_map(changed_region)
                 .collect();
         }
-        // Only the changes of the paragraphs of the body are read: those
-        // of notes, tables and the like are left out, as accepted.
-        let marked: std::collections::HashSet<&str> = document
-            .body
-            .iter()
-            .flat_map(|p| &p.spans)
-            .filter_map(|s| match &s.field {
-                Some(Field::ChangeStart { id } | Field::Change { id }) => Some(id.as_str()),
-                _ => None,
-            })
-            .collect();
+        // The changes of the text of tables and of the shapes of groups
+        // are left out, as accepted, as their comments are.
+        let mut marked = std::collections::HashSet::new();
+        change_marks(text, &mut marked);
+        if let Some(masters) = styles
+            .as_ref()
+            .and_then(|s| s.child(OFFICE, "master-styles"))
+        {
+            change_marks(masters, &mut marked);
+        }
         let unread = document
             .tracked_changes
             .iter()
@@ -950,6 +949,24 @@ fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
         if !matches!(skipped, Some("annotation" | "changed-region" | "object")) {
             let body = body && !(name.is(TABLE, "table") || name.is(DRAW, "g"));
             left_out(child, body, out);
+        }
+    }
+}
+
+/// The regions that the marks of the text read in `e` name where their
+/// text starts: not those of tables or of the shapes of groups (W148).
+fn change_marks(e: &Element, out: &mut std::collections::HashSet<String>) {
+    for child in e.elements() {
+        let name = &child.name;
+        if name.is(TEXT, "change") || name.is(TEXT, "change-start") {
+            if let Some(id) = child.attr(TEXT, "change-id") {
+                out.insert(id.to_owned());
+            }
+        } else if !(name.is(TABLE, "table")
+            || name.is(DRAW, "g")
+            || name.is(TEXT, "tracked-changes"))
+        {
+            change_marks(child, out);
         }
     }
 }
