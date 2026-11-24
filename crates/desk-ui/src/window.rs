@@ -175,6 +175,10 @@ pub struct DocumentWindow {
     autosave_source: RefCell<Option<glib::SourceId>>,
     /// Whether the file as it was opened is kept as a version yet.
     opened_kept: Cell<bool>,
+    /// Whether the file is no longer saved over on its own, as the copy of
+    /// it as opened could not be kept: changes then wait for Save, which
+    /// asks where.
+    in_place_refused: Cell<bool>,
 }
 
 /// How long a pause in the editing is before the document saves itself
@@ -681,6 +685,7 @@ impl DocumentWindow {
             before_screen: Cell::new(None),
             autosave_source: RefCell::new(None),
             opened_kept: Cell::new(false),
+            in_place_refused: Cell::new(false),
             slides,
         });
         this.add_actions();
@@ -924,6 +929,7 @@ impl DocumentWindow {
     /// draft until then.
     fn autosaves(&self) -> bool {
         self.opener.is_some()
+            && !self.in_place_refused.get()
             && self
                 .path
                 .borrow()
@@ -966,7 +972,18 @@ impl DocumentWindow {
         if !self.editor().is_some_and(|e| e.is_modified()) {
             return true;
         }
-        self.keep_version_before_writing(&path);
+        if !self.keep_version_before_writing(&path) {
+            // The file as it was opened is kept nowhere else: it is not
+            // written over (review RV, batch 5).
+            self.in_place_refused.set(true);
+            self.alert(
+                &tr("Cannot Keep the Original of {name}")
+                    .replace("{name}", &display_name(&path)),
+                &tr("Desk could not keep a copy of the file as it was opened, so it will not save over the file on its own. Choose Save to save the changes in a file."),
+            );
+            self.refresh();
+            return false;
+        }
         if !self.write_to(&path) {
             return false;
         }
@@ -979,10 +996,11 @@ impl DocumentWindow {
 
     /// Keeps the file as it is as a version before it is written over:
     /// the first time after the document opened, then once an hour, and
-    /// thins the old versions (DOC-11).
-    fn keep_version_before_writing(&self, path: &Path) {
+    /// thins the old versions (DOC-11). Whether the file may be written
+    /// over: not when the version of it as opened could not be kept.
+    fn keep_version_before_writing(&self, path: &Path) -> bool {
         if !path.exists() {
-            return;
+            return true;
         }
         let store = crate::versions::Store::for_document(path);
         let now = crate::versions::now();
@@ -996,13 +1014,15 @@ impl DocumentWindow {
         } else {
             None
         };
-        if let Some(kind) = kind
-            && store.keep(path, kind, now).is_ok()
-            && kind == crate::versions::Kind::Opened
-        {
+        let kept = kind.is_none_or(|kind| store.keep(path, kind, now).is_ok());
+        if kind == Some(crate::versions::Kind::Opened) {
+            if !kept {
+                return false;
+            }
             self.opened_kept.set(true);
         }
         store.thin(now, crate::versions::local_offset());
+        true
     }
 
     /// Opens a document in this window, or says why it cannot.
@@ -1013,6 +1033,7 @@ impl DocumentWindow {
                     source.remove();
                 }
                 self.opened_kept.set(false);
+                self.in_place_refused.set(false);
                 *self.path.borrow_mut() = Some(path.to_owned());
                 *self.name.borrow_mut() = display_name(path);
                 self.show_document(shown.document);
@@ -1489,9 +1510,6 @@ impl DocumentWindow {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
-        // Tables of contents are up to date in what is kept, as Pages
-        // updates them when a document closes (EST-22).
-        editor.update_tables_of_contents();
         let pages = editor.pages();
         let mut document = crate::fields::saved(editor.document(), &path.to_string_lossy());
         // How it shows, to reopen the same way (INT-08, DOC-16).
@@ -1627,7 +1645,10 @@ impl DocumentWindow {
                     shown.document,
                     tr("{name} (recovered)").replace("{name}", &name),
                 );
-                draft.remove();
+                // The draft stays the draft of this window until the
+                // document is saved or given up: a second crash before an
+                // edit would otherwise lose it (review RV, batch 5).
+                *self.draft.borrow_mut() = Some(draft.clone());
                 true
             }
             Err(_) => false,
@@ -1638,6 +1659,7 @@ impl DocumentWindow {
         self.drop_draft();
         // The file is new: its first version is what was saved now.
         self.opened_kept.set(false);
+        self.in_place_refused.set(false);
         *self.path.borrow_mut() = Some(path.to_owned());
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {
@@ -1675,13 +1697,38 @@ impl DocumentWindow {
         if let Some(folder) = path.as_deref().and_then(Path::parent) {
             dialog.set_initial_folder(Some(&gio::File::for_path(folder)));
         }
+        let window = self.window.clone();
         dialog.save(Some(&self.window), gio::Cancellable::NONE, move |result| {
-            chosen(
-                result
-                    .ok()
-                    .and_then(|file| file.path())
-                    .map(|path| with_extension(path, extension)),
+            let Some(picked) = result.ok().and_then(|file| file.path()) else {
+                chosen(None);
+                return;
+            };
+            let path = with_extension(picked.clone(), extension);
+            if !replaces_unasked(&picked, &path) {
+                chosen(Some(path));
+                return;
+            }
+            // The dialog asked about the name typed, not about the one
+            // with the extension added, which is another file that exists
+            // (review RV, batch 5).
+            let alert = adw::AlertDialog::new(
+                Some(&tr("Replace {name}?").replace("{name}", &display_name(&path))),
+                Some(&tr(
+                    "A file with this name already exists. Replacing it overwrites its contents.",
+                )),
             );
+            alert.add_response("cancel", &tr("_Cancel"));
+            alert.add_response("replace", &tr("_Replace"));
+            alert.set_response_appearance("replace", adw::ResponseAppearance::Destructive);
+            alert.set_default_response(Some("cancel"));
+            alert.set_close_response("cancel");
+            let chosen = std::cell::Cell::new(Some(chosen));
+            alert.connect_response(None, move |_, response| {
+                if let Some(chosen) = chosen.take() {
+                    chosen((response == "replace").then(|| path.clone()));
+                }
+            });
+            alert.present(Some(&window));
         });
     }
 
@@ -2052,9 +2099,15 @@ impl DocumentWindow {
         let (Some(opener), Some(path)) = (self.opener, self.path.borrow().clone()) else {
             return;
         };
-        if !self.opened_kept.get() {
+        // Changes not saved yet are saved first, which keeps the file as
+        // it was opened as a version, and the changes as the version
+        // before the revert (review RV, batch 5).
+        if !self.opened_kept.get() && !self.editor().is_some_and(|e| e.is_modified()) {
             // The file is still as it was opened.
             self.load(opener, &path);
+            return;
+        }
+        if !self.opened_kept.get() && !self.autosave() {
             return;
         }
         let opened = crate::versions::Store::for_document(&path)
@@ -2083,17 +2136,22 @@ impl DocumentWindow {
                 crate::versions::now(),
             );
         }
-        match crate::open_document(opener, &version.path) {
-            Ok(shown) => {
-                self.show_document(shown.document);
-                if self.write_to(&path)
-                    && let Some(editor) = self.editor()
-                {
-                    editor.mark_saved();
-                }
+        // The bytes of the version take the place of the file, not the
+        // version as Desk reads and writes it again, which may leave out
+        // what Desk does not read (review RV, batch 5).
+        if let Err(message) = crate::open_document(opener, &version.path) {
+            self.alert(&tr("Cannot Restore the Version"), &message);
+            return;
+        }
+        match std::fs::read(&version.path).and_then(|bytes| crate::write_replacing(&path, &bytes)) {
+            Ok(()) => {
+                let opened = self.opened_kept.get();
+                self.load(opener, &path);
+                // The version as opened is kept already.
+                self.opened_kept.set(opened);
                 self.refresh();
             }
-            Err(message) => self.alert(&tr("Cannot Restore the Version"), &message),
+            Err(error) => self.alert(&tr("Cannot Restore the Version"), &error.to_string()),
         }
     }
 
@@ -4093,6 +4151,12 @@ fn with_extension(path: PathBuf, extension: &str) -> PathBuf {
     }
 }
 
+/// Whether the path saved to, with its extension added, is another file
+/// that exists, which the Save dialog did not ask about replacing.
+fn replaces_unasked(picked: &Path, path: &Path) -> bool {
+    picked != path && path.exists()
+}
+
 thread_local! {
     /// Whether a window of the app looked at the size of the screen.
     static SCREEN_CHECKED: Cell<bool> = const { Cell::new(false) };
@@ -4154,6 +4218,22 @@ mod tests {
     #[test]
     fn doc_14_a_copy_is_named_after_the_original() {
         assert_eq!(copy_name("Letter"), "Letter copy");
+    }
+
+    #[test]
+    fn a_name_saved_with_its_extension_added_asks_before_replacing() {
+        // Review RV, batch 5: "Report" typed in the Save dialog saved over
+        // an existing Report.odt without asking.
+        let folder = std::env::temp_dir().join(format!("desk-replace-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let typed = folder.join("Report");
+        let saved = with_extension(typed.clone(), "odt");
+        assert!(!replaces_unasked(&typed, &saved));
+        std::fs::write(&saved, b"kept").unwrap();
+        assert!(replaces_unasked(&typed, &saved));
+        // The dialog itself asked about a name typed with its extension.
+        assert!(!replaces_unasked(&saved, &saved));
+        std::fs::remove_dir_all(&folder).unwrap();
     }
 
     #[test]

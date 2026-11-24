@@ -90,7 +90,13 @@ pub fn opened(document: desk_model::Document, file: &str) -> desk_model::Documen
 /// that file.
 pub fn saved(document: desk_model::Document, file: &str) -> desk_model::Document {
     let mut editor = desk_model::Editor::new(document);
-    if let Err(error) = editor.edit("Save", |edit| edit.refresh_fields(file, None)) {
+    // Tables of contents are up to date in what is kept, as Pages updates
+    // them when a document closes (EST-22): in the copy saved, so that
+    // saving, and autosaving, never changes the undo history.
+    if let Err(error) = editor.edit("Save", |edit| {
+        edit.update_tables_of_contents()?;
+        edit.refresh_fields(file, None)
+    }) {
         glib::g_warning!("desk", "cannot update the fields: {error}");
     }
     editor.into_document()
@@ -117,6 +123,62 @@ mod tests {
         for pattern in DATE_FORMATS {
             assert!(!pt.date(day, pattern).is_empty());
         }
+    }
+
+    #[test]
+    fn est_22_a_saved_copy_has_its_table_of_contents_updated() {
+        // Review RV, batch 5: saving updated the tables of contents in the
+        // editor, so each autosave after an undo added a step to the undo
+        // history and cleared the redo.
+        use desk_model::{Document, Editor, Position, TocLevel, TocSettings};
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Setup", |edit| {
+                let at = edit.insert_text(start, "Chapter one")?;
+                let at = edit.split_paragraph(at)?;
+                edit.insert_text(at, "Some text")?;
+                let heading = edit.new_paragraph_style("Heading", start, start, false)?;
+                let entry = edit.new_paragraph_style("TOC Heading", start, start, false)?;
+                let first = Position::new(start.paragraph, 0);
+                edit.set_paragraph_style(first, first, heading)?;
+                let mut settings = edit.document().text_settings().clone();
+                settings.toc = TocSettings {
+                    levels: vec![TocLevel {
+                        style: heading,
+                        entry,
+                        page_number: false,
+                    }],
+                    page_links: false,
+                };
+                edit.set_text_settings(settings)?;
+                edit.insert_table_of_contents(0)
+            })
+            .unwrap();
+        editor
+            .edit("Rename", |edit| {
+                edit.insert_text(Position::new(start.paragraph, 0), "The ")
+                    .map(|_| ())
+            })
+            .unwrap();
+        let text = |document: &Document| -> String {
+            document
+                .body()
+                .iter()
+                .next()
+                .map(|p| p.runs().map(|r| r.text().to_owned()).collect())
+                .unwrap_or_default()
+        };
+        assert!(!text(editor.document()).starts_with("The "));
+        let copy = saved(editor.document().clone(), "/tmp/a.odt");
+        assert!(
+            text(&copy).starts_with("The Chapter one"),
+            "{}",
+            text(&copy)
+        );
+        // The editor and its history are as they were.
+        assert!(!text(editor.document()).starts_with("The "));
+        assert_eq!(editor.undo_name(), Some("Rename"));
     }
 
     #[test]

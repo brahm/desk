@@ -211,20 +211,65 @@ pub(crate) fn save_document(
     write_replacing(path, &bytes).map_err(|e| e.to_string())
 }
 
-fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+/// Writes a file whole or not at all: into a new file beside it, which
+/// then takes its place.
+///
+/// The new file has a name no one can guess and is made, never opened if
+/// it exists, so that in a folder others can write to a link put in its
+/// place does not take the bytes or the permissions elsewhere; it is on
+/// the disk before it takes the place of the file, so that a crash leaves
+/// one or the other whole (review RV, batch 5).
+pub(crate) fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
     let name = path.file_name().unwrap_or_default().to_string_lossy();
-    let temporary = path.with_file_name(format!(".{name}.desk-{}", std::process::id()));
-    let result = std::fs::write(&temporary, bytes).and_then(|()| {
-        // Keep the permissions of the file it replaces.
-        if let Ok(old) = std::fs::metadata(path) {
-            std::fs::set_permissions(&temporary, old.permissions())?;
+    let temporary = path.with_file_name(format!(
+        ".{name}.desk-{}",
+        gtk::glib::uuid_string_random().replace('-', "")
+    ));
+    let result = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&temporary)
+        .and_then(|mut file| {
+            file.write_all(bytes)?;
+            // Keep the permissions of the file it replaces, or those of a
+            // new file.
+            let permissions = match std::fs::metadata(path) {
+                Ok(old) => old.permissions(),
+                Err(_) => std::os::unix::fs::PermissionsExt::from_mode(0o666 & !umask()),
+            };
+            file.set_permissions(permissions)?;
+            file.sync_all()
+        })
+        .and_then(|()| std::fs::rename(&temporary, path));
+    match result {
+        Ok(()) => {
+            if let Some(folder) = path.parent().and_then(|p| std::fs::File::open(p).ok()) {
+                let _ = folder.sync_all();
+            }
+            Ok(())
         }
-        std::fs::rename(&temporary, path)
-    });
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary);
+        Err(error) => {
+            let _ = std::fs::remove_file(&temporary);
+            Err(error)
+        }
     }
-    result
+}
+
+/// The permissions that new files leave out, as the process set them.
+fn umask() -> u32 {
+    // Read from /proc, as setting it to read it races with other threads.
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| {
+            status
+                .lines()
+                .find_map(|l| l.strip_prefix("Umask:"))
+                .and_then(|v| u32::from_str_radix(v.trim(), 8).ok())
+        })
+        .unwrap_or(0o022)
 }
 
 /// A warning of the Warnings window (INT-22).
@@ -785,6 +830,35 @@ pub(crate) fn with_gtk<R: Send + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_is_written_whole_without_following_links() {
+        // Review RV, batch 5: the file written first had a name anyone
+        // could guess, and a link put there sent the bytes elsewhere.
+        use std::os::unix::fs::PermissionsExt;
+        let folder = std::env::temp_dir().join(format!("desk-write-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("a.odt");
+        let elsewhere = folder.join("elsewhere");
+        std::fs::write(&elsewhere, b"theirs").unwrap();
+        // A link at the name the old code used.
+        std::os::unix::fs::symlink(
+            &elsewhere,
+            folder.join(format!(".a.odt.desk-{}", std::process::id())),
+        )
+        .unwrap();
+        write_replacing(&path, b"first").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+        write_replacing(&path, b"second").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"second");
+        assert_eq!(std::fs::read(&elsewhere).unwrap(), b"theirs");
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o640);
+        // Nothing is left beside it but the link.
+        assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 3);
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
 
     #[test]
     fn doc_03_the_index_of_a_package_opens_the_package() {

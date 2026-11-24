@@ -100,6 +100,28 @@ fn unescape(text: &str) -> String {
         .map_or_else(|| text.to_owned(), |s| s.to_string())
 }
 
+/// Whether a link of a document opens at a click without asking: a page
+/// on the web, or an email without a file attached. Any other link, which
+/// a file may make point to a file of the user, a shared folder or another
+/// app, shows its address and asks first (review RV, batch 5).
+pub fn opens_without_asking(link: &str) -> bool {
+    let Some((scheme, rest)) = link.split_once(':') else {
+        return false;
+    };
+    match scheme.to_ascii_lowercase().as_str() {
+        "http" | "https" => true,
+        "mailto" => rest.split_once('?').is_none_or(|(_, query)| {
+            query.split('&').all(|pair| {
+                let key = pair.split_once('=').map_or(pair, |(k, _)| k);
+                ["subject", "body", "cc", "bcc"]
+                    .iter()
+                    .any(|allowed| key.eq_ignore_ascii_case(allowed))
+            })
+        }),
+        _ => false,
+    }
+}
+
 impl Target {
     /// What a link points to.
     pub fn parse(link: &str) -> Self {
@@ -204,6 +226,32 @@ pub fn document_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_web_pages_and_plain_emails_open_without_asking() {
+        // Review RV, batch 5: a click on any link of a document opened it,
+        // whatever it pointed to.
+        for link in [
+            "https://example.com/a?b=c",
+            "HTTP://example.com",
+            "mailto:someone@example.com",
+            "mailto:someone@example.com?subject=Hi&body=There",
+        ] {
+            assert!(opens_without_asking(link), "{link}");
+        }
+        for link in [
+            "file:///home/user/Downloads/x.jar",
+            "smb://server/share",
+            "sftp://server/file",
+            "steam://run/1",
+            "mailto:someone@example.com?attach=/home/user/.ssh/id_rsa",
+            "javascript:alert(1)",
+            "/etc/passwd",
+            "report.txt",
+        ] {
+            assert!(!opens_without_asking(link), "{link}");
+        }
+    }
 
     #[test]
     fn iop_32_links_of_a_presentation_are_kept() {

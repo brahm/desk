@@ -153,11 +153,19 @@ impl Store {
 
     /// Removes the versions that [`thinned`] leaves out, as at `now`, for
     /// a place `offset` seconds east of UTC.
+    ///
+    /// The newest version of the document as it was opened stays, as
+    /// Revert to Last Opened goes back to it (review RV, batch 5).
     pub fn thin(&self, now: i64, offset: i64) {
         let versions = self.list();
         let times: Vec<i64> = versions.iter().map(|v| v.time).collect();
+        let opened = versions.iter().position(|v| v.kind == Kind::Opened);
         for index in thinned(&times, now, offset) {
-            let _ = std::fs::remove_file(&versions[index].path);
+            if Some(index) != opened
+                && let Some(version) = versions.get(index)
+            {
+                let _ = std::fs::remove_file(&version.path);
+            }
         }
     }
 
@@ -174,7 +182,15 @@ impl Store {
     pub fn move_to(&self, document: &Path) -> Self {
         let parent = self.folder.parent().map(Path::to_owned).unwrap_or_default();
         let moved = Self::in_root(&parent, document);
-        if self.folder.exists() && !moved.folder.exists() {
+        if self.folder.exists() && self.folder != moved.folder {
+            // Versions left by a file of that name that is gone are set
+            // aside, not shown as those of this document (review RV,
+            // batch 5).
+            if moved.folder.exists() {
+                let mut aside = moved.folder.clone().into_os_string();
+                aside.push(format!(".replaced-{}", now()));
+                let _ = std::fs::rename(&moved.folder, aside);
+            }
             let _ = std::fs::rename(&self.folder, &moved.folder);
         }
         moved
@@ -275,6 +291,52 @@ mod tests {
         let moved = store.move_to(&folder.join("Report.odt"));
         assert_eq!(moved.list().len(), 1);
         assert!(store.list().is_empty());
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn a_renamed_document_takes_its_versions_over_those_of_a_file_gone() {
+        // Review RV, batch 5: renamed to the name of a deleted file, a
+        // document showed the versions of that file.
+        let folder = scratch("move-over");
+        let root = folder.join("versions");
+        let gone = folder.join("Report.odt");
+        std::fs::write(&gone, "old report").unwrap();
+        Store::in_root(&root, &gone)
+            .keep(&gone, Kind::Opened, 1)
+            .unwrap();
+        std::fs::remove_file(&gone).unwrap();
+        let letter = folder.join("Letter.odt");
+        std::fs::write(&letter, "letter").unwrap();
+        let store = Store::in_root(&root, &letter);
+        store.keep(&letter, Kind::Opened, 2).unwrap();
+        let moved = store.move_to(&gone);
+        let versions = moved.list();
+        assert_eq!(versions.len(), 1);
+        assert_eq!(
+            std::fs::read_to_string(&versions[0].path).unwrap(),
+            "letter"
+        );
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn the_version_as_opened_is_not_thinned() {
+        // Review RV, batch 5: a day after, the copy of the file as opened
+        // went with the others of its day, and Revert had nothing to go
+        // back to.
+        let folder = scratch("thin-opened");
+        let document = folder.join("Letter.odt");
+        std::fs::write(&document, "x").unwrap();
+        let store = Store::in_root(&folder.join("versions"), &document);
+        let now = 1000 * DAY;
+        store.keep(&document, Kind::Opened, now - 2 * DAY).unwrap();
+        store
+            .keep(&document, Kind::Automatic, now - 2 * DAY + 60)
+            .unwrap();
+        store.thin(now, 0);
+        let kinds: Vec<_> = store.list().iter().map(|v| v.kind).collect();
+        assert_eq!(kinds, [Kind::Automatic, Kind::Opened]);
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

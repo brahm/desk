@@ -1965,15 +1965,34 @@ impl TextEditor {
             return;
         }
         let window = self.view.area().root().and_downcast::<gtk::Window>();
-        gtk::UriLauncher::new(link).launch(
-            window.as_ref(),
-            gtk::gio::Cancellable::NONE,
-            |result| {
+        let launch = move |window: Option<&gtk::Window>, link: &str| {
+            gtk::UriLauncher::new(link).launch(window, gtk::gio::Cancellable::NONE, |result| {
                 if let Err(error) = result {
                     glib::g_warning!("desk", "cannot open the link: {error}");
                 }
-            },
-        );
+            });
+        };
+        if crate::links::opens_without_asking(link) {
+            launch(window.as_ref(), link);
+            return;
+        }
+        // A link to a file, a shared folder or another app shows where it
+        // goes, and opens only when asked to (review RV, batch 5).
+        use adw::prelude::{AdwDialogExt, AlertDialogExt};
+        let dialog = adw::AlertDialog::new(Some(&tr("Open This Link?")), Some(link));
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("open", &tr("_Open"));
+        dialog.set_response_appearance("open", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let link = link.to_owned();
+        let parent = window.clone();
+        dialog.connect_response(None, move |_, response| {
+            if response == "open" {
+                launch(parent.as_ref(), &link);
+            }
+        });
+        dialog.present(window.as_ref());
     }
 
     /// Makes the selection, or the word at the cursor, a bookmark named by
