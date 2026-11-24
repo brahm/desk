@@ -189,7 +189,7 @@ impl crate::Document {
         }
     }
 
-    /// The colour of one author, as [`Document::author_palette`] gives it.
+    /// The colour of one author, as [`crate::Document::author_palette`] gives it.
     pub fn author_color(&self, author: &str, local: &str) -> AuthorColor {
         self.author_palette(local).color(author)
     }
