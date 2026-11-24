@@ -58,6 +58,13 @@ enum Step {
 }
 
 impl<T: CellText> Evaluator<'_, T> {
+    /// The header cells that finding a header by its name looks at.
+    fn header_cost(&self) -> u64 {
+        let t = self.table;
+        u64::from(t.header_rows()) * u64::from(t.cols())
+            + u64::from(t.body_end().saturating_sub(t.body_start())) * u64::from(t.header_cols())
+    }
+
     fn is_pending_formula(&self, row: u32, col: u32) -> bool {
         row < self.table.rows()
             && col < self.table.cols()
@@ -92,7 +99,9 @@ impl<T: CellText> Evaluator<'_, T> {
             Expr::Cell(a) => rect(*a, *a),
             Expr::Range(a, b) => rect(*a, *b),
             Expr::Header(name) => {
-                if let Some((a, b)) = header_range(self.table, name) {
+                if self.spend(self.header_cost())
+                    && let Some((a, b)) = header_range(self.table, name)
+                {
                     rect(a, b);
                 }
             }
@@ -207,6 +216,9 @@ impl<T: CellText> Context for Evaluator<'_, T> {
     }
 
     fn header(&self, name: &str) -> Option<(CellRef, CellRef)> {
+        if !self.spend(self.header_cost()) {
+            return None;
+        }
         header_range(self.table, name)
     }
 
