@@ -683,19 +683,24 @@ impl<T: CellText> Table<T> {
         }
     }
 
+    /// The row after the last that cells put from row `start` may fill:
+    /// the end of the body when they start in it and the table has a
+    /// footer, which they leave as it is; the end of the table otherwise.
+    pub(crate) fn last_row_for(&self, start: u32) -> u32 {
+        if self.footer_rows > 0 && start < self.body_end() {
+            self.body_end()
+        } else {
+            self.rows()
+        }
+    }
+
     /// Where [`Table::add_rows_to_reach`] adds rows, and how many: past
     /// the end of the body when cells put from the body would reach the
     /// footer, past the end of the table otherwise.
     pub(crate) fn rows_to_reach(&self, start: u32, end: u32) -> (u32, u32) {
         let end = end.min(MAX_CELLS);
-        let rows = self.rows();
-        let body_end = self.body_end();
-        let last = if self.footer_rows > 0 && start < body_end {
-            body_end
-        } else {
-            rows
-        };
-        (last, end.saturating_sub(last).min(MAX_CELLS - rows))
+        let last = self.last_row_for(start);
+        (last, end.saturating_sub(last).min(MAX_CELLS - self.rows()))
     }
 
     /// The formula that the cells of a column repeat down to row `at`,

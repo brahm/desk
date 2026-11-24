@@ -266,31 +266,37 @@ fn wildcard_chars(p: &[char], t: &[char]) -> bool {
     parts_in_order(middle, inner, first.len()).is_some()
 }
 
-/// Takes from the work of the table what matching a pattern against
-/// texts costs at most: the pattern by the texts when the pattern holds
-/// one of `wild`, whose matching tries the pattern from many places, and
-/// the texts otherwise.
+/// Takes from the work of the table what matching or comparing a pattern
+/// with texts costs at most. Each text is put in lower case and the
+/// pattern prepared for it: the pattern and the text, for each. When the
+/// pattern holds one of `wild`, matching tries it from many places: the
+/// pattern by each text.
 fn spend_matching(e: &Eval<'_>, pattern: &Value, texts: &[Value], wild: &[char]) -> Result<()> {
     let Value::Text(p) = pattern else {
         return Ok(());
     };
-    let total: usize = texts
+    let p = p.len() as u64 + 1;
+    let total: u64 = texts
         .iter()
         .map(|v| match v {
-            Value::Text(t) => t.len() + 1,
+            Value::Text(t) => t.len() as u64 + 1,
             _ => 1,
         })
         .sum();
-    let work = if p.contains(wild) {
-        (p.len() as u64 + 1).saturating_mul(total as u64)
+    let work = if p > 1 && pattern_has(pattern, wild) {
+        p.saturating_mul(total)
     } else {
-        total as u64
+        p.saturating_mul(texts.len() as u64).saturating_add(total)
     };
     if e.context.spend(work) {
         Ok(())
     } else {
         Err(ErrorKind::Value)
     }
+}
+
+fn pattern_has(pattern: &Value, wild: &[char]) -> bool {
+    matches!(pattern, Value::Text(t) if t.contains(wild))
 }
 
 /// The characters with which matching a whole text tries a pattern from
@@ -1455,9 +1461,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let needle = e.scalar(at(a, 0)?);
             let hay = e.arg(at(a, 1)?).values();
             let kind = if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 };
-            if kind == 0 {
-                spend_matching(e, &needle, &hay, ANCHORED)?;
-            }
+            // Approximate, the needle is compared with each value.
+            let wild = if kind == 0 { ANCHORED } else { &[] };
+            spend_matching(e, &needle, &hay, wild)?;
             let pos = match kind {
                 0 => lookup_position(&needle, &hay, true),
                 -1 => hay
@@ -1488,9 +1494,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..rows).map(|i| r.at(i, 0)).collect();
-            if !approx {
-                spend_matching(e, &needle, &first, ANCHORED)?;
-            }
+            spend_matching(e, &needle, &first, if approx { &[] } else { ANCHORED })?;
             let row = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row, col as usize - 1))
         }
@@ -1511,9 +1515,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..cols).map(|i| r.at(0, i)).collect();
-            if !approx {
-                spend_matching(e, &needle, &first, ANCHORED)?;
-            }
+            spend_matching(e, &needle, &first, if approx { &[] } else { ANCHORED })?;
             let col = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row as usize - 1, col))
         }

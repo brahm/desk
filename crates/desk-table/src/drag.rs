@@ -67,26 +67,38 @@ impl<T: CellText> Table<T> {
     /// landed on, which become the selection.
     pub fn put_cells(&mut self, at: (u32, u32), from: &Self, area: Area) -> Area {
         let area = from.clamped(area);
-        let need_rows = at.0 + area.rows;
+        self.grow_to_put(at, area);
+        self.put_grown(at, from, area)
+    }
+
+    /// Adds the rows and columns that the cells of `area` need from `at`:
+    /// rows before the footer when they start in the body.
+    fn grow_to_put(&mut self, at: (u32, u32), area: Area) {
+        self.add_rows_to_reach(at.0, at.0 + area.rows);
         let need_cols = at.1 + area.cols;
-        self.add_rows_to_reach(at.0, need_rows);
         if need_cols > self.cols() {
             let _ = self.insert_cols(self.cols(), need_cols - self.cols());
         }
+    }
+
+    /// [`Table::put_cells`] once the table has grown: the cells past it,
+    /// or past the body when they start in it, are left out.
+    fn put_grown(&mut self, at: (u32, u32), from: &Self, area: Area) -> Area {
+        let last_row = self.last_row_for(at.0).max(at.0 + 1);
         let dr = i64::from(at.0) - i64::from(area.row);
         let dc = i64::from(at.1) - i64::from(area.col);
         for (r, c) in area.cells() {
             let (tr, tc) = ((i64::from(r) + dr) as u32, (i64::from(c) + dc) as u32);
             // A table at its largest leaves the rest out.
-            if tr < self.rows() && tc < self.cols() && !self.is_covered(tr, tc) {
+            if tr < last_row && tc < self.cols() && !self.is_covered(tr, tc) {
                 *self.cell_mut(tr, tc) = carried(from.cell(r, c), dr, dc);
             }
         }
         Area::between(
             at,
             (
-                (need_rows - 1).min(self.rows() - 1),
-                (need_cols - 1).min(self.cols() - 1),
+                (at.0 + area.rows - 1).min(last_row - 1),
+                (at.1 + area.cols - 1).min(self.cols() - 1),
             ),
         )
     }
@@ -96,7 +108,23 @@ impl<T: CellText> Table<T> {
     /// are replaced, and the cells they leave are emptied. Formulas that
     /// move keep pointing at the same cells. The cells they landed on.
     pub fn move_cells(&mut self, area: Area, to: (u32, u32), copying: bool) -> Area {
-        let area = self.clamped(area);
+        let mut area = self.clamped(area);
+        // The table grows first, so that the formulas kept below move with
+        // the rows added, as every other formula does. The cells moved
+        // move too when the rows go above them.
+        let (row_at, add) = self.rows_to_reach(to.0, to.0 + area.rows);
+        if add > 0 && (area.row_end() <= row_at || area.row >= row_at) {
+            let _ = self.insert_rows(row_at, add);
+            if area.row >= row_at {
+                area.row += add;
+            }
+        }
+        // An area across the end of the body is put within the rows there
+        // are.
+        let need_cols = to.1 + area.cols;
+        if need_cols > self.cols() {
+            let _ = self.insert_cols(self.cols(), need_cols - self.cols());
+        }
         let source = self.clone();
         if !copying {
             for (r, c) in area.cells() {
@@ -105,7 +133,7 @@ impl<T: CellText> Table<T> {
                 }
             }
         }
-        let landed = self.put_cells(to, &source, area);
+        let landed = self.put_grown(to, &source, area);
         if !copying {
             // Moved formulas point at the same cells, as before.
             let (dr, dc) = (
@@ -114,7 +142,7 @@ impl<T: CellText> Table<T> {
             );
             for (r, c) in area.cells() {
                 let (tr, tc) = ((i64::from(r) + dr) as u32, (i64::from(c) + dc) as u32);
-                if tr < self.rows()
+                if tr < landed.row_end()
                     && tc < self.cols()
                     && let Content::Formula(f) = &source.cell(r, c).content
                     && !self.is_covered(tr, tc)
@@ -179,6 +207,27 @@ mod tests {
         let landed = t.move_cells(Area::between((3, 1), (3, 1)), (3, 0), false);
         assert_eq!(landed, Area::between((3, 0), (3, 0)));
         assert_eq!(t.cell(3, 0).content, Content::Formula("=B2+B3".into()));
+    }
+
+    #[test]
+    fn cells_moved_past_the_body_go_before_the_footer_with_their_references() {
+        // A formula that points at the total, moved down past the body
+        // (review of the pull request of RV batch 2).
+        let mut t = table();
+        t.set_footer_rows(1).unwrap();
+        t.type_text(1, 2, "=B4", &Locale::pt_br());
+        let landed = t.move_cells(Area::between((1, 2), (2, 2)), (2, 2), false);
+        assert_eq!(landed, Area::between((2, 2), (3, 2)));
+        assert_eq!((t.rows(), t.footer_rows()), (5, 1));
+        assert_eq!(t.cell(2, 2).content, Content::Formula("=B5".into()));
+        assert_eq!(t.cell(4, 1).content, Content::Formula("=B2+B3".into()));
+        // An area across the end of the body is put in the rows there are.
+        let mut t = table();
+        t.set_footer_rows(1).unwrap();
+        let landed = t.move_cells(Area::between((2, 0), (3, 0)), (2, 2), true);
+        assert_eq!(landed, Area::between((2, 2), (2, 2)));
+        assert_eq!(t.rows(), 4);
+        assert!(t.cell(3, 2).content.is_empty());
     }
 
     #[test]

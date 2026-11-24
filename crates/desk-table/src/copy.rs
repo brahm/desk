@@ -67,11 +67,7 @@ impl<T: CellText> Table<T> {
         }
         // Text pasted in the body of a table with a footer, past the rows
         // it could add, leaves the footer as it is.
-        let last_row = if self.footer_rows() > 0 && r0 < self.body_end() {
-            self.body_end()
-        } else {
-            self.rows()
-        };
+        let last_row = self.last_row_for(r0);
         if new_cols > cols {
             let _ = self.insert_cols(cols, new_cols - cols);
         }
@@ -88,7 +84,7 @@ impl<T: CellText> Table<T> {
         Area::between(
             (r0, c0),
             (
-                (r0.saturating_add(lines.len() as u32) - 1).min(self.rows() - 1),
+                (r0.saturating_add(lines.len() as u32) - 1).min(last_row.max(r0 + 1) - 1),
                 (c0.saturating_add(width) - 1).min(self.cols() - 1),
             ),
         )
@@ -168,6 +164,11 @@ mod tests {
         assert_eq!(t.cell(9, 0).content, Content::Number(Num(9.0)));
         assert_eq!(t.cell(10, 0).content, Content::Text("Total".into()));
         assert_eq!(t.cell(11, 0).content, Content::Text("Average".into()));
+        // The selection is what was written.
+        let mut u: Table<String> = Table::new(4, 1);
+        u.set_footer_rows(1).unwrap();
+        let area = u.paste_text((2, 0), "1", &pt);
+        assert_eq!(area, Area::cell(2, 0));
         // Lines within the body add nothing.
         t.paste_text((1, 0), "5\n6\n", &pt);
         assert_eq!(t.rows(), 12);

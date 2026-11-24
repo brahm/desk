@@ -45,12 +45,24 @@ const MAX_WORK: u64 = 1 << 27;
 /// tables, each within [`MAX_WORK`], holds the app no longer than two.
 const MAX_DOCUMENT_WORK: u64 = 1 << 28;
 
+/// What the conditional rules of the cells of a document may compare
+/// while it is laid out, apart from the work of its formulas.
+const MAX_RULE_WORK: u64 = 1 << 27;
+
 /// The work left and the tables evaluated while a [`WorkScope`] lives.
 struct SharedWork {
     left: u64,
+    /// What is left of [`MAX_RULE_WORK`].
+    rules_left: u64,
+    /// The time of every table of the scope: the first asked for, so that
+    /// a table laid out again a second later is the same.
+    now: Option<f64>,
     /// The values of the tables evaluated, by what they depend on: a
     /// layout lays a table out more than once, and its work is taken once.
     done: HashMap<u64, Values>,
+    /// The keys of [`SharedWork::done`], random so that a file cannot
+    /// make two tables hash the same.
+    keys: std::collections::hash_map::RandomState,
 }
 
 thread_local! {
@@ -74,7 +86,10 @@ pub fn share_work() -> WorkScope {
         if none {
             *w = Some(SharedWork {
                 left: MAX_DOCUMENT_WORK,
+                rules_left: MAX_RULE_WORK,
+                now: None,
                 done: HashMap::new(),
+                keys: std::collections::hash_map::RandomState::new(),
             });
         }
         none
@@ -82,17 +97,17 @@ pub fn share_work() -> WorkScope {
     WorkScope { outermost }
 }
 
-/// Takes `work` from the budget of the scope, if one lives: all that is
-/// left when too little is.
-fn spend_shared(work: u64) -> bool {
+/// Takes `work` from what the rules of the scope may compare, if one
+/// lives: all that is left when too little is.
+fn spend_on_rules(work: u64) -> bool {
     SHARED_WORK.with(|w| match w.borrow_mut().as_mut() {
         None => true,
-        Some(w) if w.left >= work => {
-            w.left -= work;
+        Some(w) if w.rules_left >= work => {
+            w.rules_left -= work;
             true
         }
         Some(w) => {
-            w.left = 0;
+            w.rules_left = 0;
             false
         }
     })
@@ -373,10 +388,15 @@ impl<T: CellText> Table<T> {
     /// The values of all the cells, with the formulas computed; `now` is
     /// the date and time for TODAY and NOW, in days from 30 December 1899.
     pub fn values(&self, now: f64) -> Values {
-        let Some(left) = SHARED_WORK.with(|w| w.borrow().as_ref().map(|w| w.left)) else {
+        let shared = SHARED_WORK.with(|w| {
+            w.borrow_mut().as_mut().map(|w| {
+                let now = *w.now.get_or_insert(now);
+                (w.left, now, self.fingerprint(&w.keys))
+            })
+        });
+        let Some((left, now, key)) = shared else {
             return self.values_within(now, MAX_WORK);
         };
-        let key = self.fingerprint(now);
         let done =
             SHARED_WORK.with(|w| w.borrow().as_ref().and_then(|w| w.done.get(&key).cloned()));
         if let Some(values) = done {
@@ -392,14 +412,14 @@ impl<T: CellText> Table<T> {
         values
     }
 
-    /// What the values of the table depend on: its cells, its headers
-    /// and footers, and the time.
-    fn fingerprint(&self, now: f64) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
+    /// What the values of the table depend on, apart from the time,
+    /// which is the same for the whole scope: its cells, headers and
+    /// footers.
+    fn fingerprint(&self, keys: &std::collections::hash_map::RandomState) -> u64 {
+        use std::hash::{BuildHasher, Hash, Hasher};
+        let mut h = keys.build_hasher();
         (self.rows(), self.cols()).hash(&mut h);
         (self.header_rows(), self.header_cols(), self.footer_rows()).hash(&mut h);
-        now.to_bits().hash(&mut h);
         for r in 0..self.rows() {
             for c in 0..self.cols() {
                 self.cell(r, c).content.hash(&mut h);
@@ -452,10 +472,11 @@ impl<T: CellText> Table<T> {
             return RuleStyle::default();
         }
         // The texts that rules compare, put in lower case for each, are
-        // taken from the work of the document laid out: a file can give a
-        // million cells many rules that each compare long texts.
+        // taken from what the rules of the document laid out may do, apart
+        // from its formulas: a file can give a million cells many rules
+        // that each compare long texts.
         let value = values.get(row, col);
-        if !spend_shared(conditional::text_work(&cell.rules, value)) {
+        if !spend_on_rules(conditional::text_work(&cell.rules, value)) {
             return RuleStyle::default();
         }
         let refused = std::cell::Cell::new(false);
@@ -463,7 +484,7 @@ impl<T: CellText> Table<T> {
             &cell.rules,
             value,
             &|r: CellRef| match values.get(r.row, r.col) {
-                Value::Text(t) if !spend_shared(t.len() as u64) => {
+                Value::Text(t) if !spend_on_rules(t.len() as u64) => {
                     refused.set(true);
                     Value::Empty
                 }
@@ -559,6 +580,8 @@ mod tests {
             // The same table again, as a layout does, takes no more work.
             assert_eq!(one.values(0.0), first);
             assert_eq!(one.clone().values(0.0), first);
+            // A second later, as a layout asks again, too.
+            assert_eq!(one.values(1.0 / 86_400.0), first);
             let second = two.values(0.0);
             assert_eq!(second.get(11, 1), &Value::Error(ErrorKind::Value));
         }
@@ -582,6 +605,16 @@ mod tests {
         let v = t.values(0.0);
         assert_eq!(v.get(999, 1), &Value::Number(1.0));
         assert_eq!(v.get(999, 2), &Value::Number(1000.0));
+        // Approximate lookups compare each long text, and spend it.
+        let mut t: Table<String> = Table::new(100, 2);
+        for r in 0..100 {
+            t.type_text(r, 0, &format!("x{r:0>2999}"), &en);
+            t.type_text(r, 1, "=MATCH($A$100,$A$1:$A$100,1)", &en);
+        }
+        let v = t.values_within(0.0, 1 << 22);
+        assert_eq!(v.get(0, 1), &Value::Number(100.0));
+        // Reading the range alone would leave work for a dozen.
+        assert_eq!(v.get(5, 1), &Value::Error(ErrorKind::Value));
     }
 
     #[test]
@@ -605,12 +638,15 @@ mod tests {
         assert_eq!(t.rule_style(&v, 0, 1).bold, Some(true));
         SHARED_WORK.with(|w| {
             if let Some(w) = w.borrow_mut().as_mut() {
-                w.left = 700_000;
+                w.rules_left = 700_000;
             }
         });
         // The first time fits, the second does not.
         assert_eq!(t.rule_style(&v, 0, 1).bold, Some(true));
         assert_eq!(t.rule_style(&v, 0, 1).bold, None);
+        // The formulas keep their own work.
+        let left = SHARED_WORK.with(|w| w.borrow().as_ref().map(|w| w.left));
+        assert_eq!(left, Some(MAX_DOCUMENT_WORK));
     }
 
     #[test]
