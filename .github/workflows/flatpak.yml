@@ -60,7 +60,7 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
       options: --privileged
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       # The image comes with the GNOME runtimes installed in its layers.
       # When Flathub has a newer version, flatpak-builder updates them,
       # and overlayfs refuses to rename the directories of a lower layer
@@ -77,7 +77,7 @@ jobs:
             fi
           done
       - name: Build the bundle
-        uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        uses: flathub-infra/flatpak-github-actions/flatpak-builder@933e9e8ca36e85046ebca8e211f0785c6becac40 # master
         with:
           bundle: desk-writer-${{ env.CHANNEL }}.flatpak
           manifest-path: build-aux/flatpak/br.com.brahm.Desk.Writer.json
@@ -100,7 +100,7 @@ jobs:
             done'
       - name: Keep the bundle and the build repository
         run: tar -cf build-repo.tar repo
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desk-writer-flatpak
           path: |
@@ -117,8 +117,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: desk-writer-flatpak
       - name: Move the nightly tag and replace the bundle
@@ -147,8 +147,8 @@ jobs:
       group: flatpak-repository
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: desk-writer-flatpak
       - name: Install Flatpak and OSTree

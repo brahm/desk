@@ -15,9 +15,6 @@
     ],
     "build-options": {
         "append-path": "/usr/lib/sdk/rust-stable/bin",
-        "build-args": [
-            "--share=network"
-        ],
         "env": {
             "CARGO_HOME": "/run/build/desk/cargo",
             "CARGO_TARGET_DIR": "/run/build/desk/target"
@@ -462,6 +459,29 @@
             ]
         },
         {
+            "name": "openjpeg",
+            "buildsystem": "cmake-ninja",
+            "config-opts": [
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DBUILD_CODEC=OFF",
+                "-DBUILD_STATIC_LIBS=OFF",
+                "-DBUILD_DOC=OFF"
+            ],
+            "cleanup": [
+                "/include",
+                "/lib/pkgconfig",
+                "/lib/cmake",
+                "/lib/openjpeg-*"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://archive.ubuntu.com/ubuntu/pool/main/o/openjpeg2/openjpeg2_2.5.4.orig.tar.xz",
+                    "sha256": "6f6cf917e9587bc2df83aee5b51aa22dd56111640b3bad290b93443b6a4682b7"
+                }
+            ]
+        },
+        {
             "name": "poppler",
             "buildsystem": "cmake-ninja",
             "build-options": {
@@ -480,7 +500,7 @@
                 "-DENABLE_NSS3=OFF",
                 "-DENABLE_GPGME=OFF",
                 "-DENABLE_LCMS=OFF",
-                "-DENABLE_LIBOPENJPEG=unmaintained",
+                "-DENABLE_LIBOPENJPEG=openjpeg2",
                 "-DBUILD_GTK_TESTS=OFF",
                 "-DBUILD_QT5_TESTS=OFF",
                 "-DBUILD_QT6_TESTS=OFF",
@@ -506,7 +526,7 @@
             "name": "desk",
             "buildsystem": "simple",
             "build-commands": [
-                "cargo build --release --locked --package desk-writer",
+                "cargo --offline build --release --locked --package desk-writer",
                 "install -Dm755 $CARGO_TARGET_DIR/release/desk-writer -t /app/bin",
                 "install -Dm644 data/br.com.brahm.Desk.Writer.desktop -t /app/share/applications",
                 "install -Dm644 data/br.com.brahm.Desk.Writer.metainfo.xml -t /app/share/metainfo",
@@ -535,7 +555,8 @@
                         "corpus",
                         "site"
                     ]
-                }
+                },
+                "cargo-sources.json"
             ]
         }
     ]

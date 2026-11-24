@@ -12,7 +12,6 @@ publish.workspace = true
 gif.workspace = true
 glib.workspace = true
 poppler-rs.workspace = true
-desk-anim.workspace = true
 desk-chart.workspace = true
 desk-formula.workspace = true
 desk-iwork.workspace = true

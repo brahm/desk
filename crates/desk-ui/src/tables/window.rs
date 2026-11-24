@@ -125,11 +125,9 @@ enum MenuTarget {
 pub(super) struct TablesWindow {
     /// The window that holds the tab of the document.
     frame: RefCell<Rc<crate::tabs::Frame>>,
-    /// The controllers the document added to that window.
-    window_controllers: RefCell<Vec<gtk::EventController>>,
-    /// What the workbook follows of the window that holds it, which moves
-    /// with the tab (third review of RV batch 5).
-    window_notifies: crate::tabs::WindowNotifies,
+    /// The controllers and handlers it put on that window, which move
+    /// with the tab.
+    on_window: crate::tabs::WindowBindings,
     /// The tab of the document, with its own breakpoints.
     root: adw::BreakpointBin,
     tab: std::cell::OnceCell<adw::TabPage>,
@@ -187,9 +185,7 @@ impl TablesWindow {
     /// Adds a controller to the window that holds the tab, which moves
     /// with the tab to another window.
     fn add_window_controller(&self, controller: impl IsA<gtk::EventController>) {
-        let controller = controller.upcast();
-        self.window().add_controller(controller.clone());
-        self.window_controllers.borrow_mut().push(controller);
+        self.on_window.add_controller(&self.window(), controller);
     }
 
     /// A new window with a document of the Blank template.
@@ -377,8 +373,7 @@ impl TablesWindow {
 
         let this = Rc::new(Self {
             frame: RefCell::new(frame.clone()),
-            window_controllers: RefCell::new(Vec::new()),
-            window_notifies: crate::tabs::WindowNotifies::default(),
+            on_window: crate::tabs::WindowBindings::default(),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -1287,7 +1282,7 @@ impl TablesWindow {
         let leave = leave.downgrade();
         let weak = Rc::downgrade(self);
         let before = Rc::new(Cell::new(false));
-        self.window_notifies
+        self.on_window
             .connect(&self.window(), "fullscreened", move |window| {
                 let Some(this) = weak.upgrade() else { return };
                 let on = window.is_fullscreen();
@@ -1424,18 +1419,10 @@ impl crate::tabs::FramePage for TablesWindow {
     }
 
     fn moved_to(&self, frame: &Rc<crate::tabs::Frame>) {
-        // The controllers on the window go with the tab to its new one.
+        // What is on the window goes with the tab to its new one.
         let old = self.window();
-        let controllers = self.window_controllers.borrow().clone();
-        for controller in &controllers {
-            old.remove_controller(controller);
-        }
         *self.frame.borrow_mut() = frame.clone();
-        let new = self.window();
-        for controller in controllers {
-            new.add_controller(controller);
-        }
-        self.window_notifies.move_to(&old, &new);
+        self.on_window.move_to(&old, &self.window());
     }
 
     /// Desk Tables does not save documents yet, so a tab closes at once.

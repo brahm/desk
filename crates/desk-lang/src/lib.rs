@@ -38,7 +38,12 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// thousands, each of which used to load the same dictionary again, on
 /// the thread of the window (review RV, batch 5). A dictionary is now
 /// found by what of the tag picks it, and loaded once by its file.
+///
+/// The folders are listed once too, when the first tag is looked up, so
+/// that tags that no dictionary fits cost no reading of the disk (review
+/// RV, batch 6, B-063).
 struct Loaded<T> {
+    files: Option<Vec<(usize, PathBuf)>>,
     by_key: HashMap<String, Option<PathBuf>>,
     by_file: HashMap<PathBuf, Option<Arc<T>>>,
 }
@@ -46,6 +51,7 @@ struct Loaded<T> {
 impl<T> Default for Loaded<T> {
     fn default() -> Self {
         Self {
+            files: None,
             by_key: HashMap::new(),
             by_file: HashMap::new(),
         }
@@ -60,10 +66,16 @@ impl<T> Loaded<T> {
         load: impl FnOnce(&Path) -> Option<T>,
     ) -> Option<Arc<T>> {
         let key = dictionaries::key(language)?;
+        let files = &mut self.files;
         let file = self
             .by_key
             .entry(key)
-            .or_insert_with_key(|key| find(kind, key))
+            .or_insert_with_key(|key| {
+                let files = files.get_or_insert_with(|| {
+                    dictionaries::listing(kind, &dictionaries::search_folders(kind))
+                });
+                dictionaries::best_among(kind, key, files)
+            })
             .clone()?;
         self.by_file
             .entry(file)
@@ -121,5 +133,32 @@ mod tests {
             assert_eq!(got.as_deref(), Some(&7));
         }
         assert_eq!(loads, 1);
+    }
+
+    #[test]
+    fn the_folders_of_dictionaries_are_listed_once() {
+        // Review RV, batch 6 (B-063): each tag that no dictionary fits
+        // listed the folders again.
+        let folder = std::env::temp_dir().join(format!("desk-lang-once-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("en_US.dic"), "1\nword\n").unwrap();
+        let mut loaded: Loaded<u32> = Loaded {
+            files: Some(dictionaries::listing(
+                Kind::Spelling,
+                std::slice::from_ref(&folder),
+            )),
+            ..Loaded::default()
+        };
+        // Gone from the disk: what was listed is what is looked in.
+        std::fs::remove_dir_all(&folder).unwrap();
+        for n in 0..1000 {
+            assert!(
+                loaded
+                    .get(Kind::Spelling, &format!("x{n:02}"), |_| Some(1))
+                    .is_none()
+            );
+        }
+        assert!(loaded.get(Kind::Spelling, "en-GB", |_| Some(1)).is_some());
+        assert!(dictionaries::listing(Kind::Spelling, &[folder]).is_empty());
     }
 }

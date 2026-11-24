@@ -12,6 +12,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   a new preference says, which the first such link asks for; other links
   outside the document ask, and the address of a link shows under the
   pointer (D-030).
+* Changed: the Flatpak of Desk is built without network access, from
+  crates checked against Cargo.lock, and reads JPEG 2000 in PDFs through
+  OpenJPEG (review RV, batch 6).
 * Fixed: text and pictures pasted from other programs are read with a
   limit, a tab dragged to another window keeps full screen and its
   shortcuts, and the address shown for a link is the one it opens

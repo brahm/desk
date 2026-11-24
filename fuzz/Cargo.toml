@@ -67,3 +67,10 @@ path = "fuzz_targets/formula_parse.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "picture"
+path = "fuzz_targets/picture.rs"
+test = false
+doc = false
+bench = false

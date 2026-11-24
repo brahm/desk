@@ -46,11 +46,13 @@ pub(crate) trait FramePage {
     fn moved_to(&self, _frame: &Rc<Frame>) {}
 }
 
-/// What a document follows of the window that holds it: handlers of
-/// notifications of its properties, which move with the tab to another
-/// window and are told of the new one (third review of RV batch 5).
+/// What a document puts on the window that holds it: controllers, and
+/// handlers of notifications of its properties, which move with the tab
+/// to another window, the handlers told of the new one (third review of
+/// RV batch 5; one place for both apps since batch 6).
 #[derive(Default)]
-pub(crate) struct WindowNotifies {
+pub(crate) struct WindowBindings {
+    controllers: RefCell<Vec<gtk::EventController>>,
     handlers: RefCell<Vec<WindowNotify>>,
 }
 
@@ -61,7 +63,18 @@ type WindowNotify = (
     glib::SignalHandlerId,
 );
 
-impl WindowNotifies {
+impl WindowBindings {
+    /// Adds a controller to `window`.
+    pub(crate) fn add_controller(
+        &self,
+        window: &adw::ApplicationWindow,
+        controller: impl IsA<gtk::EventController>,
+    ) {
+        let controller = controller.upcast();
+        window.add_controller(controller.clone());
+        self.controllers.borrow_mut().push(controller);
+    }
+
     /// Calls `f` whenever `property` of `window` changes.
     pub(crate) fn connect(
         &self,
@@ -83,9 +96,13 @@ impl WindowNotifies {
         window.connect_notify_local(Some(property), move |window, _| f(window))
     }
 
-    /// Follows `new` in place of `old`, and tells each handler of what it
+    /// Moves to `new` from `old`, and tells each handler of what `new`
     /// shows, which may differ.
     pub(crate) fn move_to(&self, old: &adw::ApplicationWindow, new: &adw::ApplicationWindow) {
+        for controller in self.controllers.borrow().iter() {
+            old.remove_controller(controller);
+            new.add_controller(controller.clone());
+        }
         let handlers: Vec<_> = {
             let mut handlers = self.handlers.borrow_mut();
             for (property, f, id) in handlers.iter_mut() {
@@ -586,14 +603,23 @@ mod tests {
                 adw::ApplicationWindow::builder().build(),
             );
             let seen = Rc::new(RefCell::new(Vec::new()));
-            let notifies = WindowNotifies::default();
+            let notifies = WindowBindings::default();
             let kept = seen.clone();
             notifies.connect(&a, "title", move |w| {
                 kept.borrow_mut()
                     .push(w.title().map(String::from).unwrap_or_default());
             });
             a.set_title(Some("a1"));
+            let keys = gtk::EventControllerKey::new();
+            notifies.add_controller(&a, keys.clone());
+            let holds = |w: &adw::ApplicationWindow| {
+                let list = w.observe_controllers();
+                (0..list.n_items()).any(|i| list.item(i).as_ref() == Some(keys.upcast_ref()))
+            };
+            assert!(holds(&a));
             notifies.move_to(&a, &b);
+            // The controllers go along.
+            assert!(!holds(&a) && holds(&b));
             a.set_title(Some("a2"));
             b.set_title(Some("b1"));
             // Told of the new window when it moves, then of its changes

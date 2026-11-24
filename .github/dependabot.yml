@@ -1,0 +1,8 @@
+# The actions of the workflows are pinned by commit (review RV, batch 6);
+# Dependabot proposes new commits when their tags move.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
