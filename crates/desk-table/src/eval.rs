@@ -4,9 +4,9 @@
 //! The values of the cells, with the formulas computed (TAB-32).
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use desk_formula::{CellRef, Context, ErrorKind, Formula, Value};
+use desk_formula::{CellRef, Context, ErrorKind, Expr, Formula, Value};
 
 use crate::cell::{CellText, Content};
 use crate::conditional::{self, RuleStyle};
@@ -41,13 +41,118 @@ struct Evaluator<'a, T> {
     now: f64,
 }
 
+/// A step of [`Evaluator::prepare`].
+enum Step {
+    /// Look at a cell and what it depends on.
+    Enter(u32, u32),
+    /// Compute a cell, once what it depends on is computed.
+    Leave(u32, u32),
+}
+
 impl<T: CellText> Evaluator<'_, T> {
+    fn is_pending_formula(&self, row: u32, col: u32) -> bool {
+        row < self.table.rows()
+            && col < self.table.cols()
+            && matches!(self.table.cell(row, col).content, Content::Formula(_))
+            && !self.cache.borrow().contains_key(&(row, col))
+    }
+
+    /// The formula cells not yet computed that a formula refers to.
+    fn dependencies(&self, expr: &Expr, out: &mut Vec<(u32, u32)>) {
+        let mut rect = |a: CellRef, b: CellRef| {
+            let rows = a.row.min(b.row)..=a.row.max(b.row).min(self.table.rows().saturating_sub(1));
+            for r in rows {
+                let cols =
+                    a.col.min(b.col)..=a.col.max(b.col).min(self.table.cols().saturating_sub(1));
+                for c in cols {
+                    if self.is_pending_formula(r, c) {
+                        out.push((r, c));
+                    }
+                }
+            }
+        };
+        match expr {
+            Expr::Cell(a) => rect(*a, *a),
+            Expr::Range(a, b) => rect(*a, *b),
+            Expr::Header(name) => {
+                if let Some((a, b)) = header_range(self.table, name) {
+                    rect(a, b);
+                }
+            }
+            Expr::Unary(_, e) => self.dependencies(e, out),
+            Expr::Binary(_, a, b) => {
+                self.dependencies(a, out);
+                self.dependencies(b, out);
+            }
+            Expr::Call(_, args) => {
+                for a in args {
+                    self.dependencies(a, out);
+                }
+            }
+            Expr::Number(_) | Expr::Text(_) | Expr::Bool(_) | Expr::Error(_) => {}
+        }
+    }
+
+    /// Computes the formulas a cell depends on, the deepest first, with a
+    /// stack of its own: computed by recursion, a chain of formulas that
+    /// each refer to the next, as a running balance from the bottom up,
+    /// overflowed the stack. The cells of a cycle are circular.
+    fn prepare(&self, row: u32, col: u32) {
+        let mut steps = vec![Step::Enter(row, col)];
+        let mut path: Vec<(u32, u32)> = Vec::new();
+        let mut on_path: HashSet<(u32, u32)> = HashSet::new();
+        while let Some(step) = steps.pop() {
+            match step {
+                Step::Enter(r, c) => {
+                    if !self.is_pending_formula(r, c) {
+                        continue;
+                    }
+                    if on_path.contains(&(r, c)) {
+                        // Every cell from this one up the path is in the
+                        // cycle.
+                        let start = path.iter().rposition(|&p| p == (r, c)).unwrap_or(0);
+                        let mut cache = self.cache.borrow_mut();
+                        for &p in path.get(start..).unwrap_or_default() {
+                            cache.insert(p, Value::Error(ErrorKind::Circular));
+                        }
+                        continue;
+                    }
+                    steps.push(Step::Leave(r, c));
+                    path.push((r, c));
+                    on_path.insert((r, c));
+                    if let Content::Formula(text) = &self.table.cell(r, c).content
+                        && let Ok(f) = Formula::parse(text)
+                    {
+                        let mut deps = Vec::new();
+                        self.dependencies(&f.expr, &mut deps);
+                        steps.extend(deps.into_iter().map(|(r, c)| Step::Enter(r, c)));
+                    }
+                }
+                Step::Leave(r, c) => {
+                    path.pop();
+                    on_path.remove(&(r, c));
+                    self.value(r, c);
+                }
+            }
+        }
+    }
+
     fn value(&self, row: u32, col: u32) -> Value {
         if row >= self.table.rows() || col >= self.table.cols() {
             return Value::Empty;
         }
         if let Some(v) = self.cache.borrow().get(&(row, col)) {
             return v.clone();
+        }
+        // A formula asked for from outside another one: what it depends
+        // on first, without recursion.
+        if self.visiting.borrow().is_empty() && self.is_pending_formula(row, col) {
+            self.visiting.borrow_mut().push((row, col));
+            self.prepare(row, col);
+            self.visiting.borrow_mut().pop();
+            if let Some(v) = self.cache.borrow().get(&(row, col)) {
+                return v.clone();
+            }
         }
         let cell = self.table.cell(row, col);
         let v = match &cell.content {
@@ -203,5 +308,25 @@ mod tests {
         assert_eq!(v.get(3, 2), &Value::Error(ErrorKind::Circular));
         assert_eq!(v.get(1, 2), &Value::Number(20.0));
         assert_eq!(t.shown(&v, 3, 1, &en).text, "15");
+    }
+
+    #[test]
+    fn a_long_chain_of_formulas_is_computed_without_recursion() {
+        // A1 = A2 + 1, A2 = A3 + 1 and so on, a running balance from the
+        // bottom up, overflowed the stack (review RV, batch 2).
+        let en = Locale::en_us();
+        let n = 20_000;
+        let mut t: Table<String> = Table::new(n, 1);
+        for r in 0..n - 1 {
+            t.type_text(r, 0, &format!("=A{}+1", r + 2), &en);
+        }
+        t.type_text(n - 1, 0, "1", &en);
+        let v = t.values(0.0);
+        assert_eq!(v.get(0, 0), &Value::Number(f64::from(n)));
+        // A chain that closes on itself is circular in every cell.
+        t.type_text(n - 1, 0, "=A1", &en);
+        let v = t.values(0.0);
+        assert_eq!(v.get(0, 0), &Value::Error(ErrorKind::Circular));
+        assert_eq!(v.get(n - 1, 0), &Value::Error(ErrorKind::Circular));
     }
 }
