@@ -45,8 +45,9 @@ const LABEL_ROOM: f32 = 10_000.0;
 pub const MIN_SEGMENT_WIDTH: f32 = 18.0;
 
 /// How far down a line looks for a free piece before it gives up and
-/// overflows.
-const MAX_SEARCH: f32 = 10_000.0;
+/// overflows, in steps of a point: counted, as far down a point added to
+/// a position may change nothing.
+const MAX_SEARCH: u32 = 10_000;
 
 /// One glyph, in the coordinates of the layout.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -921,18 +922,31 @@ impl TextSystem {
             }
         };
         let has_tabs = source.contains('\t');
+        // The advances of the clusters summed from the start, so that the
+        // width of a line is found at once for each place it may end: a
+        // line of thousands of words, in a tiny font, was summed again for
+        // each of them.
+        let sums: Vec<f64> = std::iter::once(0.0)
+            .chain(clusters.iter().scan(0.0f64, |sum, c| {
+                *sum += f64::from(c.advance);
+                Some(*sum)
+            }))
+            .collect();
         // The width of the text from `a` to `b` on a line from `x` to
         // `limit`, and how much wider its tabs are than as shaped.
         let natural = |a: usize, b: usize, x: f32, limit: f32| -> (f32, f32) {
             let end = trim(a, b);
-            let clusters = span(a, end);
             let hyphen = hyphen_at(b).map_or(0.0, |h| h.3);
             if !has_tabs {
-                return (
-                    clusters.iter().map(|c| c.advance).sum::<f32>() + hyphen,
-                    0.0,
-                );
+                let first = clusters.partition_point(|c| c.start < a);
+                let last = clusters.partition_point(|c| c.start < end);
+                let sum = sums
+                    .get(last)
+                    .zip(sums.get(first))
+                    .map_or(0.0, |(l, f)| l - f);
+                return (sum as f32 + hyphen, 0.0);
             }
+            let clusters = span(a, end);
             let first = |c: &Cluster| source[c.start..].chars().next().unwrap_or(' ');
             let pieces = clusters.iter().map(|c| Piece {
                 tab: first(c) == '\t',
@@ -975,9 +989,9 @@ impl TextSystem {
         let mut y = top;
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
-        let mut searched_from = y;
+        let mut searched: u32 = 0;
         // Where the search for a line wide enough for the next word began.
-        let mut narrow_from = y;
+        let mut narrowed: u32 = 0;
         // Whether the band was measured again with a shorter line.
         let mut shortened = false;
         'band: loop {
@@ -995,7 +1009,9 @@ impl TextSystem {
                 if space.is_exhausted(y) {
                     break;
                 }
-                if y - searched_from < MAX_SEARCH {
+                // A space the same all the way down has no room lower.
+                if searched < MAX_SEARCH && !space.is_uniform() {
+                    searched += 1;
                     y += 1.0;
                     continue;
                 }
@@ -1003,7 +1019,7 @@ impl TextSystem {
                 // wider than the column: overflow rather than loop forever.
                 segments.push((indent, (edge(indent) - indent).max(MIN_SEGMENT_WIDTH)));
             }
-            searched_from = y;
+            searched = 0;
             let saved: BreakerState = breaker.state().clone();
             let (saved_pos, saved_next, saved_placed) = (pos, next_break, placed.len());
             let mut tallest = 0.0_f32;
@@ -1049,11 +1065,13 @@ impl TextSystem {
                 if end.is_none()
                     && next_break < breaks.len()
                     && width + 0.001 < measure
-                    && y - narrow_from < MAX_SEARCH
+                    && narrowed < MAX_SEARCH
+                    && !space.is_uniform()
                 {
                     if placed.len() > saved_placed {
                         break;
                     }
+                    narrowed += 1;
                     y += 1.0;
                     continue 'band;
                 }
@@ -1252,7 +1270,7 @@ impl TextSystem {
                 pos = line_end;
                 next_break = chosen;
                 first_line = false;
-                narrow_from = y;
+                narrowed = 0;
                 if pos >= source.len() {
                     break 'band;
                 }
@@ -1861,6 +1879,9 @@ fn line_tabs(
 
 /// The leader of a tab: its character repeated across the space of the
 /// tab, ending where the tab does.
+/// The most dots, dashes or rules of the leader of a tab.
+const MAX_LEADER_GLYPHS: usize = 10_000;
+
 fn leader_run(
     place: TabPlace,
     font: &FontData,
@@ -1874,7 +1895,9 @@ fn leader_run(
     if advance <= 0.0 || place.width < advance {
         return None;
     }
-    let count = ((place.width + 0.01) / advance).floor() as usize;
+    // As many as a wide page holds at a readable size: a file may set the
+    // tab at a thousandth of a point, which would make millions.
+    let count = (((place.width + 0.01) / advance).floor() as usize).min(MAX_LEADER_GLYPHS);
     let end = place.start + place.width;
     let x = end - count as f32 * advance;
     Some(GlyphRun {

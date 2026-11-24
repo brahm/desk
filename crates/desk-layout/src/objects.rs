@@ -233,9 +233,16 @@ impl PlacedObject {
             .collect();
         let top = points.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
         let bottom = points.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max);
-        let mut b0 = top - margin;
-        while b0 < bottom + margin {
-            let b1 = b0 + PROFILE_BAND;
+        // Bands counted, and widened past a number of them: a margin of a
+        // file may make millions, and far down a quarter of a point added
+        // to a position no longer moves it.
+        let start = top - margin;
+        let length = bottom + margin - start;
+        let count = (length / PROFILE_BAND).ceil().clamp(0.0, MAX_PROFILE_BANDS) as usize;
+        let band = (length / count.max(1) as f32).max(PROFILE_BAND);
+        for k in 0..count {
+            let b0 = start + k as f32 * band;
+            let b1 = b0 + band;
             // The contour grown by the margin all around, as Pages grows
             // it: a point of the contour takes the room of a circle of the
             // margin around it, so that the room ends round over the top
@@ -291,7 +298,6 @@ impl PlacedObject {
             if let Some(span) = span {
                 bands.push((b0, b1, span.0, span.1, part));
             }
-            b0 = b1;
         }
     }
 }
@@ -392,6 +398,10 @@ pub(crate) type Profile = Arc<[(f32, f32, f32, f32, u16)]>;
 
 /// How tall the bands of the contour of an object are, in points.
 const PROFILE_BAND: f32 = 0.25;
+
+/// The most bands of the profile of an object, enough for a page at a
+/// quarter of a point each: an object with a larger margin gets wider ones.
+const MAX_PROFILE_BANDS: f32 = 20_000.0;
 
 /// How many steps an edge of a contour near a band is taken in.
 const PROFILE_STEPS: usize = 8;
@@ -1488,6 +1498,26 @@ mod tests {
         object.contour = None;
         let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
         assert_eq!(e.span(100.0, 102.0), Some((200.0, 300.0)));
+    }
+
+    #[test]
+    fn a_contour_with_a_huge_margin_takes_a_bounded_profile() {
+        // Review RV, batch 4: a margin of two million points made 16
+        // million bands for each paragraph placed, and far down the page
+        // a band added to a position no longer moved it, without end.
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::triangle()),
+            Frame::from_pt(200.0, 2_100_000.0, 100.0, 100.0),
+        );
+        object.wrap_margin = desk_model::Length::from_points(2_000_000);
+        object.contour = object.shape_contour();
+        let started = std::time::Instant::now();
+        let placed = PlacedObject::new(&object, None, 0.0);
+        let profile = placed.profile(2_000_000.0).unwrap();
+        assert!(profile.len() <= 20_000, "{}", profile.len());
+        assert!(started.elapsed().as_secs() < 10);
     }
 
     #[test]

@@ -1633,3 +1633,65 @@ fn pxv_06_a_drop_cap_can_stand_in_a_shape() {
     }
     assert_eq!(shaped.lines[3].x, 0.0);
 }
+
+#[test]
+fn a_column_too_narrow_for_any_line_overflows_line_after_line() {
+    // Review RV, batch 4: in a column narrower than the narrowest piece of
+    // a line, as a narrow column of a table, each line looked 10,000
+    // points down for room; past 2^24 points, a point added changed
+    // nothing, and the layout never ended.
+    let mut system = TextSystem::new();
+    let text = vec!["a"; 3000].join(" ");
+    let layout = lay_in(
+        &mut system,
+        ParaFormat::default(),
+        &[(&text, sans())],
+        &Column::new(10.0),
+    );
+    assert!(layout.lines.len() > 1000);
+    // One under the other, without a gap.
+    for pair in layout.lines.windows(2) {
+        assert!((pair[1].top - pair[0].top - pair[0].height).abs() < 0.01);
+    }
+}
+
+#[test]
+fn the_leader_of_a_tab_in_a_tiny_font_is_bounded() {
+    // Review RV, batch 4: the leader of a tab at a thousandth of a point
+    // was tens of thousands of dots, at a thousandth hundreds of
+    // thousands, and a page of them gigabytes.
+    use desk_model::{TabAlignment, TabLeader, TabStop, TabStops};
+    let mut system = TextSystem::new();
+    let paragraph = ParaFormat {
+        tab_stops: TabStops::new([TabStop {
+            alignment: TabAlignment::Right,
+            leader: TabLeader::Dots,
+            ..TabStop::left(Length::from_points(190))
+        }]),
+        ..ParaFormat::default()
+    };
+    let tiny = CharFormat {
+        font_size: Length::from_pt(0.02),
+        ..sans()
+    };
+    let layout = lay(&mut system, paragraph, &[("\tx", tiny)]);
+    let glyphs: usize = layout.lines[0].runs.iter().map(|r| r.glyphs.len()).sum();
+    assert!(glyphs > 1000 && glyphs <= 10_010, "{glyphs}");
+}
+
+#[test]
+fn a_line_of_thousands_of_words_is_measured_once_for_each() {
+    // Review RV, batch 4: each place a line could end summed the line
+    // again from its start, the square of its words: a paragraph in a
+    // tiny font, thousands of words a line, took minutes.
+    let mut system = TextSystem::new();
+    let text = vec!["a"; 200_000].join(" ");
+    let tiny = CharFormat {
+        font_size: Length::from_pt(0.02),
+        ..sans()
+    };
+    let started = std::time::Instant::now();
+    let layout = lay(&mut system, ParaFormat::default(), &[(&text, tiny)]);
+    assert!(layout.lines.len() > 1);
+    assert!(started.elapsed().as_secs() < 20, "{:?}", started.elapsed());
+}

@@ -208,7 +208,8 @@ impl Range {
         let mut out = Vec::new();
         if self.log {
             let mut v = self.min;
-            while v <= self.max * 1.000_001 {
+            // A decade each, as many as a double has at most.
+            while v <= self.max * 1.000_001 && v.is_finite() && out.len() < 700 {
                 out.push(v);
                 v *= 10.0;
             }
@@ -230,6 +231,11 @@ fn nice_step(span: f64, count: f64) -> f64 {
     }
     let raw = span / count;
     let p = 10f64.powf(raw.log10().floor());
+    // A span so small or so large that its powers of ten underflow or
+    // overflow has no nice step.
+    if !(p.is_finite() && p > 0.0) {
+        return 1.0;
+    }
     let f = raw / p;
     let n = if f <= 1.0 {
         1.0
@@ -245,10 +251,37 @@ fn nice_step(span: f64, count: f64) -> f64 {
     n * p
 }
 
+/// The range of a value axis, finite and with its maximum above its
+/// minimum, whatever the values and the limits a file gives.
 fn value_range(axis: &ValueAxis, lo: f64, hi: f64, zero: bool) -> Range {
+    let range = any_value_range(axis, lo, hi, zero);
+    let finite = [range.min, range.max, range.step]
+        .iter()
+        .all(|v| v.is_finite());
+    if finite && range.min < range.max && range.step > 0.0 {
+        range
+    } else if range.log {
+        Range {
+            min: 1.0,
+            max: 10.0,
+            step: 10.0,
+            log: true,
+        }
+    } else {
+        Range {
+            min: 0.0,
+            max: 1.0,
+            step: 0.2,
+            log: false,
+        }
+    }
+}
+
+fn any_value_range(axis: &ValueAxis, lo: f64, hi: f64, zero: bool) -> Range {
     if axis.scale == Scale::Logarithmic {
-        let lo = axis.min.map_or(lo, |m| m.0).max(1e-12);
-        let hi = axis.max.map_or(hi, |m| m.0).max(lo * 10.0);
+        // A decade below the largest double, for the axis to end on one.
+        let lo = axis.min.map_or(lo, |m| m.0).clamp(1e-12, 1e300);
+        let hi = axis.max.map_or(hi, |m| m.0).max(lo * 10.0).min(1e307);
         let min = 10f64.powf(lo.log10().floor());
         let max = 10f64.powf(hi.log10().ceil());
         return Range {
@@ -554,7 +587,7 @@ fn axis_extent(
             }
         }
     }
-    if !lo.is_finite() {
+    if !lo.is_finite() || !hi.is_finite() {
         (0.0, 1.0)
     } else {
         (lo, hi)
@@ -1909,6 +1942,38 @@ mod tests {
         chart.value_axis.scale = Scale::Percent;
         let v = series_values(&chart);
         assert!((v[0][0].unwrap() + v[1][0].unwrap() - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn values_at_the_ends_of_doubles_draw_on_finite_axes() {
+        // Review RV, batch 4: a logarithmic axis to 1.7e308 counted its
+        // decades without end, and a value of 1e-323 made a step of 0 and
+        // an axis of NaN, which clamp refused.
+        for (kind, scale, value) in [
+            (ChartKind::Column, Scale::Logarithmic, 1.7e308),
+            (ChartKind::StackedColumn, Scale::Logarithmic, 1e308),
+            (ChartKind::Column, Scale::Linear, 1e-323),
+            (ChartKind::Line, Scale::Linear, f64::MAX),
+            (ChartKind::StackedColumn, Scale::Linear, f64::MAX),
+        ] {
+            let mut chart = Chart::new(kind);
+            chart.value_axis.scale = scale;
+            for s in 0..chart.series_count() {
+                for c in 0..chart.category_count() {
+                    let (r, k) = if chart.series_in_rows { (s, c) } else { (c, s) };
+                    chart.data.set(r, k, Some(value));
+                }
+            }
+            draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        }
+        let r = value_range(&ValueAxis::default(), 0.0, 1e-323, true);
+        assert!(r.min.is_finite() && r.max > r.min && r.step > 0.0);
+        let log = ValueAxis {
+            scale: Scale::Logarithmic,
+            max: Some(Num(f64::MAX)),
+            ..ValueAxis::default()
+        };
+        assert!(value_range(&log, 1.0, f64::MAX, true).ticks().len() <= 700);
     }
 
     #[test]

@@ -27,6 +27,12 @@ pub trait LineSpace {
     fn min_piece(&self) -> f32 {
         crate::MIN_SEGMENT_WIDTH
     }
+
+    /// Whether the free pieces are the same at every height, so that a
+    /// line with no room has none lower down either.
+    fn is_uniform(&self) -> bool {
+        false
+    }
 }
 
 /// A column of a fixed width with nothing in it.
@@ -50,5 +56,9 @@ impl LineSpace for Column {
 
     fn segments(&self, _top: f32, _height: f32) -> Vec<(f32, f32)> {
         vec![(0.0, self.width)]
+    }
+
+    fn is_uniform(&self) -> bool {
+        true
     }
 }
