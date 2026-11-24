@@ -680,11 +680,20 @@ fn is_name_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '$' || c == '.'
 }
 
-/// How deep a formula may nest, in parentheses, operators, signs and
-/// arguments, before it is refused: deeper, the parser and then the
-/// evaluator and the writer, which recurse, would overflow the stack. A
-/// file can hold any formula.
-pub const MAX_NESTING: usize = 512;
+/// How deep a formula may nest before it is refused: deeper, the parser
+/// and then the evaluator and the writer, which recurse, would overflow
+/// the stack. A file can hold any formula. An operator after another, as
+/// in =A1+A2+...+A1000, costs [`OPERATOR_COST`]; a parenthesis, a sign, a
+/// percent or a function, which the parser recurses for too, cost
+/// [`NESTING_COST`].
+pub const MAX_NESTING: usize = 2048;
+
+/// What an operator of a chain costs of [`MAX_NESTING`].
+pub const OPERATOR_COST: usize = 2;
+
+/// What a parenthesis, a sign, a percent or a function costs of
+/// [`MAX_NESTING`].
+pub const NESTING_COST: usize = 8;
 
 struct Parser<'a> {
     tokens: &'a [(usize, Token)],
@@ -733,8 +742,8 @@ impl Parser<'_> {
     }
 
     /// Goes one level deeper, or refuses a formula that nests too deep.
-    fn enter(&mut self) -> Result<(), ParseError> {
-        self.depth += 1;
+    fn enter(&mut self, cost: usize) -> Result<(), ParseError> {
+        self.depth += cost;
         if self.depth > MAX_NESTING {
             return Err(self.error("the formula nests too deep"));
         }
@@ -750,7 +759,7 @@ impl Parser<'_> {
                 break;
             }
             // Each operator puts what came before one level deeper.
-            self.enter()?;
+            self.enter(OPERATOR_COST)?;
             self.pos += 1;
             let right = self.expr(p + 1)?;
             left = Expr::Binary(op, Box::new(left), Box::new(right));
@@ -760,9 +769,9 @@ impl Parser<'_> {
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
-        self.enter()?;
+        self.enter(NESTING_COST)?;
         let e = self.unary_inner();
-        self.depth -= 1;
+        self.depth -= NESTING_COST;
         e
     }
 
@@ -784,7 +793,7 @@ impl Parser<'_> {
         let depth = self.depth;
         let mut e = self.primary()?;
         while self.peek() == Some(&Token::Op("%")) {
-            self.enter()?;
+            self.enter(NESTING_COST)?;
             self.pos += 1;
             e = Expr::Unary(UnaryOp::Percent, Box::new(e));
         }
@@ -803,11 +812,11 @@ impl Parser<'_> {
             Token::Quoted(q) => Ok(Expr::Header(q)),
             Token::Error(e) => Ok(Expr::Error(e)),
             Token::Open => {
-                // A parenthesis costs the stack more than a sign: it
-                // counts twice.
-                self.enter()?;
+                // With the sign or the operand around it, a parenthesis
+                // costs twice.
+                self.enter(NESTING_COST)?;
                 let e = self.expr(0)?;
-                self.depth -= 1;
+                self.depth -= NESTING_COST;
                 if self.peek() != Some(&Token::Close) {
                     return Err(self.error("missing )"));
                 }
@@ -817,7 +826,7 @@ impl Parser<'_> {
             Token::Name(name) => {
                 if self.peek() == Some(&Token::Open) {
                     self.pos += 1;
-                    self.enter()?;
+                    self.enter(NESTING_COST)?;
                     let mut args = Vec::new();
                     if self.peek() == Some(&Token::Close) {
                         self.pos += 1;
@@ -834,7 +843,7 @@ impl Parser<'_> {
                             }
                         }
                     }
-                    self.depth -= 1;
+                    self.depth -= NESTING_COST;
                     // The names of functions are ASCII: the capital of
                     // another letter, such as ǰ, may be two characters
                     // that no name holds.
@@ -1019,21 +1028,36 @@ mod tests {
                 None
             }
         }
-        let n = MAX_NESTING / 3 - 1;
-        for text in [
-            format!("={}A1{}", "(-".repeat(n), ")".repeat(n)),
-            format!("={}A1{}", "ABS(".repeat(n), ")".repeat(n)),
-            format!(
-                "={}A1{}",
-                "(".repeat(MAX_NESTING / 2 - 1),
-                ")".repeat(MAX_NESTING / 2 - 1)
-            ),
-            format!("=A1{}", "^A1".repeat(MAX_NESTING - 2)),
-            format!("=A1{}", "-A1".repeat(MAX_NESTING - 2)),
-        ] {
+        // The largest of each form that is read.
+        let largest = |form: &dyn Fn(usize) -> String| {
+            let (mut low, mut high) = (1, 5_000);
+            while low < high {
+                let mid = (low + high + 1) / 2;
+                if Formula::parse(&form(mid)).is_ok() {
+                    low = mid;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            form(low)
+        };
+        let forms: [&dyn Fn(usize) -> String; 6] = [
+            &|n| format!("={}A1{}", "(-".repeat(n), ")".repeat(n)),
+            &|n| format!("={}A1{}", "ABS(".repeat(n), ")".repeat(n)),
+            &|n| format!("={}A1{}", "(".repeat(n), ")".repeat(n)),
+            &|n| format!("=A1{}", "^A1".repeat(n)),
+            &|n| format!("=A1{}", "-A1".repeat(n)),
+            &|n| format!("=A1{}", "%".repeat(n)),
+        ];
+        for text in forms.iter().map(|form| largest(*form)) {
             let formula = Formula::parse(&text).unwrap();
             assert!(!formula.to_string().is_empty());
             let _ = crate::evaluate(&formula, &Cells);
+            let _ = formula.moved(0, 1).to_odf();
         }
+        // A chain of a thousand cells added, as other spreadsheets write
+        // them, is read (review of the pull request of RV batch 2).
+        let sum = format!("=A1{}", "+A1".repeat(999));
+        assert!(Formula::parse(&sum).is_ok());
     }
 }

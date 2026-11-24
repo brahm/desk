@@ -457,6 +457,20 @@ mod tests {
     }
 
     #[test]
+    fn the_longest_sum_a_formula_holds_is_computed_and_moved() {
+        // In a thread with the small stack of the tests, without
+        // optimization.
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(3, 1);
+        t.type_text(0, 0, "1", &en);
+        let sum = format!("=A1{}", "+A1".repeat(1_020));
+        t.type_text(1, 0, &sum, &en);
+        assert_eq!(t.values(0.0).get(1, 0), &Value::Number(1_021.0));
+        t.insert_rows(0, 1).unwrap();
+        assert!(t.source_text(2, 0, &en).starts_with("=A2+A2"));
+    }
+
+    #[test]
     fn a_long_chain_of_formulas_is_computed_without_recursion() {
         // A1 = A2 + 1, A2 = A3 + 1 and so on, a running balance from the
         // bottom up, overflowed the stack (review RV, batch 2).
