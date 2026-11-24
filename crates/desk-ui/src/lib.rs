@@ -315,6 +315,9 @@ pub(crate) struct Shown {
     /// others with the same metrics; then the Warnings window opens by
     /// itself, as in Pages.
     pub lossy: bool,
+    /// Whether the reader left out content of the file, which saving over
+    /// it would lose; a font replaced by another loses nothing (D-031).
+    pub left_out: bool,
 }
 
 thread_local! {
@@ -325,7 +328,8 @@ thread_local! {
 /// Reads and lays out a document.
 pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, String> {
     let Opened { document, warnings } = (opener.open)(&package_of(path))?;
-    let mut lossy = !warnings.is_empty();
+    let left_out = !warnings.is_empty();
+    let mut lossy = left_out;
     let mut warnings: Vec<Warning> = warnings
         .into_iter()
         .map(|text| Warning { text, font: None })
@@ -346,6 +350,7 @@ pub(crate) fn open_document(opener: &Opener, path: &Path) -> Result<Shown, Strin
         document,
         warnings,
         lossy,
+        left_out,
     })
 }
 

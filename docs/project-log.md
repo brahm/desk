@@ -2138,6 +2138,12 @@ paragraph, and objects on a second page.
   recovery draft, and Save asks first, offering to save over the file or
   as a new file. Once the owner says to save over it, the document saves
   itself again, as every file does.
+- The review of the pull request found that a font replaced by another
+  made a file wait to be asked, though it loses nothing; that after Save
+  Over the versions could not be browsed; that Revert dropped the changes
+  of a file waiting to be asked; and that closing asked twice. All fixed:
+  only content the reader left out counts, Save Over holds for the file,
+  the changes are kept as a version, and closing asks once.
 
 ## Decisions, with their reasons and consequences
 
