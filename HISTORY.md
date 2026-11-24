@@ -8,6 +8,13 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: Desk no longer closes, or runs out of memory, on Pages '09 and
+  ODT files made to loop or to repeat cells without end, nor on GIF
+  pictures that declare a huge size (review RV, batch 1).
+* Fixed: Pages '09 files larger than 256 MB open, and their pictures keep
+  their size instead of coming in at 256 pixels.
+* Fixed: files with control characters pasted from the web open again in
+  LibreOffice, and chart rows written once for several are read whole.
 * Changed: development is paused for a review of all the code for bugs
   and optimizations (phase RV); Writer review (W2) resumes after it.
 * Fixed: the tables of Pages '09 documents open in Desk Writer with
