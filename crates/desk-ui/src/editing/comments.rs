@@ -363,6 +363,69 @@ impl TextEditor {
         added
     }
 
+    /// Highlights the text selected, by `author`, now: a comment without
+    /// text, which typing in its bubble makes a comment (W059, PXV-19).
+    /// Nothing without text selected, as Insert > Highlight of Pages 15.4
+    /// is off then. Gives the new highlight.
+    pub fn add_highlight(&self, author: &str) -> Option<NodeId> {
+        if self.cell_rects().is_some() {
+            return None;
+        }
+        let (start, end) = self.selection().ordered();
+        if start == end {
+            return None;
+        }
+        let highlight = Comment {
+            id: NodeId::new(1).expect("not zero"),
+            author: author.into(),
+            date: Some(crate::comments_page::now().into()),
+            text: "".into(),
+            replies: Arc::new([]),
+        };
+        let mut added = None;
+        self.format_edit("Highlight", |edit| {
+            let from = at_spot(edit.document(), start)?;
+            let to = at_spot(edit.document(), end)?;
+            added = Some(edit.add_comment(from, to, highlight)?);
+            Ok(())
+        });
+        added
+    }
+
+    /// The highlights and comments on the text selected, or on the text
+    /// at the cursor: those whose text meets the selection, in the text
+    /// being edited.
+    pub fn comments_in_selection(&self) -> Vec<NodeId> {
+        let (start, end) = self.selection().ordered();
+        let story = self.story();
+        let state = self.state.borrow();
+        placed(Self::main_document(&state))
+            .into_iter()
+            .filter(|p| p.object.is_none() && p.story == story)
+            .filter(|p| {
+                if start == end {
+                    p.start <= start && start <= p.end
+                } else {
+                    p.start < end && start < p.end
+                }
+            })
+            .map(|p| p.id)
+            .collect()
+    }
+
+    /// Edit > Remove Highlights and Comments: deletes those on the text
+    /// selected, with their replies, in one step that Undo takes back
+    /// (PXV-19). Gives how many.
+    pub fn remove_comments_in_selection(&self) -> usize {
+        let ids = self.comments_in_selection();
+        if !ids.is_empty() {
+            self.format_edit("Remove Highlights and Comments", |edit| {
+                ids.iter().try_for_each(|id| edit.remove_comment(*id))
+            });
+        }
+        ids.len()
+    }
+
     /// Changes the text of a comment. Emptied, a comment is deleted, as
     /// in Pages 15.4, but a highlight stays one; given text, a highlight
     /// becomes a comment (PXV-19).
@@ -1088,6 +1151,63 @@ mod tests {
                     .all(|r| r.attrs.comments.is_none())
             );
             assert_eq!(editor.comments_in_order().len(), 1);
+        });
+    }
+
+    #[test]
+    fn w059_a_highlight_is_on_the_selection_and_goes_with_the_comments_on_it() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            document
+                .transact("Typing", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three four").map(|_| ())
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            // Nothing selected: no highlight, as Insert > Highlight is off.
+            editor.select(Selection::cursor(Spot::new(0, 1)));
+            assert_eq!(editor.add_highlight("Ana"), None);
+            editor.select(Selection {
+                anchor: Spot::new(0, 4),
+                focus: Spot::new(0, 7),
+            });
+            let highlight = editor.add_highlight("Ana").unwrap();
+            let made = editor
+                .document()
+                .comments()
+                .get(highlight)
+                .cloned()
+                .unwrap();
+            assert!(made.is_highlight());
+            assert_eq!(&*made.author, "Ana");
+            assert_eq!(editor.undo_name().as_deref(), Some("Highlight"));
+            // It has no mark in the margin, and is listed with the
+            // comments; given text, it is a comment.
+            assert!(editor.comment_flags().is_empty());
+            assert_eq!(editor.comments_in_order().len(), 1);
+            let comment = editor
+                .add_comment((Spot::new(0, 14), Spot::new(0, 18)), "Bo", "four")
+                .unwrap();
+            // Remove Highlights and Comments takes those that the
+            // selection meets, at once.
+            editor.select(Selection {
+                anchor: Spot::new(0, 0),
+                focus: Spot::new(0, 5),
+            });
+            assert_eq!(editor.comments_in_selection(), [highlight]);
+            editor.select(Selection::cursor(Spot::new(0, 16)));
+            assert_eq!(editor.comments_in_selection(), [comment]);
+            editor.select(Selection {
+                anchor: Spot::new(0, 18),
+                focus: Spot::new(0, 0),
+            });
+            assert_eq!(editor.remove_comments_in_selection(), 2);
+            assert!(editor.document().comments().is_empty());
+            editor.select(Selection::cursor(Spot::new(0, 9)));
+            assert_eq!(editor.remove_comments_in_selection(), 0);
+            editor.undo();
+            assert_eq!(editor.document().comments().len(), 2);
         });
     }
 

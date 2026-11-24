@@ -467,6 +467,10 @@ pub fn run(info: AppInfo, opener: Option<&'static Opener>) -> gtk::glib::ExitCod
             if opener.is_none() {
                 app.set_accels_for_action("app.new-tab", &["<Control>n", "<Control>t"]);
             }
+        } else {
+            // ⇧⌘H in Pages 15.4 (PXV-19); Desk Slides has Ctrl+Shift+H
+            // for Skip Slide.
+            app.set_accels_for_action("win.insert-highlight", &["<Control><Shift>h"]);
         }
         for (action, keys) in [
             ("win.bold", &["<Control>b"][..]),

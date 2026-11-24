@@ -360,6 +360,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
     menu.append_section(None, &notes);
     let comments = gio::Menu::new();
     comments.append(Some(&tr("Co_mment")), Some("win.insert-comment"));
+    comments.append(Some(&tr("_Highlight")), Some("win.insert-highlight"));
     comments.append(Some(&tr("Next Comment")), Some("win.next-comment"));
     comments.append(Some(&tr("Previous Comment")), Some("win.previous-comment"));
     menu.append_section(None, &comments);

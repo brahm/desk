@@ -242,7 +242,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 81] = [
+const DOCUMENT_ACTIONS: [&str; 83] = [
     "outline",
     "screen-view",
     "text-size",
@@ -299,6 +299,8 @@ const DOCUMENT_ACTIONS: [&str; 81] = [
     "next-note",
     "previous-note",
     "insert-comment",
+    "insert-highlight",
+    "remove-comments",
     "next-comment",
     "previous-comment",
     "insert-toc",
@@ -3554,6 +3556,34 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&insert);
+        // Highlight: a comment without text on the text selected, and
+        // Remove Highlights and Comments on it (W059, PXV-19).
+        let highlight = gio::SimpleAction::new("insert-highlight", None);
+        let weak = Rc::downgrade(self);
+        highlight.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let author = crate::comments_page::author();
+            if this
+                .editor()
+                .and_then(|e| e.add_highlight(&author))
+                .is_none()
+            {
+                this.window().error_bell();
+            }
+        });
+        self.actions.add_action(&highlight);
+        let remove = gio::SimpleAction::new("remove-comments", None);
+        let weak = Rc::downgrade(self);
+        remove.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            if this
+                .editor()
+                .is_none_or(|e| e.remove_comments_in_selection() == 0)
+            {
+                this.window().error_bell();
+            }
+        });
+        self.actions.add_action(&remove);
         for (name, forward) in [("next-comment", true), ("previous-comment", false)] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(self);
@@ -3941,6 +3971,13 @@ impl DocumentWindow {
         edit.append(Some(&tr("Select _All")), Some("win.select-all"));
         edit.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
         menu.append_section(None, &edit);
+        let comments = gio::Menu::new();
+        comments.append(Some(&tr("_Highlight")), Some("win.insert-highlight"));
+        comments.append(
+            Some(&tr("_Remove Highlights and Comments")),
+            Some("win.remove-comments"),
+        );
+        menu.append_section(None, &comments);
         let format = gio::Menu::new();
         format.append(Some(&tr("_Bold")), Some("win.bold"));
         format.append(Some(&tr("_Italic")), Some("win.italic"));

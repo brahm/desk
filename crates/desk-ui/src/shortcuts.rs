@@ -159,6 +159,7 @@ const SECTIONS: &[Section] = &[
                 "<Control><Shift>k",
                 n_("Comment on the selection or the word"),
             ),
+            ("<Control><Shift>h", n_("Highlight the selection")),
             ("<Control><Alt>k", n_("Next comment")),
             ("<Control><Shift><Alt>k", n_("Previous comment")),
         ],
