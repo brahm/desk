@@ -2189,6 +2189,25 @@ paragraph, and objects on a second page.
   name they carry, the identity that tracked changes bring in step 8,
   so it moves there (B-066).
 
+### 24 November: the model of tracked changes (step 8 of W2, first part)
+
+- A change is kept as comments are: a record with its kind, author and
+  date, and the text it covers carrying its identifier. Deleted text
+  stays in its place, marked, so that rejecting it is only removing the
+  mark, and a break added or deleted is marked on the paragraph it ends.
+  Undo covers all of it.
+- ODF keeps deleted text in the region of its deletion, out of the
+  body, with a `text:change` where it was, and joins the paragraphs
+  whose breaks it took. Reading puts that text back in its place, and
+  writing takes it out again; a program that does not track changes
+  reads Desk's file as accepted, as it reads LibreOffice's.
+- ODF needs a date on every change; one whose date is unknown is
+  written as the epoch, which Desk reads back as unknown.
+- Until the views of markup (step 11), the pages underline text added
+  and strike text deleted, in the colour of the author (W150); printing
+  shows deleted text as text until step 15. Changes of formatting stay
+  listed as left out, as accepted, until step 9.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

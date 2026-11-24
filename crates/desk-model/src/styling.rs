@@ -246,14 +246,20 @@ impl Document {
                 .into_iter()
                 .map(|run| {
                     let style = run.style.and_then(|s| self.flat_character_style(s));
-                    (run.text().to_owned(), style, run.attrs.clone())
+                    // A copy is not part of the tracked change of what it
+                    // copies (W148).
+                    let mut attrs = run.attrs.clone();
+                    attrs.change = None;
+                    (run.text().to_owned(), style, attrs)
                 })
                 .collect();
+            let mut attrs = paragraph.attrs().clone();
+            attrs.break_change = None;
             paragraphs.push(FragmentParagraph {
                 style: self
                     .flat_paragraph_style(paragraph.style())
                     .ok_or(ModelError::UnknownStyle(paragraph.style()))?,
-                attrs: paragraph.attrs().clone(),
+                attrs,
                 runs,
             });
         }

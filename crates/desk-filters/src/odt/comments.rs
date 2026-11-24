@@ -278,7 +278,7 @@ pub(super) fn cell_annotations(
 
 /// A date of ODF as the model keeps it: none for the empty date that
 /// LibreOffice writes when it has none.
-fn date(date: Option<&str>) -> Option<Arc<str>> {
+pub(super) fn date(date: Option<&str>) -> Option<Arc<str>> {
     date.filter(|d| !d.is_empty() && !d.starts_with("0000"))
         .map(Into::into)
 }

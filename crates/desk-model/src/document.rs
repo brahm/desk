@@ -318,6 +318,8 @@ pub struct PagedFlow {
     pub notes: Notes,
     /// The comments on the text (W149).
     pub comments: Comments,
+    /// The tracked changes of the text (W148).
+    pub changes: crate::Changes,
     /// The objects on the pages, from back to front (OBJ-01).
     pub objects: Objects,
 }
@@ -441,6 +443,7 @@ impl Document {
                 section_margins: imbl::OrdMap::new(),
                 notes: Notes::default(),
                 comments: Comments::default(),
+                changes: crate::Changes::default(),
                 objects: Objects::default(),
             }),
             slides: None,
@@ -624,6 +627,23 @@ impl Document {
         match &self.container {
             Container::Pages(flow) => &flow.comments,
         }
+    }
+
+    /// The tracked changes of the text (W148).
+    pub fn changes(&self) -> &crate::Changes {
+        match &self.container {
+            Container::Pages(flow) => &flow.changes,
+        }
+    }
+
+    /// The pieces of the body that tracked changes cover, in its order
+    /// (W148): one for each run of text of one change in a paragraph, with
+    /// the break of the paragraph when the change covers it too. Pieces
+    /// whose change is not among those of the document are left out.
+    pub fn change_spans(&self) -> Vec<crate::ChangeSpan> {
+        let mut spans = crate::change::change_spans_in(self.body().iter());
+        spans.retain(|s| self.changes().get(s.id).is_some());
+        spans
     }
 
     /// Where each comment of the body is, in the order of the body: the
@@ -1147,6 +1167,17 @@ impl Document {
                 let Container::Pages(flow) = &mut self.container;
                 let old: Option<Comment> = flow.comments.replace(id, comment);
                 Ok(Op::SetComment { id, comment: old })
+            }
+            Op::SetChange { id, change } => {
+                if let Some(change) = &change {
+                    if change.id != id {
+                        return Err(ModelError::DuplicateId(id));
+                    }
+                    self.ids.observe(id);
+                }
+                let Container::Pages(flow) = &mut self.container;
+                let old = flow.changes.replace(id, change);
+                Ok(Op::SetChange { id, change: old })
             }
             Op::InsertObject { index, object } => {
                 let len = self.objects().len();

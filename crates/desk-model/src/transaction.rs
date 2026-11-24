@@ -135,6 +135,20 @@ impl Edit {
         attrs.start = None;
         // The new item counts on from the one it was split from.
         attrs.list_start = None;
+        // The break the paragraph ended at now ends the second, and the
+        // new one between them is in no tracked change (W148).
+        let ends = paragraph.attrs().break_change;
+        attrs.break_change = ends;
+        if ends.flatten().is_some() {
+            let mut own = paragraph.attrs().clone();
+            own.break_change = None;
+            let style = paragraph.style();
+            self.apply(Op::SetParagraphFormat {
+                paragraph: at.paragraph,
+                style,
+                attrs: own,
+            })?;
+        }
         let id = self.new_id();
         if !tail.is_empty() {
             self.apply(Op::ReplaceText {
@@ -211,6 +225,20 @@ impl Edit {
         let (last, last_range) = ranges[ranges.len() - 1].clone();
         let last_paragraph = self.doc.paragraph(last)?;
         let tail = last_paragraph.slice(last_range.end..last_paragraph.len())?;
+        // The joined paragraph ends at the break the last one ended at,
+        // and with its tracked change (W148).
+        let ends = last_paragraph.attrs().break_change;
+        let first_paragraph = self.doc.paragraph(first)?;
+        if first_paragraph.attrs().break_change != ends {
+            let mut attrs = first_paragraph.attrs().clone();
+            attrs.break_change = ends;
+            let style = first_paragraph.style();
+            self.apply(Op::SetParagraphFormat {
+                paragraph: first,
+                style,
+                attrs,
+            })?;
+        }
         self.apply(Op::ReplaceText {
             paragraph: first,
             range: first_range,
@@ -528,6 +556,68 @@ impl Edit {
             self.apply(Op::SetComment { id, comment })?;
         }
         Ok(())
+    }
+
+    /// Adds, replaces or removes a tracked change, leaving the text it
+    /// covers as it is (W148).
+    pub fn set_change(
+        &mut self,
+        id: NodeId,
+        change: Option<crate::Change>,
+    ) -> Result<(), ModelError> {
+        if self.doc.changes().get(id) != change.as_ref() {
+            self.apply(Op::SetChange { id, change })?;
+        }
+        Ok(())
+    }
+
+    /// Adds a new tracked change and returns its identifier, which the
+    /// text it covers is then given (W148).
+    pub fn add_change(
+        &mut self,
+        kind: crate::ChangeKind,
+        author: &str,
+        date: Option<&str>,
+    ) -> Result<NodeId, ModelError> {
+        let id = self.new_id();
+        self.set_change(
+            id,
+            Some(crate::Change {
+                id,
+                kind,
+                author: author.into(),
+                date: date.map(Into::into),
+            }),
+        )?;
+        Ok(id)
+    }
+
+    /// Puts the text between two positions in a tracked change (W148).
+    pub fn mark_change(
+        &mut self,
+        start: Position,
+        end: Position,
+        change: NodeId,
+    ) -> Result<(), ModelError> {
+        self.map_runs(start, end, |run| run.attrs.change = Some(Some(change)))
+    }
+
+    /// Puts the break at the end of a paragraph in a tracked change, or
+    /// takes it out of any with none (W148).
+    pub fn mark_break_change(
+        &mut self,
+        paragraph: NodeId,
+        change: Option<NodeId>,
+    ) -> Result<(), ModelError> {
+        let p = self.doc.paragraph(paragraph)?;
+        let mut attrs = p.attrs().clone();
+        attrs.break_change = change.map(Some);
+        let style = p.style();
+        self.apply(Op::SetParagraphFormat {
+            paragraph,
+            style,
+            attrs,
+        })
     }
 
     /// Puts a new comment on the text between two positions, which must

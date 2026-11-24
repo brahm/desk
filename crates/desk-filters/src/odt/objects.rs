@@ -1841,7 +1841,9 @@ impl Exporter<'_> {
             });
         }
         let mut names = runs.into_iter();
-        let spans = export_spans(paragraph, None, self.comments, |_| names.next().flatten());
+        let spans = export_spans(paragraph, None, self.comments, None, |_| {
+            names.next().flatten()
+        });
         odf::Paragraph {
             style: Some(style),
             spans,

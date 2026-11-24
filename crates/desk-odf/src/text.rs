@@ -83,10 +83,17 @@ pub struct TextDocument {
     pub markers: Vec<crate::draw::Marker>,
     /// The pictures that graphic styles fill with, by name.
     pub fill_images: Vec<crate::draw::FillImage>,
+    /// The tracked changes of the body (`text:tracked-changes`): the
+    /// insertions and deletions that its text marks (W148).
+    pub tracked_changes: Vec<ChangedRegion>,
+    /// `text:track-changes` of `text:tracked-changes`: whether changes
+    /// are being tracked.
+    pub track_changes: bool,
     /// What the reader left out of the body and of the headers and
     /// footers, by the name of its element, with how many times: tables
     /// (`table`, whose text is read as paragraphs), comments
-    /// (`annotation`), tracked changes (`changed-region`) and drawing
+    /// (`annotation`), tracked changes of formatting (`changed-region`)
+    /// and drawing
     /// objects that Desk does not read, as charts and embedded objects
     /// (`object`).
     pub skipped: Vec<(String, usize)>,
@@ -1068,6 +1075,50 @@ pub enum Field {
         /// `office:name`.
         name: String,
     },
+    /// `text:change-start`, where the text of a tracked change starts,
+    /// by the `text:id` of its region; the text of the span is empty.
+    ChangeStart {
+        /// `text:change-id`.
+        id: String,
+    },
+    /// `text:change-end`, where the text of a tracked change ends.
+    ChangeEnd {
+        /// `text:change-id`.
+        id: String,
+    },
+    /// `text:change`, where the text that a deletion took was.
+    Change {
+        /// `text:change-id`.
+        id: String,
+    },
+}
+
+/// What a tracked change did (`text:changed-region`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ChangeKind {
+    /// `text:insertion`.
+    #[default]
+    Insertion,
+    /// `text:deletion`.
+    Deletion,
+    /// `text:format-change`.
+    FormatChange,
+}
+
+/// A tracked change (`text:changed-region`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ChangedRegion {
+    /// `text:id`, which the marks of its text name.
+    pub id: String,
+    /// What it did.
+    pub kind: ChangeKind,
+    /// `dc:creator` of its `office:change-info`.
+    pub creator: Option<String>,
+    /// `dc:date` of its `office:change-info`, as written.
+    pub date: Option<String>,
+    /// The paragraphs that a deletion took: the text after the first
+    /// joined the paragraph where it was.
+    pub deleted: Vec<Paragraph>,
 }
 
 /// A comment (`office:annotation`). One with an `office:name` is on the

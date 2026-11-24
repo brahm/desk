@@ -56,6 +56,9 @@ struct State {
     comment_marks: Vec<(SpanRect, desk_model::AuthorColor)>,
     /// The marks of the comments in the margin (W149, W150).
     comment_flags: Vec<(SpanRect, desk_model::AuthorColor)>,
+    /// The text of tracked changes, with what each did and the colour of
+    /// its author (W148, W150).
+    change_marks: Vec<(SpanRect, desk_model::ChangeKind, desk_model::AuthorColor)>,
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
@@ -274,6 +277,7 @@ impl DocumentView {
             squiggles: Vec::new(),
             comment_marks: Vec::new(),
             comment_flags: Vec::new(),
+            change_marks: Vec::new(),
         }));
         let view = Self {
             scrolled,
@@ -478,6 +482,22 @@ impl DocumentView {
             let mut state = self.state.borrow_mut();
             let changed = state.comment_marks != marks;
             state.comment_marks = marks;
+            changed
+        };
+        if changed {
+            self.area.queue_draw();
+        }
+    }
+
+    /// Marks the text of tracked changes (W148).
+    pub fn set_change_marks(
+        &self,
+        marks: Vec<(SpanRect, desk_model::ChangeKind, desk_model::AuthorColor)>,
+    ) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let changed = state.change_marks != marks;
+            state.change_marks = marks;
             changed
         };
         if changed {
@@ -1098,6 +1118,7 @@ fn draw_marks(
     focused: bool,
 ) {
     draw_comments(cr, state, page, rect, scale);
+    draw_changes(cr, state, page, rect, scale);
     draw_invisibles(cr, state, page, rect, scale);
     draw_squiggles(cr, state, page, rect, scale);
     // The accent color of GNOME, lighter without focus.
@@ -1500,6 +1521,28 @@ fn draw_comments(
         cr.fill_preserve().ok();
         let (r, g, b) = rgb(color.ink());
         cr.set_source_rgb(r, g, b);
+        cr.stroke().ok();
+    }
+}
+
+/// The text of tracked changes on a page, in the colour of each author:
+/// a line under text added, and through text deleted (W148, REV-04).
+fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
+    cr.set_line_width((1.5 * scale).max(1.0));
+    for (span, kind, color) in state.change_marks.iter().filter(|(s, _, _)| s.page == page) {
+        let ink = color.ink();
+        cr.set_source_rgb(
+            f64::from(ink.r) / 255.0,
+            f64::from(ink.g) / 255.0,
+            f64::from(ink.b) / 255.0,
+        );
+        let y = match kind {
+            desk_model::ChangeKind::Insertion => span.y1 - (span.y1 - span.y0) * 0.12,
+            desk_model::ChangeKind::Deletion => (span.y0 + span.y1) / 2.0,
+        };
+        let y = rect.y + y * scale;
+        cr.move_to(rect.x + span.x0 * scale, y);
+        cr.line_to(rect.x + span.x1 * scale, y);
         cr.stroke().ok();
     }
 }

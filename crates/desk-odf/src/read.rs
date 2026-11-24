@@ -6,14 +6,17 @@
 use std::collections::HashMap;
 
 use crate::error::OdfError;
-use crate::ns::{CONFIG, DC, DESK, DRAW, FO, LOEXT, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK};
+use crate::ns::{
+    CONFIG, DC, DESK, DRAW, FO, LOEXT, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK, XML,
+};
 use crate::text::{
-    Annotation, Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground,
-    Family, Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note,
-    NotesConfiguration, PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart,
-    SectionStyle, Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument,
-    TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, TocLevel,
+    Annotation, Background, Border, BorderLine, Break, ChangeKind, ChangedRegion, Column, Columns,
+    DropCap, DropCapBackground, Family, Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK,
+    LeaderStyle, Line, LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle,
+    MasterPage, Meta, Note, NotesConfiguration, PageLayout, Paragraph, ParagraphProperties,
+    Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut, TabStop, TabType,
+    TextAlign, TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform,
+    TocLevel,
 };
 use crate::units::{Color, Length, parse_percent};
 use crate::xml::{self, Element, Node};
@@ -126,6 +129,32 @@ pub fn read_streams(
             &mut document.page_objects,
         );
         document.toc_levels = toc_levels(text);
+        if let Some(tracked) = text.child(TEXT, "tracked-changes") {
+            document.track_changes = tracked.attr(TEXT, "track-changes") != Some("false");
+            document.tracked_changes = tracked
+                .children_named(TEXT, "changed-region")
+                .filter_map(changed_region)
+                .collect();
+        }
+        // Only the changes of the paragraphs of the body are read: those
+        // of notes, tables and the like are left out, as accepted.
+        let marked: std::collections::HashSet<&str> = document
+            .body
+            .iter()
+            .flat_map(|p| &p.spans)
+            .filter_map(|s| match &s.field {
+                Some(Field::ChangeStart { id } | Field::Change { id }) => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        let unread = document
+            .tracked_changes
+            .iter()
+            .filter(|r| r.kind != ChangeKind::FormatChange && !marked.contains(r.id.as_str()))
+            .count();
+        if unread > 0 {
+            document.skipped.push(("changed-region".to_owned(), unread));
+        }
         left_out(text, true, &mut document.skipped);
     }
     if let Some(masters) = styles
@@ -893,7 +922,13 @@ fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
             }
             Some("annotation")
         } else if name.is(TEXT, "changed-region") {
-            Some("changed-region")
+            // Insertions and deletions are read; changes of formatting
+            // are not yet.
+            if child.child(TEXT, "format-change").is_some() {
+                Some("changed-region")
+            } else {
+                continue;
+            }
         } else if name.ns == DRAW && name.local != "a" {
             // Only objects that the reader drops: what is inside the
             // others is theirs.
@@ -1198,8 +1233,12 @@ fn collect_paragraphs(
         } else if name.ns == DRAW {
             // Objects outside paragraphs, as those anchored to pages.
             objects.extend(crate::draw::draw_object(child, &paragraph));
-        } else if name.is(OFFICE, "annotation") {
-            // Comments are not part of the text flow.
+        } else if name.is(OFFICE, "annotation")
+            || name.is(TEXT, "tracked-changes")
+            || name.is(OFFICE, "change-info")
+        {
+            // Comments, tracked changes and what is said of a change, as
+            // its comment, are not part of the text flow.
         } else {
             collect_paragraphs(child, list, section, out, objects);
         }
@@ -1395,14 +1434,26 @@ impl SpanBuilder {
                     let name = e.attr(TEXT, "ref-name").unwrap_or_default().to_owned();
                     return self.field(style, e, Field::PageOf { name });
                 }
+                "change" | "change-start" | "change-end" => {
+                    let id = e.attr(TEXT, "change-id").unwrap_or_default().to_owned();
+                    let field = match name.local.as_str() {
+                        "change" => Field::Change { id },
+                        "change-start" => Field::ChangeStart { id },
+                        _ => Field::ChangeEnd { id },
+                    };
+                    self.spans.push(Span {
+                        field: Some(field),
+                        link: self.link.clone(),
+                        bookmark: self.bookmark.clone(),
+                        ..Span::default()
+                    });
+                    return;
+                }
                 // Reference marks and the like add no text of their own.
                 "reference-mark"
                 | "reference-mark-start"
                 | "reference-mark-end"
                 | "soft-page-break"
-                | "change"
-                | "change-start"
-                | "change-end"
                 | "tracked-changes" => return,
                 _ => {}
             }
@@ -1442,6 +1493,33 @@ impl SpanBuilder {
         // Links, fields and anything else: their text.
         self.content(e, style);
     }
+}
+
+/// A tracked change: a `text:changed-region` with its insertion,
+/// deletion or change of formatting.
+fn changed_region(e: &Element) -> Option<ChangedRegion> {
+    let id = e.attr(TEXT, "id").or_else(|| e.attr(XML, "id"))?.to_owned();
+    let (kind, change) = [
+        ("insertion", ChangeKind::Insertion),
+        ("deletion", ChangeKind::Deletion),
+        ("format-change", ChangeKind::FormatChange),
+    ]
+    .into_iter()
+    .find_map(|(name, kind)| Some((kind, e.child(TEXT, name)?)))?;
+    let info = change.child(OFFICE, "change-info");
+    let element = |ns: &str, local: &str| info.and_then(|i| i.child(ns, local)).map(Element::text);
+    let mut deleted = Vec::new();
+    if kind == ChangeKind::Deletion {
+        let mut objects = Vec::new();
+        collect_paragraphs(change, None, None, &mut deleted, &mut objects);
+    }
+    Some(ChangedRegion {
+        id,
+        kind,
+        creator: element(DC, "creator"),
+        date: element(DC, "date"),
+        deleted,
+    })
 }
 
 /// A comment: an `office:annotation`, or the `desk:annotation` of a

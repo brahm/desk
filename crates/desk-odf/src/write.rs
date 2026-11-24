@@ -77,6 +77,7 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     w.end();
     w.start("office:body").start("office:text");
+    write_tracked_changes(&mut w, document);
     for object in &document.page_objects {
         crate::draw::write_draw_object(&mut w, object, &write_paragraph);
     }
@@ -1222,7 +1223,13 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
         if span.field.is_some()
             && !matches!(
                 span.field,
-                Some(Field::Annotation(_) | Field::AnnotationEnd { .. })
+                Some(
+                    Field::Annotation(_)
+                        | Field::AnnotationEnd { .. }
+                        | Field::ChangeStart { .. }
+                        | Field::ChangeEnd { .. }
+                        | Field::Change { .. }
+                )
             )
         {
             text.after_space = false;
@@ -1233,6 +1240,45 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
     }
     if let Some(name) = bookmark {
         w.start("text:bookmark-end").attr("text:name", name).end();
+    }
+    w.end();
+}
+
+/// The tracked changes of the body (`text:tracked-changes`), with the
+/// paragraphs that each deletion took (W148).
+fn write_tracked_changes(w: &mut Writer, document: &TextDocument) {
+    if document.tracked_changes.is_empty() && !document.track_changes {
+        return;
+    }
+    w.start("text:tracked-changes").attr(
+        "text:track-changes",
+        if document.track_changes {
+            "true"
+        } else {
+            "false"
+        },
+    );
+    for region in &document.tracked_changes {
+        w.start("text:changed-region")
+            .attr("xml:id", &region.id)
+            .attr("text:id", &region.id);
+        w.start(match region.kind {
+            crate::ChangeKind::Insertion => "text:insertion",
+            crate::ChangeKind::Deletion => "text:deletion",
+            crate::ChangeKind::FormatChange => "text:format-change",
+        });
+        w.start("office:change-info");
+        w.text_element("dc:creator", region.creator.as_deref().unwrap_or_default());
+        // ODF needs a date: an unknown one is written as the epoch.
+        w.text_element(
+            "dc:date",
+            region.date.as_deref().unwrap_or(crate::UNKNOWN_DATE),
+        );
+        w.end();
+        for paragraph in &region.deleted {
+            write_paragraph(w, paragraph);
+        }
+        w.end().end();
     }
     w.end();
 }
@@ -1278,6 +1324,15 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             w.start("office:annotation-end")
                 .attr("office:name", name)
                 .end();
+            return;
+        }
+        Field::ChangeStart { id } | Field::ChangeEnd { id } | Field::Change { id } => {
+            let element = match field {
+                Field::ChangeStart { .. } => "text:change-start",
+                Field::ChangeEnd { .. } => "text:change-end",
+                _ => "text:change",
+            };
+            w.start(element).attr("text:change-id", id).end();
             return;
         }
         Field::PageNumber { num_format } => {

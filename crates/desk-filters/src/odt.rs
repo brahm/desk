@@ -30,6 +30,7 @@ use desk_odf as odf;
 use crate::log::{Content, ImportLog, Warning};
 use crate::sections;
 
+mod changes;
 mod comments;
 pub(crate) mod objects;
 mod tables;
@@ -338,6 +339,7 @@ fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) ->
         link: None,
         bookmark: None,
         comments: None,
+        change: None,
     }
 }
 
@@ -675,6 +677,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         list_start: None,
         list_override: None,
         toc_entry: None,
+        break_change: None,
     }
 }
 
@@ -1654,6 +1657,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     if !source.body.is_empty() {
         document.apply(Op::RemoveParagraph { paragraph: first })?;
     }
+    // The marks of tracked changes came with the comments (W148).
+    let (tracked, comments): (Vec<_>, Vec<_>) = comments
+        .into_iter()
+        .partition(|(_, _, field)| changes::is_mark(field));
     comments::import(&mut document, comments)?;
     // The stops of the styles move after those of the paragraphs, which
     // are measured from the indents the styles had as read.
@@ -1908,6 +1915,35 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .collect(),
         },
     })?;
+
+    // Last, as the paragraphs that deletions took join the body, and what
+    // came before finds paragraphs by their place in it (W148). Only the
+    // deletions whose marks the body has are read.
+    let met: HashSet<String> = changes::marked(&tracked)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let mut deleted = HashMap::new();
+    for region in &source.tracked_changes {
+        if region.kind != odf::ChangeKind::Deletion || !met.contains(&region.id) {
+            continue;
+        }
+        let mut paragraphs = Vec::new();
+        for paragraph in &region.deleted {
+            paragraphs.push(import_paragraph(
+                source,
+                &mut document,
+                &ids,
+                default,
+                paragraph,
+                relative,
+                &marks,
+                None,
+            )?);
+        }
+        deleted.insert(region.id.clone(), paragraphs);
+    }
+    changes::import(&mut document, &source.tracked_changes, deleted, tracked)?;
 
     let meta = &source.meta;
     document.apply(Op::SetMetadata {
@@ -2186,7 +2222,10 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
         | odf::Field::PageOf { .. }
         | odf::Field::Object(_)
         | odf::Field::Annotation(_)
-        | odf::Field::AnnotationEnd { .. } => Field::FileName {
+        | odf::Field::AnnotationEnd { .. }
+        | odf::Field::ChangeStart { .. }
+        | odf::Field::ChangeEnd { .. }
+        | odf::Field::Change { .. } => Field::FileName {
             shown: shown.into(),
             path: false,
             extension: true,
@@ -2300,8 +2339,13 @@ fn import_paragraph(
     for span in &paragraph.spans {
         // Comments, where the text they are on starts and ends: read where
         // `comments` takes them, as in the body (W149).
-        if let Some(field @ (odf::Field::Annotation(_) | odf::Field::AnnotationEnd { .. })) =
-            &span.field
+        if let Some(
+            field @ (odf::Field::Annotation(_)
+            | odf::Field::AnnotationEnd { .. }
+            | odf::Field::ChangeStart { .. }
+            | odf::Field::ChangeEnd { .. }
+            | odf::Field::Change { .. }),
+        ) = &span.field
         {
             if let Some(comments) = comments.as_deref_mut() {
                 comments.push((runs.iter().map(Run::len).sum(), field.clone()));
@@ -2493,10 +2537,40 @@ fn export_spans(
     paragraph: &Paragraph,
     mut notes: Option<&mut NoteRefs<'_>>,
     marks: &CommentMarks,
+    track: Option<&mut Option<NodeId>>,
     mut style: impl FnMut(&Run) -> Option<String>,
 ) -> Vec<odf::Span> {
     let mut spans = Vec::new();
     let mut offset = 0;
+    // Where a tracked change starts and ends, by its identifier, which
+    // `changes::export` makes regions of (W148). The change open at the
+    // start comes from the break before, and the one at the end goes on
+    // past the break when it took it.
+    let mut open = track.as_deref().copied().flatten();
+    let mut switch = |spans: &mut Vec<odf::Span>, to: Option<NodeId>, run: Option<&Run>| {
+        if track.is_none() || open == to {
+            return;
+        }
+        let link = run.and_then(|r| r.attrs.link.clone().flatten());
+        let bookmark = run.and_then(|r| r.attrs.bookmark.clone().flatten());
+        let mark = |field| odf::Span {
+            field: Some(field),
+            link: link.as_deref().map(str::to_owned),
+            bookmark: bookmark.as_deref().map(str::to_owned),
+            ..odf::Span::default()
+        };
+        if let Some(id) = open {
+            spans.push(mark(odf::Field::ChangeEnd {
+                id: id.get().to_string(),
+            }));
+        }
+        if let Some(id) = to {
+            spans.push(mark(odf::Field::ChangeStart {
+                id: id.get().to_string(),
+            }));
+        }
+        open = to;
+    };
     // The comments that start and end before a run (W149).
     let comments = |spans: &mut Vec<odf::Span>, at: usize, run: Option<&Run>| {
         let Some(marks) = marks.get(&(paragraph.id(), at)) else {
@@ -2514,6 +2588,7 @@ fn export_spans(
     };
     let mut last = None;
     for run in paragraph.runs() {
+        switch(&mut spans, run.attrs.change.flatten(), Some(run));
         comments(&mut spans, offset, Some(run));
         offset += run.len();
         last = Some(run);
@@ -2581,6 +2656,11 @@ fn export_spans(
         }
     }
     comments(&mut spans, offset, last);
+    let ends = paragraph.attrs().break_change.flatten();
+    switch(&mut spans, ends, None);
+    if let Some(track) = track {
+        *track = open;
+    }
     spans
 }
 
@@ -2712,7 +2792,7 @@ fn export_margins(
                     },
                 )
             };
-            let spans = export_spans(paragraph, None, comments, |run| {
+            let spans = export_spans(paragraph, None, comments, None, |run| {
                 let attrs = run.attrs.without_field();
                 let named = run.style.map(|id| names[&id].clone());
                 if attrs.is_empty() {
@@ -3067,6 +3147,8 @@ pub fn export(document: &Document) -> odf::TextDocument {
         marks,
     };
     let comment_marks = comments::export(document);
+    // The tracked change open past the break of the paragraph before.
+    let mut tracked: Option<NodeId> = None;
     // The master pages of the sections with headers and footers of their
     // own, by the paragraph that starts each (EST-16).
     let masters = section_masters(document);
@@ -3147,28 +3229,34 @@ pub fn export(document: &Document) -> odf::TextDocument {
         if let Some(master) = masters.get(&paragraph.id()) {
             with_master.push((out.body.len(), master.clone()));
         }
-        let spans = export_spans(paragraph, Some(&mut note_refs), &comment_marks, |run| {
-            let named = run.style.map(|id| names[&id].clone());
-            let attrs = run.attrs.without_field();
-            if attrs.is_empty() {
-                named
-            } else {
-                Some(automatic_name(
-                    odf::Family::Text,
-                    named,
-                    None,
-                    odf::Properties {
-                        paragraph: odf::ParagraphProperties::default(),
-                        text: text_properties(
-                            &attrs,
-                            &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
-                            &mut fills,
-                        ),
-                        ..Default::default()
-                    },
-                ))
-            }
-        });
+        let spans = export_spans(
+            paragraph,
+            Some(&mut note_refs),
+            &comment_marks,
+            Some(&mut tracked),
+            |run| {
+                let named = run.style.map(|id| names[&id].clone());
+                let attrs = run.attrs.without_field();
+                if attrs.is_empty() {
+                    named
+                } else {
+                    Some(automatic_name(
+                        odf::Family::Text,
+                        named,
+                        None,
+                        odf::Properties {
+                            paragraph: odf::ParagraphProperties::default(),
+                            text: text_properties(
+                                &attrs,
+                                &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                                &mut fills,
+                            ),
+                            ..Default::default()
+                        },
+                    ))
+                }
+            },
+        );
         let list = item.as_ref().map(|item| {
             let first = previous != Some(item.style);
             let start = paragraph.attrs().list_start.flatten();
@@ -3255,7 +3343,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     },
                 )
             };
-            let spans = export_spans(paragraph, None, &comment_marks, |run| {
+            let spans = export_spans(paragraph, None, &comment_marks, None, |run| {
                 let named = run.style.map(|id| names[&id].clone());
                 let attrs = run.attrs.without_field();
                 if attrs.is_empty() {
@@ -3387,6 +3475,8 @@ pub fn export(document: &Document) -> odf::TextDocument {
         creator: some(&meta.author),
         generator: Some(format!("Desk/{}", env!("CARGO_PKG_VERSION"))),
     };
+    // Last, as it joins paragraphs whose breaks deletions took (W148).
+    out.tracked_changes = changes::export(&mut out.body, document);
     out
 }
 
