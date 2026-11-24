@@ -28,6 +28,7 @@ pub fn read_streams(
     styles: Option<&str>,
     meta: Option<&str>,
 ) -> Result<TextDocument, OdfError> {
+    crate::table::start_document();
     let content = xml::parse(content)?;
     if !content.name.is(OFFICE, "document-content") {
         return Err(OdfError::Malformed(

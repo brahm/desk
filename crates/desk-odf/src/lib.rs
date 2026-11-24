@@ -60,7 +60,8 @@ pub use package::{
 };
 pub use read::read_streams;
 pub use table::{
-    MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow, TableTemplate,
+    MAX_COLUMNS, MAX_DOCUMENT_CELLS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties,
+    TableRow, TableTemplate,
 };
 pub use text::{
     Annotation, Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground,

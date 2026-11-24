@@ -956,3 +956,29 @@ fn est_16_a_paragraph_after_a_section_goes_back_to_the_pages() {
     let sections: Vec<Option<&str>> = read.body.iter().map(|p| p.section.as_deref()).collect();
     assert_eq!(sections, [Some("S1"), Some("S2"), Some("S1"), Some("")]);
 }
+
+#[test]
+fn tables_that_repeat_rows_without_end_are_read_within_bounds() {
+    // Each table repeats a row of 1,024 cells 10,000 times. The limits
+    // of rows and columns held for each table, so a few hundred bytes
+    // cloned ten million cells per table (review RV, batch 1). The
+    // document as a whole now reads at most MAX_DOCUMENT_CELLS.
+    let table = r#"<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><table:table-column/><table:table-row table:number-rows-repeated="10000"><table:table-cell table:number-columns-repeated="1024"><text:p>x</text:p></table:table-cell></table:table-row></table:table>"#;
+    let document = read_streams(&content(&table.repeat(20)), None, None).unwrap();
+    let cells: usize = document
+        .body
+        .iter()
+        .flat_map(|p| p.objects())
+        .filter_map(|o| match &o.kind {
+            desk_odf::DrawKind::Table(t) => {
+                Some(t.rows.iter().map(|r| r.cells.len()).sum::<usize>())
+            }
+            _ => None,
+        })
+        .sum();
+    assert!(cells <= desk_odf::MAX_DOCUMENT_CELLS, "{cells}");
+    assert!(cells > 0);
+    // The count starts again with the next document.
+    let again = read_streams(&content(table), None, None).unwrap();
+    assert!(again.body.iter().any(|p| p.objects().next().is_some()));
+}

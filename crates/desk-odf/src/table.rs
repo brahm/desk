@@ -16,6 +16,32 @@ pub const MAX_COLUMNS: usize = 1024;
 /// The most rows read.
 pub const MAX_ROWS: usize = 10_000;
 
+/// The most cells read in the tables of one document, all together. The
+/// limits of rows and columns hold for each table, and a few hundred bytes
+/// that repeat a row of repeated cells in many tables would still clone
+/// millions of cells.
+pub const MAX_DOCUMENT_CELLS: usize = 1 << 20;
+
+thread_local! {
+    /// The cells the tables of the document read now may still clone.
+    static CELLS_LEFT: std::cell::Cell<usize> = const { std::cell::Cell::new(MAX_DOCUMENT_CELLS) };
+}
+
+/// Starts the count of cells of a new document.
+pub(crate) fn start_document() {
+    CELLS_LEFT.set(MAX_DOCUMENT_CELLS);
+}
+
+/// How many of `wanted` copies of a row of `cells` cells the document may
+/// still read, which are then counted.
+fn take_rows(wanted: usize, cells: usize) -> usize {
+    let cells = cells.max(1);
+    let left = CELLS_LEFT.get();
+    let n = wanted.min(left / cells);
+    CELLS_LEFT.set(left - n * cells);
+    n
+}
+
 /// A table.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Table {
@@ -208,6 +234,7 @@ fn read_parts(
                     n = n.min(2);
                 }
                 let n = n.min(MAX_ROWS - table.rows.len().min(MAX_ROWS));
+                let n = take_rows(n, row.cells.len());
                 for _ in 0..n {
                     table.rows.push(row.clone());
                 }

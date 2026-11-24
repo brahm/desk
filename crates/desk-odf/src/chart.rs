@@ -87,7 +87,15 @@ fn cell_ref(s: &str) -> Option<(usize, usize)> {
 }
 
 /// The cells of a range such as `local-table.$B$2:.$B$5`, in order.
-fn range(address: &str) -> Vec<(usize, usize)> {
+/// The most cells a chart reads, in its data table and in the ranges of
+/// its series and categories together, so that a few hundred bytes that
+/// repeat rows and columns cannot take all the memory.
+const MAX_CHART_CELLS: usize = 1 << 20;
+
+/// The cells of a range of the data table, by column and row, cut to the
+/// grid that holds the data and to what is left of `budget`, which it
+/// spends.
+fn range(address: &str, grid: &[Vec<Datum>], budget: &mut usize) -> Vec<(usize, usize)> {
     let address = address.split_whitespace().next().unwrap_or_default();
     let mut parts = address.split(':').map(|p| match p.rfind('.') {
         Some(i) => &p[i + 1..],
@@ -97,9 +105,18 @@ fn range(address: &str) -> Vec<(usize, usize)> {
         return Vec::new();
     };
     let end = parts.next().and_then(cell_ref).unwrap_or(start);
+    // Past the grid every cell is empty: a range is read as far as the
+    // grid goes, and at least its first cell.
+    let last_row = end.1.min(grid.len().saturating_sub(1)).max(start.1);
+    let width = grid.iter().map(Vec::len).max().unwrap_or(0);
+    let last_col = end.0.min(width.saturating_sub(1)).max(start.0);
     let mut out = Vec::new();
-    for row in start.1..=end.1.min(start.1 + 10_000) {
-        for col in start.0..=end.0.min(start.0 + 1024) {
+    for row in start.1..=last_row {
+        for col in start.0..=last_col {
+            if *budget == 0 {
+                return out;
+            }
+            *budget -= 1;
             out.push((col, row));
         }
     }
@@ -131,20 +148,20 @@ fn local_range(from: (usize, usize), to: (usize, usize)) -> String {
     )
 }
 
-/// The rows of the data table of a chart.
-fn grid(table: &Element) -> Vec<Vec<Datum>> {
+/// The rows of the data table of a chart, spending `budget` on its cells.
+fn grid(table: &Element, budget: &mut usize) -> Vec<Vec<Datum>> {
     let mut rows = Vec::new();
-    collect_rows(table, &mut rows);
+    collect_rows(table, &mut rows, budget);
     rows
 }
 
-fn collect_rows(e: &Element, rows: &mut Vec<Vec<Datum>>) {
+fn collect_rows(e: &Element, rows: &mut Vec<Vec<Datum>>, budget: &mut usize) {
     for child in e.elements() {
         if child.name.is(TABLE, "table-row") {
             if rows.len() >= 10_000 {
                 return;
             }
-            let mut row = Vec::new();
+            let mut row: Vec<Datum> = Vec::new();
             for cell in child.elements() {
                 if !cell.name.is(TABLE, "table-cell") && !cell.name.is(TABLE, "covered-table-cell")
                 {
@@ -170,13 +187,26 @@ fn collect_rows(e: &Element, rows: &mut Vec<Vec<Datum>>) {
                     .and_then(|n| n.parse::<usize>().ok())
                     .unwrap_or(1)
                     .clamp(1, 1024);
-                for _ in 0..n {
+                for _ in 0..n.min(1024 - row.len().min(1024)) {
                     row.push(datum.clone());
                 }
             }
-            rows.push(row);
+            // A row written once for several the same, as ODF allows.
+            let repeated = child
+                .attr(TABLE, "number-rows-repeated")
+                .and_then(|n| n.trim().parse::<usize>().ok())
+                .unwrap_or(1)
+                .clamp(1, 10_000 - rows.len());
+            for _ in 0..repeated {
+                let cells = row.len().max(1);
+                if *budget < cells {
+                    return;
+                }
+                *budget -= cells;
+                rows.push(row.clone());
+            }
         } else if child.name.ns == TABLE {
-            collect_rows(child, rows);
+            collect_rows(child, rows, budget);
         }
     }
 }
@@ -253,7 +283,8 @@ pub(crate) fn read_chart(content: &str) -> Result<Option<ChartDocument>, OdfErro
     out.three_d |=
         plot.attr(DR3D_NS, "projection").is_some() || plot.child(DR3D_NS, "light").is_some();
     let table = chart.child(TABLE, "table");
-    let grid = table.map(grid).unwrap_or_default();
+    let mut budget = MAX_CHART_CELLS;
+    let grid = table.map(|t| grid(t, &mut budget)).unwrap_or_default();
     for axis in plot.children_named(CHART, "axis") {
         let dimension = axis.attr(CHART, "dimension");
         let t = title(axis.child(CHART, "title"));
@@ -263,7 +294,7 @@ pub(crate) fn read_chart(content: &str) -> Result<Option<ChartDocument>, OdfErro
                 .child(CHART, "categories")
                 .and_then(|c| c.attr(TABLE, "cell-range-address"))
             {
-                out.categories = range(categories)
+                out.categories = range(categories, &grid, &mut budget)
                     .into_iter()
                     .map(|at| text_of(datum(&grid, at)))
                     .collect();
@@ -275,21 +306,21 @@ pub(crate) fn read_chart(content: &str) -> Result<Option<ChartDocument>, OdfErro
     for series in plot.children_named(CHART, "series") {
         let values: Vec<Option<f64>> = series
             .attr(CHART, "values-cell-range-address")
-            .map(range)
+            .map(|a| range(a, &grid, &mut budget))
             .unwrap_or_default()
             .into_iter()
             .map(|at| number_of(datum(&grid, at)))
             .collect();
         let name = series
             .attr(CHART, "label-cell-address")
-            .and_then(|a| range(a).first().copied())
+            .and_then(|a| range(a, &grid, &mut 1).first().copied())
             .map(|at| text_of(datum(&grid, at)))
             .unwrap_or_default();
         let x_values = series
             .child(CHART, "domain")
             .and_then(|d| d.attr(TABLE, "cell-range-address"))
             .map(|a| {
-                range(a)
+                range(a, &grid, &mut budget)
                     .into_iter()
                     .map(|at| number_of(datum(&grid, at)))
                     .collect()
@@ -575,5 +606,47 @@ mod tests {
         assert_eq!(read_chart(&content).unwrap().unwrap(), chart);
         assert_eq!(column_name(27), "AB");
         assert_eq!(cell_ref("$AB$3"), Some((27, 2)));
+    }
+
+    /// The content of a chart with one series over `rows`, whose data
+    /// table is `table`.
+    fn chart_with(rows: &str, table: &str) -> String {
+        format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:chart="{CHART}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:chart><chart:chart chart:class="chart:bar"><chart:plot-area><chart:series chart:values-cell-range-address="local-table.$B$2:.$B${rows}"/></chart:plot-area><table:table table:name="local-table">{table}</table:table></chart:chart></office:chart></office:body></office:document-content>"#
+        )
+    }
+
+    fn row(repeated: usize, value: f64) -> String {
+        format!(
+            r#"<table:table-row table:number-rows-repeated="{repeated}"><table:table-cell><text:p>x</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="{value}"/></table:table-row>"#
+        )
+    }
+
+    #[test]
+    fn rows_written_once_for_several_are_read_as_several() {
+        // Two rows the same, written as one with number-rows-repeated:
+        // the rows after it moved up and the series lost a value (review
+        // RV, batch 1).
+        let header = row(1, 0.0);
+        let content = chart_with("4", &format!("{header}{}{}", row(2, 1.0), row(1, 2.0)));
+        let chart = read_chart(&content).unwrap().unwrap();
+        assert_eq!(chart.series[0].values, [Some(1.0), Some(1.0), Some(2.0)]);
+    }
+
+    #[test]
+    fn a_chart_that_repeats_its_cells_without_end_is_read_within_bounds() {
+        // A row repeated 10,000 times of 1,024 cells, and a series over a
+        // range far past the data: each was expanded in full, about ten
+        // million cells from a few hundred bytes.
+        let wide = format!(
+            r#"<table:table-row table:number-rows-repeated="10000"><table:table-cell table:number-columns-repeated="1024" office:value-type="float" office:value="1"/></table:table-row>"#
+        );
+        let content = chart_with("1048576", &wide);
+        let chart = read_chart(&content).unwrap().unwrap();
+        assert!(chart.series[0].values.len() <= MAX_CHART_CELLS);
+        let mut budget = 10;
+        let grid = vec![vec![Datum::Empty; 3]; 2];
+        assert_eq!(range("$A$1:$AMJ$1048576", &grid, &mut budget).len(), 6);
+        assert_eq!(budget, 4);
     }
 }
