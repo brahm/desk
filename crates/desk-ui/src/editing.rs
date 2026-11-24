@@ -499,6 +499,8 @@ struct State {
     /// How wide the text flows in Screen View, in points, and its Text
     /// Size, while it is on (PXV-01).
     screen: Option<(f64, f64)>,
+    /// What the editor added to its view, taken off with it.
+    attached: Attached,
 }
 
 impl State {
@@ -664,6 +666,10 @@ impl TextEditor {
                 cells: None,
                 cell_editor: None,
                 screen: None,
+                attached: Attached {
+                    area: view.area().downgrade(),
+                    controllers: Vec::new(),
+                },
             })),
         };
         this.show_pages();
@@ -3887,7 +3893,7 @@ impl TextEditor {
                 glib::Propagation::Proceed
             }
         });
-        self.view.area().add_controller(keys);
+        self.attach(keys);
 
         let focus = gtk::EventControllerFocus::new();
         let weak = self.downgrade();
@@ -3904,7 +3910,7 @@ impl TextEditor {
                 this.view.area().queue_draw();
             }
         });
-        self.view.area().add_controller(focus);
+        self.attach(focus);
     }
 
     fn connect_input_method(&self) {
@@ -4117,7 +4123,7 @@ impl TextEditor {
                 this.state.borrow_mut().adding = false;
             }
         });
-        self.view.area().add_controller(click);
+        self.attach(click);
 
         let drag = gtk::GestureDrag::builder()
             .button(gdk::BUTTON_PRIMARY)
@@ -4184,7 +4190,18 @@ impl TextEditor {
             state.drag_from = None;
             state.adding = false;
         });
-        self.view.area().add_controller(drag);
+        self.attach(drag);
+    }
+
+    /// Adds a controller to the view, for as long as the editor lives.
+    pub(super) fn attach(&self, controller: impl IsA<gtk::EventController>) {
+        let controller = controller.upcast();
+        self.view.area().add_controller(controller.clone());
+        self.state
+            .borrow_mut()
+            .attached
+            .controllers
+            .push(controller);
     }
 
     /// Blinks the cursor, as GTK text views do, while the window lives.
@@ -4194,15 +4211,37 @@ impl TextEditor {
             return;
         }
         let view = self.view.downgrade();
+        // It stops with the editor, not only with the view.
+        let state = Rc::downgrade(&self.state);
         let mut on = true;
         glib::timeout_add_local(Duration::from_millis(600), move || {
-            let Some(view) = view.upgrade() else {
+            let (Some(view), Some(_)) = (view.upgrade(), state.upgrade()) else {
                 return glib::ControlFlow::Break;
             };
             on = !on;
             view.set_caret_on(on);
             glib::ControlFlow::Continue
         });
+    }
+}
+
+/// The controllers that an editor added to its view. They go with the
+/// editor: a document shown again in the same view, as after Revert or
+/// Restore, has an editor of its own, and the controllers of the one
+/// before, with its input method, stayed on the view, as its blinking
+/// went on (review RV, batch 5).
+struct Attached {
+    area: glib::WeakRef<gtk::DrawingArea>,
+    controllers: Vec<gtk::EventController>,
+}
+
+impl Drop for Attached {
+    fn drop(&mut self) {
+        if let Some(area) = self.area.upgrade() {
+            for controller in self.controllers.drain(..) {
+                area.remove_controller(&controller);
+            }
+        }
     }
 }
 
@@ -4231,6 +4270,27 @@ async fn clipboard_bytes(
 mod tests {
     use super::*;
     use desk_model::{Editor, Language};
+
+    #[test]
+    fn an_editor_takes_its_controllers_off_the_view_when_it_goes() {
+        // Review RV, batch 5: each document shown again in a view, as after
+        // Revert or Restore, added its controllers to those of the one
+        // before, which stayed.
+        crate::with_gtk(|| {
+            let view = crate::view::DocumentView::new();
+            let count =
+                |view: &crate::view::DocumentView| view.area().observe_controllers().n_items();
+            let before = count(&view);
+            let first = TextEditor::new(&view, Document::new_word_processing());
+            let with_one = count(&view);
+            assert!(with_one > before);
+            drop(first);
+            let second = TextEditor::new(&view, Document::new_word_processing());
+            assert_eq!(count(&view), with_one);
+            drop(second);
+            assert_eq!(count(&view), before);
+        });
+    }
 
     #[test]
     fn txt_07_a_misspelling_with_one_suggestion_is_corrected() {
