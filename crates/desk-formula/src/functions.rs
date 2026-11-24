@@ -1472,7 +1472,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             count(a, 1, 1)?;
             // The size of a range is in its reference: its cells are
             // not read.
-            let (rows, cols) = match at(a, 0)? {
+            let (rows, _) = match at(a, 0)? {
                 Expr::Cell(_) => (1, 1),
                 Expr::Range(p, q) => (
                     p.row.abs_diff(q.row) as usize + 1,
@@ -1492,7 +1492,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             count(a, 1, 1)?;
             // The size of a range is in its reference: its cells are
             // not read.
-            let (rows, cols) = match at(a, 0)? {
+            let (_, cols) = match at(a, 0)? {
                 Expr::Cell(_) => (1, 1),
                 Expr::Range(p, q) => (
                     p.row.abs_diff(q.row) as usize + 1,

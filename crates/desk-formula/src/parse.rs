@@ -1032,7 +1032,7 @@ mod tests {
         let largest = |form: &dyn Fn(usize) -> String| {
             let (mut low, mut high) = (1, 5_000);
             while low < high {
-                let mid = (low + high + 1) / 2;
+                let mid = (low + high).div_ceil(2);
                 if Formula::parse(&form(mid)).is_ok() {
                     low = mid;
                 } else {
