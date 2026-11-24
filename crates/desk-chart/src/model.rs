@@ -254,10 +254,15 @@ impl ChartData {
                     .skip(1)
                     .map(|s| {
                         let t = s.trim().replace(' ', "");
-                        let t = if t.contains(',') && !t.contains('.') {
-                            t.replace(',', ".")
-                        } else {
-                            t.replace(',', "")
+                        // With both marks, the last is the decimal one, as
+                        // in 1,234.56 and 1.234,56; a comma alone is one.
+                        let t = match (t.rfind(','), t.rfind('.')) {
+                            (Some(comma), Some(dot)) if comma > dot => {
+                                t.replace('.', "").replace(',', ".")
+                            }
+                            (Some(_), Some(_)) => t.replace(',', ""),
+                            (Some(_), None) => t.replace(',', "."),
+                            _ => t,
                         };
                         t.parse::<f64>().ok().map(Num)
                     })
@@ -1047,6 +1052,14 @@ impl Chart {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pasted_numbers_take_the_last_mark_as_the_decimal_one() {
+        // Review RV, batch 4: 1.234,56 was read as 1.23456.
+        let data = ChartData::from_text("\tA\tB\tC\tD\nx\t1.234,56\t1,234.56\t2,5\t3.5");
+        let row: Vec<Option<f64>> = (0..4).map(|c| data.get(0, c)).collect();
+        assert_eq!(row, [Some(1234.56), Some(1234.56), Some(2.5), Some(3.5)]);
+    }
 
     #[test]
     fn data_with_a_value_for_each_row_and_column_is_consistent() {

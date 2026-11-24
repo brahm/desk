@@ -2029,6 +2029,37 @@ paragraph, and objects on a second page.
 - *Consequences:* the modules of `desk-model` that read bytes deny
   unchecked indexing (D-028). The history keeps 1000 actions; keeping
   only the cells changed by an edit of a table is B-054, for phase T1.
+- The review of the pull request (#204, merged after two rounds) found
+  six more, findings 13 to 18: past 1000 actions the window took every
+  edit for one that changed nothing; typing after a Redo joined the
+  typing redone; the heads of linked boxes were found again for each box;
+  MP4 samples sharing their bytes, or thousands of tracks, could make
+  Reduce Media copy hundreds of gigabytes; chunk rows were searched in
+  full; and a WAVE with a second data chunk was not reduced.
+- *Consequences:* a text box in a group is its own head until the chains
+  and the layout of linked boxes reach into groups.
+
+### 24 November: batch 4 of the review, text, layout and drawing (RV)
+
+- `/code-review` and `/security-review` read `desk-text`, `desk-layout`,
+  `desk-render` and `desk-chart`, and found 16 problems to fix; the
+  report is [review/batch-4.md](review/batch-4.md). Seven came from the
+  security review. Most were a document making the app hang or run out
+  of memory: very narrow table columns, tiny fonts with long lines or
+  tab leaders, huge wrap margins, PNGs that declare a huge size, and
+  text shadows of huge text. Chart values at the limits of doubles could
+  also panic. The other bugs:
+  - a chart with no categories panicked;
+  - pasted numbers like 1.234,56 were read wrong;
+  - the ffl ligature broke PDF search;
+  - notes numbered by page took the wrong number;
+  - footnotes changed where pages broke;
+  - tab stops near the edge of a column came out of order;
+  - lines and pictures of no size stopped the rest of a page from drawing.
+- *Consequences:* PNG pictures over 8192 pixels a side are not drawn,
+  as JPEG already were not. Three slow paths moved to the backlog: B-055
+  (balanced columns) and B-057 (PDF pictures, lines with tabs) to W6,
+  and B-056 (merged cells) to T1.
 
 ## Decisions, with their reasons and consequences
 

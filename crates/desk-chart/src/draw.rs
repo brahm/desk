@@ -195,12 +195,21 @@ struct Range {
 }
 
 impl Range {
+    /// Where a value falls along the axis, from 0 at its minimum to 1 at
+    /// its maximum; a value far outside it stays at most a thousand lengths
+    /// of the axis away, which the plot clips, rather than at coordinates
+    /// too large for Cairo.
     fn fraction(&self, v: f64) -> f32 {
-        if self.log {
+        let f = if self.log {
             let lv = v.max(self.min).log10();
-            ((lv - self.min.log10()) / (self.max.log10() - self.min.log10())) as f32
+            (lv - self.min.log10()) / (self.max.log10() - self.min.log10())
         } else {
-            ((v - self.min) / (self.max - self.min)) as f32
+            (v - self.min) / (self.max - self.min)
+        };
+        if f.is_nan() {
+            0.0
+        } else {
+            f.clamp(-1000.0, 1000.0) as f32
         }
     }
 
@@ -208,7 +217,8 @@ impl Range {
         let mut out = Vec::new();
         if self.log {
             let mut v = self.min;
-            while v <= self.max * 1.000_001 {
+            // A decade each, as many as a double has at most.
+            while v <= self.max * 1.000_001 && v.is_finite() && out.len() < 700 {
                 out.push(v);
                 v *= 10.0;
             }
@@ -230,6 +240,11 @@ fn nice_step(span: f64, count: f64) -> f64 {
     }
     let raw = span / count;
     let p = 10f64.powf(raw.log10().floor());
+    // A span so small or so large that its powers of ten underflow or
+    // overflow has no nice step.
+    if !(p.is_finite() && p > 0.0) {
+        return 1.0;
+    }
     let f = raw / p;
     let n = if f <= 1.0 {
         1.0
@@ -245,10 +260,62 @@ fn nice_step(span: f64, count: f64) -> f64 {
     n * p
 }
 
+/// The range of a value axis, finite and with its maximum above its
+/// minimum, whatever the values and the limits a file gives.
 fn value_range(axis: &ValueAxis, lo: f64, hi: f64, zero: bool) -> Range {
+    let range = any_value_range(axis, lo, hi, zero);
+    let finite = [range.min, range.max, range.step]
+        .iter()
+        .all(|v| v.is_finite());
+    if finite && range.min < range.max && range.step > 0.0 {
+        return range;
+    }
+    fallback_range(range.log, lo, hi)
+}
+
+/// A range around the values and as wide as they spread, so that they
+/// still fall on the axis: as when they and the minimum are all 1e16,
+/// which adding 1 does not change. The limits of the file are left out.
+fn fallback_range(log: bool, lo: f64, hi: f64) -> Range {
+    let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
+        (lo, hi)
+    } else {
+        (0.0, 0.0)
+    };
+    if log {
+        // Decades from the smallest value a log axis shows to a decade
+        // below the largest double.
+        let lo = lo.clamp(1e-12, 1e300);
+        let min = 10f64.powf(lo.log10().floor());
+        let max = 10f64.powf(hi.clamp(lo, 1e306).log10().ceil());
+        Range {
+            min,
+            max: if max <= min { min * 10.0 } else { max },
+            step: 10.0,
+            log: true,
+        }
+    } else {
+        // Halves, so that neither the spread nor the ends overflow.
+        let limit = f64::MAX / 4.0;
+        let mid = (lo / 2.0 + hi / 2.0).clamp(-limit, limit);
+        let half = (hi / 2.0 - lo / 2.0)
+            .max(mid.abs() / 2.0)
+            .max(0.5)
+            .min(limit);
+        Range {
+            min: mid - half,
+            max: mid + half,
+            step: half / 2.5,
+            log: false,
+        }
+    }
+}
+
+fn any_value_range(axis: &ValueAxis, lo: f64, hi: f64, zero: bool) -> Range {
     if axis.scale == Scale::Logarithmic {
-        let lo = axis.min.map_or(lo, |m| m.0).max(1e-12);
-        let hi = axis.max.map_or(hi, |m| m.0).max(lo * 10.0);
+        // A decade below the largest double, for the axis to end on one.
+        let lo = axis.min.map_or(lo, |m| m.0).clamp(1e-12, 1e300);
+        let hi = axis.max.map_or(hi, |m| m.0).max(lo * 10.0).min(1e307);
         let min = 10f64.powf(lo.log10().floor());
         let max = 10f64.powf(hi.log10().ceil());
         return Range {
@@ -482,10 +549,12 @@ fn legend(cx: &mut Ctx<'_>, left: f32, right: f32, top: f32) -> f32 {
 }
 
 /// The values of each series in each category, stacked or as they are;
-/// with a percent scale each category adds up to 100.
+/// with a percent scale each category adds up to 100. A chart with no
+/// categories gets one empty category, as the axes draw one, so that each
+/// series has a value for every category the drawing goes through.
 fn series_values(chart: &Chart) -> Vec<Vec<Option<f64>>> {
     let ns = chart.series_count();
-    let nc = chart.category_count();
+    let nc = chart.category_count().max(1);
     let mut v: Vec<Vec<Option<f64>>> = (0..ns)
         .map(|s| (0..nc).map(|c| chart.value(s, c)).collect())
         .collect();
@@ -551,7 +620,7 @@ fn axis_extent(
             }
         }
     }
-    if !lo.is_finite() {
+    if !lo.is_finite() || !hi.is_finite() {
         (0.0, 1.0)
     } else {
         (lo, hi)
@@ -1906,6 +1975,104 @@ mod tests {
         chart.value_axis.scale = Scale::Percent;
         let v = series_values(&chart);
         assert!((v[0][0].unwrap() + v[1][0].unwrap() - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn values_at_the_ends_of_doubles_draw_on_finite_axes() {
+        // Review RV, batch 4: a logarithmic axis to 1.7e308 counted its
+        // decades without end, and a value of 1e-323 made a step of 0 and
+        // an axis of NaN, which clamp refused.
+        for (kind, scale, value) in [
+            (ChartKind::Column, Scale::Logarithmic, 1.7e308),
+            (ChartKind::StackedColumn, Scale::Logarithmic, 1e308),
+            (ChartKind::Column, Scale::Linear, 1e-323),
+            (ChartKind::Line, Scale::Linear, f64::MAX),
+            (ChartKind::StackedColumn, Scale::Linear, f64::MAX),
+        ] {
+            let mut chart = Chart::new(kind);
+            chart.value_axis.scale = scale;
+            for s in 0..chart.series_count() {
+                for c in 0..chart.category_count() {
+                    let (r, k) = if chart.series_in_rows { (s, c) } else { (c, s) };
+                    chart.data.set(r, k, Some(value));
+                }
+            }
+            draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        }
+        let r = value_range(&ValueAxis::default(), 0.0, 1e-323, true);
+        assert!(r.min.is_finite() && r.max > r.min && r.step > 0.0);
+        let log = ValueAxis {
+            scale: Scale::Logarithmic,
+            max: Some(Num(f64::MAX)),
+            ..ValueAxis::default()
+        };
+        assert!(value_range(&log, 1.0, f64::MAX, true).ticks().len() <= 700);
+        // Review of RV batch 4: with a minimum and all the values at 1e16,
+        // the axis went from 0 to 1, and the points to coordinates far
+        // off the chart.
+        let fixed = ValueAxis {
+            min: Some(Num(1e16)),
+            ..ValueAxis::default()
+        };
+        let r = value_range(&fixed, 1e16, 1e16, true);
+        assert!(
+            r.min <= 1e16 && 1e16 <= r.max && r.min < r.max,
+            "{} {}",
+            r.min,
+            r.max
+        );
+        assert!((0.0..=1.0).contains(&r.fraction(1e16)));
+        assert_eq!(r.fraction(f64::MAX), 1000.0);
+        // Second review: the range fallen back on was as wide as the middle
+        // of the values, not as they spread, and its ends could overflow.
+        for (log, lo, hi) in [
+            (false, 1e16, 1e18),
+            (false, -1e18, 1e16),
+            (false, -f64::MAX, f64::MAX),
+            (false, f64::MAX, f64::MAX),
+            (false, 5.0, 5.0),
+            (true, 1e16, 1e18),
+            (true, 1e-5, 1e300),
+            (true, 3.0, 3.0),
+        ] {
+            let r = fallback_range(log, lo, hi);
+            assert!(
+                r.min.is_finite() && r.max.is_finite() && r.min < r.max && r.step > 0.0,
+                "{lo} {hi}: {} {}",
+                r.min,
+                r.max
+            );
+            if hi.abs() < 1e300 && lo.abs() < 1e300 {
+                assert!(r.min <= lo && hi <= r.max, "{lo} {hi}: {} {}", r.min, r.max);
+            }
+        }
+    }
+
+    #[test]
+    fn a_chart_with_series_and_no_categories_draws_empty() {
+        // Review RV, batch 4: the categories all deleted in the Data
+        // Editor, or none in a file, made drawing read past the values.
+        for kind in [
+            ChartKind::Column,
+            ChartKind::Bar,
+            ChartKind::Line,
+            ChartKind::Area,
+            ChartKind::Scatter,
+            ChartKind::Mixed,
+            ChartKind::TwoAxis,
+            ChartKind::Pie,
+        ] {
+            let mut chart = Chart::new(kind);
+            chart.series_in_rows = true;
+            while !chart.data.cols.is_empty() {
+                chart.data.delete_col(0);
+            }
+            assert_eq!(chart.category_count(), 0);
+            assert!(chart.series_count() > 0);
+            draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+            chart.series_in_rows = false;
+            draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        }
     }
 
     #[test]

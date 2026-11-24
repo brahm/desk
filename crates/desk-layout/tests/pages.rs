@@ -1369,3 +1369,173 @@ fn pxv_12_balanced_columns_end_at_the_same_height() {
         .count();
     assert_eq!(right, 0);
 }
+
+#[test]
+fn est_05_est_13_a_line_fits_a_page_by_the_same_rule_with_footnotes() {
+    // Review RV, batch 4: with footnotes, the leading below the last line
+    // of a page could stick out of the body, which Pages 15.4 does not let
+    // it, and which it did not without them. The first page has no note:
+    // a note on the second must not change it.
+    use desk_model::{
+        CharAttrs, Editor, FIELD_CHARACTER, Field, LineSpacing, Note, ParaAttrs, Paragraph, Run,
+    };
+    let document = |height: f32, with_note: bool| {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Setup", |edit| {
+                edit.set_page_setup(setup(height))?;
+                let text = ["line"; 12].join(&LINE_BREAK.to_string());
+                let end = edit.insert_text(start, &text)?;
+                let spaced = ParaAttrs {
+                    line_spacing: Some(LineSpacing::DOUBLE),
+                    ..ParaAttrs::default()
+                };
+                edit.set_paragraph_attrs(start, end, &spaced)?;
+                let at = edit.split_paragraph(end)?;
+                let broken = ParaAttrs {
+                    page_break_before: Some(true),
+                    line_spacing: Some(LineSpacing::SINGLE),
+                    ..ParaAttrs::default()
+                };
+                edit.set_paragraph_attrs(at, at, &broken)?;
+                let at = edit.insert_text(at, "Text")?;
+                if with_note {
+                    let note = edit.new_id();
+                    let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+                    let mark = CharAttrs {
+                        field: Some(Some(Field::NoteMark { note })),
+                        ..CharAttrs::default()
+                    };
+                    edit.set_character_attrs(at, after, &mark)?;
+                    let body = edit.document().styles().default_paragraph();
+                    let id = edit.new_id();
+                    let paragraph =
+                        Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new("note")])?;
+                    edit.set_note(
+                        note,
+                        Some(Note {
+                            id: note,
+                            mark: None,
+                            paragraphs: vec![paragraph].into(),
+                        }),
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        editor.into_document()
+    };
+    let mut system = TextSystem::new();
+    for height in (100..=200).step_by(2) {
+        let height = height as f32;
+        let plain = paginate(&document(height, false), &mut system);
+        let noted = paginate(&document(height, true), &mut system);
+        assert_eq!(
+            counts(&plain).first(),
+            counts(&noted).first(),
+            "body {height}"
+        );
+    }
+}
+
+#[test]
+fn est_05_est_13_a_chain_laid_out_again_meets_its_notes_again() {
+    // Review RV, batch 4: a chain of paragraphs kept with the next, laid
+    // out again in the next column, left the notes it had met where it
+    // was first, and a later pass kept their room where they no longer
+    // are. Moved by a column break instead, the chain is laid out once:
+    // both must give the same pages.
+    use desk_model::{CharAttrs, Editor, FIELD_CHARACTER, Field, Note, ParaAttrs, Paragraph, Run};
+    let document = |filler: usize, tail: usize, kept: bool| {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let start = editor.document().start();
+        editor
+            .edit("Setup", |edit| {
+                let mut page = setup(120.0);
+                page.layout = columns(2);
+                edit.set_page_setup(page)?;
+                let text = ["line"; 40][..filler].join(&LINE_BREAK.to_string());
+                let at = edit.insert_text(start, &text)?;
+                let head = edit.split_paragraph(at)?;
+                let at = edit.insert_text(head, "Head")?;
+                let attrs = if kept {
+                    ParaAttrs {
+                        keep_with_next: Some(true),
+                        ..ParaAttrs::default()
+                    }
+                } else {
+                    ParaAttrs {
+                        column_break_before: Some(true),
+                        ..ParaAttrs::default()
+                    }
+                };
+                edit.set_paragraph_attrs(head, head, &attrs)?;
+                let body = edit.split_paragraph(at)?;
+                let text = ["text"; 40][..tail].join(&LINE_BREAK.to_string());
+                let at = edit.insert_text(body, &text)?;
+                if kept {
+                    let plain = ParaAttrs {
+                        keep_with_next: Some(false),
+                        ..ParaAttrs::default()
+                    };
+                    edit.set_paragraph_attrs(body, body, &plain)?;
+                }
+                let note = edit.new_id();
+                let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+                let mark = CharAttrs {
+                    field: Some(Some(Field::NoteMark { note })),
+                    ..CharAttrs::default()
+                };
+                edit.set_character_attrs(at, after, &mark)?;
+                let style = edit.document().styles().default_paragraph();
+                let id = edit.new_id();
+                let text = ["note"; 3].join(&LINE_BREAK.to_string());
+                let paragraph =
+                    Paragraph::from_runs(id, style, ParaAttrs::default(), [Run::new(&text)])?;
+                edit.set_note(
+                    note,
+                    Some(Note {
+                        id: note,
+                        mark: None,
+                        paragraphs: vec![paragraph].into(),
+                    }),
+                )
+            })
+            .unwrap();
+        editor.into_document()
+    };
+    let mut system = TextSystem::new();
+    let notes = |layout: &DocumentLayout| -> Vec<Vec<usize>> {
+        layout
+            .pages
+            .iter()
+            .map(|p| p.note_lines.iter().map(|l| l.index).collect())
+            .collect()
+    };
+    // Where a line is: its page and the left of its column.
+    let place = |layout: &DocumentLayout, paragraph: usize, last: bool| {
+        let mut found = layout.pages.iter().enumerate().flat_map(|(n, p)| {
+            p.lines
+                .iter()
+                .filter(move |l| l.paragraph == paragraph)
+                .map(move |l| (n, l.origin.0 as i32))
+        });
+        if last { found.last() } else { found.next() }
+    };
+    let mut moved = 0;
+    for filler in 1..20 {
+        for tail in 1..30 {
+            let kept = paginate(&document(filler, tail, true), &mut system);
+            // Only where the chain did move to the next column.
+            if place(&kept, 0, true) == place(&kept, 1, false) {
+                continue;
+            }
+            moved += 1;
+            let broken = paginate(&document(filler, tail, false), &mut system);
+            assert_eq!(counts(&kept), counts(&broken), "{filler} {tail}");
+            assert_eq!(notes(&kept), notes(&broken), "{filler} {tail}");
+        }
+    }
+    assert!(moved > 0);
+}

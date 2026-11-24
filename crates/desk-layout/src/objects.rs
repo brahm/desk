@@ -174,20 +174,13 @@ impl PlacedObject {
         in_frame
     }
 
-    /// The room the object takes from the text, if it takes any.
-    pub(crate) fn exclusion(&self) -> Option<Exclusion> {
+    /// The box of the room the object takes from the text, if it takes
+    /// any, without the profile of its contour.
+    pub(crate) fn exclusion_box(&self) -> Option<Exclusion> {
         if matches!(self.object.wrap, Wrap::Through | Wrap::Behind) {
             return None;
         }
-        // The margin is from the outside of the stroke, as in Pages
-        // (OBJ-17).
-        let stroke = self
-            .object
-            .style
-            .stroke
-            .as_ref()
-            .map_or(0.0, |s| s.width.to_pt() as f32 / 2.0);
-        let margin = self.object.wrap_margin.to_pt() as f32 + stroke;
+        let margin = self.wrap_margin();
         let (x0, y0, x1, y1) = self.bounds();
         Some(Exclusion {
             x0: x0 - margin,
@@ -195,8 +188,33 @@ impl PlacedObject {
             x1: x1 + margin,
             y1: y1 + margin,
             wrap: self.object.wrap,
-            profile: self.profile(margin),
+            profile: None,
         })
+    }
+
+    /// The room the object takes from the text, if it takes any, with the
+    /// profile of its contour, which takes the time of its points: only
+    /// for an object in the way.
+    pub(crate) fn exclusion(&self) -> Option<Exclusion> {
+        self.exclusion_box().map(|e| self.with_profile(e))
+    }
+
+    /// The profile of the contour added to the box of the room it takes.
+    pub(crate) fn with_profile(&self, mut e: Exclusion) -> Exclusion {
+        e.profile = self.profile(self.wrap_margin());
+        e
+    }
+
+    /// The margin of the wrap, from the outside of the stroke, as in
+    /// Pages (OBJ-17).
+    fn wrap_margin(&self) -> f32 {
+        let stroke = self
+            .object
+            .style
+            .stroke
+            .as_ref()
+            .map_or(0.0, |s| s.width.to_pt() as f32 / 2.0);
+        self.object.wrap_margin.to_pt() as f32 + stroke
     }
 
     /// The room that the contour of the object takes from the text, band
@@ -206,9 +224,31 @@ impl PlacedObject {
         let contour = self.object.contour.as_ref().filter(|c| c.len() >= 3)?;
         let mut bands = Vec::new();
         // Each part apart of the outline takes its own room (B-047).
-        let parts = std::iter::once(contour).chain(self.object.contour_parts.iter());
-        for (part, contour) in parts.enumerate().filter(|(_, c)| c.len() >= 3) {
-            self.part_profile(contour, margin, part as u16, &mut bands);
+        let parts: Vec<&[(i32, i32)]> = std::iter::once(contour)
+            .chain(self.object.contour_parts.iter())
+            .map(|c| &c[..])
+            .filter(|c| c.len() >= 3)
+            .collect();
+        // An outline of a file, or traced from the specks of a picture, may
+        // have hundreds of thousands of points and parts. Past a number of
+        // parts the text goes around the box. Each part keeps a few points
+        // and a share of the rest by its own points, and an even share of
+        // the bands, so that none is left out.
+        if parts.len() > MAX_PROFILE_PARTS {
+            return None;
+        }
+        let share = parts.len().max(1);
+        let total: usize = parts.iter().map(|c| c.len()).sum();
+        let spare = MAX_PROFILE_POINTS.saturating_sub(MIN_PART_POINTS * share);
+        let most = MAX_PROFILE_BANDS / share as f32;
+        for (part, contour) in parts.into_iter().enumerate() {
+            let points = MIN_PART_POINTS + spare * contour.len() / total.max(1);
+            let mut kept = thinned(contour, points);
+            if kept.len() < 3 {
+                // A speck of points all in one place, or in a line: its box.
+                kept = bounding_box(contour);
+            }
+            self.part_profile(&kept, margin, part as u16, most, &mut bands);
         }
         Some(bands.into())
     }
@@ -219,6 +259,7 @@ impl PlacedObject {
         contour: &[(i32, i32)],
         margin: f32,
         part: u16,
+        most: f32,
         bands: &mut Vec<(f32, f32, f32, f32, u16)>,
     ) {
         let scale = desk_model::POLYGON_SCALE as f32;
@@ -233,9 +274,16 @@ impl PlacedObject {
             .collect();
         let top = points.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
         let bottom = points.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max);
-        let mut b0 = top - margin;
-        while b0 < bottom + margin {
-            let b1 = b0 + PROFILE_BAND;
+        // Bands counted, and widened past a number of them: a margin of a
+        // file may make millions, and far down a quarter of a point added
+        // to a position no longer moves it.
+        let start = top - margin;
+        let length = bottom + margin - start;
+        let count = (length / PROFILE_BAND).ceil().clamp(0.0, most) as usize;
+        let band = (length / count.max(1) as f32).max(PROFILE_BAND);
+        for k in 0..count {
+            let b0 = start + k as f32 * band;
+            let b1 = b0 + band;
             // The contour grown by the margin all around, as Pages grows
             // it: a point of the contour takes the room of a circle of the
             // margin around it, so that the room ends round over the top
@@ -291,7 +339,6 @@ impl PlacedObject {
             if let Some(span) = span {
                 bands.push((b0, b1, span.0, span.1, part));
             }
-            b0 = b1;
         }
     }
 }
@@ -393,6 +440,59 @@ pub(crate) type Profile = Arc<[(f32, f32, f32, f32, u16)]>;
 /// How tall the bands of the contour of an object are, in points.
 const PROFILE_BAND: f32 = 0.25;
 
+/// The four corners of the box of a contour.
+fn bounding_box(contour: &[(i32, i32)]) -> Vec<(i32, i32)> {
+    let (mut x0, mut y0, mut x1, mut y1) = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
+    for &(x, y) in contour {
+        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+    }
+    vec![(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+}
+
+/// At most about `most` points of a contour, in their order: of each run
+/// of points, those that reach furthest up, down, left and right, so that
+/// the outline keeps its extent and a zigzag its teeth.
+fn thinned(contour: &[(i32, i32)], most: usize) -> Vec<(i32, i32)> {
+    if contour.len() <= most {
+        return contour.to_vec();
+    }
+    let run = (contour.len() * 4).div_ceil(most.max(4));
+    let mut kept = Vec::with_capacity(most + 4);
+    for chunk in contour.chunks(run) {
+        let mut ends: Vec<usize> = Vec::with_capacity(4);
+        let pick = |key: fn(&(i32, i32)) -> i32, max: bool| {
+            let found = chunk.iter().enumerate().map(|(i, p)| (key(p), i));
+            if max { found.max() } else { found.min() }.map(|(_, i)| i)
+        };
+        ends.extend(pick(|p| p.0, false));
+        ends.extend(pick(|p| p.0, true));
+        ends.extend(pick(|p| p.1, false));
+        ends.extend(pick(|p| p.1, true));
+        ends.sort_unstable();
+        ends.dedup();
+        kept.extend(ends.into_iter().filter_map(|i| chunk.get(i).copied()));
+    }
+    kept
+}
+
+/// The most bands of the profile of an object, all its parts together, each
+/// part an even share: enough for one part down a page at a quarter of a
+/// point each; a part taller, or of an outline of many parts, gets wider
+/// ones.
+const MAX_PROFILE_BANDS: f32 = 20_000.0;
+
+/// The fewest points of each part of an outline that its profile goes
+/// through, when the parts together have more than [`MAX_PROFILE_POINTS`].
+const MIN_PART_POINTS: usize = 4;
+
+/// The most points of an outline, all its parts together, that its profile
+/// goes through, about: each part keeps some, and a share of the rest by
+/// its own points.
+const MAX_PROFILE_POINTS: usize = 2048;
+
+/// The most parts apart of an outline that the text goes between.
+const MAX_PROFILE_PARTS: usize = 256;
+
 /// How many steps an edge of a contour near a band is taken in.
 const PROFILE_STEPS: usize = 8;
 
@@ -483,6 +583,19 @@ impl LineSpace for WrapSpace<'_> {
             return vec![(0.0, self.width)];
         };
         free_segments(piece, self.width, top, height)
+    }
+
+    /// Below the last part, under its objects, the column is free.
+    fn uniform_below(&self) -> Option<f32> {
+        let Some(last) = self.pieces.last() else {
+            return Some(f32::NEG_INFINITY);
+        };
+        let below = last
+            .exclusions
+            .iter()
+            .map(|e| e.y1 - last.origin)
+            .fold(last.from, f32::max);
+        Some(below)
     }
 }
 
@@ -1488,6 +1601,155 @@ mod tests {
         object.contour = None;
         let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
         assert_eq!(e.span(100.0, 102.0), Some((200.0, 300.0)));
+    }
+
+    #[test]
+    fn a_column_is_the_same_all_the_way_down_below_its_objects() {
+        // Review of RV batch 4: a line with no room in a column with
+        // objects looked thousands of points down, past them too.
+        let wrap = piece(Wrap::Both);
+        let pieces = [wrap];
+        let space = WrapSpace {
+            width: 300.0,
+            pieces: &pieces,
+        };
+        // The object ends 200 points down the page; the paragraph starts 50.
+        assert_eq!(space.uniform_below(), Some(150.0));
+        let free = WrapSpace {
+            width: 300.0,
+            pieces: &[],
+        };
+        assert_eq!(free.uniform_below(), Some(f32::NEG_INFINITY));
+    }
+
+    #[test]
+    fn a_contour_of_many_parts_and_points_takes_a_bounded_profile() {
+        // Review of RV batch 4: the bands were bounded for each part, and
+        // a path of 65,536 parts of three points, 800 points tall, made
+        // hundreds of millions of them, for each paragraph near it.
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::triangle()),
+            Frame::from_pt(100.0, 100.0, 400.0, 800.0),
+        );
+        let s = desk_model::POLYGON_SCALE;
+        let tall: Vec<(i32, i32)> = vec![(0, 0), (s / 2, s), (s, 0)];
+        object.contour = Some(tall.clone().into());
+        object.contour_parts = std::iter::repeat_n(Arc::<[(i32, i32)]>::from(tall), 65_535)
+            .collect::<Vec<_>>()
+            .into();
+        let started = std::time::Instant::now();
+        let placed = PlacedObject::new(&object, None, 0.0);
+        // The text goes around the box.
+        assert!(placed.profile(10.0).is_none());
+        // Of fewer parts, with many points, their points are thinned.
+        object.contour_parts = object.contour_parts[..255]
+            .iter()
+            .map(|_| {
+                let zigzag: Vec<(i32, i32)> = (0..1000)
+                    .map(|k| (k * s / 1000, if k % 2 == 0 { 0 } else { s }))
+                    .chain([(s, s), (0, s)])
+                    .collect();
+                Arc::<[(i32, i32)]>::from(zigzag)
+            })
+            .collect::<Vec<_>>()
+            .into();
+        let profile = PlacedObject::new(&object, None, 0.0).profile(10.0).unwrap();
+        assert!(profile.len() <= 20_000, "{}", profile.len());
+        assert!(started.elapsed().as_secs() < 10, "{:?}", started.elapsed());
+        // A contour of a few points keeps them all.
+        object.contour_parts = Default::default();
+        let profile = PlacedObject::new(&object, None, 0.0).profile(10.0).unwrap();
+        assert!(profile.len() > 3000);
+    }
+
+    #[test]
+    fn every_part_of_a_large_contour_keeps_its_room() {
+        // Second review of RV batch 4: one stride for all the parts thinned
+        // a small part beside a large one to nothing, and the parts after
+        // the budget of bands was spent got none: text ran over them.
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::triangle()),
+            Frame::from_pt(100.0, 100.0, 512.0, 800.0),
+        );
+        object.style.stroke = None;
+        let s = desk_model::POLYGON_SCALE;
+        // A left fifth of 100,000 points and a right fifth of four.
+        let large: Vec<(i32, i32)> = (0..100_000)
+            .map(|k| (if k % 2 == 0 { 0 } else { s / 5 }, k * s / 100_000))
+            .chain([(0, s)])
+            .collect();
+        object.contour = Some(large.into());
+        object.contour_parts = Arc::from([Arc::from(
+            &[(s * 4 / 5, 0), (s, 0), (s, s), (s * 4 / 5, s)][..],
+        )]);
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        let spans = e.spans(500.0, 510.0);
+        assert_eq!(spans.len(), 2, "{spans:?}");
+        assert!(spans[0].1 > 200.0, "the teeth of the zigzag: {spans:?}");
+        assert!(spans[1].1 > 600.0, "{spans:?}");
+        // Third review: beside 255 specks traced from a picture, of a point
+        // each, the large part kept 8 points and lost its teeth, and a
+        // speck that thinned to nothing sent the text around the box.
+        let speck = |k: i32| {
+            let at = (s * 2 / 5 + k * 10, s / 2);
+            Arc::<[(i32, i32)]>::from(&[at, at, at][..])
+        };
+        object.contour_parts = std::iter::once(object.contour_parts[0].clone())
+            .chain((0..254).map(speck))
+            .collect::<Vec<_>>()
+            .into();
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        assert!(e.profile.is_some());
+        for y in (120..880).step_by(7) {
+            let spans = e.spans(y as f32, y as f32 + 1.0);
+            assert!(
+                spans[0].1 > 205.0,
+                "the teeth of the zigzag at {y}: {spans:?}"
+            );
+            assert!(spans.last().unwrap().1 > 600.0, "{spans:?}");
+        }
+        // 256 thin parts across the frame, each down its whole height.
+        object.contour = Some(Arc::from(&[(0, 0), (s / 512, 0), (s / 512, s), (0, s)][..]));
+        object.contour_parts = (1..256)
+            .map(|k| {
+                let x = k * s / 256;
+                Arc::<[(i32, i32)]>::from(&[(x, 0), (x + s / 512, 0), (x + s / 512, s), (x, s)][..])
+            })
+            .collect::<Vec<_>>()
+            .into();
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        let profile = e.profile.as_ref().unwrap();
+        assert!(profile.len() <= 20_000, "{}", profile.len());
+        let mut parts: Vec<u16> = profile.iter().map(|b| b.4).collect();
+        parts.dedup();
+        assert_eq!(parts.len(), 256);
+        // Down to the bottom of the last part.
+        let last = profile.iter().filter(|b| b.4 == 255).map(|b| b.1);
+        assert!(last.fold(0.0, f32::max) >= 900.0);
+    }
+
+    #[test]
+    fn a_contour_with_a_huge_margin_takes_a_bounded_profile() {
+        // Review RV, batch 4: a margin of two million points made 16
+        // million bands for each paragraph placed, and far down the page
+        // a band added to a position no longer moved it, without end.
+        use desk_model::{Frame, NodeId, Object, ObjectKind, Shape};
+        let mut object = Object::new(
+            NodeId::new(1).unwrap(),
+            ObjectKind::Shape(Shape::triangle()),
+            Frame::from_pt(200.0, 2_100_000.0, 100.0, 100.0),
+        );
+        object.wrap_margin = desk_model::Length::from_points(2_000_000);
+        object.contour = object.shape_contour();
+        let started = std::time::Instant::now();
+        let placed = PlacedObject::new(&object, None, 0.0);
+        let profile = placed.profile(2_000_000.0).unwrap();
+        assert!(profile.len() <= 20_000, "{}", profile.len());
+        assert!(started.elapsed().as_secs() < 10);
     }
 
     #[test]

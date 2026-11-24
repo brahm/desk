@@ -1288,7 +1288,9 @@ impl Paginator<'_> {
         // The page and column where each paragraph ends.
         let mut ends = vec![(0, 0); n];
         // Where the current chain of paragraphs kept with the next one started.
-        let mut chain: Option<(usize, Cursor, usize, usize)> = None;
+        // With how many pages and lines there were, and how many notes
+        // were met.
+        let mut chain: Option<(usize, Cursor, usize, usize, usize)> = None;
         let mut i = 0;
         while i < n {
             let format = self.texts[i].paragraph().clone();
@@ -1314,6 +1316,7 @@ impl Paginator<'_> {
                     cursor,
                     self.pages.len(),
                     self.pages[cursor.page].lines.len(),
+                    self.met.len(),
                 ));
             }
             if format.page_break_before && !self.pages[cursor.page].lines.is_empty() {
@@ -1331,12 +1334,15 @@ impl Paginator<'_> {
                 && !format.page_break_before
                 && format.start.is_none()
                 && ends[i - 1] != start
-                && let Some((first, saved, page_count, line_count)) = chain
+                && let Some((first, saved, page_count, line_count, met_count)) = chain
                 && line_count > 0
                 && !forced[first]
             {
                 forced[first] = true;
                 self.pages.truncate(page_count);
+                // The notes met where the chain was are met again where
+                // it goes.
+                self.met.truncate(met_count);
                 let page = &mut self.pages[saved.page];
                 page.lines.truncate(line_count);
                 page.blocks.retain(|b| b.paragraph < first);
@@ -1536,8 +1542,9 @@ impl Paginator<'_> {
                 .objects
                 .iter()
                 .chain(&anchored)
-                .filter_map(PlacedObject::exclusion)
-                .filter(|e| in_the_way(e, x, x + width, top + cursor.y))
+                .filter_map(|o| o.exclusion_box().map(|e| (o, e)))
+                .filter(|(_, e)| in_the_way(e, x, x + width, top + cursor.y))
+                .map(|(o, e)| o.with_profile(e))
                 .collect();
             pieces.retain(|p| p.from < base);
             pieces.push(Piece {
@@ -1577,7 +1584,9 @@ impl Paginator<'_> {
                             let line = &block.lines[b];
                             let first = reserved == 0.0 && taken == 0.0;
                             let cost = notes.cost(i, line, first);
-                            let height = line.text_bottom - base;
+                            // All of the line, its leading too, as
+                            // `Block::fitting` measures it.
+                            let height = line.top + line.height - base;
                             if split_before && cost > 0.0 {
                                 return false;
                             }

@@ -26,7 +26,7 @@ use parley::{
 };
 
 use crate::fonts::{FontChoice, FontMatch, PagesFont, choose, pages_font};
-use crate::input::{FF, FFI, FI, FL, ParagraphText, SMALL_CAPS_SCALE};
+use crate::input::{FF, FFI, FFL, FI, FL, ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
 use crate::tabs::{Piece, TabPlace, TabRuler};
 
@@ -45,8 +45,9 @@ const LABEL_ROOM: f32 = 10_000.0;
 pub const MIN_SEGMENT_WIDTH: f32 = 18.0;
 
 /// How far down a line looks for a free piece before it gives up and
-/// overflows.
-const MAX_SEARCH: f32 = 10_000.0;
+/// overflows, in steps of a point: counted, as far down a point added to
+/// a position may change nothing.
+const MAX_SEARCH: u32 = 10_000;
 
 /// One glyph, in the coordinates of the layout.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -339,8 +340,12 @@ impl TextSystem {
     pub fn add_fonts(&mut self, data: Vec<u8>) -> usize {
         let blob = parley::fontique::Blob::new(std::sync::Arc::new(data));
         let added = self.fonts.collection.register_fonts(blob, None);
-        // A family chosen before may now be installed.
+        // A family chosen before may now be installed, and what was
+        // measured of it was measured with the font that stood for it.
         self.choices.clear();
+        self.unit_metrics.clear();
+        self.digit_widths.clear();
+        self.space_kerns.clear();
         added.iter().map(|(_, fonts)| fonts.len()).sum()
     }
 
@@ -917,18 +922,31 @@ impl TextSystem {
             }
         };
         let has_tabs = source.contains('\t');
+        // The advances of the clusters summed from the start, so that the
+        // width of a line is found at once for each place it may end: a
+        // line of thousands of words, in a tiny font, was summed again for
+        // each of them.
+        let sums: Vec<f64> = std::iter::once(0.0)
+            .chain(clusters.iter().scan(0.0f64, |sum, c| {
+                *sum += f64::from(c.advance);
+                Some(*sum)
+            }))
+            .collect();
         // The width of the text from `a` to `b` on a line from `x` to
         // `limit`, and how much wider its tabs are than as shaped.
         let natural = |a: usize, b: usize, x: f32, limit: f32| -> (f32, f32) {
             let end = trim(a, b);
-            let clusters = span(a, end);
             let hyphen = hyphen_at(b).map_or(0.0, |h| h.3);
             if !has_tabs {
-                return (
-                    clusters.iter().map(|c| c.advance).sum::<f32>() + hyphen,
-                    0.0,
-                );
+                let first = clusters.partition_point(|c| c.start < a);
+                let last = clusters.partition_point(|c| c.start < end);
+                let sum = sums
+                    .get(last)
+                    .zip(sums.get(first))
+                    .map_or(0.0, |(l, f)| l - f);
+                return (sum as f32 + hyphen, 0.0);
             }
+            let clusters = span(a, end);
             let first = |c: &Cluster| source[c.start..].chars().next().unwrap_or(' ');
             let pieces = clusters.iter().map(|c| Piece {
                 tab: first(c) == '\t',
@@ -971,9 +989,12 @@ impl TextSystem {
         let mut y = top;
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
-        let mut searched_from = y;
-        // Where the search for a line wide enough for the next word began.
-        let mut narrow_from = y;
+        // The steps of a point down that the next line took looking for
+        // room, and those it took looking for room wide enough for its
+        // next word: a budget each, so that a line that went a long way
+        // down past an object may still go lower to where its word fits,
+        // and the two together stay bounded however they take turns.
+        let (mut searched, mut widened): (u32, u32) = (0, 0);
         // Whether the band was measured again with a shorter line.
         let mut shortened = false;
         'band: loop {
@@ -991,7 +1012,10 @@ impl TextSystem {
                 if space.is_exhausted(y) {
                     break;
                 }
-                if y - searched_from < MAX_SEARCH {
+                // A space the same all the way down has no room lower.
+                let uniform = space.uniform_below().is_some_and(|u| y >= u);
+                if searched < MAX_SEARCH && !uniform {
+                    searched += 1;
                     y += 1.0;
                     continue;
                 }
@@ -999,7 +1023,6 @@ impl TextSystem {
                 // wider than the column: overflow rather than loop forever.
                 segments.push((indent, (edge(indent) - indent).max(MIN_SEGMENT_WIDTH)));
             }
-            searched_from = y;
             let saved: BreakerState = breaker.state().clone();
             let (saved_pos, saved_next, saved_placed) = (pos, next_break, placed.len());
             let mut tallest = 0.0_f32;
@@ -1045,11 +1068,13 @@ impl TextSystem {
                 if end.is_none()
                     && next_break < breaks.len()
                     && width + 0.001 < measure
-                    && y - narrow_from < MAX_SEARCH
+                    && widened < MAX_SEARCH
+                    && !space.uniform_below().is_some_and(|u| y >= u)
                 {
                     if placed.len() > saved_placed {
                         break;
                     }
+                    widened += 1;
                     y += 1.0;
                     continue 'band;
                 }
@@ -1248,7 +1273,7 @@ impl TextSystem {
                 pos = line_end;
                 next_break = chosen;
                 first_line = false;
-                narrow_from = y;
+                (searched, widened) = (0, 0);
                 if pos >= source.len() {
                     break 'band;
                 }
@@ -1855,6 +1880,9 @@ fn line_tabs(
         .collect()
 }
 
+/// The most dots, dashes or rules of the leader of a tab.
+const MAX_LEADER_GLYPHS: usize = 10_000;
+
 /// The leader of a tab: its character repeated across the space of the
 /// tab, ending where the tab does.
 fn leader_run(
@@ -1870,7 +1898,9 @@ fn leader_run(
     if advance <= 0.0 || place.width < advance {
         return None;
     }
-    let count = ((place.width + 0.01) / advance).floor() as usize;
+    // As many as a wide page holds at a readable size: a file may set the
+    // tab at a thousandth of a point, which would make millions.
+    let count = (((place.width + 0.01) / advance).floor() as usize).min(MAX_LEADER_GLYPHS);
     let end = place.start + place.width;
     let x = end - count as f32 * advance;
     Some(GlyphRun {
@@ -2232,6 +2262,21 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
     }
 }
 
+/// Adds a character of the laid-out text as the letters it stands for: a
+/// ligature that Pages joins as its letters, so that a PDF reads and finds
+/// them, and a place where the word may break as nothing.
+fn push_letters(text: &mut String, c: char) {
+    match c {
+        FI => text.push_str("fi"),
+        FL => text.push_str("fl"),
+        FF => text.push_str("ff"),
+        FFI => text.push_str("ffi"),
+        FFL => text.push_str("ffl"),
+        SOFT_HYPHEN => {}
+        c => text.push(c),
+    }
+}
+
 /// The text that a run draws and its clusters, as [`GlyphRun::text`] and
 /// [`GlyphRun::clusters`] describe them, given how many glyphs it has,
 /// tabs left out.
@@ -2260,15 +2305,7 @@ fn run_text(
         }
         let start = text.len();
         for c in source[cluster.text_range()].chars() {
-            match c {
-                FI => text.push_str("fi"),
-                FL => text.push_str("fl"),
-                FF => text.push_str("ff"),
-                FFI => text.push_str("ffi"),
-                // A place where the word may break is not text to copy.
-                SOFT_HYPHEN => {}
-                c => text.push(c),
-            }
+            push_letters(&mut text, c);
         }
         let n = cluster.glyphs().count();
         count += n;
@@ -2324,4 +2361,43 @@ fn char_glyph(font: &FontData, size: f32, c: char) -> Option<(u32, f32)> {
         .glyph_metrics(Size::new(size), LocationRef::default())
         .advance_width(id)?;
     Some((id.to_u32(), advance))
+}
+
+#[cfg(test)]
+mod letters_tests {
+    use super::*;
+
+    #[test]
+    fn ligatures_are_their_letters_in_the_text_of_a_run() {
+        // Review RV, batch 4: the ffl of Hoefler Text was left as U+FB04
+        // in PDFs, where a search for "baffle" did not find it.
+        let mut text = String::new();
+        for c in ['b', 'a', FFL, 'e', ' ', FI, FL, FF, FFI, SOFT_HYPHEN] {
+            push_letters(&mut text, c);
+        }
+        assert_eq!(text, "baffle fiflffffi");
+    }
+
+    #[test]
+    fn what_was_measured_of_a_missing_font_is_measured_again_once_it_is_added() {
+        // Review RV, batch 4: the widths of digits, the metrics and the
+        // kerning of spaces kept those of the font that stood for the
+        // family before it was added.
+        let name = "DeskSansSpace60";
+        let fonts =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/fonts");
+        let data = std::fs::read(fonts.join(format!("{name}.ttf"))).unwrap();
+        let format = CharFormat {
+            font_family: name.into(),
+            ..CharFormat::default()
+        };
+        let mut system = TextSystem::new();
+        system.digit_width(&format);
+        system.unit_metrics(&format);
+        assert!(!system.digit_widths.is_empty() && !system.unit_metrics.is_empty());
+        system.add_fonts(data);
+        assert!(system.digit_widths.is_empty());
+        assert!(system.unit_metrics.is_empty());
+        assert!(system.space_kerns.is_empty());
+    }
 }

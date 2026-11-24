@@ -81,18 +81,17 @@ impl Painter {
 
     /// The picture decoded, or `None` when Cairo cannot read it.
     fn picture(&mut self, picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
-        if let Some((_, surface)) = self
+        if let Some(at) = self
             .pictures
             .iter()
-            .find(|(p, _)| p.same_data(picture) || p == picture)
+            .position(|(p, _)| p.same_data(picture) || p == picture)
         {
-            return Some(surface.clone());
+            return Some(used(&mut self.pictures, at));
         }
         let surface = picture_surface(picture)?;
-        // A bound on the memory of long sessions.
-        if self.pictures.len() > 64 {
-            self.pictures.clear();
-        }
+        // A bound on the memory of long sessions: on the pictures, and on
+        // their pixels, which a few large ones fill.
+        evict(&mut self.pictures, 64, surface_bytes(&surface));
         self.pictures.push((picture.clone(), surface.clone()));
         Some(surface)
     }
@@ -170,14 +169,12 @@ impl Painter {
             kept: kept.cloned(),
             adjust,
         };
-        if let Some((_, surface)) = self.adjusted.iter().find(|(k, _)| *k == key) {
-            return Some(surface.clone());
+        if let Some(at) = self.adjusted.iter().position(|(k, _)| *k == key) {
+            return Some(used(&mut self.adjusted, at));
         }
         let source = self.picture(picture)?;
         let surface = adjusted_surface(&source, alpha, kept, adjust).ok()?;
-        if self.adjusted.len() > 16 {
-            self.adjusted.clear();
-        }
+        evict(&mut self.adjusted, 16, surface_bytes(&surface));
         self.adjusted.push((key, surface.clone()));
         Some(surface)
     }
@@ -294,12 +291,14 @@ impl Painter {
                     let Some(((x, y), rest)) = points.split_first() else {
                         continue;
                     };
+                    if !drawn_width(*width) {
+                        continue;
+                    }
                     set_color(cr, *color);
                     cr.set_line_width(f64::from(*width));
                     cr.set_line_cap(cairo::LineCap::Butt);
                     cr.set_line_join(cairo::LineJoin::Miter);
-                    let dashes: Vec<f64> = dashes.iter().map(|&d| f64::from(d)).collect();
-                    cr.set_dash(&dashes, 0.0);
+                    cr.set_dash(&dash_pattern(dashes), 0.0);
                     cr.move_to(f64::from(*x), f64::from(*y));
                     for (x, y) in rest {
                         cr.line_to(f64::from(*x), f64::from(*y));
@@ -317,6 +316,9 @@ impl Painter {
                     width,
                     height,
                 } => {
+                    if !drawn_rect(*width, *height) {
+                        continue;
+                    }
                     if picture.format() == desk_model::PictureFormat::Pdf {
                         paint_pdf(cr, picture, (*x, *y, *width, *height))?;
                         continue;
@@ -378,14 +380,12 @@ impl Painter {
                             cr.fill()?;
                         }
                     }
-                    if let Some(stroke) = stroke {
+                    if let Some(stroke) = stroke.as_ref().filter(|s| drawn_width(s.width)) {
                         set_color(cr, stroke.color);
                         cr.set_line_width(f64::from(stroke.width));
                         cr.set_line_cap(cairo::LineCap::Butt);
                         cr.set_line_join(cairo::LineJoin::Miter);
-                        let dashes: Vec<f64> =
-                            stroke.dashes.iter().map(|&d| f64::from(d)).collect();
-                        cr.set_dash(&dashes, 0.0);
+                        cr.set_dash(&dash_pattern(&stroke.dashes), 0.0);
                         cr.stroke()?;
                         cr.set_dash(&[], 0.0);
                     }
@@ -682,18 +682,30 @@ fn paint_shadow(
     let scale = sx
         .abs()
         .max(sy.abs())
-        .clamp(SHADOW_MIN_SCALE, SHADOW_MAX_SCALE);
+        .clamp(SHADOW_MIN_SCALE, SHADOW_MAX_SCALE)
+        // Large text gets fewer pixels for its shadow, as an object does.
+        .min(f64::from(SHADOW_MAX_SIDE) / extents.width().max(extents.height()))
+        .max(f64::MIN_POSITIVE);
     let sigma = f64::from(blur.max(0.0)) / 2.0 * scale;
     let radius = (((4.0 * sigma * sigma + 1.0).sqrt() - 1.0) / 2.0).round() as usize;
     // Room for the blur on every side.
     let margin = (3 * radius + 1) as f64 / scale;
     let x0 = extents.x_bearing() - margin;
     let y0 = extents.y_bearing() - margin;
-    let width = ((extents.width() + 2.0 * margin) * scale).ceil() as i32;
-    let height = ((extents.height() + 2.0 * margin) * scale).ceil() as i32;
+    let width = ((extents.width() + 2.0 * margin) * scale).ceil();
+    let height = ((extents.height() + 2.0 * margin) * scale).ceil();
+    // A blur wider than the text leaves no shadow to see: it is not drawn,
+    // and the rest of the page is.
+    if !(width <= f64::from(2 * SHADOW_MAX_SIDE) && height <= f64::from(2 * SHADOW_MAX_SIDE)) {
+        return Ok(());
+    }
+    let (width, height) = (width as i32, height as i32);
     let x0 = x0 + glyphs.first().map_or(0.0, |g| g.x());
     let y0 = y0 + glyphs.first().map_or(0.0, |g| g.y());
-    let mut mask = cairo::ImageSurface::create(cairo::Format::A8, width.max(1), height.max(1))?;
+    let Ok(mut mask) = cairo::ImageSurface::create(cairo::Format::A8, width.max(1), height.max(1))
+    else {
+        return Ok(());
+    };
     {
         let mc = Context::new(&mask)?;
         mc.scale(scale, scale);
@@ -767,12 +779,40 @@ struct AdjustedKey {
     adjust: desk_model::Adjustments,
 }
 
+/// Whether a line of a width draws anything: a width of 0, negative or
+/// not finite does not, and Cairo would take its dashes for an error.
+fn drawn_width(width: f32) -> bool {
+    width.is_finite() && width > 0.0
+}
+
+/// Whether a rectangle of a size draws anything: scaling into a side of 0
+/// would leave Cairo in an error that stops the rest of the page.
+fn drawn_rect(width: f32, height: f32) -> bool {
+    drawn_width(width) && drawn_width(height)
+}
+
+/// The dashes of a line as Cairo takes them: none, a solid line, for a
+/// pattern Cairo refuses, of a negative or infinite dash or all of 0,
+/// which would put the context in an error for the rest of the page.
+fn dash_pattern(dashes: &[f32]) -> Vec<f64> {
+    let valid =
+        dashes.iter().all(|d| d.is_finite() && *d >= 0.0) && dashes.iter().any(|d| *d > 0.0);
+    if valid {
+        dashes.iter().map(|&d| f64::from(d)).collect()
+    } else {
+        Vec::new()
+    }
+}
+
 /// Paints a surface scaled into a rectangle.
 fn paint_surface(
     cr: &Context,
     surface: &cairo::ImageSurface,
     (x, y, width, height): (f32, f32, f32, f32),
 ) -> Result<(), RenderError> {
+    if !drawn_rect(width, height) {
+        return Ok(());
+    }
     cr.save()?;
     cr.translate(f64::from(x), f64::from(y));
     cr.scale(
@@ -1066,17 +1106,67 @@ pub fn reduced_picture(
     desk_model::Picture::from_png(png)
 }
 
-/// The largest side of a picture decoded to draw, in pixels.
+/// The largest side of a PDF drawn as pixels, in pixels.
 const MAX_DECODED_SIDE: f64 = 8192.0;
+
+/// The most pixels of a picture decoded to draw: those of a square of
+/// 8192, in any shape, with no side over the 32767 that Cairo takes.
+const MAX_DECODED_PIXELS: u64 = 8192 * 8192;
+const MAX_SURFACE_SIDE: u32 = 32767;
+
+/// Whether a picture is small enough to decode, by the size its header
+/// declares.
+fn decodable(picture: &desk_model::Picture) -> bool {
+    let (w, h) = (picture.width(), picture.height());
+    w.max(h) <= MAX_SURFACE_SIDE && u64::from(w) * u64::from(h) <= MAX_DECODED_PIXELS
+}
+
+/// The most bytes of pixels that the decoded pictures, and those adjusted,
+/// keep between paints.
+const MAX_CACHED_BYTES: usize = 512 << 20;
+
+/// Leaves out the surfaces kept that were used least lately, until there
+/// are at most `count` and room for `adding` more bytes within
+/// [`MAX_CACHED_BYTES`]: the pictures of the page painted stay, and are not
+/// decoded again at each paint.
+fn evict<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, count: usize, adding: usize) {
+    let mut held: usize = kept.iter().map(|(_, s)| surface_bytes(s)).sum();
+    let mut drop = 0;
+    while drop < kept.len() && (kept.len() - drop > count || held + adding > MAX_CACHED_BYTES) {
+        held -= kept.get(drop).map_or(0, |(_, s)| surface_bytes(s));
+        drop += 1;
+    }
+    kept.drain(..drop);
+}
+
+/// The surface kept at `at`, moved last as the newest used, so that the
+/// pictures painted again are the last to be left out.
+fn used<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, at: usize) -> cairo::ImageSurface {
+    let entry = kept.remove(at);
+    let surface = entry.1.clone();
+    kept.push(entry);
+    surface
+}
+
+/// The bytes of the pixels of a surface.
+fn surface_bytes(surface: &cairo::ImageSurface) -> usize {
+    usize::try_from(surface.stride()).unwrap_or(0) * usize::try_from(surface.height()).unwrap_or(0)
+}
 
 /// The pixels of a picture, to draw: PNG and JPEG decoded, and the first
 /// page of a PDF drawn at two pixels a point.
 pub fn picture_surface(picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
     use desk_model::PictureFormat;
     match picture.format() {
-        PictureFormat::Png => {
-            cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.data())).ok()
-        }
+        // A PNG or JPEG of a few bytes may declare billions of pixels,
+        // which would be allocated and filled: its size, from its header,
+        // is checked first. A tall screenshot keeps its pixels.
+        PictureFormat::Png => decodable(picture)
+            .then(|| {
+                cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.data())).ok()
+            })
+            .flatten(),
+        PictureFormat::Jpeg if !decodable(picture) => None,
         PictureFormat::Jpeg => jpeg_surface(picture.shared_data()),
         PictureFormat::Pdf => {
             let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
@@ -1120,7 +1210,7 @@ fn paint_pdf(
         return Ok(());
     };
     let (pw, ph) = page.size();
-    if pw <= 0.0 || ph <= 0.0 {
+    if !(pw > 0.0 && ph > 0.0 && drawn_rect(width, height)) {
         return Ok(());
     }
     cr.save()?;
@@ -1147,12 +1237,18 @@ fn jpeg_surface(data: std::sync::Arc<[u8]>) -> Option<cairo::ImageSurface> {
     use zune_jpeg::zune_core::options::DecoderOptions;
     let options = DecoderOptions::default()
         .jpeg_set_out_colorspace(ColorSpace::RGB)
-        .set_max_width(MAX_DECODED_SIDE as usize)
-        .set_max_height(MAX_DECODED_SIDE as usize);
+        .set_max_width(MAX_SURFACE_SIDE as usize)
+        .set_max_height(MAX_SURFACE_SIDE as usize);
     let mut decoder = JpegDecoder::new_with_options(ZCursor::new(&data[..]), options);
-    let pixels = decoder.decode().ok()?;
+    // The size the decoder reads, which may not be the one the model read
+    // for the picture: bounded before the pixels are allocated.
+    decoder.decode_headers().ok()?;
     let info = decoder.info()?;
     let (width, height) = (usize::from(info.width), usize::from(info.height));
+    if (width as u64) * (height as u64) > MAX_DECODED_PIXELS {
+        return None;
+    }
+    let pixels = decoder.decode().ok()?;
     if width == 0 || height == 0 || pixels.len() < width * height * 3 {
         return None;
     }
@@ -1181,4 +1277,133 @@ fn jpeg_surface(data: std::sync::Arc<[u8]>) -> Option<cairo::ImageSurface> {
     // Cairo writes the JPEG itself into a PDF, rather than its pixels.
     let _ = surface.set_mime_data("image/jpeg", data);
     Some(surface)
+}
+
+#[cfg(test)]
+mod picture_tests {
+    use super::*;
+
+    /// The CRC of a PNG chunk.
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc = !0u32;
+        for &b in bytes {
+            crc ^= u32::from(b);
+            for _ in 0..8 {
+                crc = if crc & 1 == 1 {
+                    (crc >> 1) ^ 0xEDB8_8320
+                } else {
+                    crc >> 1
+                };
+            }
+        }
+        !crc
+    }
+
+    /// A JPEG of 8 by 8 pixels, made for the test.
+    const SMALL_JPEG: &str = concat!(
+        "ffd8ffe000104a46494600010100000100010000ffdb004300100b0c0e0c0a10",
+        "0e0d0e1211101318281a181616183123251d283a333d3c3933383740485c4e40",
+        "4457453738506d51575f626768673e4d71797064785c656763ffdb0043011112",
+        "121815182f1a1a2f634238426363636363636363636363636363636363636363",
+        "636363636363636363636363636363636363636363636363636363636363ffc0",
+        "0011080008000803012200021101031101ffc400150001010000000000000000",
+        "0000000000000002ffc40014100100000000000000000000000000000000ffc4",
+        "0014010100000000000000000000000000000005ffc400141101000000000000",
+        "00000000000000000000ffda000c03010002110311003f009005997fffd9",
+    );
+
+    #[test]
+    fn the_pictures_used_least_lately_are_left_out_first() {
+        // Second review of RV batch 4: a picture painted again was left out
+        // as the oldest, and decoded again at the next paint.
+        let surface = || cairo::ImageSurface::create(cairo::Format::ARgb32, 1, 1).unwrap();
+        let mut kept: Vec<(u8, cairo::ImageSurface)> = (0..3).map(|k| (k, surface())).collect();
+        used(&mut kept, 0);
+        evict(&mut kept, 2, 4);
+        let keys: Vec<u8> = kept.iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, [2, 0]);
+    }
+
+    #[test]
+    fn a_jpeg_is_bounded_by_the_size_its_decoder_reads() {
+        // Second review of RV batch 4: the size checked was the one the
+        // model read for the picture, and the decoder took up to 32767 a
+        // side from the frame it reads.
+        let mut bytes: Vec<u8> = (0..SMALL_JPEG.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&SMALL_JPEG[i..i + 2], 16).unwrap())
+            .collect();
+        assert!(jpeg_surface(bytes.clone().into()).is_some());
+        let frame = bytes.windows(2).position(|w| w == [0xFF, 0xC0]).unwrap();
+        // 30000 by 30000.
+        bytes.splice(frame + 5..frame + 9, [0x75, 0x30, 0x75, 0x30]);
+        assert!(jpeg_surface(bytes.into()).is_none());
+    }
+
+    #[test]
+    fn the_shadow_of_huge_text_or_a_huge_blur_is_bounded() {
+        // Review RV, batch 4: text at 8000 points made a mask of a
+        // gigabyte, and a blur of 5000 points one too large for Cairo,
+        // whose error left the rest of the page undrawn.
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 100, 100).unwrap();
+        let cr = Context::new(&surface).unwrap();
+        cr.select_font_face("Sans", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
+        let glyphs = [cairo::Glyph::new(36, 10.0, 50.0)];
+        let black = Rgba {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+        };
+        cr.set_font_size(12.0);
+        assert!(paint_shadow(&cr, &glyphs, black, (1.0, 1.0), 5000.0).is_ok());
+        cr.set_font_size(8000.0);
+        let started = std::time::Instant::now();
+        assert!(paint_shadow(&cr, &glyphs, black, (1.0, 1.0), 1.0).is_ok());
+        assert!(started.elapsed().as_secs() < 5);
+        assert_eq!(cr.status(), Ok(()));
+    }
+
+    #[test]
+    fn lines_and_pictures_of_no_size_leave_cairo_able_to_draw() {
+        // Review RV, batch 4: the dashes of a line 0 wide, all of 0, and a
+        // picture 0 wide put the context in an error for the rest of the
+        // page, and made PDF export fail.
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 10, 10).unwrap();
+        let cr = Context::new(&surface).unwrap();
+        cr.set_dash(&dash_pattern(&[0.0, 0.0]), 0.0);
+        cr.set_dash(&dash_pattern(&[3.0, -1.0]), 0.0);
+        cr.set_dash(&dash_pattern(&[f32::NAN]), 0.0);
+        assert_eq!(cr.status(), Ok(()));
+        assert_eq!(dash_pattern(&[3.0, 1.0]), [3.0, 1.0]);
+        assert!(!drawn_width(0.0) && !drawn_width(f32::NAN) && drawn_width(0.1));
+        let picture = cairo::ImageSurface::create(cairo::Format::ARgb32, 2, 2).unwrap();
+        paint_surface(&cr, &picture, (0.0, 0.0, 0.0, 5.0)).unwrap();
+        assert_eq!(cr.status(), Ok(()));
+    }
+
+    #[test]
+    fn a_png_that_declares_a_huge_size_is_not_decoded() {
+        // Review RV, batch 4: a PNG of a few megabytes may declare 30000
+        // pixels a side, which Cairo allocated, gigabytes, and filled.
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 2, 2).unwrap();
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        let small = desk_model::Picture::from_png(png.clone()).unwrap();
+        assert!(picture_surface(&small).is_some());
+        png[16..20].copy_from_slice(&30_000u32.to_be_bytes());
+        png[20..24].copy_from_slice(&30_000u32.to_be_bytes());
+        let crc = crc32(&png[12..29]);
+        png[29..33].copy_from_slice(&crc.to_be_bytes());
+        let huge = desk_model::Picture::from_png(png.clone()).unwrap();
+        assert_eq!(huge.width(), 30_000);
+        assert!(picture_surface(&huge).is_none());
+        // A tall screenshot is not refused for its height.
+        let tall = cairo::ImageSurface::create(cairo::Format::ARgb32, 1200, 16_000).unwrap();
+        let mut png = Vec::new();
+        tall.write_to_png(&mut png).unwrap();
+        let tall = desk_model::Picture::from_png(png).unwrap();
+        assert!(decodable(&tall));
+        assert!(picture_surface(&tall).is_some());
+    }
 }

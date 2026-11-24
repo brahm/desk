@@ -377,15 +377,48 @@ impl NotePlan {
 }
 
 /// The index of the page whose line holds an offset of a paragraph.
+/// A line that holds it comes first: a mark that starts a line is on the
+/// page of that line, not of the line before, which ends where it starts;
+/// only an offset at the end of the paragraph is held by none.
 fn page_of_offset(layout: &DocumentLayout, paragraph: usize, offset: usize) -> usize {
-    layout
-        .pages
-        .iter()
-        .position(|page| {
-            page.lines.iter().any(|l| {
-                l.paragraph == paragraph
-                    && (l.line.range.contains(&offset) || l.line.range.end == offset)
-            })
-        })
+    let pages = layout.pages.iter().map(|page| {
+        page.lines
+            .iter()
+            .map(|l| (l.paragraph, l.line.range.clone()))
+    });
+    page_holding(pages, paragraph, offset)
+}
+
+/// [`page_of_offset`] over the paragraphs and ranges of the lines of each
+/// page.
+fn page_holding<P, L>(pages: P, paragraph: usize, offset: usize) -> usize
+where
+    P: Iterator<Item = L> + Clone,
+    L: Iterator<Item = (usize, std::ops::Range<usize>)>,
+{
+    let on = |at: &dyn Fn(&std::ops::Range<usize>) -> bool| {
+        pages
+            .clone()
+            .position(|mut lines| lines.any(|(p, range)| p == paragraph && at(&range)))
+    };
+    on(&|range| range.contains(&offset))
+        .or_else(|| on(&|range| range.end == offset))
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod page_tests {
+    use super::*;
+
+    #[test]
+    fn a_mark_that_starts_a_page_is_numbered_on_it() {
+        // Review RV, batch 4: the line before, on the page before, ends
+        // where the mark starts, and was found first.
+        let pages = [vec![(0, 0..10)], vec![(0, 10..20)]];
+        let lines = || pages.iter().map(|p| p.iter().cloned());
+        assert_eq!(page_holding(lines(), 0, 10), 1);
+        assert_eq!(page_holding(lines(), 0, 5), 0);
+        // The end of the paragraph is held by no line.
+        assert_eq!(page_holding(lines(), 0, 20), 1);
+    }
 }

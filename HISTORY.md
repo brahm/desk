@@ -8,9 +8,17 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: Desk no longer hangs or runs out of memory on narrow table
+  columns, tiny fonts, huge wrap margins, huge PNG pictures or text
+  shadows, nor closes on charts without categories or with extreme
+  values (review RV, batch 4).
+* Fixed: pasted chart numbers such as 1.234,56, the ffl ligature in
+  PDFs, notes numbered by page, and page breaks with footnotes.
 * Fixed: Desk no longer closes or hangs on movies and sounds made to
   break Reduce Media, nor on documents of thousands of linked text boxes,
   paragraphs or objects (review RV, batch 3).
+* Fixed: Undo keeps the selection of each action after a thousand of
+  them, and typing after a Redo is a new step (review RV, batch 3).
 * Fixed: typing after an Undo is a new step of Undo, and conditional
   formatting rules copied into new rows and columns compare with the
   right cells.

@@ -50,6 +50,14 @@ impl LineSpace for Beside<'_> {
     fn is_exhausted(&self, top: f32) -> bool {
         self.inner.is_exhausted(top)
     }
+
+    fn min_piece(&self) -> f32 {
+        self.inner.min_piece()
+    }
+
+    fn uniform_below(&self) -> Option<f32> {
+        self.inner.uniform_below().map(|u| u.max(self.bottom))
+    }
 }
 
 /// A straight piece of an outline, from one point to another.
