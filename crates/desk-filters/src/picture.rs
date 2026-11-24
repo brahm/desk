@@ -13,6 +13,16 @@ use desk_model::Picture;
 /// bullet, and it keeps a large icon from making the document large.
 pub const MAX_SIDE: u32 = 256;
 
+/// The most pixels a TIFF or GIF picture may have, so that a small file
+/// that declares a huge size cannot take all the memory: 64 million,
+/// 256 MB of RGBA.
+const MAX_PIXELS: u64 = 64 << 20;
+
+/// Whether a picture of this size may be converted.
+fn fits(width: u32, height: u32) -> bool {
+    width > 0 && height > 0 && u64::from(width) * u64::from(height) <= MAX_PIXELS
+}
+
 /// A picture from the bytes of a PNG or TIFF file, or `None` when they are
 /// neither or cannot be read.
 pub fn picture(bytes: &[u8]) -> Option<Picture> {
@@ -56,20 +66,25 @@ fn from_gif(bytes: &[u8], max_side: u32) -> Option<Picture> {
     options.set_color_output(gif::ColorOutput::RGBA);
     let mut decoder = options.read_info(Cursor::new(bytes)).ok()?;
     let (width, height) = (u32::from(decoder.width()), u32::from(decoder.height()));
-    if width == 0 || height == 0 {
+    if !fits(width, height) {
         return None;
     }
-    // The frame is drawn on a clear screen of the size of the file.
+    // The frame is drawn on a clear screen of the size of the file. The
+    // offsets are worked out in usize: in u32, a screen of 65535 × 65535
+    // pixels overflows.
     let frame = decoder.read_next_frame().ok()??;
-    let mut rgba = vec![0u8; (width * height * 4) as usize];
-    let (fw, fh) = (u32::from(frame.width), u32::from(frame.height));
-    let (left, top) = (u32::from(frame.left), u32::from(frame.top));
-    for y in 0..fh.min(height.saturating_sub(top)) {
-        for x in 0..fw.min(width.saturating_sub(left)) {
-            let from = ((y * fw + x) * 4) as usize;
-            let to = (((y + top) * width + x + left) * 4) as usize;
-            if let Some(pixel) = frame.buffer.get(from..from + 4) {
-                rgba[to..to + 4].copy_from_slice(pixel);
+    let (width_px, height_px) = (width as usize, height as usize);
+    let mut rgba = vec![0u8; width_px * height_px * 4];
+    let (fw, fh) = (usize::from(frame.width), usize::from(frame.height));
+    let (left, top) = (usize::from(frame.left), usize::from(frame.top));
+    for y in 0..fh.min(height_px.saturating_sub(top)) {
+        for x in 0..fw.min(width_px.saturating_sub(left)) {
+            let from = (y * fw + x) * 4;
+            let to = ((y + top) * width_px + x + left) * 4;
+            if let (Some(pixel), Some(target)) =
+                (frame.buffer.get(from..from + 4), rgba.get_mut(to..to + 4))
+            {
+                target.copy_from_slice(pixel);
             }
         }
     }
@@ -84,7 +99,7 @@ fn from_tiff(bytes: &[u8], max_side: u32) -> Option<Picture> {
     use tiff::decoder::{Decoder, DecodingResult};
     let mut decoder = Decoder::new(Cursor::new(bytes)).ok()?;
     let (width, height) = decoder.dimensions().ok()?;
-    if width == 0 || height == 0 || u64::from(width) * u64::from(height) > 64 << 20 {
+    if !fits(width, height) {
         return None;
     }
     let color = decoder.colortype().ok()?;
@@ -127,16 +142,18 @@ fn scaled(rgba: &[u8], width: u32, height: u32, max_side: u32) -> (Vec<u8>, u32,
     let mut out = Vec::with_capacity((w * h * 4) as usize);
     for y in 0..h {
         for x in 0..w {
-            let mut sum = [0u32; 4];
+            // In u64: a square of many pixels, each colour weighed by its
+            // opacity, overflows u32.
+            let mut sum = [0u64; 4];
             let mut count = 0;
             for sy in y * factor..((y + 1) * factor).min(height) {
                 for sx in x * factor..((x + 1) * factor).min(width) {
                     let at = ((sy * width + sx) * 4) as usize;
                     // Colors weighed by their opacity, so that clear
                     // pixels do not darken the edges.
-                    let alpha = u32::from(rgba[at + 3]);
+                    let alpha = u64::from(rgba[at + 3]);
                     for (c, s) in sum.iter_mut().take(3).enumerate() {
-                        *s += u32::from(rgba[at + c]) * alpha;
+                        *s += u64::from(rgba[at + c]) * alpha;
                     }
                     sum[3] += alpha;
                     count += 1;
@@ -196,5 +213,43 @@ mod tests {
 
     fn picture_of(bytes: &[u8]) -> Picture {
         picture(bytes).unwrap()
+    }
+
+    /// A GIF with a screen of `width` × `height` and one frame of 1 × 1.
+    fn gif(width: u16, height: u16) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = gif::Encoder::new(&mut bytes, width, height, &[]).unwrap();
+            let frame = gif::Frame {
+                width: 1,
+                height: 1,
+                left: width - 1,
+                top: height - 1,
+                palette: Some(vec![255, 0, 0, 0, 0, 0]),
+                buffer: std::borrow::Cow::Borrowed(&[0]),
+                ..gif::Frame::default()
+            };
+            encoder.write_frame(&frame).unwrap();
+        }
+        bytes
+    }
+
+    #[test]
+    fn a_gif_that_declares_a_huge_screen_is_refused() {
+        // A few dozen bytes that declare 65535 × 65535 pixels: the
+        // screen was allocated at once, and its size overflowed u32
+        // (review RV, batch 1).
+        assert!(picture(&gif(65535, 65535)).is_none());
+        // A small one keeps its frame, placed on the screen.
+        let small = picture_of(&gif(3, 2));
+        assert_eq!((small.width(), small.height()), (3, 2));
+    }
+
+    #[test]
+    fn a_wide_picture_scaled_by_a_large_factor_is_converted() {
+        // A 70000 × 2 TIFF scaled to one pixel sums 140000 pixels, which
+        // overflowed u32 when weighed by their opacity.
+        let wide = picture_within(&tiff(70000, 2), 1).unwrap();
+        assert_eq!((wide.width(), wide.height()), (1, 1));
     }
 }
