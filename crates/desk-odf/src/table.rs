@@ -4,6 +4,7 @@
 //! Tables (`table:table`): those in the text of a document, and those in
 //! a frame, as Desk writes the tables that float on a page.
 
+use crate::budget::{self, Cost};
 use crate::ns::{DESK, OFFICE, STYLE, TABLE, TEXT};
 use crate::text::{Border, Paragraph};
 use crate::units::{Color, Length};
@@ -15,32 +16,6 @@ pub const MAX_COLUMNS: usize = 1024;
 
 /// The most rows read.
 pub const MAX_ROWS: usize = 10_000;
-
-/// The most cells read in the tables of one document, all together. The
-/// limits of rows and columns hold for each table, and a few hundred bytes
-/// that repeat a row of repeated cells in many tables would still clone
-/// millions of cells.
-pub const MAX_DOCUMENT_CELLS: usize = 1 << 20;
-
-thread_local! {
-    /// The cells the tables of the document read now may still clone.
-    static CELLS_LEFT: std::cell::Cell<usize> = const { std::cell::Cell::new(MAX_DOCUMENT_CELLS) };
-}
-
-/// Starts the count of cells of a new document.
-pub(crate) fn start_document() {
-    CELLS_LEFT.set(MAX_DOCUMENT_CELLS);
-}
-
-/// How many of `wanted` copies of a row of `cells` cells the document may
-/// still read, which are then counted.
-fn take_rows(wanted: usize, cells: usize) -> usize {
-    let cells = cells.max(1);
-    let left = CELLS_LEFT.get();
-    let n = wanted.min(left / cells);
-    CELLS_LEFT.set(left - n * cells);
-    n
-}
 
 /// A table.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -180,11 +155,24 @@ pub(crate) fn read_table(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph)
     while table.columns.len() < used {
         table.columns.push(TableColumn::default());
     }
-    for row in &mut table.rows {
-        while row.cells.len() < used {
-            row.cells.push(TableCell::default());
+    // Every row is filled to the widest, which the document pays for:
+    // a wide row and a narrow one repeated many times would otherwise be
+    // many cells that no budget counted.
+    let mut kept = table.rows.len();
+    for (i, row) in table.rows.iter_mut().enumerate() {
+        let missing = used.saturating_sub(row.cells.len());
+        let cost = Cost {
+            cells: missing,
+            bytes: 0,
+        };
+        if missing > 0 && budget::take_table(1, cost) == 0 {
+            kept = i;
+            break;
         }
+        row.cells.resize_with(used, TableCell::default);
     }
+    table.rows.truncate(kept);
+    table.header_rows = table.header_rows.min(kept);
     table
 }
 
@@ -225,7 +213,15 @@ fn read_parts(
             }
             "table-header-rows" => read_parts(child, table, paragraph, header_columns, true),
             "table-row" => {
+                let before = budget::table_left();
                 let row = read_row(child, paragraph);
+                // What the row cost to read, its cells and whatever they
+                // hold, is what each copy costs again.
+                let cost = budget::spent(before, budget::table_left());
+                let cost = Cost {
+                    cells: cost.cells.max(1),
+                    ..cost
+                };
                 let empty = row.cells.iter().all(|c| c.paragraphs.is_empty());
                 let mut n = count(child, "number-rows-repeated");
                 // Spreadsheets fill the sheet with a row repeated a
@@ -234,7 +230,11 @@ fn read_parts(
                     n = n.min(2);
                 }
                 let n = n.min(MAX_ROWS - table.rows.len().min(MAX_ROWS));
-                let n = take_rows(n, row.cells.len());
+                let n = if n == 0 {
+                    0
+                } else {
+                    1 + budget::take_table(n - 1, cost)
+                };
                 for _ in 0..n {
                     table.rows.push(row.clone());
                 }
@@ -257,6 +257,7 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
         if !covered && !c.name.is(TABLE, "table-cell") {
             continue;
         }
+        let before = budget::table_left();
         let value_type = c
             .attr(OFFICE, "value-type")
             .or_else(|| c.attr(crate::ns::CALCEXT, "value-type"))
@@ -302,6 +303,21 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
             n = n.min(2);
         }
         let n = n.min(MAX_COLUMNS - row.cells.len().min(MAX_COLUMNS));
+        // The first copy costs the cell as written; each other copy, that
+        // and what reading its content cost, such as a table inside.
+        let nested = budget::spent(before, budget::table_left());
+        let own = Cost {
+            cells: 1,
+            bytes: budget::weight(c),
+        };
+        let copy = Cost {
+            cells: own.cells + nested.cells,
+            bytes: own.bytes + nested.bytes,
+        };
+        let n = match budget::take_table(n.min(1), own) {
+            0 => 0,
+            _ => 1 + budget::take_table(n - 1, copy),
+        };
         for _ in 0..n {
             row.cells.push(cell.clone());
         }

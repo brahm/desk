@@ -81,7 +81,9 @@ pub(crate) fn zip_index<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<S
 ///
 /// The zip is read from the file as it is needed, not loaded whole: a
 /// flat file with a movie in it can be far larger than the largest index.
-pub(crate) fn open_zip(path: &Path) -> Result<Option<ZipArchive<fs::File>>, IworkError> {
+pub(crate) fn open_zip(
+    path: &Path,
+) -> Result<Option<ZipArchive<std::io::BufReader<fs::File>>>, IworkError> {
     let mut file = fs::File::open(path)?;
     let mut magic = [0; 4];
     let zip = file.read(&mut magic)? == magic.len() && magic == ZIP_MAGIC;
@@ -89,7 +91,7 @@ pub(crate) fn open_zip(path: &Path) -> Result<Option<ZipArchive<fs::File>>, Iwor
         return Ok(None);
     }
     file.rewind()?;
-    Ok(Some(ZipArchive::new(file)?))
+    Ok(Some(ZipArchive::new(std::io::BufReader::new(file))?))
 }
 
 /// The text of the index of a document on disk: a package folder or a

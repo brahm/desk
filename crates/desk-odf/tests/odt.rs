@@ -982,3 +982,48 @@ fn tables_that_repeat_rows_without_end_are_read_within_bounds() {
     let again = read_streams(&content(table), None, None).unwrap();
     assert!(again.body.iter().any(|p| p.objects().next().is_some()));
 }
+
+/// The cells, and the bytes of their text, of the tables of a document.
+fn table_size(document: &desk_odf::TextDocument) -> (usize, usize) {
+    document
+        .body
+        .iter()
+        .flat_map(|p| p.objects())
+        .filter_map(|o| match &o.kind {
+            desk_odf::DrawKind::Table(t) => Some(t),
+            _ => None,
+        })
+        .flat_map(|t| &t.rows)
+        .flat_map(|r| &r.cells)
+        .fold((0, 0), |(cells, bytes), c| {
+            let text: usize = c.paragraphs.iter().map(|p| p.text().len()).sum();
+            (cells + 1, bytes + text)
+        })
+}
+
+#[test]
+fn rows_filled_to_the_widest_are_counted() {
+    // A row of 1,024 cells and a row of one cell repeated 10,000 times:
+    // the second was counted as one cell a copy, then filled to 1,024
+    // (review of batch 1).
+    let table = r#"<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><table:table-row><table:table-cell table:number-columns-repeated="1024"><text:p>x</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="10000"><table:table-cell><text:p>y</text:p></table:table-cell></table:table-row></table:table>"#;
+    let document = read_streams(&content(&table.repeat(20)), None, None).unwrap();
+    let (cells, _) = table_size(&document);
+    assert!(cells <= desk_odf::MAX_DOCUMENT_CELLS, "{cells}");
+    assert!(cells > 0);
+}
+
+#[test]
+fn cells_repeated_with_much_text_are_counted_by_their_weight() {
+    // One cell of 256 KB of text, repeated across a row repeated many
+    // times: the count of cells held, and each copy cloned the text
+    // (review of batch 1).
+    let text = "x".repeat(256 << 10);
+    let table = format!(
+        r#"<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><table:table-row table:number-rows-repeated="10000"><table:table-cell table:number-columns-repeated="100"><text:p>{text}</text:p></table:table-cell></table:table-row></table:table>"#
+    );
+    let document = read_streams(&content(&table), None, None).unwrap();
+    let (cells, bytes) = table_size(&document);
+    assert!(bytes <= desk_odf::MAX_DOCUMENT_BYTES, "{bytes}");
+    assert!(cells > 0);
+}

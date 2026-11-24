@@ -925,35 +925,69 @@ impl<'a> Importer<'a> {
                 put.insert(*id);
             }
             if put.len() == before {
-                // A parent that cannot be put, as in a cycle: the rest go
-                // under Body, or stand alone as character styles. Each is
-                // put, since the runs already point to it.
-                for (style, id, name) in &order {
-                    if put.insert(*id) {
-                        let (paragraph, character) = merged(&[style], 1);
-                        match style.family {
-                            Family::Paragraph => {
-                                self.document.put_style(ParagraphStyle {
-                                    id: *id,
-                                    name: name.as_str().into(),
-                                    shortcut: None,
-                                    parent: (*id != self.body).then_some(self.body),
-                                    next: None,
-                                    paragraph,
-                                    character,
-                                })?;
-                            }
-                            Family::Character => {
-                                self.document.put_style(CharacterStyle {
-                                    id: *id,
-                                    name: name.as_str().into(),
-                                    shortcut: None,
-                                    parent: None,
-                                    character,
-                                })?;
-                            }
-                            Family::Layout | Family::Section => {}
+                // A parent that cannot be put, as in a cycle. One style of
+                // the cycle is put without its parent, under Body or
+                // alone as a character style, and the others then follow
+                // it; the styles below the cycle keep their parents. Each
+                // style is put, since the runs already point to it.
+                let parents: HashMap<StyleId, StyleId> = order
+                    .iter()
+                    .filter(|(_, id, _)| !put.contains(id))
+                    .filter_map(|(style, id, _)| {
+                        let chain = sheet.ancestry(style);
+                        let parent = chain
+                            .get(1)
+                            .and_then(|p| self.ids.get(&(p.family, p.ident.clone()?)).copied())?;
+                        Some((*id, parent))
+                    })
+                    .collect();
+                let Some(first) = order
+                    .iter()
+                    .map(|(_, id, _)| *id)
+                    .find(|id| !put.contains(id))
+                else {
+                    break;
+                };
+                // Up from the first style left, the first style met twice
+                // is in the cycle.
+                let mut seen = HashSet::new();
+                let mut at = first;
+                while seen.insert(at) {
+                    match parents.get(&at) {
+                        Some(parent) if !put.contains(parent) && *parent != self.body => {
+                            at = *parent;
                         }
+                        _ => break,
+                    }
+                }
+                if !order.iter().any(|(_, id, _)| *id == at) {
+                    at = first;
+                }
+                if let Some((style, id, name)) = order.iter().find(|(_, id, _)| *id == at) {
+                    put.insert(*id);
+                    let (paragraph, character) = merged(&[style], 1);
+                    match style.family {
+                        Family::Paragraph => {
+                            self.document.put_style(ParagraphStyle {
+                                id: *id,
+                                name: name.as_str().into(),
+                                shortcut: None,
+                                parent: (*id != self.body).then_some(self.body),
+                                next: None,
+                                paragraph,
+                                character,
+                            })?;
+                        }
+                        Family::Character => {
+                            self.document.put_style(CharacterStyle {
+                                id: *id,
+                                name: name.as_str().into(),
+                                shortcut: None,
+                                parent: None,
+                                character,
+                            })?;
+                        }
+                        Family::Layout | Family::Section => {}
                     }
                 }
             }
@@ -1522,7 +1556,13 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .files
         .iter()
         .filter_map(|(path, bytes)| {
-            let picture = crate::picture::picture_within(bytes, crate::picture::OBJECT_MAX_SIDE)?;
+            // Only a converted picture comes out otherwise than for a
+            // bullet; the others are not read twice.
+            let picture = if crate::picture::scaled_when_read(bytes) {
+                crate::picture::picture_within(bytes, crate::picture::OBJECT_MAX_SIDE)?
+            } else {
+                pictures.iter().find(|(p, _)| p == path)?.1.clone()
+            };
             Some((path.clone(), picture))
         })
         .collect();

@@ -551,7 +551,7 @@ fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Ve
         marks: Vec::new(),
         note_break: false,
         note_ends: Vec::new(),
-        guard: Guard::default(),
+        guard: ids.guard(),
     };
     reader.block(body);
     reader.note_ends.into_iter().map(|e| e - start).collect()

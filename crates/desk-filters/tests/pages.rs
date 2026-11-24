@@ -236,6 +236,30 @@ fn doc_22_character_styles_in_a_cycle_are_kept_and_saved() {
 }
 
 #[test]
+fn doc_22_a_style_below_a_cycle_keeps_its_parent() {
+    // When parents looped, every style left was put without a parent,
+    // those below the cycle too, and they lost what they inherit (review
+    // of batch 1).
+    let styles = r#"
+<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32"><sf:property-map/></sf:paragraphstyle>
+<sf:characterstyle sf:name="C" sf:ident="c" sf:parent-ident="d"><sf:property-map/></sf:characterstyle>
+<sf:characterstyle sf:name="D" sf:ident="d" sf:parent-ident="c"><sf:property-map/></sf:characterstyle>
+<sf:characterstyle sf:name="E" sf:ident="e" sf:parent-ident="c"><sf:property-map/></sf:characterstyle>"#;
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="e">x</sf:span></sf:p>"#;
+    let document = read_pages(index(styles, "", body).as_bytes()).unwrap();
+    let styles = document.styles();
+    let id = |name| {
+        styles
+            .by_name(StyleFamily::Character, name)
+            .map(|s| s.id())
+            .unwrap()
+    };
+    let e = styles.by_name(StyleFamily::Character, "E").unwrap();
+    assert_eq!(e.parent(), Some(id("C")));
+    assert!(!desk_filters::write_odt(&document).unwrap().is_empty());
+}
+
+#[test]
 fn doc_22_what_the_model_cannot_hold_is_logged() {
     let lists = r#"<sf:liststyle sf:name="Bullet" sf:ident="list-style-1" sfa:ID="L-1"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="text"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>
 <sf:liststyle sf:name="None" sf:ident="list-style-default" sfa:ID="L-0"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="none"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>"#;

@@ -42,6 +42,7 @@
 #![deny(clippy::indexing_slicing, clippy::unwrap_used)]
 #![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]
 
+mod budget;
 mod chart;
 mod draw;
 mod error;
@@ -54,6 +55,7 @@ mod units;
 mod write;
 mod xml;
 
+pub use budget::{MAX_CHART_CELLS, MAX_CHART_VALUES, MAX_DOCUMENT_BYTES, MAX_DOCUMENT_CELLS};
 pub use chart::{CHART_TYPE, ChartDocument, ChartSeries};
 pub use draw::{
     DrawKind, DrawObject, FillImage, Gradient, GradientStop, GraphicProperties, Marker,
@@ -65,8 +67,7 @@ pub use package::{
 };
 pub use read::read_streams;
 pub use table::{
-    MAX_COLUMNS, MAX_DOCUMENT_CELLS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties,
-    TableRow, TableTemplate,
+    MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow, TableTemplate,
 };
 pub use text::{
     Annotation, Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground,

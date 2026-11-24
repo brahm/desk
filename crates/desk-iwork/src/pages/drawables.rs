@@ -756,7 +756,7 @@ pub(super) fn read(
         graphic_styles,
         table_styles,
         skipped: Vec::new(),
-        guard: Guard::default(),
+        guard: ids.guard(),
     };
     let mut drawables = Vec::new();
     let mut chains: Vec<Vec<String>> = Vec::new();

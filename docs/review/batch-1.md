@@ -10,11 +10,11 @@ fuzzing for each target.
 
 | # | Class | Where | What failed | What was done |
 | --- | --- | --- | --- | --- |
-| 1 | A | `desk-iwork/src/pages.rs`, `pages/drawables.rs` | A span or a group that refers back to itself (`sfa:IDREF`) made the reader recurse until the stack overflowed, which aborts the app; spans that refer twice to the next at each level did 2^n work | A guard (`sf::Guard`) bounds the depth and the references one document follows; tests with a loop and with 40 levels of branching references |
-| 2 | A | `desk-filters/src/pages.rs` | Character styles whose parents loop were left out of the document while its runs named them, and saving as ODT failed | They are put without a parent; test that reads and saves them |
+| 1 | A | `desk-iwork/src/pages.rs`, `pages/drawables.rs` | A span or a group that refers back to itself (`sfa:IDREF`) made the reader recurse until the stack overflowed, which aborts the app; spans that refer twice to the next at each level did 2^n work | A guard (`sf::Guard`) bounds the depth and the references one document follows, shared by every reader of the document; tests with a loop, with 40 levels of branching references and with two readers |
+| 2 | A | `desk-filters/src/pages.rs` | Character styles whose parents loop were left out of the document while its runs named them, and saving as ODT failed | One style of the cycle is put without a parent, and the styles below it keep theirs; tests that read and save them |
 | 3 | A | `desk-filters/src/odt/tables.rs` | The `desk:table` JSON of a damaged file could name a table whose cells, lines or merges do not fit its size; the first cell read panicked. Chart data was trusted the same way | `Table::is_consistent` and `ChartData::is_consistent`; the reader falls back to the ODF cells; tests in `desk-table`, `desk-chart` and `desk-filters` |
 | 4 | A | `desk-filters/src/picture.rs` | A GIF of a few bytes that declared a 65535 × 65535 screen was allocated at once, and its size overflowed `u32`; the sums of a picture scaled by a large factor overflowed too | GIF and TIFF share a limit of 64 million pixels; sizes and sums in `usize` and `u64`; tests |
-| 5 | A | `desk-odf/src/table.rs`, `chart.rs` | The limits of rows and columns held per table, so a few hundred bytes cloned millions of cells across tables; a chart expanded its ranges whole | At most a million table cells per document and a million chart cells per chart; chart ranges cut to their data; tests |
+| 5 | A | `desk-odf/src/table.rs`, `chart.rs` | The limits of rows and columns held per table, so a few hundred bytes cloned millions of cells across tables; a chart expanded its ranges whole | A budget for the whole document (`desk-odf/src/budget.rs`): a million table cells, counting the cells a row is filled with; 64 MB of content copied by repetition, each copy weighed; a million chart cells and eight million series values across the charts; chart ranges cut to their data and counted apart from the data table, so a large valid chart keeps its series; tests |
 | 6 | A | `desk-odf/src/xml.rs` | Control characters from pasted HTML were written as they were, and LibreOffice could not open the file. A damaged file that carried them was read with them, so it read differently once saved again (found by fuzzing `odt_streams` and `odt_import`) | The characters XML 1.0 does not allow are left out on writing and on reading; tests |
 | 7 | B | `desk-iwork/src/lib.rs`, `package.rs` | A Pages flat file larger than 256 MB (one with a movie) was refused as an index too large | The zip is read from the file, and opened once for the index and its files rather than once per file; test with a 257 MB file |
 | 8 | B | `desk-filters/src/pages.rs` | TIFF and GIF pictures of objects, fills and posters came in scaled down to 256 pixels, the size of an image bullet | They keep up to 4096 pixels, as from ODT (`picture::OBJECT_MAX_SIDE`); test |
@@ -25,6 +25,14 @@ fuzzing for each target.
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
+
+The review of the pull request asked for the guard and the budgets to hold
+for the document rather than for each body, table or chart, and for the
+cycle fallback to keep the parents of the styles below a cycle; it is
+done in the rows above. It also asked that the pictures of a Pages
+document be decoded once (only TIFF and GIF, which are scaled, are read
+again at the size of objects) and that the zip of a flat file be read
+through a buffer.
 
 ## Lints (D-028)
 

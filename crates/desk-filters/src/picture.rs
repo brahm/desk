@@ -33,6 +33,12 @@ pub fn picture(bytes: &[u8]) -> Option<Picture> {
     picture_within(bytes, MAX_SIDE)
 }
 
+/// Whether the picture in these bytes comes out at a size that depends on
+/// the largest side asked for: a TIFF or a GIF file, which is converted.
+pub fn scaled_when_read(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") || bytes.starts_with(b"GIF8")
+}
+
 /// A picture from the bytes of a PNG, JPEG, PDF, TIFF or GIF file, a TIFF
 /// or GIF one scaled down to fit `max_side`, or `None` when they are none
 /// of those or cannot be read.

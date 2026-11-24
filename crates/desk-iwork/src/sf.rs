@@ -15,7 +15,12 @@ use crate::ns::{SF, SFA};
 use crate::xml::Element;
 
 /// The objects of an index by their `sfa:ID`.
-pub(crate) struct Ids<'a>(HashMap<&'a str, &'a Element>);
+pub(crate) struct Ids<'a> {
+    map: HashMap<&'a str, &'a Element>,
+    /// What the readers of the document have spent: one count for the
+    /// whole document, whichever reader follows a reference.
+    spent: std::rc::Rc<Spent>,
+}
 
 impl<'a> Ids<'a> {
     /// Indexes every element with an ID under `root`.
@@ -34,12 +39,23 @@ impl<'a> Ids<'a> {
                 children.reverse();
             }
         }
-        Self(ids)
+        Self {
+            map: ids,
+            spent: std::rc::Rc::default(),
+        }
+    }
+
+    /// A guard for a reader of this document. Every guard of a document
+    /// shares its depth and its count of references.
+    pub fn guard(&self) -> Guard {
+        Guard {
+            spent: std::rc::Rc::clone(&self.spent),
+        }
     }
 
     /// The element with an ID.
     pub fn get(&self, id: &str) -> Option<&'a Element> {
-        self.0.get(id).copied()
+        self.map.get(id).copied()
     }
 
     /// The element itself, or the one it refers to when it is a
@@ -66,42 +82,42 @@ pub(crate) const MAX_REFERENCES: u32 = 100_000;
 /// to an element it is reading, and from following references without
 /// end, which would overflow the stack or never finish.
 pub(crate) struct Guard {
-    depth: u32,
-    references: u32,
+    spent: std::rc::Rc<Spent>,
 }
 
-impl Default for Guard {
-    fn default() -> Self {
-        Self {
-            depth: 0,
-            references: MAX_REFERENCES,
-        }
-    }
+/// The depth and the references spent in reading one document.
+#[derive(Default)]
+pub(crate) struct Spent {
+    depth: std::cell::Cell<u32>,
+    references: std::cell::Cell<u32>,
 }
 
 impl Guard {
     /// Enters an element. False when it is too deep and must be skipped;
     /// otherwise [`Guard::leave`] is called once the element is read.
     pub fn enter(&mut self) -> bool {
-        if self.depth >= MAX_READ_DEPTH {
+        let depth = self.spent.depth.get();
+        if depth >= MAX_READ_DEPTH {
             return false;
         }
-        self.depth += 1;
+        self.spent.depth.set(depth + 1);
         true
     }
 
     /// Leaves the element entered last.
     pub fn leave(&mut self) {
-        self.depth = self.depth.saturating_sub(1);
+        let depth = &self.spent.depth;
+        depth.set(depth.get().saturating_sub(1));
     }
 
     /// Counts a reference about to be followed. False when the document
     /// has used up the references allowed, and the reference is skipped.
     pub fn follow(&mut self) -> bool {
-        if self.references == 0 {
+        let references = self.spent.references.get();
+        if references >= MAX_REFERENCES {
             return false;
         }
-        self.references -= 1;
+        self.spent.references.set(references + 1);
         true
     }
 
@@ -1035,5 +1051,25 @@ mod tests {
         .unwrap();
         let ids = Ids::new(&root);
         assert_eq!(ids.get("x").and_then(|e| e.attr("", "n")), Some("1"));
+    }
+
+    #[test]
+    fn the_readers_of_a_document_share_one_count_of_references() {
+        // Each text body had a guard of its own, so shapes in groups
+        // that are referenced many times multiplied the references
+        // followed (review of batch 1).
+        let root = crate::xml::parse("<r/>").unwrap();
+        let ids = Ids::new(&root);
+        let (mut a, mut b) = (ids.guard(), ids.guard());
+        for _ in 0..MAX_REFERENCES {
+            assert!(a.follow());
+        }
+        assert!(!b.follow());
+        for _ in 0..MAX_READ_DEPTH {
+            assert!(a.enter());
+        }
+        assert!(!b.enter());
+        b.leave();
+        assert!(a.enter());
     }
 }
