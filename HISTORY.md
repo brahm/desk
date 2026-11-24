@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: a file that Desk opened with content it does not read is no
+  longer saved over on its own; Save asks first, to save over it or as a
+  new file (D-031).
+* Changed: the review of all the code (phase RV) is over, and Writer
+  review (W2) resumes.
 * Changed: a link to the web opens at once, asks first or never opens, as
   a new preference says, which the first such link asks for; other links
   outside the document ask, and the address of a link shows under the

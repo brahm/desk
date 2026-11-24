@@ -185,6 +185,50 @@ pub struct DocumentWindow {
     /// it as opened could not be kept: changes then wait for Save, which
     /// asks where.
     in_place_refused: Cell<bool>,
+    /// Whether the file holds content Desk did not read and the owner of
+    /// the document has not said yet to save over it: until then it is
+    /// not saved over on its own, and Save asks first (D-031).
+    lossy_pending: Cell<bool>,
+    /// The file the owner said to save over although Desk did not read
+    /// all of it: opened again, as after Revert or a version restored, it
+    /// saves itself without asking again (D-031).
+    save_over: RefCell<Option<PathBuf>>,
+}
+
+/// How a document is saved: over its file, as it saves itself; after
+/// asking whether to, as its file holds content Desk did not read
+/// (D-031); or in a new file, which the Save dialog asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SaveRoute {
+    InPlace,
+    AskFirst,
+    NewFile,
+}
+
+/// How a document is saved, by whether its file is of the kind the app
+/// saves, whether its original could not be kept, and whether it was
+/// read with losses that saving over it has not been agreed to yet.
+fn save_route(in_place: bool, refused: bool, lossy_pending: bool) -> SaveRoute {
+    match (in_place && !refused, lossy_pending) {
+        (false, _) => SaveRoute::NewFile,
+        (true, true) => SaveRoute::AskFirst,
+        (true, false) => SaveRoute::InPlace,
+    }
+}
+
+impl SaveRoute {
+    /// Whether the document has a file of its own that it saves to, now
+    /// or once asked: its versions and Revert work on that file.
+    fn has_file(self) -> bool {
+        self != SaveRoute::NewFile
+    }
+}
+
+/// Whether a file just opened waits to be asked before it is saved over:
+/// the reader left out some of it, and the owner has not said yet to
+/// save over that file (D-031).
+fn waits_to_ask(left_out: bool, save_over: Option<&Path>, path: &Path) -> bool {
+    left_out && save_over != Some(path)
 }
 
 /// How long a pause in the editing is before the document saves itself
@@ -708,6 +752,8 @@ impl DocumentWindow {
             autosave_source: RefCell::new(None),
             opened_kept: Cell::new(false),
             in_place_refused: Cell::new(false),
+            lossy_pending: Cell::new(false),
+            save_over: RefCell::new(None),
             slides,
         });
         this.add_actions();
@@ -948,13 +994,22 @@ impl DocumentWindow {
     /// such as a Pages document, waits for Save As, and keeps a recovery
     /// draft until then.
     fn autosaves(&self) -> bool {
-        self.opener.is_some()
-            && !self.in_place_refused.get()
+        self.route() == SaveRoute::InPlace
+    }
+
+    /// How the document is saved now.
+    fn route(&self) -> SaveRoute {
+        let in_place = self.opener.is_some()
             && self
                 .path
                 .borrow()
                 .as_deref()
-                .is_some_and(|p| self.saves_in_place(p))
+                .is_some_and(|p| self.saves_in_place(p));
+        save_route(
+            in_place,
+            self.in_place_refused.get(),
+            self.lossy_pending.get(),
+        )
     }
 
     /// Saves the document a moment after the editing pauses (DOC-11).
@@ -1054,6 +1109,10 @@ impl DocumentWindow {
                 }
                 self.opened_kept.set(false);
                 self.in_place_refused.set(false);
+                // What Desk did not read is not written over without
+                // asking (D-031).
+                let waits = waits_to_ask(shown.left_out, self.save_over.borrow().as_deref(), path);
+                self.lossy_pending.set(waits);
                 *self.path.borrow_mut() = Some(path.to_owned());
                 *self.name.borrow_mut() = display_name(path);
                 self.show_document(shown.document);
@@ -1417,9 +1476,9 @@ impl DocumentWindow {
             ),
             (
                 "revert",
-                self.autosaves() && (modified || self.opened_kept.get()),
+                self.route().has_file() && (modified || self.opened_kept.get()),
             ),
-            ("versions", self.autosaves()),
+            ("versions", self.route().has_file()),
             ("properties", path.is_some()),
         ] {
             self.enable(action, enabled);
@@ -1527,11 +1586,17 @@ impl DocumentWindow {
 
     /// Writes the document to a file, and says why when it cannot.
     fn write_to(&self, path: &Path) -> bool {
+        self.write_named(path, path)
+    }
+
+    /// Writes the document to `path`, with the fields of its file name
+    /// showing `named`.
+    fn write_named(&self, path: &Path, named: &Path) -> bool {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
         let pages = editor.pages();
-        let mut document = crate::fields::saved(editor.document(), &path.to_string_lossy());
+        let mut document = crate::fields::saved(editor.document(), &named.to_string_lossy());
         // How it shows, to reopen the same way (INT-08, DOC-16).
         document.set_view(Some(self.current_view()));
         // A picture of the first page, unless the preferences leave it out
@@ -1558,6 +1623,10 @@ impl DocumentWindow {
     /// A document that saves itself saves its changes now and keeps a
     /// version of what it holds, as Cmd-S of iWork does (DOC-11).
     fn save(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
+        if self.route() == SaveRoute::AskFirst {
+            self.ask_save_over(done);
+            return;
+        }
         let path = self.path.borrow().clone();
         match path {
             Some(path) if self.autosaves() => {
@@ -1574,6 +1643,118 @@ impl DocumentWindow {
                 done(saved);
             }
             _ => self.save_as(done),
+        }
+    }
+
+    /// Asks whether to save over a file that holds content Desk did not
+    /// read, which saving over it leaves out, or to save in a new file
+    /// (D-031). Saving over it once makes the document save itself again.
+    fn ask_save_over(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Save Over “{name}”?").replace("{name}", &self.name.borrow())),
+            Some(&tr(
+                "Desk did not read everything in this file, as Document Warnings lists. Saving over it leaves out what Desk did not read. The file as it was opened stays among its versions.",
+            )),
+        );
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("new", &tr("Save as _New File"));
+        dialog.add_response("over", &tr("Save _Over"));
+        dialog.set_response_appearance("over", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("new", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("new"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.choose(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |response| {
+                let Some(this) = weak.upgrade() else {
+                    done(false);
+                    return;
+                };
+                match response.as_str() {
+                    "over" => this.save_over(done),
+                    "new" => this.save_as(done),
+                    _ => done(false),
+                }
+            },
+        );
+    }
+
+    /// Saves over the file, as the owner said to, and lets the document
+    /// save itself from now on, even opened again (D-031).
+    fn save_over(self: &Rc<Self>, done: impl FnOnce(bool) + 'static) {
+        // Saved now as any file is; the answer holds only once the file
+        // is written, so that a failed write does not let the document
+        // save itself over the file later without asking.
+        self.lossy_pending.set(false);
+        let weak = Rc::downgrade(self);
+        let path = self.path.borrow().clone();
+        // Boxed, as Save may ask again and come back here.
+        let after: Box<dyn FnOnce(bool)> = Box::new(move |saved| {
+            if let Some(this) = weak.upgrade() {
+                if saved {
+                    *this.save_over.borrow_mut() = path;
+                } else {
+                    this.lossy_pending.set(true);
+                }
+                this.refresh();
+            }
+            done(saved);
+        });
+        self.save(after);
+    }
+
+    /// Keeps the changes of a document that waits to be asked before it
+    /// is saved over (D-031) as a version, without touching its file, so
+    /// that Revert or a version restored does not lose them. Says whether
+    /// nothing was lost.
+    fn keep_changes_as_version(&self, path: &Path) -> bool {
+        if !self.editor().is_some_and(|e| e.is_modified()) {
+            return true;
+        }
+        let extension = path
+            .extension()
+            .map(|e| e.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        // A name no one can guess, in a folder that only its owner can
+        // read.
+        let folder =
+            std::env::temp_dir().join(format!("desk-changes-{}", glib::uuid_string_random()));
+        let cannot = |message: &str| {
+            self.alert(&tr("Cannot Keep the Changes"), message);
+            false
+        };
+        if let Err(error) =
+            std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+                .create(&folder)
+        {
+            return cannot(&error.to_string());
+        }
+        // Named as the document, which the fields of its name show.
+        let file = match path.file_name() {
+            Some(name) => folder.join(name),
+            None => folder.join(format!("document.{extension}")),
+        };
+        // Writing alerts by itself when it fails.
+        let kept = self.write_named(&file, path)
+            && match crate::versions::Store::for_document(path).keep(
+                &file,
+                crate::versions::Kind::Automatic,
+                crate::versions::now(),
+            ) {
+                Ok(_) => true,
+                Err(error) => cannot(&error.to_string()),
+            };
+        let _ = std::fs::remove_dir_all(&folder);
+        kept
+    }
+
+    /// Drops the recovery draft once the document read again holds no
+    /// changes: a draft stays while a Revert or a restore failed.
+    fn drop_draft_if_read_again(&self) {
+        if self.editor().is_some_and(|e| !e.is_modified()) {
+            self.drop_draft();
         }
     }
 
@@ -1681,6 +1862,8 @@ impl DocumentWindow {
         // The file is new: its first version is what was saved now.
         self.opened_kept.set(false);
         self.in_place_refused.set(false);
+        self.lossy_pending.set(false);
+        self.save_over.borrow_mut().take();
         *self.path.borrow_mut() = Some(path.to_owned());
         *self.name.borrow_mut() = display_name(path);
         if let Some(editor) = self.editor() {
@@ -2127,6 +2310,38 @@ impl DocumentWindow {
         // Changes not saved yet are saved first, which keeps the file as
         // it was opened as a version, and the changes as the version
         // before the revert (review RV, batch 5).
+        if self.lossy_pending.get() {
+            // Never saved over while it waits to be asked (D-031): its
+            // changes are kept as a version, and the file as it was opened
+            // comes back, from its version when another took its place.
+            if !self.keep_changes_as_version(&path) {
+                return;
+            }
+            let opened = self
+                .opened_kept
+                .get()
+                .then(|| {
+                    crate::versions::Store::for_document(&path)
+                        .list()
+                        .into_iter()
+                        .find(|v| v.kind == crate::versions::Kind::Opened)
+                })
+                .flatten();
+            match opened {
+                Some(version) => self.put_in_place(opener, &path, &version),
+                None if !self.opened_kept.get() => {
+                    self.load(opener, &path);
+                    self.drop_draft_if_read_again();
+                }
+                // A version took the place of the file, and the file as
+                // it was opened is gone from its versions.
+                None => self.alert(
+                    &tr("Cannot Revert"),
+                    &tr("The version of the document as it was opened is no longer kept."),
+                ),
+            }
+            return;
+        }
         if !self.opened_kept.get() && !self.editor().is_some_and(|e| e.is_modified()) {
             // The file is still as it was opened.
             self.load(opener, &path);
@@ -2150,16 +2365,42 @@ impl DocumentWindow {
         let (Some(opener), Some(path)) = (self.opener, self.path.borrow().clone()) else {
             return;
         };
-        if !self.autosave() {
-            return;
+        // A file read with losses is not saved over (D-031): its changes
+        // are kept as a version instead.
+        let kept = if self.lossy_pending.get() {
+            self.keep_changes_as_version(&path)
+        } else {
+            self.autosave()
+        };
+        if kept {
+            self.put_in_place(opener, &path, version);
         }
-        let store = crate::versions::Store::for_document(&path);
+    }
+
+    /// Puts the bytes of a version in place of the file, keeping the file
+    /// as a version first: as opened when it was not kept yet, which a
+    /// file read with losses never was. Nothing is replaced when it
+    /// cannot be kept.
+    fn put_in_place(
+        self: &Rc<Self>,
+        opener: &'static Opener,
+        path: &Path,
+        version: &crate::versions::Version,
+    ) {
+        let store = crate::versions::Store::for_document(path);
         if path.exists() {
-            let _ = store.keep(
-                &path,
-                crate::versions::Kind::Automatic,
-                crate::versions::now(),
-            );
+            let kind = if self.opened_kept.get() {
+                crate::versions::Kind::Automatic
+            } else {
+                crate::versions::Kind::Opened
+            };
+            if let Err(error) = store.keep(path, kind, crate::versions::now()) {
+                self.alert(&tr("Cannot Restore the Version"), &error.to_string());
+                return;
+            }
+            if kind == crate::versions::Kind::Opened {
+                self.opened_kept.set(true);
+            }
         }
         // The bytes of the version take the place of the file, not the
         // version as Desk reads and writes it again, which may leave out
@@ -2168,10 +2409,14 @@ impl DocumentWindow {
             self.alert(&tr("Cannot Restore the Version"), &message);
             return;
         }
-        match std::fs::read(&version.path).and_then(|bytes| crate::write_replacing(&path, &bytes)) {
+        match std::fs::read(&version.path).and_then(|bytes| crate::write_replacing(path, &bytes)) {
             Ok(()) => {
+                // Bytes Desk did not write: whether to save over what it
+                // does not read of them is asked again (D-031).
+                self.save_over.borrow_mut().take();
                 let opened = self.opened_kept.get();
-                self.load(opener, &path);
+                self.load(opener, path);
+                self.drop_draft_if_read_again();
                 // The version as opened is kept already.
                 self.opened_kept.set(opened);
                 self.refresh();
@@ -2223,6 +2468,10 @@ impl DocumentWindow {
         if let Some(tab) = self.tab.get() {
             self.frame().view().set_selected_page(tab);
         }
+        if self.route() == SaveRoute::AskFirst {
+            self.ask_to_close_unread(done);
+            return;
+        }
         // The dialog of GNOME apps, rather than Don't Save of Pages.
         let dialog = adw::AlertDialog::new(
             Some(&tr("Save Changes?")),
@@ -2262,6 +2511,54 @@ impl DocumentWindow {
                         });
                     }
                     _ => done(false),
+                }
+            },
+        );
+    }
+
+    /// Asks what to do with the changes of a file that Desk did not read
+    /// whole before its tab closes, in one dialog: leave them out, save
+    /// them as a new file, or save over the file (D-031).
+    fn ask_to_close_unread(self: &Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Save Changes?")),
+            Some(
+                &tr("“{name}” contains unsaved changes. Desk did not read everything in this file, as Document Warnings lists: saving over it leaves out what Desk did not read, and saving as a new file keeps the file as it is.")
+                    .replace("{name}", &self.name.borrow()),
+            ),
+        );
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("discard", &tr("_Discard"));
+        dialog.add_response("over", &tr("Save _Over"));
+        dialog.add_response("new", &tr("Save as _New File"));
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("over", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("new", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("new"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.choose(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |response| {
+                let Some(this) = weak.upgrade() else {
+                    done(false);
+                    return;
+                };
+                let after = {
+                    let weak = Rc::downgrade(&this);
+                    move |saved: bool| {
+                        if let (true, Some(this)) = (saved, weak.upgrade()) {
+                            this.drop_draft();
+                        }
+                        done(saved);
+                    }
+                };
+                match response.as_str() {
+                    "discard" => after(true),
+                    "over" => this.save_over(after),
+                    "new" => this.save_as(after),
+                    _ => after(false),
                 }
             },
         );
@@ -4264,6 +4561,35 @@ fn remember_recent(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_read_with_losses_is_saved_over_only_after_asking() {
+        // B-061, decided by the owner (D-031): a file opened with content
+        // Desk does not read was saved over on its own after the first
+        // edit.
+        assert_eq!(save_route(true, false, false), SaveRoute::InPlace);
+        assert_eq!(save_route(true, false, true), SaveRoute::AskFirst);
+        assert_eq!(save_route(false, false, true), SaveRoute::NewFile);
+        assert_eq!(save_route(true, true, true), SaveRoute::NewFile);
+        assert_eq!(save_route(true, true, false), SaveRoute::NewFile);
+    }
+
+    #[test]
+    fn a_file_saved_over_once_is_not_asked_about_again() {
+        // Review of the pull request of D-031: after Save Over, Revert or
+        // a version restored read the file again and asked again, and the
+        // versions could no longer be browsed.
+        let file = Path::new("/d/Report.odt");
+        assert!(waits_to_ask(true, None, file));
+        assert!(!waits_to_ask(true, Some(file), file));
+        assert!(waits_to_ask(true, Some(Path::new("/d/Other.odt")), file));
+        // A font replaced by another loses nothing, and does not ask.
+        assert!(!waits_to_ask(false, None, file));
+        // The versions of a file that waits to be asked can be browsed.
+        assert!(SaveRoute::AskFirst.has_file());
+        assert!(SaveRoute::InPlace.has_file());
+        assert!(!SaveRoute::NewFile.has_file());
+    }
 
     #[test]
     fn doc_14_a_copy_is_named_after_the_original() {

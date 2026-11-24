@@ -55,6 +55,10 @@ and drawing, the interface, and a pass across the crates. Each batch
 opens with a report of findings in [`review/`](review/README.md) and
 ends in a pull request whose fixes each come with a test.
 
+RV ended on 24 November, with its six batches merged (pull requests 202
+to 207) and the last row it left for the owner, B-061, decided as D-031.
+W2 resumed the same day.
+
 | Phase | What it delivers | Inventory rows | Estimate (days) |
 | --- | --- | --- | --- |
 | **R** Replanning | Goals, decisions, backlog register, inventory, window proposals, ODF catalogue, architecture, this roadmap, contributor guides | - | In progress |
