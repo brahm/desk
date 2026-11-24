@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: the tables of Pages '09 documents open in Desk Writer with
+  their fills, lines, alternating rows, text styles, cell formats and
+  conditional formatting, as Pages shows them.
 * Fixed: Desk Writer opens the tables in the text of Pages '09
   documents, which it dropped, with their cells, formulas, merged cells
   and the comments of their cells.

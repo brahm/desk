@@ -1889,6 +1889,37 @@ paragraph, and objects on a second page.
   of the table and of its cells, are B-049, a sixth pull request of
   step 5, as the owner chose to read the tables in W2.
 
+### 24 November: the styles of the tables of Pages '09 files (step 5 of W2, sixth part)
+
+- The tables of Pages '09 files now look as Pages 15.4 shows them, as
+  their PDFs in the corpus compare (tab-01, tab-04, tab-14, tab-20,
+  tab-21, tab-23, tab-28). Each cell names its cell style (`sf:s`),
+  whose parents (`sf:parent-ident`) give what it does not; the table
+  style gives the cell style of each part, header rows, header columns,
+  footer and body, the alternating fill, and the vector styles of the
+  lines of each part, which the runs of `sf:horizontal-gridline-styles`
+  and `sf:vertical-gridline-styles` replace line by line. Each look is
+  read once, so a table of many cells keeps few looks.
+- A paragraph style that does not say where its text goes puts it on
+  the left: Pages shows the numbers of tab-14 on the left, and only the
+  natural alignment (4) is Desk's automatic one.
+- The format of a cell comes from the format type of its style, whose
+  codes are those the files show: 256 automatic, 257 currency, 258
+  percentage, 259 scientific, 260 text, 261 date and time, 268
+  duration, 269 numeral system and 270 a format someone made. A date
+  keeps its pattern as a custom format, which writes it as Pages does.
+  The rule of tab-21 is code 6, not equal to, as the manifest records;
+  a rule turns on only what it sets, since Pages lists every attribute
+  with those it leaves off or clear.
+- Other codes, of rules and of formats, are not in the files and are
+  not guessed: those cells keep the automatic format and no rule. They
+  wait for the reader of Numbers '09, where the same model has more
+  files to learn from (B-050, T5). Two differences from Pages remain,
+  both of Desk's tables already on record: a gradient fill is drawn in
+  its first colour (TAB-22, partial), and a duration is written with
+  the units that are not zero, 5h where Pages writes 5h 0m 0s (NCEL-15,
+  partial). B-049 is closed.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

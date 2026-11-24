@@ -426,6 +426,8 @@ struct Reader<'a, 'b> {
     document: &'b mut PagesDocument,
     /// The graphic styles with an identifier.
     graphic_styles: HashMap<&'a str, &'a Element>,
+    /// The styles that tables refer to, by element and identifier.
+    table_styles: super::tables::Styles<'a>,
     /// The elements the reader does not read, by name, with how many.
     skipped: Vec<(String, usize)>,
 }
@@ -672,7 +674,7 @@ impl<'a> Reader<'a, '_> {
                 DrawableKind::Group(objects)
             }
             "media" => media(self.ids, element),
-            "tabular-info" => match super::tables::read(self.ids, element) {
+            "tabular-info" => match super::tables::read(self.ids, &self.table_styles, element) {
                 Some(table) => DrawableKind::Table(Box::new(table)),
                 None => DrawableKind::Other("tabular-info".to_owned()),
             },
@@ -716,10 +718,27 @@ pub(super) fn read(
         .filter(|e| e.name.is(SF, "graphic-style"))
         .filter_map(|e| Some((e.attr(SF, "ident")?, e)))
         .collect();
+    let mut table_styles = super::tables::Styles::new();
+    for e in root.descendants().filter(|e| {
+        matches!(
+            e.name.local.as_str(),
+            "cell-style" | "paragraphstyle" | "layoutstyle" | "vector-style" | "tabular-style"
+        )
+    }) {
+        if let Some(ident) = e.attr(SF, "ident") {
+            // A named style before an anonymous one of the same
+            // identifier.
+            let key = (e.name.local.as_str(), ident);
+            if !table_styles.contains_key(&key) || e.attr(SF, "name").is_some() {
+                table_styles.insert(key, e);
+            }
+        }
+    }
     let mut reader = Reader {
         ids,
         document,
         graphic_styles,
+        table_styles,
         skipped: Vec::new(),
     };
     let mut drawables = Vec::new();

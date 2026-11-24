@@ -924,9 +924,10 @@ fn comment_object(
 }
 
 /// A table of Pages '09 as a table of the model: its grid, the sizes of
-/// its rows and columns, its headers and footers, what its cells hold and
-/// its merged cells (B-048, TAB-01). The cells look as those of a new
-/// table; the styles of Pages '09 are left out.
+/// its rows and columns, its headers and footers, what its cells hold, its
+/// merged cells (B-048, TAB-01), and its look (B-049): the fills of its
+/// parts and of its cells, the font, color, alignment and wrapping of
+/// their text, every other row filled, and its lines.
 fn table_of(source: &iwork::Table) -> desk_model::Table {
     use desk_model::table::{Area, Content, Num};
     let mut table = desk_model::Table::new(source.rows(), source.cols());
@@ -953,6 +954,7 @@ fn table_of(source: &iwork::Table) -> desk_model::Table {
         };
         table.set_content(cell.row, cell.col, content);
     }
+    table_look(source, &mut table);
     for cell in source.cells.iter().filter(|c| c.rows > 1 || c.cols > 1) {
         let _ = table.merge(Area {
             row: cell.row,
@@ -962,6 +964,266 @@ fn table_of(source: &iwork::Table) -> desk_model::Table {
         });
     }
     table
+}
+
+/// A color of iWork as a color of tables.
+fn table_color(color: desk_iwork::sf::Color) -> desk_model::table::Color {
+    let c = rgba(color);
+    desk_model::table::Color {
+        r: c.r,
+        g: c.g,
+        b: c.b,
+        a: c.a,
+    }
+}
+
+/// The fill of a cell style: none when it says none or does not say.
+fn cell_fill(look: &iwork::CellLook) -> Option<desk_model::table::CellFill> {
+    use desk_model::table::CellFill;
+    match look.cell.get("fill")? {
+        Value::Color(color) => Some(CellFill::Color(table_color(*color))),
+        Value::Gradient { angle, stops, .. } if stops.len() >= 2 => Some(CellFill::Gradient {
+            start: table_color(stops[0].1),
+            end: table_color(stops[stops.len() - 1].1),
+            angle: (angle.to_degrees().round() as i64).rem_euclid(360) as i16,
+        }),
+        _ => None,
+    }
+}
+
+/// The format of a cell of Pages '09 as a format of tables (TAB-28).
+fn cell_format(format: &iwork::CellFormat) -> desk_model::table::Format {
+    use desk_model::table::{CustomFormat, DurationStyle, Format, Negative};
+    let negative = |n: &iwork::NumberFormat| match n.negative {
+        1 => Negative::Red,
+        2 => Negative::Parentheses,
+        3 => Negative::RedParentheses,
+        _ => Negative::Minus,
+    };
+    let custom = |name: &str, pattern: &str| {
+        if pattern.is_empty() {
+            Format::Automatic
+        } else {
+            Format::Custom(CustomFormat {
+                name: name.to_owned(),
+                pattern: pattern.into(),
+            })
+        }
+    };
+    match format {
+        iwork::CellFormat::Automatic | iwork::CellFormat::Other(_) => Format::Automatic,
+        iwork::CellFormat::Currency(n) => Format::Currency {
+            symbol: match n.currency.as_str() {
+                "BRL" | "" => "R$".to_owned(),
+                "USD" => "US$".to_owned(),
+                "EUR" => "€".to_owned(),
+                "GBP" => "£".to_owned(),
+                "JPY" => "¥".to_owned(),
+                code => code.to_owned(),
+            },
+            decimals: n.decimals.unwrap_or(2).min(10),
+            thousands: n.thousands,
+            negative: negative(n),
+            accounting: n.accounting,
+        },
+        iwork::CellFormat::Percent(n) => Format::Percent {
+            decimals: n.decimals.map(|d| d.min(10)),
+            thousands: n.thousands,
+            negative: negative(n),
+        },
+        iwork::CellFormat::Scientific(n) => Format::Scientific {
+            decimals: n.decimals.unwrap_or(2).min(10),
+        },
+        iwork::CellFormat::Text => Format::Text,
+        // The pattern of a date of Pages '09, as `dd/MM/yy HH:mm`, is in
+        // the syntax of the custom formats of tables.
+        iwork::CellFormat::DateTime(pattern) => custom(pattern, pattern),
+        iwork::CellFormat::Duration(pattern) => Format::Duration {
+            style: if pattern.contains(':') {
+                DurationStyle::Clock
+            } else {
+                DurationStyle::Compact
+            },
+        },
+        iwork::CellFormat::Base(n) => Format::Base {
+            base: n.base.filter(|b| (2..=36).contains(b)).unwrap_or(10),
+            places: n.base_places.unwrap_or(0).min(32),
+            twos_complement: n.base_minus == Some(false),
+        },
+        iwork::CellFormat::Custom(n) => custom(n.name.as_deref().unwrap_or(&n.pattern), &n.pattern),
+    }
+}
+
+/// A rule of conditional formatting of Pages '09 as one of tables
+/// (TAB-21): none for a kind of condition whose code the project's files
+/// do not show (B-050).
+fn cell_rule(rule: &iwork::CellRule) -> Option<desk_model::table::Rule> {
+    use desk_model::table::{Condition, Num, Operand, Rule, RuleStyle};
+    let operand = |i: usize| match rule.operands.get(i)? {
+        iwork::RuleOperand::Number(n) => Some(Operand::Number(Num(*n))),
+        iwork::RuleOperand::Text(t) => Some(Operand::Text(t.clone())),
+    };
+    let condition = match rule.kind {
+        // tab-21: the rule that Pages saved as not equal to 50.
+        6 => Condition::NotEqual(operand(0)?),
+        _ => return None,
+    };
+    Some(Rule {
+        condition,
+        style: RuleStyle {
+            text_color: rule.font_color.map(table_color),
+            bold: rule.bold,
+            italic: rule.italic,
+            underline: rule.underline,
+            strike: rule.strike,
+            fill: rule.fill.map(table_color),
+        },
+    })
+}
+
+/// The look of a table of Pages '09 on a table of the model (B-049).
+fn table_look(source: &iwork::Table, table: &mut desk_model::Table) {
+    use desk_model::table::{Border, CellFill, HAlign, LineStyle, VAlign};
+    let look = |i: Option<usize>| i.and_then(|i| source.looks.get(i));
+    let color_of = |i: Option<usize>| match look(i).and_then(cell_fill) {
+        Some(CellFill::Color(color)) => Some(color),
+        _ => None,
+    };
+    // The parts of the table, from its table style.
+    let [header_row, header_column, footer, body] = source.part_looks;
+    if source.part_looks.iter().any(Option::is_some) {
+        table.style.header_row_fill = color_of(header_row);
+        table.style.header_column_fill = color_of(header_column);
+        table.style.footer_fill = color_of(footer);
+        table.style.body_fill = color_of(body);
+    }
+    table.style.alternating = source.banded.map(table_color);
+    let body_look = look(body);
+    let (font, size) = match body_look {
+        Some(l) => (
+            l.text
+                .string("fontName")
+                .filter(|n| !n.is_empty())
+                .map(|n| super::font_face(n).0),
+            l.text.number("fontSize").filter(|s| *s > 0.0),
+        ),
+        None => (None, None),
+    };
+    if let Some(font) = &font {
+        table.style.font = font.clone();
+    }
+    if let Some(size) = size {
+        table.style.font_size = (size * 1000.0).round() as u32;
+    }
+    if let Some(Value::Padding { left, .. }) = body_look.and_then(|l| l.layout.get("padding")) {
+        table.style.padding = (left.max(0.0) * 1000.0).round() as u32;
+    }
+    let (rows, cols) = (source.rows(), source.cols());
+    for r in 0..rows {
+        for c in 0..cols {
+            let index = source
+                .cell_looks
+                .get((r * cols + c) as usize)
+                .copied()
+                .flatten();
+            let Some(look) = look(index) else { continue };
+            let area_fill = match table.region(r, c) {
+                desk_table::Region::HeaderRow => table.style.header_row_fill,
+                desk_table::Region::HeaderColumn => table.style.header_column_fill,
+                desk_table::Region::Footer => table.style.footer_fill,
+                desk_table::Region::Body => table.style.body_fill,
+            };
+            let style = &mut table.cell_mut(r, c).style;
+            let fill = cell_fill(look);
+            if fill != area_fill.map(CellFill::Color) {
+                style.fill = fill;
+            }
+            let text = &look.text;
+            if let Some(name) = text.string("fontName").filter(|n| !n.is_empty()) {
+                let (family, weight, italic) = super::font_face(name);
+                style.text.bold = weight.is_bold();
+                style.text.italic = italic;
+                if Some(&family) != font.as_ref() {
+                    style.text.font = Some(family);
+                }
+            }
+            if let Some(bold) = text.number("bold") {
+                style.text.bold = bold != 0.0;
+            }
+            if let Some(italic) = text.number("italic") {
+                style.text.italic = italic != 0.0;
+            }
+            if let Some(s) = text.number("fontSize").filter(|s| *s > 0.0)
+                && Some(s) != size
+            {
+                style.text.size = Some((s * 1000.0).round() as u32);
+            }
+            if let Some(Value::Color(color)) = text.get("fontColor") {
+                let color = table_color(*color);
+                if color != desk_model::table::Color::rgb(0, 0, 0) {
+                    style.text.color = Some(color);
+                }
+            }
+            style.h_align = match text.number("alignment").map(|a| a as i64) {
+                Some(0) => HAlign::Left,
+                Some(1) => HAlign::Right,
+                Some(2) => HAlign::Center,
+                Some(3) => HAlign::Justify,
+                // Natural, by the kind of the value.
+                Some(4) => HAlign::Auto,
+                // A style that does not say is left aligned, as Pages
+                // shows the numbers of tab-14.
+                _ => HAlign::Left,
+            };
+            style.v_align = match look.layout.number("verticalAlignment").map(|a| a as i64) {
+                Some(1) => VAlign::Middle,
+                Some(2) => VAlign::Bottom,
+                _ => VAlign::Top,
+            };
+            if let Some(wrap) = look.cell.number("SFTCellTextWrapProperty") {
+                style.wrap = wrap != 0.0;
+            }
+            let format = cell_format(&look.format);
+            let rules: Vec<_> = look.rules.iter().filter_map(cell_rule).collect();
+            let cell = table.cell_mut(r, c);
+            cell.format = format;
+            if !rules.is_empty() {
+                cell.rules = rules.into();
+            }
+        }
+    }
+    // The lines.
+    let border = |stroke: &Option<desk_iwork::sf::Stroke>| {
+        stroke.as_ref().and_then(|s| {
+            let style = match &s.pattern {
+                desk_iwork::sf::StrokePattern::Empty => return None,
+                desk_iwork::sf::StrokePattern::Solid => LineStyle::Solid,
+                desk_iwork::sf::StrokePattern::Dashes(d) if d.first().is_some_and(|d| *d < 1.5) => {
+                    LineStyle::Dotted
+                }
+                desk_iwork::sf::StrokePattern::Dashes(_) => LineStyle::Dashed,
+            };
+            Some(Border {
+                width: (s.width * 1000.0).round().clamp(1.0, 100_000.0) as u32,
+                color: table_color(s.color),
+                style,
+            })
+        })
+    };
+    if source.h_lines.len() == ((rows + 1) * cols) as usize {
+        for i in 0..=rows {
+            for c in 0..cols {
+                table.set_h_border(i, c, border(&source.h_lines[(i * cols + c) as usize]));
+            }
+        }
+    }
+    if source.v_lines.len() == (rows * (cols + 1)) as usize {
+        for r in 0..rows {
+            for j in 0..=cols {
+                table.set_v_border(r, j, border(&source.v_lines[(r * (cols + 1) + j) as usize]));
+            }
+        }
+    }
 }
 
 /// Puts on the cells of a table the comments of Pages '09 on them, which
