@@ -98,6 +98,7 @@ impl Formula {
         let mut out = String::new();
         let mut chars = body.chars().peekable();
         let mut in_text = false;
+        let mut in_quote = false;
         while let Some(c) = chars.next() {
             if in_text {
                 out.push(c);
@@ -110,16 +111,33 @@ impl Formula {
                 }
                 continue;
             }
+            // A header named in quotes may hold a bracket.
+            if in_quote {
+                out.push(c);
+                if c == '\'' {
+                    in_quote = false;
+                }
+                continue;
+            }
             match c {
                 '"' => {
                     in_text = true;
                     out.push(c);
                 }
+                '\'' => {
+                    in_quote = true;
+                    out.push(c);
+                }
                 '[' => {
+                    // A sheet named in quotes may hold a bracket too.
                     let mut reference = String::new();
+                    let mut quoted = false;
                     for d in chars.by_ref() {
-                        if d == ']' {
+                        if d == ']' && !quoted {
                             break;
+                        }
+                        if d == '\'' {
+                            quoted = !quoted;
                         }
                         reference.push(d);
                     }
@@ -177,5 +195,17 @@ mod tests {
         let f = Formula::parse("=LOG10(100)+A1").unwrap();
         assert_eq!(f.to_odf(), "of:=LOG10(100)+[.A1]");
         assert_eq!(Formula::parse_odf(&f.to_odf()).unwrap(), f);
+    }
+
+    #[test]
+    fn a_header_with_a_bracket_goes_to_odf_and_back() {
+        let f = Formula::parse("=SUM('Preço [R$]')+A1").unwrap();
+        assert_eq!(Formula::parse_odf(&f.to_odf()).unwrap(), f);
+        assert_eq!(
+            Formula::parse_odf("of:=['Plan [1]'.A1]+1")
+                .unwrap()
+                .to_string(),
+            "=#REF!+1"
+        );
     }
 }
