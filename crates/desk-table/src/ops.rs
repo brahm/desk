@@ -116,12 +116,21 @@ const SERIES: &[&[&str]] = &[
     &["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
 ];
 
-fn series_position(text: &str) -> Option<(usize, usize)> {
+/// Where a name is in a series.
+fn position_in(series: usize, text: &str) -> Option<usize> {
     let lower = text.trim().to_lowercase();
-    SERIES
-        .iter()
-        .enumerate()
-        .find_map(|(s, names)| names.iter().position(|n| *n == lower).map(|p| (s, p)))
+    SERIES.get(series)?.iter().position(|n| *n == lower)
+}
+
+/// The first series that holds every name, and where each is in it. Short
+/// names are shared: "jan" is Portuguese and English, so "Jan", "Feb" go
+/// by the English names, where the first series holding "jan" alone,
+/// the Portuguese, had no "feb".
+fn series_of(texts: &[String]) -> Option<(usize, Vec<usize>)> {
+    (0..SERIES.len()).find_map(|s| {
+        let positions: Option<Vec<usize>> = texts.iter().map(|t| position_in(s, t)).collect();
+        positions.map(|p| (s, p))
+    })
 }
 
 /// A name of a series in the case of the example: capitalized or not.
@@ -254,7 +263,7 @@ impl<T: CellText> Table<T> {
                                 Content::Text(t) => t.plain(),
                                 _ => String::new(),
                             };
-                        let last = series_position(&last_text).map_or(0, |p| p.1) as i64;
+                        let last = position_in(*s, &last_text).unwrap_or(0) as i64;
                         let n = names.len() as i64;
                         let pos = (last + d * offset(k) as i64).rem_euclid(n) as usize;
                         Content::Text(T::from_plain(&in_case_of(names[pos], &t.plain())))
@@ -425,10 +434,13 @@ impl<T: CellText> Table<T> {
                     if c >= span.col && c < span.col_end() {
                         continue;
                     }
+                    // A cell beside the split one grows over the new row
+                    // when it ends with it. One that went past it was
+                    // grown by the insertion already.
                     let s = self.span(span.row, c);
-                    if s.row == span.row || s.row_end() == at + 1 {
+                    if s.row_end() == at {
                         let grown = Area {
-                            rows: at + 1 - s.row,
+                            rows: s.rows + 1,
                             ..s
                         };
                         self.merges_mut().retain(|m| *m != s);
@@ -451,9 +463,9 @@ impl<T: CellText> Table<T> {
                         continue;
                     }
                     let s = self.span(r, span.col);
-                    if s.col == span.col || s.col_end() == at + 1 {
+                    if s.col_end() == at {
                         let grown = Area {
-                            cols: at + 1 - s.col,
+                            cols: s.cols + 1,
                             ..s
                         };
                         self.merges_mut().retain(|m| *m != s);
@@ -585,26 +597,22 @@ fn sequence_step<T: CellText>(cells: &[Cell<T>]) -> Option<Step> {
         }
         return None;
     }
-    let positions: Option<Vec<(usize, usize)>> = cells
+    let texts: Option<Vec<String>> = cells
         .iter()
         .map(|c| match &c.content {
-            Content::Text(t) => series_position(&t.plain()),
+            Content::Text(t) => Some(t.plain()),
             _ => None,
         })
         .collect();
-    let positions = positions?;
-    let series = positions.first()?.0;
-    if !positions.iter().all(|p| p.0 == series) {
-        return None;
-    }
+    let (series, positions) = series_of(&texts?)?;
     if positions.len() == 1 {
         return Some(Step::Named(series, 1));
     }
-    let n = SERIES[series].len() as i64;
-    let d = (positions[1].1 as i64 - positions[0].1 as i64).rem_euclid(n);
+    let n = SERIES.get(series)?.len() as i64;
+    let d = (*positions.get(1)? as i64 - *positions.first()? as i64).rem_euclid(n);
     if positions
         .windows(2)
-        .all(|w| (w[1].1 as i64 - w[0].1 as i64).rem_euclid(n) == d)
+        .all(|w| (w[1] as i64 - w[0] as i64).rem_euclid(n) == d)
     {
         Some(Step::Named(series, d))
     } else {
@@ -659,6 +667,12 @@ mod tests {
         assert_eq!(texts(&t, 3), ["x", "x", "", ""]);
         t.fill(Area::cell(0, 4), FillDirection::Down, 1);
         assert_eq!(texts(&t, 4)[1], "Terça-feira");
+        // English short months go on in English: "jan" is Portuguese too,
+        // and the first series holding it has no "feb" (review RV,
+        // batch 2).
+        let mut t = table(&[&["Jan"], &["Feb"], &[""], &[""]]);
+        t.fill(Area::between((0, 0), (1, 0)), FillDirection::Down, 2);
+        assert_eq!(texts(&t, 0), ["Jan", "Feb", "Mar", "Apr"]);
     }
 
     #[test]
@@ -691,6 +705,29 @@ mod tests {
         t.split(0, 2, Split::Rows).unwrap();
         assert_eq!(t.rows(), 3);
         assert_eq!(t.span(0, 0), Area::between((0, 0), (1, 0)));
+    }
+
+    #[test]
+    fn splitting_a_cell_keeps_the_merged_cells_beside_it() {
+        // Splitting one cell broke the merges beside it: one that crossed
+        // the split row shrank, one that ended on it did not grow
+        // (review RV, batch 2).
+        let rows: Vec<Vec<&str>> = vec![vec!["", "", ""]; 5];
+        let rows: Vec<&[&str]> = rows.iter().map(Vec::as_slice).collect();
+        let mut t = table(&rows);
+        t.merge(Area::between((1, 2), (3, 2))).unwrap();
+        t.split(1, 1, Split::Rows).unwrap();
+        assert_eq!(t.span(1, 2), Area::between((1, 2), (4, 2)));
+        assert_eq!(t.span(1, 0), Area::between((1, 0), (2, 0)));
+        let mut t = table(&rows);
+        t.merge(Area::between((1, 2), (2, 2))).unwrap();
+        t.split(2, 1, Split::Rows).unwrap();
+        assert_eq!(t.span(1, 2), Area::between((1, 2), (3, 2)));
+        let mut t = table(&rows);
+        t.merge(Area::between((0, 0), (0, 1))).unwrap();
+        t.split(0, 2, Split::Columns).unwrap();
+        assert_eq!(t.span(0, 0), Area::between((0, 0), (0, 1)));
+        assert_eq!(t.span(1, 2), Area::between((1, 2), (1, 3)));
     }
 
     #[test]

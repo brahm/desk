@@ -652,7 +652,11 @@ impl<T: CellText> Table<T> {
         }
         if at < self.header_rows {
             self.header_rows = (self.header_rows + count).min(MAX_HEADERS);
-        } else if at > self.rows() - count - self.footer_rows && at < self.rows() - count {
+        } else if self.footer_rows > 0 && at > self.rows() - count - self.footer_rows {
+            // Inside the footer, or after it at the end: the footer takes
+            // the new rows. At the end they would otherwise become the
+            // footer, and the footer rows they push up, as a row of
+            // totals, the body.
             self.footer_rows = (self.footer_rows + count).min(MAX_HEADERS);
         }
         Ok(())
@@ -1067,6 +1071,13 @@ mod tests {
             Content::Formula("=SUM(C2:C4)".into())
         );
         assert_eq!(table.footer_rows(), 1);
+        // Rows added at the end of a table with a footer join the footer:
+        // the totals stayed in the footer, not the new empty row (review
+        // RV, batch 2).
+        let rows = table.rows();
+        table.insert_rows(rows, 1).unwrap();
+        assert_eq!(table.footer_rows(), 2);
+        assert_eq!(table.region(rows - 1, 2), Region::Footer);
     }
 
     #[test]
