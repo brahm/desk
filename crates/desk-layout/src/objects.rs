@@ -727,6 +727,10 @@ pub fn place_object_text(
     // Pages takes from the text of a box the room of the objects above it
     // on its page that the text wraps around, other than the boxes linked
     // to it.
+    // The heads of all the boxes, found once: each by itself goes through
+    // all the objects.
+    let heads = document.text_box_heads();
+    let head_of = |id: desk_model::NodeId| heads.get(&id).copied().unwrap_or(id);
     for page in &mut layout.pages {
         let objects = &page.objects;
         let wraps: Vec<Arc<[Exclusion]>> = (0..objects.len())
@@ -734,12 +738,12 @@ pub fn place_object_text(
                 if !matches!(objects[i].object.kind, ObjectKind::TextBox(_)) {
                     return Arc::from([]);
                 }
-                let head = document.text_box_head(objects[i].object.id);
+                let head = head_of(objects[i].object.id);
                 objects[i + 1..]
                     .iter()
                     .filter(|o| {
                         !matches!(o.object.kind, ObjectKind::TextBox(_))
-                            || document.text_box_head(o.object.id) != head
+                            || head_of(o.object.id) != head
                     })
                     .filter_map(PlacedObject::exclusion)
                     .collect()
@@ -757,7 +761,7 @@ pub fn place_object_text(
                 lay_out_text(document, &mut layout.pages[p].objects[i], system);
                 continue;
             };
-            if document.objects().get(id).is_none() || document.text_box_head(id) != id {
+            if document.objects().get(id).is_none() || head_of(id) != id {
                 continue;
             }
             let paragraphs = text.paragraphs.clone();

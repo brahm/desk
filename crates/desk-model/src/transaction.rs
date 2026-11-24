@@ -798,6 +798,12 @@ pub struct Editor {
     document: Document,
     undo: Vec<Transaction>,
     redo: Vec<Transaction>,
+    /// The actions that entered the history, which goes on counting when
+    /// the oldest leave it.
+    recorded: u64,
+    /// Whether the next action may join the last one: false after an
+    /// Undo or a Redo.
+    joinable: bool,
 }
 
 impl Editor {
@@ -807,6 +813,8 @@ impl Editor {
             document,
             undo: Vec::new(),
             redo: Vec::new(),
+            recorded: 0,
+            joinable: false,
         }
     }
 
@@ -828,6 +836,13 @@ impl Editor {
     /// The number of actions that Undo can take back.
     pub fn undo_depth(&self) -> usize {
         self.undo.len()
+    }
+
+    /// The number of actions that have entered the history since editing
+    /// began. An edit entered it when this grows; the depth of the history
+    /// stops growing at [`MAX_UNDO`], and does not tell.
+    pub fn recorded(&self) -> u64 {
+        self.recorded
     }
 
     /// Runs a user action as a transaction, which Undo can take back.
@@ -859,12 +874,12 @@ impl Editor {
         if transaction.is_empty() {
             return Ok((value, false));
         }
-        // After an Undo, the action is a new one, not the end of the one
-        // before what was undone.
-        let undone = !self.redo.is_empty();
+        // After an Undo or a Redo, the action is a new one, not the end of
+        // the one before.
+        let joinable = self.joinable;
         self.redo.clear();
         match self.undo.last_mut() {
-            Some(last) if !undone && last.name == transaction.name => {
+            Some(last) if joinable && last.name == transaction.name => {
                 last.ops.extend(transaction.ops);
                 last.inverse.extend(transaction.inverse);
                 Ok((value, true))
@@ -884,6 +899,8 @@ impl Editor {
             self.undo.remove(0);
         }
         self.undo.push(transaction);
+        self.recorded += 1;
+        self.joinable = true;
     }
 
     /// Undoes the last action. Returns false when there was none.
@@ -896,6 +913,7 @@ impl Editor {
             return Err(error);
         }
         self.redo.push(transaction);
+        self.joinable = false;
         Ok(true)
     }
 
@@ -909,6 +927,7 @@ impl Editor {
             return Err(error);
         }
         self.undo.push(transaction);
+        self.joinable = false;
         Ok(true)
     }
 

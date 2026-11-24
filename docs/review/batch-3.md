@@ -23,6 +23,12 @@ operation against its inverse.
 | 10 | A | `desk-table/src/table.rs` | The width of a table summed its columns in `u32`, which a file's widths overflowed: a panic in debug builds, a wrong width in ODT | Summed in `u64`, at most the largest; test |
 | 11 | C | `desk-model/src/pixel_outline.rs` | Tracing a picture of many opaque specks made a list of every row for each speck: a dithered picture froze the window when text wrapped tightly | Each part keeps the rows it crosses; test with 90,000 specks |
 | 12 | D | `desk-model/src/media_trim.rs`, `media.rs`, `picture.rs` | Bytes of media and pictures read with indexes that a file could put out of range | Taken with `get`; the lints of D-028 deny new ones there |
+| 13 | B | `desk-model/src/transaction.rs`, `desk-ui/src/editing*` | Once the history held `MAX_UNDO` actions, its depth stopped growing, and the window took each edit for one that changed nothing: no selection to put back, and a text box's visit not one action | The editor counts the actions recorded (`recorded`), which the window compares; the window's own history keeps as many; test |
+| 14 | B | `desk-model/src/transaction.rs` | Typing after undoing and redoing everything joined the typing redone | A flag, cleared by Undo and Redo, says whether an action may join the last; test |
+| 15 | B | `desk-model/src/story.rs`, `desk-layout/src/objects.rs` | A text box in a group that a box outside it links to was its own head, so its text and the invisibles were the wrong ones | The head is found by going back from the box itself; the layout finds all the heads once; test |
+| 16 | A | `desk-model/src/media_trim.rs` | *Security.* MP4 chunks all at one place, with large samples, made Reduce Media copy the same bytes over and over: 160 GB from a few thousand rows | The samples of a track, and of all tracks, may hold no more bytes than the file; test |
+| 17 | C | `desk-model/src/media_trim.rs` | *Security.* Each chunk looked for its row of `stsc` through all of them: chunks times rows | Rows out of order are refused, and each chunk finds its row by halves; test |
+| 18 | B | `desk-model/src/media_trim.rs` | A WAVE with a second `data` too short to cut was not reduced | The first of each, which was read, is kept, as for AIFF; test |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
@@ -38,7 +44,8 @@ pasted content, can make the model do. The model opens no file and runs
 nothing; styles refuse parent cycles, list levels and roman numbers are
 bounded, groups are bounded by the readers, and the identifiers of new
 nodes never come from a file. What a document could do was spend time:
-findings 1 to 6. It also noted, with less confidence, that notes in the
+findings 1 to 6, and, from the review of the pull request, 16 and 17.
+It also noted, with less confidence, that notes in the
 Symbols format have labels as long as their number divided by six; a
 document needs thousands of notes for that to matter, and it is left
 as it is.

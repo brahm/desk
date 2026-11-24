@@ -59,9 +59,20 @@ impl Document {
     }
 
     /// The text box whose text a text box shows: the first of the boxes
-    /// linked to it, or itself (OBJ-13).
+    /// linked to it, or itself (OBJ-13). A box in a group has the head of
+    /// the box linked to it too. In a loop of links, the head is the last
+    /// box met going back before the loop closes.
     pub fn text_box_head(&self, id: NodeId) -> NodeId {
-        self.text_box_heads().get(&id).copied().unwrap_or(id)
+        let before = self.text_box_before();
+        let mut head = id;
+        let mut seen = HashSet::from([id]);
+        while let Some(&b) = before.get(&head) {
+            if !seen.insert(b) {
+                break;
+            }
+            head = b;
+        }
+        head
     }
 
     /// The box linked to each linked box: the first, from the back, whose
@@ -79,20 +90,22 @@ impl Document {
         before
     }
 
-    /// [`Document::text_box_head`] of every object, found together in
-    /// time of the number of objects: a file can link thousands of boxes.
-    /// Going back from a box ends at a box with none before it, its head,
-    /// or at a box met already, in a loop of links, and the head is then
-    /// the last box before it.
-    fn text_box_heads(&self) -> HashMap<NodeId, NodeId> {
+    /// [`Document::text_box_head`] of every object of the page and of
+    /// every box linked to, in a group too, found together in time of the
+    /// number of objects: a file can link thousands of boxes. Going back
+    /// from a box ends at a box with none before it, its head, or at a box
+    /// met already, in a loop of links, and the head is then the last box
+    /// before it. An object not in the map is its own head.
+    pub fn text_box_heads(&self) -> HashMap<NodeId, NodeId> {
         let before = self.text_box_before();
         let mut heads: HashMap<NodeId, NodeId> = HashMap::new();
-        for o in self.objects().iter() {
-            if heads.contains_key(&o.id) {
+        let ids = self.objects().iter().map(|o| o.id);
+        for id in ids.chain(before.keys().copied()) {
+            if heads.contains_key(&id) {
                 continue;
             }
-            let mut path = vec![o.id];
-            let mut at: HashMap<NodeId, usize> = HashMap::from([(o.id, 0)]);
+            let mut path = vec![id];
+            let mut at: HashMap<NodeId, usize> = HashMap::from([(id, 0)]);
             let mut head = None;
             let mut looped = None;
             while let Some(&b) = path.last().and_then(|last| before.get(last)) {
@@ -107,7 +120,7 @@ impl Document {
                 at.insert(b, path.len());
                 path.push(b);
             }
-            let last = path.last().copied().unwrap_or(o.id);
+            let last = path.last().copied().unwrap_or(id);
             match looped {
                 // Each box of the loop goes round it to the box before
                 // itself; those that lead into it go round to the last.
@@ -710,6 +723,48 @@ mod chain_tests {
         for &id in &ids {
             assert_eq!(heads[&id], head_one_by_one(&document, id), "{id:?}");
         }
+    }
+
+    #[test]
+    fn a_box_in_a_group_has_the_head_of_the_box_linked_to_it() {
+        // Review of RV batch 3: the heads of the objects of the page left
+        // out a box in a group that a box outside it links to.
+        let mut editor = Editor::new(Document::new_word_processing());
+        let ids = editor
+            .edit("Add", |e| {
+                let ids = [e.new_id(), e.new_id(), e.new_id()];
+                let mut boxes = Vec::new();
+                for i in 0..2 {
+                    let style = e.document().styles().default_paragraph();
+                    let paragraph = Paragraph::from_runs(
+                        e.new_id(),
+                        style,
+                        crate::ParaAttrs::default(),
+                        [Run::new("x")],
+                    )?;
+                    let mut text = TextBox::new(Arc::from([paragraph]), Length::from_points(4));
+                    text.next = (i == 0).then_some(ids[1]);
+                    boxes.push(Object::new(
+                        ids[i],
+                        ObjectKind::TextBox(text),
+                        Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                    ));
+                }
+                let inner = boxes.pop().into_iter().collect::<Vec<_>>();
+                e.add_object(boxes.remove(0))?;
+                e.add_object(Object::new(
+                    ids[2],
+                    ObjectKind::Group(Arc::from(inner)),
+                    Frame::from_pt(0.0, 0.0, 50.0, 50.0),
+                ))?;
+                Ok(ids)
+            })
+            .unwrap();
+        let document = editor.into_document();
+        assert!(document.objects().iter().all(|o| o.id != ids[1]));
+        assert_eq!(document.text_box_head(ids[1]), ids[0]);
+        assert_eq!(document.text_box_heads().get(&ids[1]), Some(&ids[0]));
+        assert_eq!(head_one_by_one(&document, ids[1]), ids[0]);
     }
 
     #[test]

@@ -161,8 +161,12 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
     let (first, last) = frame_range(cut, rate, frames)?;
     let mut out = b"RIFF\0\0\0\0WAVE".to_vec();
     for (id, body) in chunks {
-        // How many frames there are, which the new data says.
-        if &id == b"fact" {
+        // How many frames there are, which the new data says; and of
+        // chunks given twice, the first, which was read, is kept.
+        let again = matches!(&id, b"fmt " | b"data")
+            && !std::ptr::eq(body, format)
+            && !std::ptr::eq(body, samples);
+        if &id == b"fact" || again {
             continue;
         }
         let body = if &id == b"data" {
@@ -501,6 +505,14 @@ impl<'a> Track<'a> {
                 .map(|r| u32::from_be_bytes(*r) as usize)
                 .collect()
         };
+        // Samples do not share bytes: more of them than the file has would
+        // be copied over and over, a few thousand rows making gigabytes.
+        let total = sizes
+            .iter()
+            .try_fold(0usize, |total, &size| total.checked_add(size))?;
+        if total > file.len() {
+            return None;
+        }
         let chunks: Vec<u64> = if let Some(stco) = find(&stbl, b"stco") {
             table(stco, 4)?
                 .iter()
@@ -516,12 +528,17 @@ impl<'a> Track<'a> {
             .iter()
             .map(|r| Some((be32(r, 0)? as usize, be32(r, 4)? as usize)))
             .collect::<Option<_>>()?;
+        // The rows are in the order of their first chunks, which lets each
+        // chunk find its row by halves.
+        if !runs.is_sorted_by_key(|(first, _)| *first) {
+            return None;
+        }
         let mut offsets = Vec::with_capacity(count);
         for (i, &chunk) in chunks.iter().enumerate() {
-            let per = runs
-                .iter()
-                .rev()
-                .find(|(first, _)| *first <= i + 1)
+            let row = runs.partition_point(|(first, _)| *first <= i + 1);
+            let per = row
+                .checked_sub(1)
+                .and_then(|r| runs.get(r))
                 .map_or(0, |r| r.1);
             let mut at = usize::try_from(chunk).ok()?;
             for _ in 0..per {
@@ -778,6 +795,15 @@ fn mp4(data: &[u8], cut: &Cut) -> Option<Kept> {
         }
         Some(atom(b"moov", &out))
     };
+    // The tracks do not share bytes either.
+    let kept = tracks.iter().try_fold(0usize, |total, t| {
+        t.kept_samples()
+            .iter()
+            .try_fold(total, |total, s| total.checked_add(s.3))
+    })?;
+    if kept > data.len() {
+        return None;
+    }
     let ftyp = find(&top, b"ftyp").map(|f| atom(b"ftyp", f));
     let head = ftyp.as_ref().map_or(0, Vec::len);
     let bodies: Vec<Vec<u8>> = tracks.iter().map(|t| t.data(data)).collect();
@@ -871,6 +897,14 @@ mod tests {
 
     #[test]
     fn obj_20_a_wave_sound_keeps_the_samples_from_its_start_to_its_stop() {
+        // A second data chunk too short to cut is left out, as AIFF's is.
+        let mut twice = wave(1000, 10_000);
+        twice.extend(b"data");
+        twice.extend(2u32.to_le_bytes());
+        twice.extend([0, 1]);
+        let mut media = Media::from_bytes(twice).unwrap();
+        media.start = 2_000;
+        assert!(media.reduced().is_some());
         let mut media = Media::from_bytes(wave(1000, 10_000)).unwrap();
         assert!(!media.reducible());
         assert!(media.reduced().is_none());
@@ -999,8 +1033,9 @@ mod tests {
         for _ in 0..count {
             stsz.extend(4u32.to_be_bytes());
         }
-        let mut stsc = 1u32.to_be_bytes().to_vec();
-        for n in [1u32, 2, 1] {
+        // Two rows that say the same: two samples in each chunk.
+        let mut stsc = 2u32.to_be_bytes().to_vec();
+        for n in [1u32, 2, 1, 2, 2, 1] {
             stsc.extend(n.to_be_bytes());
         }
         let mut stco = (chunks.len() as u32).to_be_bytes().to_vec();
@@ -1128,6 +1163,44 @@ mod tests {
         assert!(media.reduced().is_none());
         assert_eq!(scaled(u64::MAX, 600, 1), u64::MAX);
         assert_eq!(millis(u64::MAX, 1), u32::MAX);
+    }
+
+    #[test]
+    fn a_movie_whose_samples_share_their_bytes_is_not_cut() {
+        // Review of RV batch 3: chunks all at one place, with large
+        // samples, were copied once for each, a few thousand rows making
+        // gigabytes.
+        let mut data = movie();
+        let stco = data.windows(4).position(|w| w == b"stco").unwrap();
+        let first: [u8; 4] = data[stco + 12..stco + 16].try_into().unwrap();
+        for c in 0..15 {
+            data[stco + 12 + c * 4..stco + 16 + c * 4].copy_from_slice(&first);
+        }
+        let stsz = data.windows(4).position(|w| w == b"stsz").unwrap();
+        for i in 0..30 {
+            data[stsz + 16 + i * 4..stsz + 20 + i * 4].copy_from_slice(&100u32.to_be_bytes());
+        }
+        let top = atoms(&data).unwrap();
+        let moov = atoms(find(&top, b"moov").unwrap()).unwrap();
+        let trak = moov.iter().find(|a| &a.kind == b"trak").unwrap();
+        assert!(Track::read(trak.body, &data).is_none());
+        let mut media = Media::from_bytes(data.clone()).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_none());
+    }
+
+    #[test]
+    fn a_movie_whose_chunk_rows_are_out_of_order_is_not_cut() {
+        // Each chunk finds its row by halves, which needs them in order.
+        let mut data = movie();
+        let mut media = Media::from_bytes(data.clone()).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_some());
+        let stsc = data.windows(4).position(|w| w == b"stsc").unwrap();
+        data[stsc + 24..stsc + 28].copy_from_slice(&0u32.to_be_bytes());
+        let mut media = Media::from_bytes(data).unwrap();
+        media.start = 1_000;
+        assert!(media.reduced().is_none());
     }
 
     #[test]

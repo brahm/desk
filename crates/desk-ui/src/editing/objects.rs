@@ -968,7 +968,7 @@ impl TextEditor {
             return;
         }
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let result = self
             .state
             .borrow_mut()
@@ -977,7 +977,7 @@ impl TextEditor {
         self.state.borrow_mut().typing = false;
         match result {
             Ok(selected) => {
-                if self.state.borrow().editor.undo_depth() > depth {
+                if self.state.borrow().editor.recorded() > depth {
                     {
                         let mut state = self.state.borrow_mut();
                         let action = state.next_action;
@@ -1310,7 +1310,7 @@ impl TextEditor {
         change: impl FnOnce(&mut Vec<desk_model::AlphaSeed>),
     ) {
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let edits = |edit: &mut desk_model::Edit| {
             let Some(mut object) = edit.document().objects().get(id).cloned() else {
                 return Ok(());
@@ -1337,7 +1337,7 @@ impl TextEditor {
             gtk::glib::g_warning!("desk", "cannot take the color out: {error}");
             return;
         }
-        if self.state.borrow().editor.undo_depth() > depth {
+        if self.state.borrow().editor.recorded() > depth {
             let mut state = self.state.borrow_mut();
             let action = state.next_action;
             state.next_action += 1;

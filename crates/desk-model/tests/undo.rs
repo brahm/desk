@@ -423,4 +423,33 @@ fn the_history_keeps_the_last_actions() {
             .unwrap();
     }
     assert_eq!(editor.undo_depth(), desk_model::MAX_UNDO);
+    // What was recorded goes on counting, for the window to tell that an
+    // edit entered the history when it is full.
+    let recorded = editor.recorded();
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(Position::new(first, 0), "b")
+        })
+        .unwrap();
+    assert_eq!(editor.recorded(), recorded + 1);
+    assert_eq!(editor.undo_depth(), desk_model::MAX_UNDO);
+}
+
+#[test]
+fn typing_after_a_redo_is_a_new_step() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let first = editor.document().body().get(0).unwrap().id();
+    let at = Position::new(first, 0);
+    editor
+        .edit_continuing("Typing", |edit| edit.insert_text(at, "a"))
+        .unwrap();
+    let typed = editor.snapshot();
+    assert!(editor.undo().unwrap());
+    assert!(editor.redo().unwrap());
+    let (_, joined) = editor
+        .edit_continuing("Typing", |edit| edit.insert_text(at, "b"))
+        .unwrap();
+    assert!(!joined);
+    assert!(editor.undo().unwrap());
+    assert_eq!(editor.snapshot(), typed);
 }

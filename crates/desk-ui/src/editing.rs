@@ -380,6 +380,37 @@ fn at_spot(document: &Document, spot: Spot) -> Result<desk_model::Position, Mode
     })
 }
 
+/// The selections before and after each action of the history, with the
+/// number that names the action. It keeps as many as the history of the
+/// model, [`desk_model::MAX_UNDO`], which drops the oldest beyond that.
+#[derive(Debug, Default)]
+pub(crate) struct Selections(Vec<(Selection, Selection, u64)>);
+
+impl Selections {
+    /// Adds the selections of the last action, and leaves out the oldest
+    /// when the history is full.
+    fn push(&mut self, entry: (Selection, Selection, u64)) {
+        if self.0.len() >= desk_model::MAX_UNDO {
+            self.0.remove(0);
+        }
+        self.0.push(entry);
+    }
+}
+
+impl std::ops::Deref for Selections {
+    type Target = Vec<(Selection, Selection, u64)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Selections {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 struct State {
     editor: Editor,
     layout: DocumentLayout,
@@ -388,8 +419,8 @@ struct State {
     goal: Option<f64>,
     /// The selection before and after each action of the history, so that
     /// Undo and Redo put it back, and a number that names the action.
-    undo: Vec<(Selection, Selection, u64)>,
-    redo: Vec<(Selection, Selection, u64)>,
+    undo: Selections,
+    redo: Selections,
     /// The number of the next action.
     next_action: u64,
     /// The last action done when the document was saved, or opened.
@@ -597,8 +628,8 @@ impl TextEditor {
                 layout,
                 selection: Selection::default(),
                 goal: None,
-                undo: Vec::new(),
-                redo: Vec::new(),
+                undo: Selections::default(),
+                redo: Selections::default(),
                 next_action: 0,
                 saved: None,
                 on_change: Vec::new(),
@@ -1291,7 +1322,7 @@ impl TextEditor {
         let result = {
             let mut state = self.state.borrow_mut();
             let preferences = crate::preferences::get();
-            let depth = state.editor.undo_depth();
+            let depth = state.editor.recorded();
             let corrected = state.editor.edit("Replace", |edit| {
                 let typed_end = desk_model::Position::new(at.paragraph, at.offset);
                 let cursor = at_spot(edit.document(), before.focus)?;
@@ -1306,7 +1337,7 @@ impl TextEditor {
                 Ok(Spot::of(edit.document(), after))
             });
             match corrected {
-                Ok(spot) if state.editor.undo_depth() > depth => Ok(spot),
+                Ok(spot) if state.editor.recorded() > depth => Ok(spot),
                 Ok(_) => return,
                 Err(error) => Err(error),
             }
@@ -2363,7 +2394,7 @@ impl TextEditor {
     /// (PXV-11).
     pub fn move_list_item(&self, index: usize, before: usize, level: u8) {
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let result = self
             .state
             .borrow_mut()
@@ -2372,7 +2403,7 @@ impl TextEditor {
         self.state.borrow_mut().typing = false;
         match result {
             // A drop where the item was, at its level, changes nothing.
-            Ok(_) if self.state.borrow().editor.undo_depth() == depth => {}
+            Ok(_) if self.state.borrow().editor.recorded() == depth => {}
             Ok(moved) => {
                 let after = text_nav::paragraph_at(
                     self.state.borrow().editor.document(),
@@ -3553,12 +3584,12 @@ impl TextEditor {
         change: impl FnOnce(&mut desk_model::Edit) -> Result<(), ModelError>,
     ) -> Result<(), ModelError> {
         let selection = self.selection();
-        let depth = self.state.borrow().editor.undo_depth();
+        let depth = self.state.borrow().editor.recorded();
         let result = self.state.borrow_mut().editor.edit(name, change);
         self.state.borrow_mut().typing = false;
         match result {
             // Formatting that was there already changes nothing.
-            Ok(()) if self.state.borrow().editor.undo_depth() == depth => {}
+            Ok(()) if self.state.borrow().editor.recorded() == depth => {}
             Ok(()) => {
                 {
                     let mut state = self.state.borrow_mut();
