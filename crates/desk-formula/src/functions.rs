@@ -126,7 +126,9 @@ fn int(e: &Eval<'_>, x: &Expr) -> Result<i64> {
 /// the decimal digits a binary number misses come back, as 2.675 is
 /// stored a little under it, and 0.1 + 0.2 a little over 0.3.
 fn significant(n: f64) -> f64 {
-    if !n.is_finite() || n == 0.0 {
+    // A whole number has no error of binary fractions to take away, and
+    // 15 significant digits would cut 1234567890123456.
+    if !n.is_finite() || n.fract() == 0.0 {
         return n;
     }
     format!("{n:.14e}").parse().unwrap_or(n)
@@ -2068,6 +2070,18 @@ mod tests {
 
     #[test]
     fn rounding_keeps_the_digits_of_the_number() {
+        let s0 = sheet();
+        // A whole number keeps all its digits (review of the pull
+        // request of RV batch 2).
+        assert_eq!(
+            run(&s0, "=SUM(1234567890123456)"),
+            Value::Number(1_234_567_890_123_456.0)
+        );
+        assert_eq!(
+            run(&s0, "=ROUND(1234567890123456,0)"),
+            Value::Number(1_234_567_890_123_456.0)
+        );
+        assert_eq!(run(&s0, "=SUM(0.1,0.2)"), Value::Number(0.3));
         // Rounding to nine decimals first carried numbers close to an
         // integer over it, the product overflowed for large numbers, and
         // SUM lost totals under 1E-12 (review RV, batch 2).
