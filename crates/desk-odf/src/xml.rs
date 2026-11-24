@@ -113,6 +113,27 @@ fn predefined(name: &str) -> Option<char> {
     })
 }
 
+/// Whether XML 1.0 allows a character in a document: not the C0 controls
+/// other than tab, line feed and carriage return, nor U+FFFE and U+FFFF.
+fn allowed(c: char) -> bool {
+    !matches!(
+        c,
+        '\u{0}'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{fffe}' | '\u{ffff}'
+    )
+}
+
+/// Text without the characters XML 1.0 does not allow. The parser lets a
+/// damaged file carry them, and the writer leaves them out, so the reader
+/// leaves them out too: a document then reads the same before and after
+/// it is saved again.
+fn allowed_only(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.chars().all(allowed) {
+        std::borrow::Cow::Borrowed(text)
+    } else {
+        std::borrow::Cow::Owned(text.chars().filter(|&c| allowed(c)).collect())
+    }
+}
+
 /// Parses a stream into its root element.
 pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
     let mut reader = NsReader::from_str(source);
@@ -139,10 +160,8 @@ pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
                         ns: resolved(attr_ns),
                         local: attr_local.as_ref().to_owned(),
                     };
-                    attrs.push((
-                        name,
-                        attr.normalized_value(XmlVersion::Explicit1_0)?.into_owned(),
-                    ));
+                    let value = attr.normalized_value(XmlVersion::Explicit1_0)?;
+                    attrs.push((name, allowed_only(&value).into_owned()));
                 }
                 let element = Element {
                     name: Name { ns, local },
@@ -161,9 +180,9 @@ pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
                     .ok_or_else(|| OdfError::Malformed("unbalanced end tag".into()))?;
                 close(&mut stack, &mut root, element);
             }
-            Event::Text(text) => push_text(&mut stack, &text.xml10_content()),
+            Event::Text(text) => push_text(&mut stack, &allowed_only(&text.xml10_content())),
             Event::CData(data) => {
-                push_text(&mut stack, data.as_ref());
+                push_text(&mut stack, &allowed_only(data.as_ref()));
             }
             Event::GeneralRef(reference) => {
                 let c = if reference.is_char_ref() {
@@ -172,6 +191,9 @@ pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
                     predefined(&reference.xml10_content())
                 };
                 let c = c.ok_or_else(|| OdfError::Malformed("unknown entity".into()))?;
+                if !allowed(c) {
+                    continue;
+                }
                 push_text(&mut stack, c.encode_utf8(&mut [0; 4]));
             }
             Event::Eof => break,
@@ -216,12 +238,7 @@ fn push_text(stack: &mut [Element], text: &str) {
 pub(crate) fn escape(out: &mut String, text: &str, attribute: bool) {
     for c in text.chars() {
         match c {
-            '\u{0}'..='\u{8}'
-            | '\u{b}'
-            | '\u{c}'
-            | '\u{e}'..='\u{1f}'
-            | '\u{fffe}'
-            | '\u{ffff}' => {}
+            c if !allowed(c) => {}
             '&' => out.push_str("&amp;"),
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
@@ -336,5 +353,15 @@ mod tests {
         w.text("x\u{0}y");
         w.end();
         assert!(parse(&w.finish()).is_ok());
+    }
+
+    #[test]
+    fn characters_that_xml_does_not_allow_are_not_read() {
+        // A damaged file with a control character in a font name read it,
+        // saved it without, and read a different document the second time
+        // (fuzzing, review RV, batch 1).
+        let root = parse("<a n=\"\u{1}x\u{c}\">y\u{1}z&#1;<![CDATA[\u{b}w]]></a>").unwrap();
+        assert_eq!(root.attr("", "n"), Some("x"));
+        assert_eq!(root.text(), "yzw");
     }
 }

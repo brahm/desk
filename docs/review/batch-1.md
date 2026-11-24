@@ -15,7 +15,7 @@ fuzzing for each target.
 | 3 | A | `desk-filters/src/odt/tables.rs` | The `desk:table` JSON of a damaged file could name a table whose cells, lines or merges do not fit its size; the first cell read panicked. Chart data was trusted the same way | `Table::is_consistent` and `ChartData::is_consistent`; the reader falls back to the ODF cells; tests in `desk-table`, `desk-chart` and `desk-filters` |
 | 4 | A | `desk-filters/src/picture.rs` | A GIF of a few bytes that declared a 65535 × 65535 screen was allocated at once, and its size overflowed `u32`; the sums of a picture scaled by a large factor overflowed too | GIF and TIFF share a limit of 64 million pixels; sizes and sums in `usize` and `u64`; tests |
 | 5 | A | `desk-odf/src/table.rs`, `chart.rs` | The limits of rows and columns held per table, so a few hundred bytes cloned millions of cells across tables; a chart expanded its ranges whole | At most a million table cells per document and a million chart cells per chart; chart ranges cut to their data; tests |
-| 6 | A | `desk-odf/src/xml.rs` | Control characters from pasted HTML were written as they were, and LibreOffice could not open the file | The characters XML 1.0 does not allow are left out; test |
+| 6 | A | `desk-odf/src/xml.rs` | Control characters from pasted HTML were written as they were, and LibreOffice could not open the file. A damaged file that carried them was read with them, so it read differently once saved again (found by fuzzing `odt_streams` and `odt_import`) | The characters XML 1.0 does not allow are left out on writing and on reading; tests |
 | 7 | B | `desk-iwork/src/lib.rs`, `package.rs` | A Pages flat file larger than 256 MB (one with a movie) was refused as an index too large | The zip is read from the file, and opened once for the index and its files rather than once per file; test with a 257 MB file |
 | 8 | B | `desk-filters/src/pages.rs` | TIFF and GIF pictures of objects, fills and posters came in scaled down to 256 pixels, the size of an image bullet | They keep up to 4096 pixels, as from ODT (`picture::OBJECT_MAX_SIDE`); test |
 | 9 | B | `desk-odf/src/chart.rs` | Rows that ODF writes once for several (`table:number-rows-repeated`) were read once, so the series that followed moved up | Read as many times as they repeat; test |
@@ -37,7 +37,9 @@ places and is the subject of batch 2: its lints are turned on there.
 
 Each of the five targets (`odt_streams`, `odt_package`, `odt_import`,
 `pages_import`, `html_paste`) ran for an hour on the fixes of this batch.
-The results are in the pull request. The ODT round trip already has its
+`odt_streams` and `odt_import` stopped within a minute on a control
+character in a font name (finding 6); they ran their hour again after the
+fix. The results are in the pull request. The ODT round trip already has its
 target, `odt_import`; the formula parser gets one in batch 2.
 
 ## Noticed on the way, for later batches
