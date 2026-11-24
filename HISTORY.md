@@ -13,6 +13,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   pictures that declare a huge size (review RV, batch 1).
 * Fixed: Pages '09 files larger than 256 MB open, and their pictures keep
   their size instead of coming in at 256 pixels.
+* Security: a Pages package folder can no longer bring into a document,
+  through a link, a file of yours from outside the package.
 * Fixed: files with control characters pasted from the web open again in
   LibreOffice, and chart rows written once for several are read whole.
 * Changed: development is paused for a review of all the code for bugs

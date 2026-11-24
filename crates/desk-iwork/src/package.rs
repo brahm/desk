@@ -137,11 +137,21 @@ pub(crate) fn zip_file<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) 
 }
 
 /// A file of a package folder, by its path in the package.
+///
+/// A link inside the folder that leads out of it is not followed: a
+/// package received from someone else could otherwise carry a link named
+/// as a picture to any file of the user, such as a key, which would come
+/// into the document and leave with it when it is saved and sent.
 pub fn read_file_at(package: &Path, name: &str) -> Option<Vec<u8>> {
     if !inside(name) {
         return None;
     }
-    limited(fs::File::open(package.join(name)).ok()?).ok()
+    let root = fs::canonicalize(package).ok()?;
+    let path = fs::canonicalize(package.join(name)).ok()?;
+    if !path.starts_with(&root) {
+        return None;
+    }
+    limited(fs::File::open(path).ok()?).ok()
 }
 
 #[cfg(test)]
@@ -186,5 +196,23 @@ mod tests {
             .unwrap();
         let bytes = zip.finish().unwrap().into_inner();
         assert!(matches!(read_index(&bytes), Err(IworkError::Missing(_))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_out_of_a_package_folder_is_not_followed() {
+        // Security review of batch 1: a link in a package folder named as
+        // a picture read whatever file it pointed to.
+        let dir = std::env::temp_dir().join(format!("desk-link-{}", std::process::id()));
+        let package = dir.join("doc.pages");
+        std::fs::create_dir_all(package.join("Contents")).unwrap();
+        std::fs::write(dir.join("secret"), b"key").unwrap();
+        std::fs::write(package.join("Contents/inside.png"), b"png").unwrap();
+        std::os::unix::fs::symlink(dir.join("secret"), package.join("out.png")).unwrap();
+        std::os::unix::fs::symlink("Contents/inside.png", package.join("in.png")).unwrap();
+        assert_eq!(read_file_at(&package, "out.png"), None);
+        assert_eq!(read_file_at(&package, "in.png").as_deref(), Some(&b"png"[..]));
+        assert_eq!(read_file_at(&package, "Contents/inside.png").as_deref(), Some(&b"png"[..]));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

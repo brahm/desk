@@ -21,6 +21,7 @@ fuzzing for each target.
 | 9 | B | `desk-odf/src/chart.rs` | Rows that ODF writes once for several (`table:number-rows-repeated`) were read once, so the series that followed moved up | Read as many times as they repeat; test |
 | 10 | D | `desk-iwork/src/sf.rs` | Of two objects with the same `sfa:ID`, the last was kept, against the intent of the code | The first is kept; test |
 | 11 | B | `desk-odf/src/read.rs` | A paragraph in a `text:list-header` leaves its list on saving again | Backlog B-052, to W5 (LibreOffice ODT in full): the model has no list item without a label |
+| 13 | A | `desk-iwork/src/package.rs` | *Security.* A link inside a Pages package folder, named as a picture, was followed out of the folder: a package received from someone else could bring any file of the user, such as a key, into the document, to leave with it when saved and sent. Found by `/security-review` (D-029) | Paths are resolved and must stay inside the folder; test with a link out and a link in |
 | 12 | D | `desk-filters/src/pages/objects.rs` | A currency cell of Pages '09 with no currency code shows R$ whatever the region | Backlog B-051, to T5, with the other cell formats of Pages '09 (B-050) |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
@@ -33,6 +34,17 @@ done in the rows above. It also asked that the pictures of a Pages
 document be decoded once (only TIFF and GIF, which are scaled, are read
 again at the size of objects) and that the zip of a flat file be read
 through a buffer.
+
+## Security (D-029)
+
+After the owner added security to the review, the branch was read with
+`/security-review`. It found nothing the batch added; it pointed at
+finding 13, older than the batch, which is fixed here. The rest it
+checked: the zip of a flat file is only read, never extracted, and its
+paths cannot leave the package; the XML reader expands no entity but the
+five predefined ones and character references, and loads no DTD or
+external reference; the writer still escapes everything its contexts
+need.
 
 ## Lints (D-028)
 
