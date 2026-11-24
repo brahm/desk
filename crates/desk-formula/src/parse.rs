@@ -683,9 +683,9 @@ fn is_name_char(c: char) -> bool {
 /// How deep a formula may nest before it is refused: deeper, the parser
 /// and then the evaluator and the writer, which recurse, would overflow
 /// the stack. A file can hold any formula. An operator after another, as
-/// in =A1+A2+...+A1000, costs [`OPERATOR_COST`]; a parenthesis, a sign, a
+/// in =A1+A2+...+A1000, costs `OPERATOR_COST`; a parenthesis, a sign, a
 /// percent or a function, which the parser recurses for too, cost
-/// [`NESTING_COST`].
+/// `NESTING_COST`.
 pub const MAX_NESTING: usize = 2048;
 
 /// What an operator of a chain costs of [`MAX_NESTING`].
