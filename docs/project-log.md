@@ -1999,6 +1999,13 @@ paragraph, and objects on a second page.
   could still hold the app, so matching and copies now spend the budget
   and the tables of a document share one; and six wrong results, among
   them rows added after a footer and whole numbers rounded.
+- A second review of those fixes found six more (35 to 40), fixed too:
+  a refused copy spent nothing, so each formula after it copied again;
+  conditional rules compared long texts without a charge; COUNTIF without
+  a star was charged as if it had one; a layout charged a table once per
+  pass; and a paste within the table could still write over the footer.
+  Rules copied by rows added in the middle went to the backlog (B-053,
+  batch 3).
 
 ## Decisions, with their reasons and consequences
 

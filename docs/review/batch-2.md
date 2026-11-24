@@ -38,7 +38,7 @@ evaluation). Reviewed on 24 November 2026 from commit `145c979`, with
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
 
-No finding of the batch was moved to the backlog.
+No finding of the batch was moved to the backlog; one of the review of its pull request was (B-053, below).
 
 ## Review of the pull request
 
@@ -58,6 +58,22 @@ fixed in the same pull request:
 | 33 | B | `desk-formula/src/functions.rs` | Rounding to 15 significant digits cut whole numbers: `=SUM(1234567890123456)` gave `1234567890123460` | Whole numbers are kept; test |
 | 34 | B | `desk-filters` | Merge joined numbers in the locale of `LANG` | An ODT in the language of its default style, Pages '09 in that of the system's numbers; test |
 
+A second review of the fixes found more, also fixed here:
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 35 | A | `desk-formula/src/eval.rs`, `desk-table/src/eval.rs` | *Security.* A text copied and then refused spent nothing, so every formula after it copied it again, undoing 27 and 28 | A charge for work already done (`spend_done`) takes what is left when it does not fit; test |
+| 36 | A | `desk-table/src/eval.rs`, `conditional.rs` | *Security.* Conditional rules put the texts they compare in lower case for each rule and each cell shown, without a charge | Their work is taken from the budget of the document; past it the rules do not apply; test |
+| 37 | B | `desk-formula/src/functions.rs` | Matching was charged the pattern by the texts without a `*` too, so a thousand rows of `=COUNTIF($A$1:$A$1000,A1)` gave `#VALUE!` | The pattern by the texts only with `*` (or `?` in SEARCH), the texts otherwise, nothing for approximate lookups; test |
+| 38 | B | `desk-table/src/eval.rs`, `desk-ui` | A layout evaluates a table on each pass, so the budget shared by a document was charged several times, and a large table was right on the first pass and `#VALUE!` on the second; the comment list evaluated a table once for each comment | Within a scope the values of a table are kept by its cells, headers and time; test |
+| 39 | B | `desk-table/src/table.rs`, `copy.rs`, `drag.rs` | Rows were added before the footer only past the end of the table, so 9 lines pasted in a table of 10 rows with 2 of footer wrote over the totals | They are added past the end of the body; test |
+| 40 | B | `desk-filters/src/odt/tables.rs` | An ODT whose language is `und` was read as that tag | It is no language, as in the model; test |
+
+A row or column added in the middle copies the rules of the one before
+it after their references were moved, so a rule comparing with a cell
+below the new rows points too far down. It moved to the backlog as
+B-053, for batch 3, whose property tests check each operation against
+its inverse.
 A formula in a branch of `IF` that refers to its own cell stays circular,
 whichever branch is taken, as in Numbers: the dependencies are read from
 the formula, not from the branch taken, which keeps them computable
