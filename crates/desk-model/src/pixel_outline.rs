@@ -49,12 +49,15 @@ pub fn pixel_outlines(
             let Some((corners, crossings)) = trace(width, height, &opaque, (x, y)) else {
                 continue;
             };
-            // What the outline holds, by the even-odd rule along each row.
-            for (row, mut xs) in crossings.into_iter().enumerate() {
-                xs.sort_unstable();
-                for &[a, b] in xs.as_chunks::<2>().0 {
-                    let (a, b) = (a.max(0) as usize, (b.max(0) as usize).min(width));
-                    covered[row * width + a..row * width + b.max(a)].fill(true);
+            // What the outline holds, by the even-odd rule along each row:
+            // the crossings, by row then place, in pairs.
+            let mut crossings = crossings;
+            crossings.sort_unstable();
+            for row in crossings.chunk_by(|a, b| a.0 == b.0) {
+                let y = row.first().map_or(0, |c| c.0) as usize;
+                for [(_, a), (_, b)] in row.as_chunks::<2>().0 {
+                    let (a, b) = ((*a).max(0) as usize, ((*b).max(0) as usize).min(width));
+                    covered[y * width + a..y * width + b.max(a)].fill(true);
                 }
             }
             // A part of a few pixels could be straightened to a line: its
@@ -75,14 +78,16 @@ pub fn pixel_outlines(
 
 /// The corners of the edges of the pixels around the part of the opaque
 /// pixels whose first pixel, row by row, is `first`, clockwise from its
-/// top left corner, and where the outline crosses each row.
+/// top left corner, and where the outline crosses the rows: the row and
+/// the place of each crossing, so that a small part costs what it covers,
+/// not the height of the picture.
 #[allow(clippy::type_complexity)]
 fn trace(
     width: usize,
     height: usize,
     opaque: &impl Fn(usize, usize) -> bool,
     first: (usize, usize),
-) -> Option<(Vec<(i64, i64)>, Vec<Vec<i64>>)> {
+) -> Option<(Vec<(i64, i64)>, Vec<(i64, i64)>)> {
     let pixel = |x: i64, y: i64| {
         x >= 0
             && y >= 0
@@ -97,12 +102,12 @@ fn trace(
     let start = (first.0 as i64, first.1 as i64);
     let (mut at, mut heading) = (start, (1i64, 0i64));
     let mut corners: Vec<(i64, i64)> = vec![start];
-    let mut crossings: Vec<Vec<i64>> = vec![Vec::new(); height];
+    let mut crossings: Vec<(i64, i64)> = Vec::new();
     let limit = 4 * (width + 1) * (height + 1);
     for _ in 0..limit {
         if heading.1 != 0 {
             let row = at.1.min(at.1 + heading.1);
-            crossings[row as usize].push(at.0);
+            crossings.push((row, at.0));
         }
         at = (at.0 + heading.0, at.1 + heading.1);
         let right = (-heading.1, heading.0);
@@ -248,6 +253,10 @@ mod tests {
         let ring = |x: usize, y: usize| x == 0 || y == 0 || x == 6 || y == 6 || (x == 3 && y == 3);
         assert_eq!(pixel_outlines(7, 7, ring).len(), 1);
         assert!(pixel_outlines(3, 3, |_, _| false).is_empty());
+        // Specks all over a picture: each costs the rows it covers, not
+        // the height of the picture (review RV, batch 3).
+        let specks = pixel_outlines(600, 600, |x, y| x % 2 == 0 && y % 2 == 0);
+        assert_eq!(specks.len(), 300 * 300);
     }
 
     #[test]
