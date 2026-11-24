@@ -11,6 +11,7 @@
 //! between the apps keeps them, and the other apps show what they do
 //! without following them.
 
+use crate::preferences::OpenLinks;
 use gtk::gio::prelude::FileExt;
 use gtk::glib;
 
@@ -98,6 +99,67 @@ fn escape(text: &str) -> String {
 fn unescape(text: &str) -> String {
     glib::Uri::unescape_string(text, None::<&str>)
         .map_or_else(|| text.to_owned(), |s| s.to_string())
+}
+
+/// Whether a link goes to a page on the web, or to an email without a
+/// file attached. Any other link outside the document, which a file may
+/// make point to a file of the user, a shared folder or another app,
+/// shows its address and asks before it opens, whatever the preferences
+/// say (review RV, batch 5).
+pub fn is_web(link: &str) -> bool {
+    let Some((scheme, rest)) = link.split_once(':') else {
+        return false;
+    };
+    match scheme.to_ascii_lowercase().as_str() {
+        // An address with a user name before its host is one only to
+        // show and ask about: the name can look like a host (third review
+        // of RV batch 5).
+        "http" | "https" => parts(link).is_some_and(|p| {
+            // Nor one with `\`, which browsers take for `/` and so read
+            // another host than the one shown (fourth review).
+            let authority = rest
+                .trim_start_matches('/')
+                .split(['/', '?', '#'])
+                .next()
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            p.user.is_none() && !link.contains('\\') && !authority.contains("%5c")
+        }),
+        "mailto" => rest.split_once('?').is_none_or(|(_, query)| {
+            query.split('&').all(|pair| {
+                let key = pair.split_once('=').map_or(pair, |(k, _)| k);
+                ["subject", "body", "cc", "bcc"]
+                    .iter()
+                    .any(|allowed| key.eq_ignore_ascii_case(allowed))
+            })
+        }),
+        _ => false,
+    }
+}
+
+/// What a click on a link outside the document and its other documents
+/// does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Follow {
+    /// It opens.
+    Open,
+    /// Its address shows, and it opens if asked to.
+    Confirm,
+    /// The first click on a link to the web: it asks what such clicks
+    /// do from now on, and keeps the answer in the preferences.
+    Choose,
+    /// It does not open.
+    Refuse,
+}
+
+/// What a click on a link outside the document does, by the preferences.
+pub fn follow(link: &str, choice: Option<OpenLinks>) -> Follow {
+    match (choice, is_web(link)) {
+        (Some(OpenLinks::Never), _) => Follow::Refuse,
+        (_, false) | (Some(OpenLinks::Ask), true) => Follow::Confirm,
+        (None, true) => Follow::Choose,
+        (Some(OpenLinks::Open), true) => Follow::Open,
+    }
 }
 
 impl Target {
@@ -201,9 +263,199 @@ pub fn document_file(
     Some((path, bookmark.to_owned()))
 }
 
+/// The most characters of the path of an address that a tooltip or a
+/// dialog shows, and of the user name before its host.
+const MAX_SHOWN: usize = 300;
+const MAX_USER_SHOWN: usize = 40;
+
+/// The parts of an address with a host: `scheme://user@host/rest`.
+struct Parts<'a> {
+    scheme: &'a str,
+    user: Option<&'a str>,
+    host: &'a str,
+    rest: &'a str,
+}
+
+fn parts(link: &str) -> Option<Parts<'_>> {
+    let (scheme, after) = link.split_once("://")?;
+    if scheme.is_empty()
+        || !scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
+    {
+        return None;
+    }
+    // The web takes `\` for `/` in the addresses it knows (fourth review
+    // of RV batch 5).
+    let end = after.find(['/', '\\', '?', '#']).unwrap_or(after.len());
+    let (authority, rest) = after.split_at(end);
+    let (user, host) = match authority.rsplit_once('@') {
+        Some((user, host)) => (Some(user), host),
+        None => (None, authority),
+    };
+    Some(Parts {
+        scheme,
+        user,
+        host,
+        rest,
+    })
+}
+
+/// An address as a tooltip or a dialog shows it: its host first, in the
+/// letters of DNS when it has others; the characters that are not seen,
+/// or that turn the text around, written as `\u{…}`; and its path cut
+/// short, never its host (second and third reviews of RV batch 5).
+pub fn shown(link: &str) -> String {
+    let Some(parts) = parts(link) else {
+        return escaped(link, MAX_SHOWN);
+    };
+    let mut out = format!("{}://", escaped(parts.scheme, MAX_USER_SHOWN));
+    if let Some(user) = parts.user {
+        out.push_str(&escaped(user, MAX_USER_SHOWN));
+        out.push('@');
+    }
+    let host = match gtk::glib::hostname_to_ascii(parts.host) {
+        Some(ascii) if !parts.host.is_ascii() => ascii.to_string(),
+        _ => parts.host.to_string(),
+    };
+    out.push_str(&escaped(&host, 255));
+    out.push_str(&escaped(parts.rest, MAX_SHOWN));
+    out
+}
+
+/// `text` with the characters not seen written as `\u{…}`, and a `\`
+/// doubled, cut after `most` characters.
+fn escaped(text: &str, most: usize) -> String {
+    let mut out = String::new();
+    for (count, c) in text.chars().enumerate() {
+        if count == most {
+            out.push('…');
+            break;
+        }
+        if c == '\\' {
+            out.push_str("\\\\");
+        } else if hidden(c) {
+            out.push_str(&format!("\\u{{{:X}}}", u32::from(c)));
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// Whether a character is not seen, joins or turns around others: the
+/// controls, the format characters (Unicode Cf), the line and paragraph
+/// separators, and the fillers and variation selectors drawn as nothing.
+fn hidden(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            u32::from(c),
+            0x00AD
+                | 0x034F
+                | 0x0600..=0x0605
+                | 0x061C
+                | 0x06DD
+                | 0x070F
+                | 0x0890..=0x0891
+                | 0x08E2
+                | 0x115F..=0x1160
+                | 0x17B4..=0x17B5
+                | 0x180B..=0x180F
+                | 0x200B..=0x200F
+                | 0x2028..=0x202E
+                | 0x2060..=0x206F
+                | 0x3164
+                | 0xFE00..=0xFE0F
+                | 0xFEFF
+                | 0xFFA0
+                | 0xFFF9..=0xFFFB
+                | 0x110BD
+                | 0x110CD
+                | 0x13430..=0x1343F
+                | 0x1BCA0..=0x1BCA3
+                | 0x1D173..=0x1D17A
+                | 0xE0000..=0xE0FFF
+        )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_address_shows_what_it_opens() {
+        // Second and third reviews of RV batch 5: a link could hide or turn
+        // around part of its address, or push its host out of what shows.
+        assert_eq!(shown("https://a.org/x%20y"), "https://a.org/x%20y");
+        assert_eq!(
+            shown("https://a.org/\u{202E}fdp.exe"),
+            "https://a.org/\\u{202E}fdp.exe"
+        );
+        assert_eq!(shown("a\nb\u{200B}\\"), "a\\u{A}b\\u{200B}\\\\");
+        for c in [
+            '\u{2028}',
+            '\u{AD}',
+            '\u{34F}',
+            '\u{3164}',
+            '\u{E0041}',
+            '\u{FE0F}',
+        ] {
+            assert!(shown(&format!("x{c}")).starts_with("x\\u{"), "{c:?}");
+        }
+        let long = format!("https://a.org/{}", "x".repeat(1000));
+        assert!(shown(&long).ends_with('…'));
+        assert!(shown(&long).chars().count() < 400);
+        // The host shows, however long the user name before it.
+        let user = format!(
+            "https://www.paypal.com%2F{}@evil.example/",
+            "x".repeat(1000)
+        );
+        assert!(shown(&user).contains("…@evil.example/"));
+        assert!(!is_web(&user));
+        assert_eq!(follow(&user, Some(OpenLinks::Open)), Follow::Confirm);
+        // A `\` ends the host as a browser reads it (fourth review).
+        let slash = "https://www.paypal.com.login.evil.example\\@www.paypal.com/";
+        assert!(shown(slash).starts_with("https://www.paypal.com.login.evil.example\\\\"));
+        assert!(!is_web(slash));
+        assert!(!is_web("https://a%5Cb@c/") && !is_web("https://evil%5c.example/"));
+        // A host in other letters shows as DNS has it.
+        assert_eq!(shown("https://bücher.de/"), "https://xn--bcher-kva.de/");
+    }
+
+    #[test]
+    fn links_outside_the_document_follow_the_preferences() {
+        // Review RV, batch 5: a click on any link of a document opened it,
+        // whatever it pointed to. The owner chose: a link to the web asks,
+        // the first time, what such links do from now on.
+        for link in [
+            "https://example.com/a?b=c",
+            "HTTP://example.com",
+            "mailto:someone@example.com",
+            "mailto:someone@example.com?subject=Hi&body=There",
+        ] {
+            assert!(is_web(link), "{link}");
+            assert_eq!(follow(link, None), Follow::Choose);
+            assert_eq!(follow(link, Some(OpenLinks::Open)), Follow::Open);
+            assert_eq!(follow(link, Some(OpenLinks::Ask)), Follow::Confirm);
+            assert_eq!(follow(link, Some(OpenLinks::Never)), Follow::Refuse);
+        }
+        for link in [
+            "file:///home/user/Downloads/x.jar",
+            "smb://server/share",
+            "sftp://server/file",
+            "steam://run/1",
+            "mailto:someone@example.com?attach=/home/user/.ssh/id_rsa",
+            "javascript:alert(1)",
+            "/etc/passwd",
+            "report.txt",
+        ] {
+            assert!(!is_web(link), "{link}");
+            for choice in [None, Some(OpenLinks::Open), Some(OpenLinks::Ask)] {
+                assert_eq!(follow(link, choice), Follow::Confirm, "{link}");
+            }
+            assert_eq!(follow(link, Some(OpenLinks::Never)), Follow::Refuse);
+        }
+    }
 
     #[test]
     fn iop_32_links_of_a_presentation_are_kept() {

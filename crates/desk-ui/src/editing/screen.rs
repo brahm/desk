@@ -54,15 +54,19 @@ impl TextEditor {
     pub(super) fn follow_screen_width(&self) {
         let weak = self.downgrade();
         self.view.connect_width_changed(move || {
-            let Some(this) = weak.upgrade() else { return };
+            // The editor of a document shown in place of this one is gone.
+            let Some(this) = weak.upgrade() else {
+                return false;
+            };
             let Some((width, zoom)) = this.state.borrow().screen else {
-                return;
+                return true;
             };
             let now = (this.view.screen_width(), this.view.zoom());
             if (now.0 - width).abs() >= 0.5 || (now.1 - zoom).abs() > 1e-6 {
                 this.state.borrow_mut().screen = Some(now);
                 this.lay_out_again();
             }
+            true
         });
     }
 

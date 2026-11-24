@@ -100,7 +100,7 @@ impl TextEditor {
             }
             used
         });
-        self.view.area().add_controller(drop);
+        self.attach(drop);
     }
 
     /// Plays a movie or a sound where it is on the page (OBJ-19).

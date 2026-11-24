@@ -41,6 +41,63 @@ pub(crate) trait FramePage {
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>);
     /// Called once the tab has closed.
     fn closed(&self) {}
+    /// Called when the tab was dragged to another window of the app, which
+    /// holds it from now on.
+    fn moved_to(&self, _frame: &Rc<Frame>) {}
+}
+
+/// What a document follows of the window that holds it: handlers of
+/// notifications of its properties, which move with the tab to another
+/// window and are told of the new one (third review of RV batch 5).
+#[derive(Default)]
+pub(crate) struct WindowNotifies {
+    handlers: RefCell<Vec<WindowNotify>>,
+}
+
+/// A property of the window, what follows it, and its handler there.
+type WindowNotify = (
+    &'static str,
+    Rc<dyn Fn(&adw::ApplicationWindow)>,
+    glib::SignalHandlerId,
+);
+
+impl WindowNotifies {
+    /// Calls `f` whenever `property` of `window` changes.
+    pub(crate) fn connect(
+        &self,
+        window: &adw::ApplicationWindow,
+        property: &'static str,
+        f: impl Fn(&adw::ApplicationWindow) + 'static,
+    ) {
+        let f: Rc<dyn Fn(&adw::ApplicationWindow)> = Rc::new(f);
+        let id = Self::attach(window, property, &f);
+        self.handlers.borrow_mut().push((property, f, id));
+    }
+
+    fn attach(
+        window: &adw::ApplicationWindow,
+        property: &str,
+        f: &Rc<dyn Fn(&adw::ApplicationWindow)>,
+    ) -> glib::SignalHandlerId {
+        let f = f.clone();
+        window.connect_notify_local(Some(property), move |window, _| f(window))
+    }
+
+    /// Follows `new` in place of `old`, and tells each handler of what it
+    /// shows, which may differ.
+    pub(crate) fn move_to(&self, old: &adw::ApplicationWindow, new: &adw::ApplicationWindow) {
+        let handlers: Vec<_> = {
+            let mut handlers = self.handlers.borrow_mut();
+            for (property, f, id) in handlers.iter_mut() {
+                let moved = Self::attach(new, property, f);
+                old.disconnect(std::mem::replace(id, moved));
+            }
+            handlers.iter().map(|(_, f, _)| f.clone()).collect()
+        };
+        for f in handlers {
+            f(new);
+        }
+    }
 }
 
 /// A tab, the widget it holds and its document.
@@ -155,16 +212,7 @@ impl Frame {
         self.pages
             .borrow_mut()
             .push((tab.clone(), child.as_ref().clone(), page));
-        // The title of the window is that of the tab in sight.
-        let window = self.window.downgrade();
-        let view = self.view.downgrade();
-        tab.connect_title_notify(move |tab| {
-            if let (Some(window), Some(view)) = (window.upgrade(), view.upgrade())
-                && view.selected_page().as_ref() == Some(tab)
-            {
-                window.set_title(Some(&tab.title()));
-            }
-        });
+        Self::follow_title(&tab);
         self.view.set_selected_page(&tab);
         self.route_actions();
         tab
@@ -188,6 +236,19 @@ impl Frame {
     /// in this window, whose tab the function gives back.
     pub(crate) fn set_new_tab(&self, open: impl Fn() -> Option<adw::TabPage> + 'static) {
         *self.new_tab.borrow_mut() = Some(Box::new(open));
+    }
+
+    /// Gives the window the title of a tab while it is the one in sight.
+    /// Connected once: the window is the one that holds the tab when the
+    /// title changes, as the tab may move (third review of RV batch 5).
+    fn follow_title(tab: &adw::TabPage) {
+        tab.connect_title_notify(|tab| {
+            if tab.is_selected()
+                && let Some(window) = tab.child().root().and_downcast::<gtk::Window>()
+            {
+                window.set_title(Some(&tab.title()));
+            }
+        });
     }
 
     fn page_of(&self, tab: &adw::TabPage) -> Option<Rc<dyn FramePage>> {
@@ -341,13 +402,30 @@ impl Frame {
             }));
             glib::Propagation::Stop
         });
+        // A tab dragged here from another window of the app is held here
+        // from now on: asked before it closes, and running its actions
+        // here (review RV, batch 5).
+        let weak = Rc::downgrade(self);
+        self.view.connect_page_attached(move |_, tab, _| {
+            if let Some(this) = weak.upgrade() {
+                this.adopt(tab);
+            }
+        });
         // The window goes with its last tab.
+        // Not at once: the last tab dragged to another window leaves this
+        // one before it arrives there, and the window that holds it must
+        // still be listed then (review of RV batch 5).
         let weak = Rc::downgrade(self);
         self.view.connect_n_pages_notify(move |view| {
-            if view.n_pages() == 0
-                && let Some(this) = weak.upgrade()
-            {
-                this.window.destroy();
+            if view.n_pages() == 0 {
+                let weak = weak.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(this) = weak.upgrade()
+                        && this.view.n_pages() == 0
+                    {
+                        this.window.destroy();
+                    }
+                });
             }
         });
         // Closing the window closes each tab, which asks its document.
@@ -381,6 +459,29 @@ impl Frame {
         });
     }
 
+    /// Takes over a tab that another window of the app held.
+    fn adopt(self: &Rc<Self>, tab: &adw::TabPage) {
+        if self.page_of(tab).is_some() {
+            return;
+        }
+        let entry = FRAMES.with(|frames| {
+            frames.borrow().iter().find_map(|other| {
+                let mut pages = other.pages.borrow_mut();
+                let at = pages.iter().position(|(t, _, _)| t == tab)?;
+                Some(pages.remove(at))
+            })
+        });
+        let Some(entry) = entry else { return };
+        let page = entry.2.clone();
+        self.pages.borrow_mut().push(entry);
+        // The title already follows the tab, wherever it is.
+        if tab.is_selected() {
+            self.window.set_title(Some(&tab.title()));
+        }
+        page.moved_to(self);
+        self.route_actions();
+    }
+
     fn forget(&self, tab: &adw::TabPage) {
         let page = {
             let mut pages = self.pages.borrow_mut();
@@ -390,5 +491,116 @@ impl Frame {
         if let Some(page) = page {
             page.closed();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    /// A document that counts how it was told to close and to move.
+    struct Counted {
+        actions: gio::SimpleActionGroup,
+        asked: Rc<Cell<u32>>,
+        moved: Rc<Cell<u32>>,
+    }
+
+    impl FramePage for Counted {
+        fn actions(&self) -> gio::ActionGroup {
+            self.actions.clone().upcast()
+        }
+
+        fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+            self.asked.set(self.asked.get() + 1);
+            done(false);
+        }
+
+        fn moved_to(&self, _frame: &Rc<Frame>) {
+            self.moved.set(self.moved.get() + 1);
+        }
+    }
+
+    #[test]
+    fn a_tab_dragged_to_another_window_still_asks_before_it_closes() {
+        // Review RV, batch 5: the window a tab was dragged to did not know
+        // its document, and closed it without asking to save.
+        crate::with_gtk(|| {
+            let _ = adw::init();
+            let app = adw::Application::builder()
+                .application_id("br.com.brahm.Desk.TabsTest")
+                .flags(gio::ApplicationFlags::NON_UNIQUE)
+                .build();
+            let _ = app.register(gio::Cancellable::NONE);
+            let (a, b) = (Frame::new(&app, "A"), Frame::new(&app, "B"));
+            let asked = Rc::new(Cell::new(0));
+            let moved = Rc::new(Cell::new(0));
+            let page = Rc::new(Counted {
+                actions: gio::SimpleActionGroup::new(),
+                asked: asked.clone(),
+                moved: moved.clone(),
+            });
+            let tab = a.add(&gtk::Label::new(Some("x")), page);
+            // A second document in A, so that A stays after the first goes.
+            let other = a.add(
+                &gtk::Label::new(Some("y")),
+                Rc::new(Counted {
+                    actions: gio::SimpleActionGroup::new(),
+                    asked: Rc::new(Cell::new(0)),
+                    moved: Rc::new(Cell::new(0)),
+                }),
+            );
+            a.view.transfer_page(&tab, &b.view, 0);
+            assert!(a.page_of(&tab).is_none());
+            assert!(b.page_of(&tab).is_some());
+            assert_eq!(moved.get(), 1);
+            b.view.close_page(&tab);
+            assert_eq!(asked.get(), 1);
+            assert_eq!(b.view.n_pages(), 1);
+            // The last tab of a window: the window empties before the tab
+            // arrives in the other (second review of RV batch 5).
+            a.view.transfer_page(&other, &b.view, 0);
+            assert_eq!(a.view.n_pages(), 0);
+            assert!(b.page_of(&other).is_some());
+            // The title of the tab in sight is that of the window it is in
+            // now, and B follows it alone (third review).
+            b.view.set_selected_page(&other);
+            other.set_title("moved");
+            assert_eq!(b.window.title().as_deref(), Some("moved"));
+            a.window.set_title(Some("A"));
+            other.set_title("again");
+            assert_eq!(a.window.title().as_deref(), Some("A"));
+            a.window.destroy();
+            b.window.destroy();
+        });
+    }
+
+    #[test]
+    fn what_a_document_follows_of_its_window_moves_with_it() {
+        // Third review of RV batch 5: a tab dragged to another window
+        // followed full screen in the window it had left.
+        crate::with_gtk(|| {
+            let _ = adw::init();
+            let (a, b) = (
+                adw::ApplicationWindow::builder().build(),
+                adw::ApplicationWindow::builder().build(),
+            );
+            let seen = Rc::new(RefCell::new(Vec::new()));
+            let notifies = WindowNotifies::default();
+            let kept = seen.clone();
+            notifies.connect(&a, "title", move |w| {
+                kept.borrow_mut()
+                    .push(w.title().map(String::from).unwrap_or_default());
+            });
+            a.set_title(Some("a1"));
+            notifies.move_to(&a, &b);
+            a.set_title(Some("a2"));
+            b.set_title(Some("b1"));
+            // Told of the new window when it moves, then of its changes
+            // alone.
+            assert_eq!(*seen.borrow(), ["a1", "", "b1"]);
+            a.destroy();
+            b.destroy();
+        });
     }
 }

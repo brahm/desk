@@ -38,7 +38,8 @@ struct State {
     /// the edges of pages (Screen View, PXV-01).
     screen: bool,
     /// What to call when the width of the flow in Screen View changes.
-    on_width: Vec<Box<dyn Fn()>>,
+    /// Each says whether it is still wanted.
+    on_width: Vec<Box<dyn Fn() -> bool>>,
     /// The selection and the cursor, drawn over the pages.
     selection: Vec<SpanRect>,
     caret: Option<CaretRect>,
@@ -899,17 +900,16 @@ impl DocumentView {
     }
 
     /// Calls `f` whenever the width of the flow of Screen View may have
-    /// changed: when the view is resized or zoomed.
-    pub fn connect_width_changed(&self, f: impl Fn() + 'static) {
+    /// changed: when the view is resized or zoomed. `f` says whether it is
+    /// still wanted: false once what it updates is gone.
+    pub fn connect_width_changed(&self, f: impl Fn() -> bool + 'static) {
         self.state.borrow_mut().on_width.push(Box::new(f));
     }
 
     fn width_changed(&self) {
         // The callbacks may read the view, so they run without the borrow.
-        let callbacks = std::mem::take(&mut self.state.borrow_mut().on_width);
-        for callback in &callbacks {
-            callback();
-        }
+        let mut callbacks = std::mem::take(&mut self.state.borrow_mut().on_width);
+        callbacks.retain(|callback| callback());
         let mut state = self.state.borrow_mut();
         let added = std::mem::take(&mut state.on_width);
         state.on_width = callbacks;

@@ -337,7 +337,7 @@ impl DocumentWindow {
             ),
         ] {
             if let Some(action) = self
-                .window
+                .window()
                 .lookup_action(name)
                 .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
             {
@@ -397,10 +397,10 @@ impl DocumentWindow {
                 let error =
                     adw::AlertDialog::new(Some(&crate::i18n::tr("Rename Style")), Some(&body));
                 error.add_response("close", &crate::i18n::tr("_Close"));
-                error.present(Some(&this.window));
+                error.present(Some(&this.window()));
             }
         });
-        dialog.present(Some(&self.window));
+        dialog.present(Some(&self.window()));
     }
 }
 

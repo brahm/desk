@@ -557,6 +557,11 @@ impl TabStop {
     }
 }
 
+/// The most tab stops of a paragraph: far more than a line can use, as
+/// a file could give thousands, and the Tabs pane made rows for each
+/// (review RV, batch 5).
+pub const MAX_TAB_STOPS: usize = 100;
+
 /// The tab stops of a paragraph, ordered by position, with at most one at
 /// each position (FMT-16).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -569,12 +574,13 @@ impl TabStops {
     }
 
     /// The stops, ordered by position. Of two stops at one position, the
-    /// last is kept.
+    /// last is kept; past `MAX_TAB_STOPS`, the first ones.
     pub fn new(stops: impl IntoIterator<Item = TabStop>) -> Self {
         let mut stops: Vec<TabStop> = stops.into_iter().collect();
         stops.reverse();
         stops.sort_by_key(|s| s.position);
         stops.dedup_by_key(|s| s.position);
+        stops.truncate(MAX_TAB_STOPS);
         Self(stops.into())
     }
 
@@ -586,6 +592,13 @@ impl TabStops {
     /// Whether there are no stops.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Whether a stop at `position` can be added: one is there to be
+    /// replaced, or there are fewer than `MAX_TAB_STOPS`, past which
+    /// [`TabStops::with`] leaves out the last one.
+    pub fn can_take(&self, position: Length) -> bool {
+        self.0.len() < MAX_TAB_STOPS || self.0.iter().any(|s| s.position == position)
     }
 
     /// These stops with one added, or put in place of the one at its
@@ -946,6 +959,28 @@ mod tests {
         assert_eq!(stops.after(at(72)).map(|s| s.position), Some(at(144)));
         assert_eq!(stops.after(at(144)), None);
         assert_eq!(stops.without(at(72)).stops().len(), 1);
+    }
+
+    #[test]
+    fn a_paragraph_keeps_at_most_a_hundred_tab_stops() {
+        // Review RV, batch 5: a file could give a paragraph thousands of
+        // stops, and the Tabs pane built rows for each.
+        let stops = TabStops::new(
+            (1..=5000)
+                .rev()
+                .map(|pt| TabStop::left(Length::from_points(pt))),
+        );
+        assert_eq!(stops.stops().len(), MAX_TAB_STOPS);
+        assert_eq!(stops.stops()[0].position, Length::from_points(1));
+        // Second review: one more is refused before it is left out, and
+        // one in place of a stop is still taken.
+        assert!(!stops.can_take(Length::from_points(1000)));
+        assert!(stops.can_take(Length::from_points(1)));
+        assert!(
+            stops
+                .without(Length::from_points(1))
+                .can_take(Length::from_points(1000))
+        );
     }
 
     #[test]

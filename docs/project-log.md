@@ -2056,10 +2056,59 @@ paragraph, and objects on a second page.
   - footnotes changed where pages broke;
   - tab stops near the edge of a column came out of order;
   - lines and pictures of no size stopped the rest of a page from drawing.
-- *Consequences:* PNG pictures over 8192 pixels a side are not drawn,
-  as JPEG already were not. Three slow paths moved to the backlog: B-055
+- Three rounds of review of the pull request (#205) found 11 more, rows
+  17 to 27 of the report. The bounds of the first fixes held only for a
+  plain column, a single search, or a JPEG as the model read it. An
+  outline traced from a picture could still be costly or lose its small
+  parts, and the fallback range of an axis was too narrow. Merged on 24
+  November.
+- *Consequences:* PNG and JPEG pictures over 8192 by 8192 pixels, in any
+  shape, are not drawn. Three slow paths moved to the backlog: B-055
   (balanced columns) and B-057 (PDF pictures, lines with tabs) to W6,
   and B-056 (merged cells) to T1.
+
+### 24 November: batch 5 of the review, the interface and the apps (RV)
+
+- `/code-review` and `/security-review` read `desk-ui`, the app crates,
+  `desk-lang` and the Flatpak manifest, and found 21 problems; 17 are
+  fixed and the report is [review/batch-5.md](review/batch-5.md).
+- The worst: a click on any link of a document launched it, whatever it
+  pointed to. The owner decided how links open (D-030):
+  - a link to a bookmark or to another document opens at once;
+  - a link to the web follows a new preference (open at once, ask first,
+    or never open), which the first such click asks for;
+  - any other link shows its address and asks;
+  - the address of a link shows while the pointer is over it.
+- Saving lost less:
+  - a recovered draft stays until the document is saved;
+  - drafts are offered back after a crash in Flatpak;
+  - autosave does not write over a file whose original it could not keep;
+  - Revert keeps the changes as a version and restores the original bytes;
+  - Save As asks before replacing a file;
+  - a tab dragged to another window still asks before it closes;
+  - files are written through a temporary file no one can guess.
+- Leaks and limits: an editor takes its controllers away with it, rows of
+  the panes are freed, the undo history of Tables is bounded, and the
+  clipboard, dropped pictures, dictionaries and tab stops are bounded.
+- *Consequences:* four findings moved to the backlog: B-058 (autosave on
+  the thread of the window) and B-061 (autosave over a file read with
+  losses, for the owner) to W5, B-059 (thumbnails and outline) to W6, and
+  B-060 (the Flatpak build) to batch 6.
+- The review of the pull request found ten more, fixed in it (findings
+  18 to 27): the controllers of a tab dragged to another window, long file
+  names, plain text and pictures pasted read with a bound, the name of a
+  document recovered twice, the links row of Preferences before a choice,
+  the hundredth tab stop, old versions left behind, files of unknown size,
+  and addresses that hid characters in the tooltip and the dialog.
+  *Consequences:* two more rows to batch 6, B-062 (the CI skips the tests
+  that need a display) and B-063 (dictionary folders scanned again per
+  tag).
+- Its second review found seven more, fixed in it (findings 28 to 34):
+  pasted pictures limited to PNG and JPEG sized by their header, the
+  outline paste bounded, the host of an address always shown, versions
+  of a file gone removed only after the move, what a moved tab follows of
+  its window, the name of a recovered document renamed, and text in other
+  character sets.
 
 ## Decisions, with their reasons and consequences
 

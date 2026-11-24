@@ -137,9 +137,9 @@ impl DocumentWindow {
                                 this.alert(&tr("Cannot Rename"), &error.to_string());
                             }
                         },
-                        None => this.window.error_bell(),
+                        None => this.window().error_bell(),
                     },
-                    None => this.window.error_bell(),
+                    None => this.window().error_bell(),
                 }
             }
         };

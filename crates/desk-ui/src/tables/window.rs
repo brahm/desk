@@ -88,6 +88,22 @@ const NEW_TABLE_GAP: f64 = 36.0;
 /// What an action of the window does.
 type WindowAction = fn(&Rc<TablesWindow>);
 
+/// The most steps the undo history of Desk Tables keeps. Each holds a
+/// whole copy of the workbook, so fewer than the steps of the text
+/// editor, which each hold what changed (B-054).
+const MAX_UNDO: usize = 100;
+
+/// Adds a step to an undo history, leaving out the oldest past
+/// [`MAX_UNDO`]: the history grew without end, a whole copy of the
+/// workbook a step (review RV, batch 5).
+fn push_capped<T>(history: &mut Vec<T>, step: T) {
+    history.push(step);
+    if history.len() > MAX_UNDO {
+        let extra = history.len() - MAX_UNDO;
+        history.drain(..extra);
+    }
+}
+
 /// The state of the document that undo brings back.
 #[derive(Clone)]
 struct Snapshot {
@@ -107,9 +123,13 @@ enum MenuTarget {
 
 /// A window and its document.
 pub(super) struct TablesWindow {
-    /// The window that holds the tab of the document (see tabs.rs).
-    window: adw::ApplicationWindow,
-    frame: Rc<crate::tabs::Frame>,
+    /// The window that holds the tab of the document.
+    frame: RefCell<Rc<crate::tabs::Frame>>,
+    /// The controllers the document added to that window.
+    window_controllers: RefCell<Vec<gtk::EventController>>,
+    /// What the workbook follows of the window that holds it, which moves
+    /// with the tab (third review of RV batch 5).
+    window_notifies: crate::tabs::WindowNotifies,
     /// The tab of the document, with its own breakpoints.
     root: adw::BreakpointBin,
     tab: std::cell::OnceCell<adw::TabPage>,
@@ -154,6 +174,24 @@ thread_local! {
 }
 
 impl TablesWindow {
+    /// The window that holds the tab of the document now.
+    fn frame(&self) -> Rc<crate::tabs::Frame> {
+        self.frame.borrow().clone()
+    }
+
+    /// The GTK window that holds the tab of the document now.
+    fn window(&self) -> adw::ApplicationWindow {
+        self.frame.borrow().window().clone()
+    }
+
+    /// Adds a controller to the window that holds the tab, which moves
+    /// with the tab to another window.
+    fn add_window_controller(&self, controller: impl IsA<gtk::EventController>) {
+        let controller = controller.upcast();
+        self.window().add_controller(controller.clone());
+        self.window_controllers.borrow_mut().push(controller);
+    }
+
     /// A new window with a document of the Blank template.
     /// A new document in a tab of the window in front, or in a new window
     /// when the app has none.
@@ -292,7 +330,6 @@ impl TablesWindow {
             .max_sidebar_width(nav_sidebar::WIDTH)
             .show_sidebar(true)
             .build();
-        let window = frame.window().clone();
         let root = adw::BreakpointBin::builder()
             .child(&nav_split)
             .width_request(360)
@@ -339,8 +376,9 @@ impl TablesWindow {
         context_menu.set_parent(canvas.area());
 
         let this = Rc::new(Self {
-            window,
-            frame: frame.clone(),
+            frame: RefCell::new(frame.clone()),
+            window_controllers: RefCell::new(Vec::new()),
+            window_notifies: crate::tabs::WindowNotifies::default(),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -372,7 +410,7 @@ impl TablesWindow {
         this.connect_sidebar();
         this.connect_canvas();
         this.connect_fullscreen(&leave_fullscreen);
-        warn_small_screen(&this.window, &screen_banner);
+        warn_small_screen(&this.window(), &screen_banner);
         this.refresh();
         // The first table of a new document has the focus, in its first
         // cell, ready to type in, as in Numbers.
@@ -400,9 +438,9 @@ impl TablesWindow {
     /// Brings the tab of the document and its window to the front.
     pub fn show(&self) {
         if let Some(tab) = self.tab.get() {
-            self.frame.view().set_selected_page(tab);
+            self.frame().view().set_selected_page(tab);
         }
-        self.window.present();
+        self.window().present();
     }
 
     /// Shows the document, the sheet and the selection everywhere.
@@ -623,21 +661,36 @@ impl TablesWindow {
         name: &str,
         f: impl FnOnce(&mut Workbook, usize, Selection) -> Result<(usize, Selection), SheetError>,
     ) -> bool {
-        let before = self.snapshot(name);
+        let (was_current, was_selection) = (self.current.get(), self.selection.get());
+        // One copy of the workbook: the one changed; the one before goes
+        // to the undo history as it is (review RV, batch 5).
         let mut book = self.book.borrow().clone();
-        match f(&mut book, self.current.get(), self.selection.get()) {
+        match f(&mut book, was_current, was_selection) {
             Ok((current, selection)) => {
-                *self.book.borrow_mut() = book;
+                // A change that changes nothing, as a name given again, is
+                // not a step of the history.
+                let same = *self.book.borrow() == book;
                 self.current.set(current);
                 self.selection.set(selection);
-                self.undo.borrow_mut().push(before);
-                self.redo.borrow_mut().clear();
-                self.modified.set(true);
+                if !same {
+                    let before = std::mem::replace(&mut *self.book.borrow_mut(), book);
+                    push_capped(
+                        &mut self.undo.borrow_mut(),
+                        Snapshot {
+                            name: name.to_owned(),
+                            book: before,
+                            current: was_current,
+                            selection: was_selection,
+                        },
+                    );
+                    self.redo.borrow_mut().clear();
+                    self.modified.set(true);
+                }
                 self.refresh();
                 true
             }
             Err(_) => {
-                self.window.error_bell();
+                self.window().error_bell();
                 false
             }
         }
@@ -674,7 +727,7 @@ impl TablesWindow {
             return;
         };
         let now = self.snapshot(&snapshot.name);
-        self.undo.borrow_mut().push(now);
+        push_capped(&mut self.undo.borrow_mut(), now);
         self.restore(snapshot);
     }
 
@@ -759,7 +812,7 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         let field = entry.clone();
         dialog.choose(
-            Some(&self.window),
+            Some(&self.window()),
             gio::Cancellable::NONE,
             move |response| {
                 if let (Some(this), "rename") = (weak.upgrade(), response.as_str()) {
@@ -960,7 +1013,7 @@ impl TablesWindow {
             ("duplicate", |this| {
                 // A copy without a title, opened beside the original
                 // (NDOC-11).
-                let copy = Self::with_book(&this.frame, this.info, this.book.borrow().clone());
+                let copy = Self::with_book(&this.frame(), this.info, this.book.borrow().clone());
                 copy.show();
             }),
         ];
@@ -990,7 +1043,7 @@ impl TablesWindow {
                 Some(index + 1)
             };
             let Some(to) = to else {
-                this.window.error_bell();
+                this.window().error_bell();
                 return;
             };
             this.change(&tr("Move Sheet"), |book, current, selection| {
@@ -1071,7 +1124,7 @@ impl TablesWindow {
                         Some(zoom) => {
                             crate::document_controls::show_zoom(&this.bottom.zoom, zoom);
                         }
-                        None => this.window.error_bell(),
+                        None => this.window().error_bell(),
                     }
                     return;
                 }
@@ -1153,9 +1206,9 @@ impl TablesWindow {
         });
 
         let shortcuts = gio::SimpleAction::new("shortcuts", None);
-        let window = self.window.downgrade();
+        let weak = Rc::downgrade(self);
         shortcuts.connect_activate(move |_, _| {
-            if let Some(window) = window.upgrade() {
+            if let Some(window) = weak.upgrade().map(|this| this.window()) {
                 super::shortcuts::dialog().present(Some(&window));
             }
         });
@@ -1177,7 +1230,11 @@ impl TablesWindow {
             .into_iter()
             .map(|(name, menu)| (name, menu.upcast()))
             .collect();
-            crate::window::command_search::present(&this.window, this.actions.upcast_ref(), &menus);
+            crate::window::command_search::present(
+                &this.window(),
+                this.actions.upcast_ref(),
+                &menus,
+            );
         });
         self.actions.add_action(&search);
         self.sync_nav();
@@ -1204,7 +1261,7 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         close.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
-                this.frame.close(&this.root);
+                this.frame().close(&this.root);
             }
         });
         self.actions.add_action(&close);
@@ -1212,7 +1269,7 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         overview.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
-                this.frame.show_overview();
+                this.frame().show_overview();
             }
         });
         self.actions.add_action(&overview);
@@ -1224,34 +1281,36 @@ impl TablesWindow {
                 return;
             };
             action.set_state(&on.to_variant());
-            this.window.set_fullscreened(on);
+            this.window().set_fullscreened(on);
         });
         self.actions.add_action(&action);
         let leave = leave.downgrade();
         let weak = Rc::downgrade(self);
         let before = Rc::new(Cell::new(false));
-        self.window.connect_fullscreened_notify(move |window| {
-            let Some(this) = weak.upgrade() else { return };
-            let on = window.is_fullscreen();
-            formatting::set_state(window, "fullscreen", on.to_variant());
-            if let Some(leave) = leave.upgrade() {
-                leave.set_visible(on);
-            }
-            if on {
-                before.set(this.nav_split.shows_sidebar());
-                this.nav_split.set_show_sidebar(false);
-            } else if before.get() {
-                this.nav_split.set_show_sidebar(true);
-            }
-        });
+        self.window_notifies
+            .connect(&self.window(), "fullscreened", move |window| {
+                let Some(this) = weak.upgrade() else { return };
+                let on = window.is_fullscreen();
+                formatting::set_state(window, "fullscreen", on.to_variant());
+                if let Some(leave) = leave.upgrade() {
+                    leave.set_visible(on);
+                }
+                if on {
+                    before.set(this.nav_split.shows_sidebar());
+                    this.nav_split.set_show_sidebar(false);
+                } else if before.get() {
+                    this.nav_split.set_show_sidebar(true);
+                }
+            });
         let escape = gtk::ShortcutController::new();
         escape.set_scope(gtk::ShortcutScope::Managed);
-        let weak = self.window.downgrade();
+        let weak = Rc::downgrade(self);
         escape.add_shortcut(gtk::Shortcut::new(
             gtk::ShortcutTrigger::parse_string("Escape"),
             Some(gtk::CallbackAction::new(move |_, _| {
                 match weak
                     .upgrade()
+                    .map(|this| this.window())
                     .filter(gtk::prelude::GtkWindowExt::is_fullscreen)
                 {
                     Some(window) => {
@@ -1262,7 +1321,7 @@ impl TablesWindow {
                 }
             })),
         ));
-        self.window.add_controller(escape);
+        self.add_window_controller(escape);
     }
 }
 
@@ -1364,6 +1423,21 @@ impl crate::tabs::FramePage for TablesWindow {
         self.actions.clone().upcast()
     }
 
+    fn moved_to(&self, frame: &Rc<crate::tabs::Frame>) {
+        // The controllers on the window go with the tab to its new one.
+        let old = self.window();
+        let controllers = self.window_controllers.borrow().clone();
+        for controller in &controllers {
+            old.remove_controller(controller);
+        }
+        *self.frame.borrow_mut() = frame.clone();
+        let new = self.window();
+        for controller in controllers {
+            new.add_controller(controller);
+        }
+        self.window_notifies.move_to(&old, &new);
+    }
+
     /// Desk Tables does not save documents yet, so a tab closes at once.
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
         done(true);
@@ -1381,6 +1455,17 @@ impl crate::tabs::FramePage for TablesWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_undo_history_of_tables_is_bounded() {
+        let mut history = Vec::new();
+        for step in 0..MAX_UNDO + 50 {
+            push_capped(&mut history, step);
+        }
+        assert_eq!(history.len(), MAX_UNDO);
+        assert_eq!(history.first(), Some(&50));
+        assert_eq!(history.last(), Some(&(MAX_UNDO + 49)));
+    }
 
     #[test]
     fn ntab_06_headers_and_footers_fit_in_the_table() {

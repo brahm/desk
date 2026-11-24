@@ -510,6 +510,13 @@ impl Ruler {
                     if at.millipoints() <= 0 {
                         return;
                     }
+                    // Past the most stops a paragraph keeps, the new one
+                    // would be left out without a word (second review of
+                    // RV batch 5).
+                    if !stops.can_take(at) {
+                        ruler.area.error_bell();
+                        return;
+                    }
                     (tr("Tab Stops"), tabs(stops.with(TabStop::left(at))))
                 }
                 (Some(Marker::Tab(index)), true) => {

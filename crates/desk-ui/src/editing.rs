@@ -499,6 +499,8 @@ struct State {
     /// How wide the text flows in Screen View, in points, and its Text
     /// Size, while it is on (PXV-01).
     screen: Option<(f64, f64)>,
+    /// What the editor added to its view, taken off with it.
+    attached: Attached,
 }
 
 impl State {
@@ -664,6 +666,11 @@ impl TextEditor {
                 cells: None,
                 cell_editor: None,
                 screen: None,
+                attached: Attached {
+                    area: view.area().downgrade(),
+                    controllers: Vec::new(),
+                    handlers: Vec::new(),
+                },
             })),
         };
         this.show_pages();
@@ -674,6 +681,7 @@ impl TextEditor {
         this.connect_drop();
         this.connect_input_method();
         this.start_blinking();
+        this.show_link_addresses();
         this.view.area().grab_focus();
         this
     }
@@ -973,14 +981,13 @@ impl TextEditor {
         // Into selected cells, from the focused one (IOP-19).
         if self.selected_cells().is_some() {
             let weak = self.downgrade();
-            self.view.area().clipboard().read_text_async(
-                gtk::gio::Cancellable::NONE,
-                move |result| {
-                    if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
-                        this.paste_in_cells(&text);
-                    }
-                },
-            );
+            let clipboard = self.view.area().clipboard();
+            gtk::glib::spawn_future_local(async move {
+                if let (Some(text), Some(this)) = (clipboard_text(&clipboard).await, weak.upgrade())
+                {
+                    this.paste_in_cells(&text);
+                }
+            });
             return;
         }
         if self.paste_objects() {
@@ -996,28 +1003,27 @@ impl TextEditor {
             return;
         }
         let weak = self.downgrade();
-        self.view
-            .area()
-            .clipboard()
-            .read_text_async(gtk::gio::Cancellable::NONE, move |result| {
-                let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) else {
-                    return;
-                };
-                let fragment = keep
-                    .then(|| {
-                        COPIED.with(|c| {
-                            c.borrow()
-                                .as_ref()
-                                .filter(|(copied, _)| copied.as_str() == text.as_str())
-                                .map(|(_, f)| f.clone())
-                        })
+        let clipboard = self.view.area().clipboard();
+        gtk::glib::spawn_future_local(async move {
+            let (Some(text), Some(this)) = (clipboard_text(&clipboard).await, weak.upgrade())
+            else {
+                return;
+            };
+            let fragment = keep
+                .then(|| {
+                    COPIED.with(|c| {
+                        c.borrow()
+                            .as_ref()
+                            .filter(|(copied, _)| copied.as_str() == text.as_str())
+                            .map(|(_, f)| f.clone())
                     })
-                    .flatten();
-                match fragment {
-                    Some(fragment) => this.paste_fragment(&fragment),
-                    None => this.replace_selection("Paste", &text),
-                }
-            });
+                })
+                .flatten();
+            match fragment {
+                Some(fragment) => this.paste_fragment(&fragment),
+                None => this.replace_selection("Paste", &text),
+            }
+        });
     }
 
     /// Pastes the text with its styles that another app of Desk put on the
@@ -1033,20 +1039,8 @@ impl TextEditor {
         let weak = self.downgrade();
         gtk::glib::spawn_future_local(async move {
             let read = async {
-                let (stream, _) = clipboard
-                    .read_future(&[format.text_type], gtk::glib::Priority::DEFAULT)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let out = gtk::gio::MemoryOutputStream::new_resizable();
-                out.splice_future(
-                    &stream,
-                    gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
-                        | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
-                    gtk::glib::Priority::DEFAULT,
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                (format.read_text)(&out.steal_as_bytes())
+                let bytes = clipboard_bytes(&clipboard, format.text_type).await?;
+                (format.read_text)(&bytes)
             };
             let fragment = match read.await {
                 Ok(fragment) => fragment,
@@ -1087,16 +1081,20 @@ impl TextEditor {
                 Ok(bytes) => (format.read_foreign_text)(media_type, &bytes),
                 Err(error) => Err(error),
             };
-            let Some(this) = weak.upgrade() else { return };
             match fragment {
-                Ok(fragment) if !fragment.text().is_empty() => this.paste_fragment(&fragment),
-                // Nothing to read: the text alone.
+                Ok(fragment) if !fragment.text().is_empty() => {
+                    if let Some(this) = weak.upgrade() {
+                        this.paste_fragment(&fragment);
+                    }
+                }
+                // Nothing to read: the text alone. The editor is not held
+                // while it is read.
                 _ => {
-                    clipboard.read_text_async(gtk::gio::Cancellable::NONE, move |result| {
-                        if let (Ok(Some(text)), Some(this)) = (result, weak.upgrade()) {
-                            this.replace_selection("Paste", &text);
-                        }
-                    });
+                    if let Some(text) = clipboard_text(&clipboard).await
+                        && let Some(this) = weak.upgrade()
+                    {
+                        this.replace_selection("Paste", &text);
+                    }
                 }
             }
         });
@@ -1110,20 +1108,47 @@ impl TextEditor {
         let formats = clipboard.formats();
         if clipboard.is_local()
             || !formats.contains_type(gdk::Texture::static_type())
-            || formats.contain_mime_type("text/plain")
-            || formats.contain_mime_type("text/plain;charset=utf-8")
+            || text_type(formats.mime_types().iter().map(|t| t.as_str())).is_some()
         {
             return false;
         }
+        // PNG or JPEG, which a document keeps as they are read: of other
+        // kinds, some decoders make all the pixels before the size can be
+        // checked (second review of RV batch 5).
+        let Some(media_type) = ["image/png", "image/jpeg"]
+            .into_iter()
+            .find(|t| formats.contain_mime_type(t))
+        else {
+            return false;
+        };
         let weak = self.downgrade();
-        clipboard.read_texture_async(gtk::gio::Cancellable::NONE, move |result| {
-            let (Ok(Some(texture)), Some(this)) = (result, weak.upgrade()) else {
-                return;
+        gtk::glib::spawn_future_local(async move {
+            // Read with a bound, refused by the size its header gives, and
+            // decoded once to check it away from the thread of the window.
+            let picture = match clipboard_bytes(&clipboard, media_type).await {
+                Ok(bytes) => match picture_of_image(&bytes, MAX_PASTED_PIXELS) {
+                    Ok(picture) => {
+                        let checked = picture.clone();
+                        match gtk::gio::spawn_blocking(move || {
+                            desk_render::picture_surface(&checked).is_some()
+                        })
+                        .await
+                        {
+                            Ok(true) => Ok(picture),
+                            _ => Err("cannot decode the picture".to_string()),
+                        }
+                    }
+                    Err(error) => Err(error),
+                },
+                Err(error) => Err(error),
             };
-            let png = texture.save_to_png_bytes();
-            match desk_model::Picture::from_png(png.to_vec()) {
-                Some(picture) => this.insert_picture_in_line(picture),
-                None => gtk::glib::g_warning!("desk", "cannot paste the picture"),
+            let Some(this) = weak.upgrade() else { return };
+            match picture {
+                Ok(picture) => this.insert_picture_in_line(picture),
+                Err(error) => {
+                    gtk::glib::g_warning!("desk", "cannot paste the picture: {error}");
+                    this.view.area().error_bell();
+                }
             }
         });
         true
@@ -1965,15 +1990,7 @@ impl TextEditor {
             return;
         }
         let window = self.view.area().root().and_downcast::<gtk::Window>();
-        gtk::UriLauncher::new(link).launch(
-            window.as_ref(),
-            gtk::gio::Cancellable::NONE,
-            |result| {
-                if let Err(error) = result {
-                    glib::g_warning!("desk", "cannot open the link: {error}");
-                }
-            },
-        );
+        follow_outside(window.as_ref(), link);
     }
 
     /// Makes the selection, or the word at the cursor, a bookmark named by
@@ -3868,7 +3885,7 @@ impl TextEditor {
                 glib::Propagation::Proceed
             }
         });
-        self.view.area().add_controller(keys);
+        self.attach(keys);
 
         let focus = gtk::EventControllerFocus::new();
         let weak = self.downgrade();
@@ -3885,7 +3902,7 @@ impl TextEditor {
                 this.view.area().queue_draw();
             }
         });
-        self.view.area().add_controller(focus);
+        self.attach(focus);
     }
 
     fn connect_input_method(&self) {
@@ -4098,7 +4115,7 @@ impl TextEditor {
                 this.state.borrow_mut().adding = false;
             }
         });
-        self.view.area().add_controller(click);
+        self.attach(click);
 
         let drag = gtk::GestureDrag::builder()
             .button(gdk::BUTTON_PRIMARY)
@@ -4165,7 +4182,53 @@ impl TextEditor {
             state.drag_from = None;
             state.adding = false;
         });
-        self.view.area().add_controller(drag);
+        self.attach(drag);
+    }
+
+    /// Shows the whole address of a link while the pointer is over it, as
+    /// a link opens with a click (decided by the owner in review RV,
+    /// batch 5).
+    fn show_link_addresses(&self) {
+        let area = self.view.area();
+        area.set_has_tooltip(true);
+        let weak = self.downgrade();
+        let handler = area.connect_query_tooltip(move |_, x, y, keyboard, tooltip| {
+            let Some(this) = weak.upgrade() else {
+                return false;
+            };
+            if keyboard {
+                return false;
+            }
+            let Some(spot) = this.spot_at(f64::from(x), f64::from(y)) else {
+                return false;
+            };
+            let link = {
+                let state = this.state.borrow();
+                // Over the link, not just after it.
+                link_at(state.editor.document(), spot)
+                    .filter(|(_, range)| range.contains(&spot.offset))
+                    .map(|(l, _)| l)
+            };
+            match link {
+                Some(link) => {
+                    tooltip.set_text(Some(&crate::links::shown(&link)));
+                    true
+                }
+                None => false,
+            }
+        });
+        self.state.borrow_mut().attached.handlers.push(handler);
+    }
+
+    /// Adds a controller to the view, for as long as the editor lives.
+    pub(super) fn attach(&self, controller: impl IsA<gtk::EventController>) {
+        let controller = controller.upcast();
+        self.view.area().add_controller(controller.clone());
+        self.state
+            .borrow_mut()
+            .attached
+            .controllers
+            .push(controller);
     }
 
     /// Blinks the cursor, as GTK text views do, while the window lives.
@@ -4175,9 +4238,11 @@ impl TextEditor {
             return;
         }
         let view = self.view.downgrade();
+        // It stops with the editor, not only with the view.
+        let state = Rc::downgrade(&self.state);
         let mut on = true;
         glib::timeout_add_local(Duration::from_millis(600), move || {
-            let Some(view) = view.upgrade() else {
+            let (Some(view), Some(_)) = (view.upgrade(), state.upgrade()) else {
                 return glib::ControlFlow::Break;
             };
             on = !on;
@@ -4187,8 +4252,114 @@ impl TextEditor {
     }
 }
 
-/// The bytes of the clipboard as `media_type`.
-async fn clipboard_bytes(
+/// Follows a link outside the document and its other documents, as the
+/// preferences say (review RV, batch 5): a link to the web opens, asks or
+/// never opens, and the first click on one asks which; any other link
+/// shows its address and asks.
+fn follow_outside(window: Option<&gtk::Window>, link: &str) {
+    use crate::links::Follow;
+    use crate::preferences::OpenLinks;
+    use adw::prelude::{AdwDialogExt, AlertDialogExt};
+    let launch = |window: Option<&gtk::Window>, link: &str| {
+        gtk::UriLauncher::new(link).launch(window, gtk::gio::Cancellable::NONE, |result| {
+            if let Err(error) = result {
+                glib::g_warning!("desk", "cannot open the link: {error}");
+            }
+        });
+    };
+    let follow = crate::links::follow(link, crate::preferences::get().open_links);
+    let dialog = match follow {
+        Follow::Open => {
+            launch(window, link);
+            return;
+        }
+        Follow::Refuse => {
+            if let Some(window) = window {
+                window.error_bell();
+            }
+            return;
+        }
+        Follow::Confirm => {
+            let dialog = adw::AlertDialog::new(
+                Some(&tr("Open This Link?")),
+                Some(&crate::links::shown(link)),
+            );
+            dialog.add_response("cancel", &tr("_Cancel"));
+            dialog.add_response("open", &tr("_Open"));
+            dialog.set_default_response(Some("cancel"));
+            dialog
+        }
+        Follow::Choose => {
+            let body = tr("{link}\n\nDesk can open links of documents to the web at once, ask first each time, or never open them. Links to other documents always open. You can change this in Preferences.")
+                .replace("{link}", &crate::links::shown(link));
+            let dialog = adw::AlertDialog::new(Some(&tr("Open Links to the Web?")), Some(&body));
+            dialog.add_response("never", &tr("_Never Open"));
+            dialog.add_response("ask", &tr("_Ask First"));
+            dialog.add_response("open", &tr("Open at _Once"));
+            dialog.set_default_response(Some("ask"));
+            dialog
+        }
+    };
+    if !crate::links::is_web(link) {
+        dialog.set_response_appearance("open", adw::ResponseAppearance::Destructive);
+    } else {
+        dialog.set_response_appearance("open", adw::ResponseAppearance::Suggested);
+    }
+    dialog.set_close_response("cancel");
+    let link = link.to_owned();
+    let parent = window.cloned();
+    dialog.connect_response(None, move |_, response| {
+        if follow == Follow::Choose {
+            let choice = match response {
+                "never" => Some(OpenLinks::Never),
+                "ask" => Some(OpenLinks::Ask),
+                "open" => Some(OpenLinks::Open),
+                _ => None,
+            };
+            let Some(choice) = choice else { return };
+            crate::preferences::change(|p| p.open_links = Some(choice));
+            // The click that asked was meant to open the link.
+            if choice != OpenLinks::Never {
+                launch(parent.as_ref(), &link);
+            }
+        } else if response == "open" {
+            launch(parent.as_ref(), &link);
+        }
+    });
+    dialog.present(window);
+}
+
+/// The controllers that an editor added to its view. They go with the
+/// editor: a document shown again in the same view, as after Revert or
+/// Restore, has an editor of its own, and the controllers of the one
+/// before, with its input method, stayed on the view, as its blinking
+/// went on (review RV, batch 5).
+struct Attached {
+    area: glib::WeakRef<gtk::DrawingArea>,
+    controllers: Vec<gtk::EventController>,
+    handlers: Vec<glib::SignalHandlerId>,
+}
+
+impl Drop for Attached {
+    fn drop(&mut self) {
+        if let Some(area) = self.area.upgrade() {
+            for controller in self.controllers.drain(..) {
+                area.remove_controller(&controller);
+            }
+            for handler in self.handlers.drain(..) {
+                area.disconnect(handler);
+            }
+        }
+    }
+}
+
+/// The most bytes read from the clipboard: what another app offers may
+/// be of any size, and was read whole into memory (review RV, batch 5).
+const MAX_CLIPBOARD_BYTES: usize = 256 << 20;
+
+/// The bytes of the clipboard as `media_type`, unless there are more than
+/// [`MAX_CLIPBOARD_BYTES`].
+pub(super) async fn clipboard_bytes(
     clipboard: &gdk::Clipboard,
     media_type: &str,
 ) -> Result<glib::Bytes, String> {
@@ -4196,22 +4367,203 @@ async fn clipboard_bytes(
         .read_future(&[media_type], glib::Priority::DEFAULT)
         .await
         .map_err(|e| e.to_string())?;
-    let out = gtk::gio::MemoryOutputStream::new_resizable();
-    out.splice_future(
-        &stream,
-        gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
-            | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
-        glib::Priority::DEFAULT,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    Ok(out.steal_as_bytes())
+    read_bounded(&stream, MAX_CLIPBOARD_BYTES).await
+}
+
+/// The text of the clipboard, read as [`clipboard_bytes`] are when
+/// another app offers it: the text alone was read whole, whatever its
+/// size (second review of RV batch 5).
+pub(crate) async fn clipboard_text(clipboard: &gdk::Clipboard) -> Option<String> {
+    if clipboard.is_local() {
+        return clipboard
+            .read_text_future()
+            .await
+            .ok()
+            .flatten()
+            .map(String::from);
+    }
+    let types = clipboard.formats().mime_types();
+    let (media_type, charset) = text_type(types.iter().map(|t| t.as_str()))?;
+    match clipboard_bytes(clipboard, &media_type).await {
+        Ok(bytes) => Some(plain_text(&bytes, charset.as_deref())),
+        Err(error) => {
+            gtk::glib::g_warning!("desk", "cannot paste the text: {error}");
+            None
+        }
+    }
+}
+
+/// Of the types a clipboard offers, the one of plain text to read, with
+/// its character set when it gives one: UTF-8 first, in any case of
+/// letters, then another set, then text with no set.
+fn text_type<'a>(types: impl Iterator<Item = &'a str>) -> Option<(String, Option<String>)> {
+    let mut best: Option<(u8, String, Option<String>)> = None;
+    for media_type in types {
+        let lower = media_type.to_ascii_lowercase();
+        let (rank, charset) = if lower == "utf8_string" {
+            (0, Some("UTF-8".to_string()))
+        } else if let Some(params) = lower.strip_prefix("text/plain;") {
+            let Some(set) = params
+                .split(';')
+                .find_map(|p| p.trim().strip_prefix("charset="))
+            else {
+                continue;
+            };
+            let set = set.trim_matches('"').to_string();
+            let utf8 = set == "utf-8" || set == "utf8";
+            (if utf8 { 0 } else { 1 }, Some(set))
+        } else if lower == "text/plain" {
+            (2, None)
+        } else if lower == "string" {
+            (3, Some("ISO-8859-1".to_string()))
+        } else {
+            continue;
+        };
+        if best.as_ref().is_none_or(|(b, _, _)| rank < *b) {
+            best = Some((rank, media_type.to_string(), charset));
+        }
+    }
+    best.map(|(_, media_type, charset)| (media_type, charset))
+}
+
+/// The text of the bytes of a plain text in `charset`, without the null
+/// that some apps end it with. With no set, UTF-8, or Latin-1 when the
+/// bytes are not UTF-8.
+fn plain_text(bytes: &[u8], charset: Option<&str>) -> String {
+    let text = match charset {
+        Some(set) if !set.eq_ignore_ascii_case("utf-8") && !set.eq_ignore_ascii_case("utf8") => {
+            glib::convert(bytes, "UTF-8", set)
+                .map(|(converted, _)| String::from_utf8_lossy(&converted).into_owned())
+                .unwrap_or_else(|_| String::from_utf8_lossy(bytes).into_owned())
+        }
+        Some(_) => String::from_utf8_lossy(bytes).into_owned(),
+        None => match std::str::from_utf8(bytes) {
+            Ok(text) => text.to_string(),
+            Err(_) => bytes.iter().map(|&b| char::from(b)).collect(),
+        },
+    };
+    text.trim_end_matches('\0').to_string()
+}
+
+/// The most pixels of a picture pasted from another program: those of the
+/// largest the pages draw.
+const MAX_PASTED_PIXELS: i64 = 8192 * 8192;
+
+/// The picture of the bytes of a PNG or a JPEG, kept as they are, unless
+/// its header gives it more than `most` pixels.
+fn picture_of_image(bytes: &[u8], most: i64) -> Result<desk_model::Picture, String> {
+    let picture = desk_model::Picture::from_bytes(bytes.to_vec()).ok_or("not a picture")?;
+    if i64::from(picture.width()) * i64::from(picture.height()) > most {
+        return Err("the picture is too large".to_string());
+    }
+    Ok(picture)
+}
+
+/// The bytes of a stream, read without blocking, or an error past `most`.
+async fn read_bounded(
+    stream: &impl IsA<gtk::gio::InputStream>,
+    most: usize,
+) -> Result<glib::Bytes, String> {
+    let mut out = Vec::new();
+    loop {
+        let chunk = stream
+            .read_bytes_future(1 << 16, glib::Priority::DEFAULT)
+            .await
+            .map_err(|e| e.to_string())?;
+        if chunk.is_empty() {
+            break;
+        }
+        if out.len() + chunk.len() > most {
+            let _ = stream.close_future(glib::Priority::DEFAULT).await;
+            return Err(format!("more than {} MB", most >> 20));
+        }
+        out.extend_from_slice(&chunk);
+    }
+    let _ = stream.close_future(glib::Priority::DEFAULT).await;
+    Ok(glib::Bytes::from_owned(out))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use desk_model::{Editor, Language};
+
+    #[test]
+    fn what_the_clipboard_offers_is_read_up_to_a_bound() {
+        // Review RV, batch 5: what another app offered was read whole,
+        // whatever its size.
+        let context = glib::MainContext::new();
+        let read = |bytes: Vec<u8>, most: usize| {
+            let stream = gtk::gio::MemoryInputStream::from_bytes(&glib::Bytes::from_owned(bytes));
+            context
+                .with_thread_default(|| context.block_on(read_bounded(&stream, most)))
+                .unwrap()
+        };
+        let small = read(vec![7; 200_000], 300_000).unwrap();
+        assert_eq!(small.len(), 200_000);
+        assert!(read(vec![7; 400_000], 300_000).is_err());
+    }
+
+    #[test]
+    fn a_picture_pasted_is_refused_by_its_size_before_it_is_decoded() {
+        // Second review of RV batch 5: the picture of another program was
+        // decoded whole before its size was checked.
+        let pixbuf =
+            gtk::gdk_pixbuf::Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 64, 48)
+                .unwrap();
+        pixbuf.fill(0x3366_99ff);
+        let png = pixbuf.save_to_bufferv("png", &[]).unwrap();
+        let picture = picture_of_image(&png, 64 * 48).unwrap();
+        assert_eq!((picture.width(), picture.height()), (64, 48));
+        // Kept as it is, not decoded and made again.
+        assert_eq!(picture.data(), &png[..]);
+        assert!(picture_of_image(&png, 64 * 48 - 1).is_err());
+        assert!(picture_of_image(b"not a picture", 1 << 20).is_err());
+    }
+
+    #[test]
+    fn plain_text_is_read_in_the_set_its_type_gives() {
+        // Third review of RV batch 5: only types written in lower case were
+        // read, and all as UTF-8.
+        let pick = |types: &[&str]| text_type(types.iter().copied());
+        assert_eq!(
+            pick(&["STRING", "text/plain;charset=UTF-8", "TEXT"]),
+            Some(("text/plain;charset=UTF-8".into(), Some("utf-8".into())))
+        );
+        assert_eq!(
+            pick(&["text/plain", "STRING"]),
+            Some(("text/plain".into(), None))
+        );
+        assert_eq!(
+            pick(&["STRING"]),
+            Some(("STRING".into(), Some("ISO-8859-1".into())))
+        );
+        assert_eq!(pick(&["image/png"]), None);
+        assert_eq!(plain_text(b"caf\xe9", Some("ISO-8859-1")), "café");
+        assert_eq!(plain_text(b"caf\xe9", None), "café");
+        assert_eq!(plain_text("café\0".as_bytes(), None), "café");
+    }
+
+    #[test]
+    fn an_editor_takes_its_controllers_off_the_view_when_it_goes() {
+        // Review RV, batch 5: each document shown again in a view, as after
+        // Revert or Restore, added its controllers to those of the one
+        // before, which stayed.
+        crate::with_gtk(|| {
+            let view = crate::view::DocumentView::new();
+            let count =
+                |view: &crate::view::DocumentView| view.area().observe_controllers().n_items();
+            let before = count(&view);
+            let first = TextEditor::new(&view, Document::new_word_processing());
+            let with_one = count(&view);
+            assert!(with_one > before);
+            drop(first);
+            let second = TextEditor::new(&view, Document::new_word_processing());
+            assert_eq!(count(&view), with_one);
+            drop(second);
+            assert_eq!(count(&view), before);
+        });
+    }
 
     #[test]
     fn txt_07_a_misspelling_with_one_suggestion_is_corrected() {

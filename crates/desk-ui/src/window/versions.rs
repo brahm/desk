@@ -96,7 +96,7 @@ impl DocumentWindow {
             view.set_content(Some(&page));
         }
         dialog.set_child(Some(&view));
-        dialog.present(Some(&self.window));
+        dialog.present(Some(&self.window()));
     }
 
     /// The row of a version, with Open a Copy and Restore.

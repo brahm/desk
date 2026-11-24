@@ -142,8 +142,11 @@ pub fn picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
 /// The picture of an image file for a document: PNG, JPEG and PDF as
 /// they are, so that photographs stay small and PDF stays sharp, and any
 /// other format that GTK reads as PNG (OBJ-01).
+///
+/// A file larger than `MAX_PICTURE` is not read, as one dropped on the
+/// document was read whole whatever its size (review RV, batch 5).
 pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
-    let (bytes, _) = file.load_contents(gtk::gio::Cancellable::NONE).ok()?;
+    let bytes = load_bounded(file, MAX_PICTURE)?;
     let bytes: &[u8] = &bytes;
     if bytes.starts_with(b"%PDF-") {
         let (width, height) = desk_render::pdf_size(bytes)?;
@@ -159,9 +162,11 @@ pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
 /// package that Desk reads.
 const MAX_MEDIA: u64 = 64 << 20;
 
-/// A movie or a sound from a file, if Desk knows its format and it is
-/// not too large to keep in a document (OBJ-18).
-pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
+/// The largest picture file a document takes in.
+const MAX_PICTURE: u64 = 256 << 20;
+
+/// The size of a file, in bytes, when its file system knows it.
+fn file_size(file: &gtk::gio::File) -> Option<u64> {
     let size = file
         .query_info(
             "standard::size",
@@ -170,11 +175,38 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
         )
         .ok()?
         .size();
-    if size as u64 > MAX_MEDIA {
+    u64::try_from(size).ok()
+}
+
+/// The bytes of a file of at most `most` bytes. One whose size is not
+/// known, as on some remote places, is read up to the bound rather than
+/// refused (second review of RV batch 5).
+fn load_bounded(file: &gtk::gio::File, most: u64) -> Option<Vec<u8>> {
+    if file_size(file).is_some_and(|size| size > most) {
         return None;
     }
-    let (bytes, _) = file.load_contents(gtk::gio::Cancellable::NONE).ok()?;
-    desk_model::Media::from_bytes(bytes.to_vec())
+    let stream = file.read(gtk::gio::Cancellable::NONE).ok()?;
+    let mut out = Vec::new();
+    loop {
+        let chunk = stream
+            .read_bytes(1 << 16, gtk::gio::Cancellable::NONE)
+            .ok()?;
+        if chunk.is_empty() {
+            break;
+        }
+        if (out.len() + chunk.len()) as u64 > most {
+            return None;
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Some(out)
+}
+
+/// A movie or a sound from a file, if Desk knows its format and it is
+/// not too large to keep in a document (OBJ-18).
+pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
+    let bytes = load_bounded(file, MAX_MEDIA)?;
+    desk_model::Media::from_bytes(bytes)
 }
 
 /// The filters of the dialogs that choose a picture for a document: the
@@ -215,6 +247,23 @@ pub fn texture(picture: &Picture) -> Option<gtk::gdk::Texture> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_is_read_up_to_a_bound() {
+        // Second review of RV batch 5: a file whose size was not known was
+        // refused; it is read up to the bound instead.
+        let path = std::env::temp_dir().join(format!("desk-bounded-{}", std::process::id()));
+        std::fs::write(&path, vec![7u8; 100_000]).unwrap();
+        let file = gtk::gio::File::for_path(&path);
+        assert_eq!(load_bounded(&file, 100_000).map(|b| b.len()), Some(100_000));
+        assert_eq!(load_bounded(&file, 99_999), None);
+        std::fs::remove_file(&path).unwrap();
+        // A pipe has no size: what it gives is still bounded.
+        let file = gtk::gio::File::for_path("/proc/self/status");
+        assert!(file_size(&file).is_none_or(|size| size == 0));
+        assert!(load_bounded(&file, 1 << 20).is_some_and(|b| !b.is_empty()));
+        assert_eq!(load_bounded(&file, 10), None);
+    }
 
     #[test]
     fn lst_03_desk_has_pictures_for_image_bullets() {

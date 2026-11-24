@@ -25,6 +25,11 @@ fn folder() -> PathBuf {
 thread_local! {
     /// The drafts made since the app started, numbered.
     static COUNT: Cell<u32> = const { Cell::new(0) };
+    /// What the names of the drafts of this run of the app start with:
+    /// not the process ID, which in a Flatpak sandbox is the same at each
+    /// run, so that the drafts of a crash looked like those of the run
+    /// after it and were never offered back (review RV, batch 5).
+    static RUN: String = glib::uuid_string_random().replace('-', "");
 }
 
 /// The draft of one window: the copy of the document and, beside it, the
@@ -44,7 +49,8 @@ impl Draft {
             c.get()
         });
         let stamp = glib::real_time();
-        let file = format!("{}-{stamp}-{n}.{extension}", std::process::id());
+        let run = RUN.with(Clone::clone);
+        let file = format!("{run}-{stamp}-{n}.{extension}");
         Self {
             path: folder().join(file),
         }
@@ -83,11 +89,11 @@ impl Draft {
 /// The drafts that a crash left: those in the folder that this run of
 /// the app did not make, oldest first.
 pub fn leftovers() -> Vec<Draft> {
-    leftovers_in(&folder(), std::process::id())
+    RUN.with(|run| leftovers_in(&folder(), run))
 }
 
-fn leftovers_in(folder: &Path, pid: u32) -> Vec<Draft> {
-    let ours = format!("{pid}-");
+fn leftovers_in(folder: &Path, run: &str) -> Vec<Draft> {
+    let ours = format!("{run}-");
     let Ok(entries) = std::fs::read_dir(folder) else {
         return Vec::new();
     };
@@ -128,8 +134,26 @@ mod tests {
         ] {
             std::fs::write(folder.join(file), "x").unwrap();
         }
-        let drafts = leftovers_in(&folder, 42);
+        let drafts = leftovers_in(&folder, "42");
         assert_eq!(drafts, vec![Draft::at(folder.join("1-5-1.odt"))]);
         std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn the_drafts_of_a_run_are_named_apart_from_its_process() {
+        // Review RV, batch 5: in Flatpak each run has the same process
+        // ID, and the drafts of a crash were taken for those of the run
+        // after it.
+        let draft = Draft::new("odt");
+        let name = draft
+            .path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let run = RUN.with(Clone::clone);
+        assert!(name.starts_with(&format!("{run}-")), "{name}");
+        assert!(run.len() >= 32);
+        assert!(!name.starts_with(&format!("{}-", std::process::id())));
     }
 }
