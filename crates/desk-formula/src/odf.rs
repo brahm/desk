@@ -68,6 +68,13 @@ impl Formula {
                     flush(&mut token, &mut out);
                     out.push(';');
                 }
+                // A name before a parenthesis is a function, whatever
+                // it looks like: LOG10 is also a cell.
+                '(' => {
+                    out.push_str(&token);
+                    token.clear();
+                    out.push(c);
+                }
                 c => {
                     flush(&mut token, &mut out);
                     out.push(c);
@@ -161,5 +168,14 @@ mod tests {
             Formula::parse_odf("of:=[Sheet2.A1]+1").unwrap().to_string(),
             "=#REF!+1"
         );
+    }
+
+    #[test]
+    fn a_function_named_like_a_cell_stays_a_function() {
+        // LOG10 is also the cell in column LOG, row 10: it was written as
+        // [.LOG10](100), which no reader takes (review RV, batch 2).
+        let f = Formula::parse("=LOG10(100)+A1").unwrap();
+        assert_eq!(f.to_odf(), "of:=LOG10(100)+[.A1]");
+        assert_eq!(Formula::parse_odf(&f.to_odf()).unwrap(), f);
     }
 }
