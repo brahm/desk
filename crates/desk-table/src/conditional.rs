@@ -200,6 +200,11 @@ impl Condition {
     /// Whether a value meets the condition, with `cell` giving the values
     /// of the cells that the operands name and `today` the day now.
     pub fn holds(&self, value: &Value, cell: &dyn Fn(CellRef) -> Value, today: f64) -> bool {
+        // A rule whose cell was deleted no longer applies, "not equal"
+        // included.
+        if self.operands().iter().any(|o| matches!(o, Operand::Deleted)) {
+            return false;
+        }
         let operand = |o: &Operand| match o {
             Operand::Number(n) => Value::Number(n.0),
             Operand::Text(t) => Value::Text(t.clone()),
@@ -350,5 +355,10 @@ mod tests {
         assert_eq!(operand(&t, 4, 1), Operand::Deleted);
         let v = t.values(0.0);
         assert_eq!(t.rule_style(&v, 4, 1).bold, None);
+        // Nor does "not equal", which every value would meet.
+        let deleted = Condition::NotEqual(Operand::Deleted);
+        assert!(!deleted.holds(&Value::Number(1.0), &|_| Value::Empty, 0.0));
+        let between = Condition::Between(Operand::Number(Num(0.0)), Operand::Deleted);
+        assert!(!between.holds(&Value::Number(1.0), &|_| Value::Empty, 0.0));
     }
 }
