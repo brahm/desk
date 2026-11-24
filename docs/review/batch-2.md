@@ -28,7 +28,8 @@ evaluation). Reviewed on 24 November 2026 from commit `145c979`, with
 | 16 | B | `desk-table/src/ops.rs` | Sort and Convert to Text computed formulas on day 0, so `TODAY` and `NOW` sorted as 1899 | They take the day it is; test |
 | 17 | B | `desk-table/src/ops.rs` | Merge joined numbers with text in en_US, so `2,5` became `2.5` in a Brazilian document | Numbers are written as they are typed in the locale of the document; test |
 | 18 | B | `desk-table/src/format.rs` | A date typed without a year, `15/03`, was 15 March 2000 | It is of the current year, as in Numbers; test |
-| 19 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
+| 19 | B | `desk-formula/src/value.rs` | `YEAR(1E300)` passed the largest `i64` to `date_from_days`, whose first sum overflowed: a panic in debug builds, a wrong date in release | Days are clamped to well past the years an `i32` holds; test |
+| 20 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
