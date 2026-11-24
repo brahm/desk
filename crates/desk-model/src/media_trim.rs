@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg_attr(not(test), deny(clippy::indexing_slicing, clippy::unwrap_used))]
+
 //! Reduce Media (OBJ-20): a movie or a sound cut down to the part between
 //! its start and its stop, without coding it again. A sound of samples
 //! (WAVE, AIFF) is cut at the samples, an MP3 at its frames, and a
@@ -141,7 +143,7 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
     let mut at = 12;
     let mut chunks = Vec::new();
     while at + 8 <= data.len() {
-        let id: [u8; 4] = data[at..at + 4].try_into().ok()?;
+        let id: [u8; 4] = data.get(at..at + 4)?.try_into().ok()?;
         let size = le32(data, at + 4)? as usize;
         let body = data.get(at + 8..(at + 8 + size).min(data.len()))?;
         chunks.push((id, body));
@@ -164,7 +166,7 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
             continue;
         }
         let body = if &id == b"data" {
-            &body[first as usize * align..last as usize * align]
+            body.get(first as usize * align..last as usize * align)?
         } else {
             body
         };
@@ -176,7 +178,7 @@ fn wav(data: &[u8], cut: &Cut) -> Option<Kept> {
         }
     }
     let size = (out.len() - 8) as u32;
-    out[4..8].copy_from_slice(&size.to_le_bytes());
+    out.get_mut(4..8)?.copy_from_slice(&size.to_le_bytes());
     Some(Kept {
         data: out,
         from: millis(first, rate),
@@ -197,7 +199,7 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
     let mut at = 12;
     let mut chunks = Vec::new();
     while at + 8 <= data.len() {
-        let id: [u8; 4] = data[at..at + 4].try_into().ok()?;
+        let id: [u8; 4] = data.get(at..at + 4)?.try_into().ok()?;
         let size = be32(data, at + 4)? as usize;
         let body = data.get(at + 8..(at + 8 + size).min(data.len()))?;
         chunks.push((id, body));
@@ -220,7 +222,7 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
     let samples = sound.get(8 + offset..)?;
     let frames = u64::from(be32(common, 2)?).min((samples.len() / align) as u64);
     let (first, last) = frame_range(cut, rate, frames)?;
-    let mut out = data[..12].to_vec();
+    let mut out = data.get(..12)?.to_vec();
     for (id, body) in chunks {
         let owned;
         let body: &[u8] = match &id {
@@ -230,14 +232,15 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
             }
             b"COMM" => {
                 let mut c = body.to_vec();
-                c[2..6].copy_from_slice(&((last - first) as u32).to_be_bytes());
+                c.get_mut(2..6)?
+                    .copy_from_slice(&((last - first) as u32).to_be_bytes());
                 owned = c;
                 &owned
             }
             b"SSND" => {
                 let mut c = vec![0; 8];
-                c[4..8].copy_from_slice(&body[4..8]);
-                c.extend(&samples[first as usize * align..last as usize * align]);
+                c.get_mut(4..8)?.copy_from_slice(body.get(4..8)?);
+                c.extend(samples.get(first as usize * align..last as usize * align)?);
                 owned = c;
                 &owned
             }
@@ -253,7 +256,7 @@ fn aiff(data: &[u8], cut: &Cut) -> Option<Kept> {
         }
     }
     let size = (out.len() - 8) as u32;
-    out[4..8].copy_from_slice(&size.to_be_bytes());
+    out.get_mut(4..8)?.copy_from_slice(&size.to_be_bytes());
     Some(Kept {
         data: out,
         from: millis(first, rate),
@@ -278,8 +281,8 @@ fn mp3_frame(header: u32) -> Option<(usize, u64, u64)> {
         0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320,
     ];
     const V2: [u64; 15] = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
-    let kbps = if mpeg1 { V1 } else { V2 }[bitrate as usize];
-    let base = [44_100, 48_000, 32_000][rate as usize];
+    let kbps = *if mpeg1 { V1 } else { V2 }.get(bitrate as usize)?;
+    let base = *[44_100, 48_000, 32_000].get(rate as usize)?;
     let rate = match version {
         3 => base,
         2 => base / 2,
@@ -303,11 +306,11 @@ fn mp3(data: &[u8], cut: &Cut) -> Option<Kept> {
         let footer = if data.get(5)? & 0x10 != 0 { 10 } else { 0 };
         at = 10 + size + footer;
     }
-    let tag = &data[..at.min(data.len())];
+    let tag = data.get(..at.min(data.len()))?;
     let trailer = data
         .len()
         .checked_sub(128)
-        .filter(|&t| t >= at && &data[t..t + 3] == b"TAG");
+        .filter(|&t| t >= at && data.get(t..t + 3) == Some(b"TAG"));
     let end = trailer.unwrap_or(data.len());
     let mut out = tag.to_vec();
     let (mut time, mut from, mut kept, mut rate) = (0u64, None, 0u64, 0u64);
@@ -342,7 +345,7 @@ fn mp3(data: &[u8], cut: &Cut) -> Option<Kept> {
     }
     let from = from?;
     if let Some(t) = trailer {
-        out.extend(&data[t..]);
+        out.extend(data.get(t..)?);
     }
     Some(Kept {
         data: out,
@@ -363,7 +366,7 @@ fn atoms(mut data: &[u8]) -> Option<Vec<Atom<'_>>> {
     let mut all = Vec::new();
     while data.len() >= 8 {
         let size = be32(data, 0)? as u64;
-        let kind: [u8; 4] = data[4..8].try_into().ok()?;
+        let kind: [u8; 4] = data.get(4..8)?.try_into().ok()?;
         let (header, size) = match size {
             0 => (8, data.len() as u64),
             1 => (16, be64(data, 8)?),
@@ -375,9 +378,9 @@ fn atoms(mut data: &[u8]) -> Option<Vec<Atom<'_>>> {
         }
         all.push(Atom {
             kind,
-            body: &data[header..size],
+            body: data.get(header..size)?,
         });
-        data = &data[size..];
+        data = data.get(size..)?;
     }
     Some(all)
 }
@@ -533,8 +536,15 @@ impl<'a> Track<'a> {
             return None;
         }
         let samples: Vec<_> = (0..count)
-            .map(|i| (times[i].0, times[i].1, offsets[i], sizes[i]))
-            .collect();
+            .map(|i| {
+                Some((
+                    times.get(i)?.0,
+                    times.get(i)?.1,
+                    *offsets.get(i)?,
+                    *sizes.get(i)?,
+                ))
+            })
+            .collect::<Option<_>>()?;
         if samples
             .iter()
             .any(|s| s.2.checked_add(s.3).is_none_or(|end| end > file.len()))
@@ -599,15 +609,21 @@ impl<'a> Track<'a> {
         self.kept = first..last.max(first + 1).min(self.samples.len());
     }
 
+    /// The samples kept: none when the range is not of them, which
+    /// [`Track::keep`] does not make.
+    fn kept_samples(&self) -> &[(u64, u64, usize, usize)] {
+        self.samples.get(self.kept.clone()).unwrap_or_default()
+    }
+
     fn duration(&self) -> u64 {
-        self.samples[self.kept.clone()].iter().map(|s| s.1).sum()
+        self.kept_samples().iter().map(|s| s.1).sum()
     }
 
     /// The bytes of the samples kept.
     fn data(&self, file: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        for s in &self.samples[self.kept.clone()] {
-            out.extend(&file[s.2..s.2 + s.3]);
+        for s in self.kept_samples() {
+            out.extend(file.get(s.2..s.2 + s.3).unwrap_or_default());
         }
         out
     }
@@ -615,7 +631,7 @@ impl<'a> Track<'a> {
     /// The new sample table, with the samples kept in one chunk at
     /// `offset` of the file.
     fn stbl(&self, offset: u64) -> Option<Vec<u8>> {
-        let kept = &self.samples[self.kept.clone()];
+        let kept = self.kept_samples();
         let n = kept.len() as u32;
         let mut out = Vec::new();
         for a in &self.stbl {
@@ -753,8 +769,8 @@ fn mp4(data: &[u8], cut: &Cut) -> Option<Kept> {
                     &with_duration(a.body, b"mvhd", ticks(length, scale)),
                 )),
                 b"trak" => {
-                    let track = &tracks[index];
-                    out.extend(trak(a.body, track, offsets[index], scale)?);
+                    let track = tracks.get(index)?;
+                    out.extend(trak(a.body, track, *offsets.get(index)?, scale)?);
                     index += 1;
                 }
                 kind => out.extend(atom(kind, a.body)),

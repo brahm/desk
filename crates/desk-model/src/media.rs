@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg_attr(not(test), deny(clippy::indexing_slicing, clippy::unwrap_used))]
+
 //! Movies and sounds on the pages, as Pages places them (OBJ-18,
 //! OBJ-19): the file as it came, with the frame that stands for a movie
 //! on the page and in print, and how it plays.
@@ -61,7 +63,7 @@ impl MediaFormat {
         }
         // An ID3 tag, or a frame of MPEG audio layer III.
         if at(0..3) == b"ID3"
-            || (at(0..2).len() == 2 && bytes[0] == 0xFF && bytes[1] & 0xE6 == 0xE2)
+            || (bytes.first() == Some(&0xFF) && bytes.get(1).is_some_and(|b| b & 0xE6 == 0xE2))
         {
             return Some(Self::Mp3);
         }

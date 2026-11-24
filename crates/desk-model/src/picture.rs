@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![cfg_attr(not(test), deny(clippy::indexing_slicing, clippy::unwrap_used))]
+
 //! Pictures: the image bullets of lists (LST-03) and the images of
 //! documents (OBJ-01), kept as PNG or, as they came, JPEG.
 
@@ -84,11 +86,10 @@ impl Picture {
             return None;
         }
         let mut at = 2;
-        while at + 4 <= jpeg.len() {
-            if jpeg[at] != 0xFF {
+        while let Some(&[ff, marker, high, low]) = jpeg.get(at..at + 4) {
+            if ff != 0xFF {
                 return None;
             }
-            let marker = jpeg[at + 1];
             // Fill bytes, and markers without a length.
             if marker == 0xFF {
                 at += 1;
@@ -98,12 +99,14 @@ impl Picture {
                 at += 2;
                 continue;
             }
-            let length = usize::from(u16::from_be_bytes([jpeg[at + 2], jpeg[at + 3]]));
+            let length = usize::from(u16::from_be_bytes([high, low]));
             // A start of frame, but for the DHT, JPG and DAC markers.
             if (0xC0..=0xCF).contains(&marker) && ![0xC4, 0xC8, 0xCC].contains(&marker) {
-                let header = jpeg.get(at + 4..at + 9)?;
-                let height = u32::from(u16::from_be_bytes([header[1], header[2]]));
-                let width = u32::from(u16::from_be_bytes([header[3], header[4]]));
+                let &[_, h1, h2, w1, w2] = jpeg.get(at + 4..at + 9)? else {
+                    return None;
+                };
+                let height = u32::from(u16::from_be_bytes([h1, h2]));
+                let width = u32::from(u16::from_be_bytes([w1, w2]));
                 if width == 0 || height == 0 {
                     return None;
                 }
@@ -213,8 +216,8 @@ impl Hash for Picture {
     fn hash<H: Hasher>(&self, state: &mut H) {
         (self.width, self.height, self.png.len()).hash(state);
         let ends = 64.min(self.png.len());
-        self.png[..ends].hash(state);
-        self.png[self.png.len() - ends..].hash(state);
+        self.png.get(..ends).hash(state);
+        self.png.get(self.png.len() - ends..).hash(state);
     }
 }
 
