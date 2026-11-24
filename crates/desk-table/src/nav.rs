@@ -126,8 +126,10 @@ mod tests {
         let mut t = table(5, 5);
         // B2:C3 merged, and C4:D4, which a selection that takes in C3
         // must then reach.
-        t.merge(Area::between((1, 1), (2, 2))).unwrap();
-        t.merge(Area::between((3, 2), (3, 3))).unwrap();
+        t.merge(Area::between((1, 1), (2, 2)), &crate::Locale::en_us())
+            .unwrap();
+        t.merge(Area::between((3, 2), (3, 3)), &crate::Locale::en_us())
+            .unwrap();
         assert_eq!(
             t.selection_area((0, 0), (0, 3)),
             Area::between((0, 0), (0, 3))
@@ -183,7 +185,8 @@ mod tests {
     #[test]
     fn tab_08_moves_leave_and_enter_merged_cells_by_their_edges() {
         let mut t = table(4, 4);
-        t.merge(Area::between((1, 1), (2, 2))).unwrap();
+        t.merge(Area::between((1, 1), (2, 2)), &crate::Locale::en_us())
+            .unwrap();
         // Into the merged cell: at its first cell, from any side.
         assert_eq!(t.step((0, 2), Step::Down), Landing::Cell(1, 1));
         assert_eq!(t.step((2, 0), Step::Right), Landing::Cell(1, 1));

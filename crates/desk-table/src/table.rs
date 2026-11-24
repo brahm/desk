@@ -1047,7 +1047,9 @@ mod tests {
     fn tables_made_here_are_consistent_and_broken_ones_are_not() {
         let mut table = t(3, 2);
         assert!(table.is_consistent());
-        table.merge(Area::between((1, 1), (2, 1))).unwrap();
+        table
+            .merge(Area::between((1, 1), (2, 1)), &crate::Locale::en_us())
+            .unwrap();
         assert!(table.is_consistent());
         let mut short = t(3, 2);
         short.cells.pop();

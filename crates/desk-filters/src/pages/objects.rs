@@ -955,13 +955,15 @@ fn table_of(source: &iwork::Table) -> desk_model::Table {
         table.set_content(cell.row, cell.col, content);
     }
     table_look(source, &mut table);
+    let locale = desk_model::table::Locale::from_tag(&std::env::var("LANG").unwrap_or_default());
     for cell in source.cells.iter().filter(|c| c.rows > 1 || c.cols > 1) {
-        let _ = table.merge(Area {
+        let area = Area {
             row: cell.row,
             col: cell.col,
             rows: cell.rows,
             cols: cell.cols,
-        });
+        };
+        let _ = table.merge(area, &locale);
     }
     table
 }

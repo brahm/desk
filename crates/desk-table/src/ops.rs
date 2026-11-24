@@ -148,8 +148,9 @@ fn in_case_of(name: &str, example: &str) -> String {
 impl<T: CellText> Table<T> {
     /// Sorts the body rows of an area by the values of a column, in the
     /// order of TAB-15; `rows` none sorts the whole body. Header and
-    /// footer rows stay.
-    pub fn sort(&mut self, col: u32, ascending: bool, rows: Option<(u32, u32)>) {
+    /// footer rows stay. Formulas are sorted by their values at `now`, in
+    /// days from 30 December 1899, for TODAY and NOW.
+    pub fn sort(&mut self, col: u32, ascending: bool, rows: Option<(u32, u32)>, now: f64) {
         if col >= self.cols() {
             return;
         }
@@ -159,7 +160,7 @@ impl<T: CellText> Table<T> {
         if end <= start + 1 {
             return;
         }
-        let values = self.values(0.0);
+        let values = self.values(now);
         let mut order: Vec<u32> = (start..end).collect();
         order.sort_by(|a, b| {
             let (x, y) = (values.get(*a, col), values.get(*b, col));
@@ -281,8 +282,9 @@ impl<T: CellText> Table<T> {
     /// Merges the cells of an area into one (TAB-23). They must all be of
     /// one region. The texts are joined, with tabs across and line breaks
     /// down, as in Pages 15.4, and the merged cell takes the look of the
-    /// top left cell.
-    pub fn merge(&mut self, area: Area) -> Result<(), TableError> {
+    /// top left cell. Numbers, dates and formulas joined with text are
+    /// written as they are typed in `locale`.
+    pub fn merge(&mut self, area: Area, locale: &crate::Locale) -> Result<(), TableError> {
         if area.row_end() > self.rows() || area.col_end() > self.cols() {
             return Err(TableError::OutOfRange);
         }
@@ -325,11 +327,7 @@ impl<T: CellText> Table<T> {
                         if first_value.is_none() {
                             first_value = Some(other.clone());
                         }
-                        parts.push(T::from_plain(&self.source_text(
-                            r,
-                            c,
-                            &crate::Locale::en_us(),
-                        )));
+                        parts.push(T::from_plain(&self.source_text(r, c, locale)));
                     }
                 }
             }
@@ -525,9 +523,10 @@ impl<T: CellText> Table<T> {
     }
 
     /// The table as text, as "Convert Table to Text" makes it: a tab
-    /// between cells and a line between rows (TAB-05).
-    pub fn to_text(&self, locale: &crate::Locale) -> String {
-        let values = self.values(0.0);
+    /// between cells and a line between rows (TAB-05), with formulas as
+    /// their values at `now`.
+    pub fn to_text(&self, locale: &crate::Locale, now: f64) -> String {
+        let values = self.values(now);
         let mut lines = Vec::new();
         for r in 0..self.rows() {
             let row: Vec<String> = (0..self.cols())
@@ -638,10 +637,19 @@ mod tests {
     fn tab_15_sort_puts_numbers_text_booleans_then_empty() {
         let mut t = table(&[&["Nome"], &["b"], &[""], &["TRUE"], &["10"], &["a"], &["2"]]);
         t.set_header_rows(1).unwrap();
-        t.sort(0, true, None);
+        t.sort(0, true, None, 0.0);
         assert_eq!(texts(&t, 0), ["Nome", "2", "10", "a", "b", "TRUE", ""]);
-        t.sort(0, false, None);
+        t.sort(0, false, None, 0.0);
         assert_eq!(texts(&t, 0), ["Nome", "TRUE", "b", "a", "10", "2", ""]);
+    }
+
+    #[test]
+    fn sort_takes_today_as_the_day_it_is() {
+        let mut t = table(&[&["Dia"], &["=TODAY()"], &["1000"]]);
+        t.set_header_rows(1).unwrap();
+        // On day 45,000 TODAY is larger than 1,000, not 0.
+        t.sort(0, true, None, 45_000.0);
+        assert_eq!(texts(&t, 0), ["Dia", "1000", "=TODAY()"]);
     }
 
     #[test]
@@ -675,16 +683,30 @@ mod tests {
         let mut t = table(&[&["a", "b"], &["c", ""], &["", ""]]);
         t.set_header_rows(1).unwrap();
         assert_eq!(
-            t.merge(Area::between((0, 0), (1, 1))),
+            t.merge(Area::between((0, 0), (1, 1)), &Locale::en_us()),
             Err(TableError::MixedRegions)
         );
-        t.merge(Area::between((1, 0), (2, 1))).unwrap();
+        t.merge(Area::between((1, 0), (2, 1)), &Locale::en_us())
+            .unwrap();
         assert_eq!(t.span(2, 1), Area::between((1, 0), (2, 1)));
         assert!(t.is_covered(2, 1));
         assert_eq!(t.source_text(1, 0, &Locale::en_us()), "c");
         let mut u = table(&[&["a", "b"], &["c", "d"]]);
-        u.merge(Area::between((0, 0), (1, 1))).unwrap();
+        u.merge(Area::between((0, 0), (1, 1)), &Locale::en_us())
+            .unwrap();
         assert_eq!(u.source_text(0, 0, &Locale::en_us()), "a\tb\u{2028}c\td");
+    }
+
+    #[test]
+    fn merge_writes_numbers_as_they_are_typed_in_the_locale() {
+        let pt = Locale::pt_br();
+        let mut t: Table<String> = Table::new(2, 2);
+        t.set_header_rows(0).unwrap();
+        t.set_header_cols(0).unwrap();
+        t.type_text(0, 0, "Preço", &pt);
+        t.type_text(0, 1, "2,5", &pt);
+        t.merge(Area::between((0, 0), (0, 1)), &pt).unwrap();
+        assert_eq!(t.source_text(0, 0, &pt), "Preço\t2,5");
     }
 
     #[test]
@@ -710,16 +732,19 @@ mod tests {
         let rows: Vec<Vec<&str>> = vec![vec!["", "", ""]; 5];
         let rows: Vec<&[&str]> = rows.iter().map(Vec::as_slice).collect();
         let mut t = table(&rows);
-        t.merge(Area::between((1, 2), (3, 2))).unwrap();
+        t.merge(Area::between((1, 2), (3, 2)), &Locale::en_us())
+            .unwrap();
         t.split(1, 1, Split::Rows).unwrap();
         assert_eq!(t.span(1, 2), Area::between((1, 2), (4, 2)));
         assert_eq!(t.span(1, 0), Area::between((1, 0), (2, 0)));
         let mut t = table(&rows);
-        t.merge(Area::between((1, 2), (2, 2))).unwrap();
+        t.merge(Area::between((1, 2), (2, 2)), &Locale::en_us())
+            .unwrap();
         t.split(2, 1, Split::Rows).unwrap();
         assert_eq!(t.span(1, 2), Area::between((1, 2), (3, 2)));
         let mut t = table(&rows);
-        t.merge(Area::between((0, 0), (0, 1))).unwrap();
+        t.merge(Area::between((0, 0), (0, 1)), &Locale::en_us())
+            .unwrap();
         t.split(0, 2, Split::Columns).unwrap();
         assert_eq!(t.span(0, 0), Area::between((0, 0), (0, 1)));
         assert_eq!(t.span(1, 2), Area::between((1, 2), (1, 3)));
@@ -730,7 +755,7 @@ mod tests {
         let en = Locale::en_us();
         let t: Table<String> = Table::from_text("a\tb\n1\t2", &en);
         assert_eq!((t.rows(), t.cols()), (2, 2));
-        assert_eq!(t.to_text(&en), "a\tb\n1\t2");
+        assert_eq!(t.to_text(&en, 0.0), "a\tb\n1\t2");
     }
 
     #[test]

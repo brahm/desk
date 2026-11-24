@@ -564,8 +564,11 @@ pub(crate) fn import_table(source: &odf::TextDocument, odf_table: &odf::Table) -
             }
         }
     }
+    // The language the reader falls back to: a file names none for a
+    // table.
+    let locale = Locale::from_tag(&std::env::var("LANG").unwrap_or_default());
     for area in merges {
-        let _ = table.merge(area);
+        let _ = table.merge(area, &locale);
     }
     table
 }
