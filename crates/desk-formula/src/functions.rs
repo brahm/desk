@@ -115,11 +115,26 @@ fn int(e: &Eval<'_>, x: &Expr) -> Result<i64> {
     Ok(num(e, x)?.trunc() as i64)
 }
 
+/// A number cut to 15 significant digits, as many as spreadsheets keep:
+/// the decimal digits a binary number misses come back, as 2.675 is
+/// stored a little under it, and 0.1 + 0.2 a little over 0.3.
+fn significant(n: f64) -> f64 {
+    if !n.is_finite() || n == 0.0 {
+        return n;
+    }
+    format!("{n:.14e}").parse().unwrap_or(n)
+}
+
 fn round_to(n: f64, digits: i64, mode: fn(f64) -> f64) -> f64 {
     let factor = 10f64.powi(digits.clamp(-15, 15) as i32);
-    // Round the decimal digits a binary number misses, as 2.675.
-    let scaled = (n * factor * 1e9).round() / 1e9;
-    mode(scaled) / factor
+    let scaled = n * factor;
+    // A number so large has no such digits to round.
+    if !scaled.is_finite() {
+        return n;
+    }
+    // Relative to the number, not to its digits: rounding to a fixed
+    // number of decimals first pushed 1.9999999999 up to 2 before TRUNC.
+    mode(significant(scaled)) / factor
 }
 
 fn round_half_away(x: f64) -> f64 {
@@ -969,7 +984,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             let v = numbers(e, a)?;
             let s: f64 = v.iter().sum();
-            Ok(Value::Number(round_to(s, 12, round_half_away)))
+            Ok(Value::Number(significant(s)))
         }
     ),
     f!(
@@ -1949,5 +1964,22 @@ mod tests {
             panic!()
         };
         assert!((p + 88.848_788_6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn rounding_keeps_the_digits_of_the_number() {
+        // Rounding to nine decimals first carried numbers close to an
+        // integer over it, the product overflowed for large numbers, and
+        // SUM lost totals under 1E-12 (review RV, batch 2).
+        let s = Sheet::default();
+        assert_eq!(run(&s, "=TRUNC(1.9999999999)"), Value::Number(1.0));
+        assert_eq!(run(&s, "=ROUNDUP(2.0000000001,0)"), Value::Number(3.0));
+        assert_eq!(run(&s, "=ROUNDDOWN(-1.9999999999,0)"), Value::Number(-1.0));
+        assert_eq!(run(&s, "=ROUND(1E300,0)"), Value::Number(1e300));
+        assert_eq!(run(&s, "=ROUND(1E300,2)"), Value::Number(1e300));
+        assert_eq!(run(&s, "=SUM(1E-13)"), Value::Number(1e-13));
+        assert_eq!(run(&s, "=ROUND(2.675,2)"), Value::Number(2.68));
+        assert_eq!(run(&s, "=ROUND(-2.5,0)"), Value::Number(-3.0));
+        assert_eq!(run(&s, "=ROUNDUP(0.1*3,1)"), Value::Number(0.3));
     }
 }
