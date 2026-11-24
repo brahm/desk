@@ -483,9 +483,12 @@ fn legend(cx: &mut Ctx<'_>, left: f32, right: f32, top: f32) -> f32 {
 
 /// The values of each series in each category, stacked or as they are;
 /// with a percent scale each category adds up to 100.
+/// The values of each series, one for each category. A chart with no
+/// categories gets one empty category, as the axes draw one, so that each
+/// series has a value for every category the drawing goes through.
 fn series_values(chart: &Chart) -> Vec<Vec<Option<f64>>> {
     let ns = chart.series_count();
-    let nc = chart.category_count();
+    let nc = chart.category_count().max(1);
     let mut v: Vec<Vec<Option<f64>>> = (0..ns)
         .map(|s| (0..nc).map(|c| chart.value(s, c)).collect())
         .collect();
@@ -1906,6 +1909,33 @@ mod tests {
         chart.value_axis.scale = Scale::Percent;
         let v = series_values(&chart);
         assert!((v[0][0].unwrap() + v[1][0].unwrap() - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_chart_with_series_and_no_categories_draws_empty() {
+        // Review RV, batch 4: the categories all deleted in the Data
+        // Editor, or none in a file, made drawing read past the values.
+        for kind in [
+            ChartKind::Column,
+            ChartKind::Bar,
+            ChartKind::Line,
+            ChartKind::Area,
+            ChartKind::Scatter,
+            ChartKind::Mixed,
+            ChartKind::TwoAxis,
+            ChartKind::Pie,
+        ] {
+            let mut chart = Chart::new(kind);
+            chart.series_in_rows = true;
+            while !chart.data.cols.is_empty() {
+                chart.data.delete_col(0);
+            }
+            assert_eq!(chart.category_count(), 0);
+            assert!(chart.series_count() > 0);
+            draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+            chart.series_in_rows = false;
+            draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        }
     }
 
     #[test]

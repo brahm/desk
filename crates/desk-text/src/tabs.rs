@@ -131,6 +131,9 @@ impl TabRuler {
             };
             stop.position = stop.position.min(width - room);
         }
+        // Each kind keeps its own room, so a left stop after a centered
+        // one may come before it now: a tab goes to the nearer.
+        self.stops.sort_by(|a, b| a.position.total_cmp(&b.position));
         self
     }
 
@@ -241,6 +244,17 @@ mod tests {
                 kern: 0.0,
             })
             .collect()
+    }
+
+    #[test]
+    fn clamped_stops_stay_in_order() {
+        // Review RV, batch 4: in a column 470 points wide, a centered stop
+        // at 450 stayed and a left one at 460 went to 445, before it; a
+        // tab at 440 went past the left one.
+        let r = ruler(&[(450, TabAlignment::Center), (460, TabAlignment::Left)], 0).clamped(470.0);
+        let stop = r.next(440.0);
+        assert_eq!((stop.position, stop.alignment), (445.0, TabAlignment::Left));
+        assert_eq!(r.next(446.0).alignment, TabAlignment::Center);
     }
 
     #[test]

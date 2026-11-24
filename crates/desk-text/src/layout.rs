@@ -26,7 +26,7 @@ use parley::{
 };
 
 use crate::fonts::{FontChoice, FontMatch, PagesFont, choose, pages_font};
-use crate::input::{FF, FFI, FI, FL, ParagraphText, SMALL_CAPS_SCALE};
+use crate::input::{FF, FFI, FFL, FI, FL, ParagraphText, SMALL_CAPS_SCALE};
 use crate::space::LineSpace;
 use crate::tabs::{Piece, TabPlace, TabRuler};
 
@@ -339,8 +339,12 @@ impl TextSystem {
     pub fn add_fonts(&mut self, data: Vec<u8>) -> usize {
         let blob = parley::fontique::Blob::new(std::sync::Arc::new(data));
         let added = self.fonts.collection.register_fonts(blob, None);
-        // A family chosen before may now be installed.
+        // A family chosen before may now be installed, and what was
+        // measured of it was measured with the font that stood for it.
         self.choices.clear();
+        self.unit_metrics.clear();
+        self.digit_widths.clear();
+        self.space_kerns.clear();
         added.iter().map(|(_, fonts)| fonts.len()).sum()
     }
 
@@ -2232,6 +2236,21 @@ fn run_box(format: &CharFormat, size: f32, metrics: &parley::FontMetrics) -> Run
     }
 }
 
+/// Adds a character of the laid-out text as the letters it stands for: a
+/// ligature that Pages joins as its letters, so that a PDF reads and finds
+/// them, and a place where the word may break as nothing.
+fn push_letters(text: &mut String, c: char) {
+    match c {
+        FI => text.push_str("fi"),
+        FL => text.push_str("fl"),
+        FF => text.push_str("ff"),
+        FFI => text.push_str("ffi"),
+        FFL => text.push_str("ffl"),
+        SOFT_HYPHEN => {}
+        c => text.push(c),
+    }
+}
+
 /// The text that a run draws and its clusters, as [`GlyphRun::text`] and
 /// [`GlyphRun::clusters`] describe them, given how many glyphs it has,
 /// tabs left out.
@@ -2260,15 +2279,7 @@ fn run_text(
         }
         let start = text.len();
         for c in source[cluster.text_range()].chars() {
-            match c {
-                FI => text.push_str("fi"),
-                FL => text.push_str("fl"),
-                FF => text.push_str("ff"),
-                FFI => text.push_str("ffi"),
-                // A place where the word may break is not text to copy.
-                SOFT_HYPHEN => {}
-                c => text.push(c),
-            }
+            push_letters(&mut text, c);
         }
         let n = cluster.glyphs().count();
         count += n;
@@ -2324,4 +2335,43 @@ fn char_glyph(font: &FontData, size: f32, c: char) -> Option<(u32, f32)> {
         .glyph_metrics(Size::new(size), LocationRef::default())
         .advance_width(id)?;
     Some((id.to_u32(), advance))
+}
+
+#[cfg(test)]
+mod letters_tests {
+    use super::*;
+
+    #[test]
+    fn ligatures_are_their_letters_in_the_text_of_a_run() {
+        // Review RV, batch 4: the ffl of Hoefler Text was left as U+FB04
+        // in PDFs, where a search for "baffle" did not find it.
+        let mut text = String::new();
+        for c in ['b', 'a', FFL, 'e', ' ', FI, FL, FF, FFI, SOFT_HYPHEN] {
+            push_letters(&mut text, c);
+        }
+        assert_eq!(text, "baffle fiflffffi");
+    }
+
+    #[test]
+    fn what_was_measured_of_a_missing_font_is_measured_again_once_it_is_added() {
+        // Review RV, batch 4: the widths of digits, the metrics and the
+        // kerning of spaces kept those of the font that stood for the
+        // family before it was added.
+        let name = "DeskSansSpace60";
+        let fonts =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/fonts");
+        let data = std::fs::read(fonts.join(format!("{name}.ttf"))).unwrap();
+        let format = CharFormat {
+            font_family: name.into(),
+            ..CharFormat::default()
+        };
+        let mut system = TextSystem::new();
+        system.digit_width(&format);
+        system.unit_metrics(&format);
+        assert!(!system.digit_widths.is_empty() && !system.unit_metrics.is_empty());
+        system.add_fonts(data);
+        assert!(system.digit_widths.is_empty());
+        assert!(system.unit_metrics.is_empty());
+        assert!(system.space_kerns.is_empty());
+    }
 }
