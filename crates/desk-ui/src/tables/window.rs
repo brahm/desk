@@ -88,6 +88,22 @@ const NEW_TABLE_GAP: f64 = 36.0;
 /// What an action of the window does.
 type WindowAction = fn(&Rc<TablesWindow>);
 
+/// The most steps the undo history of Desk Tables keeps. Each holds a
+/// whole copy of the workbook, so fewer than the steps of the text
+/// editor, which each hold what changed (B-054).
+const MAX_UNDO: usize = 100;
+
+/// Adds a step to an undo history, leaving out the oldest past
+/// [`MAX_UNDO`]: the history grew without end, a whole copy of the
+/// workbook a step (review RV, batch 5).
+fn push_capped<T>(history: &mut Vec<T>, step: T) {
+    history.push(step);
+    if history.len() > MAX_UNDO {
+        let extra = history.len() - MAX_UNDO;
+        history.drain(..extra);
+    }
+}
+
 /// The state of the document that undo brings back.
 #[derive(Clone)]
 struct Snapshot {
@@ -629,16 +645,31 @@ impl TablesWindow {
         name: &str,
         f: impl FnOnce(&mut Workbook, usize, Selection) -> Result<(usize, Selection), SheetError>,
     ) -> bool {
-        let before = self.snapshot(name);
+        let (was_current, was_selection) = (self.current.get(), self.selection.get());
+        // One copy of the workbook: the one changed; the one before goes
+        // to the undo history as it is (review RV, batch 5).
         let mut book = self.book.borrow().clone();
-        match f(&mut book, self.current.get(), self.selection.get()) {
+        match f(&mut book, was_current, was_selection) {
             Ok((current, selection)) => {
-                *self.book.borrow_mut() = book;
+                // A change that changes nothing, as a name given again, is
+                // not a step of the history.
+                let same = *self.book.borrow() == book;
                 self.current.set(current);
                 self.selection.set(selection);
-                self.undo.borrow_mut().push(before);
-                self.redo.borrow_mut().clear();
-                self.modified.set(true);
+                if !same {
+                    let before = std::mem::replace(&mut *self.book.borrow_mut(), book);
+                    push_capped(
+                        &mut self.undo.borrow_mut(),
+                        Snapshot {
+                            name: name.to_owned(),
+                            book: before,
+                            current: was_current,
+                            selection: was_selection,
+                        },
+                    );
+                    self.redo.borrow_mut().clear();
+                    self.modified.set(true);
+                }
                 self.refresh();
                 true
             }
@@ -680,7 +711,7 @@ impl TablesWindow {
             return;
         };
         let now = self.snapshot(&snapshot.name);
-        self.undo.borrow_mut().push(now);
+        push_capped(&mut self.undo.borrow_mut(), now);
         self.restore(snapshot);
     }
 
@@ -1391,6 +1422,17 @@ impl crate::tabs::FramePage for TablesWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_undo_history_of_tables_is_bounded() {
+        let mut history = Vec::new();
+        for step in 0..MAX_UNDO + 50 {
+            push_capped(&mut history, step);
+        }
+        assert_eq!(history.len(), MAX_UNDO);
+        assert_eq!(history.first(), Some(&50));
+        assert_eq!(history.last(), Some(&(MAX_UNDO + 49)));
+    }
 
     #[test]
     fn ntab_06_headers_and_footers_fit_in_the_table() {
