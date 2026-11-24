@@ -143,7 +143,7 @@ pub fn picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
 /// they are, so that photographs stay small and PDF stays sharp, and any
 /// other format that GTK reads as PNG (OBJ-01).
 ///
-/// A file larger than [`MAX_PICTURE`] is not read, as one dropped on the
+/// A file larger than `MAX_PICTURE` is not read, as one dropped on the
 /// document was read whole whatever its size (review RV, batch 5).
 pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
     if file_size(file)? > MAX_PICTURE {

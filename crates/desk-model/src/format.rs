@@ -574,7 +574,7 @@ impl TabStops {
     }
 
     /// The stops, ordered by position. Of two stops at one position, the
-    /// last is kept; past [`MAX_TAB_STOPS`], the first ones.
+    /// last is kept; past `MAX_TAB_STOPS`, the first ones.
     pub fn new(stops: impl IntoIterator<Item = TabStop>) -> Self {
         let mut stops: Vec<TabStop> = stops.into_iter().collect();
         stops.reverse();
