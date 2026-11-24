@@ -219,8 +219,10 @@ pub enum DrawableKind {
         /// `sf:volume`, from 0 to 1.
         volume: f64,
     },
+    /// A table (`sf:tabular-info`).
+    Table(Box<super::Table>),
     /// An object the reader does not read yet, by its element: a picture,
-    /// a movie, a chart or a table.
+    /// a movie or a chart.
     Other(String),
 }
 
@@ -670,6 +672,10 @@ impl<'a> Reader<'a, '_> {
                 DrawableKind::Group(objects)
             }
             "media" => media(self.ids, element),
+            "tabular-info" => match super::tables::read(self.ids, element) {
+                Some(table) => DrawableKind::Table(Box::new(table)),
+                None => DrawableKind::Other("tabular-info".to_owned()),
+            },
             other => DrawableKind::Other(other.to_owned()),
         };
         let (shadow, reflection) = self.filters(element);
@@ -775,7 +781,12 @@ pub(super) fn read(
     let attachments: Vec<&Element> = root
         .descendants()
         .filter(|e| e.name.is(SF, "attachment"))
-        .filter(|e| e.attr(SF, "kind") == Some("drawable-attachment"))
+        .filter(|e| {
+            matches!(
+                e.attr(SF, "kind"),
+                Some("drawable-attachment" | "tabular-attachment")
+            )
+        })
         .collect();
     for attachment in attachments {
         let Some(id) = attachment.attr(SFA, "ID") else {

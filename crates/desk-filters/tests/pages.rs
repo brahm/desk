@@ -1545,3 +1545,47 @@ fn rev_08_the_comments_of_pages_09_are_kept_on_their_text() {
         "Comment on a selection here"
     );
 }
+
+#[test]
+fn tab_01_tab_27_the_tables_of_pages_09_open_with_their_cells_and_comments() {
+    use desk_model::ObjectKind;
+    use desk_model::table::{Area, Content, Num};
+    let table_of = |name: &str| {
+        let (document, objects) = fixture_objects(name);
+        let table = objects
+            .iter()
+            .find_map(|o| match &o.kind {
+                ObjectKind::Table(t) => Some(((**t).clone(), o.id, o.anchor)),
+                _ => None,
+            })
+            .expect("a table");
+        (document, table)
+    };
+    let (_, (basic, _, anchor)) = table_of("tab-01-basic.pages");
+    assert_eq!(anchor, desk_model::Anchor::InText);
+    assert_eq!((basic.rows(), basic.cols(), basic.header_rows()), (5, 3, 1));
+    assert_eq!(basic.cell(1, 0).content, Content::Text("Apple".into()));
+    assert_eq!(basic.cell(3, 1).content, Content::Number(Num(7.0)));
+    assert_eq!(basic.width(0), 160_205);
+    let (_, (merged, _, _)) = table_of("tab-23-24-merge-split.pages");
+    assert!(merged.merges().contains(&Area {
+        row: 2,
+        col: 0,
+        rows: 1,
+        cols: 3
+    }));
+    let (_, (formulas, _, _)) = table_of("tab-32-iop-05-formulas.pages");
+    assert_eq!(
+        formulas.cell(3, 2).content,
+        Content::Formula("=SUM(A4:B4)".into())
+    );
+    // The comment of a cell, on its cell, and nothing is left out.
+    let (document, (_, table, _)) = table_of("tab-27-cell-comment.pages");
+    let found = document.cell_comments();
+    assert_eq!(found.len(), 1);
+    assert_eq!((found[0].table, found[0].row, found[0].col), (table, 0, 0));
+    assert_eq!(
+        &*document.comments().get(found[0].id).unwrap().text,
+        "Comment on a cell."
+    );
+}

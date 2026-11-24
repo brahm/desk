@@ -16,6 +16,9 @@ use crate::sf::{Ids, Stylesheet};
 use crate::xml::{self, Element, Node};
 
 mod drawables;
+mod tables;
+
+pub use tables::{CellContent, Table, TableCell};
 
 pub use drawables::{
     AlignmentGuide, Drawable, DrawableKind, Geometry, ObjectShadow, Place, ShapePath, TextWrap,
@@ -271,7 +274,8 @@ pub struct PagesDocument {
     /// The guides fixed on the pages (OBJ-28).
     pub guides: Vec<AlignmentGuide>,
     /// The objects in the line of the text (`sf:attachment` of kind
-    /// `drawable-attachment`) that the reader reads, by object ID.
+    /// `drawable-attachment` or `tabular-attachment`) that the reader reads,
+    /// by object ID.
     pub attachments: Vec<(String, Drawable)>,
     /// Whether the document has body text (Document Inspector, "Document
     /// Body"): a page layout document has none.

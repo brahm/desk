@@ -157,3 +157,101 @@ fn other_documents_are_refused() {
     ));
     assert!(read_pages(b"not xml <").is_err());
 }
+
+/// The table of a fixture of Pages '09, in the line of the text.
+fn fixture_table(name: &str) -> desk_iwork::pages::Table {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages")
+        .join(name);
+    let document = read_pages_at(&path).unwrap();
+    document
+        .attachments
+        .iter()
+        .find_map(|(_, d)| match &d.kind {
+            desk_iwork::pages::DrawableKind::Table(t) => Some((**t).clone()),
+            _ => None,
+        })
+        .expect("a table")
+}
+
+#[test]
+fn tab_01_reads_the_cells_of_a_table_row_by_row() {
+    use desk_iwork::pages::CellContent;
+    let table = fixture_table("tab-01-basic.pages");
+    assert_eq!((table.rows(), table.cols()), (5, 3));
+    assert_eq!(table.header_rows, 1);
+    assert!((table.widths[0] - 160.2047).abs() < 0.001);
+    let at = |r, c| {
+        table
+            .cells
+            .iter()
+            .find(|cell| (cell.row, cell.col) == (r, c))
+            .map(|cell| cell.content.clone())
+    };
+    assert_eq!(at(0, 2), Some(CellContent::Text("Price".into())));
+    assert_eq!(at(1, 0), Some(CellContent::Text("Apple".into())));
+    assert_eq!(at(3, 1), Some(CellContent::Number(7.0)));
+    assert_eq!(at(4, 0), None);
+    assert!(table.skipped.is_empty());
+}
+
+#[test]
+fn tab_23_32_reads_merged_cells_skipped_cells_and_formulas() {
+    use desk_iwork::pages::CellContent;
+    let merged = fixture_table("tab-23-24-merge-split.pages");
+    let spans: Vec<(u32, u32, u32, u32)> = merged
+        .cells
+        .iter()
+        .filter(|c| c.rows > 1 || c.cols > 1)
+        .map(|c| (c.row, c.col, c.rows, c.cols))
+        .collect();
+    assert_eq!(
+        spans,
+        [
+            (0, 0, 1, 2),
+            (1, 0, 1, 2),
+            (2, 0, 1, 3),
+            (3, 0, 1, 2),
+            (3, 2, 2, 1),
+            (3, 3, 2, 1)
+        ]
+    );
+    let formulas = fixture_table("tab-32-iop-05-formulas.pages");
+    let at = |r, c| {
+        formulas
+            .cells
+            .iter()
+            .find(|cell| (cell.row, cell.col) == (r, c))
+            .map(|cell| cell.content.clone())
+    };
+    // A cell skipped: the 6 is in the second column of the last row.
+    assert_eq!(at(3, 1), Some(CellContent::Number(6.0)));
+    assert_eq!(at(3, 0), None);
+    assert_eq!(at(3, 2), Some(CellContent::Formula("=SUM(A4:B4)".into())));
+}
+
+#[test]
+fn tab_27_reads_the_cells_that_have_comments() {
+    let table = fixture_table("tab-27-cell-comment.pages");
+    assert_eq!(
+        table.comments,
+        [(0, 0, "SLAnnotationTableCell-0".to_owned())]
+    );
+}
+
+#[test]
+fn every_table_of_the_fixtures_reads_every_cell() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/pages");
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|e| e != "pages") {
+            continue;
+        }
+        let document = read_pages_at(&path).unwrap();
+        for (_, drawable) in &document.attachments {
+            if let desk_iwork::pages::DrawableKind::Table(table) = &drawable.kind {
+                assert!(table.skipped.is_empty(), "{path:?}: {:?}", table.skipped);
+            }
+        }
+    }
+}
