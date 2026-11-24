@@ -122,20 +122,32 @@ impl Run {
 /// formatting joined.
 fn normalize(runs: impl IntoIterator<Item = Run>) -> Vector<Run> {
     let mut out: Vector<Run> = Vector::new();
+    // The text of the last run, while runs of its format join it: joined
+    // once, at the end, so that many small runs cost their length, not
+    // its square.
+    let mut joined: Option<String> = None;
+    let close = |out: &mut Vector<Run>, joined: &mut Option<String>| {
+        if let (Some(text), Some(last)) = (joined.take(), out.back_mut()) {
+            last.text = text.into();
+        }
+    };
     for run in runs {
         if run.is_empty() {
             continue;
         }
         match out.back_mut() {
             Some(last) if last.same_format(&run) => {
-                let mut text = String::with_capacity(last.len() + run.len());
-                text.push_str(&last.text);
-                text.push_str(&run.text);
-                last.text = text.into();
+                joined
+                    .get_or_insert_with(|| last.text.to_string())
+                    .push_str(&run.text);
             }
-            _ => out.push_back(run),
+            _ => {
+                close(&mut out, &mut joined);
+                out.push_back(run);
+            }
         }
     }
+    close(&mut out, &mut joined);
     out
 }
 
@@ -357,14 +369,18 @@ impl Paragraph {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextFlow {
     paragraphs: Vector<Paragraph>,
+    /// The identifiers of the paragraphs: a file adds them one by one,
+    /// and each is checked to be new without going through the others.
+    ids: imbl::HashSet<NodeId>,
 }
 
 impl TextFlow {
     /// Makes a flow with one paragraph. A flow always has at least one.
     pub fn new(first: Paragraph) -> Self {
         let mut paragraphs = Vector::new();
+        let ids = imbl::HashSet::unit(first.id);
         paragraphs.push_back(first);
-        Self { paragraphs }
+        Self { paragraphs, ids }
     }
 
     /// The number of paragraphs.
@@ -389,9 +405,17 @@ impl TextFlow {
 
     /// The index of a paragraph.
     pub fn index_of(&self, id: NodeId) -> Option<usize> {
-        // A linear search is enough for now; an index from identifiers to
-        // positions can come with long documents.
+        // Only a paragraph of the flow is looked for; an index from
+        // identifiers to positions can come with long documents.
+        if !self.ids.contains(&id) {
+            return None;
+        }
         self.paragraphs.iter().position(|p| p.id == id)
+    }
+
+    /// Whether a paragraph of the flow has an identifier.
+    pub fn contains(&self, id: NodeId) -> bool {
+        self.ids.contains(&id)
     }
 
     /// A paragraph by identifier.
@@ -411,9 +435,10 @@ impl TextFlow {
                 len: self.len(),
             });
         }
-        if self.index_of(paragraph.id).is_some() {
+        if self.ids.contains(&paragraph.id) {
             return Err(ModelError::DuplicateId(paragraph.id));
         }
+        self.ids.insert(paragraph.id);
         self.paragraphs.insert(index, paragraph);
         Ok(())
     }
@@ -423,6 +448,7 @@ impl TextFlow {
         if self.len() == 1 {
             return Err(ModelError::LastParagraph);
         }
+        self.ids.remove(&id);
         Ok((index, self.paragraphs.remove(index)))
     }
 }
@@ -455,6 +481,42 @@ mod tests {
         assert_eq!(paragraph.runs().count(), 1);
         assert_eq!(paragraph.text(), "abcd");
         assert!(paragraph.is_normalized());
+    }
+
+    #[test]
+    fn many_runs_of_one_format_are_joined_in_their_length() {
+        // A file can give a paragraph a span for each letter (review RV,
+        // batch 3): joining them took the square of their length.
+        let runs = (0..200_000).map(|i| {
+            if i % 50_000 == 49_999 {
+                Run::with_attrs("b", None, bold())
+            } else {
+                Run::new("a")
+            }
+        });
+        let paragraph = Paragraph::from_runs(id(1), id(2), ParaAttrs::default(), runs).unwrap();
+        assert_eq!(paragraph.runs().count(), 8);
+        assert_eq!(paragraph.len(), 200_000);
+        assert!(paragraph.is_normalized());
+    }
+
+    #[test]
+    fn a_flow_checks_new_paragraphs_without_going_through_the_others() {
+        let paragraph =
+            |n: u64| Paragraph::from_runs(id(n), id(1), ParaAttrs::default(), []).unwrap();
+        let mut flow = TextFlow::new(paragraph(2));
+        for n in 3..100_000 {
+            flow.insert(flow.len(), paragraph(n)).unwrap();
+        }
+        assert!(matches!(
+            flow.insert(0, paragraph(500)),
+            Err(ModelError::DuplicateId(_))
+        ));
+        assert!(flow.contains(id(99_999)) && !flow.contains(id(100_000)));
+        flow.remove(id(500)).unwrap();
+        assert!(!flow.contains(id(500)) && flow.index_of(id(500)).is_none());
+        flow.insert(0, paragraph(500)).unwrap();
+        assert_eq!(flow.index_of(id(500)), Some(0));
     }
 
     #[test]

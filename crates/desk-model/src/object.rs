@@ -980,7 +980,7 @@ impl ObjectShadow {
 
 /// The objects of a document, from back to front.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Objects(imbl::Vector<Object>);
+pub struct Objects(imbl::Vector<Object>, imbl::HashSet<NodeId>);
 
 impl Objects {
     /// How many objects there are.
@@ -1013,16 +1013,34 @@ impl Objects {
         self.0.iter().flat_map(Object::paragraphs)
     }
 
+    /// Whether an object, or a paragraph or an object inside one, has an
+    /// identifier, without going through them: a file adds objects one
+    /// by one, and each identifier is checked to be new.
+    pub fn holds_id(&self, id: NodeId) -> bool {
+        self.1.contains(&id)
+    }
+
     pub(crate) fn insert(&mut self, index: usize, object: Object) {
+        self.1.extend(object.ids());
         self.0.insert(index, object);
     }
 
     pub(crate) fn remove(&mut self, index: usize) -> Object {
-        self.0.remove(index)
+        let object = self.0.remove(index);
+        for id in object.ids() {
+            self.1.remove(&id);
+        }
+        object
     }
 
     pub(crate) fn set(&mut self, index: usize, object: Object) -> Object {
-        self.0.set(index, object)
+        let ids = object.ids();
+        let old = self.0.set(index, object);
+        for id in old.ids() {
+            self.1.remove(&id);
+        }
+        self.1.extend(ids);
+        old
     }
 }
 
