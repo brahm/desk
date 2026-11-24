@@ -417,6 +417,46 @@ mod tests {
         assert_eq!(operand(&t, 4, 1), Operand::Deleted);
         let v = t.values(0.0);
         assert_eq!(t.rule_style(&v, 4, 1).bold, None);
+        // Rows and columns added in the middle copy the rules relatively,
+        // from where their references were (B-053).
+        let mut t: Table<String> = Table::new(6, 3);
+        t.set_header_rows(0).unwrap();
+        t.set_header_cols(0).unwrap();
+        let rule = |r: CellRef| Rule {
+            condition: Condition::Greater(Operand::Cell(r)),
+            style: RuleStyle::default(),
+        };
+        // Below its cell, and fixed at A1.
+        t.cell_mut(1, 1).rules = std::sync::Arc::from([
+            rule(CellRef::new(1, 3)),
+            rule(CellRef::parse("$A$1").unwrap()),
+        ]);
+        t.insert_rows(2, 2).unwrap();
+        let operands = |t: &Table<String>, r, c| -> Vec<Operand> {
+            t.cell(r, c)
+                .rules
+                .iter()
+                .map(|x| match &x.condition {
+                    Condition::Greater(o) => o.clone(),
+                    other => panic!("{other:?}"),
+                })
+                .collect()
+        };
+        // The original moves with the rows; each copy keeps the distance.
+        assert_eq!(operands(&t, 1, 1)[0], Operand::Cell(CellRef::new(1, 5)));
+        assert_eq!(operands(&t, 2, 1)[0], Operand::Cell(CellRef::new(1, 4)));
+        assert_eq!(operands(&t, 3, 1)[0], Operand::Cell(CellRef::new(1, 5)));
+        assert_eq!(
+            operands(&t, 3, 1)[1],
+            Operand::Cell(CellRef::parse("$A$1").unwrap())
+        );
+        // A column copies the rule of the one before it, to its left.
+        let mut t: Table<String> = Table::new(1, 3);
+        t.set_header_rows(0).unwrap();
+        t.set_header_cols(0).unwrap();
+        t.cell_mut(0, 1).rules = std::sync::Arc::from([rule(CellRef::new(0, 0))]);
+        t.insert_cols(2, 1).unwrap();
+        assert_eq!(operands(&t, 0, 2)[0], Operand::Cell(CellRef::new(1, 0)));
         // Nor does "not equal", which every value would meet.
         let deleted = Condition::NotEqual(Operand::Deleted);
         assert!(!deleted.holds(&Value::Number(1.0), &|_| Value::Empty, 0.0));

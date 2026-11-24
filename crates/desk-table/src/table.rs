@@ -475,7 +475,10 @@ impl<T: CellText> Table<T> {
 
     /// The width of the table.
     pub fn total_width(&self) -> u32 {
-        self.widths.iter().sum()
+        // Many wide columns, or a few widths from a file, pass the largest
+        // u32.
+        let sum: u64 = self.widths.iter().map(|w| u64::from(*w)).sum();
+        u32::try_from(sum).unwrap_or(u32::MAX)
     }
 
     /// The part of the table a cell is in.
@@ -613,20 +616,20 @@ impl<T: CellText> Table<T> {
         let model_row = if at > 0 { at - 1 } else { 0 };
         let repeated: Vec<Option<String>> =
             (0..cols).map(|c| self.repeated_formula(at, c)).collect();
+        // The row copied is taken before the references move.
+        let model: Vec<Cell<T>> = (0..cols)
+            .map(|c| self.cell(model_row, c).cleared())
+            .collect();
         self.shift_formulas(Axis::Rows, at, i64::from(count));
         let mut new_cells = Vec::with_capacity((count * cols) as usize);
         for k in 0..count {
             for c in 0..cols {
-                let mut cell = self.cell(model_row, c).cleared();
+                let mut cell = model[c as usize].clone();
                 cell.comment = None;
-                // The references of the row copied were just moved: at
-                // the top, it is itself `count` rows down now.
-                let from = if at == 0 {
-                    model_row + count
-                } else {
-                    model_row
-                };
-                cell.move_references(0, i64::from(at + k) - i64::from(from));
+                let delta = i64::from(at + k) - i64::from(model_row);
+                cell.rules = crate::conditional::map_rule_cells(&cell.rules, &mut |r| {
+                    copied_ref(r, Axis::Rows, at, count, delta)
+                });
                 if let Some(f) = &repeated[c as usize]
                     && let Ok(formula) = Formula::parse(f)
                 {
@@ -727,26 +730,32 @@ impl<T: CellText> Table<T> {
         }
         let old_cols = self.cols();
         let model_col = if at > 0 { at - 1 } else { 0 };
-        self.shift_formulas(Axis::Columns, at, i64::from(count));
         let rows = self.rows();
+        // The column copied is taken before the references move, and its
+        // rules copied relatively, as those of rows are.
+        let model: Vec<Cell<T>> = (0..rows)
+            .map(|r| self.cell(r, model_col).cleared())
+            .collect();
+        self.shift_formulas(Axis::Columns, at, i64::from(count));
+        let copy = |r: u32, k: u32| {
+            let mut cell = model[r as usize].clone();
+            cell.comment = None;
+            let delta = i64::from(at + k) - i64::from(model_col);
+            cell.rules = crate::conditional::map_rule_cells(&cell.rules, &mut |x| {
+                copied_ref(x, Axis::Columns, at, count, delta)
+            });
+            cell
+        };
         let mut cells = Vec::with_capacity(((old_cols + count) * rows) as usize);
         for r in 0..rows {
             for c in 0..old_cols {
                 if c == at {
-                    for _ in 0..count {
-                        let mut cell = self.cell(r, model_col).cleared();
-                        cell.comment = None;
-                        cells.push(cell);
-                    }
+                    cells.extend((0..count).map(|k| copy(r, k)));
                 }
                 cells.push(self.cell(r, c).clone());
             }
             if at == old_cols {
-                for _ in 0..count {
-                    let mut cell = self.cell(r, model_col).cleared();
-                    cell.comment = None;
-                    cells.push(cell);
-                }
+                cells.extend((0..count).map(|k| copy(r, k)));
             }
         }
         let mut h = Vec::with_capacity(((rows + 1) * (old_cols + count)) as usize);
@@ -1070,6 +1079,32 @@ fn shrink_merges(
         }
     }
     out
+}
+
+/// A reference of a rule copied into a row or column added at `at`,
+/// `delta` from the one copied, taken before the insertion: a relative
+/// part keeps its distance from the cell, and an absolute part points at
+/// the cell it pointed at, which the `count` new ones may have moved.
+fn copied_ref(
+    r: desk_formula::CellRef,
+    axis: Axis,
+    at: u32,
+    count: u32,
+    delta: i64,
+) -> Option<desk_formula::CellRef> {
+    let place = |n: u32, abs: bool| -> Option<u32> {
+        if abs {
+            Some(if n >= at { n.checked_add(count)? } else { n })
+        } else {
+            u32::try_from(i64::from(n) + delta).ok()
+        }
+    };
+    let mut r = r;
+    match axis {
+        Axis::Rows => r.row = place(r.row, r.row_abs)?,
+        Axis::Columns => r.col = place(r.col, r.col_abs)?,
+    }
+    Some(r)
 }
 
 #[cfg(test)]
