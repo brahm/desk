@@ -1298,6 +1298,14 @@ fn grouped_by(s: &str, sep: char) -> bool {
             .all(|p| p.len() == 3 && p.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// The year it is now, by the clock of the system in UTC.
+fn this_year() -> i32 {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    date_from_days(25_569 + (secs / 86_400) as i64).0
+}
+
 /// A date or a time typed with slashes, hyphens or colons, in days from
 /// 30 December 1899.
 pub fn parse_date(text: &str, locale: &Locale) -> Option<f64> {
@@ -1329,7 +1337,8 @@ pub fn parse_date(text: &str, locale: &Locale) -> Option<f64> {
             let y = match nums.get(2) {
                 Some(y) if parts[2].len() <= 2 => 2000 + y - if *y > 50 { 100 } else { 0 },
                 Some(y) => *y,
-                None => 2000,
+                // A date without a year is of this year, as in Numbers.
+                None => this_year(),
             };
             (y, m, day)
         };
@@ -1374,6 +1383,17 @@ mod tests {
 
     fn show(f: &Format, v: Value) -> String {
         f.show(&v, &Locale::pt_br()).text
+    }
+
+    #[test]
+    fn a_date_typed_without_a_year_is_of_this_year() {
+        let pt = Locale::pt_br();
+        let typed = parse_date("15/03", &pt).unwrap();
+        let (year, month, day) = date_from_days(typed as i64);
+        assert_eq!((year, month, day), (this_year(), 3, 15));
+        assert!(this_year() >= 2026);
+        let full = parse_date("15/03/2001", &pt).unwrap();
+        assert_eq!(date_from_days(full as i64), (2001, 3, 15));
     }
 
     #[test]
