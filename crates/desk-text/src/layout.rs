@@ -989,9 +989,10 @@ impl TextSystem {
         let mut y = top;
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
+        // The steps of a point down that the next line took looking for
+        // room, or for room wide enough for its next word: one budget, as
+        // the two may take turns.
         let mut searched: u32 = 0;
-        // Where the search for a line wide enough for the next word began.
-        let mut narrowed: u32 = 0;
         // Whether the band was measured again with a shorter line.
         let mut shortened = false;
         'band: loop {
@@ -1010,7 +1011,8 @@ impl TextSystem {
                     break;
                 }
                 // A space the same all the way down has no room lower.
-                if searched < MAX_SEARCH && !space.is_uniform() {
+                let uniform = space.uniform_below().is_some_and(|u| y >= u);
+                if searched < MAX_SEARCH && !uniform {
                     searched += 1;
                     y += 1.0;
                     continue;
@@ -1019,7 +1021,6 @@ impl TextSystem {
                 // wider than the column: overflow rather than loop forever.
                 segments.push((indent, (edge(indent) - indent).max(MIN_SEGMENT_WIDTH)));
             }
-            searched = 0;
             let saved: BreakerState = breaker.state().clone();
             let (saved_pos, saved_next, saved_placed) = (pos, next_break, placed.len());
             let mut tallest = 0.0_f32;
@@ -1065,13 +1066,13 @@ impl TextSystem {
                 if end.is_none()
                     && next_break < breaks.len()
                     && width + 0.001 < measure
-                    && narrowed < MAX_SEARCH
-                    && !space.is_uniform()
+                    && searched < MAX_SEARCH
+                    && !space.uniform_below().is_some_and(|u| y >= u)
                 {
                     if placed.len() > saved_placed {
                         break;
                     }
-                    narrowed += 1;
+                    searched += 1;
                     y += 1.0;
                     continue 'band;
                 }
@@ -1270,7 +1271,7 @@ impl TextSystem {
                 pos = line_end;
                 next_break = chosen;
                 first_line = false;
-                narrowed = 0;
+                searched = 0;
                 if pos >= source.len() {
                     break 'band;
                 }
@@ -1877,11 +1878,11 @@ fn line_tabs(
         .collect()
 }
 
-/// The leader of a tab: its character repeated across the space of the
-/// tab, ending where the tab does.
 /// The most dots, dashes or rules of the leader of a tab.
 const MAX_LEADER_GLYPHS: usize = 10_000;
 
+/// The leader of a tab: its character repeated across the space of the
+/// tab, ending where the tab does.
 fn leader_run(
     place: TabPlace,
     font: &FontData,

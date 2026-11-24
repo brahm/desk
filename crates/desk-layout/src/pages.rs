@@ -1542,8 +1542,9 @@ impl Paginator<'_> {
                 .objects
                 .iter()
                 .chain(&anchored)
-                .filter_map(PlacedObject::exclusion)
-                .filter(|e| in_the_way(e, x, x + width, top + cursor.y))
+                .filter_map(|o| o.exclusion_box().map(|e| (o, e)))
+                .filter(|(_, e)| in_the_way(e, x, x + width, top + cursor.y))
+                .map(|(o, e)| o.with_profile(e))
                 .collect();
             pieces.retain(|p| p.from < base);
             pieces.push(Piece {

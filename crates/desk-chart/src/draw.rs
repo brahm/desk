@@ -195,12 +195,21 @@ struct Range {
 }
 
 impl Range {
+    /// Where a value falls along the axis, from 0 at its minimum to 1 at
+    /// its maximum; a value far outside it stays at most a thousand lengths
+    /// of the axis away, which the plot clips, rather than at coordinates
+    /// too large for Cairo.
     fn fraction(&self, v: f64) -> f32 {
-        if self.log {
+        let f = if self.log {
             let lv = v.max(self.min).log10();
-            ((lv - self.min.log10()) / (self.max.log10() - self.min.log10())) as f32
+            (lv - self.min.log10()) / (self.max.log10() - self.min.log10())
         } else {
-            ((v - self.min) / (self.max - self.min)) as f32
+            (v - self.min) / (self.max - self.min)
+        };
+        if f.is_nan() {
+            0.0
+        } else {
+            f.clamp(-1000.0, 1000.0) as f32
         }
     }
 
@@ -259,19 +268,29 @@ fn value_range(axis: &ValueAxis, lo: f64, hi: f64, zero: bool) -> Range {
         .iter()
         .all(|v| v.is_finite());
     if finite && range.min < range.max && range.step > 0.0 {
-        range
-    } else if range.log {
+        return range;
+    }
+    // Around the values, so that they still fall on the axis: as when
+    // they and the minimum are all 1e16, which adding 1 does not change.
+    let mid = if lo.is_finite() && hi.is_finite() {
+        lo / 2.0 + hi / 2.0
+    } else {
+        0.0
+    };
+    if range.log {
+        let min = 10f64.powf(mid.clamp(1e-12, 1e300).log10().floor());
         Range {
-            min: 1.0,
-            max: 10.0,
+            min,
+            max: min * 10.0,
             step: 10.0,
             log: true,
         }
     } else {
+        let half = mid.abs().max(1.0) / 2.0;
         Range {
-            min: 0.0,
-            max: 1.0,
-            step: 0.2,
+            min: mid - half,
+            max: mid + half,
+            step: half / 2.5,
             log: false,
         }
     }
@@ -515,8 +534,7 @@ fn legend(cx: &mut Ctx<'_>, left: f32, right: f32, top: f32) -> f32 {
 }
 
 /// The values of each series in each category, stacked or as they are;
-/// with a percent scale each category adds up to 100.
-/// The values of each series, one for each category. A chart with no
+/// with a percent scale each category adds up to 100. A chart with no
 /// categories gets one empty category, as the axes draw one, so that each
 /// series has a value for every category the drawing goes through.
 fn series_values(chart: &Chart) -> Vec<Vec<Option<f64>>> {
@@ -1974,6 +1992,22 @@ mod tests {
             ..ValueAxis::default()
         };
         assert!(value_range(&log, 1.0, f64::MAX, true).ticks().len() <= 700);
+        // Review of RV batch 4: with a minimum and all the values at 1e16,
+        // the axis went from 0 to 1, and the points to coordinates far
+        // off the chart.
+        let fixed = ValueAxis {
+            min: Some(Num(1e16)),
+            ..ValueAxis::default()
+        };
+        let r = value_range(&fixed, 1e16, 1e16, true);
+        assert!(
+            r.min <= 1e16 && 1e16 <= r.max && r.min < r.max,
+            "{} {}",
+            r.min,
+            r.max
+        );
+        assert!((0.0..=1.0).contains(&r.fraction(1e16)));
+        assert_eq!(r.fraction(f64::MAX), 1000.0);
     }
 
     #[test]

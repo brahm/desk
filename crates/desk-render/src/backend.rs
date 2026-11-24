@@ -91,10 +91,7 @@ impl Painter {
         let surface = picture_surface(picture)?;
         // A bound on the memory of long sessions: on the pictures, and on
         // their pixels, which a few large ones fill.
-        let held: usize = self.pictures.iter().map(|(_, s)| surface_bytes(s)).sum();
-        if self.pictures.len() > 64 || held + surface_bytes(&surface) > MAX_CACHED_BYTES {
-            self.pictures.clear();
-        }
+        evict(&mut self.pictures, 64, surface_bytes(&surface));
         self.pictures.push((picture.clone(), surface.clone()));
         Some(surface)
     }
@@ -177,10 +174,7 @@ impl Painter {
         }
         let source = self.picture(picture)?;
         let surface = adjusted_surface(&source, alpha, kept, adjust).ok()?;
-        let held: usize = self.adjusted.iter().map(|(_, s)| surface_bytes(s)).sum();
-        if self.adjusted.len() > 16 || held + surface_bytes(&surface) > MAX_CACHED_BYTES {
-            self.adjusted.clear();
-        }
+        evict(&mut self.adjusted, 16, surface_bytes(&surface));
         self.adjusted.push((key, surface.clone()));
         Some(surface)
     }
@@ -1112,12 +1106,38 @@ pub fn reduced_picture(
     desk_model::Picture::from_png(png)
 }
 
-/// The largest side of a picture decoded to draw, in pixels.
+/// The largest side of a PDF drawn as pixels, in pixels.
 const MAX_DECODED_SIDE: f64 = 8192.0;
+
+/// The most pixels of a picture decoded to draw: those of a square of
+/// 8192, in any shape, with no side over the 32767 that Cairo takes.
+const MAX_DECODED_PIXELS: u64 = 8192 * 8192;
+const MAX_SURFACE_SIDE: u32 = 32767;
+
+/// Whether a picture is small enough to decode, by the size its header
+/// declares.
+fn decodable(picture: &desk_model::Picture) -> bool {
+    let (w, h) = (picture.width(), picture.height());
+    w.max(h) <= MAX_SURFACE_SIDE && u64::from(w) * u64::from(h) <= MAX_DECODED_PIXELS
+}
 
 /// The most bytes of pixels that the decoded pictures, and those adjusted,
 /// keep between paints.
 const MAX_CACHED_BYTES: usize = 512 << 20;
+
+/// Leaves out the oldest surfaces kept, until there are at most `count`
+/// and room for `adding` more bytes within [`MAX_CACHED_BYTES`]: the
+/// pictures of the page painted stay, and are not decoded again at each
+/// paint.
+fn evict<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, count: usize, adding: usize) {
+    let mut held: usize = kept.iter().map(|(_, s)| surface_bytes(s)).sum();
+    let mut drop = 0;
+    while drop < kept.len() && (kept.len() - drop > count || held + adding > MAX_CACHED_BYTES) {
+        held -= kept.get(drop).map_or(0, |(_, s)| surface_bytes(s));
+        drop += 1;
+    }
+    kept.drain(..drop);
+}
 
 /// The bytes of the pixels of a surface.
 fn surface_bytes(surface: &cairo::ImageSurface) -> usize {
@@ -1129,14 +1149,15 @@ fn surface_bytes(surface: &cairo::ImageSurface) -> usize {
 pub fn picture_surface(picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
     use desk_model::PictureFormat;
     match picture.format() {
-        // A PNG of a few bytes may declare billions of pixels, which Cairo
-        // would allocate and fill: its size is checked first, as JPEG's.
-        PictureFormat::Png => (f64::from(picture.width().max(picture.height()))
-            <= MAX_DECODED_SIDE)
+        // A PNG or JPEG of a few bytes may declare billions of pixels,
+        // which would be allocated and filled: its size, from its header,
+        // is checked first. A tall screenshot keeps its pixels.
+        PictureFormat::Png => decodable(picture)
             .then(|| {
                 cairo::ImageSurface::create_from_png(&mut std::io::Cursor::new(picture.data())).ok()
             })
             .flatten(),
+        PictureFormat::Jpeg if !decodable(picture) => None,
         PictureFormat::Jpeg => jpeg_surface(picture.shared_data()),
         PictureFormat::Pdf => {
             let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
@@ -1207,8 +1228,8 @@ fn jpeg_surface(data: std::sync::Arc<[u8]>) -> Option<cairo::ImageSurface> {
     use zune_jpeg::zune_core::options::DecoderOptions;
     let options = DecoderOptions::default()
         .jpeg_set_out_colorspace(ColorSpace::RGB)
-        .set_max_width(MAX_DECODED_SIDE as usize)
-        .set_max_height(MAX_DECODED_SIDE as usize);
+        .set_max_width(MAX_SURFACE_SIDE as usize)
+        .set_max_height(MAX_SURFACE_SIDE as usize);
     let mut decoder = JpegDecoder::new_with_options(ZCursor::new(&data[..]), options);
     let pixels = decoder.decode().ok()?;
     let info = decoder.info()?;
@@ -1318,8 +1339,15 @@ mod picture_tests {
         png[20..24].copy_from_slice(&30_000u32.to_be_bytes());
         let crc = crc32(&png[12..29]);
         png[29..33].copy_from_slice(&crc.to_be_bytes());
-        let huge = desk_model::Picture::from_png(png).unwrap();
+        let huge = desk_model::Picture::from_png(png.clone()).unwrap();
         assert_eq!(huge.width(), 30_000);
         assert!(picture_surface(&huge).is_none());
+        // A tall screenshot is not refused for its height.
+        let tall = cairo::ImageSurface::create(cairo::Format::ARgb32, 1200, 16_000).unwrap();
+        let mut png = Vec::new();
+        tall.write_to_png(&mut png).unwrap();
+        let tall = desk_model::Picture::from_png(png).unwrap();
+        assert!(decodable(&tall));
+        assert!(picture_surface(&tall).is_some());
     }
 }

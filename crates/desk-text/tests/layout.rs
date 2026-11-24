@@ -1656,6 +1656,29 @@ fn a_column_too_narrow_for_any_line_overflows_line_after_line() {
 }
 
 #[test]
+fn a_drop_cap_in_a_column_too_narrow_for_any_line_overflows_at_once() {
+    // Review of RV batch 4: the space beside a drop cap did not say that
+    // the column below it is the same all the way down, and each line
+    // looked thousands of points down for room.
+    let mut system = TextSystem::new();
+    let text = vec!["a"; 400].join(" ");
+    let started = std::time::Instant::now();
+    let layout = lay_in(
+        &mut system,
+        ParaFormat {
+            drop_cap: Some(desk_model::DropCap::default()),
+            ..ParaFormat::default()
+        },
+        &[(&text, sans())],
+        &Column::new(10.0),
+    );
+    assert!(layout.lines.len() > 100);
+    let last = layout.lines.last().unwrap();
+    assert!(last.top < 30.0 * layout.lines.len() as f32, "{}", last.top);
+    assert!(started.elapsed().as_secs() < 10, "{:?}", started.elapsed());
+}
+
+#[test]
 fn the_leader_of_a_tab_in_a_tiny_font_is_bounded() {
     // Review RV, batch 4: the leader of a tab at a thousandth of a point
     // was tens of thousands of dots, at a thousandth hundreds of

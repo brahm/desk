@@ -26,6 +26,12 @@ to Cairo and Poppler, sizes and counts that a file sets.
 | 14 | A | `desk-layout/src/objects.rs` | *Security.* A wrap margin of millions of points made millions of bands of contour for each paragraph placed, and far down the page they stopped moving, without end | The bands are counted, at most 20,000, and wider past that; test |
 | 15 | B | `desk-render/src/backend.rs` | *Security.* A dashed line 0 wide, dashes all of 0 or negative, or a picture 0 wide put Cairo in an error for the rest of the page, and PDF export failed | Such lines and pictures are not drawn, and such dashes draw a solid line; test |
 | 16 | A | `desk-text/src/layout.rs` | *Security.* Each place a line could end summed the line again from its start: a paragraph in a tiny font, thousands of words a line, took minutes | The advances are summed once; test with 200,000 words |
+| 17 | A | `desk-text/src/drop_cap.rs`, `desk-layout/src/objects.rs` | *Security*, from the review of the pull request. Fix 9 knew only a plain column: beside a drop cap or a wrapped object, a column too narrow still looked down without end | A space says from where it is the same all the way down, and a drop cap and wrapped objects say it too; tests |
+| 18 | A | `desk-text/src/layout.rs` | *Security*, from the review. The 10,000 steps of fix 9 were counted for each try of a line, and a paragraph that overflowed tried again for each line | One count for each line, reset only when a line is placed |
+| 19 | A | `desk-render/src/backend.rs` | From the review. The pictures kept held 512 MB, but a picture over it was kept whole, and the oldest were not the first to go | The oldest go first until the new one fits |
+| 20 | B | `desk-render/src/backend.rs` | From the review. Fix 11 refused a picture 1200 by 16,000, which is tall but small, and let JPEG through at 32,767 a side | Pictures are refused by their pixels, at most 8192 squared, and by a side over 32,767, PNG and JPEG alike; test |
+| 21 | A | `desk-chart/src/draw.rs` | From the review. When the range of an axis was not finite, fix 10 fell back to 0 to 1, so every bar went off the chart, and a fraction of `f64::MAX` reached Cairo | The fallback is built around the values, and a fraction is at most a thousand charts long; test |
+| 22 | A | `desk-layout/src/objects.rs` | *Security*, from the review. Fix 14 counted bands for each part of a contour; a contour of thousands of parts or points was still costly for each paragraph, out of its way or not | A contour of more than 256 parts has no profile and wraps around its box; points are at most 2048; the 20,000 bands are shared by all parts; a profile is worked out only for an object in the way; tests |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
@@ -38,11 +44,12 @@ Three findings of performance moved to the backlog:
 ## Security (D-029)
 
 The security review read the four crates for what a document can make them
-do. Findings 9 to 16 came from it.
+do. Findings 9 to 16 came from it, and 17, 18 and 22 from the security review
+of the pull request.
 
 These paths were checked and found safe:
-- JPEG is decoded with a limit of 8192 pixels a side, and PDF pictures
-  are drawn at most 8192 a side.
+- PNG and JPEG are decoded only up to 8192 by 8192 pixels, and PDF
+  pictures are drawn at most 8192 a side.
 - The shadows of objects are bounded.
 - PDF metadata goes through Cairo, which escapes it. The crates write no
   link, URI or SVG.
