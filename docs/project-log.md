@@ -1968,6 +1968,31 @@ paragraph, and objects on a second page.
   the subject of batch 2 and gets the lints there. The five fuzz targets
   ran for an hour each on the fixes.
 
+### 24 November: batch 2 of the review, formulas and tables (RV)
+
+- `/code-review`, `/security-review` and a new fuzz target read
+  `desk-formula` and `desk-table`, and found 24 problems; the report is
+  [review/batch-2.md](review/batch-2.md). Three could close the app: a
+  formula of thousands of parentheses overflowed the stack of the parser,
+  and a running balance of thousands of rows the stack of the evaluator;
+  and a formula written back after a row was inserted lost its small
+  constants. Three were security findings, all about a file or a paste
+  holding the app: formulas over large ranges or texts that double from
+  cell to cell, which now have a budget of work and a limit of 32,767
+  bytes of text; a number format of many zeros, padded in quadratic time;
+  and pasted text that grew the table one row at a time, or asked for
+  billions of cells. The rest were wrong results: rounding, ODF names
+  and headers, footers, splits, fills, autocomplete, conditional rules
+  that did not follow their cells, sorting by `TODAY`, merged numbers in
+  English and dates typed without a year in 2000. Each fix has a test.
+- The new fuzz target, `formula_parse`, writes every formula it reads
+  and reads it back; it found four formulas that were written in a way
+  that did not read the same.
+- *Consequences:* `desk-formula` denies unchecked indexing and `unwrap`
+  (D-028), as the format libraries do. Formulas give `#VALUE!` past the
+  budget of a table, which no table of normal size reaches. No finding
+  went to the backlog.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

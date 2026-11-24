@@ -8,6 +8,16 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: Desk no longer closes, or hangs, on formulas nested thousands
+  of levels deep, long running balances, formulas over large ranges or
+  texts that double from cell to cell, number formats of many zeros, or a
+  long text pasted into a table (review RV, batch 2).
+* Fixed: formulas keep their small constants when rows are inserted, and
+  conditional rules follow the cells they compare with.
+* Fixed: sorting by a formula with TODAY, merging cells with numbers, and
+  dates typed without a year use the right day, language and year.
+* Fixed: rows added after a footer join it, splitting a cell keeps the
+  merged cells beside it, and Jan, Feb fills on in English.
 * Fixed: Desk no longer closes, or runs out of memory, on Pages '09 and
   ODT files made to loop or to repeat cells without end, nor on GIF
   pictures that declare a huge size (review RV, batch 1).
