@@ -2006,6 +2006,12 @@ paragraph, and objects on a second page.
   pass; and a paste within the table could still write over the footer.
   Rules copied by rows added in the middle went to the backlog (B-053,
   batch 3).
+- A third review found seven more (41 to 47) and asked for a simpler
+  budget, which it now is: one per document, taken once for each table,
+  with the rules apart. Approximate lookups and matching are charged what
+  they compare; the values kept are found again a second later and
+  cannot be made to collide; and moving cells past the body grows the
+  table first.
 
 ## Decisions, with their reasons and consequences
 

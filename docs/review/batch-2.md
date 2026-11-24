@@ -69,6 +69,24 @@ A second review of the fixes found more, also fixed here:
 | 39 | B | `desk-table/src/table.rs`, `copy.rs`, `drag.rs` | Rows were added before the footer only past the end of the table, so 9 lines pasted in a table of 10 rows with 2 of footer wrote over the totals | They are added past the end of the body; test |
 | 40 | B | `desk-filters/src/odt/tables.rs` | An ODT whose language is `und` was read as that tag | It is no language, as in the model; test |
 
+A third review found seven more, fixed too, and asked for a simpler
+budget: one per document, taken once for each table, with the rules
+apart. That is what it now is.
+
+| # | Class | Where | What failed | What was done |
+| --- | --- | --- | --- | --- |
+| 41 | A | `desk-formula/src/functions.rs` | *Security.* Approximate lookups compared long texts, each put in lower case, without a charge | They are charged the needle and each text; test |
+| 42 | B | `desk-formula/src/functions.rs` | Matching without `*` was charged the texts only, though the pattern is prepared for each | The pattern for each text and the texts; test |
+| 43 | B | `desk-table/src/eval.rs` | The time was in the key of the values kept, so a table laid out a second later was evaluated and charged again | The time of a scope is the first asked for; test |
+| 44 | A | `desk-table/src/eval.rs` | *Security.* The values were kept by a hash with fixed keys, which a file could make collide to show the values of another table | The keys are random for each scope |
+| 45 | B | `desk-table/src/eval.rs` | Rules spent the budget of the formulas, so a table with many rules left the next tables with `#VALUE!` | Rules have a budget of their own; test |
+| 46 | B | `desk-table/src/drag.rs` | Cells moved past the body were taken before the rows were added, so a moved formula that pointed at the total pointed at the new row | The table grows first; test |
+| 47 | B | `desk-table/src/drag.rs`, `copy.rs` | Cells dragged from the body could still write into the footer, and the selection of a paste took footer rows it did not write | Both stop at the end of the body; tests |
+
+A refused copy still stops the table and takes what was left of its
+work: the copy that was refused was larger than that, so it is the work
+done, not more.
+
 A row or column added in the middle copies the rules of the one before
 it after their references were moved, so a rule comparing with a cell
 below the new rows points too far down. It moved to the backlog as
