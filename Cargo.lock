@@ -333,6 +333,7 @@ name = "desk-table"
 version = "0.1.0"
 dependencies = [
  "desk-formula",
+ "proptest",
  "serde",
 ]
 
