@@ -135,6 +135,20 @@ impl Edit {
         attrs.start = None;
         // The new item counts on from the one it was split from.
         attrs.list_start = None;
+        // The break the paragraph ended at now ends the second, and the
+        // new one between them is in no tracked change (W148).
+        let ends = paragraph.attrs().break_change;
+        attrs.break_change = ends;
+        if ends.flatten().is_some() {
+            let mut own = paragraph.attrs().clone();
+            own.break_change = None;
+            let style = paragraph.style();
+            self.apply(Op::SetParagraphFormat {
+                paragraph: at.paragraph,
+                style,
+                attrs: own,
+            })?;
+        }
         let id = self.new_id();
         if !tail.is_empty() {
             self.apply(Op::ReplaceText {
@@ -211,6 +225,20 @@ impl Edit {
         let (last, last_range) = ranges[ranges.len() - 1].clone();
         let last_paragraph = self.doc.paragraph(last)?;
         let tail = last_paragraph.slice(last_range.end..last_paragraph.len())?;
+        // The joined paragraph ends at the break the last one ended at,
+        // and with its tracked change (W148).
+        let ends = last_paragraph.attrs().break_change;
+        let first_paragraph = self.doc.paragraph(first)?;
+        if first_paragraph.attrs().break_change != ends {
+            let mut attrs = first_paragraph.attrs().clone();
+            attrs.break_change = ends;
+            let style = first_paragraph.style();
+            self.apply(Op::SetParagraphFormat {
+                paragraph: first,
+                style,
+                attrs,
+            })?;
+        }
         self.apply(Op::ReplaceText {
             paragraph: first,
             range: first_range,

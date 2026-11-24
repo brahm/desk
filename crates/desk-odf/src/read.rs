@@ -136,6 +136,25 @@ pub fn read_streams(
                 .filter_map(changed_region)
                 .collect();
         }
+        // Only the changes of the paragraphs of the body are read: those
+        // of notes, tables and the like are left out, as accepted.
+        let marked: std::collections::HashSet<&str> = document
+            .body
+            .iter()
+            .flat_map(|p| &p.spans)
+            .filter_map(|s| match &s.field {
+                Some(Field::ChangeStart { id } | Field::Change { id }) => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        let unread = document
+            .tracked_changes
+            .iter()
+            .filter(|r| r.kind != ChangeKind::FormatChange && !marked.contains(r.id.as_str()))
+            .count();
+        if unread > 0 {
+            document.skipped.push(("changed-region".to_owned(), unread));
+        }
         left_out(text, true, &mut document.skipped);
     }
     if let Some(masters) = styles
@@ -1214,8 +1233,12 @@ fn collect_paragraphs(
         } else if name.ns == DRAW {
             // Objects outside paragraphs, as those anchored to pages.
             objects.extend(crate::draw::draw_object(child, &paragraph));
-        } else if name.is(OFFICE, "annotation") || name.is(TEXT, "tracked-changes") {
-            // Comments and tracked changes are not part of the text flow.
+        } else if name.is(OFFICE, "annotation")
+            || name.is(TEXT, "tracked-changes")
+            || name.is(OFFICE, "change-info")
+        {
+            // Comments, tracked changes and what is said of a change, as
+            // its comment, are not part of the text flow.
         } else {
             collect_paragraphs(child, list, section, out, objects);
         }

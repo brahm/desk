@@ -1662,28 +1662,6 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         .into_iter()
         .partition(|(_, _, field)| changes::is_mark(field));
     comments::import(&mut document, comments)?;
-    // The paragraphs that deletions took, read as those of the body.
-    let mut deleted = HashMap::new();
-    for region in &source.tracked_changes {
-        if region.kind != odf::ChangeKind::Deletion {
-            continue;
-        }
-        let mut paragraphs = Vec::new();
-        for paragraph in &region.deleted {
-            paragraphs.push(import_paragraph(
-                source,
-                &mut document,
-                &ids,
-                default,
-                paragraph,
-                relative,
-                &marks,
-                None,
-            )?);
-        }
-        deleted.insert(region.id.clone(), paragraphs);
-    }
-    changes::import(&mut document, &source.tracked_changes, deleted, tracked)?;
     // The stops of the styles move after those of the paragraphs, which
     // are measured from the indents the styles had as read.
     if relative {
@@ -1937,6 +1915,35 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .collect(),
         },
     })?;
+
+    // Last, as the paragraphs that deletions took join the body, and what
+    // came before finds paragraphs by their place in it (W148). Only the
+    // deletions whose marks the body has are read.
+    let met: HashSet<String> = changes::marked(&tracked)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let mut deleted = HashMap::new();
+    for region in &source.tracked_changes {
+        if region.kind != odf::ChangeKind::Deletion || !met.contains(&region.id) {
+            continue;
+        }
+        let mut paragraphs = Vec::new();
+        for paragraph in &region.deleted {
+            paragraphs.push(import_paragraph(
+                source,
+                &mut document,
+                &ids,
+                default,
+                paragraph,
+                relative,
+                &marks,
+                None,
+            )?);
+        }
+        deleted.insert(region.id.clone(), paragraphs);
+    }
+    changes::import(&mut document, &source.tracked_changes, deleted, tracked)?;
 
     let meta = &source.meta;
     document.apply(Op::SetMetadata {

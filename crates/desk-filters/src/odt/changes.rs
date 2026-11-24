@@ -30,6 +30,17 @@ pub(super) fn is_mark(field: &odf::Field) -> bool {
     )
 }
 
+/// The regions that marks of the body name where their text starts.
+pub(super) fn marked(events: &Events) -> std::collections::HashSet<&str> {
+    events
+        .iter()
+        .filter_map(|(_, _, field)| match field {
+            odf::Field::ChangeStart { id } | odf::Field::Change { id } => Some(id.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Puts the insertions and deletions of the body in the document: each
 /// region a change, the text between the marks of an insertion in it,
 /// and the paragraphs that a deletion took, already read as paragraphs of
@@ -40,9 +51,12 @@ pub(super) fn import(
     mut deleted: HashMap<String, Vec<Paragraph>>,
     events: Events,
 ) -> Result<(), FilterError> {
+    // The regions whose marks the body has: the others, in notes and the
+    // like, are listed as left out by the reader.
+    let met = marked(&events);
     let read: Vec<&odf::ChangedRegion> = regions
         .iter()
-        .filter(|r| r.kind != odf::ChangeKind::FormatChange)
+        .filter(|r| r.kind != odf::ChangeKind::FormatChange && met.contains(r.id.as_str()))
         .collect();
     if read.is_empty() || events.is_empty() {
         return Ok(());
@@ -82,17 +96,21 @@ pub(super) fn import(
                         continue;
                     };
                     let (_, start) = open.remove(i);
-                    edit.mark_change(start, at, change)?;
-                    // The breaks it went past.
+                    // An end before its start, as a file may have, marks
+                    // nothing.
                     let body = edit.document().body();
                     let (Some(first), Some(last)) =
                         (body.index_of(start.paragraph), body.index_of(at.paragraph))
                     else {
                         continue;
                     };
+                    if (last, at.offset) < (first, start.offset) {
+                        continue;
+                    }
                     let breaks: Vec<NodeId> = (first..last)
                         .filter_map(|i| body.get(i).map(Paragraph::id))
                         .collect();
+                    edit.mark_change(start, at, change)?;
                     for paragraph in breaks {
                         edit.mark_break_change(paragraph, Some(change))?;
                     }
@@ -111,7 +129,13 @@ pub(super) fn import(
             let Some(paragraphs) = deleted.remove(&region) else {
                 continue;
             };
-            restore(edit, change, at, paragraphs)?;
+            let fits = edit
+                .document()
+                .paragraph(at.paragraph)
+                .is_ok_and(|p| at.offset <= p.len() && p.is_boundary(at.offset));
+            if fits {
+                restore(edit, change, at, paragraphs)?;
+            }
         }
         Ok(())
     })?;
@@ -286,6 +310,10 @@ pub(super) fn export(
                             ..span.clone()
                         });
                     }
+                }
+                // Comments stay in the text, where deleted text was.
+                Some(odf::Field::Annotation(_) | odf::Field::AnnotationEnd { .. }) => {
+                    here.spans.push(span);
                 }
                 _ => match &mut deleting {
                     Some((_, taking)) => taking.spans.push(span),

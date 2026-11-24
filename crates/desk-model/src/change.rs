@@ -187,4 +187,55 @@ mod tests {
         let (_, attrs) = document.body().iter().next().unwrap().format_at(6);
         assert_eq!(attrs.change, None);
     }
+
+    #[test]
+    fn w148_a_break_keeps_its_change_when_paragraphs_split_and_join() {
+        let mut document = Document::new_word_processing();
+        let first = document.body().iter().next().unwrap().id();
+        let (gone, _) = document
+            .transact("Changes", |edit| {
+                let start = edit.document().start();
+                edit.insert_text(start, "one two")?;
+                let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+                edit.mark_break_change(first, Some(gone))?;
+                Ok(gone)
+            })
+            .unwrap();
+        // Return in the middle: the new break is in no change, and the
+        // one that ended the paragraph ends the second half.
+        let (second, _) = document
+            .transact("Typing", |edit| {
+                edit.split_paragraph(Position::new(first, 3))
+            })
+            .unwrap();
+        let breaks = |d: &Document| -> Vec<Option<crate::NodeId>> {
+            d.body()
+                .iter()
+                .map(|p| p.attrs().break_change.flatten())
+                .collect()
+        };
+        assert_eq!(breaks(&document), [None, Some(gone)]);
+        // Joined again, the paragraph ends at that break.
+        document
+            .transact("Delete", |edit| edit.join_with_next(first))
+            .unwrap();
+        assert_eq!(breaks(&document), [Some(gone)]);
+        let _ = second;
+        // A copy of text in a change is in none.
+        document
+            .transact("Change", |edit| {
+                edit.mark_change(Position::new(first, 0), Position::new(first, 3), gone)
+            })
+            .unwrap();
+        let fragment = document
+            .copy_fragment(Position::new(first, 0), Position::new(first, 3))
+            .unwrap();
+        assert!(
+            fragment
+                .paragraphs
+                .iter()
+                .all(|p| p.attrs.break_change.is_none()
+                    && p.runs.iter().all(|(_, _, a)| a.change.is_none()))
+        );
+    }
 }
