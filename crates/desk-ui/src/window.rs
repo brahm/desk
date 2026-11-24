@@ -3971,13 +3971,16 @@ impl DocumentWindow {
         edit.append(Some(&tr("Select _All")), Some("win.select-all"));
         edit.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
         menu.append_section(None, &edit);
-        let comments = gio::Menu::new();
-        comments.append(Some(&tr("_Highlight")), Some("win.insert-highlight"));
-        comments.append(
-            Some(&tr("_Remove Highlights and Comments")),
-            Some("win.remove-comments"),
-        );
-        menu.append_section(None, &comments);
+        // Desk Slides has its comments with phase S2 (S158).
+        if self.slides.is_none() {
+            let comments = gio::Menu::new();
+            comments.append(Some(&tr("_Highlight")), Some("win.insert-highlight"));
+            comments.append(
+                Some(&tr("_Remove Highlights and Comments")),
+                Some("win.remove-comments"),
+            );
+            menu.append_section(None, &comments);
+        }
         let format = gio::Menu::new();
         format.append(Some(&tr("_Bold")), Some("win.bold"));
         format.append(Some(&tr("_Italic")), Some("win.italic"));

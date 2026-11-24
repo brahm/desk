@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: Insert > Highlight (Ctrl+Shift+H) in Desk Writer marks the
   selected text for review, and Remove Highlights and Comments takes
-  them off the selection.
+  them off the selection (#214).
 * Changed: a file that Desk opened with content it does not read is no
   longer saved over on its own; Save asks first, to save over it or as a
   new file (D-031).
