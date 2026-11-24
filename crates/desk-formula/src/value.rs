@@ -165,6 +165,21 @@ pub(crate) fn format_number(n: f64) -> String {
     out
 }
 
+/// A number as a formula writes it: in full, so that it reads back the
+/// same. Very small and very large numbers take an exponent; the 15
+/// digits of [`format_number`] are for showing a value, and a formula
+/// written back with them lost a small constant, as `1E-16` became `0`.
+pub(crate) fn formula_number(n: f64) -> String {
+    if n == n.trunc() && n.abs() < 1e15 {
+        return format!("{}", n as i64);
+    }
+    if n.is_finite() && (1e-5..1e15).contains(&n.abs()) {
+        format!("{n}")
+    } else {
+        format!("{n:E}")
+    }
+}
+
 /// The year, month and day of a day counted from 30 December 1899.
 pub fn date_from_days(days: i64) -> (i32, u32, u32) {
     // Days from 1 March of year 0, by the algorithm of Howard Hinnant.

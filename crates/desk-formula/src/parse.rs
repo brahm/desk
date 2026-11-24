@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use crate::value::{ErrorKind, format_number};
+use crate::value::{ErrorKind, formula_number};
 
 /// A cell that a formula names, by its column and row from 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -266,6 +266,7 @@ impl Formula {
         let mut parser = Parser {
             tokens: &tokens,
             pos: 0,
+            depth: 0,
         };
         let expr = parser.expr(0).map_err(|mut e| {
             e.at += offset;
@@ -450,7 +451,7 @@ impl fmt::Display for ExprDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let parent = self.1;
         match self.0 {
-            Expr::Number(n) => f.write_str(&format_number(*n)),
+            Expr::Number(n) => f.write_str(&formula_number(*n)),
             Expr::Text(t) => write!(f, "\"{}\"", t.replace('"', "\"\"")),
             Expr::Bool(b) => f.write_str(if *b { "TRUE" } else { "FALSE" }),
             Expr::Error(e) => f.write_str(e.code()),
@@ -665,9 +666,17 @@ fn is_name_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '$' || c == '.'
 }
 
+/// How deep a formula may nest, in parentheses, operators, signs and
+/// arguments, before it is refused: deeper, the parser and then the
+/// evaluator and the writer, which recurse, would overflow the stack. A
+/// file can hold any formula.
+pub const MAX_NESTING: usize = 512;
+
 struct Parser<'a> {
     tokens: &'a [(usize, Token)],
     pos: usize,
+    /// How deep the expression being read now is.
+    depth: usize,
 }
 
 impl Parser<'_> {
@@ -709,21 +718,41 @@ impl Parser<'_> {
         })
     }
 
+    /// Goes one level deeper, or refuses a formula that nests too deep.
+    fn enter(&mut self) -> Result<(), ParseError> {
+        self.depth += 1;
+        if self.depth > MAX_NESTING {
+            return Err(self.error("the formula nests too deep"));
+        }
+        Ok(())
+    }
+
     fn expr(&mut self, min: u8) -> Result<Expr, ParseError> {
+        let depth = self.depth;
         let mut left = self.unary()?;
         while let Some(op) = self.binary_op() {
             let p = op.precedence();
             if p < min.max(1) {
                 break;
             }
+            // Each operator puts what came before one level deeper.
+            self.enter()?;
             self.pos += 1;
             let right = self.expr(p + 1)?;
             left = Expr::Binary(op, Box::new(left), Box::new(right));
         }
+        self.depth = depth;
         Ok(left)
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
+        self.enter()?;
+        let e = self.unary_inner();
+        self.depth -= 1;
+        e
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             Some(Token::Op("-")) => {
                 self.pos += 1;
@@ -738,11 +767,14 @@ impl Parser<'_> {
     }
 
     fn postfix(&mut self) -> Result<Expr, ParseError> {
+        let depth = self.depth;
         let mut e = self.primary()?;
         while self.peek() == Some(&Token::Op("%")) {
+            self.enter()?;
             self.pos += 1;
             e = Expr::Unary(UnaryOp::Percent, Box::new(e));
         }
+        self.depth = depth;
         Ok(e)
     }
 
@@ -757,7 +789,11 @@ impl Parser<'_> {
             Token::Quoted(q) => Ok(Expr::Header(q)),
             Token::Error(e) => Ok(Expr::Error(e)),
             Token::Open => {
+                // A parenthesis costs the stack more than a sign: it
+                // counts twice.
+                self.enter()?;
                 let e = self.expr(0)?;
+                self.depth -= 1;
                 if self.peek() != Some(&Token::Close) {
                     return Err(self.error("missing )"));
                 }
@@ -767,6 +803,7 @@ impl Parser<'_> {
             Token::Name(name) => {
                 if self.peek() == Some(&Token::Open) {
                     self.pos += 1;
+                    self.enter()?;
                     let mut args = Vec::new();
                     if self.peek() == Some(&Token::Close) {
                         self.pos += 1;
@@ -783,6 +820,7 @@ impl Parser<'_> {
                             }
                         }
                     }
+                    self.depth -= 1;
                     return Ok(Expr::Call(name.to_uppercase(), args));
                 }
                 if let Some(a) = CellRef::parse(&name) {
@@ -862,5 +900,85 @@ mod tests {
         assert_eq!(CellRef::column_name(26), "AA");
         assert_eq!(CellRef::parse("AA10"), Some(CellRef::new(26, 9)));
         assert_eq!(CellRef::parse("A0"), None);
+    }
+
+    #[test]
+    fn small_and_large_constants_are_written_in_full() {
+        // A formula written back after a row was inserted lost its small
+        // constants: =A1*1E-16 became =A2*0 (review RV, batch 2).
+        assert_eq!(
+            Formula::parse("=A1*1E-16").unwrap().moved(0, 1).to_string(),
+            "=A2*1E-16"
+        );
+        for text in [
+            "=1.2345E-14",
+            "=0.1",
+            "=123.456",
+            "=1E300",
+            "=0.00001",
+            "=3",
+        ] {
+            let once = round_trip(text);
+            let n = |t: &str| match Formula::parse(t).unwrap().expr {
+                Expr::Number(n) => n,
+                other => panic!("{other:?}"),
+            };
+            assert_eq!(n(&once).to_bits(), n(text).to_bits(), "{text} -> {once}");
+        }
+    }
+
+    #[test]
+    fn formulas_that_nest_too_deep_are_refused() {
+        // 200,000 parentheses, signs or operators overflowed the stack of
+        // the parser, and then of the evaluator (review RV, batch 2).
+        let deep = format!("={}1{}", "(".repeat(200_000), ")".repeat(200_000));
+        assert!(Formula::parse(&deep).is_err());
+        assert!(Formula::parse(&format!("={}1", "-".repeat(200_000))).is_err());
+        assert!(Formula::parse(&format!("=1{}", "%".repeat(200_000))).is_err());
+        assert!(Formula::parse(&format!("=1{}", "+1".repeat(200_000))).is_err());
+        assert!(
+            Formula::parse_odf(&format!(
+                "of:={}1{}",
+                "(".repeat(200_000),
+                ")".repeat(200_000)
+            ))
+            .is_err()
+        );
+        let within = format!("={}1{}", "(".repeat(100), ")".repeat(100));
+        assert!(Formula::parse(&within).is_ok());
+        // A long sum of cells, as people write, stays within.
+        let sum = format!("=A1{}", "+A1".repeat(400));
+        assert!(Formula::parse(&sum).is_ok());
+    }
+
+    #[test]
+    fn the_deepest_formula_allowed_is_evaluated_and_written() {
+        // In a thread with a small stack, as the tests have, in a build
+        // without optimization.
+        struct Cells;
+        impl crate::Context for Cells {
+            fn cell(&self, _: CellRef) -> crate::Value {
+                crate::Value::Number(1.0)
+            }
+            fn header(&self, _: &str) -> Option<(CellRef, CellRef)> {
+                None
+            }
+        }
+        let n = MAX_NESTING / 3 - 1;
+        for text in [
+            format!("={}A1{}", "(-".repeat(n), ")".repeat(n)),
+            format!("={}A1{}", "ABS(".repeat(n), ")".repeat(n)),
+            format!(
+                "={}A1{}",
+                "(".repeat(MAX_NESTING / 2 - 1),
+                ")".repeat(MAX_NESTING / 2 - 1)
+            ),
+            format!("=A1{}", "^A1".repeat(MAX_NESTING - 2)),
+            format!("=A1{}", "-A1".repeat(MAX_NESTING - 2)),
+        ] {
+            let formula = Formula::parse(&text).unwrap();
+            assert!(!formula.to_string().is_empty());
+            let _ = crate::evaluate(&formula, &Cells);
+        }
     }
 }
