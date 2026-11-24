@@ -40,6 +40,44 @@ impl Values {
 /// `#VALUE!` past it rather than holding the app or filling its memory.
 const MAX_WORK: u64 = 1 << 27;
 
+/// What the formulas of all the tables of a document may do while it is
+/// laid out or saved, under [`share_work`]: a document of thousands of
+/// tables, each within [`MAX_WORK`], holds the app no longer than two.
+const MAX_DOCUMENT_WORK: u64 = 1 << 28;
+
+thread_local! {
+    /// What is left of [`MAX_DOCUMENT_WORK`] while a [`WorkScope`] lives.
+    static SHARED_WORK: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// While it lives, the tables evaluated on this thread share one budget
+/// of work, as those of a document laid out or saved do. Scopes opened
+/// inside it share the same budget.
+#[must_use = "the budget is shared only while the scope lives"]
+pub struct WorkScope {
+    outermost: bool,
+}
+
+/// Opens a [`WorkScope`].
+pub fn share_work() -> WorkScope {
+    let outermost = SHARED_WORK.with(|w| {
+        let none = w.get().is_none();
+        if none {
+            w.set(Some(MAX_DOCUMENT_WORK));
+        }
+        none
+    });
+    WorkScope { outermost }
+}
+
+impl Drop for WorkScope {
+    fn drop(&mut self) {
+        if self.outermost {
+            SHARED_WORK.with(|w| w.set(None));
+        }
+    }
+}
+
 /// The largest range a formula reads, as `desk-formula` bounds it.
 const MAX_RANGE_CELLS: u64 = 1_000_000;
 
@@ -304,6 +342,8 @@ impl<T: CellText> Table<T> {
 
     /// [`Table::values`] with `work` for the formulas to do.
     fn values_within(&self, now: f64, work: u64) -> Values {
+        let shared = SHARED_WORK.with(std::cell::Cell::get);
+        let work = shared.map_or(work, |left| work.min(left));
         let eval = Evaluator {
             table: self,
             cache: RefCell::new(HashMap::new()),
@@ -316,6 +356,10 @@ impl<T: CellText> Table<T> {
             for c in 0..self.cols() {
                 values.push(eval.value(r, c));
             }
+        }
+        if let Some(left) = shared {
+            let spent = work - eval.work_left.get();
+            SHARED_WORK.with(|w| w.set(Some(left - spent)));
         }
         Values {
             cols: self.cols(),
@@ -400,6 +444,29 @@ mod tests {
         // A table of the size people make is far from the limit.
         let v = t.values(0.0);
         assert_eq!(v.get(39, 1), &Value::Number(40.0));
+    }
+
+    #[test]
+    fn the_tables_of_a_document_share_their_work() {
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(12, 2);
+        for r in 0..12 {
+            t.type_text(r, 0, "1", &en);
+            t.type_text(r, 1, "=SUM(A1:A65535)", &en);
+        }
+        {
+            let _scope = share_work();
+            SHARED_WORK.with(|w| w.set(Some(1 << 20)));
+            // A scope opened inside shares the same budget.
+            let _inner = share_work();
+            let first = t.values(0.0);
+            assert_eq!(first.get(11, 1), &Value::Number(12.0));
+            let second = t.values(0.0);
+            assert_eq!(second.get(11, 1), &Value::Error(ErrorKind::Value));
+        }
+        // Out of the scope, each table has its own work again.
+        assert_eq!(SHARED_WORK.with(std::cell::Cell::get), None);
+        assert_eq!(t.values(0.0).get(11, 1), &Value::Number(12.0));
     }
 
     #[test]

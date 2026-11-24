@@ -110,6 +110,7 @@ pub fn read_odt_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterErro
 
 /// Writes a document as an ODT file.
 pub fn write_odt(document: &Document) -> Result<Vec<u8>, FilterError> {
+    let _work = desk_table::share_work();
     Ok(odf::write_odt(&export(document))?)
 }
 
@@ -119,6 +120,8 @@ pub fn write_odt_with_thumbnail(
     document: &Document,
     thumbnail: Option<&[u8]>,
 ) -> Result<Vec<u8>, FilterError> {
+    // The formulas of all the tables of the document share one budget.
+    let _work = desk_table::share_work();
     Ok(odf::write_odt_with_thumbnail(&export(document), thumbnail)?)
 }
 

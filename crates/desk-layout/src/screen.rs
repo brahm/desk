@@ -52,6 +52,8 @@ pub fn paginate_screen(
     zoom: f64,
     system: &mut TextSystem,
 ) -> DocumentLayout {
+    // The layouts that fit the boxes to their text share one budget.
+    let _work = desk_model::table::share_work();
     let mut fits = Fits::default();
     let mut layout = paginate(&screen_document_with(document, width, zoom, &fits), system);
     // The boxes of text across the column take the height of their text,

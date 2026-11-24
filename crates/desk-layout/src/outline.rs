@@ -37,6 +37,7 @@ const ELLIPSIS: &str = "\u{2026}";
 /// Lays out a document on pages as it shows: as an outline when it was
 /// saved showing as one, and as [`paginate`] does otherwise.
 pub fn paginate_view(document: &Document, system: &mut TextSystem) -> DocumentLayout {
+    let _work = desk_model::table::share_work();
     match document.view() {
         Some(view) if view.outline => paginate_outline(document, view.outline_options, system),
         _ => paginate(document, system),
@@ -50,6 +51,7 @@ pub fn paginate_outline(
     options: OutlineOptions,
     system: &mut TextSystem,
 ) -> DocumentLayout {
+    let _work = desk_model::table::share_work();
     let outline = outline_document(document, options);
     if !options.first_line {
         return paginate(&outline, system);
