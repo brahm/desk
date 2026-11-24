@@ -1470,7 +1470,17 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "How many rows a range has.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(e.arg(at(a, 0)?).shape().0 as f64))
+            // The size of a range is in its reference: its cells are
+            // not read.
+            let (rows, cols) = match at(a, 0)? {
+                Expr::Cell(_) => (1, 1),
+                Expr::Range(p, q) => (
+                    p.row.abs_diff(q.row) as usize + 1,
+                    p.col.abs_diff(q.col) as usize + 1,
+                ),
+                other => e.arg(other).shape(),
+            };
+            Ok(Value::Number(rows as f64))
         }
     ),
     f!(
@@ -1480,7 +1490,17 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "How many columns a range has.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 1, 1)?;
-            Ok(Value::Number(e.arg(at(a, 0)?).shape().1 as f64))
+            // The size of a range is in its reference: its cells are
+            // not read.
+            let (rows, cols) = match at(a, 0)? {
+                Expr::Cell(_) => (1, 1),
+                Expr::Range(p, q) => (
+                    p.row.abs_diff(q.row) as usize + 1,
+                    p.col.abs_diff(q.col) as usize + 1,
+                ),
+                other => e.arg(other).shape(),
+            };
+            Ok(Value::Number(cols as f64))
         }
     ),
     f!(

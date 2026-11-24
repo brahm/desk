@@ -40,6 +40,12 @@ impl Values {
 /// `#VALUE!` past it rather than holding the app or filling its memory.
 const MAX_WORK: u64 = 1 << 27;
 
+/// The largest range a formula reads, as `desk-formula` bounds it.
+const MAX_RANGE_CELLS: u64 = 1_000_000;
+
+/// The functions that read where their cell or range is, not its values.
+const POSITION_FUNCTIONS: [&str; 4] = ["ROW", "COLUMN", "ROWS", "COLUMNS"];
+
 struct Evaluator<'a, T> {
     table: &'a Table<T>,
     cache: RefCell<HashMap<(u32, u32), Value>>,
@@ -81,14 +87,25 @@ impl<T: CellText> Evaluator<'_, T> {
                 u64::from(a.row.abs_diff(b.row)) + 1,
                 u64::from(a.col.abs_diff(b.col)) + 1,
             );
-            if !self.spend(rows * cols) {
+            // A range the formula refuses to read has nothing to prepare.
+            if rows * cols > MAX_RANGE_CELLS {
                 return;
             }
-            let rows = a.row.min(b.row)..=a.row.max(b.row).min(self.table.rows().saturating_sub(1));
-            for r in rows {
-                let cols =
-                    a.col.min(b.col)..=a.col.max(b.col).min(self.table.cols().saturating_sub(1));
-                for c in cols {
+            // Only the part inside the table is looked at. A refused
+            // charge leaves the work for others: the formula then refuses
+            // the range too, as it costs at least as much.
+            let last_row = a.row.max(b.row).min(self.table.rows().saturating_sub(1));
+            let last_col = a.col.max(b.col).min(self.table.cols().saturating_sub(1));
+            let (first_row, first_col) = (a.row.min(b.row), a.col.min(b.col));
+            if first_row > last_row || first_col > last_col {
+                return;
+            }
+            let inside = u64::from(last_row - first_row + 1) * u64::from(last_col - first_col + 1);
+            if !self.spend(inside) {
+                return;
+            }
+            for r in first_row..=last_row {
+                for c in first_col..=last_col {
                     if self.is_pending_formula(r, c) {
                         out.push((r, c));
                     }
@@ -110,6 +127,13 @@ impl<T: CellText> Evaluator<'_, T> {
                 self.dependencies(a, out);
                 self.dependencies(b, out);
             }
+            // The place of a cell or a range is not its value: =ROW(A2)
+            // in A2 is not circular.
+            Expr::Call(name, args)
+                if POSITION_FUNCTIONS.contains(&name.as_str())
+                    && args
+                        .iter()
+                        .all(|a| matches!(a, Expr::Cell(_) | Expr::Range(..))) => {}
             Expr::Call(_, args) => {
                 for a in args {
                     self.dependencies(a, out);
@@ -226,16 +250,15 @@ impl<T: CellText> Context for Evaluator<'_, T> {
         self.now
     }
 
+    /// A charge refused leaves the work as it was, for the formulas
+    /// that ask for less.
     fn spend(&self, work: u64) -> bool {
         match self.work_left.get().checked_sub(work) {
             Some(left) => {
                 self.work_left.set(left);
                 true
             }
-            None => {
-                self.work_left.set(0);
-                false
-            }
+            None => false,
         }
     }
 }
@@ -377,6 +400,33 @@ mod tests {
         // A table of the size people make is far from the limit.
         let v = t.values(0.0);
         assert_eq!(v.get(39, 1), &Value::Number(40.0));
+    }
+
+    #[test]
+    fn a_range_refused_leaves_the_work_to_the_other_formulas() {
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(3, 2);
+        t.type_text(0, 0, "2", &en);
+        // Larger than any range a formula reads.
+        t.type_text(0, 1, "=SUM(A1:ZZZ60000)", &en);
+        t.type_text(1, 1, "=A1*3", &en);
+        // Larger than the work left, but not than the limit of a range.
+        t.type_text(2, 1, "=SUM(A1:A60000)", &en);
+        let v = t.values_within(0.0, 1_000);
+        assert_eq!(v.get(0, 1), &Value::Error(ErrorKind::Reference));
+        assert_eq!(v.get(2, 1), &Value::Error(ErrorKind::Value));
+        assert_eq!(v.get(1, 1), &Value::Number(6.0));
+    }
+
+    #[test]
+    fn the_place_of_its_own_cell_is_not_circular() {
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(3, 1);
+        t.type_text(1, 0, "=ROW(A2)-1", &en);
+        t.type_text(2, 0, "=ROWS(A1:A3)+COLUMN(A3)", &en);
+        let v = t.values(0.0);
+        assert_eq!(v.get(1, 0), &Value::Number(1.0));
+        assert_eq!(v.get(2, 0), &Value::Number(4.0));
     }
 
     #[test]
