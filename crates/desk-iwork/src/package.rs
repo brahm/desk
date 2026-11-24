@@ -104,9 +104,12 @@ pub fn read_index_at(path: &Path) -> Result<String, IworkError> {
         };
     }
     for name in [INDEX_GZ, INDEX] {
-        let file = path.join(name);
-        if file.is_file() {
-            return index_text(&limited(fs::File::open(file)?)?);
+        // Read as the other files of the folder are: a link that leads
+        // out of the package is not followed.
+        if path.join(name).is_file()
+            && let Some(bytes) = read_file_at(path, name)
+        {
+            return index_text(&bytes);
         }
     }
     Err(IworkError::Missing(INDEX))
@@ -211,6 +214,8 @@ mod tests {
         std::os::unix::fs::symlink(dir.join("secret"), package.join("out.png")).unwrap();
         std::os::unix::fs::symlink("Contents/inside.png", package.join("in.png")).unwrap();
         assert_eq!(read_file_at(&package, "out.png"), None);
+        std::os::unix::fs::symlink(dir.join("secret"), package.join("index.xml")).unwrap();
+        assert!(read_index_at(&package).is_err());
         assert_eq!(
             read_file_at(&package, "in.png").as_deref(),
             Some(&b"png"[..])

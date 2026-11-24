@@ -141,7 +141,16 @@ pub(crate) fn read_table(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph)
         desk: e.attr(DESK, "table").map(str::to_owned),
         ..Table::default()
     };
-    read_parts(e, &mut table, paragraph, false, false);
+    // Where the last row that holds anything is, among all the rows of
+    // the table, in whatever group: the empty rows repeated after it are
+    // filler, those before it keep their place.
+    let mut rows = Vec::new();
+    all_rows(e, &mut rows);
+    let mut cursor = Rows {
+        next: 0,
+        last_content: rows.iter().rposition(|r| row_has_content(r)),
+    };
+    read_parts(e, &mut table, paragraph, false, false, &mut cursor);
     // Repeated cells and columns past the last that holds anything, as
     // spreadsheets write to fill the sheet, are left out.
     let used = table
@@ -176,12 +185,34 @@ pub(crate) fn read_table(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph)
     table
 }
 
+/// Which row of the table comes next, and where the last that holds
+/// anything is.
+struct Rows {
+    next: usize,
+    last_content: Option<usize>,
+}
+
+/// The rows of a table in order, in whatever group they are.
+fn all_rows<'a>(e: &'a Element, out: &mut Vec<&'a Element>) {
+    for child in e.elements() {
+        if child.name.ns != TABLE {
+            continue;
+        }
+        match child.name.local.as_str() {
+            "table-row" => out.push(child),
+            "table-rows" | "table-row-group" | "table-header-rows" => all_rows(child, out),
+            _ => {}
+        }
+    }
+}
+
 fn read_parts(
     e: &Element,
     table: &mut Table,
     paragraph: &dyn Fn(&Element) -> Paragraph,
     header_columns: bool,
     header_rows: bool,
+    rows: &mut Rows,
 ) {
     for child in e.elements() {
         if child.name.ns != TABLE {
@@ -205,13 +236,13 @@ fn read_parts(
                 }
             }
             "table-columns" | "table-column-group" => {
-                read_parts(child, table, paragraph, false, header_rows)
+                read_parts(child, table, paragraph, false, header_rows, rows)
             }
-            "table-header-columns" => read_parts(child, table, paragraph, true, header_rows),
+            "table-header-columns" => read_parts(child, table, paragraph, true, header_rows, rows),
             "table-rows" | "table-row-group" => {
-                read_parts(child, table, paragraph, header_columns, false)
+                read_parts(child, table, paragraph, header_columns, false, rows)
             }
-            "table-header-rows" => read_parts(child, table, paragraph, header_columns, true),
+            "table-header-rows" => read_parts(child, table, paragraph, header_columns, true, rows),
             "table-row" => {
                 let before = budget::table_left();
                 let (row, bytes) = read_row(child, paragraph);
@@ -221,17 +252,17 @@ fn read_parts(
                     cells: budget::spent(before, budget::table_left()).cells.max(1),
                     bytes,
                 };
-                let empty = row.cells.iter().all(|c| c.paragraphs.is_empty());
+                let index = rows.next;
+                rows.next += 1;
+                let empty = row
+                    .cells
+                    .iter()
+                    .all(|c| c.paragraphs.is_empty() && c.value.is_none());
                 let mut n = count(child, "number-rows-repeated");
                 // Spreadsheets fill the sheet with a row repeated a
                 // million times, after the last row that holds anything;
                 // empty rows before it are kept, or the rows after move.
-                let trailing = e
-                    .elements()
-                    .skip_while(|r| !std::ptr::eq(*r, child))
-                    .skip(1)
-                    .all(|r| !row_has_content(r));
-                if empty && trailing && n > 1 {
+                if empty && n > 1 && rows.last_content.is_none_or(|last| index > last) {
                     n = n.min(2);
                 }
                 let n = n.min(MAX_ROWS - table.rows.len().min(MAX_ROWS));
@@ -252,10 +283,16 @@ fn read_parts(
     }
 }
 
-/// Whether a cell as written holds anything: text or a value.
+/// Whether a cell as written holds anything that must keep its place:
+/// text, a value, a comment or a style, as the end of a row keeps them.
 fn cell_has_content(c: &Element) -> bool {
-    c.elements()
-        .any(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
+    c.attr(TABLE, "style-name").is_some()
+        || c.elements().any(|p| {
+            p.name.is(TEXT, "p")
+                || p.name.is(TEXT, "h")
+                || p.name.is(OFFICE, "annotation")
+                || p.name.is(DESK, "annotation")
+        })
         || c.attrs
             .iter()
             .any(|(name, _)| name.ns == OFFICE && name.local.ends_with("value"))
@@ -263,7 +300,7 @@ fn cell_has_content(c: &Element) -> bool {
 
 /// Whether a row as written holds anything.
 fn row_has_content(r: &Element) -> bool {
-    r.name.is(TABLE, "table-row") && r.elements().any(cell_has_content)
+    r.elements().any(cell_has_content)
 }
 
 /// Reads a row, and what the bytes of one copy of it weigh. A cell that
@@ -663,6 +700,16 @@ mod tests {
         assert!(full(5, 0));
         assert!(table.rows.len() <= 8, "{}", table.rows.len());
         assert!(table.columns.len() <= 9);
+        // Across groups, and with a cell that holds only a style.
+        budget::start_document();
+        let table = read(
+            r#"<table:table-header-rows><table:table-row table:number-rows-repeated="3"><table:table-cell/></table:table-row></table:table-header-rows><table:table-row><table:table-cell table:number-columns-repeated="4"/><table:table-cell table:style-name="ce1"/></table:table-row><table:table-row table:number-rows-repeated="5"><table:table-cell office:value-type="float" office:value="1"/></table:table-row>"#,
+        );
+        assert_eq!(table.header_rows, 3);
+        assert_eq!(table.rows.len(), 9);
+        assert_eq!(table.rows[3].cells[4].style.as_deref(), Some("ce1"));
+        // A row of values repeated at the end is kept whole.
+        assert!(table.rows[8].cells[0].value.is_some());
     }
 
     #[test]
