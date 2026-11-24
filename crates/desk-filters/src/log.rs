@@ -36,8 +36,9 @@ pub enum Content {
     Bookmarks,
     /// Tables: the text of their cells is kept as paragraphs.
     Tables,
-    /// Tracked changes kept as if they were accepted: what was inserted
-    /// stays, and what was deleted goes.
+    /// Tracked changes of formatting kept as if they were accepted: the
+    /// text keeps its new formatting. Insertions and deletions are read
+    /// (W148).
     AcceptedChanges,
     /// Objects that cannot be read yet, as charts and embedded documents.
     UnreadObjects,
@@ -125,7 +126,9 @@ impl fmt::Display for Content {
             }
             Self::Bookmarks => f.write_str("bookmarks, whose text is kept"),
             Self::Tables => f.write_str("tables, whose text is kept as paragraphs"),
-            Self::AcceptedChanges => f.write_str("tracked changes, which are kept as accepted"),
+            Self::AcceptedChanges => {
+                f.write_str("tracked changes of formatting, which are kept as accepted")
+            }
             Self::UnreadObjects => f.write_str("objects such as charts and embedded documents"),
             Self::Other(name) => write!(f, "content of the kind \u{201c}{name}\u{201d}"),
         }

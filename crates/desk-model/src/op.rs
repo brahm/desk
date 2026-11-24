@@ -111,6 +111,14 @@ pub enum Op {
         /// The comment; none to remove it.
         comment: Option<Comment>,
     },
+    /// Adds, replaces or removes a tracked change, leaving the text it
+    /// covers as it is (W148).
+    SetChange {
+        /// The change.
+        id: NodeId,
+        /// The change; none to remove it.
+        change: Option<crate::Change>,
+    },
     /// Puts an object among the objects of the document (OBJ-01).
     InsertObject {
         /// Its place from the back.

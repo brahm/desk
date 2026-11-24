@@ -479,6 +479,7 @@ fn para_border(chain: &[&IworkStyle], own: usize) -> Option<ParaBorder> {
 fn para_attrs(properties: &Properties) -> ParaAttrs {
     ParaAttrs {
         toc_entry: None,
+        break_change: None,
         hyphenate: flag(properties, "hyphenate"),
         alignment: properties.number("alignment").map(|n| match n as i64 {
             1 => Alignment::Right,

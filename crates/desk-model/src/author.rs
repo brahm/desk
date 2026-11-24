@@ -153,7 +153,8 @@ impl crate::Document {
     }
 
     /// The colours of the authors, with `local` the name of the author of
-    /// this computer: the one chosen for each; for the others the colours
+    /// this computer, of comments and tracked changes: the one chosen for
+    /// each; for the others the colours
     /// no one chose, in their order (yellow first), the local author
     /// first and then the others by name. The order of names, unlike the
     /// identifiers of comments, is the same once the document is saved
@@ -167,13 +168,12 @@ impl crate::Document {
             .filter(|c| !chosen.iter().any(|(_, t)| t == c))
             .collect();
         let mut others = std::collections::BTreeSet::new();
-        for comment in self.comments().iter() {
-            for name in
-                std::iter::once(&comment.author).chain(comment.replies.iter().map(|r| &r.author))
-            {
-                if &**name != local && !colors.contains_key(&**name) {
-                    others.insert(&**name);
-                }
+        let names = self.comments().iter().flat_map(|comment| {
+            std::iter::once(&comment.author).chain(comment.replies.iter().map(|r| &r.author))
+        });
+        for name in names.chain(self.changes().iter().map(|c| &c.author)) {
+            if &**name != local && !colors.contains_key(&**name) {
+                others.insert(&**name);
             }
         }
         let mut placed = 0;

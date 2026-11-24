@@ -3532,6 +3532,7 @@ fn int_22_what_a_file_of_another_program_loses_is_listed() {
 <text:tracked-changes>
 <text:changed-region text:id="c1"><text:deletion><text:p>gone</text:p></text:deletion></text:changed-region>
 <text:changed-region text:id="c2"><text:insertion/></text:changed-region>
+<text:changed-region text:id="c3"><text:format-change/></text:changed-region>
 </text:tracked-changes>
 <text:p>Before<office:annotation><dc:creator>Ana</dc:creator><text:p>A note</text:p></office:annotation> <text:change-start text:change-id="c2"/>new<text:change-end text:change-id="c2"/><text:change text:change-id="c1"/></text:p>
 <table:table table:name="T"><table:table-column/><table:table-row><table:table-cell><text:p>Cell</text:p></table:table-cell></table:table-row></table:table>
@@ -3558,7 +3559,9 @@ fn int_22_what_a_file_of_another_program_loses_is_listed() {
     assert_eq!(
         found,
         [
-            (Warning::Content(Content::AcceptedChanges), 2),
+            // Insertions and deletions are read; a change of formatting
+            // is not yet (W148).
+            (Warning::Content(Content::AcceptedChanges), 1),
             (Warning::Content(Content::UnreadObjects), 1),
         ]
     );

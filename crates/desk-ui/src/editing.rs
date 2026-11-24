@@ -29,6 +29,7 @@ use crate::text_nav::{self, Selection, Spot};
 use crate::view::{DocumentView, WeakView};
 
 mod cell_drag;
+mod changes;
 mod chart_looks;
 mod comments;
 pub use comments::CommentTarget;
@@ -2765,7 +2766,9 @@ impl TextEditor {
     /// in the colours of their authors, again when the author of this
     /// computer is renamed (W149, W150).
     pub fn show_comment_marks(&self) {
-        let color = self.comment_colors(&crate::comments_page::author());
+        let local = crate::comments_page::author();
+        self.view.set_change_marks(self.change_marks(&local));
+        let color = self.comment_colors(&local);
         self.view.set_comment_marks(
             self.comment_marks()
                 .into_iter()

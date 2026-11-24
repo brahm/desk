@@ -66,16 +66,21 @@ pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,
 };
 pub use read::read_streams;
+
+/// The date written for a tracked change whose date is not known, as
+/// ODF needs one: the epoch, which readers take as unknown.
+pub const UNKNOWN_DATE: &str = "1970-01-01T00:00:00";
 pub use table::{
     MAX_COLUMNS, MAX_ROWS, Table, TableCell, TableColumn, TableProperties, TableRow, TableTemplate,
 };
 pub use text::{
-    Annotation, Background, Border, BorderLine, Break, Column, Columns, DropCap, DropCapBackground,
-    Family, Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK, LeaderStyle, Line, LineColor,
-    LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle, MasterPage, Meta, Note,
-    NotesConfiguration, PageLayout, Paragraph, ParagraphProperties, Properties, SectionStart,
-    SectionStyle, Span, Style, StyleShortcut, TabStop, TabType, TextAlign, TextDocument,
-    TextPosition, TextProperties, TextSettings, TextShadow, TextTransform, TocLevel, ViewSettings,
+    Annotation, Background, Border, BorderLine, Break, ChangeKind, ChangedRegion, Column, Columns,
+    DropCap, DropCapBackground, Family, Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK,
+    LeaderStyle, Line, LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle,
+    MasterPage, Meta, Note, NotesConfiguration, PageLayout, Paragraph, ParagraphProperties,
+    Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut, TabStop, TabType,
+    TextAlign, TextDocument, TextPosition, TextProperties, TextSettings, TextShadow, TextTransform,
+    TocLevel, ViewSettings,
 };
 pub use units::{Color, Length};
 pub use write::{Streams, VERSION, write_streams};

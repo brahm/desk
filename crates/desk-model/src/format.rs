@@ -436,6 +436,10 @@ formatting! {
         /// The comments that the text is under (W149, REV-08), which
         /// belong to the text, as bookmarks do.
         comments: crate::CommentIds = crate::CommentIds::none(),
+        /// The tracked change, an insertion or a deletion, that the text
+        /// is part of (W148, REV-01), which belongs to the text, as
+        /// comments do.
+        change: Option<crate::NodeId> = None,
     }
 }
 
@@ -857,6 +861,10 @@ formatting! {
         /// which updating the table makes again. It belongs to the
         /// paragraph, never to its style.
         toc_entry: Option<crate::toc::TocEntry> = None,
+        /// The tracked change, an insertion or a deletion, that the break
+        /// at the end of the paragraph is part of (W148, REV-01). It
+        /// belongs to the paragraph, never to its style.
+        break_change: Option<crate::NodeId> = None,
     }
 }
 
@@ -869,6 +877,7 @@ impl CharAttrs {
             link: None,
             bookmark: None,
             comments: None,
+            change: None,
             ..self.clone()
         }
     }
@@ -881,6 +890,7 @@ impl CharAttrs {
             link: self.link.clone(),
             bookmark: self.bookmark.clone(),
             comments: self.comments.clone(),
+            change: self.change,
             ..Self::default()
         }
     }
@@ -896,6 +906,7 @@ impl ParaAttrs {
             column_break_before: self.column_break_before,
             start: self.start.clone(),
             toc_entry: self.toc_entry,
+            break_change: self.break_change,
             ..Self::default()
         }
     }
@@ -906,6 +917,7 @@ impl ParaAttrs {
             column_break_before: None,
             start: None,
             toc_entry: None,
+            break_change: None,
             ..self.clone()
         }
     }

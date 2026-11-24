@@ -530,6 +530,68 @@ impl Edit {
         Ok(())
     }
 
+    /// Adds, replaces or removes a tracked change, leaving the text it
+    /// covers as it is (W148).
+    pub fn set_change(
+        &mut self,
+        id: NodeId,
+        change: Option<crate::Change>,
+    ) -> Result<(), ModelError> {
+        if self.doc.changes().get(id) != change.as_ref() {
+            self.apply(Op::SetChange { id, change })?;
+        }
+        Ok(())
+    }
+
+    /// Adds a new tracked change and returns its identifier, which the
+    /// text it covers is then given (W148).
+    pub fn add_change(
+        &mut self,
+        kind: crate::ChangeKind,
+        author: &str,
+        date: Option<&str>,
+    ) -> Result<NodeId, ModelError> {
+        let id = self.new_id();
+        self.set_change(
+            id,
+            Some(crate::Change {
+                id,
+                kind,
+                author: author.into(),
+                date: date.map(Into::into),
+            }),
+        )?;
+        Ok(id)
+    }
+
+    /// Puts the text between two positions in a tracked change (W148).
+    pub fn mark_change(
+        &mut self,
+        start: Position,
+        end: Position,
+        change: NodeId,
+    ) -> Result<(), ModelError> {
+        self.map_runs(start, end, |run| run.attrs.change = Some(Some(change)))
+    }
+
+    /// Puts the break at the end of a paragraph in a tracked change, or
+    /// takes it out of any with none (W148).
+    pub fn mark_break_change(
+        &mut self,
+        paragraph: NodeId,
+        change: Option<NodeId>,
+    ) -> Result<(), ModelError> {
+        let p = self.doc.paragraph(paragraph)?;
+        let mut attrs = p.attrs().clone();
+        attrs.break_change = change.map(Some);
+        let style = p.style();
+        self.apply(Op::SetParagraphFormat {
+            paragraph,
+            style,
+            attrs,
+        })
+    }
+
     /// Puts a new comment on the text between two positions, which must
     /// not be empty, and returns its identifier (W149). The identifier of
     /// `comment` is replaced with a new one.

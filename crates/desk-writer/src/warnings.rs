@@ -25,7 +25,9 @@ pub fn describe(entry: &Entry) -> String {
                 Content::TrackedChanges => tr("tracked changes, whose text is kept as plain text"),
                 Content::Bookmarks => tr("bookmarks, whose text is kept"),
                 Content::Tables => tr("tables, whose text is kept as paragraphs"),
-                Content::AcceptedChanges => tr("tracked changes, which are kept as accepted"),
+                Content::AcceptedChanges => {
+                    tr("tracked changes of formatting, which are kept as accepted")
+                }
                 Content::UnreadObjects => tr("objects such as charts and embedded documents"),
                 Content::Other(name) => tr("content of the kind “{name}”").replace("{name}", name),
             };
