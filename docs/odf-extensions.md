@@ -586,6 +586,19 @@ spreadsheets that `desk:table` keeps for a cell. A cell keeps its own
 copy of its format in `desk:table`, so a format renamed or deleted in the
 menu stays on the cells that have it. Other programs ignore the item.
 
+#### Author colours (settings, not an attribute)
+
+The colour each author chose for their comments and highlights (W150),
+View > Author Color in Desk Writer as in Pages 15.4, is kept in the
+`AuthorColors` item of the `DeskTextSettings` set in `settings.xml`,
+written only when an author chose one. Each line is one author, as a
+JSON object with `author`, the name as comments carry it in `dc:creator`,
+and `color`, one of `yellow`, `green`, `blue`, `pink`, `purple`, `teal`,
+`orange`, `red`, `brown` and `gray-blue`. An author without a line takes
+yellow when it is the user, and otherwise the first colour no other
+author has, in the order their first comments come in the document.
+Other programs ignore the item and colour comments their own way.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

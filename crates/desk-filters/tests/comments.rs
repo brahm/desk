@@ -150,6 +150,36 @@ fn rev_08_comments_with_replies_are_kept_in_odt() {
 }
 
 #[test]
+fn w150_the_colours_chosen_by_authors_are_kept_in_the_settings() {
+    use desk_model::AuthorColor;
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Author Color", |edit| {
+            edit.set_author_color("Ana", AuthorColor::Teal)?;
+            edit.set_author_color("Bo \"B\"", AuthorColor::GrayBlue)
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("w150-author-colors.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(
+        read.author_colors(),
+        [
+            ("Ana".to_owned(), AuthorColor::Teal),
+            ("Bo \"B\"".to_owned(), AuthorColor::GrayBlue)
+        ]
+    );
+    // A document without them writes no item.
+    let plain = write_odt(&Document::new_word_processing()).unwrap();
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&plain)).unwrap();
+    let mut settings = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("settings.xml").unwrap(), &mut settings)
+        .unwrap();
+    assert!(!settings.contains("AuthorColors"));
+}
+
+#[test]
 fn rev_08_replies_of_libreoffice_join_their_comment() {
     // As LibreOffice 24.2 writes a comment with a reply: the reply first,
     // naming its comment in loext:parent-name, and an empty date.

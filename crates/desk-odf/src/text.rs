@@ -313,6 +313,9 @@ pub struct TextSettings {
     /// The custom formats of cells (PXV-18), one a line, as the filter
     /// writes them.
     pub custom_formats: Vec<String>,
+    /// The colours that authors chose for the document (W150), one a
+    /// line, as the filter writes them.
+    pub author_colors: Vec<String>,
 }
 
 /// A list style (`text:list-style`).

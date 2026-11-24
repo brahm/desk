@@ -30,9 +30,14 @@ use crate::i18n::tr;
 #[cfg(test)]
 use crate::text_nav::Spot;
 
-/// The name that new comments and replies are written under: the full
-/// name of the user, or the login when there is none.
+/// The name that new comments and replies are written under: the one of
+/// the preferences (W150), or else the full name of the user, or the login
+/// when there is none.
 pub fn author() -> String {
+    let chosen = crate::preferences::get().author;
+    if !chosen.is_empty() {
+        return chosen;
+    }
     let name = glib::real_name().to_string_lossy().trim().to_owned();
     if name.is_empty() || name == "Unknown" {
         glib::user_name().to_string_lossy().into_owned()
@@ -346,7 +351,8 @@ impl CommentsPage {
     /// The card of a new comment, with its text being written.
     fn draft_card(self: &Rc<Self>, range: CommentTarget) -> gtk::ListBoxRow {
         let card = card_box();
-        card.append(&heading(&author(), None, &[]));
+        let color = (self.editor)().map(|e| e.local_author_color());
+        card.append(&heading(&author(), color, None, &[]));
         let weak = Rc::downgrade(self);
         let writer = self.writer(
             &card,
@@ -389,11 +395,15 @@ impl CommentsPage {
         let date = |d: &Option<std::sync::Arc<str>>| {
             d.as_deref().zip(now).map(|(d, now)| shown_date(d, now))
         };
+        let local = author();
+        let color_of =
+            |name: &str| (self.editor)().map(|e| e.document().author_color(name, &local));
         let text = text_label(&comment.text, comment.is_highlight());
         let edit = icon_button("document-edit-symbolic", &tr("Edit Comment"));
         let delete = icon_button("user-trash-symbolic", &tr("Delete Comment"));
         card.append(&heading(
             &comment.author,
+            color_of(&comment.author),
             date(&comment.date).as_deref(),
             &[&edit, &delete],
         ));
@@ -449,6 +459,7 @@ impl CommentsPage {
             let delete = icon_button("user-trash-symbolic", &tr("Delete Reply"));
             replies.append(&heading(
                 &reply.author,
+                color_of(&reply.author),
                 date(&reply.date).as_deref(),
                 &[&edit, &delete],
             ));
@@ -652,8 +663,27 @@ fn card_box() -> gtk::Box {
 }
 
 /// The line of a card that names who wrote it and when, with its buttons.
-fn heading(author: &str, date: Option<&str>, buttons: &[&gtk::Button]) -> gtk::Box {
+/// The heading of a comment or a reply: a dot in the colour of its author
+/// (W150), the author and the date, and its buttons.
+fn heading(
+    author: &str,
+    color: Option<desk_model::AuthorColor>,
+    date: Option<&str>,
+    buttons: &[&gtk::Button],
+) -> gtk::Box {
     let line = gtk::Box::builder().spacing(6).build();
+    if let Some(color) = color {
+        let desk_model::Rgba { r, g, b, .. } = color.ink();
+        let dot = gtk::Label::builder()
+            .use_markup(true)
+            .label(format!(
+                "<span foreground=\"#{r:02x}{g:02x}{b:02x}\">●</span>"
+            ))
+            .valign(gtk::Align::Start)
+            .accessible_role(gtk::AccessibleRole::Presentation)
+            .build();
+        line.append(&dot);
+    }
     let author = if author.is_empty() {
         tr("Unknown Author")
     } else {

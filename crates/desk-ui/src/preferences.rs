@@ -244,6 +244,9 @@ pub struct Preferences {
     /// What a click on a link of a document to the web does; none until
     /// the first such click asks.
     pub open_links: Option<OpenLinks>,
+    /// The name that comments and changes are written under (W150); empty
+    /// for the full name of the user of the computer.
+    pub author: String,
 }
 
 /// The color of invisible characters until it is changed: the blue of
@@ -299,6 +302,7 @@ impl Default for Preferences {
             show_size_and_position: true,
             move_objects_aside: true,
             open_links: None,
+            author: String::new(),
         }
     }
 }
@@ -385,6 +389,9 @@ impl Preferences {
             .string(WINDOW, "open-links")
             .ok()
             .and_then(|w| OpenLinks::from_word(&w));
+        if let Ok(author) = file.string(EDITING, "author") {
+            out.author = author.trim().to_owned();
+        }
         out.show_warnings = file
             .boolean(WINDOW, "show-warnings")
             .unwrap_or(out.show_warnings);
@@ -474,6 +481,11 @@ impl Preferences {
             None => {
                 let _ = file.remove_key(WINDOW, "open-links");
             }
+        }
+        if self.author.is_empty() {
+            let _ = file.remove_key(EDITING, "author");
+        } else {
+            file.set_string(EDITING, "author", &self.author);
         }
         file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
         file.set_boolean(WINDOW, "screen-view", self.screen_view);
@@ -861,6 +873,7 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         .title(tr("General"))
         .icon_name("preferences-system-symbolic")
         .build();
+    page.add(&author_group());
     page.add(&rulers);
     if !tables {
         page.add(&editing);
@@ -873,6 +886,27 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         .build();
     dialog.add(&page);
     dialog.present(Some(parent));
+}
+
+/// Author: the name that comments and tracked changes are written under,
+/// as Settings > General > Author of Pages 15.4 (W150, `pref.author`).
+/// Left empty, it is the full name of the user of the computer.
+fn author_group() -> adw::PreferencesGroup {
+    let row = adw::EntryRow::builder()
+        .title(tr("Author"))
+        .text(get().author)
+        .show_apply_button(true)
+        .build();
+    row.connect_apply(|row| {
+        let name = row.text().trim().to_owned();
+        change(|p| p.author = name.clone());
+    });
+    let group = adw::PreferencesGroup::builder()
+        .title(tr("Comments and Changes"))
+        .description(tr("The name used for comments and tracked changes"))
+        .build();
+    group.add(&row);
+    group
 }
 
 /// Default Font: whether new documents of the Blank templates take a font
@@ -1125,6 +1159,7 @@ mod tests {
             show_size_and_position: false,
             move_objects_aside: false,
             open_links: Some(OpenLinks::Never),
+            author: "Ana Souza".into(),
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -1138,6 +1173,7 @@ mod tests {
         assert!(!Preferences::read(&empty).screen_view);
         assert!(Preferences::read(&empty).detect_links);
         assert!(Preferences::read(&empty).include_preview);
+        assert!(Preferences::read(&empty).author.is_empty());
         assert_eq!(Preferences::read(&empty).zoom, 125);
         assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
         assert_eq!(Preferences::read(&empty).guide_color, GUIDE_COLOR);

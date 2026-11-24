@@ -290,6 +290,15 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     document.append(Some(&tr("_Invisibles")), Some("win.invisibles"));
     // Show Warnings, as the View menu of Pages 15.4 has it (W009).
     document.append(Some(&tr("Document _Warnings")), Some("win.warnings"));
+    // Author Color, as View > Comments & Changes of Pages 15.4 (W150).
+    let colors = gio::Menu::new();
+    for color in desk_model::AuthorColor::ALL {
+        colors.append(
+            Some(&author_color_name(color)),
+            Some(&format!("win.author-color('{}')", color.key())),
+        );
+    }
+    document.append_submenu(Some(&tr("_Author Color")), &colors);
     let window = gio::Menu::new();
     window.append(Some(&tr("As _Outline")), Some("win.outline"));
     // Screen View, and the size of its text (PXV-01).
@@ -310,6 +319,23 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
     menu.append_section(None, &window);
     menu.append_section(None, navigation);
     menu
+}
+
+/// The name of an author colour, as the menu shows it (W150).
+pub(crate) fn author_color_name(color: desk_model::AuthorColor) -> String {
+    use desk_model::AuthorColor::*;
+    match color {
+        Yellow => tr("Yellow"),
+        Green => tr("Green"),
+        Blue => tr("Blue"),
+        Pink => tr("Pink"),
+        Purple => tr("Purple"),
+        Teal => tr("Teal"),
+        Orange => tr("Orange"),
+        Red => tr("Red"),
+        Brown => tr("Brown"),
+        GrayBlue => tr("Gray Blue"),
+    }
 }
 
 /// The Insert menu (GNM-10): what the Insert menu of Pages had besides the

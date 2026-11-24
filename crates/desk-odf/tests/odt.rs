@@ -512,6 +512,7 @@ fn full_document() -> TextDocument {
             drop_cap_styles: Some(vec!["lines=2 weight=700".into(), "lines=5".into()]),
             chart_styles: Some(vec![r#"{"fills":[]}"#.into(), "{}".into()]),
             custom_formats: vec![r#"{"name":"kg","pattern":"0 kg"}"#.into()],
+            author_colors: vec![r#"{"author":"Ana","color":"teal"}"#.into()],
         },
         style_shortcuts: vec![
             StyleShortcut {

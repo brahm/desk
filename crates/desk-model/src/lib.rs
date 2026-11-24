@@ -46,6 +46,7 @@
 
 mod arrange;
 mod aside;
+mod author;
 mod auto_numbers;
 mod autocorrect;
 mod case_change;
@@ -89,6 +90,7 @@ mod units;
 pub mod workbook;
 
 pub use arrange::SectionsClip;
+pub use author::AuthorColor;
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{
     AutoCorrect, Correction, QuoteStyle, Quotes, Replacement, ends_word, is_quote, smart_dash,
