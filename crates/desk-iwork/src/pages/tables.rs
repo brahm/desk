@@ -99,7 +99,8 @@ pub struct Table {
     /// the footer rows and the body.
     pub part_looks: [Option<usize>; 4],
     /// The lines across, above each row and below the last, a line for
-    /// each column: none where no line is drawn.
+    /// each column: none where no line is drawn. Empty for a table
+    /// without a table style, whose lines are those of a new table.
     pub h_lines: Vec<Option<Stroke>>,
     /// The lines down, left of each column and right of the last, a line
     /// for each row.
@@ -592,21 +593,16 @@ fn read_looks<'a>(
     cell_styles: &[Option<&'a Element>],
 ) {
     let (rows, cols) = (table.rows(), table.cols());
-    let Some(table_style) = model.child(SF, "tabular-style-ref").map(|r| ids.deref(r)) else {
-        table.cell_looks = vec![None; cell_styles.len()];
-        return;
-    };
-    let mut seen: Vec<*const Element> = Vec::new();
+    let table_style = model.child(SF, "tabular-style-ref").map(|r| ids.deref(r));
+    // Each style is read once, found again by its element.
+    let mut seen: HashMap<*const Element, usize> = HashMap::new();
     let mut index_of = |style: &'a Element, table: &mut Table| -> usize {
-        let key: *const Element = style;
-        if let Some(i) = seen.iter().position(|s| *s == key) {
-            return i;
-        }
-        seen.push(key);
-        table.looks.push(look(ids, styles, style));
-        table.looks.len() - 1
+        *seen.entry(style as *const Element).or_insert_with(|| {
+            table.looks.push(look(ids, styles, style));
+            table.looks.len() - 1
+        })
     };
-    let part = |name: &str| property_element(ids, styles, table_style, name);
+    let part = |name: &str| table_style.and_then(|t| property_element(ids, styles, t, name));
     let parts = [
         part("SFTDefaultHeaderRowCellStyleProperty"),
         part("SFTDefaultHeaderColumnCellStyleProperty"),
@@ -640,6 +636,11 @@ fn read_looks<'a>(
             table.cell_looks.push(look);
         }
     }
+    // Without a table style, the cells keep their own styles, and the
+    // lines and the alternating rows are those of a new table.
+    let Some(table_style) = table_style else {
+        return;
+    };
     let flag = |name: &str| {
         properties(ids, styles, table_style)
             .number(name)
@@ -674,7 +675,7 @@ fn read_looks<'a>(
                     &border
                 }
             } else if i == rows {
-                if table.footer_rows > 0 {
+                if footer_start < rows {
                     &footer_border
                 } else if header_rows == rows {
                     &header_border
@@ -683,7 +684,7 @@ fn read_looks<'a>(
                 }
             } else if header_rows > 0 && i == header_rows {
                 &header_separator
-            } else if table.footer_rows > 0 && i == footer_start {
+            } else if footer_start < rows && i == footer_start {
                 &footer_separator
             } else if in_header(i, c) {
                 &header_body
@@ -748,6 +749,9 @@ fn read_looks<'a>(
                 } else {
                     (&mut table.v_lines, cols + 1, rows)
                 };
+                // The run goes along the line: no further than its end,
+                // whatever the file says.
+                let stop = stop.min(if across { along } else { count });
                 for k in start..stop {
                     let at = if across {
                         (index < count && k < along).then(|| (index * along + k) as usize)

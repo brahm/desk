@@ -310,6 +310,7 @@ pub(crate) fn export_table(
                         "US$" | "$" => "USD",
                         "€" => "EUR",
                         "£" => "GBP",
+                        "¥" => "JPY",
                         other => other,
                     }
                     .to_owned(),
@@ -489,6 +490,7 @@ pub(crate) fn import_table(source: &odf::TextDocument, odf_table: &odf::Table) -
                             Some("USD") => "US$",
                             Some("EUR") => "€",
                             Some("GBP") => "£",
+                            Some("JPY") => "¥",
                             Some(other) => other,
                         }
                         .to_owned(),

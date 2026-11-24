@@ -1136,7 +1136,12 @@ fn table_look(source: &iwork::Table, table: &mut desk_model::Table) {
             let style = &mut table.cell_mut(r, c).style;
             let fill = cell_fill(look);
             if fill != area_fill.map(CellFill::Color) {
-                style.fill = fill;
+                // A cell without a fill in a part that has one shows the
+                // page through it, which is white: the fill of a cell of
+                // the model is none for that of its part.
+                style.fill = fill.or_else(|| {
+                    area_fill.map(|_| CellFill::Color(desk_model::table::Color::rgb(255, 255, 255)))
+                });
             }
             let text = &look.text;
             if let Some(name) = text.string("fontName").filter(|n| !n.is_empty()) {

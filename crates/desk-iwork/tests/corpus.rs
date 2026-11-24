@@ -327,6 +327,44 @@ fn tab_21_28_29_reads_the_formats_and_the_rules_of_cells() {
 }
 
 #[test]
+fn a_table_reads_runs_past_its_lines_and_cells_without_a_table_style() {
+    use std::io::Read;
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages/tab-04-22-25-appearance.pages/index.xml.gz");
+    let mut xml = String::new();
+    flate2::read::GzDecoder::new(std::fs::File::open(path).unwrap())
+        .read_to_string(&mut xml)
+        .unwrap();
+    let table_of = |xml: &str| {
+        let document = desk_iwork::pages::parse_pages(xml).unwrap();
+        document
+            .attachments
+            .iter()
+            .find_map(|(_, d)| match &d.kind {
+                desk_iwork::pages::DrawableKind::Table(t) => Some((**t).clone()),
+                _ => None,
+            })
+            .expect("a table")
+    };
+    // A run whose end is far past the line stops at the line, at once.
+    let runs = r#"sf:start-index="2" sf:stop-index="3""#;
+    assert!(xml.contains(runs));
+    let far = table_of(&xml.replace(runs, r#"sf:start-index="2" sf:stop-index="4294967295""#));
+    assert_eq!(far.h_lines.len(), ((far.rows() + 1) * far.cols()) as usize);
+    assert_eq!(far.h_lines[2].as_ref().map(|s| s.width), Some(3.0));
+    // Without the table style, the cells keep their own styles.
+    let style = r#"<sf:tabular-style-ref sfa:IDREF="SFTTableStyle-1"/>"#;
+    assert!(xml.contains(style));
+    let bare = table_of(&xml.replace(style, ""));
+    assert_eq!(bare.part_looks, [None; 4]);
+    assert!(bare.h_lines.is_empty() && bare.banded.is_none());
+    assert!(matches!(
+        look_of(&bare, 0, 2).cell.get("fill"),
+        Some(Value::Gradient { .. })
+    ));
+}
+
+#[test]
 fn every_table_of_the_fixtures_reads_every_cell() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/fixtures/pages");
     for entry in std::fs::read_dir(&dir).unwrap() {
