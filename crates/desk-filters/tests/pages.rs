@@ -214,6 +214,28 @@ fn doc_22_a_cycle_of_parents_ends() {
 }
 
 #[test]
+fn doc_22_character_styles_in_a_cycle_are_kept_and_saved() {
+    // Character styles whose parents loop were left out of the document
+    // while its runs still named them, and saving as ODT panicked
+    // (review RV, batch 1).
+    let styles = r#"
+<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32"><sf:property-map/></sf:paragraphstyle>
+<sf:characterstyle sf:name="C" sf:ident="c" sf:parent-ident="d"><sf:property-map/></sf:characterstyle>
+<sf:characterstyle sf:name="D" sf:ident="d" sf:parent-ident="c"><sf:property-map/></sf:characterstyle>"#;
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="c">x</sf:span><sf:span sf:style="d">y</sf:span></sf:p>"#;
+    let document = read_pages(index(styles, "", body).as_bytes()).unwrap();
+    for name in ["C", "D"] {
+        assert!(
+            document
+                .styles()
+                .by_name(StyleFamily::Character, name)
+                .is_some()
+        );
+    }
+    assert!(!desk_filters::write_odt(&document).unwrap().is_empty());
+}
+
+#[test]
 fn doc_22_what_the_model_cannot_hold_is_logged() {
     let lists = r#"<sf:liststyle sf:name="Bullet" sf:ident="list-style-1" sfa:ID="L-1"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="text"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>
 <sf:liststyle sf:name="None" sf:ident="list-style-default" sfa:ID="L-0"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="none"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>"#;

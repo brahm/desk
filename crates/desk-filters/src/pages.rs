@@ -920,20 +920,33 @@ impl<'a> Importer<'a> {
             }
             if put.len() == before {
                 // A parent that cannot be put, as in a cycle: the rest go
-                // under Body.
+                // under Body, or stand alone as character styles. Each is
+                // put, since the runs already point to it.
                 for (style, id, name) in &order {
                     if put.insert(*id) {
                         let (paragraph, character) = merged(&[style], 1);
-                        if style.family == Family::Paragraph {
-                            self.document.put_style(ParagraphStyle {
-                                id: *id,
-                                name: name.as_str().into(),
-                                shortcut: None,
-                                parent: (*id != self.body).then_some(self.body),
-                                next: None,
-                                paragraph,
-                                character,
-                            })?;
+                        match style.family {
+                            Family::Paragraph => {
+                                self.document.put_style(ParagraphStyle {
+                                    id: *id,
+                                    name: name.as_str().into(),
+                                    shortcut: None,
+                                    parent: (*id != self.body).then_some(self.body),
+                                    next: None,
+                                    paragraph,
+                                    character,
+                                })?;
+                            }
+                            Family::Character => {
+                                self.document.put_style(CharacterStyle {
+                                    id: *id,
+                                    name: name.as_str().into(),
+                                    shortcut: None,
+                                    parent: None,
+                                    character,
+                                })?;
+                            }
+                            Family::Layout | Family::Section => {}
                         }
                     }
                 }
