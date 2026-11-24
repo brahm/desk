@@ -297,7 +297,9 @@ impl<T: CellText> Table<T> {
     pub fn new(rows: u32, cols: u32) -> Self {
         let rows = rows.clamp(1, MAX_CELLS);
         let cols = cols.clamp(1, MAX_CELLS);
-        let n = (rows * cols) as usize;
+        // In usize: the product of the largest sizes only just fits u32.
+        let (r, c) = (rows as usize, cols as usize);
+        let n = r * c;
         Self {
             name: String::new(),
             widths: vec![72_000; cols as usize],
@@ -307,8 +309,8 @@ impl<T: CellText> Table<T> {
             header_cols: u32::from(cols > 1),
             footer_rows: 0,
             merges: Vec::new(),
-            h_borders: vec![Some(DEFAULT_BORDER); ((rows + 1) * cols) as usize],
-            v_borders: vec![Some(DEFAULT_BORDER); (rows * (cols + 1)) as usize],
+            h_borders: vec![Some(DEFAULT_BORDER); (r + 1) * c],
+            v_borders: vec![Some(DEFAULT_BORDER); r * (c + 1)],
             style: TableStyle::default(),
             options: TableOptions::default(),
         }
