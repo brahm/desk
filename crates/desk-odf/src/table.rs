@@ -4,6 +4,7 @@
 //! Tables (`table:table`): those in the text of a document, and those in
 //! a frame, as Desk writes the tables that float on a page.
 
+use crate::budget::{self, Cost};
 use crate::ns::{DESK, OFFICE, STYLE, TABLE, TEXT};
 use crate::text::{Border, Paragraph};
 use crate::units::{Color, Length};
@@ -140,7 +141,16 @@ pub(crate) fn read_table(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph)
         desk: e.attr(DESK, "table").map(str::to_owned),
         ..Table::default()
     };
-    read_parts(e, &mut table, paragraph, false, false);
+    // Where the last row that holds anything is, among all the rows of
+    // the table, in whatever group: the empty rows repeated after it are
+    // filler, those before it keep their place.
+    let mut rows = Vec::new();
+    all_rows(e, &mut rows);
+    let mut cursor = Rows {
+        next: 0,
+        last_content: rows.iter().rposition(|r| row_has_content(r)),
+    };
+    read_parts(e, &mut table, paragraph, false, false, &mut cursor);
     // Repeated cells and columns past the last that holds anything, as
     // spreadsheets write to fill the sheet, are left out.
     let used = table
@@ -154,12 +164,46 @@ pub(crate) fn read_table(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph)
     while table.columns.len() < used {
         table.columns.push(TableColumn::default());
     }
-    for row in &mut table.rows {
-        while row.cells.len() < used {
-            row.cells.push(TableCell::default());
+    // Every row is filled to the widest, which the document pays for:
+    // a wide row and a narrow one repeated many times would otherwise be
+    // many cells that no budget counted.
+    let mut kept = table.rows.len();
+    for (i, row) in table.rows.iter_mut().enumerate() {
+        let missing = used.saturating_sub(row.cells.len());
+        let cost = Cost {
+            cells: missing,
+            bytes: 0,
+        };
+        if missing > 0 && budget::take_table(1, cost) == 0 {
+            kept = i;
+            break;
+        }
+        row.cells.resize_with(used, TableCell::default);
+    }
+    table.rows.truncate(kept);
+    table.header_rows = table.header_rows.min(kept);
+    table
+}
+
+/// Which row of the table comes next, and where the last that holds
+/// anything is.
+struct Rows {
+    next: usize,
+    last_content: Option<usize>,
+}
+
+/// The rows of a table in order, in whatever group they are.
+fn all_rows<'a>(e: &'a Element, out: &mut Vec<&'a Element>) {
+    for child in e.elements() {
+        if child.name.ns != TABLE {
+            continue;
+        }
+        match child.name.local.as_str() {
+            "table-row" => out.push(child),
+            "table-rows" | "table-row-group" | "table-header-rows" => all_rows(child, out),
+            _ => {}
         }
     }
-    table
 }
 
 fn read_parts(
@@ -168,6 +212,7 @@ fn read_parts(
     paragraph: &dyn Fn(&Element) -> Paragraph,
     header_columns: bool,
     header_rows: bool,
+    rows: &mut Rows,
 ) {
     for child in e.elements() {
         if child.name.ns != TABLE {
@@ -191,23 +236,41 @@ fn read_parts(
                 }
             }
             "table-columns" | "table-column-group" => {
-                read_parts(child, table, paragraph, false, header_rows)
+                read_parts(child, table, paragraph, false, header_rows, rows)
             }
-            "table-header-columns" => read_parts(child, table, paragraph, true, header_rows),
+            "table-header-columns" => read_parts(child, table, paragraph, true, header_rows, rows),
             "table-rows" | "table-row-group" => {
-                read_parts(child, table, paragraph, header_columns, false)
+                read_parts(child, table, paragraph, header_columns, false, rows)
             }
-            "table-header-rows" => read_parts(child, table, paragraph, header_columns, true),
+            "table-header-rows" => read_parts(child, table, paragraph, header_columns, true, rows),
             "table-row" => {
-                let row = read_row(child, paragraph);
-                let empty = row.cells.iter().all(|c| c.paragraphs.is_empty());
+                let before = budget::table_left();
+                let (row, bytes) = read_row(child, paragraph);
+                // Each copy of the row costs again the cells it read, and
+                // the bytes of what they hold.
+                let cost = Cost {
+                    cells: budget::spent(before, budget::table_left()).cells.max(1),
+                    bytes,
+                };
+                let index = rows.next;
+                rows.next += 1;
+                let empty = row
+                    .cells
+                    .iter()
+                    .all(|c| c.paragraphs.is_empty() && c.value.is_none());
                 let mut n = count(child, "number-rows-repeated");
                 // Spreadsheets fill the sheet with a row repeated a
-                // million times.
-                if empty && n > 1 {
+                // million times, after the last row that holds anything;
+                // empty rows before it are kept, or the rows after move.
+                if empty && n > 1 && rows.last_content.is_none_or(|last| index > last) {
                     n = n.min(2);
                 }
                 let n = n.min(MAX_ROWS - table.rows.len().min(MAX_ROWS));
+                let n = if n == 0 {
+                    0
+                } else {
+                    1 + budget::take_table(n - 1, cost)
+                };
                 for _ in 0..n {
                     table.rows.push(row.clone());
                 }
@@ -220,16 +283,50 @@ fn read_parts(
     }
 }
 
-fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow {
+/// Whether a cell as written holds text, a value or a comment.
+fn holds_data(c: &Element) -> bool {
+    c.elements().any(|p| {
+        p.name.is(TEXT, "p")
+            || p.name.is(TEXT, "h")
+            || p.name.is(OFFICE, "annotation")
+            || p.name.is(DESK, "annotation")
+    }) || c
+        .attrs
+        .iter()
+        .any(|(name, _)| name.ns == OFFICE && name.local.ends_with("value"))
+}
+
+/// Whether a cell as written holds anything that must keep its place in
+/// its row: data or a style, as the end of a row keeps them.
+fn cell_has_content(c: &Element) -> bool {
+    c.attr(TABLE, "style-name").is_some() || holds_data(c)
+}
+
+/// Whether a row as written holds data. A style alone does not count:
+/// spreadsheets fill the sheet with rows of styled empty cells when a
+/// whole column is formatted, and such a row would keep every filler row
+/// before it.
+fn row_has_content(r: &Element) -> bool {
+    r.elements().any(holds_data)
+}
+
+/// Reads a row, and what the bytes of one copy of it weigh. A cell that
+/// the budget of the document refuses ends the row: the cells after it
+/// would otherwise move into its place.
+fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> (TableRow, usize) {
     let mut row = TableRow {
         style: e.attr(TABLE, "style-name").map(str::to_owned),
         cells: Vec::new(),
     };
-    for c in e.elements() {
+    let mut bytes = 0usize;
+    let cells: Vec<&Element> = e
+        .elements()
+        .filter(|c| c.name.is(TABLE, "covered-table-cell") || c.name.is(TABLE, "table-cell"))
+        .collect();
+    let last_content = cells.iter().rposition(|c| cell_has_content(c));
+    for (i, &c) in cells.iter().enumerate() {
         let covered = c.name.is(TABLE, "covered-table-cell");
-        if !covered && !c.name.is(TABLE, "table-cell") {
-            continue;
-        }
+        let before = budget::table_left();
         let value_type = c
             .attr(OFFICE, "value-type")
             .or_else(|| c.attr(crate::ns::CALCEXT, "value-type"))
@@ -271,12 +368,31 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
         };
         let empty = cell.paragraphs.is_empty() && cell.value.is_none();
         let mut n = count(c, "number-columns-repeated");
-        if empty && n > 1 {
+        // Empty cells repeated to the edge of the sheet; those before a
+        // cell that holds something are kept, or it would move.
+        if empty && n > 1 && last_content.is_none_or(|last| i > last) {
             n = n.min(2);
         }
-        let n = n.min(MAX_COLUMNS - row.cells.len().min(MAX_COLUMNS));
+        let wanted = n.min(MAX_COLUMNS - row.cells.len().min(MAX_COLUMNS));
+        // The first copy costs a cell: its content was in the file. Each
+        // other copy costs that content again, and what reading it cost,
+        // such as the copies a table inside made.
+        let nested = budget::spent(before, budget::table_left());
+        let copy = Cost {
+            cells: 1 + nested.cells,
+            bytes: budget::weight(c) + nested.bytes,
+        };
+        let first = Cost { cells: 1, bytes: 0 };
+        let n = match budget::take_table(wanted.min(1), first) {
+            0 => 0,
+            _ => 1 + budget::take_table(wanted - 1, copy),
+        };
         for _ in 0..n {
             row.cells.push(cell.clone());
+        }
+        bytes = bytes.saturating_add(copy.bytes.saturating_mul(n));
+        if n < wanted {
+            break;
         }
     }
     // Empty cells at the end of a row stand for nothing.
@@ -288,7 +404,7 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
     {
         row.cells.pop();
     }
-    row
+    (row, bytes)
 }
 
 /// Writes a `table:table`. `paragraph` writes the paragraphs of a cell.
@@ -542,4 +658,89 @@ pub(crate) fn write_table_template(w: &mut Writer, template: &TableTemplate) {
         }
     }
     w.end();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(xml: &str) -> Table {
+        let xml = format!(
+            r#"<table:table xmlns:table="{TABLE}" xmlns:text="{TEXT}" xmlns:office="{OFFICE}">{xml}</table:table>"#
+        );
+        let e = crate::xml::parse(&xml).unwrap();
+        read_table(&e, &|_| Paragraph::default())
+    }
+
+    #[test]
+    fn what_is_written_once_costs_no_bytes() {
+        // Every cell paid for its bytes, so a document with much text in
+        // its tables, none of it repeated, lost cells without a word
+        // (review of batch 1).
+        budget::start_document();
+        budget::take_table(
+            1,
+            Cost {
+                cells: 0,
+                bytes: budget::MAX_DOCUMENT_BYTES - 10,
+            },
+        );
+        let text = "x".repeat(4096);
+        let table = read(&format!(
+            r#"<table:table-row><table:table-cell><text:p>{text}</text:p></table:table-cell><table:table-cell><text:p>{text}</text:p></table:table-cell></table:table-row>"#
+        ));
+        assert_eq!(table.rows.len(), 1);
+        assert_eq!(table.rows[0].cells.len(), 2);
+        assert!(table.rows[0].cells.iter().all(|c| c.paragraphs.len() == 1));
+    }
+
+    #[test]
+    fn empty_cells_and_rows_before_others_keep_their_place() {
+        // Empty cells or rows repeated were cut to two wherever they
+        // were, and what followed them moved (review of batch 1).
+        budget::start_document();
+        let table = read(
+            r#"<table:table-row><table:table-cell><text:p>a</text:p></table:table-cell><table:table-cell table:number-columns-repeated="5"/><table:table-cell><text:p>b</text:p></table:table-cell><table:table-cell table:number-columns-repeated="1000"/></table:table-row><table:table-row table:number-rows-repeated="4"><table:table-cell/></table:table-row><table:table-row><table:table-cell><text:p>c</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="100000"><table:table-cell/></table:table-row>"#,
+        );
+        let full = |r: usize, c: usize| !table.rows[r].cells[c].paragraphs.is_empty();
+        assert!(full(0, 0) && full(0, 6) && !full(0, 5));
+        assert!(full(5, 0));
+        assert!(table.rows.len() <= 8, "{}", table.rows.len());
+        assert!(table.columns.len() <= 9);
+        // Across groups, and with a cell that holds only a style.
+        budget::start_document();
+        let table = read(
+            r#"<table:table-header-rows><table:table-row table:number-rows-repeated="3"><table:table-cell/></table:table-row></table:table-header-rows><table:table-row><table:table-cell table:number-columns-repeated="4"/><table:table-cell table:style-name="ce1"/></table:table-row><table:table-row table:number-rows-repeated="5"><table:table-cell office:value-type="float" office:value="1"/></table:table-row>"#,
+        );
+        assert_eq!(table.header_rows, 3);
+        assert_eq!(table.rows.len(), 9);
+        assert_eq!(table.rows[3].cells[4].style.as_deref(), Some("ce1"));
+        // A row of values repeated at the end is kept whole.
+        assert!(table.rows[8].cells[0].value.is_some());
+        // Styled empty rows that fill the sheet after the last value are
+        // cut, as other filler rows are.
+        budget::start_document();
+        let table = read(
+            r#"<table:table-row><table:table-cell><text:p>a</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="1048000"><table:table-cell table:style-name="ce1"/></table:table-row>"#,
+        );
+        assert!(table.rows.len() <= 3, "{}", table.rows.len());
+    }
+
+    #[test]
+    fn a_cell_refused_ends_its_row() {
+        // The copies of the first cell cannot be paid for: the cell after
+        // them took their place (review of batch 1).
+        budget::start_document();
+        budget::take_table(
+            1,
+            Cost {
+                cells: 0,
+                bytes: budget::MAX_DOCUMENT_BYTES - 5,
+            },
+        );
+        let table = read(
+            r#"<table:table-row><table:table-cell table:number-columns-repeated="3"><text:p>aaaaaaaaaa</text:p></table:table-cell><table:table-cell><text:p>b</text:p></table:table-cell></table:table-row>"#,
+        );
+        assert_eq!(table.rows.first().map(|r| r.cells.len()), Some(1));
+    }
 }

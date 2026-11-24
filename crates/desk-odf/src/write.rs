@@ -618,24 +618,30 @@ fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
                 w.attr("text:style-override", style);
             }
         };
-        if open.len() == depth {
-            if open[depth - 1] {
+        // `open` holds, for each list open, whether it has an item open.
+        if open.len() == depth
+            && let Some(item) = open.last_mut()
+        {
+            if *item {
                 w.end();
             }
             start_item(w, Some(member));
-            open[depth - 1] = true;
+            *item = true;
         }
         while open.len() < depth {
-            let last = open.len() - 1;
-            if !open[last] {
+            if let Some(item) = open.last_mut()
+                && !*item
+            {
                 start_item(w, None);
-                open[last] = true;
+                *item = true;
             }
             w.start("text:list");
             open.push(false);
-            if open.len() == depth {
+            if open.len() == depth
+                && let Some(item) = open.last_mut()
+            {
                 start_item(w, Some(member));
-                open[depth - 1] = true;
+                *item = true;
             }
         }
         write_paragraph(w, paragraph);

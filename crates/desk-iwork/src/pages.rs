@@ -12,7 +12,7 @@
 
 use crate::error::IworkError;
 use crate::ns::{KEY, LS, SF, SFA, SL};
-use crate::sf::{Ids, Stylesheet};
+use crate::sf::{Guard, Ids, Stylesheet};
 use crate::xml::{self, Element, Node};
 
 mod drawables;
@@ -486,7 +486,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         document.stylesheet = Stylesheet::read(&ids, sheet);
     }
     if let Some(body) = storage.child(SF, "text-body") {
-        read_block(&ids, &mut document, body);
+        read_block(&ids, &mut document, body, ids.text_guard());
     }
     // The notes, in a text storage of their own inside that of the body.
     // Each ends with a note break; what follows the last is an empty
@@ -497,7 +497,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         .and_then(|s| s.child(SF, "text-body"));
     if let Some(notes) = notes {
         let body = std::mem::take(&mut document.body);
-        let ends = read_block(&ids, &mut document, notes);
+        let ends = read_block(&ids, &mut document, notes, ids.text_guard());
         let mut paragraphs = std::mem::replace(&mut document.body, body).into_iter();
         let mut start = 0;
         for end in ends {
@@ -519,7 +519,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
                     continue;
                 };
                 let body = std::mem::take(&mut document.body);
-                read_block(&ids, &mut document, text);
+                read_block(&ids, &mut document, text, ids.text_guard());
                 let paragraphs = std::mem::replace(&mut document.body, body);
                 let name_attr = element.attr(SF, "name").unwrap_or_default().to_owned();
                 let list = if item == "header" {
@@ -531,12 +531,23 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             }
         }
     }
+    // References left unfollowed, the limit reached, lose what they
+    // stand for: the log says so.
+    let refused = ids.references_refused() as usize;
+    if refused > 0 {
+        document.skipped.push(("reference".to_owned(), refused));
+    }
     Ok(document)
 }
 
 /// Reads the paragraphs of a text body into the body of a document, and
 /// returns how many paragraphs there are after each note break.
-fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Vec<usize> {
+fn read_block(
+    ids: &Ids<'_>,
+    document: &mut PagesDocument,
+    body: &Element,
+    guard: Guard,
+) -> Vec<usize> {
     let start = document.body.len();
     let mut reader = BodyReader {
         ids,
@@ -551,6 +562,7 @@ fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Ve
         marks: Vec::new(),
         note_break: false,
         note_ends: Vec::new(),
+        guard,
     };
     reader.block(body);
     reader.note_ends.into_iter().map(|e| e - start).collect()
@@ -675,9 +687,11 @@ struct BodyReader<'a, 'b> {
     note_break: bool,
     /// The number of paragraphs read when each note ended.
     note_ends: Vec<usize>,
+    /// Stops references that lead back to the text being read.
+    guard: Guard,
 }
 
-impl BodyReader<'_, '_> {
+impl<'a> BodyReader<'a, '_> {
     fn skip(&mut self, element: &Element) {
         self.skip_named(&element.name.local.clone());
     }
@@ -690,7 +704,7 @@ impl BodyReader<'_, '_> {
     }
 
     /// Reads the paragraphs inside sections, layouts and other blocks.
-    fn block(&mut self, element: &Element) {
+    fn block(&mut self, element: &'a Element) {
         for child in element.elements() {
             if child.name.ns != SF {
                 continue;
@@ -722,7 +736,7 @@ impl BodyReader<'_, '_> {
         }
     }
 
-    fn paragraph(&mut self, element: &Element) {
+    fn paragraph(&mut self, element: &'a Element) {
         let mut paragraph = Paragraph {
             style: element.attr(SF, "style").map(str::to_owned),
             list_level: element
@@ -754,8 +768,18 @@ impl BodyReader<'_, '_> {
         }
     }
 
-    /// Reads the text inside a paragraph or a span into runs.
-    fn inline(&mut self, element: &Element, style: Option<&str>, runs: &mut Vec<Run>) {
+    /// Reads the text inside a paragraph or a span into runs. A span can
+    /// refer to another, so the guard stops a reference back to a span
+    /// being read, which would otherwise loop until the stack overflows.
+    fn inline(&mut self, element: &'a Element, style: Option<&str>, runs: &mut Vec<Run>) {
+        if !self.guard.enter() {
+            return;
+        }
+        self.inline_nodes(element, style, runs);
+        self.guard.leave();
+    }
+
+    fn inline_nodes(&mut self, element: &'a Element, style: Option<&str>, runs: &mut Vec<Run>) {
         for node in &element.children {
             match node {
                 Node::Text(text) => self.push(runs, style, text),
@@ -775,7 +799,9 @@ impl BodyReader<'_, '_> {
                     self.inline(child, style, runs);
                 }
                 Node::Element(child) if child.name.ns == SF => {
-                    let child = self.ids.deref(child);
+                    let Some(child) = self.guard.deref(self.ids, child) else {
+                        continue;
+                    };
                     match child.name.local.as_str() {
                         "span" => {
                             let inner = child.attr(SF, "style").or(style);

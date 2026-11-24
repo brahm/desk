@@ -15,7 +15,15 @@ use crate::ns::{SF, SFA};
 use crate::xml::Element;
 
 /// The objects of an index by their `sfa:ID`.
-pub(crate) struct Ids<'a>(HashMap<&'a str, &'a Element>);
+pub(crate) struct Ids<'a> {
+    map: HashMap<&'a str, &'a Element>,
+    /// What the readers of the text of the document have spent, its
+    /// body, notes, headers and footers: one count for all of them.
+    text: std::rc::Rc<Spent>,
+    /// What the reader of the floating objects and their text has spent,
+    /// apart, so that objects that spend it all leave the body whole.
+    objects: std::rc::Rc<Spent>,
+}
 
 impl<'a> Ids<'a> {
     /// Indexes every element with an ID under `root`.
@@ -26,14 +34,46 @@ impl<'a> Ids<'a> {
             if let Some(id) = element.attr(SFA, "ID") {
                 ids.entry(id).or_insert(element);
             }
+            // Reversed, so that the first child comes off the stack first
+            // and, of two objects with the same ID, the first is kept.
+            let start = stack.len();
             stack.extend(element.elements());
+            if let Some(children) = stack.get_mut(start..) {
+                children.reverse();
+            }
         }
-        Self(ids)
+        Self {
+            map: ids,
+            text: std::rc::Rc::default(),
+            objects: std::rc::Rc::default(),
+        }
+    }
+
+    /// A guard for a reader of the text of this document. Every such
+    /// guard shares its depth and its count of references.
+    pub fn text_guard(&self) -> Guard {
+        Guard {
+            spent: std::rc::Rc::clone(&self.text),
+        }
+    }
+
+    /// A guard for the reader of the floating objects of this document,
+    /// with a count of its own.
+    pub fn objects_guard(&self) -> Guard {
+        Guard {
+            spent: std::rc::Rc::clone(&self.objects),
+        }
+    }
+
+    /// How many references the readers left unfollowed, the limit
+    /// reached.
+    pub fn references_refused(&self) -> u32 {
+        self.text.refused.get() + self.objects.refused.get()
     }
 
     /// The element with an ID.
     pub fn get(&self, id: &str) -> Option<&'a Element> {
-        self.0.get(id).copied()
+        self.map.get(id).copied()
     }
 
     /// The element itself, or the one it refers to when it is a
@@ -42,6 +82,75 @@ impl<'a> Ids<'a> {
         match element.attr(SFA, "IDREF") {
             Some(id) => self.get(id).unwrap_or(element),
             None => element,
+        }
+    }
+}
+
+/// How deep the readers of text and of groups go, references included.
+/// The XML of an index is at most 256 elements deep, so a document that
+/// goes deeper does it through a reference back to an element being read.
+pub(crate) const MAX_READ_DEPTH: u32 = 320;
+
+/// How many references a reader follows in one document. References that
+/// point to references, each read in full wherever it is used, can double
+/// the work at every level; this bounds the total.
+pub(crate) const MAX_REFERENCES: u32 = 100_000;
+
+/// Keeps a recursive reader from looping on a reference that leads back
+/// to an element it is reading, and from following references without
+/// end, which would overflow the stack or never finish.
+#[derive(Clone)]
+pub(crate) struct Guard {
+    spent: std::rc::Rc<Spent>,
+}
+
+/// The depth and the references spent in reading one document.
+#[derive(Default)]
+pub(crate) struct Spent {
+    depth: std::cell::Cell<u32>,
+    references: std::cell::Cell<u32>,
+    refused: std::cell::Cell<u32>,
+}
+
+impl Guard {
+    /// Enters an element. False when it is too deep and must be skipped;
+    /// otherwise [`Guard::leave`] is called once the element is read.
+    pub fn enter(&mut self) -> bool {
+        let depth = self.spent.depth.get();
+        if depth >= MAX_READ_DEPTH {
+            return false;
+        }
+        self.spent.depth.set(depth + 1);
+        true
+    }
+
+    /// Leaves the element entered last.
+    pub fn leave(&mut self) {
+        let depth = &self.spent.depth;
+        depth.set(depth.get().saturating_sub(1));
+    }
+
+    /// Counts a reference about to be followed. False when the document
+    /// has used up the references allowed, and the reference is skipped.
+    pub fn follow(&mut self) -> bool {
+        let references = self.spent.references.get();
+        if references >= MAX_REFERENCES {
+            let refused = &self.spent.refused;
+            refused.set(refused.get().saturating_add(1));
+            return false;
+        }
+        self.spent.references.set(references + 1);
+        true
+    }
+
+    /// The element a child stands for: itself, or the one it refers to.
+    /// `None` when the reference must not be followed.
+    pub fn deref<'a>(&mut self, ids: &Ids<'a>, element: &'a Element) -> Option<&'a Element> {
+        let target = ids.deref(element);
+        if std::ptr::eq(target, element) || self.follow() {
+            Some(target)
+        } else {
+            None
         }
     }
 }
@@ -949,5 +1058,43 @@ impl Stylesheet {
             chain.push(parent);
         }
         chain
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn of_two_objects_with_the_same_id_the_first_is_kept() {
+        let root = crate::xml::parse(&format!(
+            r#"<r xmlns:sfa="{SFA}"><a sfa:ID="x" n="1"/><b><a sfa:ID="x" n="2"/></b><a sfa:ID="x" n="3"/></r>"#
+        ))
+        .unwrap();
+        let ids = Ids::new(&root);
+        assert_eq!(ids.get("x").and_then(|e| e.attr("", "n")), Some("1"));
+    }
+
+    #[test]
+    fn the_readers_of_a_document_share_one_count_of_references() {
+        // Each text body had a guard of its own, so shapes in groups
+        // that are referenced many times multiplied the references
+        // followed (review of batch 1).
+        let root = crate::xml::parse("<r/>").unwrap();
+        let ids = Ids::new(&root);
+        let (mut a, mut b) = (ids.text_guard(), ids.text_guard());
+        for _ in 0..MAX_REFERENCES {
+            assert!(a.follow());
+        }
+        assert!(!b.follow());
+        assert_eq!(ids.references_refused(), 1);
+        // The objects have a count of their own.
+        assert!(ids.objects_guard().follow());
+        for _ in 0..MAX_READ_DEPTH {
+            assert!(a.enter());
+        }
+        assert!(!b.enter());
+        b.leave();
+        assert!(a.enter());
     }
 }

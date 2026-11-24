@@ -1943,6 +1943,31 @@ paragraph, and objects on a second page.
 - The dashboard learned the status `paused`, so that W2 shows as paused
   beside RV in progress, and RV has a group of its own, Revisão.
 
+### 24 November: batch 1 of the review, the file readers (RV)
+
+- `/code-review` read `desk-iwork`, `desk-odf` and `desk-filters`, the
+  crates that read files Desk did not write, and found twelve problems;
+  the report is [review/batch-1.md](review/batch-1.md). Six could close
+  the app or take all its memory with a crafted or damaged file: a Pages
+  '09 span or group that refers back to itself overflowed the stack;
+  character styles whose parents loop made saving fail; the `desk:table`
+  JSON of a damaged ODT could name more cells than it held; a GIF of a few
+  bytes could ask for gigabytes; repeated rows in many tables or in a
+  chart cloned millions of cells; and control characters from pasted HTML
+  made files LibreOffice could not open. Three more were wrong behaviour:
+  Pages flat files over 256 MB did not open, pictures placed in Pages
+  documents came in at 256 pixels, and chart rows written once for
+  several were read once. Each fix has a test that failed before it.
+- *Why two went to the backlog:* a list header in ODT needs a list item
+  without a label in the model, which is the work of W5 (B-052); the
+  currency of a Pages '09 cell with no code needs the region of the
+  document in the reader of cell formats, which goes with the other
+  formats of B-050 in T5 (B-051).
+- *Consequences:* `desk-odf` and `desk-iwork` now deny unchecked
+  indexing and `unwrap` (D-028). `desk-formula`, with 184 such places, is
+  the subject of batch 2 and gets the lints there. The five fuzz targets
+  ran for an hour each on the fixes.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

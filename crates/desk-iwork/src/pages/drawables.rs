@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 use super::{PagesDocument, Paragraph, read_block};
 use crate::ns::{SF, SFA, SL};
-use crate::sf::{Ids, Properties};
+use crate::sf::{Guard, Ids, Properties};
 use crate::xml::Element;
 
 /// Where a floating object is.
@@ -430,6 +430,8 @@ struct Reader<'a, 'b> {
     table_styles: super::tables::Styles<'a>,
     /// The elements the reader does not read, by name, with how many.
     skipped: Vec<(String, usize)>,
+    /// Stops references that lead back to a group being read.
+    guard: Guard,
 }
 
 impl<'a> Reader<'a, '_> {
@@ -574,7 +576,7 @@ impl<'a> Reader<'a, '_> {
         let outer = std::mem::take(&mut self.document.body);
         // What the text of objects loses is not counted with the body.
         let skipped = self.document.skipped.clone();
-        read_block(self.ids, self.document, body);
+        read_block(self.ids, self.document, body, self.guard.clone());
         let paragraphs = std::mem::replace(&mut self.document.body, outer);
         self.document.skipped = skipped;
         (paragraphs, open)
@@ -643,9 +645,23 @@ impl<'a> Reader<'a, '_> {
         }
     }
 
-    /// Reads an object, or one it refers to.
+    /// Reads an object, or one it refers to. A group can hold a reference
+    /// to itself or to a group around it, so the guard ends the loop that
+    /// would otherwise overflow the stack.
     fn drawable(&mut self, element: &'a Element, place: &Place) -> Option<Drawable> {
-        let element = self.ids.deref(element);
+        if !self.guard.enter() {
+            return None;
+        }
+        let object = self
+            .guard
+            .deref(self.ids, element)
+            .and_then(|e| self.object(e, place));
+        self.guard.leave();
+        object
+    }
+
+    /// Reads an object that is not a reference.
+    fn object(&mut self, element: &'a Element, place: &Place) -> Option<Drawable> {
         let kind = match element.name.local.as_str() {
             "drawable-shape" => {
                 let (text, _) = self.text(element);
@@ -740,6 +756,7 @@ pub(super) fn read(
         graphic_styles,
         table_styles,
         skipped: Vec::new(),
+        guard: ids.objects_guard(),
     };
     let mut drawables = Vec::new();
     let mut chains: Vec<Vec<String>> = Vec::new();

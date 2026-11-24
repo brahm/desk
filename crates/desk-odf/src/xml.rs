@@ -9,8 +9,6 @@
 //! the document type are dropped, and entities are never expanded beyond
 //! the five predefined ones and character references.
 
-use std::fmt::Write as _;
-
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::{NsReader, XmlVersion};
@@ -115,6 +113,27 @@ fn predefined(name: &str) -> Option<char> {
     })
 }
 
+/// Whether XML 1.0 allows a character in a document: not the C0 controls
+/// other than tab, line feed and carriage return, nor U+FFFE and U+FFFF.
+fn allowed(c: char) -> bool {
+    !matches!(
+        c,
+        '\u{0}'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{fffe}' | '\u{ffff}'
+    )
+}
+
+/// Text without the characters XML 1.0 does not allow. The parser lets a
+/// damaged file carry them, and the writer leaves them out, so the reader
+/// leaves them out too: a document then reads the same before and after
+/// it is saved again.
+fn allowed_only(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.chars().all(allowed) {
+        std::borrow::Cow::Borrowed(text)
+    } else {
+        std::borrow::Cow::Owned(text.chars().filter(|&c| allowed(c)).collect())
+    }
+}
+
 /// Parses a stream into its root element.
 pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
     let mut reader = NsReader::from_str(source);
@@ -141,10 +160,8 @@ pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
                         ns: resolved(attr_ns),
                         local: attr_local.as_ref().to_owned(),
                     };
-                    attrs.push((
-                        name,
-                        attr.normalized_value(XmlVersion::Explicit1_0)?.into_owned(),
-                    ));
+                    let value = attr.normalized_value(XmlVersion::Explicit1_0)?;
+                    attrs.push((name, allowed_only(&value).into_owned()));
                 }
                 let element = Element {
                     name: Name { ns, local },
@@ -163,9 +180,9 @@ pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
                     .ok_or_else(|| OdfError::Malformed("unbalanced end tag".into()))?;
                 close(&mut stack, &mut root, element);
             }
-            Event::Text(text) => push_text(&mut stack, &text.xml10_content()),
+            Event::Text(text) => push_text(&mut stack, &allowed_only(&text.xml10_content())),
             Event::CData(data) => {
-                push_text(&mut stack, data.as_ref());
+                push_text(&mut stack, &allowed_only(data.as_ref()));
             }
             Event::GeneralRef(reference) => {
                 let c = if reference.is_char_ref() {
@@ -174,6 +191,9 @@ pub(crate) fn parse(source: &str) -> Result<Element, OdfError> {
                     predefined(&reference.xml10_content())
                 };
                 let c = c.ok_or_else(|| OdfError::Malformed("unknown entity".into()))?;
+                if !allowed(c) {
+                    continue;
+                }
                 push_text(&mut stack, c.encode_utf8(&mut [0; 4]));
             }
             Event::Eof => break,
@@ -210,9 +230,15 @@ fn push_text(stack: &mut [Element], text: &str) {
 /// escaping what must be escaped. A reader turns a carriage return into a
 /// line feed, and tabs and line ends in attribute values into spaces, so
 /// those are written as character references to come back as they were.
+///
+/// The characters that XML 1.0 does not allow at all, the other C0
+/// controls and U+FFFE and U+FFFF, are left out: written as they are, or
+/// as references, they make a file that no reader opens. Pasted text can
+/// carry them.
 pub(crate) fn escape(out: &mut String, text: &str, attribute: bool) {
     for c in text.chars() {
         match c {
+            c if !allowed(c) => {}
             '&' => out.push_str("&amp;"),
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
@@ -252,7 +278,8 @@ impl Writer {
     /// Opens an element.
     pub fn start(&mut self, name: &'static str) -> &mut Self {
         self.close_tag();
-        write!(self.out, "<{name}").unwrap();
+        self.out.push('<');
+        self.out.push_str(name);
         self.open.push(name);
         self.in_tag = true;
         self
@@ -261,7 +288,9 @@ impl Writer {
     /// Adds an attribute to the element just opened.
     pub fn attr(&mut self, name: &str, value: &str) -> &mut Self {
         debug_assert!(self.in_tag);
-        write!(self.out, " {name}=\"").unwrap();
+        self.out.push(' ');
+        self.out.push_str(name);
+        self.out.push_str("=\"");
         escape(&mut self.out, value, true);
         self.out.push('"');
         self
@@ -289,7 +318,9 @@ impl Writer {
             self.out.push_str("/>");
             self.in_tag = false;
         } else {
-            write!(self.out, "</{name}>").unwrap();
+            self.out.push_str("</");
+            self.out.push_str(name);
+            self.out.push('>');
         }
         self
     }
@@ -303,5 +334,34 @@ impl Writer {
         assert!(self.open.is_empty(), "elements left open");
         self.close_tag();
         self.out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn characters_that_xml_does_not_allow_are_left_out() {
+        // A control character pasted into the text made content.xml a
+        // file that no reader opens (review RV, batch 1).
+        let mut out = String::new();
+        escape(&mut out, "a\u{1}b\u{b}c\u{fffe}d\te\r", false);
+        assert_eq!(out, "abcd\te&#13;");
+        let mut w = Writer::new();
+        w.start("text:p");
+        w.text("x\u{0}y");
+        w.end();
+        assert!(parse(&w.finish()).is_ok());
+    }
+
+    #[test]
+    fn characters_that_xml_does_not_allow_are_not_read() {
+        // A damaged file with a control character in a font name read it,
+        // saved it without, and read a different document the second time
+        // (fuzzing, review RV, batch 1).
+        let root = parse("<a n=\"\u{1}x\u{c}\">y\u{1}z&#1;<![CDATA[\u{b}w]]></a>").unwrap();
+        assert_eq!(root.attr("", "n"), Some("x"));
+        assert_eq!(root.text(), "yzw");
     }
 }

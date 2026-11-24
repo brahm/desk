@@ -25,8 +25,7 @@ use super::{
     para_attrs, paragraph_properties, rgba, text_properties,
 };
 
-/// The largest side of a picture of an object, in pixels.
-const MAX_SIDE: u32 = 4096;
+use crate::picture::OBJECT_MAX_SIDE as MAX_SIDE;
 
 /// The graphic properties of a style, with those of its parents under
 /// them.

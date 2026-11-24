@@ -318,8 +318,9 @@ pub(super) fn read(ids: &Ids<'_>, styles: &Styles<'_>, element: &Element) -> Opt
         if row >= rows {
             break;
         }
-        cell_styles[(row * cols + col as u32) as usize] =
-            cell.attr(SF, "s").and_then(|id| ids.get(id));
+        if let Some(style) = cell_styles.get_mut((row * cols + col as u32) as usize) {
+            *style = cell.attr(SF, "s").and_then(|id| ids.get(id));
+        }
         let content = match cell.name.local.as_str() {
             "g" | "s" => CellContent::Empty,
             "t" => CellContent::Text(cell_text(cell)),
@@ -610,7 +611,10 @@ fn read_looks<'a>(
         part("SFTDefaultBodyCellStyleProperty"),
     ];
     for (i, style) in parts.iter().enumerate() {
-        table.part_looks[i] = style.map(|s| index_of(s, table));
+        let look = style.map(|s| index_of(s, table));
+        if let Some(part) = table.part_looks.get_mut(i) {
+            *part = look;
+        }
     }
     let (header_rows, header_cols) = (table.header_rows.min(rows), table.header_cols.min(cols));
     let footer_start = rows - table.footer_rows.min(rows - header_rows);
@@ -628,10 +632,10 @@ fn read_looks<'a>(
     table.cell_looks = Vec::with_capacity(cell_styles.len());
     for r in 0..rows {
         for c in 0..cols {
-            let own = cell_styles[(r * cols + c) as usize];
+            let own = cell_styles.get((r * cols + c) as usize).copied().flatten();
             let look = match own {
                 Some(style) => Some(index_of(style, table)),
-                None => table.part_looks[part_of(r, c)],
+                None => table.part_looks.get(part_of(r, c)).copied().flatten(),
             };
             table.cell_looks.push(look);
         }
@@ -758,8 +762,8 @@ fn read_looks<'a>(
                     } else {
                         (index < along && k < count).then(|| (k * along + index) as usize)
                     };
-                    if let Some(at) = at {
-                        lines[at] = stroke.clone();
+                    if let Some(line) = at.and_then(|at| lines.get_mut(at)) {
+                        *line = stroke.clone();
                     }
                 }
             }

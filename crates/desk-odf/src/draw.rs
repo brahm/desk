@@ -1110,10 +1110,12 @@ fn contour_path(e: &Element) -> Vec<Vec<(i32, i32)>> {
         };
         for (k, v) in values.chunks_exact(step).enumerate() {
             let base = if relative { at } else { (0.0, 0.0) };
+            // A chunk has `step` values, the last two the point it goes to.
+            let value = |i: usize| v.get(i).copied().unwrap_or(0.0);
             at = match command.to_ascii_uppercase() {
-                'H' => (base.0 + v[0], at.1),
-                'V' => (at.0, base.1 + v[0]),
-                _ => (base.0 + v[step - 2], base.1 + v[step - 1]),
+                'H' => (base.0 + value(0), at.1),
+                'V' => (at.0, base.1 + value(0)),
+                _ => (base.0 + value(step - 2), base.1 + value(step - 1)),
             };
             if command.eq_ignore_ascii_case(&'M') && k == 0 {
                 close(&mut part, &mut parts);

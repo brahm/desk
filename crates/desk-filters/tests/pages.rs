@@ -214,6 +214,77 @@ fn doc_22_a_cycle_of_parents_ends() {
 }
 
 #[test]
+fn doc_22_character_styles_in_a_cycle_are_kept_and_saved() {
+    // Character styles whose parents loop were left out of the document
+    // while its runs still named them, and saving as ODT panicked
+    // (review RV, batch 1).
+    let styles = r#"
+<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32"><sf:property-map/></sf:paragraphstyle>
+<sf:characterstyle sf:name="C" sf:ident="c" sf:parent-ident="d"><sf:property-map/></sf:characterstyle>
+<sf:characterstyle sf:name="D" sf:ident="d" sf:parent-ident="c"><sf:property-map/></sf:characterstyle>"#;
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="c">x</sf:span><sf:span sf:style="d">y</sf:span></sf:p>"#;
+    let document = read_pages(index(styles, "", body).as_bytes()).unwrap();
+    for name in ["C", "D"] {
+        assert!(
+            document
+                .styles()
+                .by_name(StyleFamily::Character, name)
+                .is_some()
+        );
+    }
+    assert!(!desk_filters::write_odt(&document).unwrap().is_empty());
+}
+
+#[test]
+fn doc_22_a_style_below_a_cycle_keeps_its_parent() {
+    // When parents looped, every style left was put without a parent,
+    // those below the cycle too, and they lost what they inherit (review
+    // of batch 1).
+    let styles = r#"
+<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32"><sf:property-map/></sf:paragraphstyle>
+<sf:characterstyle sf:name="C" sf:ident="c" sf:parent-ident="d"><sf:property-map/></sf:characterstyle>
+<sf:characterstyle sf:name="D" sf:ident="d" sf:parent-ident="c"><sf:property-map/></sf:characterstyle>
+<sf:characterstyle sf:name="E" sf:ident="e" sf:parent-ident="c"><sf:property-map/></sf:characterstyle>"#;
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="e">x</sf:span></sf:p>"#;
+    let document = read_pages(index(styles, "", body).as_bytes()).unwrap();
+    let styles = document.styles();
+    let id = |name| {
+        styles
+            .by_name(StyleFamily::Character, name)
+            .map(|s| s.id())
+            .unwrap()
+    };
+    let e = styles.by_name(StyleFamily::Character, "E").unwrap();
+    assert_eq!(e.parent(), Some(id("C")));
+    assert!(!desk_filters::write_odt(&document).unwrap().is_empty());
+}
+
+#[test]
+fn doc_22_many_style_cycles_are_cut_in_one_pass() {
+    // One cycle was cut per pass, each pass looking up the parents of
+    // every style left: thousands of cycles took minutes (review of
+    // batch 1).
+    let mut styles = String::from(
+        r#"<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32"><sf:property-map/></sf:paragraphstyle>"#,
+    );
+    for i in 0..3000 {
+        styles.push_str(&format!(
+            r#"<sf:characterstyle sf:name="C{i}" sf:ident="c{i}" sf:parent-ident="d{i}"><sf:property-map/></sf:characterstyle><sf:characterstyle sf:name="D{i}" sf:ident="d{i}" sf:parent-ident="c{i}"><sf:property-map/></sf:characterstyle>"#
+        ));
+    }
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="c7">x</sf:span></sf:p>"#;
+    let start = std::time::Instant::now();
+    let document = read_pages(index(&styles, "", body).as_bytes()).unwrap();
+    assert!(start.elapsed() < std::time::Duration::from_secs(20));
+    assert!(
+        document
+            .styles()
+            .by_name(StyleFamily::Character, "D2999")
+            .is_some()
+    );
+}
+
+#[test]
 fn doc_22_what_the_model_cannot_hold_is_logged() {
     let lists = r#"<sf:liststyle sf:name="Bullet" sf:ident="list-style-1" sfa:ID="L-1"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="text"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>
 <sf:liststyle sf:name="None" sf:ident="list-style-default" sfa:ID="L-0"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="none"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>"#;
@@ -1665,4 +1736,38 @@ fn tab_04_14_21_28_the_tables_of_pages_09_keep_their_styles_formats_and_rules() 
     assert_eq!(rule[0].style.italic, Some(true));
     assert_eq!(rule[0].style.bold, None);
     assert!(rules.cell(1, 1).rules.is_empty());
+}
+
+#[test]
+fn obj_01_obj_02_a_large_tiff_picture_keeps_its_size() {
+    // Pictures placed as objects were scaled down to 256 pixels, the
+    // size of an image bullet (review RV, batch 1).
+    let package = std::env::temp_dir().join(format!("desk-tiff-{}.pages", std::process::id()));
+    let source = fixture("obj-02-image-formats.pages");
+    std::fs::create_dir_all(&package).unwrap();
+    for entry in std::fs::read_dir(&source).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_file() {
+            std::fs::copy(entry.path(), package.join(entry.file_name())).unwrap();
+        }
+    }
+    let mut tiff = std::io::Cursor::new(Vec::new());
+    let pixels = vec![128u8; 600 * 400 * 3];
+    tiff::encoder::TiffEncoder::new(&mut tiff)
+        .unwrap()
+        .write_image::<tiff::encoder::colortype::RGB8>(600, 400, &pixels)
+        .unwrap();
+    std::fs::write(package.join("test-picture.tiff"), tiff.into_inner()).unwrap();
+    let read = desk_filters::read_pages_at(&package);
+    std::fs::remove_dir_all(&package).unwrap();
+    let document = read.unwrap();
+    let sizes: Vec<(u32, u32)> = document
+        .objects()
+        .iter()
+        .filter_map(|o| match &o.kind {
+            desk_model::ObjectKind::Image(p) => Some((p.width(), p.height())),
+            _ => None,
+        })
+        .collect();
+    assert!(sizes.contains(&(600, 400)), "{sizes:?}");
 }

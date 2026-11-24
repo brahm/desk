@@ -3994,3 +3994,66 @@ fn pxv_15_pxv_16_a_table_keeps_its_title_and_its_lock() {
     assert_eq!(table.name, "Vendas");
     assert!(table.options.show_name && table.options.name_centered && table.options.name_outline);
 }
+
+/// An ODT file with one of its streams changed by `edit`.
+fn with_stream(bytes: &[u8], name: &str, edit: impl Fn(String) -> String) -> Vec<u8> {
+    use std::io::{Read, Write};
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut out = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).unwrap();
+        let entry = file.name().unwrap().into_owned();
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        if entry == name {
+            data = edit(String::from_utf8(data).unwrap()).into_bytes();
+        }
+        out.start_file(entry, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        out.write_all(&data).unwrap();
+    }
+    out.finish().unwrap().into_inner()
+}
+
+#[test]
+fn tab_a_table_whose_desk_json_disagrees_with_its_size_is_read_from_odf() {
+    // The JSON of desk:table named a table of 2 × 2 with no cells: it was
+    // taken as it was, and the first cell read panicked (review RV,
+    // batch 1). The table is read from its ODF cells instead.
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Insert Table", |edit| {
+            let mut table = desk_model::Table::new(2, 2);
+            table.cell_mut(0, 0).content = desk_table::Content::Text("Cell".to_owned());
+            let id = edit.new_id();
+            edit.add_object(desk_model::Object::new(
+                id,
+                desk_model::ObjectKind::Table(std::sync::Arc::new(table)),
+                desk_model::Frame::from_pt(72.0, 72.0, 216.0, 60.0),
+            ))
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    let broken = with_stream(&bytes, "content.xml", |xml| {
+        assert!(xml.contains("&quot;cells&quot;:["));
+        xml.replacen(
+            "&quot;cells&quot;:[",
+            "&quot;cells&quot;:[],&quot;old&quot;:[",
+            1,
+        )
+    });
+    let read = read_odt(&broken).unwrap();
+    let table = read
+        .objects()
+        .iter()
+        .find_map(|o| match &o.kind {
+            desk_model::ObjectKind::Table(t) => Some(t.clone()),
+            _ => None,
+        })
+        .unwrap();
+    assert!(table.is_consistent());
+    assert_eq!(
+        table.cell(0, 0).content,
+        desk_table::Content::Text("Cell".to_owned())
+    );
+}

@@ -254,7 +254,7 @@ fn manifest(
         .attr("manifest:media-type", MEDIA_TYPE)
         .end();
     let streams = ["content.xml", "styles.xml", "meta.xml", "settings.xml"];
-    for path in &streams[..if settings { 4 } else { 3 }] {
+    for path in streams.iter().take(if settings { 4 } else { 3 }) {
         w.start("manifest:file-entry")
             .attr("manifest:full-path", path)
             .attr("manifest:media-type", "text/xml")

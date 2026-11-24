@@ -638,8 +638,12 @@ fn is_named(style: &IworkStyle) -> bool {
 
 struct Importer<'a> {
     sheet: &'a Stylesheet,
-    /// The pictures of the package, by path.
+    /// The pictures of the package as image bullets, by path, scaled
+    /// down to the size of a bullet.
     pictures: &'a [(String, desk_model::Picture)],
+    /// The pictures of the package as objects, fills and posters, by
+    /// path, at the size of [`crate::picture::OBJECT_MAX_SIDE`].
+    object_pictures: &'a [(String, desk_model::Picture)],
     document: Document,
     /// The model style of each named style, by identifier.
     ids: HashMap<(Family, String), StyleId>,
@@ -769,12 +773,14 @@ impl<'a> Importer<'a> {
     fn new(
         sheet: &'a Stylesheet,
         pictures: &'a [(String, desk_model::Picture)],
+        object_pictures: &'a [(String, desk_model::Picture)],
     ) -> Result<Self, FilterError> {
         let document = Document::new_word_processing();
         let body = document.styles().default_paragraph();
         let mut importer = Self {
             sheet,
             pictures,
+            object_pictures,
             document,
             ids: HashMap::new(),
             lists: HashMap::new(),
@@ -856,86 +862,141 @@ impl<'a> Importer<'a> {
         }
 
         // Parents first, so that every parent exists when a child is put.
-        let mut put: HashSet<StyleId> = HashSet::new();
-        while put.len() < order.len() {
-            let before = put.len();
-            for (style, id, name) in &order {
-                if put.contains(id) {
-                    continue;
-                }
-                let chain = sheet.ancestry(style);
+        // The parent of each style is found once. A style whose parents
+        // lead back to it, or to a style that is not there, is cut there:
+        // put without its parent, under Body or alone as a character
+        // style, and the styles below keep their parents. Each style is
+        // put, since the runs already point to it.
+        let index: HashMap<StyleId, usize> = order
+            .iter()
+            .enumerate()
+            .map(|(i, (_, id, _))| (*id, i))
+            .collect();
+        let chains: Vec<_> = order
+            .iter()
+            .map(|(style, _, _)| sheet.ancestry(style))
+            .collect();
+        let parents: Vec<Option<StyleId>> = order
+            .iter()
+            .zip(&chains)
+            .map(|((_, id, _), chain)| {
                 let parent = chain
                     .get(1)
                     .and_then(|p| self.ids.get(&(p.family, p.ident.clone()?)).copied());
-                let parent = match parent {
-                    Some(parent) if parent != *id => Some(parent),
-                    _ => None,
+                parent.filter(|parent| parent != id)
+            })
+            .collect();
+        // 0: not seen; 1: on the way up from a style; 2: placed.
+        let mut state = vec![0u8; order.len()];
+        let mut cut = vec![false; order.len()];
+        let mut sequence = Vec::with_capacity(order.len());
+        for start in 0..order.len() {
+            let mut path = Vec::new();
+            let mut at = start;
+            while state.get(at).copied() == Some(0) {
+                if let Some(s) = state.get_mut(at) {
+                    *s = 1;
+                }
+                path.push(at);
+                let Some(parent) = parents.get(at).copied().flatten() else {
+                    break;
                 };
-                if parent.is_some_and(|p| !put.contains(&p) && p != self.body) {
-                    continue;
+                match index.get(&parent) {
+                    Some(&p) if state.get(p).copied() == Some(1) => {
+                        // A cycle: this style is cut from its parent.
+                        if let Some(c) = cut.get_mut(at) {
+                            *c = true;
+                        }
+                    }
+                    Some(&p) => at = p,
+                    // Body, put before; any other style that is not there
+                    // cuts the style from it.
+                    None if parent == self.body => {}
+                    None => {
+                        if let Some(c) = cut.get_mut(at) {
+                            *c = true;
+                        }
+                    }
                 }
-                let (mut paragraph, mut character) = merged(&[style], 1);
-                if parent.is_none() && style.family == Family::Paragraph {
-                    // Every property set, from the defaults of Pages.
-                    let mut full: ParaAttrs = pages_paragraph_defaults().into();
-                    full.merge(&paragraph);
-                    paragraph = full;
-                    let mut full: CharAttrs = CharFormat::default().into();
-                    full.merge(&character);
-                    character = full;
+            }
+            for &i in path.iter().rev() {
+                if let Some(s) = state.get_mut(i) {
+                    *s = 2;
                 }
-                paragraph.first_line_indent =
-                    first_line_indent(&chain, 1).or(paragraph.first_line_indent);
-                paragraph.border = para_border(&chain, 1).or(paragraph.border);
+                sequence.push(i);
+            }
+        }
+        for i in sequence {
+            let (Some((style, id, name)), Some(chain)) = (order.get(i), chains.get(i)) else {
+                continue;
+            };
+            let parent = parents.get(i).copied().flatten();
+            if cut.get(i).copied().unwrap_or(false) {
+                let (paragraph, character) = merged(&[style], 1);
                 match style.family {
                     Family::Paragraph => {
-                        let parent = if *id == self.body {
-                            None
-                        } else {
-                            parent.or(Some(self.body))
-                        };
                         self.document.put_style(ParagraphStyle {
                             id: *id,
                             name: name.as_str().into(),
                             shortcut: None,
-                            parent,
+                            parent: (*id != self.body).then_some(self.body),
                             next: None,
                             paragraph,
                             character,
                         })?;
                     }
-                    Family::Layout | Family::Section => {}
                     Family::Character => {
                         self.document.put_style(CharacterStyle {
                             id: *id,
                             name: name.as_str().into(),
                             shortcut: None,
-                            parent: parent
-                                .filter(|_| style.parent.as_deref() != Some(NULL_CHARACTER)),
-                            character: merged(&[style], 1).1,
+                            parent: None,
+                            character,
                         })?;
                     }
+                    Family::Layout | Family::Section => {}
                 }
-                put.insert(*id);
+                continue;
             }
-            if put.len() == before {
-                // A parent that cannot be put, as in a cycle: the rest go
-                // under Body.
-                for (style, id, name) in &order {
-                    if put.insert(*id) {
-                        let (paragraph, character) = merged(&[style], 1);
-                        if style.family == Family::Paragraph {
-                            self.document.put_style(ParagraphStyle {
-                                id: *id,
-                                name: name.as_str().into(),
-                                shortcut: None,
-                                parent: (*id != self.body).then_some(self.body),
-                                next: None,
-                                paragraph,
-                                character,
-                            })?;
-                        }
-                    }
+            let (mut paragraph, mut character) = merged(&[style], 1);
+            if parent.is_none() && style.family == Family::Paragraph {
+                // Every property set, from the defaults of Pages.
+                let mut full: ParaAttrs = pages_paragraph_defaults().into();
+                full.merge(&paragraph);
+                paragraph = full;
+                let mut full: CharAttrs = CharFormat::default().into();
+                full.merge(&character);
+                character = full;
+            }
+            paragraph.first_line_indent =
+                first_line_indent(chain, 1).or(paragraph.first_line_indent);
+            paragraph.border = para_border(chain, 1).or(paragraph.border);
+            match style.family {
+                Family::Paragraph => {
+                    let parent = if *id == self.body {
+                        None
+                    } else {
+                        parent.or(Some(self.body))
+                    };
+                    self.document.put_style(ParagraphStyle {
+                        id: *id,
+                        name: name.as_str().into(),
+                        shortcut: None,
+                        parent,
+                        next: None,
+                        paragraph,
+                        character,
+                    })?;
+                }
+                Family::Layout | Family::Section => {}
+                Family::Character => {
+                    self.document.put_style(CharacterStyle {
+                        id: *id,
+                        name: name.as_str().into(),
+                        shortcut: None,
+                        parent: parent.filter(|_| style.parent.as_deref() != Some(NULL_CHARACTER)),
+                        character: merged(&[style], 1).1,
+                    })?;
                 }
             }
         }
@@ -1497,6 +1558,26 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .iter()
         .filter_map(|(path, bytes)| Some((path.clone(), crate::picture::picture(bytes)?)))
         .collect();
+    // Pictures placed as objects keep their detail, up to the size the
+    // ODT import allows; they were scaled down to the size of a bullet.
+    let by_path: HashMap<&str, &desk_model::Picture> = pictures
+        .iter()
+        .map(|(p, picture)| (p.as_str(), picture))
+        .collect();
+    let object_pictures: Vec<(String, desk_model::Picture)> = source
+        .files
+        .iter()
+        .filter_map(|(path, bytes)| {
+            // Only a converted picture comes out otherwise than for a
+            // bullet; the others are not read twice.
+            let picture = if crate::picture::scaled_when_read(bytes) {
+                crate::picture::picture_within(bytes, crate::picture::OBJECT_MAX_SIDE)?
+            } else {
+                (*by_path.get(path.as_str())?).clone()
+            };
+            Some((path.clone(), picture))
+        })
+        .collect();
     let images_kept = source
         .file_paths()
         .iter()
@@ -1511,7 +1592,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         }
     }
 
-    let mut importer = Importer::new(&source.stylesheet, &pictures)?;
+    let mut importer = Importer::new(&source.stylesheet, &pictures, &object_pictures)?;
     importer.notes = source
         .notes
         .iter()

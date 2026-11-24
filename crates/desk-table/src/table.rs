@@ -329,6 +329,30 @@ impl<T: CellText> Table<T> {
         table
     }
 
+    /// Whether the parts of the table agree with its size: as many cells
+    /// and lines as rows and columns call for, headers and footers that
+    /// fit, and merges inside it. A table made by these methods always
+    /// does; one read from a file may not, and indexing it would panic.
+    pub fn is_consistent(&self) -> bool {
+        let (rows, cols) = (self.heights.len() as u64, self.widths.len() as u64);
+        let fits = |n: u64| (1..=u64::from(MAX_CELLS)).contains(&n);
+        fits(rows)
+            && fits(cols)
+            && self.cells.len() as u64 == rows * cols
+            && self.h_borders.len() as u64 == (rows + 1) * cols
+            && self.v_borders.len() as u64 == rows * (cols + 1)
+            && self.header_rows <= MAX_HEADERS
+            && self.header_cols <= MAX_HEADERS
+            && u64::from(self.header_rows) + u64::from(self.footer_rows) <= rows
+            && u64::from(self.header_cols) <= cols
+            && self.merges.iter().all(|m| {
+                m.rows > 0
+                    && m.cols > 0
+                    && u64::from(m.row) + u64::from(m.rows) <= rows
+                    && u64::from(m.col) + u64::from(m.cols) <= cols
+            })
+    }
+
     /// How many rows.
     pub fn rows(&self) -> u32 {
         self.heights.len() as u32
@@ -988,6 +1012,26 @@ mod tests {
 
     fn t(rows: u32, cols: u32) -> Table<String> {
         Table::new(rows, cols)
+    }
+
+    #[test]
+    fn tables_made_here_are_consistent_and_broken_ones_are_not() {
+        let mut table = t(3, 2);
+        assert!(table.is_consistent());
+        table.merge(Area::between((1, 1), (2, 1))).unwrap();
+        assert!(table.is_consistent());
+        let mut short = t(3, 2);
+        short.cells.pop();
+        assert!(!short.is_consistent());
+        let mut lines = t(3, 2);
+        lines.v_borders.pop();
+        assert!(!lines.is_consistent());
+        let mut outside = t(3, 2);
+        outside.merges.push(Area::between((2, 1), (3, 1)));
+        assert!(!outside.is_consistent());
+        let mut headers = t(3, 2);
+        headers.footer_rows = 3;
+        assert!(!headers.is_consistent());
     }
 
     #[test]

@@ -36,7 +36,13 @@
 //! ```
 
 #![forbid(unsafe_code)]
+// A file read is never trusted, so the library neither indexes without a
+// check nor unwraps: either would close the app on a malformed file
+// (D-028). Tests may, where a panic is the failure they report.
+#![deny(clippy::indexing_slicing, clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]
 
+mod budget;
 mod chart;
 mod draw;
 mod error;
@@ -49,6 +55,7 @@ mod units;
 mod write;
 mod xml;
 
+pub use budget::{MAX_CHART_CELLS, MAX_CHART_VALUES, MAX_DOCUMENT_BYTES, MAX_DOCUMENT_CELLS};
 pub use chart::{CHART_TYPE, ChartDocument, ChartSeries};
 pub use draw::{
     DrawKind, DrawObject, FillImage, Gradient, GradientStop, GraphicProperties, Marker,

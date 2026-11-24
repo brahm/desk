@@ -19,6 +19,11 @@
 //! checks this rule.
 
 #![forbid(unsafe_code)]
+// A file read is never trusted, so the library neither indexes without a
+// check nor unwraps: either would close the app on a malformed file
+// (D-028). Tests may, where a panic is the failure they report.
+#![deny(clippy::indexing_slicing, clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]
 
 mod error;
 pub mod ns;
@@ -36,9 +41,20 @@ pub use pages::{Outliner, PagesDocument, parse_pages};
 /// Reads a Pages document from the bytes of a flat file or of its index,
 /// with the files of the package that it uses.
 pub fn read_pages(bytes: &[u8]) -> Result<PagesDocument, IworkError> {
-    let mut document = parse_pages(&read_index(bytes)?)?;
+    if !bytes.starts_with(b"PK\x03\x04") {
+        return parse_pages(&read_index(bytes)?);
+    }
+    read_zip(&mut zip::ZipArchive::new(std::io::Cursor::new(bytes))?)
+}
+
+/// Reads a Pages document from a flat file, opening the zip once for the
+/// index and every file.
+fn read_zip<R: std::io::Read + std::io::Seek>(
+    archive: &mut zip::ZipArchive<R>,
+) -> Result<PagesDocument, IworkError> {
+    let mut document = parse_pages(&package::zip_index(archive)?)?;
     for name in document.file_paths() {
-        if let Some(file) = package::read_file(bytes, &name) {
+        if let Some(file) = package::zip_file(archive, &name) {
             document.files.push((name, file));
         }
     }
@@ -49,7 +65,10 @@ pub fn read_pages(bytes: &[u8]) -> Result<PagesDocument, IworkError> {
 /// the files of the package that it uses.
 pub fn read_pages_at(path: &Path) -> Result<PagesDocument, IworkError> {
     if !path.is_dir() {
-        return read_pages(&package::limited(std::fs::File::open(path)?)?);
+        return match package::open_zip(path)? {
+            Some(mut archive) => read_zip(&mut archive),
+            None => parse_pages(&read_index_at(path)?),
+        };
     }
     let mut document = parse_pages(&read_index_at(path)?)?;
     for name in document.file_paths() {

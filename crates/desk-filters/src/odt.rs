@@ -3433,7 +3433,6 @@ fn drop_cap_style(line: &str) -> Option<DropCapStyle> {
     Some(style)
 }
 
-/// The line of a style of drop caps in the settings.
 /// A chart style of the `ChartStyles` item of the settings (W080): the
 /// fills and the text as JSON, as `desk:chart` keeps them.
 fn chart_style(line: &str) -> Option<ChartStyle> {

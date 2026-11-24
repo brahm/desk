@@ -380,3 +380,103 @@ fn every_table_of_the_fixtures_reads_every_cell() {
         }
     }
 }
+
+/// The index of a document of `corpus/fixtures/pages`, as text.
+fn fixture_index(name: &str) -> String {
+    use std::io::Read;
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/fixtures/pages")
+        .join(name)
+        .join("index.xml.gz");
+    let mut xml = String::new();
+    flate2::read::GzDecoder::new(std::fs::File::open(path).unwrap())
+        .read_to_string(&mut xml)
+        .unwrap();
+    xml
+}
+
+/// An index whose body is `body`, inside a section and a layout.
+fn minimal_index(body: &str) -> String {
+    format!(
+        r#"<?xml version="1.0"?>
+<sl:document xmlns:sf="http://developer.apple.com/namespaces/sf" xmlns:sfa="http://developer.apple.com/namespaces/sfa" xmlns:sl="http://developer.apple.com/namespaces/sl">
+<sl:stylesheet sfa:ID="S-1"><sf:styles/><sf:anon-styles/></sl:stylesheet>
+<sf:text-storage sf:kind="body"><sf:stylesheet-ref sfa:IDREF="S-1"/><sf:text-body><sf:section sf:name="Text Page"><sf:layout>{body}</sf:layout></sf:section></sf:text-body></sf:text-storage>
+</sl:document>"#
+    )
+}
+
+#[test]
+fn references_that_lead_back_to_themselves_end() {
+    // A span that refers to itself, and a group that holds a reference
+    // to itself: without a guard each looped until the stack overflowed
+    // (review RV, batch 1).
+    let xml = minimal_index(
+        r#"<sf:p><sf:span sfa:ID="loop">a<sf:span-ref sfa:IDREF="loop"/></sf:span><sf:br/></sf:p>"#,
+    );
+    let document = desk_iwork::pages::parse_pages(&xml).unwrap();
+    let text: String = texts(&document).concat();
+    assert!(text.starts_with('a'), "{text:?}");
+    let xml = fixture_index("obj-30-group.pages");
+    let group = r#"<sf:group sl:order="0" sfa:ID="SLGroupInfo-0">"#;
+    assert!(xml.contains(group));
+    let xml = xml.replacen(
+        group,
+        &format!(r#"{group}<sf:group sfa:IDREF="SLGroupInfo-0"/>"#),
+        1,
+    );
+    let document = desk_iwork::pages::parse_pages(&xml).unwrap();
+    assert!(!document.drawables.is_empty());
+}
+
+#[test]
+fn references_that_branch_at_every_level_end() {
+    // Each span refers twice to the next, 40 levels deep: read in full
+    // at every use, that is 2^40 spans. The reader stops after the
+    // references it allows, and says so in the log.
+    let mut spans = String::new();
+    for level in 0..40 {
+        let next = level + 1;
+        spans.push_str(&format!(
+            r#"<sf:span sfa:ID="s{level}">x<sf:span-ref sfa:IDREF="s{next}"/><sf:span-ref sfa:IDREF="s{next}"/></sf:span>"#
+        ));
+    }
+    let xml = minimal_index(&format!("<sf:p>{spans}<sf:br/></sf:p>"));
+    let document = desk_iwork::pages::parse_pages(&xml).unwrap();
+    assert!(texts(&document).concat().starts_with('x'));
+    assert!(
+        document
+            .skipped
+            .iter()
+            .any(|(name, n)| name == "reference" && *n > 0),
+        "{:?}",
+        document.skipped
+    );
+}
+
+#[test]
+fn a_flat_file_larger_than_the_largest_index_opens() {
+    // A flat file with a movie can be larger than the largest index read
+    // (256 MB). It used to be read whole under that limit, and refused
+    // as an index too large (review RV, batch 1).
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
+    let path = std::env::temp_dir().join(format!("desk-large-{}.pages", std::process::id()));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let stored = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored)
+        .large_file(true);
+    zip.start_file("Contents/movie.mov", stored).unwrap();
+    std::io::copy(
+        &mut std::io::Read::take(std::io::repeat(0), desk_iwork::MAX_INDEX + (1 << 20)),
+        &mut zip,
+    )
+    .unwrap();
+    zip.start_file("index.xml", stored).unwrap();
+    zip.write_all(fixture_index("obj-30-group.pages").as_bytes())
+        .unwrap();
+    zip.finish().unwrap();
+    let read = read_pages_at(&path);
+    std::fs::remove_file(&path).unwrap();
+    assert!(!read.unwrap().body.is_empty());
+}
