@@ -81,12 +81,12 @@ impl Painter {
 
     /// The picture decoded, or `None` when Cairo cannot read it.
     fn picture(&mut self, picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
-        if let Some((_, surface)) = self
+        if let Some(at) = self
             .pictures
             .iter()
-            .find(|(p, _)| p.same_data(picture) || p == picture)
+            .position(|(p, _)| p.same_data(picture) || p == picture)
         {
-            return Some(surface.clone());
+            return Some(used(&mut self.pictures, at));
         }
         let surface = picture_surface(picture)?;
         // A bound on the memory of long sessions: on the pictures, and on
@@ -169,8 +169,8 @@ impl Painter {
             kept: kept.cloned(),
             adjust,
         };
-        if let Some((_, surface)) = self.adjusted.iter().find(|(k, _)| *k == key) {
-            return Some(surface.clone());
+        if let Some(at) = self.adjusted.iter().position(|(k, _)| *k == key) {
+            return Some(used(&mut self.adjusted, at));
         }
         let source = self.picture(picture)?;
         let surface = adjusted_surface(&source, alpha, kept, adjust).ok()?;
@@ -1125,10 +1125,10 @@ fn decodable(picture: &desk_model::Picture) -> bool {
 /// keep between paints.
 const MAX_CACHED_BYTES: usize = 512 << 20;
 
-/// Leaves out the oldest surfaces kept, until there are at most `count`
-/// and room for `adding` more bytes within [`MAX_CACHED_BYTES`]: the
-/// pictures of the page painted stay, and are not decoded again at each
-/// paint.
+/// Leaves out the surfaces kept that were used least lately, until there
+/// are at most `count` and room for `adding` more bytes within
+/// [`MAX_CACHED_BYTES`]: the pictures of the page painted stay, and are not
+/// decoded again at each paint.
 fn evict<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, count: usize, adding: usize) {
     let mut held: usize = kept.iter().map(|(_, s)| surface_bytes(s)).sum();
     let mut drop = 0;
@@ -1137,6 +1137,15 @@ fn evict<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, count: usize, adding: usiz
         drop += 1;
     }
     kept.drain(..drop);
+}
+
+/// The surface kept at `at`, moved last as the newest used, so that the
+/// pictures painted again are the last to be left out.
+fn used<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, at: usize) -> cairo::ImageSurface {
+    let entry = kept.remove(at);
+    let surface = entry.1.clone();
+    kept.push(entry);
+    surface
 }
 
 /// The bytes of the pixels of a surface.
@@ -1231,9 +1240,15 @@ fn jpeg_surface(data: std::sync::Arc<[u8]>) -> Option<cairo::ImageSurface> {
         .set_max_width(MAX_SURFACE_SIDE as usize)
         .set_max_height(MAX_SURFACE_SIDE as usize);
     let mut decoder = JpegDecoder::new_with_options(ZCursor::new(&data[..]), options);
-    let pixels = decoder.decode().ok()?;
+    // The size the decoder reads, which may not be the one the model read
+    // for the picture: bounded before the pixels are allocated.
+    decoder.decode_headers().ok()?;
     let info = decoder.info()?;
     let (width, height) = (usize::from(info.width), usize::from(info.height));
+    if (width as u64) * (height as u64) > MAX_DECODED_PIXELS {
+        return None;
+    }
+    let pixels = decoder.decode().ok()?;
     if width == 0 || height == 0 || pixels.len() < width * height * 3 {
         return None;
     }
@@ -1282,6 +1297,49 @@ mod picture_tests {
             }
         }
         !crc
+    }
+
+    /// A JPEG of 8 by 8 pixels, made for the test.
+    const SMALL_JPEG: &str = concat!(
+        "ffd8ffe000104a46494600010100000100010000ffdb004300100b0c0e0c0a10",
+        "0e0d0e1211101318281a181616183123251d283a333d3c3933383740485c4e40",
+        "4457453738506d51575f626768673e4d71797064785c656763ffdb0043011112",
+        "121815182f1a1a2f634238426363636363636363636363636363636363636363",
+        "636363636363636363636363636363636363636363636363636363636363ffc0",
+        "0011080008000803012200021101031101ffc400150001010000000000000000",
+        "0000000000000002ffc40014100100000000000000000000000000000000ffc4",
+        "0014010100000000000000000000000000000005ffc400141101000000000000",
+        "00000000000000000000ffda000c03010002110311003f009005997fffd9",
+    );
+
+    #[test]
+    fn the_pictures_used_least_lately_are_left_out_first() {
+        // Second review of RV batch 4: a picture painted again was left out
+        // as the oldest, and decoded again at the next paint.
+        let surface = || cairo::ImageSurface::create(cairo::Format::ARgb32, 1, 1).unwrap();
+        let mut kept: Vec<(u8, cairo::ImageSurface)> = (0..3).map(|k| (k, surface())).collect();
+        used(&mut kept, 0);
+        evict(&mut kept, 2, 4);
+        let keys: Vec<u8> = kept.iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, [2, 0]);
+    }
+
+    #[test]
+    fn a_jpeg_is_bounded_by_the_size_its_decoder_reads() {
+        // Second review of RV batch 4: the size checked was the one the
+        // model read for the picture, and the decoder took up to 32767 a
+        // side from the frame it reads.
+        let mut bytes: Vec<u8> = (0..SMALL_JPEG.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&SMALL_JPEG[i..i + 2], 16).unwrap())
+            .collect();
+        assert!(jpeg_surface(bytes.clone().into()).is_some());
+        let frame = bytes.windows(2).position(|w| w == [0xFF, 0xC0]).unwrap();
+        // 30000 by 30000.
+        bytes.splice(frame + 5..frame + 9, [0x75, 0x30, 0x75, 0x30]);
+        let started = std::time::Instant::now();
+        assert!(jpeg_surface(bytes.into()).is_none());
+        assert!(started.elapsed().as_secs() < 2);
     }
 
     #[test]

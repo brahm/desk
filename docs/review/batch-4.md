@@ -32,6 +32,11 @@ to Cairo and Poppler, sizes and counts that a file sets.
 | 20 | B | `desk-render/src/backend.rs` | From the review. Fix 11 refused a picture 1200 by 16,000, which is tall but small, and let JPEG through at 32,767 a side | Pictures are refused by their pixels, at most 8192 squared, and by a side over 32,767, PNG and JPEG alike; test |
 | 21 | A | `desk-chart/src/draw.rs` | From the review. When the range of an axis was not finite, fix 10 fell back to 0 to 1, so every bar went off the chart, and a fraction of `f64::MAX` reached Cairo | The fallback is built around the values, and a fraction is at most a thousand charts long; test |
 | 22 | A | `desk-layout/src/objects.rs` | *Security*, from the review. Fix 14 counted bands for each part of a contour; a contour of thousands of parts or points was still costly for each paragraph, out of its way or not | A contour of more than 256 parts has no profile and wraps around its box; points are at most 2048; the 20,000 bands are shared by all parts; a profile is worked out only for an object in the way; tests |
+| 23 | A | `desk-layout/src/objects.rs` | *Security*, from the second review. Fix 22 thinned every part by one stride, so a small part beside a large one could vanish and a zigzag lose its teeth; the parts after the budget of bands was spent got none; text ran over them | Each part keeps its share of the points, those that reach furthest of each run, and its share of the bands; a part thinned to nothing sends the text around the box; test |
+| 24 | A | `desk-render/src/backend.rs` | *Security*, from the second review. The pixels of a JPEG were bounded by the size the model read, which may not be the frame the decoder reads | The decoder's own size is bounded before the pixels are decoded; test |
+| 25 | B | `desk-text/src/layout.rs` | From the second review. With fix 18, a line that spent the budget getting past a tall object could not go lower for a word too wide for the piece below it, and broke it there | A budget for each search, both reset when a line is placed; test |
+| 26 | B | `desk-chart/src/draw.rs` | From the second review. The range of fix 21 was as wide as the middle of the values, not as they spread, and its ends could overflow | As wide as the values spread, in halves; test |
+| 27 | C | `desk-render/src/backend.rs` | From the second review. A picture painted again was left out as the oldest | The pictures used least lately go first; test |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
@@ -44,8 +49,8 @@ Three findings of performance moved to the backlog:
 ## Security (D-029)
 
 The security review read the four crates for what a document can make them
-do. Findings 9 to 16 came from it, and 17, 18 and 22 from the security review
-of the pull request.
+do. Findings 9 to 16 came from it, and 17, 18, 22, 23 and 24 from the security
+review of the pull request.
 
 These paths were checked and found safe:
 - PNG and JPEG are decoded only up to 8192 by 8192 pixels, and PDF

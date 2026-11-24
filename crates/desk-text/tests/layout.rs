@@ -1718,3 +1718,45 @@ fn a_line_of_thousands_of_words_is_measured_once_for_each() {
     assert!(layout.lines.len() > 1);
     assert!(started.elapsed().as_secs() < 20, "{:?}", started.elapsed());
 }
+
+/// An object over the whole column down to 9990 points, then a piece 20
+/// points wide to 10,200, then the whole column.
+struct TallThenNarrow;
+
+impl LineSpace for TallThenNarrow {
+    fn width(&self) -> f32 {
+        200.0
+    }
+
+    fn segments(&self, top: f32, height: f32) -> Vec<(f32, f32)> {
+        if top < 9990.0 {
+            vec![]
+        } else if top + height <= 10_200.0 {
+            vec![(0.0, 20.0)]
+        } else {
+            vec![(0.0, 200.0)]
+        }
+    }
+
+    fn min_piece(&self) -> f32 {
+        0.5
+    }
+}
+
+#[test]
+fn a_line_past_a_tall_object_still_goes_lower_for_its_word() {
+    // Second review of RV batch 4: one budget for both searches, spent
+    // getting past a tall object, left none for a word too wide for the
+    // piece below it, which was broken there instead.
+    let mut system = TextSystem::new();
+    let layout = lay_in(
+        &mut system,
+        ParaFormat::default(),
+        &[("extraordinary", sans())],
+        &TallThenNarrow,
+    );
+    assert_eq!(layout.lines.len(), 1, "{:?}", layout.lines.len());
+    let first = &layout.lines[0];
+    assert!(first.top > 10_150.0, "{}", first.top);
+    assert!(first.width > 100.0, "{}", first.width);
+}

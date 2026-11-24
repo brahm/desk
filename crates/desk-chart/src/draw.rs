@@ -270,23 +270,38 @@ fn value_range(axis: &ValueAxis, lo: f64, hi: f64, zero: bool) -> Range {
     if finite && range.min < range.max && range.step > 0.0 {
         return range;
     }
-    // Around the values, so that they still fall on the axis: as when
-    // they and the minimum are all 1e16, which adding 1 does not change.
-    let mid = if lo.is_finite() && hi.is_finite() {
-        lo / 2.0 + hi / 2.0
+    fallback_range(range.log, lo, hi)
+}
+
+/// A range around the values and as wide as they spread, so that they
+/// still fall on the axis: as when they and the minimum are all 1e16,
+/// which adding 1 does not change. The limits of the file are left out.
+fn fallback_range(log: bool, lo: f64, hi: f64) -> Range {
+    let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
+        (lo, hi)
     } else {
-        0.0
+        (0.0, 0.0)
     };
-    if range.log {
-        let min = 10f64.powf(mid.clamp(1e-12, 1e300).log10().floor());
+    if log {
+        // Decades from the smallest value a log axis shows to a decade
+        // below the largest double.
+        let lo = lo.clamp(1e-12, 1e300);
+        let min = 10f64.powf(lo.log10().floor());
+        let max = 10f64.powf(hi.clamp(lo, 1e306).log10().ceil());
         Range {
             min,
-            max: min * 10.0,
+            max: if max <= min { min * 10.0 } else { max },
             step: 10.0,
             log: true,
         }
     } else {
-        let half = mid.abs().max(1.0) / 2.0;
+        // Halves, so that neither the spread nor the ends overflow.
+        let limit = f64::MAX / 4.0;
+        let mid = (lo / 2.0 + hi / 2.0).clamp(-limit, limit);
+        let half = (hi / 2.0 - lo / 2.0)
+            .max(mid.abs() / 2.0)
+            .max(0.5)
+            .min(limit);
         Range {
             min: mid - half,
             max: mid + half,
@@ -2008,6 +2023,29 @@ mod tests {
         );
         assert!((0.0..=1.0).contains(&r.fraction(1e16)));
         assert_eq!(r.fraction(f64::MAX), 1000.0);
+        // Second review: the range fallen back on was as wide as the middle
+        // of the values, not as they spread, and its ends could overflow.
+        for (log, lo, hi) in [
+            (false, 1e16, 1e18),
+            (false, -1e18, 1e16),
+            (false, -f64::MAX, f64::MAX),
+            (false, f64::MAX, f64::MAX),
+            (false, 5.0, 5.0),
+            (true, 1e16, 1e18),
+            (true, 1e-5, 1e300),
+            (true, 3.0, 3.0),
+        ] {
+            let r = fallback_range(log, lo, hi);
+            assert!(
+                r.min.is_finite() && r.max.is_finite() && r.min < r.max && r.step > 0.0,
+                "{lo} {hi}: {} {}",
+                r.min,
+                r.max
+            );
+            if hi.abs() < 1e300 && lo.abs() < 1e300 {
+                assert!(r.min <= lo && hi <= r.max, "{lo} {hi}: {} {}", r.min, r.max);
+            }
+        }
     }
 
     #[test]

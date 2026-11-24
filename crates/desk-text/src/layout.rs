@@ -990,9 +990,11 @@ impl TextSystem {
         let mut guess = text.formats()[0].font_size.to_pt() as f32 * 1.2;
         let mut first_line = true;
         // The steps of a point down that the next line took looking for
-        // room, or for room wide enough for its next word: one budget, as
-        // the two may take turns.
-        let mut searched: u32 = 0;
+        // room, and those it took looking for room wide enough for its
+        // next word: a budget each, so that a line that went a long way
+        // down past an object may still go lower to where its word fits,
+        // and the two together stay bounded however they take turns.
+        let (mut searched, mut widened): (u32, u32) = (0, 0);
         // Whether the band was measured again with a shorter line.
         let mut shortened = false;
         'band: loop {
@@ -1066,13 +1068,13 @@ impl TextSystem {
                 if end.is_none()
                     && next_break < breaks.len()
                     && width + 0.001 < measure
-                    && searched < MAX_SEARCH
+                    && widened < MAX_SEARCH
                     && !space.uniform_below().is_some_and(|u| y >= u)
                 {
                     if placed.len() > saved_placed {
                         break;
                     }
-                    searched += 1;
+                    widened += 1;
                     y += 1.0;
                     continue 'band;
                 }
@@ -1271,7 +1273,7 @@ impl TextSystem {
                 pos = line_end;
                 next_break = chosen;
                 first_line = false;
-                searched = 0;
+                (searched, widened) = (0, 0);
                 if pos >= source.len() {
                     break 'band;
                 }
