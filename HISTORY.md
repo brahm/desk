@@ -8,6 +8,12 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: Desk no longer closes or hangs on movies and sounds made to
+  break Reduce Media, nor on documents of thousands of linked text boxes,
+  paragraphs or objects (review RV, batch 3).
+* Fixed: typing after an Undo is a new step of Undo, and conditional
+  formatting rules copied into new rows and columns compare with the
+  right cells.
 * Fixed: Desk no longer closes, or hangs, on formulas nested thousands
   of levels deep, long running balances, formulas over large ranges or
   texts that double from cell to cell, number formats of many zeros, or a

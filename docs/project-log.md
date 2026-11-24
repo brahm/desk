@@ -2013,6 +2013,23 @@ paragraph, and objects on a second page.
   cannot be made to collide; and moving cells past the body grows the
   table first.
 
+### 24 November: batch 3 of the review, the document model (RV)
+
+- `/code-review`, `/security-review` and new property tests read
+  `desk-model`, and found 12 problems; the report is
+  [review/batch-3.md](review/batch-3.md). Six were security findings,
+  all about a file holding the app or filling its memory: Reduce Media
+  on AIFF and MP4 files made to panic or to count billions of samples,
+  and documents of thousands of linked text boxes, of a span for each
+  letter, or of many paragraphs and objects, which took the square or
+  the cube of their size. The rest: typing after an Undo joined the
+  typing before, the undo history kept every action, rules copied into
+  new rows and columns pointed at the wrong cells (B-053), the width of
+  a table overflowed, and the outline of a speckled picture was slow.
+- *Consequences:* the modules of `desk-model` that read bytes deny
+  unchecked indexing (D-028). The history keeps 1000 actions; keeping
+  only the cells changed by an edit of a table is B-054, for phase T1.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
