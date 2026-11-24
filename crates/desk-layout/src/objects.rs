@@ -231,18 +231,22 @@ impl PlacedObject {
             .collect();
         // An outline of a file, or traced from the specks of a picture, may
         // have hundreds of thousands of points and parts. Past a number of
-        // parts the text goes around the box; each part keeps its share of
-        // the points and of the bands, so that none is left out.
+        // parts the text goes around the box. Each part keeps a few points
+        // and a share of the rest by its own points, and an even share of
+        // the bands, so that none is left out.
         if parts.len() > MAX_PROFILE_PARTS {
             return None;
         }
         let share = parts.len().max(1);
-        let points = MAX_PROFILE_POINTS / share;
+        let total: usize = parts.iter().map(|c| c.len()).sum();
+        let spare = MAX_PROFILE_POINTS.saturating_sub(MIN_PART_POINTS * share);
         let most = MAX_PROFILE_BANDS / share as f32;
         for (part, contour) in parts.into_iter().enumerate() {
-            let kept = thinned(contour, points);
+            let points = MIN_PART_POINTS + spare * contour.len() / total.max(1);
+            let mut kept = thinned(contour, points);
             if kept.len() < 3 {
-                return None;
+                // A speck of points all in one place, or in a line: its box.
+                kept = bounding_box(contour);
             }
             self.part_profile(&kept, margin, part as u16, most, &mut bands);
         }
@@ -436,6 +440,15 @@ pub(crate) type Profile = Arc<[(f32, f32, f32, f32, u16)]>;
 /// How tall the bands of the contour of an object are, in points.
 const PROFILE_BAND: f32 = 0.25;
 
+/// The four corners of the box of a contour.
+fn bounding_box(contour: &[(i32, i32)]) -> Vec<(i32, i32)> {
+    let (mut x0, mut y0, mut x1, mut y1) = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
+    for &(x, y) in contour {
+        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+    }
+    vec![(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+}
+
 /// At most about `most` points of a contour, in their order: of each run
 /// of points, those that reach furthest up, down, left and right, so that
 /// the outline keeps its extent and a zigzag its teeth.
@@ -462,12 +475,19 @@ fn thinned(contour: &[(i32, i32)], most: usize) -> Vec<(i32, i32)> {
     kept
 }
 
-/// The most bands of the profile of an object, enough for a page at a
-/// quarter of a point each: an object with a larger margin gets wider ones.
+/// The most bands of the profile of an object, all its parts together, each
+/// part an even share: enough for one part down a page at a quarter of a
+/// point each; a part taller, or of an outline of many parts, gets wider
+/// ones.
 const MAX_PROFILE_BANDS: f32 = 20_000.0;
 
+/// The fewest points of each part of an outline that its profile goes
+/// through, when the parts together have more than [`MAX_PROFILE_POINTS`].
+const MIN_PART_POINTS: usize = 4;
+
 /// The most points of an outline, all its parts together, that its profile
-/// goes through.
+/// goes through, about: each part keeps some, and a share of the rest by
+/// its own points.
 const MAX_PROFILE_POINTS: usize = 2048;
 
 /// The most parts apart of an outline that the text goes between.
@@ -1671,6 +1691,27 @@ mod tests {
         assert_eq!(spans.len(), 2, "{spans:?}");
         assert!(spans[0].1 > 200.0, "the teeth of the zigzag: {spans:?}");
         assert!(spans[1].1 > 600.0, "{spans:?}");
+        // Third review: beside 255 specks traced from a picture, of a point
+        // each, the large part kept 8 points and lost its teeth, and a
+        // speck that thinned to nothing sent the text around the box.
+        let speck = |k: i32| {
+            let at = (s * 2 / 5 + k * 10, s / 2);
+            Arc::<[(i32, i32)]>::from(&[at, at, at][..])
+        };
+        object.contour_parts = std::iter::once(object.contour_parts[0].clone())
+            .chain((0..254).map(speck))
+            .collect::<Vec<_>>()
+            .into();
+        let e = PlacedObject::new(&object, None, 0.0).exclusion().unwrap();
+        assert!(e.profile.is_some());
+        for y in (120..880).step_by(7) {
+            let spans = e.spans(y as f32, y as f32 + 1.0);
+            assert!(
+                spans[0].1 > 205.0,
+                "the teeth of the zigzag at {y}: {spans:?}"
+            );
+            assert!(spans.last().unwrap().1 > 600.0, "{spans:?}");
+        }
         // 256 thin parts across the frame, each down its whole height.
         object.contour = Some(Arc::from(&[(0, 0), (s / 512, 0), (s / 512, s), (0, s)][..]));
         object.contour_parts = (1..256)
