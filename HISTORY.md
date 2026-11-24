@@ -12,6 +12,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   a new preference says, which the first such link asks for; other links
   outside the document ask, and the address of a link shows under the
   pointer (D-030).
+* Fixed: text and pictures pasted from other programs are read with a
+  limit, a tab dragged to another window keeps full screen and its
+  shortcuts, and the address shown for a link is the one it opens
+  (review RV, batch 5).
 * Fixed: drafts are offered back after a crash in Flatpak, autosave no
   longer writes over a file whose original it cannot keep, Revert keeps
   the changes as a version, and Save As asks before replacing a file
