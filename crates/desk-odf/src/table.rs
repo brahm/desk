@@ -283,24 +283,31 @@ fn read_parts(
     }
 }
 
-/// Whether a cell as written holds anything that must keep its place:
-/// text, a value, a comment or a style, as the end of a row keeps them.
-fn cell_has_content(c: &Element) -> bool {
-    c.attr(TABLE, "style-name").is_some()
-        || c.elements().any(|p| {
-            p.name.is(TEXT, "p")
-                || p.name.is(TEXT, "h")
-                || p.name.is(OFFICE, "annotation")
-                || p.name.is(DESK, "annotation")
-        })
-        || c.attrs
-            .iter()
-            .any(|(name, _)| name.ns == OFFICE && name.local.ends_with("value"))
+/// Whether a cell as written holds text, a value or a comment.
+fn holds_data(c: &Element) -> bool {
+    c.elements().any(|p| {
+        p.name.is(TEXT, "p")
+            || p.name.is(TEXT, "h")
+            || p.name.is(OFFICE, "annotation")
+            || p.name.is(DESK, "annotation")
+    }) || c
+        .attrs
+        .iter()
+        .any(|(name, _)| name.ns == OFFICE && name.local.ends_with("value"))
 }
 
-/// Whether a row as written holds anything.
+/// Whether a cell as written holds anything that must keep its place in
+/// its row: data or a style, as the end of a row keeps them.
+fn cell_has_content(c: &Element) -> bool {
+    c.attr(TABLE, "style-name").is_some() || holds_data(c)
+}
+
+/// Whether a row as written holds data. A style alone does not count:
+/// spreadsheets fill the sheet with rows of styled empty cells when a
+/// whole column is formatted, and such a row would keep every filler row
+/// before it.
 fn row_has_content(r: &Element) -> bool {
-    r.elements().any(cell_has_content)
+    r.elements().any(holds_data)
 }
 
 /// Reads a row, and what the bytes of one copy of it weigh. A cell that
@@ -710,6 +717,13 @@ mod tests {
         assert_eq!(table.rows[3].cells[4].style.as_deref(), Some("ce1"));
         // A row of values repeated at the end is kept whole.
         assert!(table.rows[8].cells[0].value.is_some());
+        // Styled empty rows that fill the sheet after the last value are
+        // cut, as other filler rows are.
+        budget::start_document();
+        let table = read(
+            r#"<table:table-row><table:table-cell><text:p>a</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="1048000"><table:table-cell table:style-name="ce1"/></table:table-row>"#,
+        );
+        assert!(table.rows.len() <= 3, "{}", table.rows.len());
     }
 
     #[test]
