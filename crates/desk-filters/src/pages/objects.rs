@@ -554,7 +554,7 @@ impl Builder<'_, '_> {
     /// The picture of a file of the package, when it can be read.
     fn picture(&self, path: &str) -> Option<desk_model::Picture> {
         self.importer
-            .pictures
+            .object_pictures
             .iter()
             .find(|(p, _)| p == path)
             .map(|(_, picture)| picture.clone())

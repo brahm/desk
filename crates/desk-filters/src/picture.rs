@@ -13,6 +13,10 @@ use desk_model::Picture;
 /// bullet, and it keeps a large icon from making the document large.
 pub const MAX_SIDE: u32 = 256;
 
+/// The largest side of the picture of an object, a fill or a poster, in
+/// pixels, from ODT and from Pages alike.
+pub const OBJECT_MAX_SIDE: u32 = 4096;
+
 /// The most pixels a TIFF or GIF picture may have, so that a small file
 /// that declares a huge size cannot take all the memory: 64 million,
 /// 256 MB of RGBA.

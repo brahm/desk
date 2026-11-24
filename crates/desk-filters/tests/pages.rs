@@ -1688,3 +1688,37 @@ fn tab_04_14_21_28_the_tables_of_pages_09_keep_their_styles_formats_and_rules() 
     assert_eq!(rule[0].style.bold, None);
     assert!(rules.cell(1, 1).rules.is_empty());
 }
+
+#[test]
+fn obj_01_obj_02_a_large_tiff_picture_keeps_its_size() {
+    // Pictures placed as objects were scaled down to 256 pixels, the
+    // size of an image bullet (review RV, batch 1).
+    let package = std::env::temp_dir().join(format!("desk-tiff-{}.pages", std::process::id()));
+    let source = fixture("obj-02-image-formats.pages");
+    std::fs::create_dir_all(&package).unwrap();
+    for entry in std::fs::read_dir(&source).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_file() {
+            std::fs::copy(entry.path(), package.join(entry.file_name())).unwrap();
+        }
+    }
+    let mut tiff = std::io::Cursor::new(Vec::new());
+    let pixels = vec![128u8; 600 * 400 * 3];
+    tiff::encoder::TiffEncoder::new(&mut tiff)
+        .unwrap()
+        .write_image::<tiff::encoder::colortype::RGB8>(600, 400, &pixels)
+        .unwrap();
+    std::fs::write(package.join("test-picture.tiff"), tiff.into_inner()).unwrap();
+    let read = desk_filters::read_pages_at(&package);
+    std::fs::remove_dir_all(&package).unwrap();
+    let document = read.unwrap();
+    let sizes: Vec<(u32, u32)> = document
+        .objects()
+        .iter()
+        .filter_map(|o| match &o.kind {
+            desk_model::ObjectKind::Image(p) => Some((p.width(), p.height())),
+            _ => None,
+        })
+        .collect();
+    assert!(sizes.contains(&(600, 400)), "{sizes:?}");
+}

@@ -638,8 +638,12 @@ fn is_named(style: &IworkStyle) -> bool {
 
 struct Importer<'a> {
     sheet: &'a Stylesheet,
-    /// The pictures of the package, by path.
+    /// The pictures of the package as image bullets, by path, scaled
+    /// down to the size of a bullet.
     pictures: &'a [(String, desk_model::Picture)],
+    /// The pictures of the package as objects, fills and posters, by
+    /// path, at the size of [`crate::picture::OBJECT_MAX_SIDE`].
+    object_pictures: &'a [(String, desk_model::Picture)],
     document: Document,
     /// The model style of each named style, by identifier.
     ids: HashMap<(Family, String), StyleId>,
@@ -769,12 +773,14 @@ impl<'a> Importer<'a> {
     fn new(
         sheet: &'a Stylesheet,
         pictures: &'a [(String, desk_model::Picture)],
+        object_pictures: &'a [(String, desk_model::Picture)],
     ) -> Result<Self, FilterError> {
         let document = Document::new_word_processing();
         let body = document.styles().default_paragraph();
         let mut importer = Self {
             sheet,
             pictures,
+            object_pictures,
             document,
             ids: HashMap::new(),
             lists: HashMap::new(),
@@ -1510,6 +1516,16 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         .iter()
         .filter_map(|(path, bytes)| Some((path.clone(), crate::picture::picture(bytes)?)))
         .collect();
+    // Pictures placed as objects keep their detail, up to the size the
+    // ODT import allows; they were scaled down to the size of a bullet.
+    let object_pictures: Vec<(String, desk_model::Picture)> = source
+        .files
+        .iter()
+        .filter_map(|(path, bytes)| {
+            let picture = crate::picture::picture_within(bytes, crate::picture::OBJECT_MAX_SIDE)?;
+            Some((path.clone(), picture))
+        })
+        .collect();
     let images_kept = source
         .file_paths()
         .iter()
@@ -1524,7 +1540,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
         }
     }
 
-    let mut importer = Importer::new(&source.stylesheet, &pictures)?;
+    let mut importer = Importer::new(&source.stylesheet, &pictures, &object_pictures)?;
     importer.notes = source
         .notes
         .iter()

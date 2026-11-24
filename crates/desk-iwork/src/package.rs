@@ -119,15 +119,6 @@ fn inside(name: &str) -> bool {
         && name.split('/').all(|part| part != ".." && !part.is_empty())
 }
 
-/// A file of a flat file, by its path in the package, at most
-/// [`MAX_INDEX`] bytes; `None` when there is none.
-pub fn read_file(bytes: &[u8], name: &str) -> Option<Vec<u8>> {
-    if !bytes.starts_with(ZIP_MAGIC) {
-        return None;
-    }
-    zip_file(&mut ZipArchive::new(Cursor::new(bytes)).ok()?, name)
-}
-
 /// A file of an open flat file, by its path in the package, at most
 /// [`MAX_INDEX`] bytes; `None` when there is none.
 pub(crate) fn zip_file<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) -> Option<Vec<u8>> {
