@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Desk contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The magic numbers and chunk names of the pictures the converters read.
+"\x89PNG\x0d\x0a\x1a\x0a"
+"IHDR"
+"IDAT"
+"IEND"
+"PLTE"
+"\xff\xd8\xff"
+"GIF87a"
+"GIF89a"
+"NETSCAPE2.0"
+"II*\x00"
+"MM\x00*"
+"%PDF-"

@@ -23,13 +23,18 @@ batches moved here (B-060, B-062, B-063) are done.
 | 7 | D | `desk-ui/src/window.rs`, `tables/window.rs`, `tabs.rs` | The windows of Writer and Slides and of Tables each kept their own controllers on the window and moved them by the same code when a tab moved | One `WindowBindings` holds the controllers and the handlers, and moves them; test |
 | 8 | D | `fuzz/` | The picture converters (TIFF and GIF to PNG), where batch 1 found overflows, had no fuzz target | A `picture` target, with seeds of each kind. It ran 226,705 inputs in three minutes without a failure, and the CI runs it with the others |
 
+| 9 | B | `desk-lang/src/lib.rs` | *Review of the pull request.* Listed once for the whole run, the folders missed a dictionary installed while Desk ran | Listed again when a tag finds nothing and a folder changed since; test |
+| 10 | B | `.github/workflows/ci.yml`, `dependabot.yml` | *Review of the pull request.* The toolchain action was pinned on its `stable` and `nightly` branches, which name the toolchain themselves: an update to `master` would have broken every job | Pinned on `master` with the toolchain named; the Flathub action, which has no tags, is left out of Dependabot |
+| 11 | D | `desk-ui/src/tabs.rs`, `ci/fuzz.sh` | *Review of the pull request.* A borrow was held while GTK moved the handlers, and the picture target ran with the ODF dictionary | No borrow across GTK; a dictionary of picture tokens |
+
 Class A: data lost, a panic, a hang or memory exhausted, or a security
 flaw. B: wrong behaviour. C: performance. D: clean-up. See
 [README.md](README.md).
 
 The coverage per crate that `cargo llvm-cov` would give was not measured.
 Its instrumented build of the whole workspace did not fit the disk of the
-review session. It moved to the backlog as B-064, for phase W6.
+review session. It moved to the backlog as B-064, for phase W6. Pinning the containers
+of the CI by digest, and Dependabot for the crates, moved to B-065, for X1.
 
 ## Security (D-029)
 

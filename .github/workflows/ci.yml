@@ -37,8 +37,9 @@ jobs:
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br xvfb xauth
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
+          toolchain: stable
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Check formatting
@@ -97,7 +98,9 @@ jobs:
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation jing unzip
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -119,7 +122,9 @@ jobs:
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us gstreamer1.0-plugins-good gstreamer1.0-libav
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Drive Desk Writer as a screen reader sees it
         run: ci/ui-test.sh
@@ -149,7 +154,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends libcairo2-dev libglib2.0-dev libfreetype-dev libfontconfig-dev libpoppler-glib-dev
-      - uses: dtolnay/rust-toolchain@6a52aad76a94a5fbc50d567bb5be24419801c1fb # nightly
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
+        with:
+          toolchain: nightly
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: fuzz

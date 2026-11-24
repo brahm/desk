@@ -99,18 +99,33 @@ impl WindowBindings {
     /// Moves to `new` from `old`, and tells each handler of what `new`
     /// shows, which may differ.
     pub(crate) fn move_to(&self, old: &adw::ApplicationWindow, new: &adw::ApplicationWindow) {
-        for controller in self.controllers.borrow().iter() {
+        // No borrow is held while GTK runs, as a handler may run in it.
+        let controllers = self.controllers.borrow().clone();
+        for controller in &controllers {
             old.remove_controller(controller);
             new.add_controller(controller.clone());
         }
-        let handlers: Vec<_> = {
-            let mut handlers = self.handlers.borrow_mut();
-            for (property, f, id) in handlers.iter_mut() {
-                let moved = Self::attach(new, property, f);
-                old.disconnect(std::mem::replace(id, moved));
-            }
-            handlers.iter().map(|(_, f, _)| f.clone()).collect()
-        };
+        let moving: Vec<_> = self
+            .handlers
+            .borrow()
+            .iter()
+            .map(|(property, f, _)| (*property, f.clone()))
+            .collect();
+        let ids: Vec<_> = moving
+            .iter()
+            .map(|(property, f)| Self::attach(new, property, f))
+            .collect();
+        let old_ids: Vec<_> = self
+            .handlers
+            .borrow_mut()
+            .iter_mut()
+            .zip(ids)
+            .map(|((_, _, id), moved)| std::mem::replace(id, moved))
+            .collect();
+        for id in old_ids {
+            old.disconnect(id);
+        }
+        let handlers: Vec<_> = moving.into_iter().map(|(_, f)| f).collect();
         for f in handlers {
             f(new);
         }
