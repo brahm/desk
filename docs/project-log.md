@@ -2056,8 +2056,14 @@ paragraph, and objects on a second page.
   - footnotes changed where pages broke;
   - tab stops near the edge of a column came out of order;
   - lines and pictures of no size stopped the rest of a page from drawing.
-- *Consequences:* PNG pictures over 8192 pixels a side are not drawn,
-  as JPEG already were not. Three slow paths moved to the backlog: B-055
+- Three rounds of review of the pull request (#205) found 11 more, rows
+  17 to 27 of the report. The bounds of the first fixes held only for a
+  plain column, a single search, or a JPEG as the model read it. An
+  outline traced from a picture could still be costly or lose its small
+  parts, and the fallback range of an axis was too narrow. Merged on 24
+  November.
+- *Consequences:* PNG and JPEG pictures over 8192 by 8192 pixels, in any
+  shape, are not drawn. Three slow paths moved to the backlog: B-055
   (balanced columns) and B-057 (PDF pictures, lines with tabs) to W6,
   and B-056 (merged cells) to T1.
 
