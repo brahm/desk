@@ -202,7 +202,11 @@ impl Condition {
     pub fn holds(&self, value: &Value, cell: &dyn Fn(CellRef) -> Value, today: f64) -> bool {
         // A rule whose cell was deleted no longer applies, "not equal"
         // included.
-        if self.operands().iter().any(|o| matches!(o, Operand::Deleted)) {
+        if self
+            .operands()
+            .iter()
+            .any(|o| matches!(o, Operand::Deleted))
+        {
             return false;
         }
         let operand = |o: &Operand| match o {
@@ -319,6 +323,32 @@ mod tests {
         assert_eq!(s, RuleStyle::default());
         assert!(Condition::Contains("ab".into()).holds(&Value::Text("xABy".into()), &cell, 0.0));
         assert!(Condition::Today.holds(&Value::Date(45_000.3), &cell, 45_000.9));
+    }
+
+    #[test]
+    fn a_row_added_at_the_top_copies_the_rules_of_the_first_once() {
+        // The rules of the row copied were moved down with it, then moved
+        // again: the new first row compared with the cell below the one
+        // it should (review of the pull request of RV batch 2).
+        use crate::{Locale, Table};
+        let mut t: Table<String> = Table::new(3, 1);
+        t.set_header_rows(0).unwrap();
+        t.type_text(1, 0, "5", &Locale::en_us());
+        let rule = Rule {
+            condition: Condition::Greater(Operand::Cell(CellRef::new(0, 1))),
+            style: RuleStyle::default(),
+        };
+        t.cell_mut(0, 0).rules = std::sync::Arc::from([rule]);
+        t.insert_rows(0, 2).unwrap();
+        let operand = |r| match &t.cell(r, 0).rules[0].condition {
+            Condition::Greater(o) => o.clone(),
+            other => panic!("{other:?}"),
+        };
+        // The first row as it was compares with its old neighbour, now
+        // row 4; the new rows each with the row below them.
+        assert_eq!(operand(2), Operand::Cell(CellRef::new(0, 3)));
+        assert_eq!(operand(0), Operand::Cell(CellRef::new(0, 1)));
+        assert_eq!(operand(1), Operand::Cell(CellRef::new(0, 2)));
     }
 
     #[test]

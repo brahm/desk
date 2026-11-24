@@ -60,9 +60,7 @@ impl<T: CellText> Table<T> {
             new_cols = fit(new_rows).clamp(cols, new_cols);
             new_rows = fit(new_cols).clamp(rows, new_rows);
         }
-        if new_rows > rows {
-            let _ = self.insert_rows(rows, new_rows - rows);
-        }
+        self.add_rows_to_reach(r0, new_rows);
         if new_cols > cols {
             let _ = self.insert_cols(cols, new_cols - cols);
         }
@@ -131,6 +129,21 @@ mod tests {
         assert_eq!((t.rows(), t.cols()), (60_001, 17));
         assert_eq!(area, Area::between((0, 0), (t.rows() - 1, t.cols() - 1)));
         assert_eq!(t.cell(1, 0).content, Content::Text("y".into()));
+    }
+
+    #[test]
+    fn text_pasted_past_the_body_goes_before_the_footer() {
+        let pt = Locale::pt_br();
+        let mut t: Table<String> = Table::new(4, 2);
+        t.type_text(3, 1, "=SUM(B2:B3)", &pt);
+        t.set_footer_rows(1).unwrap();
+        let area = t.paste_text((2, 1), "1\n2\n3\n", &pt);
+        assert_eq!(area, Area::between((2, 1), (4, 1)));
+        assert_eq!(t.footer_rows(), 1);
+        assert_eq!(t.rows(), 6);
+        assert_eq!(t.cell(4, 1).content, Content::Number(Num(3.0)));
+        // The totals stay the footer, not written over.
+        assert_eq!(t.cell(5, 1).content, Content::Formula("=SUM(B2:B3)".into()));
     }
 
     #[test]

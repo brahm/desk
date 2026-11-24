@@ -69,9 +69,7 @@ impl<T: CellText> Table<T> {
         let area = from.clamped(area);
         let need_rows = at.0 + area.rows;
         let need_cols = at.1 + area.cols;
-        if need_rows > self.rows() {
-            let _ = self.insert_rows(self.rows(), need_rows - self.rows());
-        }
+        self.add_rows_to_reach(at.0, need_rows);
         if need_cols > self.cols() {
             let _ = self.insert_cols(self.cols(), need_cols - self.cols());
         }
@@ -201,6 +199,19 @@ mod tests {
         assert_eq!(landed, Area::between((1, 1), (2, 2)));
         assert_eq!((to.rows(), to.cols()), (3, 3));
         assert_eq!(to.cell(2, 1).content, Content::Text("Sul".into()));
+    }
+
+    #[test]
+    fn cells_dragged_past_the_body_go_before_the_footer() {
+        let from = table();
+        let mut to: Table<String> = Table::new(3, 2);
+        to.type_text(2, 1, "Total", &Locale::pt_br());
+        to.set_footer_rows(1).unwrap();
+        // Three rows from the one row of the body: the table grows.
+        to.put_cells((1, 0), &from, Area::between((1, 0), (3, 1)));
+        assert_eq!((to.rows(), to.footer_rows()), (5, 1));
+        assert_eq!(to.cell(2, 0).content, Content::Text("Sul".into()));
+        assert_eq!(to.cell(4, 1).content, Content::Text("Total".into()));
     }
 
     #[test]

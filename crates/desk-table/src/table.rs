@@ -619,7 +619,14 @@ impl<T: CellText> Table<T> {
             for c in 0..cols {
                 let mut cell = self.cell(model_row, c).cleared();
                 cell.comment = None;
-                cell.move_references(0, i64::from(at + k) - i64::from(model_row));
+                // The references of the row copied were just moved: at
+                // the top, it is itself `count` rows down now.
+                let from = if at == 0 {
+                    model_row + count
+                } else {
+                    model_row
+                };
+                cell.move_references(0, i64::from(at + k) - i64::from(from));
                 if let Some(f) = &repeated[c as usize]
                     && let Ok(formula) = Formula::parse(f)
                 {
@@ -663,6 +670,28 @@ impl<T: CellText> Table<T> {
             self.footer_rows = (self.footer_rows + count).min(MAX_HEADERS);
         }
         Ok(())
+    }
+
+    /// Adds the rows that cells put from row `start` down to row `end`,
+    /// excluded, need. Below the body of a table with a footer, they are
+    /// added to the body, so that the footer stays the last rows and is
+    /// not written over; put in the footer, they join it.
+    pub(crate) fn add_rows_to_reach(&mut self, start: u32, end: u32) {
+        let end = end.min(MAX_CELLS);
+        let rows = self.rows();
+        if end <= rows {
+            return;
+        }
+        let body_end = self.body_end();
+        let (at, add) = if self.footer_rows > 0 && start < body_end {
+            (body_end, end - body_end)
+        } else {
+            (rows, end - rows)
+        };
+        let add = add.min(MAX_CELLS - rows);
+        if add > 0 {
+            let _ = self.insert_rows(at, add);
+        }
     }
 
     /// The formula that the cells of a column repeat down to row `at`,
