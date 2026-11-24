@@ -2126,7 +2126,18 @@ paragraph, and objects on a second page.
   move their controllers with a tab. A fuzz target covers the picture
   converters.
 - *Consequences:* the coverage per crate could not be measured in the
-  session and moved to the backlog as B-064, for W6.
+  session and moved to the backlog as B-064, for W6. Pinning the containers
+  of the CI by digest, and Dependabot for the crates, moved to B-065, for X1.
+
+### 24 November: the end of the review, and a file read with losses (RV)
+
+- Batch 6 merged as #207. All six batches of RV are merged, and the
+  review is over; W2 resumes.
+- The owner decided B-061 (D-031): a file that Desk opened with content
+  it does not read is not saved over on its own. Its changes wait in the
+  recovery draft, and Save asks first, offering to save over the file or
+  as a new file. Once the owner says to save over it, the document saves
+  itself again, as every file does.
 
 ## Decisions, with their reasons and consequences
 
@@ -2512,6 +2523,13 @@ malformed file, and only a lint keeps new code from doing it again.
 *Consequences:* after batch 1 of RV, `desk-odf`, `desk-iwork` and
 `desk-formula` deny `indexing_slicing` and `unwrap_used`.
 
+**D-031: a file read with losses is saved over only after asking (24 November).**
+*Why:* automatic saving would quietly drop what Desk could not read of a
+file, such as parts of a Pages document; the owner chose to ask first.
+*Consequences:* closes B-061. Save offers to save over the file or as a
+new file; until then the changes stay in the recovery draft, and the
+file as it was opened stays among its versions.
+
 ## What changed direction, and what it cost
 
 | Date | Change | What was redone or set aside |
@@ -2548,7 +2566,8 @@ chose W1, Writer to the behaviour of 15, as the next phase. W1 ran
 from 17 to 22 November and brought Writer to the behaviour of Pages
 15.4, checked on the Mac; the owner closed it and chose W2, Writer
 review, as the next phase. On 24 November, after pull request 200, he
-paused W2 for RV, a review of all the code (D-027). The three
+paused W2 for RV, a review of all the code (D-027); RV ended the same
+day after six batches, and W2 resumed. The three
 apps can advance side by side: six phases of Writer, five of Tables, five
 of Slides, and a last phase across the apps before version 1.0.
 

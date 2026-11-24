@@ -4,7 +4,7 @@ phase	status	started	ended
 R	done	2026-11-16	2026-11-16
 B1	done	2026-11-16	2026-11-17
 W1	done	2026-11-17	2026-11-22
-W2	paused	2026-11-22	-
+W2	in-progress	2026-11-22	-
 W3	not-started	-	-
 W4	not-started	-	-
 W5	not-started	-	-
@@ -19,5 +19,5 @@ S2	not-started	-	-
 S3	not-started	-	-
 S4	not-started	-	-
 S5	not-started	-	-
-RV	in-progress	2026-11-24	-
+RV	done	2026-11-24	2026-11-24
 X1	not-started	-	-

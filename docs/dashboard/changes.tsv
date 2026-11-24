@@ -169,3 +169,11 @@ date	kind	id	from	to
 2026-11-24	backlog	B-061	new	open
 2026-11-24	backlog	B-062	new	open
 2026-11-24	backlog	B-063	new	open
+2026-11-24	phase	W2	paused	in-progress
+2026-11-24	phase	RV	in-progress	done
+2026-11-24	backlog	B-060	open	done
+2026-11-24	backlog	B-061	open	done
+2026-11-24	backlog	B-062	open	done
+2026-11-24	backlog	B-063	open	done
+2026-11-24	backlog	B-064	new	open
+2026-11-24	backlog	B-065	new	open
