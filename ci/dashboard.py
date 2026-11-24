@@ -272,11 +272,16 @@ def next_phases(phases):
     The roadmap runs R and B1 first, then the three app tracks, which may
     run side by side, then X1. So the next phases are the first one not
     started of the preparation; once that is over, the first one not
-    started of each app track; and X1 when the tracks are over.
+    started of each app track that has no phase paused; and X1 when the
+    tracks are over.
     """
     def first(ids):
         group = [p for p in phases if ids(p['id'])]
         todo = [p for p in group if p['status'] == 'not-started']
+        # A track with a paused phase waits for it: its next phase is the
+        # paused one, which the page lists on its own.
+        if any(p['status'] == 'paused' for p in group):
+            todo = []
         return todo[:1], all(p['status'] == 'done' for p in group)
 
     prep, prep_over = first(lambda i: i in ('R', 'B1'))
