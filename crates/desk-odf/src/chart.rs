@@ -344,8 +344,9 @@ pub(crate) fn read_chart(content: &str) -> Result<Option<ChartDocument>, OdfErro
     // names in the first row, categories in the first column.
     if out.series.is_empty() && grid.len() > 1 {
         let columns = grid.iter().map(Vec::len).max().unwrap_or(0);
-        out.categories = grid[1..]
+        out.categories = grid
             .iter()
+            .skip(1)
             .map(|r| text_of(r.first().unwrap_or(&Datum::Empty)))
             .collect();
         for col in 1..columns {
@@ -638,10 +639,8 @@ mod tests {
         // A row repeated 10,000 times of 1,024 cells, and a series over a
         // range far past the data: each was expanded in full, about ten
         // million cells from a few hundred bytes.
-        let wide = format!(
-            r#"<table:table-row table:number-rows-repeated="10000"><table:table-cell table:number-columns-repeated="1024" office:value-type="float" office:value="1"/></table:table-row>"#
-        );
-        let content = chart_with("1048576", &wide);
+        let wide = r#"<table:table-row table:number-rows-repeated="10000"><table:table-cell table:number-columns-repeated="1024" office:value-type="float" office:value="1"/></table:table-row>"#;
+        let content = chart_with("1048576", wide);
         let chart = read_chart(&content).unwrap().unwrap();
         assert!(chart.series[0].values.len() <= MAX_CHART_CELLS);
         let mut budget = 10;

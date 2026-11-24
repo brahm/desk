@@ -652,7 +652,10 @@ impl<'a> Reader<'a, '_> {
         if !self.guard.enter() {
             return None;
         }
-        let object = self.guard.deref(self.ids, element).and_then(|e| self.object(e, place));
+        let object = self
+            .guard
+            .deref(self.ids, element)
+            .and_then(|e| self.object(e, place));
         self.guard.leave();
         object
     }

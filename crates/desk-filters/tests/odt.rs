@@ -4036,7 +4036,11 @@ fn tab_a_table_whose_desk_json_disagrees_with_its_size_is_read_from_odf() {
     let bytes = write_odt(editor.document()).unwrap();
     let broken = with_stream(&bytes, "content.xml", |xml| {
         assert!(xml.contains("&quot;cells&quot;:["));
-        xml.replacen("&quot;cells&quot;:[", "&quot;cells&quot;:[],&quot;old&quot;:[", 1)
+        xml.replacen(
+            "&quot;cells&quot;:[",
+            "&quot;cells&quot;:[],&quot;old&quot;:[",
+            1,
+        )
     });
     let read = read_odt(&broken).unwrap();
     let table = read

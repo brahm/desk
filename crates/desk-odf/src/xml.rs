@@ -9,8 +9,6 @@
 //! the document type are dropped, and entities are never expanded beyond
 //! the five predefined ones and character references.
 
-use std::fmt::Write as _;
-
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::{NsReader, XmlVersion};
@@ -263,7 +261,8 @@ impl Writer {
     /// Opens an element.
     pub fn start(&mut self, name: &'static str) -> &mut Self {
         self.close_tag();
-        write!(self.out, "<{name}").unwrap();
+        self.out.push('<');
+        self.out.push_str(name);
         self.open.push(name);
         self.in_tag = true;
         self
@@ -272,7 +271,9 @@ impl Writer {
     /// Adds an attribute to the element just opened.
     pub fn attr(&mut self, name: &str, value: &str) -> &mut Self {
         debug_assert!(self.in_tag);
-        write!(self.out, " {name}=\"").unwrap();
+        self.out.push(' ');
+        self.out.push_str(name);
+        self.out.push_str("=\"");
         escape(&mut self.out, value, true);
         self.out.push('"');
         self
@@ -300,7 +301,9 @@ impl Writer {
             self.out.push_str("/>");
             self.in_tag = false;
         } else {
-            write!(self.out, "</{name}>").unwrap();
+            self.out.push_str("</");
+            self.out.push_str(name);
+            self.out.push('>');
         }
         self
     }

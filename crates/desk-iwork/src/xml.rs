@@ -74,7 +74,9 @@ impl Element {
             out.push(element);
             let start = stack.len();
             stack.extend(element.elements());
-            stack[start..].reverse();
+            if let Some(children) = stack.get_mut(start..) {
+                children.reverse();
+            }
         }
         out.into_iter()
     }

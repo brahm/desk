@@ -36,6 +36,11 @@
 //! ```
 
 #![forbid(unsafe_code)]
+// A file read is never trusted, so the library neither indexes without a
+// check nor unwraps: either would close the app on a malformed file
+// (D-028). Tests may, where a panic is the failure they report.
+#![deny(clippy::indexing_slicing, clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]
 
 mod chart;
 mod draw;

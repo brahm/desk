@@ -30,7 +30,9 @@ impl<'a> Ids<'a> {
             // and, of two objects with the same ID, the first is kept.
             let start = stack.len();
             stack.extend(element.elements());
-            stack[start..].reverse();
+            if let Some(children) = stack.get_mut(start..) {
+                children.reverse();
+            }
         }
         Self(ids)
     }
