@@ -5,7 +5,7 @@
 //! with the document in `index.xml`, usually compressed with gzip.
 
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
 use flate2::read::GzDecoder;
@@ -52,7 +52,11 @@ pub fn read_index(bytes: &[u8]) -> Result<String, IworkError> {
     if !bytes.starts_with(ZIP_MAGIC) {
         return index_text(bytes);
     }
-    let mut archive = ZipArchive::new(Cursor::new(bytes))?;
+    zip_index(&mut ZipArchive::new(Cursor::new(bytes))?)
+}
+
+/// The text of the index of a flat file.
+pub(crate) fn zip_index<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<String, IworkError> {
     // The index at the root, or in the one folder that the package was
     // zipped from.
     let names: Vec<String> = archive
@@ -72,11 +76,30 @@ pub fn read_index(bytes: &[u8]) -> Result<String, IworkError> {
     index_text(&limited(file)?)
 }
 
+/// A flat file on disk, opened as a zip; `None` when the file is not one,
+/// and is then an index by itself.
+///
+/// The zip is read from the file as it is needed, not loaded whole: a
+/// flat file with a movie in it can be far larger than the largest index.
+pub(crate) fn open_zip(path: &Path) -> Result<Option<ZipArchive<fs::File>>, IworkError> {
+    let mut file = fs::File::open(path)?;
+    let mut magic = [0; 4];
+    let zip = file.read(&mut magic)? == magic.len() && magic == ZIP_MAGIC;
+    if !zip {
+        return Ok(None);
+    }
+    file.rewind()?;
+    Ok(Some(ZipArchive::new(file)?))
+}
+
 /// The text of the index of a document on disk: a package folder or a
 /// flat file.
 pub fn read_index_at(path: &Path) -> Result<String, IworkError> {
     if !path.is_dir() {
-        return read_index(&limited(fs::File::open(path)?)?);
+        return match open_zip(path)? {
+            Some(mut archive) => zip_index(&mut archive),
+            None => index_text(&limited(fs::File::open(path)?)?),
+        };
     }
     for name in [INDEX_GZ, INDEX] {
         let file = path.join(name);
@@ -99,10 +122,18 @@ fn inside(name: &str) -> bool {
 /// A file of a flat file, by its path in the package, at most
 /// [`MAX_INDEX`] bytes; `None` when there is none.
 pub fn read_file(bytes: &[u8], name: &str) -> Option<Vec<u8>> {
-    if !bytes.starts_with(ZIP_MAGIC) || !inside(name) {
+    if !bytes.starts_with(ZIP_MAGIC) {
         return None;
     }
-    let mut archive = ZipArchive::new(Cursor::new(bytes)).ok()?;
+    zip_file(&mut ZipArchive::new(Cursor::new(bytes)).ok()?, name)
+}
+
+/// A file of an open flat file, by its path in the package, at most
+/// [`MAX_INDEX`] bytes; `None` when there is none.
+pub(crate) fn zip_file<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) -> Option<Vec<u8>> {
+    if !inside(name) {
+        return None;
+    }
     // At the root, or in the one folder that the package was zipped from.
     let path = archive
         .file_names()

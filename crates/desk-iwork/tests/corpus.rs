@@ -439,3 +439,30 @@ fn references_that_branch_at_every_level_end() {
     let document = desk_iwork::pages::parse_pages(&xml).unwrap();
     assert!(!document.body.is_empty());
 }
+
+#[test]
+fn a_flat_file_larger_than_the_largest_index_opens() {
+    // A flat file with a movie can be larger than the largest index read
+    // (256 MB). It used to be read whole under that limit, and refused
+    // as an index too large (review RV, batch 1).
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
+    let path = std::env::temp_dir().join(format!("desk-large-{}.pages", std::process::id()));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let stored = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored)
+        .large_file(true);
+    zip.start_file("Contents/movie.mov", stored).unwrap();
+    std::io::copy(
+        &mut std::io::Read::take(std::io::repeat(0), desk_iwork::MAX_INDEX + (1 << 20)),
+        &mut zip,
+    )
+    .unwrap();
+    zip.start_file("index.xml", stored).unwrap();
+    zip.write_all(fixture_index("obj-30-group.pages").as_bytes())
+        .unwrap();
+    zip.finish().unwrap();
+    let read = read_pages_at(&path);
+    std::fs::remove_file(&path).unwrap();
+    assert!(!read.unwrap().body.is_empty());
+}
