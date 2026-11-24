@@ -1041,20 +1041,8 @@ impl TextEditor {
         let weak = self.downgrade();
         gtk::glib::spawn_future_local(async move {
             let read = async {
-                let (stream, _) = clipboard
-                    .read_future(&[format.text_type], gtk::glib::Priority::DEFAULT)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let out = gtk::gio::MemoryOutputStream::new_resizable();
-                out.splice_future(
-                    &stream,
-                    gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
-                        | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
-                    gtk::glib::Priority::DEFAULT,
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                (format.read_text)(&out.steal_as_bytes())
+                let bytes = clipboard_bytes(&clipboard, format.text_type).await?;
+                (format.read_text)(&bytes)
             };
             let fragment = match read.await {
                 Ok(fragment) => fragment,
@@ -1128,6 +1116,13 @@ impl TextEditor {
             let (Ok(Some(texture)), Some(this)) = (result, weak.upgrade()) else {
                 return;
             };
+            // A picture larger than the pages draw is not made into a PNG
+            // on the thread of the window (review RV, batch 5).
+            let pixels = i64::from(texture.width()) * i64::from(texture.height());
+            if pixels > 8192 * 8192 {
+                this.view.area().error_bell();
+                return;
+            }
             let png = texture.save_to_png_bytes();
             match desk_model::Picture::from_png(png.to_vec()) {
                 Some(picture) => this.insert_picture_in_line(picture),
@@ -4333,8 +4328,13 @@ impl Drop for Attached {
     }
 }
 
-/// The bytes of the clipboard as `media_type`.
-async fn clipboard_bytes(
+/// The most bytes read from the clipboard: what another app offers may
+/// be of any size, and was read whole into memory (review RV, batch 5).
+const MAX_CLIPBOARD_BYTES: usize = 256 << 20;
+
+/// The bytes of the clipboard as `media_type`, unless there are more than
+/// [`MAX_CLIPBOARD_BYTES`].
+pub(super) async fn clipboard_bytes(
     clipboard: &gdk::Clipboard,
     media_type: &str,
 ) -> Result<glib::Bytes, String> {
@@ -4342,22 +4342,53 @@ async fn clipboard_bytes(
         .read_future(&[media_type], glib::Priority::DEFAULT)
         .await
         .map_err(|e| e.to_string())?;
-    let out = gtk::gio::MemoryOutputStream::new_resizable();
-    out.splice_future(
-        &stream,
-        gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
-            | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
-        glib::Priority::DEFAULT,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    Ok(out.steal_as_bytes())
+    read_bounded(&stream, MAX_CLIPBOARD_BYTES).await
+}
+
+/// The bytes of a stream, read without blocking, or an error past `most`.
+async fn read_bounded(
+    stream: &impl IsA<gtk::gio::InputStream>,
+    most: usize,
+) -> Result<glib::Bytes, String> {
+    let mut out = Vec::new();
+    loop {
+        let chunk = stream
+            .read_bytes_future(1 << 16, glib::Priority::DEFAULT)
+            .await
+            .map_err(|e| e.to_string())?;
+        if chunk.is_empty() {
+            break;
+        }
+        if out.len() + chunk.len() > most {
+            let _ = stream.close_future(glib::Priority::DEFAULT).await;
+            return Err(format!("more than {} MB", most >> 20));
+        }
+        out.extend_from_slice(&chunk);
+    }
+    let _ = stream.close_future(glib::Priority::DEFAULT).await;
+    Ok(glib::Bytes::from_owned(out))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use desk_model::{Editor, Language};
+
+    #[test]
+    fn what_the_clipboard_offers_is_read_up_to_a_bound() {
+        // Review RV, batch 5: what another app offered was read whole,
+        // whatever its size.
+        let context = glib::MainContext::new();
+        let read = |bytes: Vec<u8>, most: usize| {
+            let stream = gtk::gio::MemoryInputStream::from_bytes(&glib::Bytes::from_owned(bytes));
+            context
+                .with_thread_default(|| context.block_on(read_bounded(&stream, most)))
+                .unwrap()
+        };
+        let small = read(vec![7; 200_000], 300_000).unwrap();
+        assert_eq!(small.len(), 200_000);
+        assert!(read(vec![7; 400_000], 300_000).is_err());
+    }
 
     #[test]
     fn an_editor_takes_its_controllers_off_the_view_when_it_goes() {

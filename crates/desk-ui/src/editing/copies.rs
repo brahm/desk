@@ -177,20 +177,8 @@ impl TextEditor {
         let clipboard = clipboard.clone();
         gtk::glib::spawn_future_local(async move {
             let read = async {
-                let (stream, _) = clipboard
-                    .read_future(&[format.media_type], gtk::glib::Priority::DEFAULT)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let out = gtk::gio::MemoryOutputStream::new_resizable();
-                out.splice_future(
-                    &stream,
-                    gtk::gio::OutputStreamSpliceFlags::CLOSE_SOURCE
-                        | gtk::gio::OutputStreamSpliceFlags::CLOSE_TARGET,
-                    gtk::glib::Priority::DEFAULT,
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                (format.read)(&out.steal_as_bytes())
+                let bytes = super::clipboard_bytes(&clipboard, format.media_type).await?;
+                (format.read)(&bytes)
             };
             let document = match read.await {
                 Ok(document) => document,

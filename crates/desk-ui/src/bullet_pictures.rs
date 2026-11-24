@@ -142,7 +142,13 @@ pub fn picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
 /// The picture of an image file for a document: PNG, JPEG and PDF as
 /// they are, so that photographs stay small and PDF stays sharp, and any
 /// other format that GTK reads as PNG (OBJ-01).
+///
+/// A file larger than [`MAX_PICTURE`] is not read, as one dropped on the
+/// document was read whole whatever its size (review RV, batch 5).
 pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
+    if file_size(file)? > MAX_PICTURE {
+        return None;
+    }
     let (bytes, _) = file.load_contents(gtk::gio::Cancellable::NONE).ok()?;
     let bytes: &[u8] = &bytes;
     if bytes.starts_with(b"%PDF-") {
@@ -159,9 +165,11 @@ pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
 /// package that Desk reads.
 const MAX_MEDIA: u64 = 64 << 20;
 
-/// A movie or a sound from a file, if Desk knows its format and it is
-/// not too large to keep in a document (OBJ-18).
-pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
+/// The largest picture file a document takes in.
+const MAX_PICTURE: u64 = 256 << 20;
+
+/// The size of a file, in bytes.
+fn file_size(file: &gtk::gio::File) -> Option<u64> {
     let size = file
         .query_info(
             "standard::size",
@@ -170,7 +178,13 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
         )
         .ok()?
         .size();
-    if size as u64 > MAX_MEDIA {
+    u64::try_from(size).ok()
+}
+
+/// A movie or a sound from a file, if Desk knows its format and it is
+/// not too large to keep in a document (OBJ-18).
+pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
+    if file_size(file)? > MAX_MEDIA {
         return None;
     }
     let (bytes, _) = file.load_contents(gtk::gio::Cancellable::NONE).ok()?;
