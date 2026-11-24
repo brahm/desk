@@ -427,6 +427,8 @@ fn sample() -> Document {
                         pattern: "dd/MM".into(),
                     },
                 ],
+                // An author who chose teal (W150).
+                author_colors: vec![("Ana".into(), desk_model::AuthorColor::Teal)],
             },
         })
         .unwrap();

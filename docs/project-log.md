@@ -2168,6 +2168,27 @@ paragraph, and objects on a second page.
   colour (W150). W059 is done and B-039 closed; the comments (W149) are
   partial until their printing in step 15.
 
+### 24 November: author name and colour (step 7 of W2)
+
+- Preferences > General has a Comments and Changes group with the
+  Author's name, which new comments and highlights take; without one,
+  the name of the account is used, as before.
+- View > Author Color offers Pages' ten colours (yellow, green, blue,
+  pink, purple, teal, orange, red, brown, gray blue) for the user's
+  items in this document. As in Pages the choice belongs to the
+  document: it is kept in the `AuthorColors` item of its settings,
+  which other programs ignore. Other authors take the colours no one
+  chose, by name, so each reads apart and keeps its colour once the
+  file is saved and opened again; the user takes yellow unless another
+  author chose it.
+- Marks and highlights are tinted in their author's colour, blended so
+  the text stays legible, and the flags and the headings of the
+  Comments page carry the same colour.
+- Pages also shows items the user made under an earlier name under the
+  current one. That needs to know which items are the user's whatever
+  name they carry, the identity that tracked changes bring in step 8,
+  so it moves there (B-066).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

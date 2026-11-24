@@ -702,7 +702,7 @@ impl TextEditor {
     /// Where the text under comments is on the pages, which shows it
     /// marked: that of the body and of the headers, footers, notes, text
     /// boxes and shapes, also while one of them is being edited.
-    pub(super) fn comment_marks(&self) -> Vec<SpanRect> {
+    pub(super) fn comment_marks(&self) -> Vec<(NodeId, SpanRect)> {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
         let places = placed(document);
@@ -710,8 +710,41 @@ impl TextEditor {
         places
             .iter()
             .filter(|p| p.object.is_none())
-            .flat_map(|p| texts.rects(p))
+            .flat_map(|p| texts.rects(p).into_iter().map(|r| (p.id, r)))
             .collect()
+    }
+
+    /// The colours of the authors of comments, by identifier, for the
+    /// author of this computer named `local` (W150): a function that
+    /// gives the colour of a comment.
+    pub fn comment_colors(
+        &self,
+        local: &str,
+    ) -> impl Fn(NodeId) -> desk_model::AuthorColor + use<> {
+        let document = self.document();
+        let palette = document.author_palette(local);
+        let of: std::collections::HashMap<NodeId, desk_model::AuthorColor> = document
+            .comments()
+            .iter()
+            .map(|comment| (comment.id, palette.color(&comment.author)))
+            .collect();
+        move |id| of.get(&id).copied().unwrap_or_default()
+    }
+
+    /// The colour of the author of this computer in the document (W150).
+    pub fn local_author_color(&self) -> desk_model::AuthorColor {
+        let local = crate::comments_page::author();
+        self.document().author_color(&local, &local)
+    }
+
+    /// Chooses the colour of the author of this computer for the document,
+    /// in its undo, as Author Color of Pages 15.4 (W150).
+    pub fn set_local_author_color(&self, color: desk_model::AuthorColor) {
+        if self.local_author_color() == color {
+            return;
+        }
+        let local = crate::comments_page::author();
+        self.format_edit("Author Color", |edit| edit.set_author_color(&local, color));
     }
 
     /// The marks of the comments in the left margin of the pages, as Pages
@@ -1270,6 +1303,42 @@ mod tests {
             assert_eq!(editor.add_highlight("Ana"), None);
             assert_eq!(editor.remove_comments_in_selection(), 0);
             assert_eq!(editor.document().comments().len(), 1);
+        });
+    }
+
+    #[test]
+    fn w150_comments_take_the_colours_of_their_authors() {
+        use desk_model::AuthorColor;
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            document
+                .transact("Typing", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three").map(|_| ())
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            let local = crate::comments_page::author();
+            let mine = editor
+                .add_comment((Spot::new(0, 0), Spot::new(0, 3)), &local, "a")
+                .unwrap();
+            let theirs = editor
+                .add_comment((Spot::new(0, 4), Spot::new(0, 7)), "Someone Else", "b")
+                .unwrap();
+            let color = editor.comment_colors(&local);
+            assert_eq!(color(mine), AuthorColor::Yellow);
+            assert_eq!(color(theirs), AuthorColor::Green);
+            // Choosing a colour is a step of the document, which Undo takes
+            // back.
+            editor.set_local_author_color(AuthorColor::Teal);
+            assert_eq!(editor.local_author_color(), AuthorColor::Teal);
+            assert_eq!(editor.undo_name().as_deref(), Some("Author Color"));
+            let color = editor.comment_colors(&local);
+            assert_eq!(color(mine), AuthorColor::Teal);
+            assert_eq!(color(theirs), AuthorColor::Yellow);
+            assert_eq!(editor.comment_marks().len(), 2);
+            editor.undo();
+            assert_eq!(editor.local_author_color(), AuthorColor::Yellow);
         });
     }
 

@@ -102,6 +102,9 @@ pub struct TextSettings {
     /// The custom formats of the cells of tables, in the order of the
     /// Data Format menu (PXV-18, TAB-31).
     pub custom_formats: Vec<crate::table::CustomFormat>,
+    /// The colours that authors of comments and changes chose for the
+    /// document, by name (W150).
+    pub author_colors: Vec<(String, crate::AuthorColor)>,
 }
 
 /// A guide fixed on a page, dragged out of a ruler, that objects snap to
@@ -150,6 +153,7 @@ impl Default for TextSettings {
             drop_cap_styles: crate::DropCapStyle::library().to_vec(),
             chart_styles: crate::ChartStyle::library().to_vec(),
             custom_formats: Vec::new(),
+            author_colors: Vec::new(),
         }
     }
 }

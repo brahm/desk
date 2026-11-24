@@ -280,6 +280,14 @@ fn write_settings(document: &TextDocument) -> Option<String> {
                 &text.custom_formats.join("\n"),
             );
         }
+        if !text.author_colors.is_empty() {
+            config_item(
+                &mut w,
+                "AuthorColors",
+                "string",
+                &text.author_colors.join("\n"),
+            );
+        }
         if !text.never_hyphenate.is_empty() {
             config_item(
                 &mut w,

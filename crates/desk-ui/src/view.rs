@@ -51,10 +51,11 @@ struct State {
     invisibles_color: desk_model::Rgba,
     /// The lines under misspelled words and mistakes (TXT-10, TXT-11).
     squiggles: Vec<Squiggle>,
-    /// The text under comments, marked as with a highlighter (W149).
-    comment_marks: Vec<SpanRect>,
-    /// The marks of the comments in the margin (W149).
-    comment_flags: Vec<SpanRect>,
+    /// The text under comments, marked as with a highlighter, each in the
+    /// colour of its author (W149, W150).
+    comment_marks: Vec<(SpanRect, desk_model::AuthorColor)>,
+    /// The marks of the comments in the margin (W149, W150).
+    comment_flags: Vec<(SpanRect, desk_model::AuthorColor)>,
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
@@ -472,7 +473,7 @@ impl DocumentView {
     }
 
     /// Marks the text under comments (W149).
-    pub fn set_comment_marks(&self, marks: Vec<SpanRect>) {
+    pub fn set_comment_marks(&self, marks: Vec<(SpanRect, desk_model::AuthorColor)>) {
         let changed = {
             let mut state = self.state.borrow_mut();
             let changed = state.comment_marks != marks;
@@ -485,7 +486,7 @@ impl DocumentView {
     }
 
     /// Puts the marks of the comments in the margin (W149).
-    pub fn set_comment_flags(&self, flags: Vec<SpanRect>) {
+    pub fn set_comment_flags(&self, flags: Vec<(SpanRect, desk_model::AuthorColor)>) {
         let changed = {
             let mut state = self.state.borrow_mut();
             let changed = state.comment_flags != flags;
@@ -1441,10 +1442,10 @@ fn draw_squiggles(
     }
 }
 
-/// The text under comments on a page, in yellow, which multiplies with
-/// the page so that the text stays as dark as it is, as a highlighter
-/// marks paper, and the mark of each comment in the margin. The color of
-/// each author comes with step 7 of the phase W2 (W150).
+/// The text under comments on a page, in the colour of the author of
+/// each, which multiplies with the page so that the text stays as dark as
+/// it is, as a highlighter marks paper, and the mark of each comment in
+/// the margin, in that colour (W149, W150).
 fn draw_comments(
     cr: &gtk::cairo::Context,
     state: &State,
@@ -1452,41 +1453,55 @@ fn draw_comments(
     rect: &PageRect,
     scale: f64,
 ) {
-    let mut marks = state
-        .comment_marks
-        .iter()
-        .filter(|s| s.page == page)
-        .peekable();
-    if marks.peek().is_none() {
-        return;
-    }
+    let rgb = |c: desk_model::Rgba| {
+        (
+            f64::from(c.r) / 255.0,
+            f64::from(c.g) / 255.0,
+            f64::from(c.b) / 255.0,
+        )
+    };
     cr.save().ok();
     cr.set_operator(gtk::cairo::Operator::Multiply);
-    cr.set_source_rgb(1.0, 0.91, 0.45);
-    for span in marks {
-        cr.rectangle(
-            rect.x + span.x0 * scale,
-            rect.y + span.y0 * scale,
-            (span.x1 - span.x0) * scale,
-            (span.y1 - span.y0) * scale,
-        );
+    // One path for each colour, so that marks of an author that overlap
+    // are tinted once; marks of two authors that overlap blend.
+    for color in desk_model::AuthorColor::ALL {
+        let mut any = false;
+        for (span, _) in state
+            .comment_marks
+            .iter()
+            .filter(|(s, c)| s.page == page && *c == color)
+        {
+            cr.rectangle(
+                rect.x + span.x0 * scale,
+                rect.y + span.y0 * scale,
+                (span.x1 - span.x0) * scale,
+                (span.y1 - span.y0) * scale,
+            );
+            any = true;
+        }
+        if any {
+            let (r, g, b) = rgb(color.highlight());
+            cr.set_source_rgb(r, g, b);
+            cr.fill().ok();
+        }
     }
-    cr.fill().ok();
     cr.restore().ok();
     // The squares in the margin, with an edge that shows on white.
-    for flag in state.comment_flags.iter().filter(|s| s.page == page) {
+    cr.set_line_width(1.0);
+    for (flag, color) in state.comment_flags.iter().filter(|(s, _)| s.page == page) {
         cr.rectangle(
             (rect.x + flag.x0 * scale).round() + 0.5,
             (rect.y + flag.y0 * scale).round() + 0.5,
             ((flag.x1 - flag.x0) * scale).round(),
             ((flag.y1 - flag.y0) * scale).round(),
         );
+        let (r, g, b) = rgb(color.highlight());
+        cr.set_source_rgb(r, g, b);
+        cr.fill_preserve().ok();
+        let (r, g, b) = rgb(color.ink());
+        cr.set_source_rgb(r, g, b);
+        cr.stroke().ok();
     }
-    cr.set_source_rgb(1.0, 0.82, 0.2);
-    cr.fill_preserve().ok();
-    cr.set_source_rgba(0.55, 0.42, 0.0, 0.8);
-    cr.set_line_width(1.0);
-    cr.stroke().ok();
 }
 
 /// The marks of the invisible characters of a page, in the blue of Pages.

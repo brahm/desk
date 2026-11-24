@@ -2761,6 +2761,25 @@ impl TextEditor {
         }
     }
 
+    /// Marks the text under comments and puts their marks in the margin,
+    /// in the colours of their authors, again when the author of this
+    /// computer is renamed (W149, W150).
+    pub fn show_comment_marks(&self) {
+        let color = self.comment_colors(&crate::comments_page::author());
+        self.view.set_comment_marks(
+            self.comment_marks()
+                .into_iter()
+                .map(|(id, r)| (r, color(id)))
+                .collect(),
+        );
+        self.view.set_comment_flags(
+            self.comment_flags()
+                .into_iter()
+                .map(|(id, r)| (r, color(id)))
+                .collect(),
+        );
+    }
+
     fn show_pages(&self) {
         let (pages, invisibles, text) = {
             let state = self.state.borrow();
@@ -2779,9 +2798,7 @@ impl TextEditor {
         self.view.set_book(self.facing_pages());
         self.view.set_pages(pages);
         self.view.set_invisibles(invisibles);
-        self.view.set_comment_marks(self.comment_marks());
-        self.view
-            .set_comment_flags(self.comment_flags().into_iter().map(|(_, r)| r).collect());
+        self.show_comment_marks();
         self.show_outlines();
         self.show_guides();
         self.view.access().set_text(text.clone());

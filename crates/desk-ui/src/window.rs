@@ -242,7 +242,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 83] = [
+const DOCUMENT_ACTIONS: [&str; 84] = [
     "outline",
     "screen-view",
     "text-size",
@@ -301,6 +301,7 @@ const DOCUMENT_ACTIONS: [&str; 83] = [
     "insert-comment",
     "insert-highlight",
     "remove-comments",
+    "author-color",
     "next-comment",
     "previous-comment",
     "insert-toc",
@@ -787,8 +788,17 @@ impl DocumentWindow {
                     p.proofread.to_variant(),
                 );
                 if let Some(editor) = this.editor() {
+                    // The author's name may have changed, and with it
+                    // their colour (W150).
+                    editor.show_comment_marks();
+                    formatting::set_state(
+                        &this.actions,
+                        "author-color",
+                        editor.local_author_color().key().to_variant(),
+                    );
                     editor.update_squiggles();
                 }
+                this.comments.refresh();
             }
         });
         {
@@ -1459,6 +1469,11 @@ impl DocumentWindow {
                 .access()
                 .update_property(&[gtk::accessible::Property::Label(&name)]);
             self.counted.set(Some(editor.main_statistics()));
+            formatting::set_state(
+                &self.actions,
+                "author-color",
+                editor.local_author_color().key().to_variant(),
+            );
             self.show_count();
             self.show_position();
         }
@@ -3584,6 +3599,30 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&remove);
+        // Author Color: the colour of the author of this computer in the
+        // document, as View > Comments & Changes > Author Color of Pages
+        // 15.4 (W150).
+        let color = gio::SimpleAction::new_stateful(
+            "author-color",
+            Some(glib::VariantTy::STRING),
+            &desk_model::AuthorColor::Yellow.key().to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        color.connect_activate(move |action, value| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(color) = value
+                .and_then(|v| v.get::<String>())
+                .and_then(|k| desk_model::AuthorColor::from_key(&k))
+            else {
+                return;
+            };
+            if let Some(editor) = this.editor() {
+                editor.set_local_author_color(color);
+                // What the document has, should the edit be refused.
+                action.set_state(&editor.local_author_color().key().to_variant());
+            }
+        });
+        self.actions.add_action(&color);
         for (name, forward) in [("next-comment", true), ("previous-comment", false)] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(self);

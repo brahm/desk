@@ -1901,6 +1901,11 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 .iter()
                 .filter_map(|line| serde_json::from_str(line).ok())
                 .collect(),
+            author_colors: text
+                .author_colors
+                .iter()
+                .filter_map(|line| author_color(line))
+                .collect(),
         },
     })?;
 
@@ -2894,6 +2899,17 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .iter()
                 .filter_map(|f| serde_json::to_string(f).ok())
                 .collect(),
+            author_colors: settings
+                .author_colors
+                .iter()
+                .filter_map(|(author, color)| {
+                    serde_json::to_string(&serde_json::json!({
+                        "author": author,
+                        "color": color.key(),
+                    }))
+                    .ok()
+                })
+                .collect(),
             ..odf_note_settings(settings.notes)
         },
         notes_configuration: notes_configuration(settings.notes),
@@ -3522,4 +3538,13 @@ fn follow(value: Option<&str>) -> LabelFollow {
         Some("nothing") => LabelFollow::Nothing,
         _ => LabelFollow::Tab,
     }
+}
+
+/// A line of the `AuthorColors` item of `settings.xml`: a JSON object
+/// with `author` and `color`, the name of one of the ten colours (W150).
+fn author_color(line: &str) -> Option<(String, desk_model::AuthorColor)> {
+    let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    let author = value.get("author")?.as_str()?;
+    let color = desk_model::AuthorColor::from_key(value.get("color")?.as_str()?)?;
+    (!author.is_empty()).then(|| (author.to_owned(), color))
 }
