@@ -669,6 +669,7 @@ impl TextEditor {
                 attached: Attached {
                     area: view.area().downgrade(),
                     controllers: Vec::new(),
+                    handlers: Vec::new(),
                 },
             })),
         };
@@ -680,6 +681,7 @@ impl TextEditor {
         this.connect_drop();
         this.connect_input_method();
         this.start_blinking();
+        this.show_link_addresses();
         this.view.area().grab_focus();
         this
     }
@@ -1971,34 +1973,7 @@ impl TextEditor {
             return;
         }
         let window = self.view.area().root().and_downcast::<gtk::Window>();
-        let launch = move |window: Option<&gtk::Window>, link: &str| {
-            gtk::UriLauncher::new(link).launch(window, gtk::gio::Cancellable::NONE, |result| {
-                if let Err(error) = result {
-                    glib::g_warning!("desk", "cannot open the link: {error}");
-                }
-            });
-        };
-        if crate::links::opens_without_asking(link) {
-            launch(window.as_ref(), link);
-            return;
-        }
-        // A link to a file, a shared folder or another app shows where it
-        // goes, and opens only when asked to (review RV, batch 5).
-        use adw::prelude::{AdwDialogExt, AlertDialogExt};
-        let dialog = adw::AlertDialog::new(Some(&tr("Open This Link?")), Some(link));
-        dialog.add_response("cancel", &tr("_Cancel"));
-        dialog.add_response("open", &tr("_Open"));
-        dialog.set_response_appearance("open", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
-        let link = link.to_owned();
-        let parent = window.clone();
-        dialog.connect_response(None, move |_, response| {
-            if response == "open" {
-                launch(parent.as_ref(), &link);
-            }
-        });
-        dialog.present(window.as_ref());
+        follow_outside(window.as_ref(), link);
     }
 
     /// Makes the selection, or the word at the cursor, a bookmark named by
@@ -4193,6 +4168,41 @@ impl TextEditor {
         self.attach(drag);
     }
 
+    /// Shows the whole address of a link while the pointer is over it, as
+    /// a link opens with a click (decided by the owner in review RV,
+    /// batch 5).
+    fn show_link_addresses(&self) {
+        let area = self.view.area();
+        area.set_has_tooltip(true);
+        let weak = self.downgrade();
+        let handler = area.connect_query_tooltip(move |_, x, y, keyboard, tooltip| {
+            let Some(this) = weak.upgrade() else {
+                return false;
+            };
+            if keyboard {
+                return false;
+            }
+            let Some(spot) = this.spot_at(f64::from(x), f64::from(y)) else {
+                return false;
+            };
+            let link = {
+                let state = this.state.borrow();
+                // Over the link, not just after it.
+                link_at(state.editor.document(), spot)
+                    .filter(|(_, range)| range.contains(&spot.offset))
+                    .map(|(l, _)| l)
+            };
+            match link {
+                Some(link) => {
+                    tooltip.set_text(Some(&link));
+                    true
+                }
+                None => false,
+            }
+        });
+        self.state.borrow_mut().attached.handlers.push(handler);
+    }
+
     /// Adds a controller to the view, for as long as the editor lives.
     pub(super) fn attach(&self, controller: impl IsA<gtk::EventController>) {
         let controller = controller.upcast();
@@ -4225,6 +4235,80 @@ impl TextEditor {
     }
 }
 
+/// Follows a link outside the document and its other documents, as the
+/// preferences say (review RV, batch 5): a link to the web opens, asks or
+/// never opens, and the first click on one asks which; any other link
+/// shows its address and asks.
+fn follow_outside(window: Option<&gtk::Window>, link: &str) {
+    use crate::links::Follow;
+    use crate::preferences::OpenLinks;
+    use adw::prelude::{AdwDialogExt, AlertDialogExt};
+    let launch = |window: Option<&gtk::Window>, link: &str| {
+        gtk::UriLauncher::new(link).launch(window, gtk::gio::Cancellable::NONE, |result| {
+            if let Err(error) = result {
+                glib::g_warning!("desk", "cannot open the link: {error}");
+            }
+        });
+    };
+    let follow = crate::links::follow(link, crate::preferences::get().open_links);
+    let dialog = match follow {
+        Follow::Open => {
+            launch(window, link);
+            return;
+        }
+        Follow::Refuse => {
+            if let Some(window) = window {
+                window.error_bell();
+            }
+            return;
+        }
+        Follow::Confirm => {
+            let dialog = adw::AlertDialog::new(Some(&tr("Open This Link?")), Some(link));
+            dialog.add_response("cancel", &tr("_Cancel"));
+            dialog.add_response("open", &tr("_Open"));
+            dialog.set_default_response(Some("cancel"));
+            dialog
+        }
+        Follow::Choose => {
+            let body = tr("{link}\n\nDesk can open links of documents to the web at once, ask first each time, or never open them. Links to other documents always open. You can change this in Preferences.")
+                .replace("{link}", link);
+            let dialog = adw::AlertDialog::new(Some(&tr("Open Links to the Web?")), Some(&body));
+            dialog.add_response("never", &tr("_Never Open"));
+            dialog.add_response("ask", &tr("_Ask First"));
+            dialog.add_response("open", &tr("Open at _Once"));
+            dialog.set_default_response(Some("ask"));
+            dialog
+        }
+    };
+    if !crate::links::is_web(link) {
+        dialog.set_response_appearance("open", adw::ResponseAppearance::Destructive);
+    } else {
+        dialog.set_response_appearance("open", adw::ResponseAppearance::Suggested);
+    }
+    dialog.set_close_response("cancel");
+    let link = link.to_owned();
+    let parent = window.cloned();
+    dialog.connect_response(None, move |_, response| {
+        if follow == Follow::Choose {
+            let choice = match response {
+                "never" => Some(OpenLinks::Never),
+                "ask" => Some(OpenLinks::Ask),
+                "open" => Some(OpenLinks::Open),
+                _ => None,
+            };
+            let Some(choice) = choice else { return };
+            crate::preferences::change(|p| p.open_links = Some(choice));
+            // The click that asked was meant to open the link.
+            if choice != OpenLinks::Never {
+                launch(parent.as_ref(), &link);
+            }
+        } else if response == "open" {
+            launch(parent.as_ref(), &link);
+        }
+    });
+    dialog.present(window);
+}
+
 /// The controllers that an editor added to its view. They go with the
 /// editor: a document shown again in the same view, as after Revert or
 /// Restore, has an editor of its own, and the controllers of the one
@@ -4233,6 +4317,7 @@ impl TextEditor {
 struct Attached {
     area: glib::WeakRef<gtk::DrawingArea>,
     controllers: Vec<gtk::EventController>,
+    handlers: Vec<glib::SignalHandlerId>,
 }
 
 impl Drop for Attached {
@@ -4240,6 +4325,9 @@ impl Drop for Attached {
         if let Some(area) = self.area.upgrade() {
             for controller in self.controllers.drain(..) {
                 area.remove_controller(&controller);
+            }
+            for handler in self.handlers.drain(..) {
+                area.disconnect(handler);
             }
         }
     }

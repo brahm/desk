@@ -119,6 +119,47 @@ impl Units {
     }
 }
 
+/// What a click on a link of a document to the web does: a link to
+/// another document or to a bookmark always opens (decided by the owner
+/// in review RV, batch 5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenLinks {
+    /// Shows the address and asks first.
+    Ask,
+    /// Opens it at once.
+    Open,
+    /// Never opens it.
+    Never,
+}
+
+impl OpenLinks {
+    /// The choices, in the order the preferences list them.
+    pub const ALL: [Self; 3] = [Self::Ask, Self::Open, Self::Never];
+
+    /// The word of the preferences file.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Open => "open",
+            Self::Never => "never",
+        }
+    }
+
+    /// The choice of a word of the preferences file.
+    pub fn from_word(word: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|c| c.word() == word)
+    }
+
+    /// The name the preferences show.
+    pub fn label(self) -> String {
+        match self {
+            Self::Ask => tr("Ask First"),
+            Self::Open => tr("Open at Once"),
+            Self::Never => tr("Never Open"),
+        }
+    }
+}
+
 /// The preferences.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Preferences {
@@ -200,6 +241,9 @@ pub struct Preferences {
     /// Whether a table that grows moves the objects beside and under it
     /// aside, as Pages '09 did (TAB-09).
     pub move_objects_aside: bool,
+    /// What a click on a link of a document to the web does; none until
+    /// the first such click asks.
+    pub open_links: Option<OpenLinks>,
 }
 
 /// The color of invisible characters until it is changed: the blue of
@@ -254,6 +298,7 @@ impl Default for Preferences {
             guides_at_edges: false,
             show_size_and_position: true,
             move_objects_aside: true,
+            open_links: None,
         }
     }
 }
@@ -336,6 +381,10 @@ impl Preferences {
         if let Ok(count) = file.string(WINDOW, "count") {
             out.count = count.to_string();
         }
+        out.open_links = file
+            .string(WINDOW, "open-links")
+            .ok()
+            .and_then(|w| OpenLinks::from_word(&w));
         out.show_warnings = file
             .boolean(WINDOW, "show-warnings")
             .unwrap_or(out.show_warnings);
@@ -420,6 +469,12 @@ impl Preferences {
         );
         file.set_boolean(WINDOW, "show-counts", self.show_counts);
         file.set_string(WINDOW, "count", &self.count);
+        match self.open_links {
+            Some(choice) => file.set_string(WINDOW, "open-links", choice.word()),
+            None => {
+                let _ = file.remove_key(WINDOW, "open-links");
+            }
+        }
         file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
         file.set_boolean(WINDOW, "screen-view", self.screen_view);
         // As a list of the key file: names, each ended by a semicolon.
@@ -749,6 +804,7 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
     if !tables {
         window.add(&invisibles);
     }
+    window.add(&open_links_row(current.open_links));
     window.add(&switch(
         &tr("Include Preview in Document"),
         &tr("A picture of the first page, which file managers show"),
@@ -861,6 +917,34 @@ fn default_font_row(current: &Preferences) -> adw::ExpanderRow {
     });
     expander.add_row(&size);
     expander
+}
+
+/// What a click on a link to the web does. Until it is chosen, here or
+/// at the first such click, it shows Ask First, which is what the first
+/// click does.
+fn open_links_row(current: Option<OpenLinks>) -> adw::ComboRow {
+    let labels: Vec<String> = OpenLinks::ALL.iter().map(|c| c.label()).collect();
+    let row = adw::ComboRow::builder()
+        .title(tr("Links to the Web"))
+        .subtitle(tr(
+            "What a click on a link of a document does. Links to other documents always open",
+        ))
+        .model(&gtk::StringList::new(
+            &labels.iter().map(String::as_str).collect::<Vec<_>>(),
+        ))
+        .selected(
+            OpenLinks::ALL
+                .iter()
+                .position(|c| Some(*c) == current)
+                .unwrap_or(0) as u32,
+        )
+        .build();
+    row.connect_selected_notify(|row| {
+        if let Some(choice) = OpenLinks::ALL.get(row.selected() as usize) {
+            change(|p| p.open_links = Some(*choice));
+        }
+    });
+    row
 }
 
 /// A list of the quotes that smart quotes can make (PXV-08).
@@ -1029,6 +1113,7 @@ mod tests {
             guides_at_edges: true,
             show_size_and_position: false,
             move_objects_aside: false,
+            open_links: Some(OpenLinks::Never),
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -1049,6 +1134,7 @@ mod tests {
         assert!(!Preferences::read(&empty).guides_at_edges);
         assert!(Preferences::read(&empty).show_size_and_position);
         assert!(Preferences::read(&empty).move_objects_aside);
+        assert_eq!(Preferences::read(&empty).open_links, None);
         assert_eq!(
             Preferences::read(&empty).autocorrect,
             AutoCorrect::default()

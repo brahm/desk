@@ -11,6 +11,7 @@
 //! between the apps keeps them, and the other apps show what they do
 //! without following them.
 
+use crate::preferences::OpenLinks;
 use gtk::gio::prelude::FileExt;
 use gtk::glib;
 
@@ -100,11 +101,12 @@ fn unescape(text: &str) -> String {
         .map_or_else(|| text.to_owned(), |s| s.to_string())
 }
 
-/// Whether a link of a document opens at a click without asking: a page
-/// on the web, or an email without a file attached. Any other link, which
-/// a file may make point to a file of the user, a shared folder or another
-/// app, shows its address and asks first (review RV, batch 5).
-pub fn opens_without_asking(link: &str) -> bool {
+/// Whether a link goes to a page on the web, or to an email without a
+/// file attached. Any other link outside the document, which a file may
+/// make point to a file of the user, a shared folder or another app,
+/// shows its address and asks before it opens, whatever the preferences
+/// say (review RV, batch 5).
+pub fn is_web(link: &str) -> bool {
     let Some((scheme, rest)) = link.split_once(':') else {
         return false;
     };
@@ -119,6 +121,31 @@ pub fn opens_without_asking(link: &str) -> bool {
             })
         }),
         _ => false,
+    }
+}
+
+/// What a click on a link outside the document and its other documents
+/// does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Follow {
+    /// It opens.
+    Open,
+    /// Its address shows, and it opens if asked to.
+    Confirm,
+    /// The first click on a link to the web: it asks what such clicks
+    /// do from now on, and keeps the answer in the preferences.
+    Choose,
+    /// It does not open.
+    Refuse,
+}
+
+/// What a click on a link outside the document does, by the preferences.
+pub fn follow(link: &str, choice: Option<OpenLinks>) -> Follow {
+    match (choice, is_web(link)) {
+        (Some(OpenLinks::Never), _) => Follow::Refuse,
+        (_, false) | (Some(OpenLinks::Ask), true) => Follow::Confirm,
+        (None, true) => Follow::Choose,
+        (Some(OpenLinks::Open), true) => Follow::Open,
     }
 }
 
@@ -228,16 +255,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_web_pages_and_plain_emails_open_without_asking() {
+    fn links_outside_the_document_follow_the_preferences() {
         // Review RV, batch 5: a click on any link of a document opened it,
-        // whatever it pointed to.
+        // whatever it pointed to. The owner chose: a link to the web asks,
+        // the first time, what such links do from now on.
         for link in [
             "https://example.com/a?b=c",
             "HTTP://example.com",
             "mailto:someone@example.com",
             "mailto:someone@example.com?subject=Hi&body=There",
         ] {
-            assert!(opens_without_asking(link), "{link}");
+            assert!(is_web(link), "{link}");
+            assert_eq!(follow(link, None), Follow::Choose);
+            assert_eq!(follow(link, Some(OpenLinks::Open)), Follow::Open);
+            assert_eq!(follow(link, Some(OpenLinks::Ask)), Follow::Confirm);
+            assert_eq!(follow(link, Some(OpenLinks::Never)), Follow::Refuse);
         }
         for link in [
             "file:///home/user/Downloads/x.jar",
@@ -249,7 +281,11 @@ mod tests {
             "/etc/passwd",
             "report.txt",
         ] {
-            assert!(!opens_without_asking(link), "{link}");
+            assert!(!is_web(link), "{link}");
+            for choice in [None, Some(OpenLinks::Open), Some(OpenLinks::Ask)] {
+                assert_eq!(follow(link, choice), Follow::Confirm, "{link}");
+            }
+            assert_eq!(follow(link, Some(OpenLinks::Never)), Follow::Refuse);
         }
     }
 
