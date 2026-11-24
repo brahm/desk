@@ -29,38 +29,97 @@ pub use proofread::{Issue, IssueKind, proofread, style_issues};
 pub use spell::{Speller, misspelled_words, words};
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
+
+/// A dictionary of each language, loaded once.
+///
+/// The languages of a document come from its file: a file may name
+/// thousands, each of which used to load the same dictionary again, on
+/// the thread of the window (review RV, batch 5). A dictionary is now
+/// found by what of the tag picks it, and loaded once by its file.
+struct Loaded<T> {
+    by_key: HashMap<String, Option<PathBuf>>,
+    by_file: HashMap<PathBuf, Option<Arc<T>>>,
+}
+
+impl<T> Default for Loaded<T> {
+    fn default() -> Self {
+        Self {
+            by_key: HashMap::new(),
+            by_file: HashMap::new(),
+        }
+    }
+}
+
+impl<T> Loaded<T> {
+    fn get(
+        &mut self,
+        kind: Kind,
+        language: &str,
+        load: impl FnOnce(&Path) -> Option<T>,
+    ) -> Option<Arc<T>> {
+        let key = dictionaries::key(language)?;
+        let file = self
+            .by_key
+            .entry(key)
+            .or_insert_with_key(|key| find(kind, key))
+            .clone()?;
+        self.by_file
+            .entry(file)
+            .or_insert_with_key(|file| load(file).map(Arc::new))
+            .clone()
+    }
+}
 
 /// The hyphenation patterns of a language, loaded once, or `None` when
 /// the system has none.
 pub fn patterns(language: &str) -> Option<Arc<Patterns>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, Option<Arc<Patterns>>>>> = OnceLock::new();
+    static CACHE: OnceLock<Mutex<Loaded<Patterns>>> = OnceLock::new();
     let cache = CACHE.get_or_init(Mutex::default);
     let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
-    cache
-        .entry(language.to_owned())
-        .or_insert_with(|| {
-            let path = find(Kind::Hyphenation, language)?;
-            let data = std::fs::read(path).ok()?;
-            Patterns::parse(&data).map(Arc::new)
-        })
-        .clone()
+    cache.get(Kind::Hyphenation, language, |path| {
+        Patterns::parse(&std::fs::read(path).ok()?)
+    })
 }
 
 /// The spelling dictionary of a language, loaded once, or `None` when the
 /// system has none.
 pub fn speller(language: &str) -> Option<Arc<Speller>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, Option<Arc<Speller>>>>> = OnceLock::new();
+    static CACHE: OnceLock<Mutex<Loaded<Speller>>> = OnceLock::new();
     let cache = CACHE.get_or_init(Mutex::default);
     let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
-    cache
-        .entry(language.to_owned())
-        .or_insert_with(|| {
-            let dic = find(Kind::Spelling, language)?;
-            let aff = dic.with_extension("aff");
-            let dic = std::fs::read(dic).ok()?;
-            let aff = std::fs::read(aff).ok()?;
-            Speller::from_bytes(&aff, &dic).map(Arc::new)
-        })
-        .clone()
+    cache.get(Kind::Spelling, language, |dic| {
+        let aff = std::fs::read(dic.with_extension("aff")).ok()?;
+        let dic = std::fs::read(dic).ok()?;
+        Speller::from_bytes(&aff, &dic)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_dictionary_is_loaded_once_for_the_tags_that_pick_it() {
+        // Review RV, batch 5: each tag a file named loaded the dictionary
+        // again, as en-q01, en-q02, and so on.
+        assert_eq!(dictionaries::key("en-q01").as_deref(), Some("en"));
+        assert_eq!(dictionaries::key("pt_br").as_deref(), Some("pt-BR"));
+        assert_eq!(dictionaries::key("PT-BR").as_deref(), Some("pt-BR"));
+        assert_eq!(dictionaries::key("und"), None);
+        let mut loaded: Loaded<u32> = Loaded::default();
+        let file = PathBuf::from("/nowhere/en_US.dic");
+        loaded.by_key.insert("en".into(), Some(file.clone()));
+        loaded.by_key.insert("en-GB".into(), Some(file));
+        let mut loads = 0;
+        for tag in ["en", "en-q01", "en-q02", "EN", "en-GB", "en_gb"] {
+            let got = loaded.get(Kind::Spelling, tag, |_| {
+                loads += 1;
+                Some(7)
+            });
+            assert_eq!(got.as_deref(), Some(&7));
+        }
+        assert_eq!(loads, 1);
+    }
 }

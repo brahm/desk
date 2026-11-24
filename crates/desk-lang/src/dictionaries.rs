@@ -183,6 +183,22 @@ fn best_in(kind: Kind, tag: &str, folders: &[PathBuf]) -> Option<PathBuf> {
     best.map(|(_, _, path)| path)
 }
 
+/// What of a BCP 47 tag picks a dictionary, as `pt-BR` for `pt_br` or
+/// `pt-BR-x-q01`: tags with the same key have the same dictionary. None
+/// when the tag names no language.
+pub fn key(tag: &str) -> Option<String> {
+    let parts = parts(tag)?;
+    let mut key = parts.language;
+    for subtag in [parts.script, parts.region, parts.variant]
+        .into_iter()
+        .flatten()
+    {
+        key.push('-');
+        key.push_str(&subtag);
+    }
+    Some(key)
+}
+
 /// The dictionary of a kind for a language, as a BCP 47 tag, if the
 /// system has one.
 pub fn find(kind: Kind, tag: &str) -> Option<PathBuf> {
