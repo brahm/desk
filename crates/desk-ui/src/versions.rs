@@ -187,30 +187,50 @@ impl Store {
             // shown as those of this document (review RV, batch 5), and
             // are removed rather than set aside, where they piled up with
             // nothing to show them (second review).
-            // They are set aside first, and removed only once the versions
-            // of this document are in their place: if that fails, they are
-            // put back (third review). This runs once the document has
-            // taken the name, so no file of that name holds them any more.
-            let mut aside = moved.folder.clone().into_os_string();
-            aside.push(".replaced");
-            let aside = PathBuf::from(aside);
-            let set_aside = moved.folder.exists() && std::fs::rename(&moved.folder, &aside).is_ok();
+            // They are set aside under a name of their own, and removed
+            // once the versions of this document are in their place
+            // (third and fourth reviews). Others set aside before, by a
+            // crash or a removal that failed, go first. This runs once the
+            // document has taken the name, so no file of that name holds
+            // them any more.
+            let name = moved
+                .folder
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy();
+            let stale = format!("{name}.replaced");
+            if let Ok(entries) = std::fs::read_dir(&parent) {
+                for entry in entries.flatten() {
+                    if entry.file_name().to_string_lossy().starts_with(&stale) {
+                        let _ = std::fs::remove_dir_all(entry.path());
+                    }
+                }
+            }
+            let aside = parent.join(format!("{stale}-{:08x}", glib::random_int()));
+            if moved.folder.exists() && std::fs::rename(&moved.folder, &aside).is_err() {
+                // Not set aside: removed where they are, so that they are
+                // never shown as the versions of this document.
+                let _ = std::fs::remove_dir_all(&moved.folder);
+            }
             if moved.folder.exists() {
-                // Not set aside: this document keeps its versions where
-                // they are rather than mixing them.
-                return self.clone();
+                glib::g_warning!(
+                    "desk",
+                    "cannot remove the versions of a file gone: {}",
+                    moved.folder.display()
+                );
+                return moved;
             }
             match std::fs::rename(&self.folder, &moved.folder) {
-                Ok(()) if set_aside => {
+                Ok(()) => {
                     let _ = std::fs::remove_dir_all(&aside);
                 }
-                Ok(()) => {}
-                Err(_) => {
-                    if set_aside {
-                        let _ = std::fs::rename(&aside, &moved.folder);
-                    }
-                    return self.clone();
-                }
+                // The versions of the file gone stay aside, never shown,
+                // until the next move to that name removes them.
+                Err(error) => glib::g_warning!(
+                    "desk",
+                    "cannot take the versions along to {}: {error}",
+                    moved.folder.display()
+                ),
             }
         }
         moved
@@ -340,6 +360,19 @@ mod tests {
         // Nothing is left of the versions of the file gone.
         let folders = std::fs::read_dir(&root).unwrap().count();
         assert_eq!(folders, 1);
+        // Fourth review: what a crash left aside does not stop the next
+        // move, and goes.
+        let key = moved
+            .folder
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        std::fs::create_dir_all(root.join(format!("{key}.replaced"))).unwrap();
+        std::fs::create_dir_all(root.join(format!("{key}.replaced-1234abcd"))).unwrap();
+        let back = moved.move_to(&letter).move_to(&gone);
+        assert_eq!(back.list().len(), 1);
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

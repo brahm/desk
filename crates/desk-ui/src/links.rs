@@ -114,7 +114,17 @@ pub fn is_web(link: &str) -> bool {
         // An address with a user name before its host is one only to
         // show and ask about: the name can look like a host (third review
         // of RV batch 5).
-        "http" | "https" => parts(link).is_some_and(|p| p.user.is_none()),
+        "http" | "https" => parts(link).is_some_and(|p| {
+            // Nor one with `\`, which browsers take for `/` and so read
+            // another host than the one shown (fourth review).
+            let authority = rest
+                .trim_start_matches('/')
+                .split(['/', '?', '#'])
+                .next()
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            p.user.is_none() && !link.contains('\\') && !authority.contains("%5c")
+        }),
         "mailto" => rest.split_once('?').is_none_or(|(_, query)| {
             query.split('&').all(|pair| {
                 let key = pair.split_once('=').map_or(pair, |(k, _)| k);
@@ -275,7 +285,9 @@ fn parts(link: &str) -> Option<Parts<'_>> {
     {
         return None;
     }
-    let end = after.find(['/', '?', '#']).unwrap_or(after.len());
+    // The web takes `\` for `/` in the addresses it knows (fourth review
+    // of RV batch 5).
+    let end = after.find(['/', '\\', '?', '#']).unwrap_or(after.len());
     let (authority, rest) = after.split_at(end);
     let (user, host) = match authority.rsplit_once('@') {
         Some((user, host)) => (Some(user), host),
@@ -401,6 +413,11 @@ mod tests {
         assert!(shown(&user).contains("…@evil.example/"));
         assert!(!is_web(&user));
         assert_eq!(follow(&user, Some(OpenLinks::Open)), Follow::Confirm);
+        // A `\` ends the host as a browser reads it (fourth review).
+        let slash = "https://www.paypal.com.login.evil.example\\@www.paypal.com/";
+        assert!(shown(slash).starts_with("https://www.paypal.com.login.evil.example\\\\"));
+        assert!(!is_web(slash));
+        assert!(!is_web("https://a%5Cb@c/") && !is_web("https://evil%5c.example/"));
         // A host in other letters shows as DNS has it.
         assert_eq!(shown("https://bücher.de/"), "https://xn--bcher-kva.de/");
     }

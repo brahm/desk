@@ -1108,8 +1108,7 @@ impl TextEditor {
         let formats = clipboard.formats();
         if clipboard.is_local()
             || !formats.contains_type(gdk::Texture::static_type())
-            || formats.contain_mime_type("text/plain")
-            || formats.contain_mime_type("text/plain;charset=utf-8")
+            || text_type(formats.mime_types().iter().map(|t| t.as_str())).is_some()
         {
             return false;
         }

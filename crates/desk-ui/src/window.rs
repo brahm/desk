@@ -1626,13 +1626,7 @@ impl DocumentWindow {
             .borrow_mut()
             .get_or_insert_with(|| crate::recovery::Draft::new(opener.saves.1))
             .clone();
-        let name = {
-            let shown = self.name.borrow().clone();
-            match &*self.draft_name.borrow() {
-                Some((title, had)) if *title == shown => had.clone(),
-                _ => shown,
-            }
-        };
+        let name = draft_name(&self.name.borrow(), self.draft_name.borrow().as_ref());
         let written = draft.name_file(&name).is_ok()
             && crate::save_document(opener, &editor.document(), None, &draft.path).is_ok();
         if written {
@@ -3903,10 +3897,6 @@ fn fill_hyphenation(menu: &gio::Menu, editor: Option<&TextEditor>) {
     menu.append_item(&item);
 }
 
-/// Fills the section of the context menu with the format of the field at
-/// the cursor, and sets the states of its actions (EST-27): the format of
-/// a number of pages, of a date and whether it updates on open, and
-/// whether a file name shows its folder and extension.
 /// The window that holds a widget now: a tab can move to another window,
 /// so it is looked up rather than kept (third review of RV batch 5).
 fn window_of(widget: &impl IsA<gtk::Widget>) -> Option<adw::ApplicationWindow> {
@@ -3916,6 +3906,19 @@ fn window_of(widget: &impl IsA<gtk::Widget>) -> Option<adw::ApplicationWindow> {
         .and_downcast::<adw::ApplicationWindow>()
 }
 
+/// The name a draft keeps: of a recovered document that still shows the
+/// title it was given, the name it had; otherwise the name it shows.
+fn draft_name(shown: &str, recovered: Option<&(String, String)>) -> String {
+    match recovered {
+        Some((title, had)) if title == shown => had.clone(),
+        _ => shown.to_string(),
+    }
+}
+
+/// Fills the section of the context menu with the format of the field at
+/// the cursor, and sets the states of its actions (EST-27): the format of
+/// a number of pages, of a date and whether it updates on open, and
+/// whether a file name shows its folder and extension.
 fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<&TextEditor>) {
     menu.remove_all();
     let Some((_, field)) = editor.and_then(TextEditor::field_at_cursor) else {
@@ -4278,6 +4281,16 @@ mod tests {
     #[test]
     fn doc_14_a_copy_is_named_after_the_original() {
         assert_eq!(copy_name("Letter"), "Letter copy");
+    }
+
+    #[test]
+    fn a_recovered_document_keeps_its_name_in_its_draft() {
+        // Second and third reviews of RV batch 5: recovered twice, a
+        // document was "(recovered) (recovered)"; renamed, it went back.
+        let recovered = ("Letter (recovered)".to_string(), "Letter".to_string());
+        assert_eq!(draft_name("Letter (recovered)", Some(&recovered)), "Letter");
+        assert_eq!(draft_name("Note", Some(&recovered)), "Note");
+        assert_eq!(draft_name("Note", None), "Note");
     }
 
     #[test]
