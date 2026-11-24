@@ -1586,11 +1586,17 @@ impl DocumentWindow {
 
     /// Writes the document to a file, and says why when it cannot.
     fn write_to(&self, path: &Path) -> bool {
+        self.write_named(path, path)
+    }
+
+    /// Writes the document to `path`, with the fields of its file name
+    /// showing `named`.
+    fn write_named(&self, path: &Path, named: &Path) -> bool {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
         let pages = editor.pages();
-        let mut document = crate::fields::saved(editor.document(), &path.to_string_lossy());
+        let mut document = crate::fields::saved(editor.document(), &named.to_string_lossy());
         // How it shows, to reopen the same way (INT-08, DOC-16).
         document.set_view(Some(self.current_view()));
         // A picture of the first page, unless the preferences leave it out
@@ -1715,30 +1721,41 @@ impl DocumentWindow {
         // read.
         let folder =
             std::env::temp_dir().join(format!("desk-changes-{}", glib::uuid_string_random()));
-        if std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
-            .create(&folder)
-            .is_err()
+        let cannot = |message: &str| {
+            self.alert(&tr("Cannot Keep the Changes"), message);
+            false
+        };
+        if let Err(error) =
+            std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+                .create(&folder)
         {
-            return false;
+            return cannot(&error.to_string());
         }
         // Named as the document, which the fields of its name show.
         let file = match path.file_name() {
             Some(name) => folder.join(name),
             None => folder.join(format!("document.{extension}")),
         };
-        let kept = self.write_to(&file)
-            && crate::versions::Store::for_document(path)
-                .keep(
-                    &file,
-                    crate::versions::Kind::Automatic,
-                    crate::versions::now(),
-                )
-                .is_ok();
+        // Writing alerts by itself when it fails.
+        let kept = self.write_named(&file, path)
+            && match crate::versions::Store::for_document(path).keep(
+                &file,
+                crate::versions::Kind::Automatic,
+                crate::versions::now(),
+            ) {
+                Ok(_) => true,
+                Err(error) => cannot(&error.to_string()),
+            };
         let _ = std::fs::remove_dir_all(&folder);
-        if kept {
+        kept
+    }
+
+    /// Drops the recovery draft once the document read again holds no
+    /// changes: a draft stays while a Revert or a restore failed.
+    fn drop_draft_if_read_again(&self) {
+        if self.editor().is_some_and(|e| !e.is_modified()) {
             self.drop_draft();
         }
-        kept
     }
 
     /// Asks where to save the document, saves it there, and keeps editing
@@ -2312,7 +2329,16 @@ impl DocumentWindow {
                 .flatten();
             match opened {
                 Some(version) => self.put_in_place(opener, &path, &version),
-                None => self.load(opener, &path),
+                None if !self.opened_kept.get() => {
+                    self.load(opener, &path);
+                    self.drop_draft_if_read_again();
+                }
+                // A version took the place of the file, and the file as
+                // it was opened is gone from its versions.
+                None => self.alert(
+                    &tr("Cannot Revert"),
+                    &tr("The version of the document as it was opened is no longer kept."),
+                ),
             }
             return;
         }
@@ -2390,6 +2416,7 @@ impl DocumentWindow {
                 self.save_over.borrow_mut().take();
                 let opened = self.opened_kept.get();
                 self.load(opener, path);
+                self.drop_draft_if_read_again();
                 // The version as opened is kept already.
                 self.opened_kept.set(opened);
                 self.refresh();

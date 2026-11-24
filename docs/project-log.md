@@ -2149,7 +2149,8 @@ paragraph, and objects on a second page.
   that Save Over held even for bytes put back from a version, and before
   the file was written; that Revert went back to the file on disk rather
   than as opened; and that the changes kept for Revert went through a
-  folder others could read. All fixed.
+  folder others could read. All fixed, and a third round made a Revert
+  or restore that fails say so and keep the recovery draft.
 
 ## Decisions, with their reasons and consequences
 
