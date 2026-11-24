@@ -292,9 +292,8 @@ fn export(
                 ..paragraph.clone()
             },
         };
-        let empty = taken(&paragraph);
         if let Some((_, taking)) = &mut deleting {
-            *taking = empty.clone();
+            *taking = taken(&paragraph);
         }
         for span in paragraph.spans {
             match &span.field {
@@ -302,7 +301,15 @@ fn export(
                     Some((index, ChangeKind::Deletion)) => {
                         let name = regions[index].id.clone();
                         here.spans.push(mark(odf::Field::Change { id: name }));
-                        deleting = Some((index, empty.clone()));
+                        // Its first paragraph joins the one of the
+                        // mark, which keeps its own list and level.
+                        deleting = Some((
+                            index,
+                            odf::Paragraph {
+                                style: paragraph.style.clone(),
+                                ..odf::Paragraph::default()
+                            },
+                        ));
                     }
                     Some((index, ChangeKind::Insertion)) => {
                         let name = regions[index].id.clone();
@@ -347,9 +354,9 @@ fn export(
     *body = out;
 }
 
-/// The paragraph that a deletion takes text of, empty: its style, the
-/// level of its heading and the list it is an item of, which the region
-/// keeps for when the deletion is rejected (B-067).
+/// A paragraph that a deletion takes whole after the break before it,
+/// empty: its style, the level of its heading and the list it is an item
+/// of, which the region keeps for when the deletion is rejected (B-067).
 fn taken(paragraph: &odf::Paragraph) -> odf::Paragraph {
     odf::Paragraph {
         style: paragraph.style.clone(),
@@ -374,6 +381,9 @@ pub(super) fn export_all(
     }
     let masters = std::iter::once(&mut out.master).chain(out.masters.iter_mut().map(|(_, m)| m));
     for master in masters {
+        for object in &mut master.objects {
+            object_text(object, document, &mut regions);
+        }
         for part in [
             &mut master.header,
             &mut master.header_first,
@@ -388,6 +398,23 @@ pub(super) fn export_all(
             text(&mut part.paragraphs, document, &mut regions);
         }
     }
+    // The regions are written in content.xml: the automatic styles of
+    // styles.xml that the text of headers and footers took there go
+    // with it.
+    let named = regions.iter().flat_map(|r| &r.deleted).flat_map(|p| {
+        p.style
+            .iter()
+            .chain(p.spans.iter().filter_map(|s| s.style.as_ref()))
+    });
+    let mut wanted: Vec<odf::Style> = Vec::new();
+    for name in named {
+        let missing = !out.automatic_styles.iter().any(|s| &s.name == name)
+            && !wanted.iter().any(|s| &s.name == name);
+        if missing && let Some(style) = out.master_styles.iter().find(|s| &s.name == name) {
+            wanted.push(style.clone());
+        }
+    }
+    out.automatic_styles.extend(wanted);
     regions
 }
 
@@ -397,8 +424,9 @@ fn text(
     document: &Document,
     regions: &mut Vec<odf::ChangedRegion>,
 ) {
-    export(paragraphs, document, regions);
-    for paragraph in paragraphs {
+    // The notes and objects first, while those in deleted text are still
+    // in the text.
+    for paragraph in paragraphs.iter_mut() {
         for span in &mut paragraph.spans {
             match &mut span.field {
                 Some(odf::Field::Note(note)) => text(&mut note.body, document, regions),
@@ -410,6 +438,7 @@ fn text(
             object_text(object, document, regions);
         }
     }
+    export(paragraphs, document, regions);
 }
 
 /// The text of an object, and of those in a group.

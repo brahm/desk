@@ -380,3 +380,88 @@ fn rev_01_a_list_item_whose_break_before_was_deleted_is_kept() {
     assert_eq!(list(&read, 0), None);
     assert_eq!(list(&read, 1), item);
 }
+
+#[test]
+fn rev_01_a_header_that_a_deletion_emptied_keeps_it_and_its_formatting() {
+    use desk_model::{
+        CharAttrs, Length, MarginKind, MarginPages, MarginPlace, ParaAttrs, Paragraph, Run, Story,
+    };
+    let mut document = Document::new_word_processing();
+    let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    let big = Some(Length::from_points(20));
+    document
+        .transact("Header", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, "Body")?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            let style = edit.document().styles().default_paragraph();
+            let changed = CharAttrs {
+                change: Some(Some(gone)),
+                font_size: big,
+                ..CharAttrs::default()
+            };
+            let header = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                vec![Run::with_attrs("gone", None, changed)],
+            )?;
+            edit.set_header_footer(place, vec![header])
+        })
+        .unwrap();
+    let story = Story::Margin {
+        section: None,
+        place,
+    };
+    let lines = |d: &Document| lines_of(d, d.story_paragraphs(story).iter());
+    assert_eq!(lines(&document), ["[-gone-]"]);
+    let written = write_odt(&document).unwrap();
+    keep("rev-01-header-emptied.odt", &written);
+    // The style of the deleted text is in content.xml, with the region.
+    let content = desk_odf::read_odt(&written).unwrap();
+    let span = &content.tracked_changes[0].deleted[0].spans[0];
+    let name = span.style.as_deref().unwrap();
+    assert!(content.automatic_styles.iter().any(|s| s.name == name));
+    let (again, log) = read_odt_logged(&written).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(lines(&again), ["[-gone-]"]);
+    let run = again.story_paragraphs(story)[0]
+        .runs()
+        .next()
+        .unwrap()
+        .clone();
+    assert_eq!(run.attrs.font_size, big);
+}
+
+#[test]
+fn rev_01_a_note_in_deleted_text_keeps_its_own_changes() {
+    let content = format!(
+        r#"{HEAD}<text:tracked-changes>
+<text:changed-region text:id="d"><text:deletion><office:change-info><dc:creator>Bo</dc:creator><dc:date>2026-11-24T13:00:00</dc:date></office:change-info><text:p>cut<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>Note <text:change-start text:change-id="i"/>new<text:change-end text:change-id="i"/></text:p></text:note-body></text:note></text:p></text:deletion></text:changed-region>
+<text:changed-region text:id="i"><text:insertion><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-24T14:00:00</dc:date></office:change-info></text:insertion></text:changed-region>
+</text:tracked-changes>
+<text:p>Body <text:change text:change-id="d"/>end</text:p>{TAIL}"#
+    );
+    let (document, log) = read_odt_logged(&odt(&content)).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let note = |document: &Document| {
+        let note = document.notes().iter().next().unwrap().id;
+        lines_of(
+            document,
+            document
+                .story_paragraphs(desk_model::Story::Note(note))
+                .iter(),
+        )
+    };
+    assert_eq!(note(&document), ["\u{fffc}Note [+new+]"]);
+    assert_eq!(described(&document).1.len(), 2);
+    let written = write_odt(&document).unwrap();
+    keep("rev-01-note-in-deleted-text.odt", &written);
+    // Every mark in the file names a region of it.
+    let content = desk_odf::read_odt(&written).unwrap();
+    assert_eq!(content.tracked_changes.len(), 2);
+    let (again, log) = read_odt_logged(&written).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(note(&again), note(&document));
+    assert_eq!(described(&again), described(&document));
+}

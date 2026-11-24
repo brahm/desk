@@ -106,7 +106,19 @@ pub fn read_odt_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterErro
         };
         log.add(Warning::Content(content), *count);
     }
-    Ok((import(&source)?, log))
+    let document = import(&source)?;
+    // Insertions and deletions whose marks no text that Desk reads has,
+    // as in tables, are left out as accepted.
+    let regions = source
+        .tracked_changes
+        .iter()
+        .filter(|r| r.kind != odf::ChangeKind::FormatChange)
+        .count();
+    let unread = regions.saturating_sub(document.changes().iter().count());
+    if unread > 0 {
+        log.add(Warning::Content(Content::AcceptedChanges), unread);
+    }
+    Ok((document, log))
 }
 
 /// Writes a document as an ODT file.
@@ -1764,7 +1776,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     )
                 },
             )?;
-            if paragraphs.iter().all(Paragraph::is_empty) {
+            // A header that a deletion emptied still has its change.
+            if paragraphs.iter().all(Paragraph::is_empty)
+                && !comments.iter().any(|(_, _, field)| changes::is_mark(field))
+            {
                 continue;
             }
             // Other programs show the first and left ones whenever they
@@ -1783,12 +1798,14 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             })?;
             let (tracked, comments) = split_tracked(comments);
             comments::import(&mut document, comments)?;
+            // The regions are in content.xml, with its styles.
             import_tracked(
-                &styled,
+                source,
                 &source.tracked_changes,
                 &mut document,
                 &ids,
                 &lists,
+                &Marks::new(),
                 default,
                 relative,
                 tracked,
@@ -1871,6 +1888,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         &mut document,
         &ids,
         &lists,
+        &Marks::new(),
         default,
         relative,
         object_tracked,
@@ -1947,6 +1965,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         &mut document,
         &ids,
         &lists,
+        &marks,
         default,
         relative,
         tracked,
@@ -2103,6 +2122,7 @@ fn import_tracked(
     document: &mut Document,
     ids: &HashMap<(odf::Family, &str), StyleId>,
     lists: &HashMap<&str, StyleId>,
+    marks: &Marks,
     default: StyleId,
     relative: bool,
     events: changes::Events,
@@ -2122,14 +2142,7 @@ fn import_tracked(
         let mut paragraphs = Vec::new();
         for paragraph in &region.deleted {
             let mut built = import_paragraph(
-                source,
-                document,
-                ids,
-                default,
-                paragraph,
-                relative,
-                &Marks::new(),
-                None,
+                source, document, ids, default, paragraph, relative, marks, None,
             )?;
             // The list it was an item of, for when the deletion is
             // rejected (B-067).
@@ -2147,6 +2160,9 @@ fn import_tracked(
                 }
                 if member.level > 0 {
                     attrs.list_level = Some(member.level);
+                }
+                if let Some(start) = member.start {
+                    attrs.list_start = Some(Some(start));
                 }
                 built = Paragraph::from_runs(
                     built.id(),
@@ -2266,6 +2282,7 @@ fn import_note(
         document,
         ids,
         &HashMap::new(),
+        &Marks::new(),
         default,
         relative,
         tracked,

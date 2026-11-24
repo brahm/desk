@@ -136,24 +136,8 @@ pub fn read_streams(
                 .filter_map(changed_region)
                 .collect();
         }
-        // The changes of the text of tables and of the shapes of groups
-        // are left out, as accepted, as their comments are.
-        let mut marked = std::collections::HashSet::new();
-        change_marks(text, &mut marked);
-        if let Some(masters) = styles
-            .as_ref()
-            .and_then(|s| s.child(OFFICE, "master-styles"))
-        {
-            change_marks(masters, &mut marked);
-        }
-        let unread = document
-            .tracked_changes
-            .iter()
-            .filter(|r| r.kind != ChangeKind::FormatChange && !marked.contains(r.id.as_str()))
-            .count();
-        if unread > 0 {
-            document.skipped.push(("changed-region".to_owned(), unread));
-        }
+        // Insertions and deletions whose marks the reader of the
+        // document does not find are counted there, as left out.
         left_out(text, true, &mut document.skipped);
     }
     if let Some(masters) = styles
@@ -949,24 +933,6 @@ fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
         if !matches!(skipped, Some("annotation" | "changed-region" | "object")) {
             let body = body && !(name.is(TABLE, "table") || name.is(DRAW, "g"));
             left_out(child, body, out);
-        }
-    }
-}
-
-/// The regions that the marks of the text read in `e` name where their
-/// text starts: not those of tables or of the shapes of groups (W148).
-fn change_marks(e: &Element, out: &mut std::collections::HashSet<String>) {
-    for child in e.elements() {
-        let name = &child.name;
-        if name.is(TEXT, "change") || name.is(TEXT, "change-start") {
-            if let Some(id) = child.attr(TEXT, "change-id") {
-                out.insert(id.to_owned());
-            }
-        } else if !(name.is(TABLE, "table")
-            || name.is(DRAW, "g")
-            || name.is(TEXT, "tracked-changes"))
-        {
-            change_marks(child, out);
         }
     }
 }
