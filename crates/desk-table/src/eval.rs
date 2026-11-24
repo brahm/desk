@@ -403,6 +403,21 @@ mod tests {
     }
 
     #[test]
+    fn copies_of_a_long_text_spend_the_work() {
+        // A long text and many cells that each repeat it (review of the
+        // pull request of RV batch 2).
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(200, 1);
+        t.type_text(0, 0, &"a".repeat(30_000), &en);
+        for r in 1..200 {
+            t.type_text(r, 0, "=$A$1", &en);
+        }
+        let v = t.values_within(0.0, 1 << 20);
+        assert!(matches!(v.get(1, 0), Value::Text(_)));
+        assert_eq!(v.get(199, 0), &Value::Error(ErrorKind::Value));
+    }
+
+    #[test]
     fn a_range_refused_leaves_the_work_to_the_other_formulas() {
         let en = Locale::en_us();
         let mut t: Table<String> = Table::new(3, 2);

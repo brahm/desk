@@ -102,6 +102,15 @@ pub(crate) struct Eval<'a> {
 }
 
 impl Eval<'_> {
+    /// The value of a cell, whose text is copied: a million cells that
+    /// each repeat a long text would fill the memory.
+    fn cell(&self, at: CellRef) -> Value {
+        match self.context.cell(at) {
+            Value::Text(t) if !self.context.spend(t.len() as u64) => Value::Error(ErrorKind::Value),
+            v => v,
+        }
+    }
+
     fn range(&self, a: CellRef, b: CellRef) -> Arg {
         let (c0, c1) = (a.col.min(b.col), a.col.max(b.col));
         let (r0, r1) = (a.row.min(b.row), a.row.max(b.row));
@@ -141,7 +150,7 @@ impl Eval<'_> {
         match expr {
             Expr::Range(a, b) => self.range(*a, *b),
             Expr::Cell(c) => Arg::Range {
-                values: vec![self.context.cell(*c)],
+                values: vec![self.cell(*c)],
                 cols: 1,
             },
             Expr::Header(name) => match self.context.header(name) {
@@ -159,7 +168,7 @@ impl Eval<'_> {
             Expr::Text(t) => Value::Text(t.clone()),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::Error(e) => Value::Error(*e),
-            Expr::Cell(c) => self.context.cell(*c),
+            Expr::Cell(c) => self.cell(*c),
             Expr::Range(..) | Expr::Header(_) => match self.arg(expr) {
                 Arg::Scalar(v) => v,
                 Arg::Range { values, .. } if values.len() == 1 => values
