@@ -1589,3 +1589,80 @@ fn tab_01_tab_27_the_tables_of_pages_09_open_with_their_cells_and_comments() {
         "Comment on a cell."
     );
 }
+
+#[test]
+fn tab_04_14_21_28_the_tables_of_pages_09_keep_their_styles_formats_and_rules() {
+    use desk_model::ObjectKind;
+    use desk_model::table::{CellFill, Color, Condition, Format, HAlign, Num, Operand};
+    let table_of = |name: &str| {
+        let (_, objects) = fixture_objects(name);
+        objects
+            .iter()
+            .find_map(|o| match &o.kind {
+                ObjectKind::Table(t) => Some((**t).clone()),
+                _ => None,
+            })
+            .expect("a table")
+    };
+    // The table style: the grey header row, text of 12 points, and the header
+    // text bold and centred.
+    let look = table_of("tab-04-22-25-appearance.pages");
+    assert_eq!(look.style.header_row_fill, Some(Color::rgb(176, 179, 178)));
+    assert_eq!(look.style.body_fill, None);
+    assert_eq!(look.style.font_size, 12_000);
+    let header = &look.cell(0, 0).style;
+    assert!(header.text.bold);
+    assert_eq!(header.h_align, HAlign::Center);
+    assert_eq!(header.fill, None);
+    // The gradient of the third header cell, and its lines of 3 points
+    // among the lines of 1 point of the rest.
+    assert!(matches!(
+        look.cell(0, 2).style.fill,
+        Some(CellFill::Gradient { angle: 270, .. })
+    ));
+    let width = |b: Option<desk_model::table::Border>| b.map(|b| b.width);
+    assert_eq!(width(look.h_border(0, 2)), Some(3_000));
+    assert_eq!(width(look.h_border(1, 2)), Some(3_000));
+    assert_eq!(width(look.v_border(0, 2)), Some(3_000));
+    assert_eq!(width(look.v_border(0, 3)), Some(3_000));
+    assert_eq!(width(look.h_border(2, 1)), Some(1_000));
+    assert_eq!(width(look.v_border(3, 0)), Some(1_000));
+    // The alternating rows, and the numbers on the left, as Pages shows
+    // them.
+    let banded = table_of("tab-14-alternating.pages");
+    assert!(banded.style.alternating.is_some());
+    assert_eq!(
+        banded.cell(1, 1).content,
+        desk_model::table::Content::Number(Num(3.0))
+    );
+    assert_eq!(banded.cell(1, 1).style.h_align, HAlign::Left);
+    // The formats of the cells.
+    let formats = table_of("tab-28-cell-formats.pages");
+    assert!(matches!(
+        formats.cell(0, 2).format,
+        Format::Percent {
+            decimals: Some(2),
+            ..
+        }
+    ));
+    assert!(
+        matches!(&formats.cell(1, 0).format, Format::Custom(c) if &*c.pattern == "dd/MM/yy HH:mm")
+    );
+    assert!(matches!(formats.cell(1, 1).format, Format::Duration { .. }));
+    assert_eq!(
+        formats.cell(2, 1).format,
+        Format::Scientific { decimals: 2 }
+    );
+    assert_eq!(formats.cell(2, 2).format, Format::Text);
+    // The rule of conditional formatting: italic when not 50.
+    let rules = table_of("tab-21-conditional.pages");
+    let rule = &rules.cell(2, 1).rules;
+    assert_eq!(rule.len(), 1);
+    assert_eq!(
+        rule[0].condition,
+        Condition::NotEqual(Operand::Number(Num(50.0)))
+    );
+    assert_eq!(rule[0].style.italic, Some(true));
+    assert_eq!(rule[0].style.bold, None);
+    assert!(rules.cell(1, 1).rules.is_empty());
+}

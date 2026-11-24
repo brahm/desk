@@ -18,7 +18,9 @@ use crate::xml::{self, Element, Node};
 mod drawables;
 mod tables;
 
-pub use tables::{CellContent, Table, TableCell};
+pub use tables::{
+    CellContent, CellFormat, CellLook, CellRule, NumberFormat, RuleOperand, Table, TableCell,
+};
 
 pub use drawables::{
     AlignmentGuide, Drawable, DrawableKind, Geometry, ObjectShadow, Place, ShapePath, TextWrap,
