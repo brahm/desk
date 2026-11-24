@@ -555,6 +555,11 @@ fn tokenize(text: &str) -> Result<Vec<(usize, Token)>, ParseError> {
                 }
                 let end = chars.get(i).map_or(text.len(), |c| c.0);
                 let n: f64 = text[at..end].parse().map_err(|_| err(at, "bad number"))?;
+                // 1E999 is past the largest number, and could not be
+                // written back.
+                if !n.is_finite() {
+                    return Err(err(at, "number too large"));
+                }
                 out.push((at, Token::Number(n)));
             }
             '"' | '\'' => {
@@ -901,6 +906,14 @@ mod tests {
         assert_eq!(CellRef::column_name(26), "AA");
         assert_eq!(CellRef::parse("AA10"), Some(CellRef::new(26, 9)));
         assert_eq!(CellRef::parse("A0"), None);
+    }
+
+    #[test]
+    fn a_number_past_the_largest_is_refused() {
+        // Found by fuzzing formula_parse: 1E999 was read as infinity,
+        // written as inf and read back as a header.
+        assert!(Formula::parse("=1E999+1").is_err());
+        assert!(Formula::parse("=1E308").is_ok());
     }
 
     #[test]
