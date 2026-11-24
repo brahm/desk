@@ -2,6 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 key	value	source
 baseline_date	2026-11-16	docs/roadmap.md, the day the plan was written
-days_low	55	docs/roadmap.md, "between 55 and 90 days"
-days_likely	70	docs/roadmap.md, "about 70 working days with the apps in sequence"
-days_high	90	docs/roadmap.md, "between 55 and 90 days"
+days_low	60	docs/roadmap.md, "between 60 and 100 days"
+days_likely	78	docs/roadmap.md, "about 78 working days with the apps in sequence"
+days_high	100	docs/roadmap.md, "between 60 and 100 days"

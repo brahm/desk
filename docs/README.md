@@ -12,6 +12,7 @@ and contribute to Desk, and for a coding agent working for that person.
 | [phases](phases) | The plan of each phase when it starts: its rows, how each is checked and the order of the pull requests |
 | [odf-extensions.md](odf-extensions.md) | How Desk stores what standard ODF cannot hold |
 | [interface](interface/README.md) | The window, its components, and the chosen proposal in [interface/proposals](interface/proposals/README.md) |
+| [review](review/README.md) | The code review of phase RV: its plan, batches and reports of findings |
 | [backlog](backlog/README.md) | What was left undone, why, and when it comes back |
 | [project-log.md](project-log.md) | The story of the project: each decision, why it was taken and what followed. Updated at the end of every set of tasks |
 | [dashboard](dashboard/README.md) | Where the project stands: the progress page, the log of what each set of tasks changed ([`changes.tsv`](dashboard/changes.tsv)), how the numbers are worked out and how to update them |

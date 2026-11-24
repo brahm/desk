@@ -42,7 +42,7 @@ three are kept up to date together.
 | --- | --- | --- |
 | [`corpus/inventory/*.tsv`](../../corpus/inventory/README.md) | Scope, status, phase and note of every feature | When a feature changes status |
 | [`../roadmap.md`](../roadmap.md) | The table of phases: id, name, what it delivers, estimate in days | When the plan changes |
-| [`phases.tsv`](phases.tsv) | The status of each phase: `not-started`, `in-progress` or `done`, with the days it started and ended | When a phase starts or ends |
+| [`phases.tsv`](phases.tsv) | The status of each phase: `not-started`, `in-progress`, `paused` or `done`, with the days it started and ended | When a phase starts, pauses or ends |
 | [`forecast.tsv`](forecast.tsv) | The estimate of the plan: its day and the least, likely and most days | When the roadmap corrects its estimate |
 | [`../backlog/deferred.tsv`](../backlog/README.md) | What was left undone, and the phase it moved to | By the rules of the backlog |
 | [`history.tsv`](history.tsv) | One row per day the dashboard was recorded | Only through `--record` |
@@ -81,8 +81,8 @@ before the plan of 2026-11-16.
 ## How the forecast is worked out
 
 The work is measured in the estimated days of the phases in the roadmap.
-A phase that is `done` counts whole; a phase `in-progress` counts by the
-share of its inventory rows that are done; the others count nothing. The
+A phase that is `done` counts whole; a phase `in-progress` or `paused`
+counts by the share of its inventory rows that are done; the others count nothing. The
 forecast is the day the page is generated plus the share still to do of
 the least, likely and most days of `forecast.tsv`. With no progress it
 moves one day later each day. It is an estimate, not a commitment.

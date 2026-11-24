@@ -69,7 +69,7 @@ STATE_HELP = {
     'base': 'o motor existe, mas o aplicativo ainda não o usa',
     'missing': 'ainda não começou',
 }
-PHASE_STATUS = {'not-started': 'Não iniciada', 'in-progress': 'Em andamento', 'done': 'Concluída'}
+PHASE_STATUS = {'not-started': 'Não iniciada', 'in-progress': 'Em andamento', 'paused': 'Pausada', 'done': 'Concluída'}
 MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto',
           'setembro', 'outubro', 'novembro', 'dezembro']
 HISTORY_COLUMNS = ['date', 'in_scope', 'done', 'review', 'partial', 'base', 'missing',
@@ -195,9 +195,9 @@ def forecast(phases, today):
     The plan (docs/dashboard/forecast.tsv, copied from the roadmap) says
     how many days the whole work takes: least, likely and most. The share
     of the work still to do is measured in the estimated days of the
-    phases: a phase that ended counts whole, a phase in progress counts by
-    the share of its inventory rows that are done, and the others count
-    nothing. Today's forecast is today plus that share of the plan's days.
+    phases: a phase that ended counts whole, a phase in progress or paused
+    counts by the share of its inventory rows that are done, and the
+    others count nothing. Today's forecast is today plus that share of the plan's days.
     """
     plan = {r['key']: r['value'] for r in read_tsv(HERE / 'forecast.tsv')}
     base = datetime.date.fromisoformat(plan['baseline_date'])
@@ -209,7 +209,7 @@ def forecast(phases, today):
             continue
         if p['status'] == 'done':
             earned += p['days']
-        elif p['status'] == 'in-progress' and p['total']:
+        elif p['status'] in ('in-progress', 'paused') and p['total']:
             earned += p['days'] * p['counts']['done'] / p['total']
     left = 1 - earned / total
     add = datetime.timedelta
@@ -437,7 +437,9 @@ def coming_next(features, phases, open_items):
     """The section with the phases in progress and the next ones, row by row."""
     o = ['<section class="card" id="a-seguir"><h2>A seguir</h2>'
          '<p class="intro">As fases em andamento e as próximas pelo roadmap, com cada recurso que falta e as pendências que voltam nelas.</p>']
-    shown = [(p, 'Em andamento') for p in phases if p['status'] == 'in-progress'] + [(p, 'Próxima') for p in next_phases(phases)]
+    shown = ([(p, 'Em andamento') for p in phases if p['status'] == 'in-progress']
+             + [(p, 'Pausada') for p in phases if p['status'] == 'paused']
+             + [(p, 'Próxima') for p in next_phases(phases)])
     if not shown:
         o.append('<p>Todas as fases do roadmap estão concluídas.</p>')
     for p, tag in shown:
@@ -538,6 +540,7 @@ body { background: var(--window); color: var(--fg); font: 15px/1.5 var(--sans); 
 .pill { display: inline-block; border-radius: 99px; padding: 1px 10px; font-size: 12px; font-weight: 600; white-space: nowrap;
   border: 1px solid var(--border); color: var(--dim); }
 .pill.in-progress, .pill.open { color: var(--accent); border-color: currentColor; }
+.pill.paused { color: var(--warn); border-color: currentColor; }
 .pill.done, .pill.merged { color: var(--ok); border-color: currentColor; }
 .pill.closed { color: var(--bad); border-color: currentColor; }
 .timeline { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
@@ -684,7 +687,7 @@ def render(features, phases, backlog, prs, prs_source, history, changes, fc, tod
 
     # Per phase.
     by_phase = collections.Counter(b['to_phase'] for b in open_items)
-    tracks = [('Preparação', lambda p: p['id'] in ('R', 'B1')), ('Writer', lambda p: p['id'].startswith('W')),
+    tracks = [('Preparação', lambda p: p['id'] in ('R', 'B1')), ('Revisão', lambda p: p['id'] == 'RV'), ('Writer', lambda p: p['id'].startswith('W')),
               ('Tables', lambda p: p['id'].startswith('T')), ('Slides', lambda p: p['id'].startswith('S')),
               ('Fechamento', lambda p: p['id'].startswith('X'))]
     w('<section class="card" id="fases"><h2>Por fase</h2>'
@@ -701,7 +704,7 @@ def render(features, phases, backlog, prs, prs_source, history, changes, fc, tod
         w(f'<tr class="track-head"><td colspan="6">{track}</td></tr>')
         for p in group:
             when = ''
-            if p['status'] == 'in-progress' and p['started'] != '-':
+            if p['status'] in ('in-progress', 'paused') and p['started'] != '-':
                 when = f' <span class="sub">desde {day(datetime.date.fromisoformat(p["started"]))}</span>'
             if p['status'] == 'done' and p['ended'] != '-':
                 when = f' <span class="sub">em {day(datetime.date.fromisoformat(p["ended"]))}</span>'

@@ -150,3 +150,8 @@ date	kind	id	from	to
 2026-11-22	feature	W131	review	done
 2026-11-22	phase	W1	in-progress	done
 2026-11-22	phase	W2	not-started	in-progress
+2026-11-24	phase	W2	in-progress	paused
+2026-11-24	phase	RV	new	in-progress
+2026-11-24	backlog	B-048	new	done
+2026-11-24	backlog	B-049	new	done
+2026-11-24	backlog	B-050	new	open
