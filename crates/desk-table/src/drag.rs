@@ -212,6 +212,14 @@ mod tests {
         assert_eq!((to.rows(), to.footer_rows()), (5, 1));
         assert_eq!(to.cell(2, 0).content, Content::Text("Sul".into()));
         assert_eq!(to.cell(4, 1).content, Content::Text("Total".into()));
+        // Two rows from the first of the body, which end within the table,
+        // still go before the footer.
+        let mut to: Table<String> = Table::new(3, 2);
+        to.type_text(2, 1, "Total", &Locale::pt_br());
+        to.set_footer_rows(1).unwrap();
+        to.put_cells((1, 0), &from, Area::between((1, 0), (2, 1)));
+        assert_eq!((to.rows(), to.footer_rows()), (4, 1));
+        assert_eq!(to.cell(3, 1).content, Content::Text("Total".into()));
     }
 
     #[test]

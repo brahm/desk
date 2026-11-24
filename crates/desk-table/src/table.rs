@@ -677,21 +677,25 @@ impl<T: CellText> Table<T> {
     /// added to the body, so that the footer stays the last rows and is
     /// not written over; put in the footer, they join it.
     pub(crate) fn add_rows_to_reach(&mut self, start: u32, end: u32) {
-        let end = end.min(MAX_CELLS);
-        let rows = self.rows();
-        if end <= rows {
-            return;
-        }
-        let body_end = self.body_end();
-        let (at, add) = if self.footer_rows > 0 && start < body_end {
-            (body_end, end - body_end)
-        } else {
-            (rows, end - rows)
-        };
-        let add = add.min(MAX_CELLS - rows);
+        let (at, add) = self.rows_to_reach(start, end);
         if add > 0 {
             let _ = self.insert_rows(at, add);
         }
+    }
+
+    /// Where [`Table::add_rows_to_reach`] adds rows, and how many: past
+    /// the end of the body when cells put from the body would reach the
+    /// footer, past the end of the table otherwise.
+    pub(crate) fn rows_to_reach(&self, start: u32, end: u32) -> (u32, u32) {
+        let end = end.min(MAX_CELLS);
+        let rows = self.rows();
+        let body_end = self.body_end();
+        let last = if self.footer_rows > 0 && start < body_end {
+            body_end
+        } else {
+            rows
+        };
+        (last, end.saturating_sub(last).min(MAX_CELLS - rows))
     }
 
     /// The formula that the cells of a column repeat down to row `at`,

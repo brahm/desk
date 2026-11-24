@@ -53,14 +53,25 @@ impl<T: CellText> Table<T> {
         // lines and tabs cannot ask for billions.
         let (rows, cols) = (self.rows(), self.cols());
         let most = MAX_PASTED_CELLS.max(u64::from(rows) * u64::from(cols));
-        let mut new_rows = r0.saturating_add(lines.len() as u32).clamp(rows, MAX_CELLS);
+        let reach = r0.saturating_add(lines.len() as u32);
+        let (row_at, add) = self.rows_to_reach(r0, reach);
+        let mut new_rows = rows + add;
         let mut new_cols = c0.saturating_add(width).clamp(cols, MAX_CELLS);
         if u64::from(new_rows) * u64::from(new_cols) > most {
             let fit = |n: u32| u32::try_from(most / u64::from(n)).unwrap_or(MAX_CELLS);
             new_cols = fit(new_rows).clamp(cols, new_cols);
             new_rows = fit(new_cols).clamp(rows, new_rows);
         }
-        self.add_rows_to_reach(r0, new_rows);
+        if new_rows > rows {
+            let _ = self.insert_rows(row_at, new_rows - rows);
+        }
+        // Text pasted in the body of a table with a footer, past the rows
+        // it could add, leaves the footer as it is.
+        let last_row = if self.footer_rows() > 0 && r0 < self.body_end() {
+            self.body_end()
+        } else {
+            self.rows()
+        };
         if new_cols > cols {
             let _ = self.insert_cols(cols, new_cols - cols);
         }
@@ -69,7 +80,7 @@ impl<T: CellText> Table<T> {
             for (j, value) in values.iter().enumerate() {
                 let c = c0.saturating_add(j as u32);
                 // A table at its largest leaves the rest out.
-                if r < self.rows() && c < self.cols() {
+                if r < last_row && c < self.cols() {
                     self.type_text(r, c, value, locale);
                 }
             }
@@ -144,6 +155,22 @@ mod tests {
         assert_eq!(t.cell(4, 1).content, Content::Number(Num(3.0)));
         // The totals stay the footer, not written over.
         assert_eq!(t.cell(5, 1).content, Content::Formula("=SUM(B2:B3)".into()));
+        // Lines that end within the table, past the body, still go before
+        // the footer: 9 lines in a table of 10 rows with 2 of footer
+        // (review of the pull request of RV batch 2).
+        let mut t: Table<String> = Table::new(10, 1);
+        t.type_text(8, 0, "Total", &pt);
+        t.type_text(9, 0, "Average", &pt);
+        t.set_footer_rows(2).unwrap();
+        let text: String = (1..=9).map(|n| format!("{n}\n")).collect();
+        t.paste_text((1, 0), &text, &pt);
+        assert_eq!((t.rows(), t.footer_rows()), (12, 2));
+        assert_eq!(t.cell(9, 0).content, Content::Number(Num(9.0)));
+        assert_eq!(t.cell(10, 0).content, Content::Text("Total".into()));
+        assert_eq!(t.cell(11, 0).content, Content::Text("Average".into()));
+        // Lines within the body add nothing.
+        t.paste_text((1, 0), "5\n6\n", &pt);
+        assert_eq!(t.rows(), 12);
     }
 
     #[test]
