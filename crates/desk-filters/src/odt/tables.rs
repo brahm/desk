@@ -299,7 +299,11 @@ pub(crate) fn export_table(
                     out_cell.value = Some(v);
                 }
             }
-            if let Format::Currency { symbol, .. } = &cell.format {
+            // ODF allows `office:currency` only on a cell whose value is
+            // money: text in a currency cell, as tab-28 has, goes without.
+            if let Format::Currency { symbol, .. } = &cell.format
+                && kind == "currency"
+            {
                 out_cell.currency = Some(
                     match symbol.as_str() {
                         "R$" => "BRL",
