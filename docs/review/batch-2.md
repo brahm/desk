@@ -29,7 +29,9 @@ evaluation). Reviewed on 24 November 2026 from commit `145c979`, with
 | 17 | B | `desk-table/src/ops.rs` | Merge joined numbers with text in en_US, so `2,5` became `2.5` in a Brazilian document | Numbers are written as they are typed in the locale of the document; test |
 | 18 | B | `desk-table/src/format.rs` | A date typed without a year, `15/03`, was 15 March 2000 | It is of the current year, as in Numbers; test |
 | 19 | B | `desk-formula/src/value.rs` | `YEAR(1E300)` passed the largest `i64` to `date_from_days`, whose first sum overflowed: a panic in debug builds, a wrong date in release | Days are clamped to well past the years an `i32` holds; test |
-| 20 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
+| 20 | B | `desk-formula/src/parse.rs` | A sign under a percent lost its parentheses when written: `=(-A1)%` became `=-A1%`, which reads as the sign of the percent (found by fuzzing `formula_parse`) | Written with its parentheses; test |
+| 21 | B | `desk-formula/src/parse.rs` | `1E999` was read as infinity, written back as `inf` and read again as a header (found by fuzzing `formula_parse`) | A number past the largest is a syntax error; test |
+| 22 | D | `desk-table/src/table.rs` | `Table::new` sized its borders by products in `u32`, which only just fit at the largest size | Sizes in `usize` |
 
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
@@ -58,7 +60,9 @@ in its library code. Its arguments are taken with `at`, which gives
 
 A new target, `formula_parse`, reads any text as a formula, writes it as
 text and as OpenFormula and reads both back the same, and evaluates it in
-a table. Its results are in the pull request.
+a table. It stopped twice in its first minutes, on findings 20 and 21;
+after their fixes it ran 15 minutes, three million formulas, without a
+failure. Its results are in the pull request.
 
 `proptest`, which the plan named for formulas against known values, was
 not needed here: the round trip of the fuzz target checks the writers,
