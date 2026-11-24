@@ -221,36 +221,70 @@ fn wildcard(pattern: &str, text: &str) -> bool {
     wildcard_chars(&p, &t)
 }
 
-/// [`wildcard`] on characters: in time of the pattern by the text at most,
-/// going back only to the last `*`.
+/// Whether `part`, with `?` for any character, matches `text` at `at`.
+fn part_at(part: &[char], text: &[char], at: usize) -> bool {
+    text.get(at..at + part.len())
+        .is_some_and(|t| part.iter().zip(t).all(|(p, c)| *p == '?' || p == c))
+}
+
+/// Where `part` first matches `text` from `from`.
+fn find_part(part: &[char], text: &[char], from: usize) -> Option<usize> {
+    (from..=text.len().saturating_sub(part.len())).find(|&i| part_at(part, text, i))
+}
+
+/// Where the parts of a pattern between its `*` match, one after the
+/// other, in `text` from `from`, each at the first place it can: the end
+/// of the last, or None. Taking each part as early as it comes leaves the
+/// most text to those after it, so no other choice matches when this one
+/// does not, and the work is at most the pattern by the text.
+fn parts_in_order(parts: &[&[char]], text: &[char], from: usize) -> Option<usize> {
+    let mut at = from;
+    for part in parts {
+        at = find_part(part, text, at)? + part.len();
+    }
+    Some(at)
+}
+
+/// [`wildcard`] on characters, in time of the pattern by the text at most.
 fn wildcard_chars(p: &[char], t: &[char]) -> bool {
-    let (mut pi, mut ti) = (0, 0);
-    let (mut star, mut mark) = (None, 0);
-    while let Some(&tc) = t.get(ti) {
-        match p.get(pi) {
-            Some(&pc) if pc == '?' || pc == tc => {
-                pi += 1;
-                ti += 1;
-            }
-            Some('*') => {
-                star = Some(pi);
-                mark = ti;
-                pi += 1;
-            }
-            _ => match star {
-                Some(s) => {
-                    pi = s + 1;
-                    mark += 1;
-                    ti = mark;
-                }
-                None => return false,
-            },
-        }
+    let parts: Vec<&[char]> = p.split(|c| *c == '*').collect();
+    let (Some(first), Some(last)) = (parts.first(), parts.last()) else {
+        return t.is_empty();
+    };
+    if parts.len() == 1 {
+        return first.len() == t.len() && part_at(first, t, 0);
     }
-    while p.get(pi) == Some(&'*') {
-        pi += 1;
+    // The first part starts the text and the last ends it, apart.
+    if first.len() + last.len() > t.len()
+        || !part_at(first, t, 0)
+        || !part_at(last, t, t.len() - last.len())
+    {
+        return false;
     }
-    pi == p.len()
+    let middle = parts.get(1..parts.len() - 1).unwrap_or_default();
+    let inner = t.get(..t.len() - last.len()).unwrap_or_default();
+    parts_in_order(middle, inner, first.len()).is_some()
+}
+
+/// Takes from the work of the table what matching a pattern against
+/// texts costs at most: the pattern by the texts.
+fn spend_matching(e: &Eval<'_>, pattern: &Value, texts: &[Value]) -> Result<()> {
+    let Value::Text(p) = pattern else {
+        return Ok(());
+    };
+    let total: usize = texts
+        .iter()
+        .map(|v| match v {
+            Value::Text(t) => t.len() + 1,
+            _ => 1,
+        })
+        .sum();
+    let work = (p.len() as u64 + 1).saturating_mul(total as u64);
+    if e.context.spend(work) {
+        Ok(())
+    } else {
+        Err(ErrorKind::Value)
+    }
 }
 
 fn date_parts(e: &Eval<'_>, x: &Expr) -> Result<(i32, u32, u32, f64)> {
@@ -1029,6 +1063,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             } else {
                 test.clone()
             };
+            spend_matching(e, &crit, &test)?;
             let mut s = 0.0;
             for (i, v) in test.iter().enumerate() {
                 if matches(v, &crit)
@@ -1118,6 +1153,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             } else {
                 test.clone()
             };
+            spend_matching(e, &crit, &test)?;
             let picked: Vec<f64> = test
                 .iter()
                 .enumerate()
@@ -1177,12 +1213,10 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 2)?;
             let crit = e.scalar(at(a, 1)?);
+            let test = e.arg(at(a, 0)?).values();
+            spend_matching(e, &crit, &test)?;
             Ok(Value::Number(
-                e.arg(at(a, 0)?)
-                    .values()
-                    .iter()
-                    .filter(|v| matches(v, &crit))
-                    .count() as f64,
+                test.iter().filter(|v| matches(v, &crit)).count() as f64,
             ))
         }
     ),
@@ -1411,6 +1445,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let needle = e.scalar(at(a, 0)?);
             let hay = e.arg(at(a, 1)?).values();
             let kind = if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 };
+            spend_matching(e, &needle, &hay)?;
             let pos = match kind {
                 0 => lookup_position(&needle, &hay, true),
                 -1 => hay
@@ -1441,6 +1476,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..rows).map(|i| r.at(i, 0)).collect();
+            spend_matching(e, &needle, &first)?;
             let row = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row, col as usize - 1))
         }
@@ -1461,6 +1497,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
                 return Err(ErrorKind::Reference);
             }
             let first: Vec<Value> = (0..cols).map(|i| r.at(0, i)).collect();
+            spend_matching(e, &needle, &first)?;
             let col = lookup_position(&needle, &first, !approx).ok_or(ErrorKind::NotAvailable)?;
             Ok(r.at(row as usize - 1, col))
         }
@@ -1605,9 +1642,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Where a text starts in another, in the same case.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
+            let (needle, hay) = (text(e, at(a, 0)?)?, text(e, at(a, 1)?)?);
+            spend_matching(e, &Value::Text(needle.clone()), &[Value::Text(hay.clone())])?;
             find(
-                &text(e, at(a, 0)?)?,
-                &text(e, at(a, 1)?)?,
+                &needle,
+                &hay,
                 if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 },
                 false,
             )
@@ -1620,9 +1659,11 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
         "Where a text starts in another, in any case.",
         |e: &Eval<'_>, a: &[Expr]| {
             count(a, 2, 3)?;
+            let (needle, hay) = (text(e, at(a, 0)?)?, text(e, at(a, 1)?)?);
+            spend_matching(e, &Value::Text(needle.clone()), &[Value::Text(hay.clone())])?;
             find(
-                &text(e, at(a, 0)?)?,
-                &text(e, at(a, 1)?)?,
+                &needle,
+                &hay,
                 if a.len() > 2 { int(e, at(a, 2)?)? } else { 1 },
                 true,
             )
@@ -1898,14 +1939,15 @@ fn find(needle: &str, hay: &str, start: i64, any_case: bool) -> Result<Value> {
         None => return Err(ErrorKind::Value),
     };
     let found = if any_case && (needle.contains('*') || needle.contains('?')) {
-        // Some text from i matches when the pattern, then any text, matches
-        // all that follows i.
-        let pattern: Vec<char> = needle.chars().chain(['*']).collect();
+        // The text matches from where the first part of the pattern first
+        // does, if the other parts follow it; from no later place
+        // otherwise, which leaves them less text.
+        let pattern: Vec<char> = needle.chars().collect();
         let text: Vec<char> = chars.iter().map(|c| c.1).collect();
-        (start..text.len()).find(|&i| {
-            text.get(i..)
-                .is_some_and(|rest| wildcard_chars(&pattern, rest))
-        })
+        let parts: Vec<&[char]> = pattern.split(|c| *c == '*').collect();
+        let (first, rest) = parts.split_first().ok_or(ErrorKind::Value)?;
+        find_part(first, &text, start)
+            .filter(|&i| i < text.len() && parts_in_order(rest, &text, i + first.len()).is_some())
     } else {
         hay[byte_start..]
             .find(&needle)
@@ -2027,6 +2069,32 @@ mod tests {
         let long = "a".repeat(4000);
         let formula = format!("=SEARCH(\"*b\",\"{long}\")");
         assert_eq!(run(&s, &formula), Value::Error(ErrorKind::Value));
+    }
+
+    #[test]
+    fn patterns_match_by_their_parts() {
+        for (pattern, text, hit) in [
+            ("a*b", "ab", true),
+            ("a*b", "axxb", true),
+            ("a*b", "axxbc", false),
+            ("a?c", "abc", true),
+            ("*", "", true),
+            ("", "", true),
+            ("", "a", false),
+            ("a*a", "a", false),
+            ("*ab*ab*", "xabyab", true),
+            ("*ab*ab*", "xaby", false),
+            ("??", "çã", true),
+            ("a**b", "ab", true),
+        ] {
+            assert_eq!(super::wildcard(pattern, text), hit, "{pattern} {text}");
+        }
+        let s = sheet();
+        assert_eq!(run(&s, "=COUNTIF(B1:B3,\"b*\")"), Value::Number(1.0));
+        // A pattern that once took steps of the pattern by the text from
+        // every start (review of the pull request of RV batch 2).
+        let slow = "=SEARCH(\"*\"&REPT(\"a\",1000)&\"b\",REPT(\"a\",30000))";
+        assert_eq!(run(&s, slow), Value::Error(ErrorKind::Value));
     }
 
     #[test]
