@@ -6,7 +6,7 @@
 
 use std::cmp::Ordering;
 
-use crate::eval::{Eval, compare};
+use crate::eval::{Eval, MAX_TEXT, compare};
 use crate::parse::Expr;
 use crate::value::{ErrorKind, Value, date_from_days, days_from_date};
 
@@ -1559,6 +1559,9 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let mut s = String::new();
             for x in a {
                 s += &text(e, x)?;
+                if s.len() > MAX_TEXT {
+                    return Err(ErrorKind::Value);
+                }
             }
             Ok(Value::Text(s))
         }
@@ -1724,7 +1727,7 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             count(a, 2, 2)?;
             let n = usize::try_from(int(e, at(a, 1)?)?).map_err(|_| ErrorKind::Value)?;
             let t = text(e, at(a, 0)?)?;
-            if t.len().saturating_mul(n) > 32_767 {
+            if t.len().saturating_mul(n) > MAX_TEXT {
                 return Err(ErrorKind::Value);
             }
             Ok(Value::Text(t.repeat(n)))
@@ -1742,6 +1745,19 @@ pub static FUNCTIONS: &[FunctionInfo] = &[
             let new = text(e, at(a, 2)?)?;
             if old.is_empty() {
                 return Ok(Value::Text(t));
+            }
+            // A long text with a long replacement for each character
+            // would be gigabytes: its length is known first.
+            if new.len() > old.len() {
+                let times = if a.len() > 3 {
+                    1
+                } else {
+                    t.matches(&old).count()
+                };
+                let len = t.len() + times.saturating_mul(new.len() - old.len());
+                if len > MAX_TEXT {
+                    return Err(ErrorKind::Value);
+                }
             }
             if a.len() > 3 {
                 let k = usize::try_from(int(e, at(a, 3)?)?).map_err(|_| ErrorKind::Value)?;

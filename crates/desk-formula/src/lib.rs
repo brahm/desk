@@ -31,7 +31,7 @@ mod odf;
 mod parse;
 mod value;
 
-pub use eval::{Context, evaluate};
+pub use eval::{Context, MAX_TEXT, evaluate};
 pub use functions::{FUNCTIONS, FunctionInfo, function};
 pub use parse::{Axis, BinaryOp, CellRef, Expr, Formula, MAX_NESTING, ParseError, UnaryOp};
 pub use value::{ErrorKind, Value, date_from_days, days_from_date};

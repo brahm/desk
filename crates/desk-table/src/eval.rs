@@ -34,11 +34,19 @@ impl Values {
     }
 }
 
+/// What the formulas of a table may do in one evaluation: cells of
+/// ranges read and bytes of text made, a few seconds of work. A table
+/// that a file fills with formulas over large ranges or long texts gives
+/// `#VALUE!` past it rather than holding the app or filling its memory.
+const MAX_WORK: u64 = 1 << 27;
+
 struct Evaluator<'a, T> {
     table: &'a Table<T>,
     cache: RefCell<HashMap<(u32, u32), Value>>,
     visiting: RefCell<Vec<(u32, u32)>>,
     now: f64,
+    /// What is left of [`MAX_WORK`].
+    work_left: std::cell::Cell<u64>,
 }
 
 /// A step of [`Evaluator::prepare`].
@@ -57,9 +65,18 @@ impl<T: CellText> Evaluator<'_, T> {
             && !self.cache.borrow().contains_key(&(row, col))
     }
 
-    /// The formula cells not yet computed that a formula refers to.
+    /// The formula cells not yet computed that a formula refers to. The
+    /// cells looked at are work: once it is spent, the formulas left give
+    /// `#VALUE!` when they are computed, without looking further.
     fn dependencies(&self, expr: &Expr, out: &mut Vec<(u32, u32)>) {
         let mut rect = |a: CellRef, b: CellRef| {
+            let (rows, cols) = (
+                u64::from(a.row.abs_diff(b.row)) + 1,
+                u64::from(a.col.abs_diff(b.col)) + 1,
+            );
+            if !self.spend(rows * cols) {
+                return;
+            }
             let rows = a.row.min(b.row)..=a.row.max(b.row).min(self.table.rows().saturating_sub(1));
             for r in rows {
                 let cols =
@@ -162,6 +179,10 @@ impl<T: CellText> Evaluator<'_, T> {
             Content::Bool(b) => Value::Bool(*b),
             Content::Date(d) => Value::Date(d.0),
             Content::Duration(d) => Value::Duration(d.0),
+            // With the work spent, a formula is not computed: what it
+            // refers to may not have been prepared, and computing it
+            // would recurse.
+            Content::Formula(_) if self.work_left.get() == 0 => Value::Error(ErrorKind::Value),
             Content::Formula(text) => {
                 if self.visiting.borrow().contains(&(row, col)) {
                     return Value::Error(ErrorKind::Circular);
@@ -191,6 +212,19 @@ impl<T: CellText> Context for Evaluator<'_, T> {
 
     fn now(&self) -> f64 {
         self.now
+    }
+
+    fn spend(&self, work: u64) -> bool {
+        match self.work_left.get().checked_sub(work) {
+            Some(left) => {
+                self.work_left.set(left);
+                true
+            }
+            None => {
+                self.work_left.set(0);
+                false
+            }
+        }
     }
 }
 
@@ -230,11 +264,17 @@ impl<T: CellText> Table<T> {
     /// The values of all the cells, with the formulas computed; `now` is
     /// the date and time for TODAY and NOW, in days from 30 December 1899.
     pub fn values(&self, now: f64) -> Values {
+        self.values_within(now, MAX_WORK)
+    }
+
+    /// [`Table::values`] with `work` for the formulas to do.
+    fn values_within(&self, now: f64, work: u64) -> Values {
         let eval = Evaluator {
             table: self,
             cache: RefCell::new(HashMap::new()),
             visiting: RefCell::new(Vec::new()),
             now,
+            work_left: std::cell::Cell::new(work),
         };
         let mut values = Vec::with_capacity((self.rows() * self.cols()) as usize);
         for r in 0..self.rows() {
@@ -308,6 +348,50 @@ mod tests {
         assert_eq!(v.get(3, 2), &Value::Error(ErrorKind::Circular));
         assert_eq!(v.get(1, 2), &Value::Number(20.0));
         assert_eq!(t.shown(&v, 3, 1, &en).text, "15");
+    }
+
+    #[test]
+    fn formulas_stop_when_their_work_is_spent() {
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(40, 2);
+        for r in 0..40 {
+            t.type_text(r, 0, "1", &en);
+            // Each reads 65,535 cells, most of them past the table.
+            t.type_text(r, 1, "=SUM(A1:A65535)", &en);
+        }
+        let v = t.values_within(0.0, 1 << 20);
+        assert_eq!(v.get(0, 1), &Value::Number(40.0));
+        assert_eq!(v.get(39, 1), &Value::Error(ErrorKind::Value));
+        // A table of the size people make is far from the limit.
+        let v = t.values(0.0);
+        assert_eq!(v.get(39, 1), &Value::Number(40.0));
+    }
+
+    #[test]
+    fn long_texts_made_by_formulas_are_bounded() {
+        let en = Locale::en_us();
+        let mut t: Table<String> = Table::new(30, 2);
+        t.type_text(0, 0, "=REPT(\"ab\",10000)", &en);
+        // Each doubles the text before it.
+        for r in 1..30 {
+            t.type_text(r, 0, &format!("=A{r}&A{r}"), &en);
+        }
+        t.type_text(0, 1, "=SUBSTITUTE(A1,\"a\",A1)", &en);
+        t.type_text(1, 1, "=CONCATENATE(A1,A1)", &en);
+        let v = t.values(0.0);
+        assert!(matches!(v.get(0, 0), Value::Text(s) if s.len() == 20_000));
+        assert_eq!(v.get(1, 0), &Value::Error(ErrorKind::Value));
+        assert_eq!(v.get(29, 0), &Value::Error(ErrorKind::Value));
+        assert_eq!(v.get(0, 1), &Value::Error(ErrorKind::Value));
+        assert_eq!(v.get(1, 1), &Value::Error(ErrorKind::Value));
+        // Texts within the limit, many times over, spend the work.
+        let mut t: Table<String> = Table::new(100, 1);
+        for r in 0..100 {
+            t.type_text(r, 0, "=REPT(\"a\",30000)", &en);
+        }
+        let v = t.values_within(0.0, 1 << 20);
+        assert!(matches!(v.get(0, 0), Value::Text(_)));
+        assert_eq!(v.get(99, 0), &Value::Error(ErrorKind::Value));
     }
 
     #[test]
