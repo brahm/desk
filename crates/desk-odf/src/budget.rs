@@ -6,7 +6,9 @@
 //! `table:number-columns-repeated`), so a few hundred bytes can stand for
 //! millions of cells, each holding a copy of whatever the one written
 //! holds. The limits of rows and columns hold for each table; these hold
-//! for the document as a whole, and count what each copy weighs.
+//! for the document as a whole, and count what each copy weighs. What was
+//! written once costs a cell and no bytes, whatever its size: the file
+//! held it. Only the copies that repetition makes cost its bytes again.
 
 use crate::xml::{Element, Node};
 
@@ -102,6 +104,11 @@ pub(crate) fn take_chart(wanted: usize, cost: Cost) -> usize {
     left.bytes -= n * cost.bytes;
     LEFT.set(left);
     n
+}
+
+/// The bytes the tables and charts of the document may still copy.
+pub(crate) fn bytes_left() -> usize {
+    LEFT.get().bytes
 }
 
 /// The values the charts of the document may still read from their data

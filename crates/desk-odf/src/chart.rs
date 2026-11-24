@@ -193,9 +193,20 @@ fn collect_rows(e: &Element, rows: &mut Vec<Vec<Datum>>) {
                     cells: 1,
                     bytes: datum_bytes(&datum),
                 };
-                let n = budget::take_chart(n.min(1024 - row.len().min(1024)), cost);
+                let wanted = n.min(1024 - row.len().min(1024));
+                // The cell as written costs a cell; only its copies cost
+                // its bytes again.
+                let n = match budget::take_chart(wanted.min(1), Cost { cells: 1, bytes: 0 }) {
+                    0 => 0,
+                    _ => 1 + budget::take_chart(wanted - 1, cost),
+                };
                 for _ in 0..n {
                     row.push(datum.clone());
+                }
+                // A cell refused ends the row, or the next would move
+                // into its column.
+                if n < wanted {
+                    break;
                 }
             }
             // A row written once for several the same, as ODF allows.
@@ -221,11 +232,21 @@ fn collect_rows(e: &Element, rows: &mut Vec<Vec<Datum>>) {
 
 /// The values of a range, within what the charts of the document may
 /// still read; the text they copy is counted too.
-fn range_values<T>(address: &str, grid: &[Vec<Datum>], of: fn(&Datum) -> T) -> Vec<T> {
-    let cells = range(address, grid, budget::chart_values_left());
-    let bytes = cells.iter().map(|&at| datum_bytes(datum(grid, at))).sum();
-    budget::spend_chart_values(cells.len(), bytes);
-    cells.into_iter().map(|at| of(datum(grid, at))).collect()
+fn range_values<T>(address: &str, grid: &[Vec<Datum>], most: usize, of: fn(&Datum) -> T) -> Vec<T> {
+    let cells = range(address, grid, most.min(budget::chart_values_left()));
+    let mut left = budget::bytes_left();
+    let mut out = Vec::with_capacity(cells.len());
+    for at in cells {
+        let d = datum(grid, at);
+        let bytes = datum_bytes(d);
+        if bytes > left {
+            break;
+        }
+        left -= bytes;
+        out.push(of(d));
+    }
+    budget::spend_chart_values(out.len(), budget::bytes_left() - left);
+    out
 }
 
 fn datum(grid: &[Vec<Datum>], (col, row): (usize, usize)) -> &Datum {
@@ -310,7 +331,7 @@ pub(crate) fn read_chart(content: &str) -> Result<Option<ChartDocument>, OdfErro
                 .child(CHART, "categories")
                 .and_then(|c| c.attr(TABLE, "cell-range-address"))
             {
-                out.categories = range_values(categories, &grid, text_of);
+                out.categories = range_values(categories, &grid, usize::MAX, text_of);
             }
         } else if dimension == Some("y") && out.y_title.is_none() {
             out.y_title = t;
@@ -319,17 +340,16 @@ pub(crate) fn read_chart(content: &str) -> Result<Option<ChartDocument>, OdfErro
     for series in plot.children_named(CHART, "series") {
         let values: Vec<Option<f64>> = series
             .attr(CHART, "values-cell-range-address")
-            .map(|a| range_values(a, &grid, number_of))
+            .map(|a| range_values(a, &grid, usize::MAX, number_of))
             .unwrap_or_default();
         let name = series
             .attr(CHART, "label-cell-address")
-            .and_then(|a| range(a, &grid, 1).first().copied())
-            .map(|at| text_of(datum(&grid, at)))
+            .and_then(|a| range_values(a, &grid, 1, text_of).into_iter().next())
             .unwrap_or_default();
         let x_values = series
             .child(CHART, "domain")
             .and_then(|d| d.attr(TABLE, "cell-range-address"))
-            .map(|a| range_values(a, &grid, number_of));
+            .map(|a| range_values(a, &grid, usize::MAX, number_of));
         let color = style(series.attr(CHART, "style-name"))
             .and_then(|s| s.child(STYLE, "graphic-properties"))
             .and_then(|g| {
@@ -689,5 +709,24 @@ mod tests {
         let chart = read_chart(&content).unwrap().unwrap();
         assert_eq!(chart.series.len(), 700);
         assert!(chart.series.iter().all(|s| s.values.len() == 1000));
+    }
+
+    #[test]
+    fn a_cell_refused_ends_its_row() {
+        // The cells after a refused one moved into its column: the
+        // number of a series came out in the column of the text (review
+        // of batch 1). Here the copies of the text cannot be paid for.
+        budget::start_document();
+        budget::take_table(
+            1,
+            Cost {
+                cells: 0,
+                bytes: budget::MAX_DOCUMENT_BYTES - 5,
+            },
+        );
+        let row = r#"<table:table-row><table:table-cell table:number-columns-repeated="3"><text:p>xxxxxxxxxx</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="5"/></table:table-row>"#;
+        let content = chart_with("1", row).replace("$B$2:.$B$1", "$B$1:.$B$1");
+        let chart = read_chart(&content).unwrap().unwrap();
+        assert_eq!(chart.series[0].values, [None]);
     }
 }

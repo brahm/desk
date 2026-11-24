@@ -395,39 +395,45 @@ fn fixture_index(name: &str) -> String {
     xml
 }
 
+/// An index whose body is `body`, inside a section and a layout.
+fn minimal_index(body: &str) -> String {
+    format!(
+        r#"<?xml version="1.0"?>
+<sl:document xmlns:sf="http://developer.apple.com/namespaces/sf" xmlns:sfa="http://developer.apple.com/namespaces/sfa" xmlns:sl="http://developer.apple.com/namespaces/sl">
+<sl:stylesheet sfa:ID="S-1"><sf:styles/><sf:anon-styles/></sl:stylesheet>
+<sf:text-storage sf:kind="body"><sf:stylesheet-ref sfa:IDREF="S-1"/><sf:text-body><sf:section sf:name="Text Page"><sf:layout>{body}</sf:layout></sf:section></sf:text-body></sf:text-storage>
+</sl:document>"#
+    )
+}
+
 #[test]
 fn references_that_lead_back_to_themselves_end() {
     // A span that refers to itself, and a group that holds a reference
     // to itself: without a guard each looped until the stack overflowed
     // (review RV, batch 1).
-    let xml = fixture_index("obj-30-group.pages");
-    let paragraph = r#"<sf:p sf:style="paragraph-style-38">"#;
-    let group = r#"<sf:group sl:order="0" sfa:ID="SLGroupInfo-0">"#;
-    assert!(xml.contains(paragraph) && xml.contains(group));
-    let xml = xml
-        .replacen(
-            paragraph,
-            &format!(
-                r#"{paragraph}<sf:span sfa:ID="loop">a<sf:span-ref sfa:IDREF="loop"/></sf:span>"#
-            ),
-            1,
-        )
-        .replacen(
-            group,
-            &format!(r#"{group}<sf:group sfa:IDREF="SLGroupInfo-0"/>"#),
-            1,
-        );
+    let xml = minimal_index(
+        r#"<sf:p><sf:span sfa:ID="loop">a<sf:span-ref sfa:IDREF="loop"/></sf:span><sf:br/></sf:p>"#,
+    );
     let document = desk_iwork::pages::parse_pages(&xml).unwrap();
-    assert!(!document.body.is_empty());
+    let text: String = texts(&document).concat();
+    assert!(text.starts_with('a'), "{text:?}");
+    let xml = fixture_index("obj-30-group.pages");
+    let group = r#"<sf:group sl:order="0" sfa:ID="SLGroupInfo-0">"#;
+    assert!(xml.contains(group));
+    let xml = xml.replacen(
+        group,
+        &format!(r#"{group}<sf:group sfa:IDREF="SLGroupInfo-0"/>"#),
+        1,
+    );
+    let document = desk_iwork::pages::parse_pages(&xml).unwrap();
+    assert!(!document.drawables.is_empty());
 }
 
 #[test]
 fn references_that_branch_at_every_level_end() {
     // Each span refers twice to the next, 40 levels deep: read in full
     // at every use, that is 2^40 spans. The reader stops after the
-    // references it allows.
-    let xml = fixture_index("obj-30-group.pages");
-    let paragraph = r#"<sf:p sf:style="paragraph-style-38">"#;
+    // references it allows, and says so in the log.
     let mut spans = String::new();
     for level in 0..40 {
         let next = level + 1;
@@ -435,9 +441,17 @@ fn references_that_branch_at_every_level_end() {
             r#"<sf:span sfa:ID="s{level}">x<sf:span-ref sfa:IDREF="s{next}"/><sf:span-ref sfa:IDREF="s{next}"/></sf:span>"#
         ));
     }
-    let xml = xml.replacen(paragraph, &format!("{paragraph}{spans}"), 1);
+    let xml = minimal_index(&format!("<sf:p>{spans}<sf:br/></sf:p>"));
     let document = desk_iwork::pages::parse_pages(&xml).unwrap();
-    assert!(!document.body.is_empty());
+    assert!(texts(&document).concat().starts_with('x'));
+    assert!(
+        document
+            .skipped
+            .iter()
+            .any(|(name, n)| name == "reference" && *n > 0),
+        "{:?}",
+        document.skipped
+    );
 }
 
 #[test]

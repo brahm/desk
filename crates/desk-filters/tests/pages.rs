@@ -260,6 +260,31 @@ fn doc_22_a_style_below_a_cycle_keeps_its_parent() {
 }
 
 #[test]
+fn doc_22_many_style_cycles_are_cut_in_one_pass() {
+    // One cycle was cut per pass, each pass looking up the parents of
+    // every style left: thousands of cycles took minutes (review of
+    // batch 1).
+    let mut styles = String::from(
+        r#"<sf:paragraphstyle sf:name="Body" sf:ident="paragraph-style-32"><sf:property-map/></sf:paragraphstyle>"#,
+    );
+    for i in 0..3000 {
+        styles.push_str(&format!(
+            r#"<sf:characterstyle sf:name="C{i}" sf:ident="c{i}" sf:parent-ident="d{i}"><sf:property-map/></sf:characterstyle><sf:characterstyle sf:name="D{i}" sf:ident="d{i}" sf:parent-ident="c{i}"><sf:property-map/></sf:characterstyle>"#
+        ));
+    }
+    let body = r#"<sf:p sf:style="paragraph-style-32"><sf:span sf:style="c7">x</sf:span></sf:p>"#;
+    let start = std::time::Instant::now();
+    let document = read_pages(index(&styles, "", body).as_bytes()).unwrap();
+    assert!(start.elapsed() < std::time::Duration::from_secs(20));
+    assert!(
+        document
+            .styles()
+            .by_name(StyleFamily::Character, "D2999")
+            .is_some()
+    );
+}
+
+#[test]
 fn doc_22_what_the_model_cannot_hold_is_logged() {
     let lists = r#"<sf:liststyle sf:name="Bullet" sf:ident="list-style-1" sfa:ID="L-1"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="text"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>
 <sf:liststyle sf:name="None" sf:ident="list-style-default" sfa:ID="L-0"><sf:property-map><sf:listLabelTypes><sf:array><sf:list-label-typeinfo sf:type="none"/></sf:array></sf:listLabelTypes></sf:property-map></sf:liststyle>"#;

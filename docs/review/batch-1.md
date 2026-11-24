@@ -27,6 +27,18 @@ fuzzing for each target.
 Class A: data lost, a panic, a hang or memory exhausted. B: wrong
 behaviour. C: performance. D: clean-up. See [README.md](README.md).
 
+A second reading of the pull request found that the fixes themselves
+cost too much or lost data: cycles of styles were cut one per pass, each
+pass looking up every style again; a cell the budget refused let the
+next move into its place; every cell paid for its bytes, though only the
+copies that repetition makes should; empty cells and rows repeated before
+others were cut and what followed moved; and the floating objects could
+spend the references of the body. Each now has its test: one pass cuts
+all cycles, a refused cell ends its row, what is written once costs no
+bytes, empty cells and rows keep their place unless they end the row or
+the table, and the text and the objects count their references apart,
+with the log saying when the limit was reached.
+
 The review of the pull request asked for the guard and the budgets to hold
 for the document rather than for each body, table or chart, and for the
 cycle fallback to keep the parents of the styles below a cycle; it is

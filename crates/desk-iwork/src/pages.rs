@@ -486,7 +486,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         document.stylesheet = Stylesheet::read(&ids, sheet);
     }
     if let Some(body) = storage.child(SF, "text-body") {
-        read_block(&ids, &mut document, body);
+        read_block(&ids, &mut document, body, ids.text_guard());
     }
     // The notes, in a text storage of their own inside that of the body.
     // Each ends with a note break; what follows the last is an empty
@@ -497,7 +497,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
         .and_then(|s| s.child(SF, "text-body"));
     if let Some(notes) = notes {
         let body = std::mem::take(&mut document.body);
-        let ends = read_block(&ids, &mut document, notes);
+        let ends = read_block(&ids, &mut document, notes, ids.text_guard());
         let mut paragraphs = std::mem::replace(&mut document.body, body).into_iter();
         let mut start = 0;
         for end in ends {
@@ -519,7 +519,7 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
                     continue;
                 };
                 let body = std::mem::take(&mut document.body);
-                read_block(&ids, &mut document, text);
+                read_block(&ids, &mut document, text, ids.text_guard());
                 let paragraphs = std::mem::replace(&mut document.body, body);
                 let name_attr = element.attr(SF, "name").unwrap_or_default().to_owned();
                 let list = if item == "header" {
@@ -531,12 +531,23 @@ pub fn parse_pages(index: &str) -> Result<PagesDocument, IworkError> {
             }
         }
     }
+    // References left unfollowed, the limit reached, lose what they
+    // stand for: the log says so.
+    let refused = ids.references_refused() as usize;
+    if refused > 0 {
+        document.skipped.push(("reference".to_owned(), refused));
+    }
     Ok(document)
 }
 
 /// Reads the paragraphs of a text body into the body of a document, and
 /// returns how many paragraphs there are after each note break.
-fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Vec<usize> {
+fn read_block(
+    ids: &Ids<'_>,
+    document: &mut PagesDocument,
+    body: &Element,
+    guard: Guard,
+) -> Vec<usize> {
     let start = document.body.len();
     let mut reader = BodyReader {
         ids,
@@ -551,7 +562,7 @@ fn read_block(ids: &Ids<'_>, document: &mut PagesDocument, body: &Element) -> Ve
         marks: Vec::new(),
         note_break: false,
         note_ends: Vec::new(),
-        guard: ids.guard(),
+        guard,
     };
     reader.block(body);
     reader.note_ends.into_iter().map(|e| e - start).collect()

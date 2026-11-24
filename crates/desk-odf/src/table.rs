@@ -214,19 +214,24 @@ fn read_parts(
             "table-header-rows" => read_parts(child, table, paragraph, header_columns, true),
             "table-row" => {
                 let before = budget::table_left();
-                let row = read_row(child, paragraph);
-                // What the row cost to read, its cells and whatever they
-                // hold, is what each copy costs again.
-                let cost = budget::spent(before, budget::table_left());
+                let (row, bytes) = read_row(child, paragraph);
+                // Each copy of the row costs again the cells it read, and
+                // the bytes of what they hold.
                 let cost = Cost {
-                    cells: cost.cells.max(1),
-                    ..cost
+                    cells: budget::spent(before, budget::table_left()).cells.max(1),
+                    bytes,
                 };
                 let empty = row.cells.iter().all(|c| c.paragraphs.is_empty());
                 let mut n = count(child, "number-rows-repeated");
                 // Spreadsheets fill the sheet with a row repeated a
-                // million times.
-                if empty && n > 1 {
+                // million times, after the last row that holds anything;
+                // empty rows before it are kept, or the rows after move.
+                let trailing = e
+                    .elements()
+                    .skip_while(|r| !std::ptr::eq(*r, child))
+                    .skip(1)
+                    .all(|r| !row_has_content(r));
+                if empty && trailing && n > 1 {
                     n = n.min(2);
                 }
                 let n = n.min(MAX_ROWS - table.rows.len().min(MAX_ROWS));
@@ -247,16 +252,36 @@ fn read_parts(
     }
 }
 
-fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow {
+/// Whether a cell as written holds anything: text or a value.
+fn cell_has_content(c: &Element) -> bool {
+    c.elements()
+        .any(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
+        || c.attrs
+            .iter()
+            .any(|(name, _)| name.ns == OFFICE && name.local.ends_with("value"))
+}
+
+/// Whether a row as written holds anything.
+fn row_has_content(r: &Element) -> bool {
+    r.name.is(TABLE, "table-row") && r.elements().any(cell_has_content)
+}
+
+/// Reads a row, and what the bytes of one copy of it weigh. A cell that
+/// the budget of the document refuses ends the row: the cells after it
+/// would otherwise move into its place.
+fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> (TableRow, usize) {
     let mut row = TableRow {
         style: e.attr(TABLE, "style-name").map(str::to_owned),
         cells: Vec::new(),
     };
-    for c in e.elements() {
+    let mut bytes = 0usize;
+    let cells: Vec<&Element> = e
+        .elements()
+        .filter(|c| c.name.is(TABLE, "covered-table-cell") || c.name.is(TABLE, "table-cell"))
+        .collect();
+    let last_content = cells.iter().rposition(|c| cell_has_content(c));
+    for (i, &c) in cells.iter().enumerate() {
         let covered = c.name.is(TABLE, "covered-table-cell");
-        if !covered && !c.name.is(TABLE, "table-cell") {
-            continue;
-        }
         let before = budget::table_left();
         let value_type = c
             .attr(OFFICE, "value-type")
@@ -299,27 +324,31 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
         };
         let empty = cell.paragraphs.is_empty() && cell.value.is_none();
         let mut n = count(c, "number-columns-repeated");
-        if empty && n > 1 {
+        // Empty cells repeated to the edge of the sheet; those before a
+        // cell that holds something are kept, or it would move.
+        if empty && n > 1 && last_content.is_none_or(|last| i > last) {
             n = n.min(2);
         }
-        let n = n.min(MAX_COLUMNS - row.cells.len().min(MAX_COLUMNS));
-        // The first copy costs the cell as written; each other copy, that
-        // and what reading its content cost, such as a table inside.
+        let wanted = n.min(MAX_COLUMNS - row.cells.len().min(MAX_COLUMNS));
+        // The first copy costs a cell: its content was in the file. Each
+        // other copy costs that content again, and what reading it cost,
+        // such as the copies a table inside made.
         let nested = budget::spent(before, budget::table_left());
-        let own = Cost {
-            cells: 1,
-            bytes: budget::weight(c),
-        };
         let copy = Cost {
-            cells: own.cells + nested.cells,
-            bytes: own.bytes + nested.bytes,
+            cells: 1 + nested.cells,
+            bytes: budget::weight(c) + nested.bytes,
         };
-        let n = match budget::take_table(n.min(1), own) {
+        let first = Cost { cells: 1, bytes: 0 };
+        let n = match budget::take_table(wanted.min(1), first) {
             0 => 0,
-            _ => 1 + budget::take_table(n - 1, copy),
+            _ => 1 + budget::take_table(wanted - 1, copy),
         };
         for _ in 0..n {
             row.cells.push(cell.clone());
+        }
+        bytes = bytes.saturating_add(copy.bytes.saturating_mul(n));
+        if n < wanted {
+            break;
         }
     }
     // Empty cells at the end of a row stand for nothing.
@@ -331,7 +360,7 @@ fn read_row(e: &Element, paragraph: &dyn Fn(&Element) -> Paragraph) -> TableRow 
     {
         row.cells.pop();
     }
-    row
+    (row, bytes)
 }
 
 /// Writes a `table:table`. `paragraph` writes the paragraphs of a cell.
@@ -585,4 +614,72 @@ pub(crate) fn write_table_template(w: &mut Writer, template: &TableTemplate) {
         }
     }
     w.end();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(xml: &str) -> Table {
+        let xml = format!(
+            r#"<table:table xmlns:table="{TABLE}" xmlns:text="{TEXT}" xmlns:office="{OFFICE}">{xml}</table:table>"#
+        );
+        let e = crate::xml::parse(&xml).unwrap();
+        read_table(&e, &|_| Paragraph::default())
+    }
+
+    #[test]
+    fn what_is_written_once_costs_no_bytes() {
+        // Every cell paid for its bytes, so a document with much text in
+        // its tables, none of it repeated, lost cells without a word
+        // (review of batch 1).
+        budget::start_document();
+        budget::take_table(
+            1,
+            Cost {
+                cells: 0,
+                bytes: budget::MAX_DOCUMENT_BYTES - 10,
+            },
+        );
+        let text = "x".repeat(4096);
+        let table = read(&format!(
+            r#"<table:table-row><table:table-cell><text:p>{text}</text:p></table:table-cell><table:table-cell><text:p>{text}</text:p></table:table-cell></table:table-row>"#
+        ));
+        assert_eq!(table.rows.len(), 1);
+        assert_eq!(table.rows[0].cells.len(), 2);
+        assert!(table.rows[0].cells.iter().all(|c| c.paragraphs.len() == 1));
+    }
+
+    #[test]
+    fn empty_cells_and_rows_before_others_keep_their_place() {
+        // Empty cells or rows repeated were cut to two wherever they
+        // were, and what followed them moved (review of batch 1).
+        budget::start_document();
+        let table = read(
+            r#"<table:table-row><table:table-cell><text:p>a</text:p></table:table-cell><table:table-cell table:number-columns-repeated="5"/><table:table-cell><text:p>b</text:p></table:table-cell><table:table-cell table:number-columns-repeated="1000"/></table:table-row><table:table-row table:number-rows-repeated="4"><table:table-cell/></table:table-row><table:table-row><table:table-cell><text:p>c</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="100000"><table:table-cell/></table:table-row>"#,
+        );
+        let full = |r: usize, c: usize| !table.rows[r].cells[c].paragraphs.is_empty();
+        assert!(full(0, 0) && full(0, 6) && !full(0, 5));
+        assert!(full(5, 0));
+        assert!(table.rows.len() <= 8, "{}", table.rows.len());
+        assert!(table.columns.len() <= 9);
+    }
+
+    #[test]
+    fn a_cell_refused_ends_its_row() {
+        // The copies of the first cell cannot be paid for: the cell after
+        // them took their place (review of batch 1).
+        budget::start_document();
+        budget::take_table(
+            1,
+            Cost {
+                cells: 0,
+                bytes: budget::MAX_DOCUMENT_BYTES - 5,
+            },
+        );
+        let table = read(
+            r#"<table:table-row><table:table-cell table:number-columns-repeated="3"><text:p>aaaaaaaaaa</text:p></table:table-cell><table:table-cell><text:p>b</text:p></table:table-cell></table:table-row>"#,
+        );
+        assert_eq!(table.rows.first().map(|r| r.cells.len()), Some(1));
+    }
 }

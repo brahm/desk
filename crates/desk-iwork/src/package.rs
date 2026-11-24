@@ -211,8 +211,14 @@ mod tests {
         std::os::unix::fs::symlink(dir.join("secret"), package.join("out.png")).unwrap();
         std::os::unix::fs::symlink("Contents/inside.png", package.join("in.png")).unwrap();
         assert_eq!(read_file_at(&package, "out.png"), None);
-        assert_eq!(read_file_at(&package, "in.png").as_deref(), Some(&b"png"[..]));
-        assert_eq!(read_file_at(&package, "Contents/inside.png").as_deref(), Some(&b"png"[..]));
+        assert_eq!(
+            read_file_at(&package, "in.png").as_deref(),
+            Some(&b"png"[..])
+        );
+        assert_eq!(
+            read_file_at(&package, "Contents/inside.png").as_deref(),
+            Some(&b"png"[..])
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

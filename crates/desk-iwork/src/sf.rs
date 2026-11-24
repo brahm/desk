@@ -17,9 +17,12 @@ use crate::xml::Element;
 /// The objects of an index by their `sfa:ID`.
 pub(crate) struct Ids<'a> {
     map: HashMap<&'a str, &'a Element>,
-    /// What the readers of the document have spent: one count for the
-    /// whole document, whichever reader follows a reference.
-    spent: std::rc::Rc<Spent>,
+    /// What the readers of the text of the document have spent, its
+    /// body, notes, headers and footers: one count for all of them.
+    text: std::rc::Rc<Spent>,
+    /// What the reader of the floating objects and their text has spent,
+    /// apart, so that objects that spend it all leave the body whole.
+    objects: std::rc::Rc<Spent>,
 }
 
 impl<'a> Ids<'a> {
@@ -41,16 +44,31 @@ impl<'a> Ids<'a> {
         }
         Self {
             map: ids,
-            spent: std::rc::Rc::default(),
+            text: std::rc::Rc::default(),
+            objects: std::rc::Rc::default(),
         }
     }
 
-    /// A guard for a reader of this document. Every guard of a document
-    /// shares its depth and its count of references.
-    pub fn guard(&self) -> Guard {
+    /// A guard for a reader of the text of this document. Every such
+    /// guard shares its depth and its count of references.
+    pub fn text_guard(&self) -> Guard {
         Guard {
-            spent: std::rc::Rc::clone(&self.spent),
+            spent: std::rc::Rc::clone(&self.text),
         }
+    }
+
+    /// A guard for the reader of the floating objects of this document,
+    /// with a count of its own.
+    pub fn objects_guard(&self) -> Guard {
+        Guard {
+            spent: std::rc::Rc::clone(&self.objects),
+        }
+    }
+
+    /// How many references the readers left unfollowed, the limit
+    /// reached.
+    pub fn references_refused(&self) -> u32 {
+        self.text.refused.get() + self.objects.refused.get()
     }
 
     /// The element with an ID.
@@ -81,6 +99,7 @@ pub(crate) const MAX_REFERENCES: u32 = 100_000;
 /// Keeps a recursive reader from looping on a reference that leads back
 /// to an element it is reading, and from following references without
 /// end, which would overflow the stack or never finish.
+#[derive(Clone)]
 pub(crate) struct Guard {
     spent: std::rc::Rc<Spent>,
 }
@@ -90,6 +109,7 @@ pub(crate) struct Guard {
 pub(crate) struct Spent {
     depth: std::cell::Cell<u32>,
     references: std::cell::Cell<u32>,
+    refused: std::cell::Cell<u32>,
 }
 
 impl Guard {
@@ -115,6 +135,8 @@ impl Guard {
     pub fn follow(&mut self) -> bool {
         let references = self.spent.references.get();
         if references >= MAX_REFERENCES {
+            let refused = &self.spent.refused;
+            refused.set(refused.get().saturating_add(1));
             return false;
         }
         self.spent.references.set(references + 1);
@@ -1060,11 +1082,14 @@ mod tests {
         // followed (review of batch 1).
         let root = crate::xml::parse("<r/>").unwrap();
         let ids = Ids::new(&root);
-        let (mut a, mut b) = (ids.guard(), ids.guard());
+        let (mut a, mut b) = (ids.text_guard(), ids.text_guard());
         for _ in 0..MAX_REFERENCES {
             assert!(a.follow());
         }
         assert!(!b.follow());
+        assert_eq!(ids.references_refused(), 1);
+        // The objects have a count of their own.
+        assert!(ids.objects_guard().follow());
         for _ in 0..MAX_READ_DEPTH {
             assert!(a.enter());
         }

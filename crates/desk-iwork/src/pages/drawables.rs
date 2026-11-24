@@ -576,7 +576,7 @@ impl<'a> Reader<'a, '_> {
         let outer = std::mem::take(&mut self.document.body);
         // What the text of objects loses is not counted with the body.
         let skipped = self.document.skipped.clone();
-        read_block(self.ids, self.document, body);
+        read_block(self.ids, self.document, body, self.guard.clone());
         let paragraphs = std::mem::replace(&mut self.document.body, outer);
         self.document.skipped = skipped;
         (paragraphs, open)
@@ -756,7 +756,7 @@ pub(super) fn read(
         graphic_styles,
         table_styles,
         skipped: Vec::new(),
-        guard: ids.guard(),
+        guard: ids.objects_guard(),
     };
     let mut drawables = Vec::new();
     let mut chains: Vec<Vec<String>> = Vec::new();
