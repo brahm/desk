@@ -827,7 +827,10 @@ impl Parser<'_> {
                         }
                     }
                     self.depth -= 1;
-                    return Ok(Expr::Call(name.to_uppercase(), args));
+                    // The names of functions are ASCII: the capital of
+                    // another letter, such as ǰ, may be two characters
+                    // that no name holds.
+                    return Ok(Expr::Call(name.to_ascii_uppercase(), args));
                 }
                 if let Some(a) = CellRef::parse(&name) {
                     if self.peek() == Some(&Token::Colon) {
@@ -906,6 +909,14 @@ mod tests {
         assert_eq!(CellRef::column_name(26), "AA");
         assert_eq!(CellRef::parse("AA10"), Some(CellRef::new(26, 9)));
         assert_eq!(CellRef::parse("A0"), None);
+    }
+
+    #[test]
+    fn a_call_of_a_name_that_is_not_ascii_is_written_back_as_read() {
+        // Found by fuzzing formula_parse: ǰ became J and a combining caron.
+        let f = Formula::parse("=ǰ$TE()").unwrap();
+        assert_eq!(Formula::parse(&f.to_string()).unwrap(), f);
+        assert_eq!(Formula::parse("=sum(1)").unwrap().to_string(), "=SUM(1)");
     }
 
     #[test]
