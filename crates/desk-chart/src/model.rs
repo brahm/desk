@@ -124,6 +124,14 @@ impl ChartData {
         }
     }
 
+    /// Whether there is a row of values for each row name, with a value
+    /// for each column name. Data made by Desk always has; data read
+    /// from a file may not, and drawing it would index past its rows.
+    pub fn is_consistent(&self) -> bool {
+        self.values.len() == self.rows.len()
+            && self.values.iter().all(|row| row.len() == self.cols.len())
+    }
+
     /// The value at a row and a column.
     pub fn get(&self, row: usize, col: usize) -> Option<f64> {
         self.values
@@ -1033,5 +1041,21 @@ impl Chart {
             }
             self.series[i].fill = collection.fill(i);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn data_with_a_value_for_each_row_and_column_is_consistent() {
+        let mut data = ChartData::sample();
+        assert!(data.is_consistent());
+        data.values[1].pop();
+        assert!(!data.is_consistent());
+        let mut data = ChartData::sample();
+        data.rows.push("Região 3".into());
+        assert!(!data.is_consistent());
     }
 }

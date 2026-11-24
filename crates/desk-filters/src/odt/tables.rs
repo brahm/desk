@@ -387,12 +387,14 @@ fn style_of<'a>(
 pub(crate) fn import_table(source: &odf::TextDocument, odf_table: &odf::Table) -> Table {
     let rows = odf_table.rows.len().max(1) as u32;
     let cols = odf_table.columns.len().max(1) as u32;
-    // What Desk wrote, when the table still has the shape it had.
+    // What Desk wrote, when the table still has the shape it had and its
+    // parts agree with it: the JSON of a damaged file could name more
+    // rows than it has cells, and the first cell read would panic.
     if let Some(table) = odf_table
         .desk
         .as_deref()
         .and_then(|d| serde_json::from_str::<Table>(d).ok())
-        .filter(|t| t.rows() == rows && t.cols() == cols)
+        .filter(|t| t.rows() == rows && t.cols() == cols && t.is_consistent())
     {
         return table;
     }
@@ -639,7 +641,11 @@ pub(crate) fn import_chart(
     desk: Option<&str>,
     odf_chart: Option<&odf::ChartDocument>,
 ) -> Option<Chart> {
-    if let Some(chart) = desk.and_then(|d| serde_json::from_str::<Chart>(d).ok()) {
+    // What Desk wrote, when its data has a value for each row and column.
+    if let Some(chart) = desk
+        .and_then(|d| serde_json::from_str::<Chart>(d).ok())
+        .filter(|c| c.data.is_consistent())
+    {
         return Some(chart);
     }
     let source = odf_chart?;
