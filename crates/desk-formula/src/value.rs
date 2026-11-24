@@ -182,6 +182,8 @@ pub(crate) fn formula_number(n: f64) -> String {
 
 /// The year, month and day of a day counted from 30 December 1899.
 pub fn date_from_days(days: i64) -> (i32, u32, u32) {
+    // Far enough for any year an i32 holds, and short of overflow below.
+    let days = days.clamp(-(1 << 39), 1 << 39);
     // Days from 1 March of year 0, by the algorithm of Howard Hinnant.
     let z = days - 25_569 + 719_468;
     let era = z.div_euclid(146_097);
@@ -214,6 +216,14 @@ pub fn days_from_date(year: i32, month: i32, day: i32) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn days_far_from_any_year_do_not_overflow() {
+        // YEAR(1E300) reached here as i64::MAX, and the sum overflowed.
+        let (y, m, d) = date_from_days(i64::MAX);
+        assert!(y > 1_000_000_000 && (1..=12).contains(&m) && (1..=31).contains(&d));
+        assert!(date_from_days(i64::MIN).0 < -1_000_000_000);
+    }
 
     #[test]
     fn dates_go_both_ways() {
