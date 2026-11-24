@@ -41,6 +41,9 @@ pub(crate) trait FramePage {
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>);
     /// Called once the tab has closed.
     fn closed(&self) {}
+    /// Called when the tab was dragged to another window of the app, which
+    /// holds it from now on.
+    fn moved_to(&self, _frame: &Rc<Frame>) {}
 }
 
 /// A tab, the widget it holds and its document.
@@ -341,6 +344,15 @@ impl Frame {
             }));
             glib::Propagation::Stop
         });
+        // A tab dragged here from another window of the app is held here
+        // from now on: asked before it closes, and running its actions
+        // here (review RV, batch 5).
+        let weak = Rc::downgrade(self);
+        self.view.connect_page_attached(move |_, tab, _| {
+            if let Some(this) = weak.upgrade() {
+                this.adopt(tab);
+            }
+        });
         // The window goes with its last tab.
         let weak = Rc::downgrade(self);
         self.view.connect_n_pages_notify(move |view| {
@@ -381,6 +393,25 @@ impl Frame {
         });
     }
 
+    /// Takes over a tab that another window of the app held.
+    fn adopt(self: &Rc<Self>, tab: &adw::TabPage) {
+        if self.page_of(tab).is_some() {
+            return;
+        }
+        let entry = FRAMES.with(|frames| {
+            frames.borrow().iter().find_map(|other| {
+                let mut pages = other.pages.borrow_mut();
+                let at = pages.iter().position(|(t, _, _)| t == tab)?;
+                Some(pages.remove(at))
+            })
+        });
+        let Some(entry) = entry else { return };
+        let page = entry.2.clone();
+        self.pages.borrow_mut().push(entry);
+        page.moved_to(self);
+        self.route_actions();
+    }
+
     fn forget(&self, tab: &adw::TabPage) {
         let page = {
             let mut pages = self.pages.borrow_mut();
@@ -390,5 +421,65 @@ impl Frame {
         if let Some(page) = page {
             page.closed();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    /// A document that counts how it was told to close and to move.
+    struct Counted {
+        actions: gio::SimpleActionGroup,
+        asked: Rc<Cell<u32>>,
+        moved: Rc<Cell<u32>>,
+    }
+
+    impl FramePage for Counted {
+        fn actions(&self) -> gio::ActionGroup {
+            self.actions.clone().upcast()
+        }
+
+        fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {
+            self.asked.set(self.asked.get() + 1);
+            done(false);
+        }
+
+        fn moved_to(&self, _frame: &Rc<Frame>) {
+            self.moved.set(self.moved.get() + 1);
+        }
+    }
+
+    #[test]
+    fn a_tab_dragged_to_another_window_still_asks_before_it_closes() {
+        // Review RV, batch 5: the window a tab was dragged to did not know
+        // its document, and closed it without asking to save.
+        crate::with_gtk(|| {
+            let _ = adw::init();
+            let app = adw::Application::builder()
+                .application_id("br.com.brahm.Desk.TabsTest")
+                .flags(gio::ApplicationFlags::NON_UNIQUE)
+                .build();
+            let _ = app.register(gio::Cancellable::NONE);
+            let (a, b) = (Frame::new(&app, "A"), Frame::new(&app, "B"));
+            let asked = Rc::new(Cell::new(0));
+            let moved = Rc::new(Cell::new(0));
+            let page = Rc::new(Counted {
+                actions: gio::SimpleActionGroup::new(),
+                asked: asked.clone(),
+                moved: moved.clone(),
+            });
+            let tab = a.add(&gtk::Label::new(Some("x")), page);
+            a.view.transfer_page(&tab, &b.view, 0);
+            assert!(a.page_of(&tab).is_none());
+            assert!(b.page_of(&tab).is_some());
+            assert_eq!(moved.get(), 1);
+            b.view.close_page(&tab);
+            assert_eq!(asked.get(), 1);
+            assert_eq!(b.view.n_pages(), 1);
+            a.window.destroy();
+            b.window.destroy();
+        });
     }
 }

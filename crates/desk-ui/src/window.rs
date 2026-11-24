@@ -86,7 +86,8 @@ pub struct DocumentWindow {
     /// The window that holds the tab of the document, shared with the
     /// other documents of that window.
     window: adw::ApplicationWindow,
-    frame: Rc<Frame>,
+    /// The window that holds the tab of the document.
+    frame: RefCell<Rc<Frame>>,
     /// The tab of the document: everything the document shows, with its
     /// own breakpoints, since the window has the tabs of other documents.
     root: adw::BreakpointBin,
@@ -292,6 +293,11 @@ const TOGGLES: [(&str, &str); 4] = [
 ];
 
 impl DocumentWindow {
+    /// The window that holds the tab of the document now.
+    fn frame(&self) -> Rc<Frame> {
+        self.frame.borrow().clone()
+    }
+
     /// A new, empty document in a tab of the window in front, or in a new
     /// window when the app has none.
     pub fn new(app: &adw::Application, info: AppInfo, opener: Option<&'static Opener>) -> Rc<Self> {
@@ -635,7 +641,7 @@ impl DocumentWindow {
 
         let this = Rc::new(Self {
             window,
-            frame: frame.clone(),
+            frame: RefCell::new(frame.clone()),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -864,7 +870,7 @@ impl DocumentWindow {
     /// Brings the tab of the document and its window to the front.
     pub fn show(&self) {
         if let Some(tab) = self.tab.get() {
-            self.frame.view().set_selected_page(tab);
+            self.frame().view().set_selected_page(tab);
         }
         self.window.present();
     }
@@ -2196,7 +2202,7 @@ impl DocumentWindow {
         }
         // The tab must be in sight for its dialog to make sense.
         if let Some(tab) = self.tab.get() {
-            self.frame.view().set_selected_page(tab);
+            self.frame().view().set_selected_page(tab);
         }
         // The dialog of GNOME apps, rather than Don't Save of Pages.
         let dialog = adw::AlertDialog::new(
@@ -2482,8 +2488,8 @@ impl DocumentWindow {
                 }
             }),
             // Ctrl+W closes the tab, as in GNOME.
-            ("close", |this| this.frame.close(&this.root)),
-            ("tab-overview", |this| this.frame.show_overview()),
+            ("close", |this| this.frame().close(&this.root)),
+            ("tab-overview", |this| this.frame().show_overview()),
         ];
         let template = gio::SimpleAction::new("new-from-template", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
@@ -3736,6 +3742,10 @@ impl DocumentWindow {
 impl FramePage for DocumentWindow {
     fn actions(&self) -> gio::ActionGroup {
         self.actions.clone().upcast()
+    }
+
+    fn moved_to(&self, frame: &Rc<Frame>) {
+        *self.frame.borrow_mut() = frame.clone();
     }
 
     fn ask_close(self: Rc<Self>, done: Box<dyn FnOnce(bool)>) {

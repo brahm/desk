@@ -109,7 +109,8 @@ enum MenuTarget {
 pub(super) struct TablesWindow {
     /// The window that holds the tab of the document (see tabs.rs).
     window: adw::ApplicationWindow,
-    frame: Rc<crate::tabs::Frame>,
+    /// The window that holds the tab of the document.
+    frame: RefCell<Rc<crate::tabs::Frame>>,
     /// The tab of the document, with its own breakpoints.
     root: adw::BreakpointBin,
     tab: std::cell::OnceCell<adw::TabPage>,
@@ -154,6 +155,11 @@ thread_local! {
 }
 
 impl TablesWindow {
+    /// The window that holds the tab of the document now.
+    fn frame(&self) -> Rc<crate::tabs::Frame> {
+        self.frame.borrow().clone()
+    }
+
     /// A new window with a document of the Blank template.
     /// A new document in a tab of the window in front, or in a new window
     /// when the app has none.
@@ -340,7 +346,7 @@ impl TablesWindow {
 
         let this = Rc::new(Self {
             window,
-            frame: frame.clone(),
+            frame: RefCell::new(frame.clone()),
             root,
             tab: std::cell::OnceCell::new(),
             actions: gio::SimpleActionGroup::new(),
@@ -400,7 +406,7 @@ impl TablesWindow {
     /// Brings the tab of the document and its window to the front.
     pub fn show(&self) {
         if let Some(tab) = self.tab.get() {
-            self.frame.view().set_selected_page(tab);
+            self.frame().view().set_selected_page(tab);
         }
         self.window.present();
     }
@@ -960,7 +966,7 @@ impl TablesWindow {
             ("duplicate", |this| {
                 // A copy without a title, opened beside the original
                 // (NDOC-11).
-                let copy = Self::with_book(&this.frame, this.info, this.book.borrow().clone());
+                let copy = Self::with_book(&this.frame(), this.info, this.book.borrow().clone());
                 copy.show();
             }),
         ];
@@ -1204,7 +1210,7 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         close.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
-                this.frame.close(&this.root);
+                this.frame().close(&this.root);
             }
         });
         self.actions.add_action(&close);
@@ -1212,7 +1218,7 @@ impl TablesWindow {
         let weak = Rc::downgrade(self);
         overview.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
-                this.frame.show_overview();
+                this.frame().show_overview();
             }
         });
         self.actions.add_action(&overview);
@@ -1362,6 +1368,10 @@ fn warn_small_screen(window: &adw::ApplicationWindow, banner: &adw::Banner) {
 impl crate::tabs::FramePage for TablesWindow {
     fn actions(&self) -> gio::ActionGroup {
         self.actions.clone().upcast()
+    }
+
+    fn moved_to(&self, frame: &Rc<crate::tabs::Frame>) {
+        *self.frame.borrow_mut() = frame.clone();
     }
 
     /// Desk Tables does not save documents yet, so a tab closes at once.
