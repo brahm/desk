@@ -789,6 +789,9 @@ impl Document {
     }
 }
 
+/// The most actions that Undo can take back.
+pub const MAX_UNDO: usize = 1000;
+
 /// A document with its undo and redo history.
 #[derive(Clone, Debug)]
 pub struct Editor {
@@ -836,7 +839,7 @@ impl Editor {
     ) -> Result<T, ModelError> {
         let (value, transaction) = self.document.transact(name, edits)?;
         if !transaction.is_empty() {
-            self.undo.push(transaction);
+            self.push_undo(transaction);
             self.redo.clear();
         }
         Ok(value)
@@ -856,18 +859,31 @@ impl Editor {
         if transaction.is_empty() {
             return Ok((value, false));
         }
+        // After an Undo, the action is a new one, not the end of the one
+        // before what was undone.
+        let undone = !self.redo.is_empty();
         self.redo.clear();
         match self.undo.last_mut() {
-            Some(last) if last.name == transaction.name => {
+            Some(last) if !undone && last.name == transaction.name => {
                 last.ops.extend(transaction.ops);
                 last.inverse.extend(transaction.inverse);
                 Ok((value, true))
             }
             _ => {
-                self.undo.push(transaction);
+                self.push_undo(transaction);
                 Ok((value, false))
             }
         }
+    }
+
+    /// Adds an action to the history, which keeps the last
+    /// [`MAX_UNDO`]: each keeps what it changed, a whole table for an edit
+    /// of its cells, and a long session would hold them all.
+    fn push_undo(&mut self, transaction: Transaction) {
+        if self.undo.len() >= MAX_UNDO {
+            self.undo.remove(0);
+        }
+        self.undo.push(transaction);
     }
 
     /// Undoes the last action. Returns false when there was none.

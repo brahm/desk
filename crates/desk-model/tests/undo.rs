@@ -386,3 +386,41 @@ fn doc_12_letters_typed_in_a_row_undo_together() {
     assert!(editor.redo().unwrap());
     assert_eq!(editor.snapshot(), typed);
 }
+
+#[test]
+fn typing_after_an_undo_is_a_new_step() {
+    // Type, paste, undo the paste and type again: the new letters do not
+    // join the first typing (review RV, batch 3).
+    let mut editor = Editor::new(Document::new_word_processing());
+    let first = editor.document().body().get(0).unwrap().id();
+    let (at, _) = editor
+        .edit_continuing("Typing", |edit| {
+            edit.insert_text(Position::new(first, 0), "abc")
+        })
+        .unwrap();
+    let typed = editor.snapshot();
+    editor
+        .edit("Paste", |edit| edit.insert_text(at, "PASTED"))
+        .unwrap();
+    assert!(editor.undo().unwrap());
+    let (_, joined) = editor
+        .edit_continuing("Typing", |edit| edit.insert_text(at, "x"))
+        .unwrap();
+    assert!(!joined);
+    assert!(editor.undo().unwrap());
+    assert_eq!(editor.snapshot(), typed);
+}
+
+#[test]
+fn the_history_keeps_the_last_actions() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let first = editor.document().body().get(0).unwrap().id();
+    for _ in 0..desk_model::MAX_UNDO + 5 {
+        editor
+            .edit("Typing", |edit| {
+                edit.insert_text(Position::new(first, 0), "a")
+            })
+            .unwrap();
+    }
+    assert_eq!(editor.undo_depth(), desk_model::MAX_UNDO);
+}
