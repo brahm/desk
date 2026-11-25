@@ -654,3 +654,66 @@ fn rev_04_text_typed_by_a_deletion_is_not_deleted_and_copies_leave_hidden_text_o
         desk_model::Markup::WithoutDeletions
     );
 }
+
+#[test]
+fn b_070_deleted_text_keeps_the_change_it_was_in() {
+    let (mut editor, p) = typed("one two three");
+    // Bo added "two ".
+    let ((bo, _), _) = editor
+        .edit("Changes", |edit| {
+            let bo = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+            edit.mark_change(Position::new(p, 4), Position::new(p, 8), bo)?;
+            Ok(((bo, ()), ()))
+        })
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(p, 0), Position::new(p, 13))
+                .map(|_| ())
+        })
+        .unwrap();
+    let deletion = editor
+        .document()
+        .changes()
+        .iter()
+        .find(|c| c.kind == ChangeKind::Deletion)
+        .unwrap()
+        .id;
+    let resolve = |editor: &mut Editor, accept: bool, id: NodeId| {
+        editor
+            .edit("Resolve", |edit| {
+                edit.resolve_changes(accept, |c| c == id).map(|_| ())
+            })
+            .unwrap();
+    };
+    // Rejecting the deletion gives "two " back to Bo's insertion.
+    resolve(&mut editor, false, deletion);
+    assert_eq!(
+        runs(&editor, p),
+        [
+            plain("one "),
+            ("two ".into(), Some((ChangeKind::Insertion, "Bo".into()))),
+            plain("three")
+        ]
+    );
+    editor.undo().unwrap();
+    // Bo's insertion accepted while the text is deleted: rejecting the
+    // deletion then leaves plain text.
+    resolve(&mut editor, true, bo);
+    resolve(&mut editor, false, deletion);
+    assert_eq!(runs(&editor, p), [plain("one two three")]);
+    editor.undo().unwrap();
+    editor.undo().unwrap();
+    // Bo's insertion rejected while the text is deleted: the text goes.
+    resolve(&mut editor, false, bo);
+    assert_eq!(editor.document().paragraph(p).unwrap().text(), "one three");
+    editor.undo().unwrap();
+    // Everything rejected: the text that Bo added goes, the rest stays.
+    editor
+        .edit("Reject All", |edit| {
+            edit.resolve_changes(false, |_| true).map(|_| ())
+        })
+        .unwrap();
+    assert_eq!(runs(&editor, p), [plain("one three")]);
+}

@@ -705,6 +705,18 @@ A highlight is an annotation whose one paragraph is empty (PXV-19).
 - **Fallback:** a change of formatting of the text of the paragraphs, as
   other programs read it, without what the paragraphs were before.
 
+#### Changes inside deleted text (no attribute of its own)
+
+Text that a tracked deletion took from another change, an insertion or
+a change of formatting of another author, keeps that change, so that
+rejecting the deletion gives the text back to it (W148, B-070). Desk
+writes the `text:change-start` and `text:change-end` marks of that
+change inside the paragraphs of the `text:deletion` that hold the text,
+with a `text:changed-region` of its own, and reads them back from
+there. ODF lets a deletion keep any content of a paragraph; other
+programs that do not look for marks there read the text as deleted
+alone, and the region as a change that holds no text.
+
 #### `desk:annotation`
 
 - **Feature:** a comment on an object itself, as Pages 15.4 puts one on

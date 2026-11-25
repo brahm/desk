@@ -2354,6 +2354,21 @@ paragraph, and objects on a second page.
   would give the author two changes they did not make.
 - The tracking actions are named in Undo and Redo.
 
+### 25 November: changes inside a deletion (step 12 of W2, second part)
+
+- Text keeps the change it was in when a tracked deletion takes it, as
+  its change before, rather than changes that nest without limit: a
+  deletion is the last thing that happens to text, and one change
+  before it is what Pages shows and gives back (B-070).
+- Rejecting the deletion gives the text back to that change; resolving
+  that change while the text is deleted keeps the text deleted, as it
+  is after the change, or takes it out when an insertion is rejected.
+- ODT keeps the marks of the change before inside the paragraphs of the
+  deletion, which ODF allows, so no attribute of its own is needed.
+- A paragraph break of another author's insertion that a deletion took
+  still loses that insertion, since a break keeps one change; it moves
+  to step 13 (B-072).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

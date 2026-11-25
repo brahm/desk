@@ -700,3 +700,82 @@ fn rev_01_changes_of_paragraph_styles_keep_the_style_before() {
         ["Centered text", "Second"]
     );
 }
+
+#[test]
+fn b_070_deleted_text_keeps_the_change_it_was_in_in_odt() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    let first = document.body().iter().next().unwrap().id();
+    document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, "one two three four")?;
+            let added =
+                edit.add_change(ChangeKind::Insertion, "Bo", Some("2026-11-24T09:30:00"))?;
+            let formatted = edit.add_change(ChangeKind::Format, "Bo", None)?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Ana", None)?;
+            // Ana deleted "one two three": "two " was Bo's, and "three"
+            // formatted by Bo.
+            edit.mark_change(Position::new(first, 0), Position::new(first, 13), gone)?;
+            edit.mark_former(
+                Position::new(first, 4),
+                Position::new(first, 8),
+                added,
+                None,
+            )?;
+            edit.mark_former(
+                Position::new(first, 8),
+                Position::new(first, 13),
+                formatted,
+                None,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    // Each run: its text, the kind of its change and of the one before.
+    let formers = |d: &Document| -> Vec<(String, Option<ChangeKind>, Option<ChangeKind>)> {
+        let kind =
+            |id: Option<desk_model::NodeId>| id.and_then(|id| d.changes().get(id)).map(|c| c.kind);
+        d.body()
+            .iter()
+            .next()
+            .unwrap()
+            .runs()
+            .map(|r| {
+                (
+                    r.text().to_owned(),
+                    kind(r.attrs.change.flatten()),
+                    kind(r.attrs.former.flatten()),
+                )
+            })
+            .collect()
+    };
+    let before = formers(&document);
+    assert_eq!(
+        before,
+        [
+            ("one ".into(), Some(ChangeKind::Deletion), None),
+            (
+                "two ".into(),
+                Some(ChangeKind::Deletion),
+                Some(ChangeKind::Insertion)
+            ),
+            (
+                "three".into(),
+                Some(ChangeKind::Deletion),
+                Some(ChangeKind::Format)
+            ),
+            (" four".into(), None, None),
+        ]
+    );
+    let bytes = write_odt(&document).unwrap();
+    keep("b-070-former-changes.odt", &bytes);
+    // Other programs read the text as if the deletion were accepted.
+    let content = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(content.body[0].text(), " four");
+    assert_eq!(content.tracked_changes.len(), 3);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(formers(&read), before);
+    assert_eq!(described(&read).1, described(&document).1);
+}

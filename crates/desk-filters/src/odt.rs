@@ -350,6 +350,7 @@ fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) ->
         comments: None,
         change: None,
         formatted: None,
+        former: None,
     }
 }
 
@@ -2141,20 +2142,34 @@ fn import_tracked(
     if events.is_empty() {
         return Ok(());
     }
-    let met: HashSet<String> = changes::marked(&events)
+    let mut met: HashSet<String> = changes::marked(&events)
         .into_iter()
         .map(str::to_owned)
         .collect();
     let mut deleted = HashMap::new();
+    // The marks in the text that deletions took: the changes it was in
+    // before, by paragraph (B-070).
+    let mut formers: HashMap<String, Vec<Vec<(usize, odf::Field)>>> = HashMap::new();
     for region in regions {
         if region.kind != odf::ChangeKind::Deletion || !met.contains(&region.id) {
             continue;
         }
         let mut paragraphs = Vec::new();
+        let mut inner = Vec::new();
         for paragraph in &region.deleted {
+            let mut found = Vec::new();
             let mut built = import_paragraph(
-                source, document, ids, default, paragraph, relative, marks, None,
+                source,
+                document,
+                ids,
+                default,
+                paragraph,
+                relative,
+                marks,
+                Some(&mut found),
             )?;
+            found.retain(|(_, field)| changes::is_mark(field));
+            inner.push(found);
             // The list it was an item of, for when the deletion is
             // rejected (B-067).
             if let Some(member) = &paragraph.list
@@ -2184,6 +2199,12 @@ fn import_tracked(
             }
             paragraphs.push(built);
         }
+        for (_, field) in inner.iter().flatten() {
+            if let odf::Field::ChangeStart { id } = field {
+                met.insert(id.clone());
+            }
+        }
+        formers.insert(region.id.clone(), inner);
         deleted.insert(region.id.clone(), paragraphs);
     }
     // The formatting that text had before its changes of formatting.
@@ -2218,7 +2239,14 @@ fn import_tracked(
             Some((r.id.clone(), before))
         })
         .collect();
-    changes::import(document, regions, deleted, &previous, &paragraphs, events)
+    changes::import(
+        document,
+        regions,
+        changes::Taken { deleted, formers },
+        &previous,
+        &paragraphs,
+        events,
+    )
 }
 
 /// The marks of tracked changes among the events of some text, apart
@@ -2753,6 +2781,7 @@ fn export_spans(
     // past the break when it took it.
     // A change of formatting starts again where the formatting before it
     // differs, as its mark names that formatting.
+    let track_on = track.is_some();
     let mut open = (track.as_deref().copied().flatten(), None);
     let mut switch =
         |spans: &mut Vec<odf::Span>,
@@ -2807,14 +2836,56 @@ fn export_spans(
         }
     };
     let mut last = None;
+    // The change that deleted text was in before, whose marks go inside
+    // those of the deletion (B-070).
+    let mut former_open: Option<NodeId> = None;
+    let mut before_change: Option<NodeId> = None;
+    let close_former = |spans: &mut Vec<odf::Span>, former_open: &mut Option<NodeId>| {
+        if let Some(id) = former_open.take() {
+            spans.push(odf::Span {
+                field: Some(odf::Field::ChangeEnd {
+                    id: id.get().to_string(),
+                }),
+                ..odf::Span::default()
+            });
+        }
+    };
     for run in paragraph.runs() {
-        let to = (
-            run.attrs.change.flatten(),
-            run.attrs.formatted.clone().flatten(),
-        );
-        switch(&mut spans, to, Some(run), &mut |before| {
+        let former = if track_on {
+            run.attrs.former.flatten()
+        } else {
+            None
+        };
+        let change = run.attrs.change.flatten();
+        if former_open.is_some() && (former_open != former || before_change != change) {
+            close_former(&mut spans, &mut former_open);
+        }
+        before_change = change;
+        // The formatting before is that of the change before, when there
+        // is one.
+        let formatted = if former.is_none() {
+            run.attrs.formatted.clone().flatten()
+        } else {
+            None
+        };
+        switch(&mut spans, (change, formatted), Some(run), &mut |before| {
             style(&Run::with_attrs("", before.style, before.attrs.clone()))
         });
+        if let Some(id) = former
+            && former_open.is_none()
+        {
+            let previous = run.attrs.formatted.clone().flatten().map(|before| {
+                style(&Run::with_attrs("", before.style, before.attrs.clone())).unwrap_or_default()
+            });
+            spans.push(odf::Span {
+                style: previous,
+                field: Some(odf::Field::ChangeStart {
+                    id: id.get().to_string(),
+                }),
+                ..odf::Span::default()
+            });
+            former_open = Some(id);
+        }
         comments(&mut spans, offset, Some(run));
         offset += run.len();
         last = Some(run);
@@ -2882,6 +2953,7 @@ fn export_spans(
         }
     }
     comments(&mut spans, offset, last);
+    close_former(&mut spans, &mut former_open);
     let ends = paragraph.attrs().break_change.flatten();
     switch(&mut spans, (ends, None), None, &mut |_| None);
     if let Some(track) = track {

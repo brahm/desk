@@ -255,6 +255,7 @@ impl Document {
                     let mut attrs = run.attrs.clone();
                     attrs.change = None;
                     attrs.formatted = None;
+                    attrs.former = None;
                     (run.text().to_owned(), style, attrs)
                 })
                 .collect();
@@ -1245,6 +1246,7 @@ impl Edit {
                 if let Some(insertion) = insertion {
                     attrs.change = Some(Some(insertion));
                     attrs.formatted = None;
+                    attrs.former = None;
                 }
                 match attrs.field {
                     Some(Some(crate::Field::NoteMark { note })) => {
