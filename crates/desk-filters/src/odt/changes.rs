@@ -30,7 +30,7 @@ pub(super) fn is_mark(field: &odf::Field) -> bool {
     )
 }
 
-/// The regions that marks of the body name where their text starts.
+/// The regions that marks of some text name where their text starts.
 pub(super) fn marked(events: &Events) -> std::collections::HashSet<&str> {
     events
         .iter()
@@ -41,8 +41,9 @@ pub(super) fn marked(events: &Events) -> std::collections::HashSet<&str> {
         .collect()
 }
 
-/// Puts the insertions and deletions of the body in the document: each
-/// region a change, the text between the marks of an insertion in it,
+/// Puts the insertions and deletions whose marks some text of the
+/// document has, the body or its stories, in the document: each region a
+/// change, the text between the marks of an insertion in it,
 /// and the paragraphs that a deletion took, already read as paragraphs of
 /// the document (`deleted`, by region), back in their place.
 pub(super) fn import(
@@ -51,9 +52,9 @@ pub(super) fn import(
     mut deleted: HashMap<String, Vec<Paragraph>>,
     events: Events,
 ) -> Result<(), FilterError> {
-    // The regions whose marks the body has: the others, in notes and the
-    // like, are listed as left out by the reader.
-    let met = marked(&events);
+    // The regions whose marks the text has.
+    let met: std::collections::HashSet<String> =
+        marked(&events).into_iter().map(str::to_owned).collect();
     let read: Vec<&odf::ChangedRegion> = regions
         .iter()
         .filter(|r| r.kind != odf::ChangeKind::FormatChange && met.contains(r.id.as_str()))
@@ -61,6 +62,7 @@ pub(super) fn import(
     if read.is_empty() || events.is_empty() {
         return Ok(());
     }
+    let texts = super::comments::by_text(document, events);
     document.transact("Tracked Changes", |edit| {
         let mut ids: HashMap<&str, (NodeId, ChangeKind)> = HashMap::new();
         for region in &read {
@@ -77,68 +79,87 @@ pub(super) fn import(
             )?;
             ids.insert(region.id.as_str(), (id, kind));
         }
-        // The insertions first, which leave the text as it is.
-        let mut open: Vec<(NodeId, Position)> = Vec::new();
-        let mut deletions: Vec<(NodeId, Position, String)> = Vec::new();
-        for (paragraph, offset, field) in &events {
-            let at = Position::new(*paragraph, *offset);
-            match field {
-                odf::Field::ChangeStart { id } => {
-                    if let Some(&(change, ChangeKind::Insertion)) = ids.get(id.as_str()) {
-                        open.push((change, at));
-                    }
+        for (story, events) in texts {
+            match story {
+                None => put(edit, &ids, &mut deleted, events)?,
+                Some(story) => {
+                    edit.edit_story(story, |edit| put(edit, &ids, &mut deleted, events))?;
                 }
-                odf::Field::ChangeEnd { id } => {
-                    let Some(&(change, _)) = ids.get(id.as_str()) else {
-                        continue;
-                    };
-                    let Some(i) = open.iter().position(|(c, _)| *c == change) else {
-                        continue;
-                    };
-                    let (_, start) = open.remove(i);
-                    // An end before its start, as a file may have, marks
-                    // nothing.
-                    let body = edit.document().body();
-                    let (Some(first), Some(last)) =
-                        (body.index_of(start.paragraph), body.index_of(at.paragraph))
-                    else {
-                        continue;
-                    };
-                    if (last, at.offset) < (first, start.offset) {
-                        continue;
-                    }
-                    let breaks: Vec<NodeId> = (first..last)
-                        .filter_map(|i| body.get(i).map(Paragraph::id))
-                        .collect();
-                    edit.mark_change(start, at, change)?;
-                    for paragraph in breaks {
-                        edit.mark_break_change(paragraph, Some(change))?;
-                    }
-                }
-                odf::Field::Change { id } => {
-                    if let Some(&(change, ChangeKind::Deletion)) = ids.get(id.as_str()) {
-                        deletions.push((change, at, id.clone()));
-                    }
-                }
-                _ => {}
-            }
-        }
-        // Then the deletions, from the last, so that the places of those
-        // before stay where they are.
-        for (change, at, region) in deletions.into_iter().rev() {
-            let Some(paragraphs) = deleted.remove(&region) else {
-                continue;
-            };
-            let fits = edit
-                .document()
-                .paragraph(at.paragraph)
-                .is_ok_and(|p| at.offset <= p.len() && p.is_boundary(at.offset));
-            if fits {
-                restore(edit, change, at, paragraphs)?;
             }
         }
         Ok(())
     })?;
+    Ok(())
+}
+
+/// Puts the changes whose marks a text has on it: the body, or a story
+/// edited as a body.
+fn put(
+    edit: &mut desk_model::Edit,
+    ids: &HashMap<&str, (NodeId, ChangeKind)>,
+    deleted: &mut HashMap<String, Vec<Paragraph>>,
+    events: Events,
+) -> Result<(), desk_model::ModelError> {
+    // The insertions first, which leave the text as it is.
+    let mut open: Vec<(NodeId, Position)> = Vec::new();
+    let mut deletions: Vec<(NodeId, Position, String)> = Vec::new();
+    for (paragraph, offset, field) in &events {
+        let at = Position::new(*paragraph, *offset);
+        match field {
+            odf::Field::ChangeStart { id } => {
+                if let Some(&(change, ChangeKind::Insertion)) = ids.get(id.as_str()) {
+                    open.push((change, at));
+                }
+            }
+            odf::Field::ChangeEnd { id } => {
+                let Some(&(change, _)) = ids.get(id.as_str()) else {
+                    continue;
+                };
+                let Some(i) = open.iter().position(|(c, _)| *c == change) else {
+                    continue;
+                };
+                let (_, start) = open.remove(i);
+                // An end before its start, as a file may have, marks
+                // nothing.
+                let body = edit.document().body();
+                let (Some(first), Some(last)) =
+                    (body.index_of(start.paragraph), body.index_of(at.paragraph))
+                else {
+                    continue;
+                };
+                if (last, at.offset) < (first, start.offset) {
+                    continue;
+                }
+                let breaks: Vec<NodeId> = (first..last)
+                    .filter_map(|i| body.get(i).map(Paragraph::id))
+                    .collect();
+                edit.mark_change(start, at, change)?;
+                for paragraph in breaks {
+                    edit.mark_break_change(paragraph, Some(change))?;
+                }
+            }
+            odf::Field::Change { id } => {
+                if let Some(&(change, ChangeKind::Deletion)) = ids.get(id.as_str()) {
+                    deletions.push((change, at, id.clone()));
+                }
+            }
+            _ => {}
+        }
+    }
+    // Then the deletions, from the last, so that the places of those
+    // before stay where they are.
+    for (change, at, region) in deletions.into_iter().rev() {
+        let Some(paragraphs) = deleted.remove(&region) else {
+            continue;
+        };
+        let fits = edit
+            .document()
+            .paragraph(at.paragraph)
+            .is_ok_and(|p| at.offset <= p.len() && p.is_boundary(at.offset));
+        if fits {
+            restore(edit, change, at, paragraphs)?;
+        }
+    }
     Ok(())
 }
 
@@ -213,20 +234,20 @@ fn restore(
 
 /// Takes the deleted text of the body out to the regions of its
 /// deletions, joining the paragraphs whose breaks they took, and names
-/// the regions of insertions; returns the regions (W148). The body comes
-/// with the marks that [`super::export_spans`] puts, which name changes
-/// by their identifiers.
-pub(super) fn export(
+/// the regions of insertions, after those already in `regions` (W148).
+/// The text comes with the marks that [`super::export_spans`] puts, which
+/// name changes by their identifiers.
+fn export(
     body: &mut Vec<odf::Paragraph>,
     document: &Document,
-) -> Vec<odf::ChangedRegion> {
-    let mut regions: Vec<odf::ChangedRegion> = Vec::new();
+    regions: &mut Vec<odf::ChangedRegion>,
+) {
     let has_marks = body
         .iter()
         .flat_map(|p| &p.spans)
         .any(|s| s.field.as_ref().is_some_and(is_mark));
     if !has_marks {
-        return regions;
+        return;
     }
     let mut out: Vec<odf::Paragraph> = Vec::with_capacity(body.len());
     // The paragraph being written, which a deletion of its break joins to
@@ -272,17 +293,16 @@ pub(super) fn export(
             },
         };
         if let Some((_, taking)) = &mut deleting {
-            *taking = odf::Paragraph {
-                style: paragraph.style.clone(),
-                ..odf::Paragraph::default()
-            };
+            *taking = taken(&paragraph);
         }
         for span in paragraph.spans {
             match &span.field {
-                Some(odf::Field::ChangeStart { id }) => match region(&mut regions, id) {
+                Some(odf::Field::ChangeStart { id }) => match region(regions, id) {
                     Some((index, ChangeKind::Deletion)) => {
                         let name = regions[index].id.clone();
                         here.spans.push(mark(odf::Field::Change { id: name }));
+                        // Its first paragraph joins the one of the
+                        // mark, which keeps its own list and level.
                         deleting = Some((
                             index,
                             odf::Paragraph {
@@ -332,5 +352,109 @@ pub(super) fn export(
     }
     out.extend(current);
     *body = out;
+}
+
+/// A paragraph that a deletion takes whole after the break before it,
+/// empty: its style, the level of its heading and the list it is an item
+/// of, which the region keeps for when the deletion is rejected (B-067).
+fn taken(paragraph: &odf::Paragraph) -> odf::Paragraph {
+    odf::Paragraph {
+        style: paragraph.style.clone(),
+        outline_level: paragraph.outline_level,
+        list: paragraph.list.clone(),
+        ..odf::Paragraph::default()
+    }
+}
+
+/// Takes the deleted text of every text of a document written as ODF out
+/// to the regions of its deletions, as [`export`] does for one: the body,
+/// the notes in it, the headers and footers, and the text of text boxes
+/// and shapes; returns the regions (W148).
+pub(super) fn export_all(
+    out: &mut odf::TextDocument,
+    document: &Document,
+) -> Vec<odf::ChangedRegion> {
+    let mut regions = Vec::new();
+    text(&mut out.body, document, &mut regions);
+    for object in &mut out.page_objects {
+        object_text(object, document, &mut regions);
+    }
+    let masters = std::iter::once(&mut out.master).chain(out.masters.iter_mut().map(|(_, m)| m));
+    for master in masters {
+        for object in &mut master.objects {
+            object_text(object, document, &mut regions);
+        }
+        for part in [
+            &mut master.header,
+            &mut master.header_first,
+            &mut master.header_left,
+            &mut master.footer,
+            &mut master.footer_first,
+            &mut master.footer_left,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            text(&mut part.paragraphs, document, &mut regions);
+        }
+    }
+    // The regions are written in content.xml: the automatic styles of
+    // styles.xml that the text of headers and footers took there go
+    // with it.
+    let named = regions.iter().flat_map(|r| &r.deleted).flat_map(|p| {
+        p.style
+            .iter()
+            .chain(p.spans.iter().filter_map(|s| s.style.as_ref()))
+    });
+    let mut wanted: Vec<odf::Style> = Vec::new();
+    for name in named {
+        let missing = !out.automatic_styles.iter().any(|s| &s.name == name)
+            && !wanted.iter().any(|s| &s.name == name);
+        if missing && let Some(style) = out.master_styles.iter().find(|s| &s.name == name) {
+            wanted.push(style.clone());
+        }
+    }
+    out.automatic_styles.extend(wanted);
     regions
+}
+
+/// One text, and the notes and objects in it.
+fn text(
+    paragraphs: &mut Vec<odf::Paragraph>,
+    document: &Document,
+    regions: &mut Vec<odf::ChangedRegion>,
+) {
+    // The notes and objects first, while those in deleted text are still
+    // in the text.
+    for paragraph in paragraphs.iter_mut() {
+        for span in &mut paragraph.spans {
+            match &mut span.field {
+                Some(odf::Field::Note(note)) => text(&mut note.body, document, regions),
+                Some(odf::Field::Object(object)) => object_text(object, document, regions),
+                _ => {}
+            }
+        }
+        for object in &mut paragraph.frames {
+            object_text(object, document, regions);
+        }
+    }
+    export(paragraphs, document, regions);
+}
+
+/// The text of an object, and of those in a group.
+fn object_text(
+    object: &mut odf::DrawObject,
+    document: &Document,
+    regions: &mut Vec<odf::ChangedRegion>,
+) {
+    text(&mut object.text, document, regions);
+    match &mut object.kind {
+        odf::DrawKind::TextBox { paragraphs, .. } => text(paragraphs, document, regions),
+        odf::DrawKind::Group(children) => {
+            for child in children {
+                object_text(child, document, regions);
+            }
+        }
+        _ => {}
+    }
 }

@@ -9,6 +9,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 ## Changes since 0.7.0 (unreleased)
 
 * Added: Desk Writer keeps the insertions and deletions tracked in the
+  notes, headers, footers, text boxes and shapes of ODT files, and the
+  list item of a paragraph whose break before it was deleted (#217).
+* Added: Desk Writer keeps the insertions and deletions tracked in the
   body of ODT files, and shows them in the colour of their author,
   instead of accepting them when the file opens (#216).
 * Added: the author's name in Preferences, and View > Author Color in

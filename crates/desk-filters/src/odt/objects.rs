@@ -1798,7 +1798,7 @@ impl Exporter<'_> {
 
     /// A paragraph of a text box, with automatic styles for what is set
     /// on it and its text.
-    fn paragraph(&mut self, paragraph: &Paragraph) -> odf::Paragraph {
+    fn paragraph(&mut self, paragraph: &Paragraph, track: &mut Option<NodeId>) -> odf::Paragraph {
         let styles = self.document.styles();
         let style_name = self.names[&paragraph.style()].clone();
         let own = ParaAttrs {
@@ -1841,7 +1841,7 @@ impl Exporter<'_> {
             });
         }
         let mut names = runs.into_iter();
-        let spans = export_spans(paragraph, None, self.comments, None, |_| {
+        let spans = export_spans(paragraph, None, self.comments, Some(track), |_| {
             names.next().flatten()
         });
         odf::Paragraph {
@@ -2152,7 +2152,13 @@ impl Exporter<'_> {
                     g.column_gap = Some(odf_length(text.column_gap));
                 }
                 odf::DrawKind::TextBox {
-                    paragraphs: text.paragraphs.iter().map(|p| self.paragraph(p)).collect(),
+                    paragraphs: {
+                        let mut track = None;
+                        text.paragraphs
+                            .iter()
+                            .map(|p| self.paragraph(p, &mut track))
+                            .collect()
+                    },
                     chain_next: text.next.map(text_box_name),
                     thread: text.thread,
                 }
@@ -2199,10 +2205,11 @@ impl Exporter<'_> {
                 g.column_count = Some(u32::from(inside.columns));
                 g.column_gap = Some(odf_length(inside.column_gap));
             }
+            let mut track = None;
             text = inside
                 .paragraphs
                 .iter()
-                .map(|p| self.paragraph(p))
+                .map(|p| self.paragraph(p, &mut track))
                 .collect();
         }
         // The object style it took is the parent of its own, which says

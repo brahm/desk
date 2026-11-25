@@ -136,25 +136,8 @@ pub fn read_streams(
                 .filter_map(changed_region)
                 .collect();
         }
-        // Only the changes of the paragraphs of the body are read: those
-        // of notes, tables and the like are left out, as accepted.
-        let marked: std::collections::HashSet<&str> = document
-            .body
-            .iter()
-            .flat_map(|p| &p.spans)
-            .filter_map(|s| match &s.field {
-                Some(Field::ChangeStart { id } | Field::Change { id }) => Some(id.as_str()),
-                _ => None,
-            })
-            .collect();
-        let unread = document
-            .tracked_changes
-            .iter()
-            .filter(|r| r.kind != ChangeKind::FormatChange && !marked.contains(r.id.as_str()))
-            .count();
-        if unread > 0 {
-            document.skipped.push(("changed-region".to_owned(), unread));
-        }
+        // Insertions and deletions whose marks the reader of the
+        // document does not find are counted there, as left out.
         left_out(text, true, &mut document.skipped);
     }
     if let Some(masters) = styles

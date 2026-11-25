@@ -2208,6 +2208,27 @@ paragraph, and objects on a second page.
   shows deleted text as text until step 15. Changes of formatting stay
   listed as left out, as accepted, until step 9.
 
+### 24 November: tracked changes of the other texts (step 8 of W2, second part)
+
+- Notes, headers, footers, text boxes and shapes carry changes as the
+  body does: ODF marks them in their own text, with the regions of
+  every text in the one `text:tracked-changes` of the body, and Desk
+  reads them there, keeps them and writes them back the same way. Each
+  text is read on its own, so that a deletion is put back in the text
+  its mark is in.
+- Changes in table cells and regions whose marks are not found are
+  counted in the log of what was left out, and the text stays as
+  accepted; cells come in step 13.
+- A deletion that takes the break before a list item keeps the item's
+  list in its region, as `text:list` around the paragraph, so the item
+  is a list item again when the deletion is rejected (B-067). The
+  section it starts and its entry of a table of contents are structure
+  around paragraphs, which step 13 brings into tracking with objects and
+  cells (B-068).
+- Showing earlier items of the user under the current name (B-066)
+  needs the identity of the author that turning tracking on gives, and
+  moves to step 10.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

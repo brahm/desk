@@ -106,7 +106,19 @@ pub fn read_odt_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterErro
         };
         log.add(Warning::Content(content), *count);
     }
-    Ok((import(&source)?, log))
+    let document = import(&source)?;
+    // Insertions and deletions whose marks no text that Desk reads has,
+    // as in tables, are left out as accepted.
+    let regions = source
+        .tracked_changes
+        .iter()
+        .filter(|r| r.kind != odf::ChangeKind::FormatChange)
+        .count();
+    let unread = regions.saturating_sub(document.changes().iter().count());
+    if unread > 0 {
+        log.add(Warning::Content(Content::AcceptedChanges), unread);
+    }
+    Ok((document, log))
 }
 
 /// Writes a document as an ODT file.
@@ -1764,7 +1776,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     )
                 },
             )?;
-            if paragraphs.iter().all(Paragraph::is_empty) {
+            // A header that a deletion emptied still has its change.
+            if paragraphs.iter().all(Paragraph::is_empty)
+                && !comments.iter().any(|(_, _, field)| changes::is_mark(field))
+            {
                 continue;
             }
             // Other programs show the first and left ones whenever they
@@ -1781,7 +1796,20 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 place,
                 paragraphs,
             })?;
+            let (tracked, comments) = split_tracked(comments);
             comments::import(&mut document, comments)?;
+            // The regions are in content.xml, with its styles.
+            import_tracked(
+                source,
+                &source.tracked_changes,
+                &mut document,
+                &ids,
+                &lists,
+                &Marks::new(),
+                default,
+                relative,
+                tracked,
+            )?;
         }
     }
 
@@ -1852,7 +1880,19 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             },
         )?;
     }
+    let (object_tracked, object_comments) = split_tracked(object_comments);
     comments::import(&mut document, object_comments)?;
+    import_tracked(
+        source,
+        &source.tracked_changes,
+        &mut document,
+        &ids,
+        &lists,
+        &Marks::new(),
+        default,
+        relative,
+        object_tracked,
+    )?;
 
     let text = &source.text_settings;
     document.apply(Op::SetTextSettings {
@@ -1919,31 +1959,17 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // Last, as the paragraphs that deletions took join the body, and what
     // came before finds paragraphs by their place in it (W148). Only the
     // deletions whose marks the body has are read.
-    let met: HashSet<String> = changes::marked(&tracked)
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
-    let mut deleted = HashMap::new();
-    for region in &source.tracked_changes {
-        if region.kind != odf::ChangeKind::Deletion || !met.contains(&region.id) {
-            continue;
-        }
-        let mut paragraphs = Vec::new();
-        for paragraph in &region.deleted {
-            paragraphs.push(import_paragraph(
-                source,
-                &mut document,
-                &ids,
-                default,
-                paragraph,
-                relative,
-                &marks,
-                None,
-            )?);
-        }
-        deleted.insert(region.id.clone(), paragraphs);
-    }
-    changes::import(&mut document, &source.tracked_changes, deleted, tracked)?;
+    import_tracked(
+        source,
+        &source.tracked_changes,
+        &mut document,
+        &ids,
+        &lists,
+        &marks,
+        default,
+        relative,
+        tracked,
+    )?;
 
     let meta = &source.meta;
     document.apply(Op::SetMetadata {
@@ -2084,6 +2110,84 @@ fn odf_note_settings(settings: NoteSettings) -> odf::TextSettings {
     }
 }
 
+/// Puts the tracked changes whose marks some text has in the document:
+/// those of the body, a note, a header or footer, or text boxes and
+/// shapes (W148). The paragraphs that its deletions took are read as those
+/// of the text, from `source`; the regions are those of the body of the
+/// file.
+#[allow(clippy::too_many_arguments)]
+fn import_tracked(
+    source: &odf::TextDocument,
+    regions: &[odf::ChangedRegion],
+    document: &mut Document,
+    ids: &HashMap<(odf::Family, &str), StyleId>,
+    lists: &HashMap<&str, StyleId>,
+    marks: &Marks,
+    default: StyleId,
+    relative: bool,
+    events: changes::Events,
+) -> Result<(), FilterError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+    let met: HashSet<String> = changes::marked(&events)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let mut deleted = HashMap::new();
+    for region in regions {
+        if region.kind != odf::ChangeKind::Deletion || !met.contains(&region.id) {
+            continue;
+        }
+        let mut paragraphs = Vec::new();
+        for paragraph in &region.deleted {
+            let mut built = import_paragraph(
+                source, document, ids, default, paragraph, relative, marks, None,
+            )?;
+            // The list it was an item of, for when the deletion is
+            // rejected (B-067).
+            if let Some(member) = &paragraph.list
+                && let Some(&list) = lists.get(member.style.as_str())
+            {
+                let mut attrs = built.attrs().clone();
+                if document
+                    .styles()
+                    .resolve_paragraph(built.style(), &attrs)
+                    .list_style
+                    != Some(list)
+                {
+                    attrs.list_style = Some(Some(list));
+                }
+                if member.level > 0 {
+                    attrs.list_level = Some(member.level);
+                }
+                if let Some(start) = member.start {
+                    attrs.list_start = Some(Some(start));
+                }
+                built = Paragraph::from_runs(
+                    built.id(),
+                    built.style(),
+                    attrs,
+                    built.runs().cloned().collect::<Vec<_>>(),
+                )?;
+            }
+            paragraphs.push(built);
+        }
+        deleted.insert(region.id.clone(), paragraphs);
+    }
+    changes::import(document, regions, deleted, events)
+}
+
+/// The marks of tracked changes among the events of some text, apart
+/// from its comments.
+fn split_tracked(
+    events: Vec<(NodeId, usize, odf::Field)>,
+) -> (changes::Events, Vec<(NodeId, usize, odf::Field)>) {
+    events
+        .into_iter()
+        .partition(|(_, _, field)| changes::is_mark(field))
+}
+
 /// Adds the note of the model for a note of ODF, whose text starts with
 /// its mark in the format of the citation in the body, and returns its
 /// id.
@@ -2170,7 +2274,19 @@ fn import_note(
             paragraphs: paragraphs.into(),
         }),
     })?;
+    let (tracked, comments) = split_tracked(comments);
     comments::import(document, comments)?;
+    import_tracked(
+        source,
+        &source.tracked_changes,
+        document,
+        ids,
+        &HashMap::new(),
+        &Marks::new(),
+        default,
+        relative,
+        tracked,
+    )?;
     Ok(id)
 }
 
@@ -2766,6 +2882,8 @@ fn export_margins(
             return None;
         }
         let mut out = Vec::new();
+        // The tracked change open past a break (W148).
+        let mut tracked: Option<NodeId> = None;
         for paragraph in paragraphs {
             let style_name = names[&paragraph.style()].clone();
             let own = ParaAttrs {
@@ -2792,7 +2910,7 @@ fn export_margins(
                     },
                 )
             };
-            let spans = export_spans(paragraph, None, comments, None, |run| {
+            let spans = export_spans(paragraph, None, comments, Some(&mut tracked), |run| {
                 let attrs = run.attrs.without_field();
                 let named = run.style.map(|id| names[&id].clone());
                 if attrs.is_empty() {
@@ -3322,6 +3440,8 @@ pub fn export(document: &Document) -> odf::TextDocument {
     for (n, id) in note_refs.order.iter().enumerate() {
         let note = document.notes().get(*id).expect("the body refers to it");
         let mut paragraphs = Vec::new();
+        // The tracked change open past a break (W148).
+        let mut tracked: Option<NodeId> = None;
         for paragraph in note.paragraphs.iter() {
             let own = paragraph.attrs().without_structure();
             let style_name = names[&paragraph.style()].clone();
@@ -3343,7 +3463,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     },
                 )
             };
-            let spans = export_spans(paragraph, None, &comment_marks, None, |run| {
+            let spans = export_spans(paragraph, None, &comment_marks, Some(&mut tracked), |run| {
                 let named = run.style.map(|id| names[&id].clone());
                 let attrs = run.attrs.without_field();
                 if attrs.is_empty() {
@@ -3476,7 +3596,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         generator: Some(format!("Desk/{}", env!("CARGO_PKG_VERSION"))),
     };
     // Last, as it joins paragraphs whose breaks deletions took (W148).
-    out.tracked_changes = changes::export(&mut out.body, document);
+    out.tracked_changes = changes::export_all(&mut out, document);
     out
 }
 
