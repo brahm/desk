@@ -2843,6 +2843,7 @@ fn export_spans(
     let mut former_open = track.as_deref().and_then(|t| t.former.clone());
     // The change open, as `switch` leaves it.
     let mut before_change = track.as_deref().and_then(|t| t.change);
+    let came = before_change;
     let close_former = |spans: &mut Vec<odf::Span>,
                         former_open: &mut Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
                         run: Option<&Run>| {
@@ -2980,6 +2981,7 @@ fn export_spans(
     if let Some(track) = track {
         track.change = open.0;
         track.former = former_open;
+        track.came = came;
     }
     spans
 }
@@ -2991,6 +2993,8 @@ fn export_spans(
 #[derive(Default)]
 pub(super) struct Track {
     change: Option<NodeId>,
+    /// The change open at the start of the paragraph last exported.
+    came: Option<NodeId>,
     former: Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
 }
 
@@ -2999,29 +3003,54 @@ pub(super) struct Track {
 /// `name` gives for the formatting before, or none when it is unknown
 /// (W148). Their names are `p` and the identifier of the change, apart
 /// from those of the changes of the text, as `changes::export` reads
-/// them.
+/// them. A paragraph that a deletion joins to another keeps them around
+/// the text it shows, out of the deletion: after the end of the change
+/// that `came` from the break before, and before the start of the one
+/// that takes its own break (B-069).
 fn paragraph_change(
     paragraph: &Paragraph,
+    came: Option<NodeId>,
     spans: &mut Vec<odf::Span>,
     mut name: impl FnMut(&desk_model::ParaFormatting) -> String,
 ) {
     let Some(id) = paragraph.attrs().format_change.flatten() else {
         return;
     };
+    let is = |span: &odf::Span, end: bool, change: NodeId| {
+        let change = change.get().to_string();
+        match &span.field {
+            Some(odf::Field::ChangeEnd { id }) => end && *id == change,
+            Some(odf::Field::ChangeStart { id }) => !end && *id == change,
+            _ => false,
+        }
+    };
+    let start = came
+        .and_then(|came| spans.iter().position(|s| is(s, true, came)))
+        .map_or(0, |at| at + 1);
+    let end = paragraph
+        .attrs()
+        .break_change
+        .flatten()
+        .and_then(|ends| spans.iter().rposition(|s| is(s, false, ends)))
+        .filter(|&at| at >= start)
+        .unwrap_or(spans.len());
     let before = paragraph.attrs().formatted.clone().flatten();
     let id = format!("p{}", id.get());
     spans.insert(
-        0,
+        end,
         odf::Span {
-            style: Some(before.as_deref().map(&mut name).unwrap_or_default()),
-            field: Some(odf::Field::ChangeStart { id: id.clone() }),
+            field: Some(odf::Field::ChangeEnd { id: id.clone() }),
             ..odf::Span::default()
         },
     );
-    spans.push(odf::Span {
-        field: Some(odf::Field::ChangeEnd { id }),
-        ..odf::Span::default()
-    });
+    spans.insert(
+        start,
+        odf::Span {
+            style: Some(before.as_deref().map(&mut name).unwrap_or_default()),
+            field: Some(odf::Field::ChangeStart { id }),
+            ..odf::Span::default()
+        },
+    );
 }
 
 /// The annotations of the comments, by the paragraph and the offset where
@@ -3176,7 +3205,7 @@ fn export_margins(
                 })
             });
             let mut spans = spans;
-            paragraph_change(paragraph, &mut spans, |before| {
+            paragraph_change(paragraph, tracked.came, &mut spans, |before| {
                 let parent = names
                     .get(&before.style)
                     .cloned()
@@ -3660,7 +3689,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             },
         );
         let mut spans = spans;
-        paragraph_change(paragraph, &mut spans, |before| {
+        paragraph_change(paragraph, tracked.came, &mut spans, |before| {
             let parent = names
                 .get(&before.style)
                 .cloned()
@@ -3809,7 +3838,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 ))
             });
             let mut spans = spans;
-            paragraph_change(paragraph, &mut spans, |before| {
+            paragraph_change(paragraph, tracked.came, &mut spans, |before| {
                 let parent = names
                     .get(&before.style)
                     .cloned()

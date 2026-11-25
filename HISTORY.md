@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: in Desk Writer, the tracked change of the formatting of a
+  paragraph that a deleted break joins to another stays on its
+  paragraph in ODT (#PR).
 * Fixed: in Desk Writer, text that another author added or formatted
   keeps that change when it is deleted while tracking changes, and
   rejecting the deletion gives it back, also in ODT (#225).

@@ -1847,7 +1847,7 @@ impl Exporter<'_> {
                 Some(self.style(prefix, odf::Family::Text, named, properties))
             }
         });
-        super::paragraph_change(paragraph, &mut spans, |before| {
+        super::paragraph_change(paragraph, track.came, &mut spans, |before| {
             let parent = names
                 .get(&before.style)
                 .cloned()
