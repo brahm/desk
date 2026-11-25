@@ -34,7 +34,12 @@ use crate::text_nav::Spot;
 /// the preferences (W150), or else the full name of the user, or the login
 /// when there is none.
 pub fn author() -> String {
-    let chosen = crate::preferences::get().author;
+    author_of(&crate::preferences::get())
+}
+
+/// The name that new comments are written under with some preferences.
+pub fn author_of(preferences: &crate::preferences::Preferences) -> String {
+    let chosen = preferences.author.clone();
     if !chosen.is_empty() {
         return chosen;
     }
@@ -44,6 +49,25 @@ pub fn author() -> String {
     } else {
         name
     }
+}
+
+/// The name that a comment or change written under `name` shows under:
+/// the current name of the author of this computer when it is one of
+/// their earlier names, as Pages 15.4 shows them (B-066), or else the
+/// name itself.
+pub fn shown_author(name: &str) -> String {
+    let preferences = crate::preferences::get();
+    if preferences.former_authors.iter().any(|n| n == name) {
+        author_of(&preferences)
+    } else {
+        name.to_owned()
+    }
+}
+
+/// The colours of the authors of a document, with the author of this
+/// computer under their name now and the earlier ones (W150, B-066).
+pub fn palette(document: &desk_model::Document) -> desk_model::AuthorPalette {
+    document.author_palette_of(&author(), &crate::preferences::get().former_authors)
 }
 
 /// Now, as comments keep when they were written: a date and time of ISO
@@ -314,7 +338,7 @@ impl CommentsPage {
         };
         let document = editor.document();
         let now = glib::DateTime::now_local().ok();
-        let palette = document.author_palette(&author());
+        let palette = palette(&document);
         let mut rows = Vec::new();
         let draft = *self.draft.borrow();
         if let Some(range) = draft {
@@ -398,13 +422,15 @@ impl CommentsPage {
         let date = |d: &Option<std::sync::Arc<str>>| {
             d.as_deref().zip(now).map(|(d, now)| shown_date(d, now))
         };
+        // Under the name the author has now (B-066).
         let color_of = |name: &str| Some(palette.color(name));
+        let comment_author = shown_author(&comment.author);
         let text = text_label(&comment.text, comment.is_highlight());
         let edit = icon_button("document-edit-symbolic", &tr("Edit Comment"));
         let delete = icon_button("user-trash-symbolic", &tr("Delete Comment"));
         card.append(&heading(
-            &comment.author,
-            color_of(&comment.author),
+            &comment_author,
+            color_of(&comment_author),
             date(&comment.date).as_deref(),
             &[&edit, &delete],
         ));
@@ -458,9 +484,10 @@ impl CommentsPage {
                 .build();
             let edit = icon_button("document-edit-symbolic", &tr("Edit Reply"));
             let delete = icon_button("user-trash-symbolic", &tr("Delete Reply"));
+            let reply_author = shown_author(&reply.author);
             replies.append(&heading(
-                &reply.author,
-                color_of(&reply.author),
+                &reply_author,
+                color_of(&reply_author),
                 date(&reply.date).as_deref(),
                 &[&edit, &delete],
             ));
@@ -531,7 +558,7 @@ impl CommentsPage {
             tr("Comment by {author}")
         };
         row.update_property(&[gtk::accessible::Property::Label(
-            &name.replace("{author}", &comment.author),
+            &name.replace("{author}", &comment_author),
         )]);
         row
     }

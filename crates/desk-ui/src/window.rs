@@ -41,6 +41,7 @@ pub(crate) use tables::TABLE_ACCELS;
 pub(crate) mod command_search;
 mod format_actions;
 mod header;
+pub(crate) use header::author_color_name;
 mod objects;
 mod rename;
 mod slides;
@@ -136,6 +137,8 @@ pub struct DocumentWindow {
     /// comment and the text it points at (W149).
     bubble: Rc<crate::comments_page::CommentsPage>,
     bubble_popover: gtk::Popover,
+    /// The bar of comments and changes of Desk Writer (REV-02).
+    review_bar: crate::review_bar::ReviewBar,
     bubble_at: Cell<Option<(Option<desk_model::NodeId>, crate::text_nav::SpanRect)>>,
     outline: Rc<crate::outline_view::OutlineView>,
     /// The navigation sidebar, with the page thumbnails (GNM-12).
@@ -242,7 +245,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 84] = [
+const DOCUMENT_ACTIONS: [&str; 90] = [
     "outline",
     "screen-view",
     "text-size",
@@ -304,6 +307,12 @@ const DOCUMENT_ACTIONS: [&str; 84] = [
     "author-color",
     "next-comment",
     "previous-comment",
+    "track-changes",
+    "tracking-on",
+    "accept-all-changes",
+    "reject-all-changes",
+    "next-review-item",
+    "previous-review-item",
     "insert-toc",
     "update-toc",
     "insert-link",
@@ -639,6 +648,12 @@ impl DocumentWindow {
                 .autohide(true)
                 .build(),
         );
+        // The bar of comments and changes, under the header bar as the
+        // bars of iWork are in window M+ (REV-02, D-008).
+        let review_bar = crate::review_bar::ReviewBar::new();
+        if !is_slides {
+            toolbar_view.add_top_bar(review_bar.widget());
+        }
         toolbar_view.add_top_bar(&screen_banner);
         toolbar_view.add_top_bar(&warnings_banner);
         let find = FindWindow::new(editor_of(), search.clone());
@@ -733,6 +748,7 @@ impl DocumentWindow {
             comments,
             bubble,
             bubble_popover,
+            review_bar,
             bubble_at: Cell::new(None),
             outline,
             nav,
@@ -1225,6 +1241,7 @@ impl DocumentWindow {
             if let Some(this) = weak.upgrade() {
                 this.show_format();
                 this.show_count();
+                this.show_review_bar();
                 if this.nav_shows("comments") {
                     this.comments
                         .show_current(this.editor().and_then(|e| e.comment_at_cursor()));
@@ -1474,9 +1491,15 @@ impl DocumentWindow {
                 "author-color",
                 editor.local_author_color().key().to_variant(),
             );
+            formatting::set_state(
+                &self.actions,
+                "tracking-on",
+                (editor.tracking() == desk_model::Tracking::On).to_variant(),
+            );
             self.show_count();
             self.show_position();
         }
+        self.show_review_bar();
         // A dialog over the window keeps the keys of editing, such as
         // Ctrl+A in a field, from reaching the document.
         let free = self.window().visible_dialog().is_none();
@@ -3462,6 +3485,7 @@ impl DocumentWindow {
         }
 
         self.add_comment_actions();
+        self.add_tracking_actions();
         self.add_field_actions();
 
         // Tables of contents, links and bookmarks (EST-22, EST-25,
@@ -3636,6 +3660,123 @@ impl DocumentWindow {
             });
             self.actions.add_action(&action);
         }
+    }
+
+    /// The bar of comments and changes as the document and the selection
+    /// are now (REV-02).
+    fn show_review_bar(&self) {
+        if self.slides.is_none() {
+            self.review_bar.show(self.editor().as_ref());
+        }
+    }
+
+    /// Track Changes and Turn Off Tracking, Paused and On, Accept All and
+    /// Reject All Changes, and Previous and Next of the bar of comments
+    /// and changes (W148, REV-02, REV-03).
+    fn add_tracking_actions(self: &Rc<Self>) {
+        if self.slides.is_some() {
+            return;
+        }
+        let track = gio::SimpleAction::new("track-changes", None);
+        let weak = Rc::downgrade(self);
+        track.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(editor) = this.editor() else { return };
+            if editor.tracking() == desk_model::Tracking::Off {
+                editor.set_tracking(desk_model::Tracking::On);
+            } else if editor.has_changes() {
+                this.ask_turn_off_tracking();
+            } else {
+                editor.set_tracking(desk_model::Tracking::Off);
+            }
+        });
+        self.actions.add_action(&track);
+        // On records changes; off, Paused, makes them as they are.
+        let on = gio::SimpleAction::new_stateful("tracking-on", None, &false.to_variant());
+        let weak = Rc::downgrade(self);
+        on.connect_change_state(move |action, value| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(on) = value.and_then(|v| v.get::<bool>()) else {
+                return;
+            };
+            if let Some(editor) = this.editor()
+                && editor.tracking() != desk_model::Tracking::Off
+            {
+                editor.set_tracking(if on {
+                    desk_model::Tracking::On
+                } else {
+                    desk_model::Tracking::Paused
+                });
+                action.set_state(&(editor.tracking() == desk_model::Tracking::On).to_variant());
+            }
+        });
+        self.actions.add_action(&on);
+        for (name, accept) in [("accept-all-changes", true), ("reject-all-changes", false)] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                let Some(this) = weak.upgrade() else { return };
+                if this
+                    .editor()
+                    .is_none_or(|e| e.resolve_all_changes(accept) == 0)
+                {
+                    this.window().error_bell();
+                }
+            });
+            self.actions.add_action(&action);
+        }
+        for (name, forward) in [("next-review-item", true), ("previous-review-item", false)] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                let Some(this) = weak.upgrade() else { return };
+                match this.editor().and_then(|e| e.go_to_review_item(forward)) {
+                    Some(crate::editing::ReviewItem::Comment(id))
+                        if !this.nav_shows("comments") =>
+                    {
+                        this.show_bubble(id);
+                    }
+                    Some(_) => {}
+                    None => this.window().error_bell(),
+                }
+            });
+            self.actions.add_action(&action);
+        }
+    }
+
+    /// Asks what to do with the changes pending before turning tracking
+    /// off, as Pages 15.4 does (REV-03): accept them all, reject them all,
+    /// or keep tracking.
+    fn ask_turn_off_tracking(self: &Rc<Self>) {
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Turn Off Tracking?")),
+            Some(&tr(
+                "To turn off change tracking, you must accept or reject all changes.",
+            )),
+        );
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("reject", &tr("_Reject All Changes"));
+        dialog.add_response("accept", &tr("_Accept All Changes"));
+        dialog.set_response_appearance("reject", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("accept", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("accept"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.choose(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |response| {
+                let Some(this) = weak.upgrade() else { return };
+                let Some(editor) = this.editor() else { return };
+                let accept = match response.as_str() {
+                    "accept" => true,
+                    "reject" => false,
+                    _ => return,
+                };
+                editor.resolve_all_changes(accept);
+                editor.set_tracking(desk_model::Tracking::Off);
+            },
+        );
     }
 
     /// Shows the bubble of a comment at its text (W149).
@@ -4493,11 +4634,25 @@ pub(crate) fn format_menu() -> gio::Menu {
 }
 
 /// Select All and Deselect All, for the command search (VMI-01), the
-/// transformations of the case (W054) and converting quotes (PXV-08).
+/// tracking of changes (REV-03), the transformations of the case (W054)
+/// and converting quotes (PXV-08).
 pub(crate) fn edit_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("Select _All")), Some("win.select-all"));
     menu.append(Some(&tr("_Deselect All")), Some("win.deselect-all"));
+    // Edit > Track Changes of Pages 15.4, which turns tracking off too
+    // (REV-03).
+    let tracking = gio::Menu::new();
+    tracking.append(Some(&tr("_Track Changes")), Some("win.track-changes"));
+    tracking.append(
+        Some(&tr("Accept All Changes")),
+        Some("win.accept-all-changes"),
+    );
+    tracking.append(
+        Some(&tr("Reject All Changes")),
+        Some("win.reject-all-changes"),
+    );
+    menu.append_section(None, &tracking);
     menu.append_section(None, &transformations_menu());
     menu.append_section(None, &substitutions_menu());
     menu

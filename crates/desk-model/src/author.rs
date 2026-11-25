@@ -160,6 +160,12 @@ impl crate::Document {
     /// identifiers of comments, is the same once the document is saved
     /// and opened again.
     pub fn author_palette(&self, local: &str) -> AuthorPalette {
+        self.author_palette_of(local, &[])
+    }
+
+    /// The same, when the local author wrote under the names of `former`
+    /// before, which take no colour of their own (B-066).
+    pub fn author_palette_of(&self, local: &str, former: &[String]) -> AuthorPalette {
         let chosen = self.author_colors();
         let mut colors: std::collections::HashMap<String, AuthorColor> =
             chosen.iter().cloned().collect();
@@ -172,7 +178,10 @@ impl crate::Document {
             std::iter::once(&comment.author).chain(comment.replies.iter().map(|r| &r.author))
         });
         for name in names.chain(self.changes().iter().map(|c| &c.author)) {
-            if &**name != local && !colors.contains_key(&**name) {
+            if &**name != local
+                && !colors.contains_key(&**name)
+                && !former.iter().any(|f| f == &**name)
+            {
                 others.insert(&**name);
             }
         }
@@ -236,6 +245,23 @@ mod tests {
                 .map(|_| ())
             })
             .unwrap();
+    }
+
+    #[test]
+    fn b_066_earlier_names_of_the_local_author_take_no_colour() {
+        let mut document = Document::new_word_processing();
+        document
+            .transact("Typing", |edit| {
+                let start = edit.document().start();
+                edit.insert_text(start, "one two").map(|_| ())
+            })
+            .unwrap();
+        comment_by(&mut document, "Ana");
+        comment_by(&mut document, "Bo");
+        // Ana is Ana Souza now: Bo keeps the colour after hers.
+        let palette = document.author_palette_of("Ana Souza", &["Ana".to_owned()]);
+        assert_eq!(palette.color("Ana Souza"), AuthorColor::Yellow);
+        assert_eq!(palette.color("Bo"), AuthorColor::Green);
     }
 
     #[test]

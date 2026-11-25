@@ -63,6 +63,7 @@ mod picture_pane;
 mod preferences;
 mod properties;
 mod recovery;
+mod review_bar;
 mod ruler;
 mod shape_pane;
 mod shortcuts;

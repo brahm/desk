@@ -2290,6 +2290,25 @@ paragraph, and objects on a second page.
 - The bar that turns tracking on and off, pauses it and moves between
   the changes come in the second pull request of step 10, with B-066.
 
+### 25 November: the bar of comments and changes (step 10 of W2, second part)
+
+- The bar is under the header bar, as window M+ puts the bars of iWork,
+  and shows while the document has comments or changes, or tracks them,
+  as in Pages 15.4. Previous and Next go through the comments and the
+  changes in one order, that of the Comments page, and the label says
+  which is selected of how many.
+- Turning tracking off with changes pending asks to accept or reject
+  them all, as Pages does, so accepting and rejecting all of them,
+  in every text of the document and as one step of undo, comes now
+  rather than in step 12, which adds them one by one and by the
+  selection.
+- Track Changes is in the command search, since the window has no Edit
+  menu (D-008), and on the bar.
+- Pages knows the user's comments and changes by their account, which
+  Desk has none of: the preferences keep the names the user wrote under
+  before, which show under the current name and take no colour of
+  their own (B-066). A file read elsewhere keeps the names as written.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

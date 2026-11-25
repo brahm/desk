@@ -32,7 +32,7 @@ mod cell_drag;
 mod changes;
 mod chart_looks;
 mod comments;
-pub use comments::CommentTarget;
+pub use comments::{CommentTarget, ReviewItem};
 mod connections;
 mod copies;
 mod custom_formats;
