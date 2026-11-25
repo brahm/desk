@@ -22,6 +22,7 @@
 //! println!("{} pages", layout.pages.len());
 //! ```
 
+mod joins;
 mod notes;
 mod objects;
 mod outline;

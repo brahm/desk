@@ -409,6 +409,33 @@ fn hidden_ranges(document: &Document, paragraph: usize) -> Vec<(usize, usize)> {
 /// A spot out of the text the view hides: past its end going forward,
 /// before its start going back. Elsewhere, the spot itself.
 pub fn skip_hidden(document: &Document, spot: Spot, forward: bool) -> Spot {
+    let mut spot = within_hidden(document, spot, forward);
+    // Past a break that does not show, to where the next paragraph
+    // shows, which is the same place (B-071).
+    loop {
+        let next = if forward
+            && spot.offset == text_of(document, spot.paragraph).len()
+            && break_hidden(document, spot.paragraph)
+        {
+            Spot::new(spot.paragraph + 1, 0)
+        } else if !forward
+            && spot.offset == 0
+            && spot.paragraph > 0
+            && break_hidden(document, spot.paragraph - 1)
+        {
+            Spot::new(
+                spot.paragraph - 1,
+                text_of(document, spot.paragraph - 1).len(),
+            )
+        } else {
+            return spot;
+        };
+        spot = within_hidden(document, next, forward);
+    }
+}
+
+/// A spot out of the text of its paragraph that the view hides.
+fn within_hidden(document: &Document, spot: Spot, forward: bool) -> Spot {
     for (start, end) in hidden_ranges(document, spot.paragraph) {
         if forward && (start..end).contains(&spot.offset) {
             return Spot::new(spot.paragraph, end);
@@ -437,17 +464,40 @@ pub fn out_of_hidden(document: &Document, selection: Selection) -> Selection {
     Selection { anchor, focus }
 }
 
-/// Whether two spots of a paragraph show at the same place, with only
-/// hidden text between them.
+/// Whether the break of a paragraph does not show: deleted, in the views
+/// of markup without deletions, where it joins the paragraph to the next
+/// (B-071).
+pub(crate) fn break_hidden(document: &Document, paragraph: usize) -> bool {
+    !document.markup().shows_deletions()
+        && paragraph + 1 < document.body().len()
+        && document
+            .body()
+            .get(paragraph)
+            .and_then(|p| p.attrs().break_change.flatten())
+            .and_then(|id| document.changes().get(id))
+            .is_some_and(|c| c.kind == desk_model::ChangeKind::Deletion)
+}
+
+/// Whether two spots show at the same place, with only hidden text
+/// between them, and hidden breaks when they are in paragraphs that
+/// show joined (B-071).
 fn shows_same(document: &Document, a: Spot, b: Spot) -> bool {
-    if a.paragraph != b.paragraph {
-        return false;
+    let (a, b) = (a.min(b), a.max(b));
+    // Whether the text of a paragraph between two offsets is hidden.
+    let hidden = |paragraph: usize, from: usize, to: usize| {
+        from >= to
+            || hidden_ranges(document, paragraph)
+                .iter()
+                .any(|&(start, end)| start <= from && to <= end)
+    };
+    if a.paragraph == b.paragraph {
+        return hidden(a.paragraph, a.offset, b.offset);
     }
-    let (from, to) = (a.offset.min(b.offset), a.offset.max(b.offset));
-    from == to
-        || hidden_ranges(document, a.paragraph)
-            .iter()
-            .any(|&(start, end)| start <= from && to <= end)
+    let len = |paragraph: usize| text_of(document, paragraph).len();
+    hidden(a.paragraph, a.offset, len(a.paragraph))
+        && (a.paragraph..b.paragraph).all(|p| break_hidden(document, p))
+        && (a.paragraph + 1..b.paragraph).all(|p| hidden(p, 0, len(p)))
+        && hidden(b.paragraph, 0, b.offset)
 }
 
 /// The word around a spot: its start and end, or the spot itself between
@@ -513,9 +563,24 @@ pub fn paragraph_at(document: &Document, spot: Spot) -> Selection {
 
 /// The start or the end of the line a spot is on.
 pub fn line_edge(layout: &DocumentLayout, spot: Spot, end: bool) -> Spot {
-    let Some((_, line)) = line_of(layout, spot) else {
+    let Some((page, line)) = line_of(layout, spot) else {
         return spot;
     };
+    // Paragraphs joined by a break that does not show have parts of one
+    // line, with one origin: the edge is that of the first or the last
+    // (B-071).
+    let row = layout.pages[page].lines.iter().filter(|l| {
+        (l.top() - line.top()).abs() < 0.01
+            && l.origin.0 == line.origin.0
+            && (l.paragraph != line.paragraph || std::ptr::eq(*l, line))
+    });
+    let line = if end {
+        row.max_by_key(|l| l.paragraph)
+    } else {
+        row.min_by_key(|l| l.paragraph)
+    }
+    .unwrap_or(line);
+    let spot = Spot::new(line.paragraph, spot.offset);
     let range = &line.line.range;
     if !end {
         return Spot::new(spot.paragraph, range.start);
@@ -724,7 +789,9 @@ pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<Invisible
     let heads = document.text_box_heads();
     for (page, p) in layout.pages.iter().enumerate() {
         for line in &p.lines {
-            line_invisibles(&mut marks, page, line, &body);
+            line_invisibles(&mut marks, page, line, &body, &|i| {
+                break_hidden(document, i)
+            });
         }
         // Those of the text in text boxes and shapes, unless turned
         // (INT-10).
@@ -741,7 +808,7 @@ pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<Invisible
             };
             let paragraphs: Vec<&desk_model::Paragraph> = text.paragraphs.iter().collect();
             for line in &placed.lines {
-                line_invisibles(&mut marks, page, line, &paragraphs);
+                line_invisibles(&mut marks, page, line, &paragraphs, &|_| false);
             }
         }
     }
@@ -754,6 +821,7 @@ fn line_invisibles(
     page: usize,
     line: &desk_layout::PlacedLine,
     paragraphs: &[&desk_model::Paragraph],
+    joined: &dyn Fn(usize) -> bool,
 ) {
     let Some(paragraph) = paragraphs.get(line.paragraph) else {
         return;
@@ -784,7 +852,11 @@ fn line_invisibles(
             ascent,
         });
     }
-    if range.end == text.len() && !slice.ends_with(desk_model::LINE_BREAK) {
+    // No mark for a break that does not show (B-071).
+    if range.end == text.len()
+        && !slice.ends_with(desk_model::LINE_BREAK)
+        && !joined(line.paragraph)
+    {
         let end = x(text.len());
         marks.push(InvisibleMark {
             page,

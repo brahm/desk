@@ -210,6 +210,10 @@ pub struct ParagraphText {
     /// The left and right margins of the page, in points, which decide
     /// a tie near the right edge of the text (step 19o of W1).
     page_margins: (f64, f64),
+    /// Whether the paragraph shows in the one before it, whose deleted
+    /// break does not show (W148, B-071): it then takes no room of its
+    /// own.
+    joined: bool,
 }
 
 /// What lays out a paragraph as Screen View of Pages 15.4 shows it.
@@ -311,6 +315,18 @@ impl ParagraphText {
     /// The left and right margins of the page, in points.
     pub fn page_margins(&self) -> (f64, f64) {
         self.page_margins
+    }
+
+    /// Marks the paragraph as shown in the one before it, whose deleted
+    /// break does not show (W148, B-071).
+    pub fn set_joined(&mut self, joined: bool) {
+        self.joined = joined;
+    }
+
+    /// Whether the paragraph shows in the one before it, and takes no
+    /// room of its own.
+    pub fn is_joined(&self) -> bool {
+        self.joined
     }
 
     /// Prepares a paragraph of a document that is an item of a list, as
@@ -482,6 +498,7 @@ impl ParagraphText {
             objects: Vec::new(),
             screen: None,
             page_margins: (0.0, 0.0),
+            joined: false,
         };
         let mut model_offset = 0;
         let mut transformed = false;
@@ -719,6 +736,7 @@ impl ParagraphText {
             objects: self.objects.clone(),
             screen: self.screen.clone(),
             page_margins: self.page_margins,
+            joined: self.joined,
         }
     }
 

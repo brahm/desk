@@ -1298,6 +1298,12 @@ impl Paginator<'_> {
         let mut chain: Option<(usize, Cursor, usize, usize, usize)> = None;
         let mut i = 0;
         while i < n {
+            // A paragraph shown in the one before takes no room (B-071).
+            if self.texts[i].is_joined() {
+                ends[i] = (cursor.page, cursor.column);
+                i += 1;
+                continue;
+            }
             let format = self.texts[i].paragraph().clone();
             // A section or a layout that starts here, once: a chain laid
             // out again starts after it.
@@ -1469,6 +1475,10 @@ impl Paginator<'_> {
     /// Places paragraph `i` from a cursor, and returns the page and column
     /// where it starts and where it ends.
     fn place(&mut self, i: usize, cursor: &mut Cursor) -> ((usize, usize), (usize, usize)) {
+        if self.texts[i].is_joined() {
+            let here = (cursor.page, cursor.column);
+            return (here, here);
+        }
         let sum = self.sum;
         let footnotes = self.footnotes.clone();
         let mut start = (cursor.page, cursor.column);

@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: in Desk Writer, the views of markup without deletions join the
+  paragraphs whose break was deleted, as accepting the deletion would
+  (#PR).
 * Fixed: in Desk Writer, the tracked change of the formatting of a
   paragraph that a deleted break joins to another stays on its
   paragraph in ODT (#226).

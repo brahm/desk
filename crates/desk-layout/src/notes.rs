@@ -139,7 +139,8 @@ impl NotePlan {
             .collect()
     }
 
-    /// Lays out the body with its notes.
+    /// Lays out the body with its notes, and the paragraphs whose deleted
+    /// breaks do not show joined (B-071).
     pub fn paginate(
         &self,
         document: &Document,
@@ -149,6 +150,26 @@ impl NotePlan {
         setup: PageSetup,
         sum: bool,
     ) -> DocumentLayout {
+        let hidden = crate::hidden_changes(document);
+        let joins = crate::joins::joins(document, hidden.as_deref());
+        let mut layout = self.paginate_joined(document, values, labels, system, setup, sum, &joins);
+        crate::joins::split_lines(&mut layout, &joins);
+        layout
+    }
+
+    /// Lays out the body with its notes, each paragraph joined to others
+    /// laid out with them.
+    #[allow(clippy::too_many_arguments)]
+    fn paginate_joined(
+        &self,
+        document: &Document,
+        values: &[FieldValues],
+        labels: &Labels,
+        system: &mut TextSystem,
+        setup: PageSetup,
+        sum: bool,
+        joins: &[Option<(usize, usize)>],
+    ) -> DocumentLayout {
         let styles = document.styles();
         let settings = document.text_settings();
         let items = styles.list_items(document.body().iter());
@@ -157,13 +178,15 @@ impl NotePlan {
             .iter()
             .enumerate()
             .map(|(i, paragraph)| {
+                let joined = crate::joins::joined_paragraph(document, joins, i);
                 let mut text = ParagraphText::new_in_document_with(
                     styles,
                     settings,
-                    paragraph,
+                    joined.as_ref().unwrap_or(paragraph),
                     items[i].as_ref(),
                     values.get(i).cloned().unwrap_or_default(),
                 );
+                text.set_joined(joins[i].is_some());
                 system.screen_spacing(&mut text);
                 text.set_page_margins(setup.margin_left.to_pt(), setup.margin_right.to_pt());
                 text
@@ -180,7 +203,12 @@ impl NotePlan {
                 let width = setup.body_width().to_pt() as f32;
                 let mut refs = vec![Vec::new(); body.len()];
                 for (index, &(paragraph, offset, _)) in self.refs.iter().enumerate() {
-                    refs[paragraph].push((offset, index));
+                    // A note of a joined paragraph is in the text of the
+                    // first of them.
+                    match joins[paragraph] {
+                        Some((head, start)) => refs[head].push((start + offset, index)),
+                        None => refs[paragraph].push((offset, index)),
+                    }
                 }
                 let mut parts = Vec::with_capacity(notes.len());
                 let laid = notes
