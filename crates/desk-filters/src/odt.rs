@@ -1252,6 +1252,8 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     let overriding: HashSet<&str> = source
         .body
         .iter()
+        // Those of items that deletions took too (B-068).
+        .chain(source.tracked_changes.iter().flat_map(|r| &r.deleted))
         .filter_map(|p| p.list.as_ref()?.style_override.as_deref())
         .collect();
     for (automatic, style) in source.list_styles.iter().map(|s| (false, s)).chain(
@@ -2177,12 +2179,13 @@ fn import_tracked(
             )?;
             found.retain(|(_, field)| changes::is_mark(field));
             inner.push(found);
+            let mut attrs = built.attrs().clone();
             // The list it was an item of, for when the deletion is
-            // rejected (B-067).
+            // rejected (B-067), with the style its item overrides the
+            // list with (B-068).
             if let Some(member) = &paragraph.list
                 && let Some(&list) = lists.get(member.style.as_str())
             {
-                let mut attrs = built.attrs().clone();
                 if document
                     .styles()
                     .resolve_paragraph(built.style(), &attrs)
@@ -2197,6 +2200,45 @@ fn import_tracked(
                 if let Some(start) = member.start {
                     attrs.list_start = Some(Some(start));
                 }
+                if let Some(own) = member.style_override.as_deref().and_then(|name| {
+                    source
+                        .automatic_list_styles
+                        .iter()
+                        .chain(&source.list_styles)
+                        .find(|s| s.name == name)
+                }) && let Some(style) = document.styles().list(list)
+                {
+                    let level = usize::from(member.level).min(LIST_LEVELS - 1);
+                    let own = list_levels(own, &source.pictures)[level].clone();
+                    if own.label.is_some() && &own != style.level(member.level) {
+                        attrs.list_override = Some(Some(std::sync::Arc::new(own)));
+                    }
+                }
+            }
+            // Its entry of a table of contents and the section it starts
+            // (B-068).
+            if paragraph.toc {
+                let target = built.runs().find_map(|r| match &r.attrs.field {
+                    Some(Some(Field::PageOf { paragraph })) => Some(*paragraph),
+                    _ => None,
+                });
+                attrs.toc_entry = Some(Some(TocEntry { target }));
+            }
+            if let Some(name) = paragraph.section.as_deref().filter(|n| !n.is_empty())
+                && let Some(style) = source.section_styles.iter().find(|s| s.name == name)
+            {
+                let layout = sections::layout(style, document.page_setup());
+                let start = match sections::section(style, None) {
+                    Some(section) => {
+                        // The break of a section is part of it.
+                        attrs.page_break_before = None;
+                        Start::Section(section, layout)
+                    }
+                    None => Start::Layout(layout),
+                };
+                attrs.start = Some(Some(std::sync::Arc::new(start)));
+            }
+            if &attrs != built.attrs() {
                 built = Paragraph::from_runs(
                     built.id(),
                     built.style(),

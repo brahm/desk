@@ -657,12 +657,16 @@ fn export(
 
 /// A paragraph that a deletion takes whole after the break before it,
 /// empty: its style, the level of its heading and the list it is an item
-/// of, which the region keeps for when the deletion is rejected (B-067).
+/// of (B-067), and the section it starts and whether it is an entry of a
+/// table of contents (B-068), which the region keeps for when the
+/// deletion is rejected.
 fn taken(paragraph: &odf::Paragraph) -> odf::Paragraph {
     odf::Paragraph {
         style: paragraph.style.clone(),
         outline_level: paragraph.outline_level,
         list: paragraph.list.clone(),
+        section: paragraph.section.clone(),
+        toc: paragraph.toc,
         ..odf::Paragraph::default()
     }
 }
