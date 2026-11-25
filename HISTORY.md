@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: Desk Writer keeps the changes of formatting tracked in ODT
   files, with the formatting the text had before, and marks them with a
-  dashed line in the colour of their author (#PR).
+  dashed line in the colour of their author (#218).
 * Added: Desk Writer keeps the insertions and deletions tracked in the
   notes, headers, footers, text boxes and shapes of ODT files, and the
   list item of a paragraph whose break before it was deleted (#217).
