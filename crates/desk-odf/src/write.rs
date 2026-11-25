@@ -77,11 +77,14 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     }
     w.end();
     w.start("office:body").start("office:text");
-    write_tracked_changes(&mut w, document);
+    // Sections and tables of contents are numbered through the text and
+    // the paragraphs that deletions took, so that their names differ.
+    let mut names = Names::default();
+    write_tracked_changes(&mut w, document, &mut names);
     for object in &document.page_objects {
         crate::draw::write_draw_object(&mut w, object, &write_paragraph);
     }
-    write_body(&mut w, &document.body, &document.toc_levels);
+    write_body(&mut w, &document.body, &document.toc_levels, &mut names);
     w.end().end().end();
     let content = w.finish();
 
@@ -561,7 +564,14 @@ fn start_toc(w: &mut Writer, number: usize, levels: &[TocLevel]) {
     w.start("text:index-body");
 }
 
-fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
+/// How many sections and tables of contents are written so far.
+#[derive(Default)]
+struct Names {
+    sections: usize,
+    tocs: usize,
+}
+
+fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel], names: &mut Names) {
     // For each open list, from the outermost, whether an item is open.
     let mut open: Vec<bool> = Vec::new();
     let mut style: Option<&str> = None;
@@ -573,12 +583,10 @@ fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
             w.end();
         }
     };
-    // Whether a section is open, and how many were.
+    // Whether a section is open.
     let mut in_section = false;
-    let mut sections = 0;
-    // Whether a table of contents is open, and how many were.
+    // Whether a table of contents is open.
     let mut in_toc = false;
-    let mut tocs = 0;
     for paragraph in body {
         if in_toc && (!paragraph.toc || paragraph.section.is_some()) {
             w.end().end();
@@ -591,18 +599,18 @@ fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel]) {
                 in_section = false;
             }
             if !name.is_empty() {
-                sections += 1;
+                names.sections += 1;
                 w.start("text:section")
                     .attr("text:style-name", name)
-                    .attr("text:name", &format!("Section{sections}"));
+                    .attr("text:name", &format!("Section{}", names.sections));
                 in_section = true;
             }
         }
         if paragraph.toc {
             close_to(w, &mut open, 0);
             if !in_toc {
-                tocs += 1;
-                start_toc(w, tocs, toc_levels);
+                names.tocs += 1;
+                start_toc(w, names.tocs, toc_levels);
                 in_toc = true;
             }
             write_paragraph(w, paragraph);
@@ -1252,7 +1260,7 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
 
 /// The tracked changes of the body (`text:tracked-changes`), with the
 /// paragraphs that each deletion took (W148).
-fn write_tracked_changes(w: &mut Writer, document: &TextDocument) {
+fn write_tracked_changes(w: &mut Writer, document: &TextDocument, names: &mut Names) {
     if document.tracked_changes.is_empty() && !document.track_changes {
         return;
     }
@@ -1287,8 +1295,10 @@ fn write_tracked_changes(w: &mut Writer, document: &TextDocument) {
             region.date.as_deref().unwrap_or(crate::UNKNOWN_DATE),
         );
         w.end();
-        // The paragraphs it took, with their lists (B-067).
-        write_body(w, &region.deleted, &[]);
+        // The paragraphs it took, with their lists (B-067), the sections
+        // they start and the tables of contents they are entries of
+        // (B-068).
+        write_body(w, &region.deleted, &document.toc_levels, names);
         w.end().end();
     }
     w.end();

@@ -2487,6 +2487,35 @@ paragraph, and objects on a second page.
   are numbered from the first of each paragraph, and the joins of
   notes are found once for each layout.
 
+### 25 November: what a deleted break takes keeps its structure (step 13 of W2, fourth part)
+
+- A paragraph whose break before it a tracked deletion took goes, in
+  ODT, into the region of the deletion. The region now keeps the
+  section the paragraph starts, as a `text:section` around it, and its
+  entry of a table of contents, as a `text:table-of-content`, as it
+  kept its list since B-067; an item keeps the style that overrides its
+  list too (B-068).
+- Sections and tables of contents are numbered through the regions and
+  the body together, so that their names differ.
+- In other programs a section or table of contents in the region holds
+  only the paragraphs the deletion took; Desk reads the start of the
+  section on its paragraph, and the section goes on past the deletion
+  as Desk keeps it.
+- The list item in a note is not kept because the paragraphs of notes
+  are written and read in ODT without their lists at all; that moves to
+  W5, which reads LibreOffice ODT in full (B-075).
+- The review found that the paragraphs a deletion takes lost what
+  their own automatic style says: a section that starts there numbers
+  its pages again from the number its paragraph gives, the end of a
+  section goes back to the layout of the pages, and an item keeps a
+  style overriding its list only when that style is not the list's
+  own. Their bookmarks are kept too, with the identifiers the body
+  gives them, so that an entry of a table of contents in the region
+  still finds its page.
+- The headers and footers of a section that starts at a taken
+  paragraph with a master page of its own are not kept: they are built
+  for the body only. That moves to W5 with B-075 (B-076).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

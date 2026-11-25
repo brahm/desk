@@ -1153,3 +1153,117 @@ fn b_073_a_change_another_interrupts_comes_back_as_one() {
     .unwrap();
     assert_eq!(read.body().iter().next().unwrap().text(), "four five");
 }
+
+/// B-068: a paragraph whose break before it a deletion took keeps in ODT
+/// the section it starts and its entry of a table of contents, and an
+/// item the style it overrides its list with.
+#[test]
+fn b_068_a_paragraph_joined_by_a_deletion_keeps_its_structure_in_odt() {
+    use desk_model::{ParaAttrs, Position, Section, Start, TocEntry};
+    use std::sync::Arc;
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Text", |edit| {
+            let start = edit.document().start();
+            let mut at = edit.insert_text(start, "Intro")?;
+            for text in ["Chapter", "Entry", "After"] {
+                at = edit.split_paragraph(at)?;
+                at = edit.insert_text(at, text)?;
+            }
+            let ids: Vec<_> = edit.document().body().iter().map(|p| p.id()).collect();
+            let section = Start::Section(Section::default(), desk_model::Layout::default());
+            let set = |edit: &mut desk_model::Edit, p, attrs: &ParaAttrs| {
+                edit.set_paragraph_attrs(Position::new(p, 0), Position::new(p, 0), attrs)
+            };
+            set(
+                edit,
+                ids[1],
+                &ParaAttrs {
+                    start: Some(Some(Arc::new(section))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            set(
+                edit,
+                ids[2],
+                &ParaAttrs {
+                    toc_entry: Some(Some(TocEntry { target: None })),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            // The breaks before "Chapter" and "Entry", deleted.
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_break_change(ids[0], Some(gone))?;
+            edit.mark_break_change(ids[1], Some(gone))?;
+            Ok(())
+        })
+        .unwrap();
+    let structure = |document: &Document| {
+        document
+            .body()
+            .iter()
+            .map(|p| {
+                (
+                    p.text(),
+                    matches!(
+                        p.attrs().start.clone().flatten().as_deref(),
+                        Some(Start::Section(..))
+                    ),
+                    p.attrs().toc_entry.flatten().is_some(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let before = structure(&document);
+    assert_eq!(
+        before,
+        [
+            ("Intro".to_owned(), false, false),
+            ("Chapter".to_owned(), true, false),
+            ("Entry".to_owned(), false, true),
+            ("After".to_owned(), false, false),
+        ]
+    );
+    let bytes = write_odt(&document).unwrap();
+    keep("b-068-structure-joined.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(structure(&read), before);
+}
+
+/// B-068: an item that a deletion joins to the paragraph before keeps the
+/// style that overrides its list.
+#[test]
+fn b_068_a_joined_item_keeps_the_style_overriding_its_list() {
+    use desk_model::Position;
+    let content = format!(
+        r#"{HEAD}<text:p>Intro</text:p><text:list text:style-name="L1"><text:list-item text:style-override="L2"><text:p>Item</text:p></text:list-item></text:list>{TAIL}"#
+    )
+    .replace(
+        "<office:body>",
+        r#"<office:automatic-styles><text:list-style style:name="L1" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><text:list-level-style-bullet text:level="1" text:bullet-char="•"/></text:list-style><text:list-style style:name="L2" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><text:list-level-style-bullet text:level="1" text:bullet-char="★"/></text:list-style></office:automatic-styles><office:body>"#,
+    );
+    let mut document = read_odt(&odt(&content)).unwrap();
+    let own = |document: &Document| {
+        document
+            .body()
+            .iter()
+            .nth(1)
+            .and_then(|p| p.attrs().list_override.clone().flatten())
+    };
+    let item = own(&document);
+    assert!(item.is_some());
+    document
+        .transact("Delete", |edit| {
+            let first = edit.document().start().paragraph;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_change(Position::new(first, 4), Position::new(first, 5), gone)?;
+            edit.mark_break_change(first, Some(gone))?;
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("b-068-override-joined.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(own(&read), item);
+}
