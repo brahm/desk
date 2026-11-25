@@ -813,6 +813,27 @@ impl Document {
         out
     }
 
+    /// The cells of the tables that tracked changes changed (REV-05), in
+    /// the order of the objects and then of the cells, row by row.
+    pub fn cell_changes(&self) -> Vec<crate::CellChange> {
+        let mut out = Vec::new();
+        for object in self.objects().iter() {
+            if let crate::ObjectKind::Table(table) = &object.kind {
+                for ((row, col), id) in table.tracked_cells() {
+                    let id = NodeId::new(id.get()).expect("not zero");
+                    out.push(crate::CellChange {
+                        id,
+                        table: object.id,
+                        row,
+                        col,
+                    });
+                }
+            }
+        }
+        out.retain(|c| self.changes().get(c.id).is_some());
+        out
+    }
+
     /// The comments on cells of tables, table by table as
     /// [`Document::object_comments`] lists objects, and row by row in each
     /// (W149, TAB-27). A comment is on one cell, the first that has it; a

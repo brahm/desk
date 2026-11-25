@@ -24,7 +24,7 @@ mod ops;
 mod table;
 
 pub use cell::{
-    Cell, CellFill, CellStyle, CellText, Color, Content, HAlign, Num, TextStyle, VAlign,
+    Cell, CellFill, CellStyle, CellText, Color, Content, HAlign, Num, TextStyle, Tracked, VAlign,
 };
 pub use conditional::{Condition, Operand, Rule, RuleStyle};
 pub use eval::{Values, WorkScope, header_range, share_work};

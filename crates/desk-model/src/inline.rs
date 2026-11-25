@@ -189,16 +189,13 @@ impl Edit {
             }
         }
         if object.anchor != Anchor::InText {
-            let mut placed = object.clone();
+            // Out of the change that moved it, which goes when no object
+            // is left in it.
+            let mut placed = object;
             placed.anchor = Anchor::InText;
             placed.rotation = 0;
             placed.moved = None;
             self.replace_object(placed)?;
-            // Out of the change that moved it, which goes when no object
-            // is left in it.
-            if let Some(moved) = object.moved {
-                self.drop_unplaced(moved.change)?;
-            }
         }
         // Moving an object that is there already, its mark is no text
         // added, which rejecting would take away with the object: it
@@ -248,6 +245,19 @@ impl Edit {
         copy.comments = crate::CommentIds::none();
         // Nor its tracked change of place (W148).
         copy.moved = None;
+        // Nor the tracked changes of its cells (REV-05).
+        if let crate::ObjectKind::Table(table) = &mut copy.kind {
+            let tracked: Vec<(u32, u32)> = (0..table.rows())
+                .flat_map(|r| (0..table.cols()).map(move |c| (r, c)))
+                .filter(|&(r, c)| table.cell(r, c).tracked.is_some())
+                .collect();
+            if !tracked.is_empty() {
+                let table = std::sync::Arc::make_mut(table);
+                for (r, c) in tracked {
+                    table.cell_mut(r, c).tracked = None;
+                }
+            }
+        }
         if let crate::ObjectKind::Table(table) = &mut copy.kind
             && !table.comments().is_empty()
         {

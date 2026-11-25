@@ -13,7 +13,7 @@ use gtk::glib;
 use super::comments::{Texts, spot_in};
 use super::{Selection, Spot, TextEditor};
 use crate::text_nav::{self, SpanRect};
-use crate::view::ChangeBar;
+use crate::view::{ChangeBar, ChangeMark};
 
 impl TextEditor {
     /// Where the text of each change of the body is on the pages, with
@@ -22,22 +22,13 @@ impl TextEditor {
     /// in Final, and no text deleted without deletions (W148, W150,
     /// REV-04).
     #[cfg(test)]
-    pub(super) fn change_marks(
-        &self,
-        local: &str,
-    ) -> Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)> {
+    pub(super) fn change_marks(&self, local: &str) -> Vec<ChangeMark> {
         self.change_view(local).0
     }
 
     /// The marks of the changes as [`TextEditor::change_marks`] gives
     /// them, and the change bars beside their lines.
-    pub(super) fn change_view(
-        &self,
-        local: &str,
-    ) -> (
-        Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)>,
-        Vec<ChangeBar>,
-    ) {
+    pub(super) fn change_view(&self, local: &str) -> (Vec<ChangeMark>, Vec<ChangeBar>) {
         let markup = self.markup();
         if markup == Markup::Final {
             return (Vec::new(), Vec::new());
@@ -56,10 +47,7 @@ impl TextEditor {
 
     /// Where the text of every change is on the pages, with what it did
     /// and the colour of its author.
-    fn placed_change_marks(
-        &self,
-        local: &str,
-    ) -> Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)> {
+    fn placed_change_marks(&self, local: &str) -> Vec<ChangeMark> {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
         let places = document.change_places();
@@ -72,9 +60,33 @@ impl TextEditor {
             .filter_map(|o| {
                 let change = document.changes().get(o.moved?.change)?;
                 let rect = super::comments::object_rect(Self::main_layout(&state), o.id)?;
-                Some((rect, change.kind, palette.color(&change.author)))
+                Some((rect, change.kind, Some(palette.color(&change.author))))
             })
             .collect();
+        // The cells that changes changed, in the colour of their author,
+        // or of none when several authors changed them (REV-05).
+        for cell in document.cell_changes() {
+            let (Some(change), Some(rect)) = (
+                document.changes().get(cell.id),
+                super::comments::cell_rect(
+                    Self::main_layout(&state),
+                    cell.table,
+                    (cell.row, cell.col),
+                ),
+            ) else {
+                continue;
+            };
+            let others = document
+                .objects()
+                .get(cell.table)
+                .and_then(|o| match &o.kind {
+                    desk_model::ObjectKind::Table(t) => t.cell(cell.row, cell.col).tracked.clone(),
+                    _ => None,
+                })
+                .is_some_and(|t| t.others);
+            let color = (!others).then(|| palette.color(&change.author));
+            out.push((rect, change.kind, color));
+        }
         if places.is_empty() {
             return out;
         }
@@ -97,7 +109,7 @@ impl TextEditor {
             else {
                 continue;
             };
-            let color = palette.color(&change.author);
+            let color = Some(palette.color(&change.author));
             for rect in text_nav::selection_rects(layout, &Selection { anchor, focus }) {
                 out.push((rect, change.kind, color));
             }
@@ -224,15 +236,32 @@ impl TextEditor {
             return None;
         };
         let state = self.state.borrow();
-        // An object that a change moved, selected (REV-01).
+        // An object that a change moved, or a cell that one changed,
+        // selected (REV-01, REV-05).
         if let [object] = state.objects[..]
             && state.story.is_none()
         {
             let document = Self::main_document(&state);
             let change = document.changes().get(id)?;
-            if document.objects().get(object)?.moved?.change != id {
-                return None;
-            }
+            let cell = state.cells.filter(|c| c.id == object).map(|c| c.focus);
+            let rect = match cell {
+                Some(cell) => {
+                    let changed = document
+                        .cell_changes()
+                        .into_iter()
+                        .any(|c| (c.id, c.table, c.row, c.col) == (id, object, cell.0, cell.1));
+                    if !changed {
+                        return None;
+                    }
+                    super::comments::cell_rect(Self::main_layout(&state), object, cell)?
+                }
+                None => {
+                    if document.objects().get(object)?.moved?.change != id {
+                        return None;
+                    }
+                    super::comments::object_rect(Self::main_layout(&state), object)?
+                }
+            };
             let palette =
                 document.author_palette_of(local, &crate::preferences::get().former_authors);
             return Some(ChangeBubble {
@@ -244,7 +273,7 @@ impl TextEditor {
                 text: String::new(),
                 object: true,
                 paragraphs: 0,
-                rect: super::comments::object_rect(Self::main_layout(&state), object)?,
+                rect,
             });
         }
         // A change of no text, as a break, or one the view hides, is
@@ -459,6 +488,7 @@ impl TextEditor {
                 o.moved
                     .is_some_and(|m| document.changes().get(m.change).is_some())
             })
+            || !document.cell_changes().is_empty()
     }
 
     /// The tracked changes that Accept and Reject of the selection take
@@ -469,6 +499,27 @@ impl TextEditor {
     pub fn changes_at_selection(&self) -> Vec<desk_model::NodeId> {
         let current = self.review_position().0;
         let state = self.state.borrow();
+        // The cells selected, the changes that changed them (REV-05).
+        if let Some(cells) = state.cells {
+            let document = Self::main_document(&state);
+            if let Some(desk_model::ObjectKind::Table(table)) =
+                document.objects().get(cells.id).map(|o| &o.kind)
+            {
+                let area = cells.area(table);
+                let mut out: Vec<desk_model::NodeId> = Vec::new();
+                for change in document.cell_changes() {
+                    if change.table == cells.id
+                        && area.contains(change.row, change.col)
+                        && !out.contains(&change.id)
+                    {
+                        out.push(change.id);
+                    }
+                }
+                if !out.is_empty() {
+                    return out;
+                }
+            }
+        }
         // The objects selected, the changes that moved them (REV-01).
         if !state.objects.is_empty() {
             let objects = Self::main_document(&state).objects();
@@ -592,8 +643,8 @@ mod tests {
             assert_eq!(
                 kinds,
                 [
-                    (ChangeKind::Insertion, AuthorColor::Yellow),
-                    (ChangeKind::Deletion, AuthorColor::Green),
+                    (ChangeKind::Insertion, Some(AuthorColor::Yellow)),
+                    (ChangeKind::Deletion, Some(AuthorColor::Green)),
                 ]
             );
             // On the text: the deleted word is to the right of the added.
@@ -1215,6 +1266,97 @@ mod tests {
             editor.set_tracking(desk_model::Tracking::On);
             assert!(editor.turn_off_tracking(Some(true)));
             assert_eq!(editor.review_position().1, 1);
+        });
+    }
+
+    #[test]
+    fn rev_05_a_cell_changed_is_marked_gone_to_and_resolved() {
+        use desk_model::table::Content;
+        use desk_model::{Anchor, Frame, Object, ObjectKind, TextSettings, Tracking};
+        use std::sync::Arc;
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let (table, _) = document
+                .transact("Table", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one")?;
+                    let mut table = desk_model::Table::new(3, 3);
+                    table.set_content(1, 1, Content::Text("Norte".into()));
+                    let mut object = Object::new(
+                        edit.new_id(),
+                        ObjectKind::Table(Arc::new(table)),
+                        Frame::from_pt(100.0, 200.0, 240.0, 60.0),
+                    );
+                    object.anchor = Anchor::Page(0);
+                    let id = object.id;
+                    edit.add_object(object)?;
+                    edit.set_text_settings(TextSettings {
+                        tracking: Tracking::On,
+                        ..edit.document().text_settings().clone()
+                    })?;
+                    Ok(id)
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.state.borrow_mut().editor.set_author("Bo");
+            assert!(!editor.has_changes());
+            // Written while tracking, the cell is in a change of its own.
+            editor.select_objects(vec![table]);
+            editor.select_cell(table, (1, 1));
+            editor.change_table("Typing", |t, _| {
+                t.set_content(1, 1, Content::Text("Sul".into()));
+            });
+            let change = editor.document().changes().iter().next().unwrap().clone();
+            assert_eq!(change.kind, ChangeKind::Cell);
+            assert!(editor.has_changes());
+            // Marked in the top right corner of the cell, in the colour of
+            // its author.
+            let at =
+                super::super::comments::cell_rect(&editor.state.borrow().layout, table, (1, 1))
+                    .unwrap();
+            let marks = editor.change_marks("Ana");
+            assert_eq!(marks.len(), 1);
+            assert_eq!(
+                (marks[0].0, marks[0].1, marks[0].2),
+                (at, ChangeKind::Cell, Some(AuthorColor::Green))
+            );
+            // Selected, it has its bubble, and its change is the one of
+            // the selection; another cell has neither.
+            let bubble = editor.change_bubble("Ana").unwrap();
+            assert_eq!((bubble.id, bubble.kind), (change.id, ChangeKind::Cell));
+            assert_eq!(crate::change_bubble::what(&bubble), "<b>Changed:</b> Cell");
+            assert_eq!(editor.changes_at_selection(), [change.id]);
+            editor.select_cell(table, (0, 0));
+            assert!(editor.change_bubble("Ana").is_none());
+            assert!(editor.changes_at_selection().is_empty());
+            // The bar goes to it from the text.
+            editor.select_objects(Vec::new());
+            editor.select(Selection::cursor(Spot::new(0, 2)));
+            assert_eq!(
+                editor.go_to_review_item(true),
+                Some(super::super::ReviewItem::Change(change.id))
+            );
+            assert_eq!(editor.selected_cells().map(|c| c.focus), Some((1, 1)));
+            assert_eq!(
+                editor.review_position(),
+                (Some((1, super::super::ReviewItem::Change(change.id))), 1)
+            );
+            // Changed again by another author, its mark is gray.
+            editor.state.borrow_mut().editor.set_author("Rui");
+            editor.change_table("Typing", |t, _| {
+                t.set_content(1, 1, Content::Text("Leste".into()));
+            });
+            assert_eq!(editor.document().changes().len(), 1);
+            assert_eq!(editor.change_marks("Ana")[0].2, None);
+            // Rejected, it holds what it held.
+            assert_eq!(editor.resolve_selected_changes(false), 1);
+            let object = editor.document().objects().get(table).unwrap().clone();
+            let ObjectKind::Table(t) = &object.kind else {
+                panic!("a table");
+            };
+            assert_eq!(t.cell(1, 1).content, Content::Text("Norte".into()));
+            assert!(t.cell(1, 1).tracked.is_none());
+            assert!(!editor.has_changes());
         });
     }
 }

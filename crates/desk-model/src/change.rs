@@ -38,6 +38,10 @@ pub enum ChangeKind {
     /// ([`crate::Object::moved`]) until the change is accepted or
     /// rejected, as Pages '09 tracked it (D-003).
     Placement,
+    /// What a cell of a table holds or how it looks changed: it keeps
+    /// what it was ([`crate::table::Cell::tracked`]) until the change is
+    /// accepted or rejected, as Pages '09 tracked it (REV-05, D-003).
+    Cell,
 }
 
 /// The style and the formatting that a paragraph had before a change of
@@ -236,12 +240,58 @@ impl crate::Edit {
             let mut placed = if accept || !there {
                 object
             } else {
-                let mut placed = crate::reframed(&object, before.frame);
+                // A table keeps the size of its cells (REV-05).
+                let frame = match object.kind {
+                    crate::ObjectKind::Table(_) => crate::Frame {
+                        width: object.frame.width,
+                        height: object.frame.height,
+                        ..before.frame
+                    },
+                    _ => before.frame,
+                };
+                let mut placed = crate::reframed(&object, frame);
                 placed.anchor = before.anchor;
                 placed
             };
             placed.moved = None;
             self.untracked(|edit| edit.replace_object(placed))?;
+        }
+        // The cells of tables changed: accepted, they keep what they hold
+        // and how they look; rejected, they take back what they were
+        // (REV-05).
+        let tables: Vec<crate::Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| matches!(o.kind, crate::ObjectKind::Table(_)))
+            .filter(|o| o.changes().iter().any(|c| kinds.contains_key(c)))
+            .cloned()
+            .collect();
+        for mut object in tables {
+            let crate::ObjectKind::Table(table) = &mut object.kind else {
+                continue;
+            };
+            let table = std::sync::Arc::make_mut(table);
+            for r in 0..table.rows() {
+                for c in 0..table.cols() {
+                    let cell = table.cell_mut(r, c);
+                    let Some(tracked) = cell.tracked.clone() else {
+                        continue;
+                    };
+                    let resolved =
+                        NodeId::new(tracked.change.get()).is_some_and(|id| kinds.contains_key(&id));
+                    if !resolved {
+                        continue;
+                    }
+                    if !accept {
+                        cell.content = tracked.content.clone();
+                        cell.format = tracked.format.clone();
+                        cell.style = tracked.style.clone();
+                    }
+                    cell.tracked = None;
+                }
+            }
+            self.untracked(|edit| edit.replace_object(object))?;
         }
         for id in &resolved {
             self.set_change(*id, None)?;
@@ -278,7 +328,7 @@ fn resolve_text(
     let goes = |kind: ChangeKind| match kind {
         ChangeKind::Insertion => !accept,
         ChangeKind::Deletion => accept,
-        ChangeKind::Format | ChangeKind::Placement => false,
+        ChangeKind::Format | ChangeKind::Placement | ChangeKind::Cell => false,
     };
     let kind_of = |id: Option<NodeId>| id.and_then(|id| kinds.get(&id).copied());
     let ids: Vec<NodeId> = edit.document().body().iter().map(Paragraph::id).collect();
@@ -417,7 +467,7 @@ fn run_goes(
     match change {
         Some(ChangeKind::Insertion) => !accept,
         Some(ChangeKind::Deletion) => accept || former == Some(ChangeKind::Insertion),
-        Some(ChangeKind::Format | ChangeKind::Placement) => false,
+        Some(ChangeKind::Format | ChangeKind::Placement | ChangeKind::Cell) => false,
         None => !accept && former == Some(ChangeKind::Insertion),
     }
 }

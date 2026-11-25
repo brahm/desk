@@ -86,6 +86,27 @@ pub struct Object {
     pub moved: Option<Moved>,
 }
 
+impl Object {
+    /// The tracked changes that the object is in: the one that moved it,
+    /// and those of the cells of a table (W148, REV-01, REV-05).
+    pub fn changes(&self) -> Vec<NodeId> {
+        let mut out: Vec<NodeId> = self.moved.map(|m| m.change).into_iter().collect();
+        if let ObjectKind::Table(table) = &self.kind {
+            for r in 0..table.rows() {
+                for c in 0..table.cols() {
+                    if let Some(tracked) = &table.cell(r, c).tracked
+                        && let Some(id) = NodeId::new(tracked.change.get())
+                        && !out.contains(&id)
+                    {
+                        out.push(id);
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
 /// Where a floating object was before a tracked change moved or resized
 /// it (W148, REV-01), as Pages '09 tracked it (D-003).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

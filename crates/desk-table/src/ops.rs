@@ -478,7 +478,13 @@ impl<T: CellText> Table<T> {
                 continue;
             }
             if all {
-                *self.cell_mut(r, c) = Cell::default();
+                // In the tracked change it was in, which keeps what it
+                // was (REV-05).
+                let tracked = self.cell(r, c).tracked.clone();
+                *self.cell_mut(r, c) = Cell {
+                    tracked,
+                    ..Cell::default()
+                };
             } else {
                 self.cell_mut(r, c).content = Content::Empty;
             }

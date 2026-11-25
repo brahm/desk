@@ -177,6 +177,7 @@ pub fn what(bubble: &ChangeBubble) -> String {
         desk_model::ChangeKind::Deletion => tr("Deleted:"),
         desk_model::ChangeKind::Format => tr("Formatted:"),
         desk_model::ChangeKind::Placement => tr("Moved:"),
+        desk_model::ChangeKind::Cell => tr("Changed:"),
     };
     let text = if !bubble.text.is_empty() {
         tr("“{text}”").replace("{text}", &bubble.text)
@@ -188,6 +189,8 @@ pub fn what(bubble: &ChangeBubble) -> String {
             bubble.paragraphs.max(1) as u64,
         )
         .replace("{n}", &bubble.paragraphs.max(1).to_string())
+    } else if bubble.kind == desk_model::ChangeKind::Cell {
+        tr("Cell")
     } else if bubble.object {
         tr("Object")
     } else {

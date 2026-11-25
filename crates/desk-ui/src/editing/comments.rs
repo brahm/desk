@@ -93,6 +93,16 @@ fn placed_changes(document: &Document) -> Vec<Placed> {
             change: true,
         })
     }));
+    // The cells that changes changed, each on its cell (REV-05).
+    out.extend(document.cell_changes().into_iter().map(|c| Placed {
+        id: c.id,
+        story: None,
+        start: Spot::default(),
+        end: Spot::default(),
+        object: Some(c.table),
+        cell: Some((c.row, c.col)),
+        change: true,
+    }));
     out
 }
 
@@ -165,7 +175,11 @@ fn placed(document: &Document) -> Vec<Placed> {
 }
 
 /// Where a cell of a table is on the pages.
-fn cell_rect(layout: &DocumentLayout, table: NodeId, (row, col): (u32, u32)) -> Option<SpanRect> {
+pub(super) fn cell_rect(
+    layout: &DocumentLayout,
+    table: NodeId,
+    (row, col): (u32, u32),
+) -> Option<SpanRect> {
     let (page, placed) = super::objects::find(layout, table)?;
     let (x, y, w, h) = placed.table.as_ref()?.cell_rect(row, col)?;
     let (x0, y0) = (f64::from(placed.x), f64::from(placed.y));

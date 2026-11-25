@@ -397,6 +397,14 @@ These sit on the `style:graphic-properties` of the graphic style of a
   The title of a table (PXV-15), shown, centered and outlined, is among
   the options it keeps; other programs show the table without it. The
   lock of a table (PXV-16) is the standard `style:protect` of its frame.
+  A cell that a tracked change changed (W148, REV-05, D-003) keeps, under
+  `tracked`, what it held, its format and its style before the change,
+  with `change`, the number in the `desk:change-name` `c<number>` of
+  the `text:changed-region` of the change, a `text:format-change` that
+  no text marks, one for each cell, and `others`, true when authors other
+  than that of the change changed it after; other programs show the
+  cell as it is now, as if the change were accepted, and leave the
+  region out.
 - **Versioning:** as for `desk:chart`.
 
 ### Text: paragraphs and characters (`style:text-properties`)
@@ -757,7 +765,8 @@ alone, and the region as a change that holds no text.
 - **On:** `text:insertion`, `text:deletion` and `text:format-change`.
   Desk writes the same name on the regions of a change that has more
   than one, and reads the regions that share a name and a kind as one
-  change.
+  change. The region of a change of cells (REV-05) always has it, as
+  the cells in `desk:table` name their change by it.
 - **Fallback:** a change of its own for each region, as other programs
   read them. Regions without the name, as other programs write them,
   are changes of their own even when their author and date are the

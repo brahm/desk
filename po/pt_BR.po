@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-25 20:06+0000\n"
+"POT-Creation-Date: 2026-11-25 21:27+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -209,21 +209,31 @@ msgstr "Formatado:"
 msgid "Moved:"
 msgstr "Movido:"
 
-#: crates/desk-ui/src/change_bubble.rs:182
+#: crates/desk-ui/src/change_bubble.rs:180
+msgid "Changed:"
+msgstr "Alterado:"
+
+#: crates/desk-ui/src/change_bubble.rs:183
 msgid "“{text}”"
 msgstr "“{text}”"
 
-#: crates/desk-ui/src/change_bubble.rs:186
+#: crates/desk-ui/src/change_bubble.rs:187
 msgid "{n} Paragraph"
 msgid_plural "{n} Paragraphs"
 msgstr[0] "{n} parágrafo"
 msgstr[1] "{n} parágrafos"
 
-#: crates/desk-ui/src/change_bubble.rs:192
+#: crates/desk-ui/src/change_bubble.rs:193 crates/desk-ui/src/formatting.rs:375
+#: crates/desk-ui/src/table_pane.rs:326
+#: crates/desk-ui/src/tables/inspector.rs:195
+msgid "Cell"
+msgstr "Célula"
+
+#: crates/desk-ui/src/change_bubble.rs:195
 msgid "Object"
 msgstr "Objeto"
 
-#: crates/desk-ui/src/change_bubble.rs:194
+#: crates/desk-ui/src/change_bubble.rs:197
 msgid "Paragraph Break"
 msgstr "Quebra de Parágrafo"
 
@@ -443,7 +453,7 @@ msgid "Edit Data"
 msgstr "Editar dados"
 
 #: crates/desk-ui/src/chart_pane.rs:199
-#: crates/desk-ui/src/editing/tables.rs:644
+#: crates/desk-ui/src/editing/tables.rs:665
 #: crates/desk-ui/src/formatting.rs:391 crates/desk-ui/src/inspector.rs:68
 #: crates/desk-ui/src/tables/header.rs:54
 #: crates/desk-ui/src/tables/inspector.rs:401
@@ -1495,14 +1505,14 @@ msgstr "_Perguntar antes"
 msgid "Open at _Once"
 msgstr "Abrir na _hora"
 
-#: crates/desk-ui/src/editing/comments.rs:220
+#: crates/desk-ui/src/editing/comments.rs:249
 #: crates/desk-ui/src/inspector.rs:62 crates/desk-ui/src/objects_pane.rs:301
 #: crates/desk-ui/src/tables/header.rs:57
 #: crates/desk-ui/src/window/header.rs:90
 msgid "Text Box"
 msgstr "Caixa de texto"
 
-#: crates/desk-ui/src/editing/comments.rs:1574
+#: crates/desk-ui/src/editing/comments.rs:1621
 #: crates/desk-ui/src/inspector.rs:61 crates/desk-ui/src/shape_pane.rs:153
 #: crates/desk-ui/src/tables/header.rs:60 crates/desk-ui/src/undo_names.rs:103
 #: crates/desk-ui/src/window/header.rs:96
@@ -1540,16 +1550,16 @@ msgstr "Tabela"
 msgid "Region"
 msgstr "Região"
 
-#: crates/desk-ui/src/editing/tables.rs:626
+#: crates/desk-ui/src/editing/tables.rs:647
 #, c-format
 msgid "%d cells selected"
 msgstr "%d células selecionadas"
 
-#: crates/desk-ui/src/editing/tables.rs:635
+#: crates/desk-ui/src/editing/tables.rs:656
 msgid "%r rows, %c columns"
 msgstr "%r linhas, %c colunas"
 
-#: crates/desk-ui/src/editing/tables.rs:643
+#: crates/desk-ui/src/editing/tables.rs:664
 #, c-format
 msgid "%d series"
 msgstr "%d séries"
@@ -2500,11 +2510,6 @@ msgstr "Mais"
 #: crates/desk-ui/src/window/header.rs:75
 msgid "Media"
 msgstr "Mídia"
-
-#: crates/desk-ui/src/formatting.rs:375 crates/desk-ui/src/table_pane.rs:326
-#: crates/desk-ui/src/tables/inspector.rs:195
-msgid "Cell"
-msgstr "Célula"
 
 #: crates/desk-ui/src/formatting.rs:392
 msgid "Axis"

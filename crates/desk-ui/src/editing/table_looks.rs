@@ -35,7 +35,7 @@ impl TextEditor {
         let Some(entry) = self.document().table_styles().get(style).cloned() else {
             return;
         };
-        self.change_table("Table Style", |table, _| entry.look.apply_to(table));
+        self.rearrange_table("Table Style", |table, _| entry.look.apply_to(table));
     }
 
     /// Takes the look of the selected table, for Paste Table Style.
@@ -55,7 +55,7 @@ impl TextEditor {
         let Some(look) = COPIED.with(|c| c.borrow().clone()) else {
             return;
         };
-        self.change_table("Paste Table Style", |table, _| look.apply_to(table));
+        self.rearrange_table("Paste Table Style", |table, _| look.apply_to(table));
     }
 
     /// Adds a table style with the look of the selected table, after the

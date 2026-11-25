@@ -2007,6 +2007,8 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // Then the objects that changes moved, with the paragraphs they were
     // at all there.
     changes::import_moves(source, &mut document, &moved)?;
+    // And the cells of tables that changes changed (REV-05).
+    changes::import_cells(source, &mut document)?;
 
     let meta = &source.meta;
     document.apply(Op::SetMetadata {

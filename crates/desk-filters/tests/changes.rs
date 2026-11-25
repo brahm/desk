@@ -1450,3 +1450,83 @@ fn rev_01_objects_moved_or_resized_are_kept_in_odt() {
         ]
     );
 }
+
+#[test]
+fn rev_05_cells_changed_are_kept_in_odt() {
+    use desk_model::table::{CellFill, Color, Content};
+    use desk_model::{Anchor, Frame, Object, ObjectKind, Table, TextSettings, Tracking};
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let table = editor
+        .edit("Table", |edit| {
+            edit.insert_text(start, "One")?;
+            let mut table = Table::new(2, 2);
+            table.cell_mut(0, 0).content = Content::Text("a".into());
+            let mut object = Object::new(
+                edit.new_id(),
+                ObjectKind::Table(std::sync::Arc::new(table)),
+                Frame::from_pt(100.0, 100.0, 144.0, 40.0),
+            );
+            object.anchor = Anchor::Page(0);
+            let id = object.id;
+            edit.add_object(object)?;
+            Ok(id)
+        })
+        .unwrap();
+    editor.set_author("Ana");
+    let settings = TextSettings {
+        tracking: Tracking::On,
+        ..editor.document().text_settings().clone()
+    };
+    editor
+        .edit("Track Changes", |edit| edit.set_text_settings(settings))
+        .unwrap();
+    editor
+        .edit("Cells", |edit| {
+            let mut object = edit.document().objects().get(table).unwrap().clone();
+            let ObjectKind::Table(t) = &mut object.kind else {
+                unreachable!()
+            };
+            let t = std::sync::Arc::make_mut(t);
+            t.cell_mut(0, 0).content = Content::Text("b".into());
+            t.cell_mut(1, 1).style.fill = Some(CellFill::Color(Color::rgb(255, 0, 0)));
+            edit.replace_object(object)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("rev-05-cells-changed.odt", &bytes);
+    let content = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(content.tracked_changes.len(), 2);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.changes().len(), 2);
+    assert!(
+        read.changes()
+            .iter()
+            .all(|c| c.kind == ChangeKind::Cell && c.author.as_ref() == "Ana")
+    );
+    let object = read.objects().iter().next().unwrap().clone();
+    let ObjectKind::Table(t) = &object.kind else {
+        unreachable!()
+    };
+    // Each changed cell names a change of the document, with what it was.
+    let tracked = t.cell(0, 0).tracked.clone().unwrap();
+    assert!(
+        read.changes()
+            .get(desk_model::NodeId::new(tracked.change.get()).unwrap())
+            .is_some()
+    );
+    assert_eq!(tracked.content, Content::Text("a".into()));
+    assert!(t.cell(1, 1).tracked.is_some());
+    assert!(t.cell(0, 1).tracked.is_none());
+    // Rejected, the cells are as they were.
+    let mut read = read;
+    read.transact("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    let object = read.objects().iter().next().unwrap().clone();
+    let ObjectKind::Table(t) = &object.kind else {
+        unreachable!()
+    };
+    assert_eq!(t.cell(0, 0).content, Content::Text("a".into()));
+    assert_eq!(t.cell(1, 1).style.fill, None);
+    assert!(read.changes().is_empty());
+}

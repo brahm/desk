@@ -222,6 +222,36 @@ pub struct Cell<T> {
     /// The comment on it, by the identifier under which the app keeps it
     /// with its other comments and their replies (TAB-27, W149).
     pub comment: Option<std::num::NonZeroU64>,
+    /// The tracked change of what it holds or how it looks, with what it
+    /// was before, which rejecting the change puts back (W148, REV-05);
+    /// none when it is in no change.
+    #[serde(default = "untracked", skip_serializing_if = "Option::is_none")]
+    pub tracked: Option<Arc<Tracked<T>>>,
+}
+
+/// No tracked change, for a cell written without one.
+fn untracked<T>() -> Option<Arc<Tracked<T>>> {
+    None
+}
+
+/// What a cell held and how it looked before a tracked change, as Pages
+/// '09 tracked the content, formulas, format, fill and text of cells
+/// (W148, REV-05, D-003), by the identifier under which the app keeps
+/// the change with its other changes.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Tracked<T> {
+    /// The change.
+    pub change: std::num::NonZeroU64,
+    /// What it held.
+    pub content: Content<T>,
+    /// How its value was written.
+    pub format: Format,
+    /// How it looked.
+    pub style: CellStyle,
+    /// Whether authors other than that of the change changed it after,
+    /// which its mark shows in gray (REV-05).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub others: bool,
 }
 
 impl<T> Default for Cell<T> {
@@ -235,6 +265,7 @@ impl<T> Default for Cell<T> {
             },
             rules: Arc::from([]),
             comment: None,
+            tracked: None,
         }
     }
 }
@@ -251,7 +282,8 @@ impl<T> Cell<T> {
         self.rules = crate::conditional::map_rule_cells(&self.rules, &mut |r| r.moved(cols, rows));
     }
 
-    /// An empty cell that looks like this one: what "Clear" leaves.
+    /// An empty cell that looks like this one, as a row added takes the
+    /// look of the row beside it, in no tracked change.
     pub fn cleared(&self) -> Self {
         Self {
             content: Content::Empty,
@@ -259,6 +291,7 @@ impl<T> Cell<T> {
             style: self.style.clone(),
             rules: self.rules.clone(),
             comment: self.comment,
+            tracked: None,
         }
     }
 }

@@ -114,7 +114,7 @@ impl TextEditor {
                 let to = first(cell);
                 if to != (drag.area.row, drag.area.col) || copying {
                     let name = if copying { "Copy Cells" } else { "Move Cells" };
-                    self.change_table(name, |table, cells| {
+                    self.rearrange_table(name, |table, cells| {
                         let landed = table.move_cells(drag.area, to, copying);
                         *cells = select(id, landed);
                     });
@@ -146,13 +146,15 @@ impl TextEditor {
                     into.kind = ObjectKind::Table(Arc::new(table));
                     into.frame.width = desk_model::Length::from_pt(w);
                     into.frame.height = desk_model::Length::from_pt(h);
-                    edit.replace_object(into)?;
+                    // Cells moved or copied are no tracked change of
+                    // their content (REV-05).
+                    edit.untracked(|edit| edit.replace_object(into))?;
                     if aside {
                         edit.move_aside(id, old)?;
                     }
                     if !copying {
                         out.kind = ObjectKind::Table(Arc::new(left));
-                        edit.replace_object(out)?;
+                        edit.untracked(|edit| edit.replace_object(out))?;
                     }
                     Ok(Some(vec![id]))
                 });
