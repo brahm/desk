@@ -1496,6 +1496,11 @@ impl DocumentWindow {
                 "tracking-on",
                 (editor.tracking() == desk_model::Tracking::On).to_variant(),
             );
+            formatting::set_state(
+                &self.actions,
+                "track-changes",
+                (editor.tracking() != desk_model::Tracking::Off).to_variant(),
+            );
             self.show_count();
             self.show_position();
         }
@@ -3677,7 +3682,8 @@ impl DocumentWindow {
         if self.slides.is_some() {
             return;
         }
-        let track = gio::SimpleAction::new("track-changes", None);
+        // Checked while changes are tracked, on or paused.
+        let track = gio::SimpleAction::new_stateful("track-changes", None, &false.to_variant());
         let weak = Rc::downgrade(self);
         track.connect_activate(move |_, _| {
             let Some(this) = weak.upgrade() else { return };
@@ -3686,8 +3692,8 @@ impl DocumentWindow {
                 editor.set_tracking(desk_model::Tracking::On);
             } else if editor.has_changes() {
                 this.ask_turn_off_tracking();
-            } else {
-                editor.set_tracking(desk_model::Tracking::Off);
+            } else if !editor.turn_off_tracking(None) {
+                this.window().error_bell();
             }
         });
         self.actions.add_action(&track);
@@ -3773,8 +3779,9 @@ impl DocumentWindow {
                     "reject" => false,
                     _ => return,
                 };
-                editor.resolve_all_changes(accept);
-                editor.set_tracking(desk_model::Tracking::Off);
+                if !editor.turn_off_tracking(Some(accept)) {
+                    this.window().error_bell();
+                }
             },
         );
     }

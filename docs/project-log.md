@@ -2306,8 +2306,14 @@ paragraph, and objects on a second page.
   menu (D-008), and on the bar.
 - Pages knows the user's comments and changes by their account, which
   Desk has none of: the preferences keep the names the user wrote under
-  before, which show under the current name and take no colour of
-  their own (B-066). A file read elsewhere keeps the names as written.
+  before, which show under the current name and in its colour, and a
+  colour chosen under an earlier name stays theirs (B-066). A file
+  read elsewhere keeps the names as written.
+- Previous and Next reach a comment and a change on the same text one
+  after the other, comments first, and the label names the one they
+  selected. The order of the comments and changes is kept until the
+  document changes, so that moving the cursor does not lay out the
+  notes and text boxes again.
 
 ## Decisions, with their reasons and consequences
 

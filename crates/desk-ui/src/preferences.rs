@@ -397,9 +397,10 @@ impl Preferences {
         if let Ok(author) = file.string(EDITING, "author") {
             out.author = author.trim().to_owned();
         }
+        // One a line, as a name has none.
         if let Ok(names) = file.string(EDITING, "former-authors") {
             out.former_authors = names
-                .split(';')
+                .lines()
                 .filter(|n| !n.is_empty())
                 .map(str::to_owned)
                 .collect();
@@ -502,12 +503,7 @@ impl Preferences {
         if self.former_authors.is_empty() {
             let _ = file.remove_key(EDITING, "former-authors");
         } else {
-            let names: String = self
-                .former_authors
-                .iter()
-                .map(|n| format!("{};", n.replace(';', "")))
-                .collect();
-            file.set_string(EDITING, "former-authors", &names);
+            file.set_string(EDITING, "former-authors", &self.former_authors.join("\n"));
         }
         file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
         file.set_boolean(WINDOW, "screen-view", self.screen_view);
@@ -1206,7 +1202,7 @@ mod tests {
             move_objects_aside: false,
             open_links: Some(OpenLinks::Never),
             author: "Ana Souza".into(),
-            former_authors: vec!["Ana".into(), "asouza".into()],
+            former_authors: vec!["Ana".into(), "Silva; Ana".into()],
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);

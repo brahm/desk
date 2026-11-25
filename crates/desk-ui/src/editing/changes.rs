@@ -6,6 +6,7 @@
 //! author. The views of markup come with step 11 of W2.
 
 use desk_model::ChangeKind;
+use gtk::glib;
 
 use super::comments::{Texts, spot_in};
 use super::{Selection, Spot, TextEditor};
@@ -46,7 +47,7 @@ impl TextEditor {
             else {
                 continue;
             };
-            let color = palette.color(&crate::comments_page::shown_author(&change.author));
+            let color = palette.color(&change.author);
             for rect in text_nav::selection_rects(layout, &Selection { anchor, focus }) {
                 out.push((rect, change.kind, color));
             }
@@ -79,6 +80,31 @@ impl TextEditor {
         };
         settings.tracking = tracking;
         self.format_edit(name, |edit| edit.set_text_settings(settings));
+    }
+
+    /// Turns the tracking of changes off, after accepting or rejecting
+    /// every change pending when `resolve` says which, as one action of
+    /// the history (REV-03). Gives whether tracking is off with no change
+    /// pending.
+    pub fn turn_off_tracking(&self, resolve: Option<bool>) -> bool {
+        if self.story().is_some() {
+            self.leave_story(None);
+        }
+        let mut settings = {
+            let state = self.state.borrow();
+            Self::main_document(&state).text_settings().clone()
+        };
+        settings.tracking = desk_model::Tracking::Off;
+        let done = self.format_edit_quiet("Turn Off Tracking", |edit| {
+            if let Some(accept) = resolve {
+                edit.resolve_changes(accept, |_| true)?;
+            }
+            edit.set_text_settings(settings)
+        });
+        if let Err(error) = &done {
+            glib::g_warning!("desk", "cannot turn off tracking: {error}");
+        }
+        done.is_ok() && self.tracking() == desk_model::Tracking::Off && !self.has_changes()
     }
 
     /// Whether any text of the document has tracked changes.
@@ -216,6 +242,61 @@ mod tests {
             assert_eq!(editor.document().body().get(0).unwrap().text(), "one two");
             editor.set_tracking(desk_model::Tracking::Off);
             assert_eq!(editor.tracking(), desk_model::Tracking::Off);
+        });
+    }
+
+    #[test]
+    fn rev_02_a_comment_and_a_change_on_the_same_text_are_both_reached() {
+        use super::super::ReviewItem;
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let p = document.start().paragraph;
+            let ((comment, added), _) = document
+                .transact("Changes", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two")?;
+                    let comment = edit.add_comment(
+                        Position::new(p, 4),
+                        Position::new(p, 7),
+                        desk_model::Comment {
+                            id: desk_model::NodeId::new(1).unwrap(),
+                            author: "Ana".into(),
+                            date: None,
+                            text: "Why?".into(),
+                            replies: std::sync::Arc::new([]),
+                        },
+                    )?;
+                    let added = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+                    edit.mark_change(Position::new(p, 4), Position::new(p, 7), added)?;
+                    Ok((comment, added))
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            assert_eq!(
+                editor.go_to_review_item(true),
+                Some(ReviewItem::Comment(comment))
+            );
+            assert_eq!(
+                editor.review_position(),
+                (Some((1, ReviewItem::Comment(comment))), 2)
+            );
+            assert_eq!(
+                editor.go_to_review_item(true),
+                Some(ReviewItem::Change(added))
+            );
+            assert_eq!(
+                editor.review_position(),
+                (Some((2, ReviewItem::Change(added))), 2)
+            );
+            assert_eq!(editor.go_to_review_item(true), None);
+            assert_eq!(
+                editor.go_to_review_item(false),
+                Some(ReviewItem::Comment(comment))
+            );
+            // Turned off, the change is accepted with it, in one action.
+            editor.set_tracking(desk_model::Tracking::On);
+            assert!(editor.turn_off_tracking(Some(true)));
+            assert_eq!(editor.review_position().1, 1);
         });
     }
 }

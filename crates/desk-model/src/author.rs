@@ -164,7 +164,8 @@ impl crate::Document {
     }
 
     /// The same, when the local author wrote under the names of `former`
-    /// before, which take no colour of their own (B-066).
+    /// before, which take the local author's colour, as the colour chosen
+    /// under one of them is theirs still (B-066).
     pub fn author_palette_of(&self, local: &str, former: &[String]) -> AuthorPalette {
         let chosen = self.author_colors();
         let mut colors: std::collections::HashMap<String, AuthorColor> =
@@ -185,11 +186,23 @@ impl crate::Document {
                 others.insert(&**name);
             }
         }
+        // The local author keeps the colour chosen under an earlier name.
+        if !colors.contains_key(local)
+            && let Some(color) = former.iter().find_map(|f| colors.get(f).copied())
+        {
+            colors.insert(local.to_owned(), color);
+        }
         let mut placed = 0;
         let unchosen = (!colors.contains_key(local)).then_some(local);
         for name in unchosen.into_iter().chain(others) {
             colors.insert(name.to_owned(), free_color(&free, placed));
             placed += 1;
+        }
+        // And what they wrote under their earlier names takes it.
+        if let Some(&mine) = colors.get(local) {
+            for name in former {
+                colors.insert(name.clone(), mine);
+            }
         }
         AuthorPalette {
             colors,
@@ -259,9 +272,21 @@ mod tests {
         comment_by(&mut document, "Ana");
         comment_by(&mut document, "Bo");
         // Ana is Ana Souza now: Bo keeps the colour after hers.
-        let palette = document.author_palette_of("Ana Souza", &["Ana".to_owned()]);
+        let former = ["Ana".to_owned()];
+        let palette = document.author_palette_of("Ana Souza", &former);
         assert_eq!(palette.color("Ana Souza"), AuthorColor::Yellow);
+        assert_eq!(palette.color("Ana"), AuthorColor::Yellow);
         assert_eq!(palette.color("Bo"), AuthorColor::Green);
+        // The colour chosen as Ana is still hers.
+        document
+            .transact("Author Color", |edit| {
+                edit.set_author_color("Ana", AuthorColor::Red)
+            })
+            .unwrap();
+        let palette = document.author_palette_of("Ana Souza", &former);
+        assert_eq!(palette.color("Ana Souza"), AuthorColor::Red);
+        assert_eq!(palette.color("Ana"), AuthorColor::Red);
+        assert_eq!(palette.color("Bo"), AuthorColor::Yellow);
     }
 
     #[test]

@@ -329,6 +329,13 @@ impl<'a> Texts<'a> {
         (page, group, y, x, start, end)
     }
 
+    /// The place of a comment or change in the order of the bar of
+    /// comments and changes: its text, and then comments before changes
+    /// on the same text, by identifier.
+    fn full_key(&self, place: &Placed) -> FullKey {
+        (self.key(place), place.change, place.id)
+    }
+
     /// The comments, in that order.
     fn ordered(&self, mut places: Vec<Placed>) -> Vec<Placed> {
         places.sort_by_cached_key(|p| self.key(p));
@@ -339,6 +346,15 @@ impl<'a> Texts<'a> {
 /// The place of a text in the order of the comments: its page, which of
 /// its texts, where it is on the page and where in the text.
 type Key = (usize, u8, u64, u64, Spot, Spot);
+
+/// The place of a comment or change in the order of the bar.
+type FullKey = (Key, bool, NodeId);
+
+/// The comments and changes of a document in the order of the bar.
+pub(super) struct ReviewOrder {
+    document: Document,
+    places: Vec<Placed>,
+}
 
 /// The text that a comment is on, on one line, as its card quotes it.
 fn commented_text(document: &Document, start: Position, end: Position) -> String {
@@ -699,38 +715,43 @@ impl TextEditor {
     /// 15.4, in the order of the pages. Gives the comment, none at the last
     /// or the first.
     pub fn go_to_comment(&self, forward: bool) -> Option<NodeId> {
-        let places = placed(&self.main_copy());
-        let place = self.next_place(places, forward)?;
-        self.select_place(&place).then_some(place.id)
+        let place = {
+            let state = self.state.borrow();
+            self.next_place(&state, placed(Self::main_document(&state)), forward)
+        }?;
+        if !self.select_place(&place) {
+            return None;
+        }
+        self.state.borrow_mut().reviewed = Some(place.item());
+        Some(place.id)
     }
 
     /// Goes to the next comment or tracked change after the selection, or
     /// the one before it, as the arrows of the bar of comments and
     /// changes do (REV-02), and selects it.
     pub fn go_to_review_item(&self, forward: bool) -> Option<ReviewItem> {
-        let places = {
-            let document = self.main_copy();
-            let mut places = placed(&document);
-            places.extend(placed_changes(&document));
-            places
-        };
-        let place = self.next_place(places, forward)?;
-        self.select_place(&place).then(|| place.item())
+        let place = {
+            let state = self.state.borrow();
+            let document = Self::main_document(&state);
+            let mut places = placed(document);
+            places.extend(placed_changes(document));
+            self.next_place(&state, places, forward)
+        }?;
+        if !self.select_place(&place) {
+            return None;
+        }
+        self.state.borrow_mut().reviewed = Some(place.item());
+        Some(place.item())
     }
 
     /// The comment or change that the selection is on, with its place in
     /// the order of the comments and changes from 1, and how many there
     /// are, as the label of the bar of comments and changes says them
-    /// (REV-02).
+    /// (REV-02). The one that Previous or Next selected is the one, while
+    /// it stays selected.
     pub fn review_position(&self) -> (Option<(usize, ReviewItem)>, usize) {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
-        let mut places = placed(document);
-        places.extend(placed_changes(document));
-        let total = places.len();
-        if total == 0 {
-            return (None, 0);
-        }
         let story = state.story.as_ref().map(|m| m.story);
         let (start, end) = state.selection.ordered();
         let object = match state.objects[..] {
@@ -741,36 +762,61 @@ impl TextEditor {
             .cells
             .filter(|c| Some(c.id) == object)
             .map(|c| c.focus);
-        let texts = Texts::new(document, Self::main_layout(&state), &places);
-        let _work = desk_model::table::share_work();
-        let ordered = texts.ordered(places);
-        let current = ordered
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| match p.object {
-                Some(o) => object == Some(o) && p.cell == cell,
-                None => object.is_none() && p.story == story && p.start <= start && end <= p.end,
+        let mut cache = state.review_order.borrow_mut();
+        if cache.as_ref().is_none_or(|c| c.document != *document) {
+            let mut places = placed(document);
+            places.extend(placed_changes(document));
+            let texts = Texts::new(document, Self::main_layout(&state), &places);
+            let _work = desk_model::table::share_work();
+            let mut keyed: Vec<(FullKey, Placed)> = places
+                .into_iter()
+                .map(|p| (texts.full_key(&p), p))
+                .collect();
+            keyed.sort_by_key(|a| a.0);
+            *cache = Some(ReviewOrder {
+                document: document.clone(),
+                places: keyed.into_iter().map(|(_, p)| p).collect(),
+            });
+        }
+        let ordered = &cache.as_ref().expect("just made").places;
+        let on = |p: &Placed| match p.object {
+            Some(o) => object == Some(o) && p.cell == cell,
+            None => object.is_none() && p.story == story && p.start <= start && end <= p.end,
+        };
+        let remembered = state.reviewed.and_then(|item| {
+            ordered
+                .iter()
+                .position(|p| p.item() == item && on(p) && (p.start, p.end) == (start, end))
+        });
+        let current = remembered
+            .or_else(|| {
+                ordered
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| on(p))
+                    .max_by_key(|(_, p)| p.start)
+                    .map(|(i, _)| i)
             })
-            .max_by_key(|(_, p)| p.start)
-            .map(|(i, p)| (i + 1, p.item()));
-        (current, total)
+            .map(|i| (i + 1, ordered[i].item()));
+        (current, ordered.len())
     }
 
-    /// The main document as it is now.
-    fn main_copy(&self) -> Document {
-        let state = self.state.borrow();
-        Self::main_document(&state).clone()
-    }
-
-    /// The first place after the selection, or the last before it.
-    fn next_place(&self, places: Vec<Placed>, forward: bool) -> Option<Placed> {
-        let state = self.state.borrow();
-        let document = Self::main_document(&state);
+    /// The first place after the selection, or the last before it, in the
+    /// order of the pages; of places on the same text, in the order of
+    /// their kind and identifier, from the one Previous or Next selected
+    /// last.
+    fn next_place(
+        &self,
+        state: &super::State,
+        places: Vec<Placed>,
+        forward: bool,
+    ) -> Option<Placed> {
+        let document = Self::main_document(state);
         let (start, end) = state.selection.ordered();
         let story = state.story.as_ref().map(|m| m.story);
         // With the text being edited, where the selection is.
         let stories = places.iter().filter_map(|p| p.story).chain(story);
-        let texts = Texts::with(document, Self::main_layout(&state), stories);
+        let texts = Texts::with(document, Self::main_layout(state), stories);
         let object = match state.objects[..] {
             [object] if story.is_none() => Some(object),
             _ => None,
@@ -779,7 +825,7 @@ impl TextEditor {
             .cells
             .filter(|c| Some(c.id) == object)
             .map(|c| c.focus);
-        let here = texts.key(&Placed {
+        let selected = Placed {
             id: NodeId::new(1).expect("not zero"),
             story,
             start,
@@ -787,8 +833,33 @@ impl TextEditor {
             object,
             cell,
             change: false,
-        });
-        let keyed = places.into_iter().map(|p| (texts.key(&p), p));
+        };
+        // The item selected last, while it is still the selection, or else
+        // the first that is the selection.
+        let exact = |p: &&Placed| {
+            (p.story, p.start, p.end, p.object, p.cell) == (story, start, end, object, cell)
+        };
+        let here = places
+            .iter()
+            .filter(exact)
+            .find(|p| state.reviewed == Some(p.item()))
+            .or_else(|| {
+                places
+                    .iter()
+                    .filter(exact)
+                    .min_by_key(|p| texts.full_key(p))
+            })
+            .map_or_else(
+                || {
+                    (
+                        texts.key(&selected),
+                        false,
+                        NodeId::new(1).expect("not zero"),
+                    )
+                },
+                |p| texts.full_key(p),
+            );
+        let keyed = places.into_iter().map(|p| (texts.full_key(&p), p));
         if forward {
             keyed
                 .filter(|(k, _)| *k > here)
@@ -853,10 +924,7 @@ impl TextEditor {
         let of: std::collections::HashMap<NodeId, desk_model::AuthorColor> = document
             .comments()
             .iter()
-            .map(|comment| {
-                let author = crate::comments_page::shown_author(&comment.author);
-                (comment.id, palette.color(&author))
-            })
+            .map(|comment| (comment.id, palette.color(&comment.author)))
             .collect();
         move |id| of.get(&id).copied().unwrap_or_default()
     }
