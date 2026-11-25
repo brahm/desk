@@ -1674,8 +1674,12 @@ impl DocumentWindow {
             editor.document()
         };
         let mut document = crate::fields::saved(document, &named.to_string_lossy());
-        // How it shows, to reopen the same way (INT-08, DOC-16).
+        // How it shows, to reopen the same way (INT-08, DOC-16); a copy
+        // as final shows changes as a new document does (REV-07).
         document.set_view(Some(self.current_view()));
+        if as_final {
+            document.set_markup(desk_model::Markup::default());
+        }
         // A picture of the first page, unless the preferences leave it out
         // (DOC-09).
         // The pages show the changes and comments that a copy as final
@@ -1871,10 +1875,21 @@ impl DocumentWindow {
     /// editing the same file with its changes and comments (REV-07).
     fn save_final(self: &Rc<Self>) {
         let weak = Rc::downgrade(self);
-        self.ask_file(&tr("Save a Copy as Final"), move |path| {
-            if let (Some(this), Some(path)) = (weak.upgrade(), path)
-                && this.write_document(&path, &path, true)
-            {
+        let named = tr("{name} (Final)");
+        self.ask_file_named(&tr("Save a Copy as Final"), Some(&named), move |path| {
+            let (Some(this), Some(path)) = (weak.upgrade(), path) else {
+                return;
+            };
+            // The copy never takes the place of the document, whose
+            // changes and comments it leaves out.
+            if this.path.borrow().as_deref() == Some(path.as_path()) {
+                this.alert(
+                    &tr("Cannot save {name}").replace("{name}", &display_name(&path)),
+                    &tr("A copy as final cannot replace the document it is made from. Choose another name or folder."),
+                );
+                return;
+            }
+            if this.write_document(&path, &path, true) {
                 remember_recent(&path);
             }
         });
@@ -1972,6 +1987,17 @@ impl DocumentWindow {
     /// offers the name of the document with the extension of the kind the
     /// app saves, in its folder.
     fn ask_file(&self, title: &str, chosen: impl FnOnce(Option<PathBuf>) + 'static) {
+        self.ask_file_named(title, None, chosen);
+    }
+
+    /// Asks where to save, as [`Self::ask_file`], suggesting the name of
+    /// the document as `named` says it, `{name}` standing for it.
+    fn ask_file_named(
+        &self,
+        title: &str,
+        named: Option<&str>,
+        chosen: impl FnOnce(Option<PathBuf>) + 'static,
+    ) {
         let Some(opener) = self.opener else { return };
         let (kind, extension) = opener.saves;
         let filter = gtk::FileFilter::new();
@@ -1989,7 +2015,10 @@ impl DocumentWindow {
             .modal(true)
             .filters(&filters)
             .default_filter(&filter)
-            .initial_name(format!("{stem}.{extension}"))
+            .initial_name(format!(
+                "{}.{extension}",
+                named.map_or(stem.clone(), |n| n.replace("{name}", &stem))
+            ))
             .build();
         if let Some(folder) = path.as_deref().and_then(Path::parent) {
             dialog.set_initial_folder(Some(&gio::File::for_path(folder)));

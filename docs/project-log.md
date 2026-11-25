@@ -2622,6 +2622,13 @@ paragraph, and objects on a second page.
   its comments, its tracking and its file.
 - The copy has no picture of its first page: the pages on the screen
   show the markup and the comments that the copy leaves out.
+- The review found that the copy took the view of markup of the window,
+  so that one saved from Final hid the changes made in it later; that
+  the dialog suggested the file of the document itself, which the copy
+  could replace with no changes or comments; and that two items of the
+  menu of the bar shared the F key. The copy now shows changes as a
+  new document does, the dialog suggests the name with "(Final)", a
+  copy cannot replace its document, and the item is reached with S.
 
 ## Decisions, with their reasons and consequences
 

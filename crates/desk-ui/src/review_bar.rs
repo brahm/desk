@@ -184,7 +184,7 @@ fn actions_menu() -> gio::Menu {
     menu.append_section(None, &all);
     // Save a Copy as Final of the action menu of Pages '09 (REV-07).
     let copy = gio::Menu::new();
-    copy.append(Some(&tr("Save a Copy as _Final…")), Some("win.save-final"));
+    copy.append(Some(&tr("_Save a Copy as Final…")), Some("win.save-final"));
     menu.append_section(None, &copy);
     let colors = gio::Menu::new();
     for color in desk_model::AuthorColor::ALL {
