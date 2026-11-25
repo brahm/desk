@@ -648,6 +648,15 @@ impl Edit {
         for object in &members {
             self.remove_object(object.id)?;
         }
+        // Grouped, they are no longer in the changes that moved them,
+        // which they leave as they are (W148).
+        let members: Vec<Object> = members
+            .into_iter()
+            .map(|mut o| {
+                o.moved = None;
+                o
+            })
+            .collect();
         let id = self.new_id();
         let mut group = Object::new(id, ObjectKind::Group(Arc::from(members)), frame);
         group.anchor = anchor;
@@ -671,6 +680,7 @@ impl Edit {
             for (i, member) in members.iter().enumerate() {
                 let mut member = member.clone();
                 member.anchor = group.anchor;
+                member.moved = None;
                 freed.push(member.id);
                 self.insert_object(index + i, member)?;
             }

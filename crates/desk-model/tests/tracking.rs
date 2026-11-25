@@ -1069,3 +1069,65 @@ fn rev_01_an_object_moved_into_the_text_is_no_insertion() {
         .unwrap();
     assert!(editor.document().objects().get(shape).is_some());
 }
+
+#[test]
+fn rev_01_an_object_moved_in_the_text_keeps_the_change_of_its_mark() {
+    let (mut editor, p) = typed("abc");
+    track(&mut editor, Tracking::On);
+    let shape = inline_shape(&mut editor, p, 1);
+    editor
+        .edit("Move", |edit| {
+            edit.put_object_in_text(shape, Position::new(p, 5))
+        })
+        .unwrap();
+    let mark = desk_model::FIELD_CHARACTER.to_string();
+    assert_eq!(runs(&editor, p), [plain("ab"), ins(&mark), plain("c")]);
+    // Rejected, the object goes, as it was added.
+    editor
+        .edit("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    assert!(editor.document().objects().get(shape).is_none());
+}
+
+#[test]
+fn rev_01_an_object_moved_then_put_in_the_text_or_grouped_leaves_its_change() {
+    use desk_model::Length;
+    let (mut editor, p) = typed("ab");
+    let shape = floating_shape(&mut editor);
+    let other = floating_shape(&mut editor);
+    track(&mut editor, Tracking::On);
+    let step = |editor: &mut Editor, ids: &[NodeId]| {
+        editor
+            .edit("Move", |edit| {
+                edit.move_objects(ids, Length::from_pt(10.0), Length::ZERO)
+            })
+            .unwrap();
+        assert_eq!(editor.document().changes().len(), 1);
+    };
+    step(&mut editor, &[shape]);
+    editor
+        .edit("Inline", |edit| {
+            edit.put_object_in_text(shape, Position::new(p, 1))
+        })
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+    let third = floating_shape(&mut editor);
+    step(&mut editor, &[other, third]);
+    let group = editor
+        .edit("Group", |edit| edit.group_objects(&[other, third]))
+        .unwrap()
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+    editor
+        .edit("Ungroup", |edit| edit.ungroup_objects(&[group]))
+        .unwrap();
+    assert!(
+        editor
+            .document()
+            .objects()
+            .iter()
+            .all(|o| o.moved.is_none())
+    );
+    // Moved again, they are in a change again.
+    step(&mut editor, &[other]);
+}

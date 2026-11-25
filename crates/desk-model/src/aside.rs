@@ -65,10 +65,13 @@ impl Edit {
                 Some(o)
             })
             .collect();
-        for object in moved {
-            self.replace_object(object)?;
-        }
-        Ok(())
+        // Moved aside, they are in no tracked change of the user (W148).
+        self.untracked(|edit| {
+            for object in moved {
+                edit.replace_object(object)?;
+            }
+            Ok(())
+        })
     }
 }
 

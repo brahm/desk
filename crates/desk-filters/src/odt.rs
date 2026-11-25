@@ -2307,7 +2307,18 @@ fn import_tracked(
             }
             paragraphs.push(built);
         }
-        // The objects in the lines it took (REV-01, OBJ-01).
+        // The objects in the lines it took (REV-01, OBJ-01). The marks of
+        // those Desk cannot hold go, and the marks of changes after them
+        // move back with the text (B-070).
+        let before: Vec<Vec<(NodeId, usize)>> = paragraphs
+            .iter()
+            .map(|p| {
+                desk_model::marks_in(std::slice::from_ref(p))
+                    .into_iter()
+                    .map(|(id, at)| (id, at.offset))
+                    .collect()
+            })
+            .collect();
         objects::import_story_inline_objects(
             source,
             document,
@@ -2326,6 +2337,17 @@ fn import_tracked(
                 )
             },
         )?;
+        for ((paragraph, marks), found) in paragraphs.iter().zip(&before).zip(&mut inner) {
+            let kept: HashSet<NodeId> = desk_model::marks_in(std::slice::from_ref(paragraph))
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            for &(_, gone) in marks.iter().filter(|(id, _)| !kept.contains(id)).rev() {
+                for (at, _) in found.iter_mut().filter(|(at, _)| *at > gone) {
+                    *at -= FIELD_CHARACTER.len_utf8();
+                }
+            }
+        }
         for (_, field) in inner.iter().flatten() {
             if let odf::Field::ChangeStart { id } = field {
                 met.insert(id.clone());

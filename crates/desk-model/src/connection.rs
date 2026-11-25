@@ -383,13 +383,16 @@ impl Edit {
             .filter(|o| matches!(o.kind, ObjectKind::Shape(Shape::Connection(_))))
             .cloned()
             .collect();
-        for line in lines {
-            let objects = self.document().objects();
-            if let Some(moved) = followed(&line, |id| objects.get(id).cloned()) {
-                self.replace_object(moved)?;
+        // Following their shapes, they are in no tracked change (W148).
+        self.untracked(|edit| {
+            for line in lines {
+                let objects = edit.document().objects();
+                if let Some(moved) = followed(&line, |id| objects.get(id).cloned()) {
+                    edit.replace_object(moved)?;
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 }
 

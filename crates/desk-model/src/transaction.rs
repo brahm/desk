@@ -1345,7 +1345,7 @@ impl Edit {
 
     /// Takes away a change of the places of objects that no object is in
     /// any longer (W148).
-    fn drop_unplaced(&mut self, change: crate::NodeId) -> Result<(), ModelError> {
+    pub(crate) fn drop_unplaced(&mut self, change: crate::NodeId) -> Result<(), ModelError> {
         let used = self
             .doc
             .objects()

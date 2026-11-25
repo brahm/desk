@@ -2540,6 +2540,15 @@ paragraph, and objects on a second page.
   paragraph it was at is counted in the body as Desk has it, with the
   paragraphs that deletions took, since reading puts those back
   before the objects take their changes.
+- The review found that an object moved within the text lost the
+  change of its mark, so that rejecting no longer took away an object
+  added; its new mark now keeps the changes of the old one. Objects
+  grouped, or put in the text, leave the change that moved them, which
+  goes when it holds no object. Objects that move by themselves, pushed
+  aside by a table that grows or connection lines that follow their
+  shapes, are in no change of the user. Reading an object that a
+  deletion took, the marks of the changes after it in the paragraph
+  move back with the text when Desk cannot hold the object.
 - The markup of moved objects, Previous and Next through them, and
   Accept and Reject of a selected object come in the next part, and
   the cells after it.
