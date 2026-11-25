@@ -1631,3 +1631,23 @@ fn b_071_a_joined_paragraph_goes_on_in_lines_of_its_own() {
     assert_eq!(lines[1].line.range.start, 0);
     assert_eq!(lines.last().unwrap().line.range.end, long.trim_end().len());
 }
+
+/// B-071 review: an object that moves with a paragraph joined to the one
+/// before stays on the page, with that one.
+#[test]
+fn b_071_an_object_of_a_joined_paragraph_stays_on_its_page() {
+    use desk_model::{ChangeKind, Markup};
+    let mut document = with_object(desk_model::Wrap::Both, Some(1));
+    document
+        .transact("Delete", |edit| {
+            let first = edit.document().start().paragraph;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_break_change(first, Some(gone))
+        })
+        .unwrap();
+    document.set_markup(Markup::WithoutDeletions);
+    let layout = paginate(&document, &mut TextSystem::new());
+    let objects: usize = layout.pages.iter().map(|p| p.objects.len()).sum();
+    assert_eq!(objects, 1);
+    assert_eq!(layout.pages[0].objects[0].paragraph, Some(0));
+}

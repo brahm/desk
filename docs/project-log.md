@@ -2410,6 +2410,11 @@ paragraph, and objects on a second page.
 - Only the body joins its paragraphs: those of notes, headers, footers,
   text boxes and cells are laid out elsewhere, and move to step 13,
   with the changes of objects and cells (B-074).
+- The review found what a joined paragraph has of its own that the
+  paragraph it shows in must take: the objects that move with it go
+  with that one, it is no item of a list, keeps with the next as that
+  one does, and starts no page, column or section. The text of a story,
+  edited as a body, is marked so, and its breaks stay until B-074.
 
 ## Decisions, with their reasons and consequences
 

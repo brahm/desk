@@ -447,6 +447,9 @@ pub struct Document {
     /// The slides of a presentation, one for each page; none for other
     /// documents.
     pub(crate) slides: Option<imbl::Vector<crate::Slide>>,
+    /// Whether the body holds the text of a story, to edit it with the
+    /// tools of the body (see [`Document::with_body`]); not content.
+    pub(crate) story_body: bool,
 }
 
 impl PartialEq for Document {
@@ -503,6 +506,7 @@ impl Document {
                 objects: Objects::default(),
             }),
             slides: None,
+            story_body: false,
         }
     }
 

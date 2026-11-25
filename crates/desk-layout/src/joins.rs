@@ -27,7 +27,8 @@ pub(crate) fn joins(
 ) -> Vec<Option<(usize, usize)>> {
     let body = document.body();
     let mut out = vec![None; body.len()];
-    let Some(hidden) = hidden else {
+    // The text of a story edited as a body is not joined yet (B-074).
+    let Some(hidden) = hidden.filter(|_| !document.is_story_body()) else {
         return out;
     };
     let mut head = 0;
@@ -119,8 +120,9 @@ pub(crate) fn split_lines(layout: &mut DocumentLayout, joins: &[Option<(usize, u
                 } else {
                     (starts_here || start < range.start) && end > range.start
                 };
-                if on {
-                    pieces.push((paragraph, start.max(range.start), end.min(range.end), start));
+                let (lo, hi) = (start.max(range.start), end.min(range.end));
+                if on && lo <= hi {
+                    pieces.push((paragraph, lo, hi, start));
                 }
             }
             let count = pieces.len();
