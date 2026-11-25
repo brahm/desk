@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: while a document tracks its changes, Desk Writer keeps what
+  is typed, deleted and formatted as changes of the author, with the
+  date, and ODT files keep whether tracking is on or paused (#220).
 * Added: Desk Writer keeps the changes of paragraph styles and of the
   formatting of paragraphs tracked in ODT files, with what the
   paragraphs were before (#219).

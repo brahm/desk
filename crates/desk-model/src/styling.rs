@@ -1181,6 +1181,12 @@ impl Edit {
             self.add_object(copy)?;
         }
         let mut position = at;
+        // Tracked, the text pasted is an insertion (W148).
+        let insertion = if self.tracking() {
+            Some(self.insertion_at(at)?)
+        } else {
+            None
+        };
         for (i, source) in fragment.paragraphs.iter().enumerate() {
             let mut style = source.style.clone();
             relink(&mut style.paragraph);
@@ -1194,8 +1200,17 @@ impl Edit {
             if !joins {
                 let id = self.style_by_name_or_add(Style::from(style.clone()))?;
                 let p = Position::new(position.paragraph, 0);
-                self.set_paragraph_style(p, p, id)?;
-                self.set_own_paragraph_attrs(position.paragraph, attrs)?;
+                // A paragraph pasted is in the insertion, with its own
+                // style: only the empty one pasted over changes its style.
+                let set = |edit: &mut Self| {
+                    edit.set_paragraph_style(p, p, id)?;
+                    edit.set_own_paragraph_attrs(position.paragraph, attrs)
+                };
+                if i > 0 {
+                    self.untracked(set)?
+                } else {
+                    set(self)?
+                }
             }
             let target = self.document().paragraph(position.paragraph)?.style();
             let mut runs = Vec::new();
@@ -1223,6 +1238,10 @@ impl Edit {
                     run_attrs.clone()
                 };
                 let mut attrs = attrs;
+                if let Some(insertion) = insertion {
+                    attrs.change = Some(Some(insertion));
+                    attrs.formatted = None;
+                }
                 match attrs.field {
                     Some(Some(crate::Field::NoteMark { note })) => {
                         if let Some(&new) = notes.get(&note) {

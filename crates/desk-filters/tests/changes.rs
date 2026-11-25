@@ -136,6 +136,34 @@ fn rev_01_insertions_and_deletions_of_libreoffice_are_read() {
     keep("rev-01-tracked-changes.odt", &written);
     let again = read_odt(&written).unwrap();
     assert_eq!(described(&again), (lines, changes));
+    // The file tracks no changes, and nor does the document.
+    assert_eq!(document.text_settings().tracking, desk_model::Tracking::Off);
+}
+
+#[test]
+fn rev_03_whether_changes_are_tracked_is_kept_in_odt() {
+    use desk_model::Tracking;
+    for tracking in [Tracking::On, Tracking::Paused, Tracking::Off] {
+        let mut document = Document::new_word_processing();
+        let settings = desk_model::TextSettings {
+            tracking,
+            ..document.text_settings().clone()
+        };
+        document
+            .transact("Track Changes", |edit| edit.set_text_settings(settings))
+            .unwrap();
+        let bytes = write_odt(&document).unwrap();
+        keep(&format!("rev-03-tracking-{tracking:?}.odt"), &bytes);
+        // Paused, other programs see that changes are not tracked.
+        let content = desk_odf::read_odt(&bytes).unwrap();
+        assert_eq!(content.track_changes, tracking == Tracking::On);
+        let read = read_odt(&bytes).unwrap();
+        assert_eq!(read.text_settings().tracking, tracking);
+    }
+    // A file of LibreOffice that tracks changes.
+    let on = LIBREOFFICE.replace(r#"track-changes="false""#, r#"track-changes="true""#);
+    let read = read_odt(&odt(&format!("{HEAD}{on}{TAIL}"))).unwrap();
+    assert_eq!(read.text_settings().tracking, Tracking::On);
 }
 
 #[test]

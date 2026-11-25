@@ -51,6 +51,59 @@ pub struct Edit {
     doc: Document,
     ops: Vec<Op>,
     inverse: Vec<Op>,
+    /// Who makes the changes and when, while they are tracked (W148).
+    tracker: Option<Tracker>,
+}
+
+/// The author and date of the changes that an edit tracks, with the
+/// change of each kind it made, once it made one (W148).
+#[derive(Clone, Debug)]
+pub struct Tracker {
+    author: Arc<str>,
+    date: Option<Arc<str>>,
+    insertion: Option<NodeId>,
+    deletion: Option<NodeId>,
+    format: Option<NodeId>,
+}
+
+impl Tracker {
+    /// Changes made by an author at a date and time of ISO 8601, if it is
+    /// known.
+    pub fn new(author: &str, date: Option<&str>) -> Self {
+        Self {
+            author: author.into(),
+            date: date.map(Into::into),
+            insertion: None,
+            deletion: None,
+            format: None,
+        }
+    }
+}
+
+/// The date and time now, in UTC, as ISO 8601 writes it
+/// (`2026-11-25T09:30:00Z`).
+pub fn now() -> String {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let days = (seconds / 86_400) as i64;
+    let time = seconds % 86_400;
+    // The civil date of a count of days since 1970 (H. Hinnant).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        time / 3600,
+        time / 60 % 60,
+        time % 60
+    )
 }
 
 impl Edit {
@@ -67,6 +120,76 @@ impl Edit {
     /// Never hands out an identifier that a copy of the document did.
     pub(crate) fn follow_ids(&mut self, copy: &Document) {
         self.doc.follow_ids(copy);
+    }
+
+    /// Whether the edit tracks the changes it makes (W148).
+    pub fn tracking(&self) -> bool {
+        self.tracker.is_some()
+    }
+
+    /// The tracked change of a kind that this edit makes, made the first
+    /// time it is needed.
+    fn tracked(&mut self, kind: crate::ChangeKind) -> Result<NodeId, ModelError> {
+        let tracker = self.tracker.as_ref().expect("the edit tracks changes");
+        let made = match kind {
+            crate::ChangeKind::Insertion => tracker.insertion,
+            crate::ChangeKind::Deletion => tracker.deletion,
+            crate::ChangeKind::Format => tracker.format,
+        };
+        if let Some(id) = made {
+            return Ok(id);
+        }
+        let (author, date) = (tracker.author.clone(), tracker.date.clone());
+        let id = self.add_change(kind, &author, date.as_deref())?;
+        let tracker = self.tracker.as_mut().expect("the edit tracks changes");
+        match kind {
+            crate::ChangeKind::Insertion => tracker.insertion = Some(id),
+            crate::ChangeKind::Deletion => tracker.deletion = Some(id),
+            crate::ChangeKind::Format => tracker.format = Some(id),
+        }
+        Ok(id)
+    }
+
+    /// The change of a kind by the author of the edit that `id` is, if it
+    /// is one.
+    fn own(&self, id: Option<NodeId>, kind: crate::ChangeKind) -> Option<NodeId> {
+        let tracker = self.tracker.as_ref()?;
+        let change = self.doc.changes().get(id?)?;
+        // A change of no known author is nobody's own.
+        (change.kind == kind && !tracker.author.is_empty() && change.author == tracker.author)
+            .then_some(change.id)
+    }
+
+    /// The insertion that text typed at a position joins: the one the
+    /// text before it is in, when the author is the same, or a new one.
+    pub(crate) fn insertion_at(&mut self, at: Position) -> Result<NodeId, ModelError> {
+        let paragraph = self.doc.paragraph(at.paragraph)?;
+        // The change of the run the character before the position is in.
+        let mut offset = 0;
+        let mut before = None;
+        for run in paragraph.runs() {
+            if offset >= at.offset {
+                break;
+            }
+            offset += run.len();
+            before = run.attrs.change.flatten();
+        }
+        match self.own(before, crate::ChangeKind::Insertion) {
+            Some(id) => Ok(id),
+            None => self.tracked(crate::ChangeKind::Insertion),
+        }
+    }
+
+    /// Runs some edits with their changes made as they are, even while
+    /// the edit tracks changes.
+    pub(crate) fn untracked<T>(
+        &mut self,
+        edits: impl FnOnce(&mut Self) -> Result<T, ModelError>,
+    ) -> Result<T, ModelError> {
+        let tracker = self.tracker.take();
+        let result = edits(self);
+        self.tracker = tracker;
+        result
     }
 
     /// Applies one operation.
@@ -93,7 +216,12 @@ impl Edit {
                 continue;
             }
             let paragraph = self.doc.paragraph(position.paragraph)?;
-            let (style, attrs) = paragraph.format_at(position.offset);
+            let (style, mut attrs) = paragraph.format_at(position.offset);
+            // Tracked, the text is added in an insertion (W148).
+            if self.tracking() {
+                attrs.change = Some(Some(self.insertion_at(position)?));
+                attrs.formatted = None;
+            }
             self.apply(Op::ReplaceText {
                 paragraph: position.paragraph,
                 range: position.offset..position.offset,
@@ -112,6 +240,20 @@ impl Edit {
     /// the attributes, except that only the first half starts a page or
     /// starts its list again.
     pub fn split_paragraph(&mut self, at: Position) -> Result<Position, ModelError> {
+        // Tracked, the new break is an insertion (W148).
+        let insertion = if self.tracking() {
+            Some(self.insertion_at(at)?)
+        } else {
+            None
+        };
+        let next = self.split_untracked(at)?;
+        if let Some(insertion) = insertion {
+            self.mark_break_change(at.paragraph, Some(insertion))?;
+        }
+        Ok(next)
+    }
+
+    fn split_untracked(&mut self, at: Position) -> Result<Position, ModelError> {
         let body = self.doc.body();
         let index = body
             .index_of(at.paragraph)
@@ -168,6 +310,9 @@ impl Edit {
     /// where it was. When the text spans paragraphs, they join into the
     /// first one, which keeps its style.
     pub fn delete(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
+        if self.tracking() {
+            return self.delete_tracked(start, end);
+        }
         // The notes whose marks go: those with no mark left go too
         // (EST-13).
         let mut marked: Vec<NodeId> = Vec::new();
@@ -207,6 +352,111 @@ impl Edit {
             }
         }
         Ok(at)
+    }
+
+    /// Deletes the text between two positions as a tracked change
+    /// (W148): text the author added in this way goes, text already
+    /// deleted stays as it is, and the rest stays, marked as deleted, with
+    /// the breaks between the paragraphs.
+    /// Deletes the text between two positions, as the Delete key does,
+    /// and gives the position after what stays of it: while the edit
+    /// tracks changes, the text deleted stays, so the cursor goes past it.
+    pub fn delete_forward(
+        &mut self,
+        start: Position,
+        end: Position,
+    ) -> Result<Position, ModelError> {
+        if self.tracking() {
+            Ok(self.delete_tracked_at(start, end)?.1)
+        } else {
+            self.delete(start, end)
+        }
+    }
+
+    fn delete_tracked(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
+        Ok(self.delete_tracked_at(start, end)?.0)
+    }
+
+    /// Deletes as a tracked change, and gives where the text deleted
+    /// starts and ends after it.
+    fn delete_tracked_at(
+        &mut self,
+        start: Position,
+        end: Position,
+    ) -> Result<(Position, Position), ModelError> {
+        use crate::ChangeKind;
+        let ranges = self.doc.paragraph_ranges(start, end)?;
+        // The pieces that go, in the order of the text: a range of a
+        // paragraph, or its break.
+        let mut gone: Vec<(Position, Position)> = Vec::new();
+        let mut marked: Vec<(Position, Position)> = Vec::new();
+        let mut breaks: Vec<NodeId> = Vec::new();
+        for (i, (id, range)) in ranges.iter().enumerate() {
+            let paragraph = self.doc.paragraph(*id)?;
+            let mut offset = 0;
+            for run in paragraph.runs() {
+                let (from, to) = (offset, offset + run.len());
+                offset = to;
+                let (from, to) = (from.max(range.start), to.min(range.end));
+                if from >= to {
+                    continue;
+                }
+                let piece = (Position::new(*id, from), Position::new(*id, to));
+                let change = run.attrs.change.flatten();
+                if self.own(change, ChangeKind::Insertion).is_some() {
+                    gone.push(piece);
+                } else if !change
+                    .and_then(|c| self.doc.changes().get(c))
+                    .is_some_and(|c| c.kind == ChangeKind::Deletion)
+                {
+                    marked.push(piece);
+                }
+            }
+            if i + 1 < ranges.len() {
+                let ends = paragraph.attrs().break_change.flatten();
+                let next = ranges[i + 1].0;
+                if self.own(ends, ChangeKind::Insertion).is_some() {
+                    gone.push((Position::new(*id, paragraph.len()), Position::new(next, 0)));
+                } else if !ends
+                    .and_then(|c| self.doc.changes().get(c))
+                    .is_some_and(|c| c.kind == ChangeKind::Deletion)
+                {
+                    breaks.push(*id);
+                }
+            }
+        }
+        if !marked.is_empty() || !breaks.is_empty() {
+            let deletion = self.tracked(ChangeKind::Deletion)?;
+            // TODO(B-070): text in another change keeps it too.
+            for (from, to) in marked {
+                self.map_runs(from, to, |run| {
+                    run.attrs.change = Some(Some(deletion));
+                    run.attrs.formatted = None;
+                })?;
+            }
+            for paragraph in breaks {
+                self.mark_break_change(paragraph, Some(deletion))?;
+            }
+        }
+        // What the author added goes, from the last piece, so that the
+        // places of those before stay where they are.
+        let mut after = end;
+        let tracker = self.tracker.take();
+        let result = gone.into_iter().rev().try_for_each(|(from, to)| {
+            self.delete(from, to)?;
+            if to.paragraph == after.paragraph {
+                after = if from.paragraph == to.paragraph {
+                    Position::new(after.paragraph, after.offset - (to.offset - from.offset))
+                } else {
+                    // The break went: what follows joins the paragraph.
+                    Position::new(from.paragraph, from.offset + after.offset)
+                };
+            }
+            Ok(())
+        });
+        self.tracker = tracker;
+        result?;
+        Ok((start, after))
     }
 
     fn delete_text(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
@@ -297,7 +547,63 @@ impl Edit {
         end: Position,
         attrs: &CharAttrs,
     ) -> Result<(), ModelError> {
+        self.track_format(start, end, |run| run.attrs.merge(attrs))?;
         self.map_runs(start, end, |run| run.attrs.merge(attrs))
+    }
+
+    /// Tracked, puts the text between two positions that `change` would
+    /// change in a change of its formatting first (W148).
+    fn track_format(
+        &mut self,
+        start: Position,
+        end: Position,
+        change: impl Fn(&mut Run),
+    ) -> Result<(), ModelError> {
+        if !self.tracking() {
+            return Ok(());
+        }
+        let mut changed: Vec<(Position, Position)> = Vec::new();
+        for (id, range) in self.doc.paragraph_ranges(start, end)? {
+            let mut offset = range.start;
+            for run in self.doc.paragraph(id)?.slice(range)? {
+                let mut new = run.clone();
+                change(&mut new);
+                // Text in a change already keeps it.
+                if new != run && run.attrs.change.flatten().is_none() {
+                    changed.push((
+                        Position::new(id, offset),
+                        Position::new(id, offset + run.len()),
+                    ));
+                }
+                offset += run.len();
+            }
+        }
+        if changed.is_empty() {
+            return Ok(());
+        }
+        let format = self.tracked(crate::ChangeKind::Format)?;
+        for (from, to) in changed {
+            self.mark_format_change(from, to, format)?;
+        }
+        Ok(())
+    }
+
+    /// Tracked, puts a paragraph in a change of its formatting before its
+    /// style or attributes change (W148).
+    fn track_paragraph(&mut self, paragraph: NodeId) -> Result<(), ModelError> {
+        if !self.tracking()
+            || self
+                .doc
+                .paragraph(paragraph)?
+                .attrs()
+                .format_change
+                .flatten()
+                .is_some()
+        {
+            return Ok(());
+        }
+        let format = self.tracked(crate::ChangeKind::Format)?;
+        self.mark_paragraph_format_change(paragraph, format)
     }
 
     /// Links the text between two positions to a place, or takes its
@@ -424,7 +730,9 @@ impl Edit {
         start: Position,
         end: Position,
     ) -> Result<(), ModelError> {
-        self.map_runs(start, end, |run| run.attrs = CharAttrs::default())
+        let clear = |run: &mut Run| run.attrs = run.attrs.text_bound();
+        self.track_format(start, end, clear)?;
+        self.map_runs(start, end, clear)
     }
 
     /// Sets or removes the character style of the text between two
@@ -435,6 +743,7 @@ impl Edit {
         end: Position,
         style: Option<StyleId>,
     ) -> Result<(), ModelError> {
+        self.track_format(start, end, |run| run.style = style)?;
         self.map_runs(start, end, |run| run.style = style)
     }
 
@@ -466,6 +775,11 @@ impl Edit {
             new.merge(attrs);
             if &new != paragraph.attrs() {
                 let style = paragraph.style();
+                if self.tracking() {
+                    self.track_paragraph(id)?;
+                    let marked = self.doc.paragraph(id)?.attrs().structure();
+                    new.merge(&marked);
+                }
                 self.apply(Op::SetParagraphFormat {
                     paragraph: id,
                     style,
@@ -485,9 +799,9 @@ impl Edit {
         style: StyleId,
     ) -> Result<(), ModelError> {
         for id in self.paragraphs_between(start, end)? {
-            let paragraph = self.doc.paragraph(id)?;
-            if paragraph.style() != style {
-                let attrs = paragraph.attrs().clone();
+            if self.doc.paragraph(id)?.style() != style {
+                self.track_paragraph(id)?;
+                let attrs = self.doc.paragraph(id)?.attrs().clone();
                 self.apply(Op::SetParagraphFormat {
                     paragraph: id,
                     style,
@@ -932,10 +1246,22 @@ impl Document {
         name: impl Into<String>,
         edits: impl FnOnce(&mut Edit) -> Result<T, ModelError>,
     ) -> Result<(T, Transaction), ModelError> {
+        self.transact_tracked(name, None, edits)
+    }
+
+    /// Runs a transaction whose changes to the text are tracked when
+    /// `tracker` says who makes them (W148).
+    pub fn transact_tracked<T>(
+        &mut self,
+        name: impl Into<String>,
+        tracker: Option<Tracker>,
+        edits: impl FnOnce(&mut Edit) -> Result<T, ModelError>,
+    ) -> Result<(T, Transaction), ModelError> {
         let mut edit = Edit {
             doc: self.clone(),
             ops: Vec::new(),
             inverse: Vec::new(),
+            tracker,
         };
         let value = edits(&mut edit)?;
         edit.follow_connections()?;
@@ -984,9 +1310,55 @@ pub struct Editor {
     /// Whether the next action may join the last one: false after an
     /// Undo or a Redo.
     joinable: bool,
+    /// Who makes the changes that tracking keeps, and when (W148).
+    signer: Signer,
+}
+
+/// Gives the author of a change and its date, when it is made.
+#[derive(Clone)]
+pub struct Signer(Arc<dyn Fn() -> (String, String) + Send + Sync>);
+
+impl Signer {
+    /// Changes signed by what `sign` gives: the author and the date.
+    pub fn new(sign: impl Fn() -> (String, String) + Send + Sync + 'static) -> Self {
+        Self(Arc::new(sign))
+    }
+}
+
+impl std::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Signer").field(&(self.0)().0).finish()
+    }
 }
 
 impl Editor {
+    /// Sets the name of the author of the changes the user makes, made
+    /// at the time [`now`] gives.
+    pub fn set_author(&mut self, author: &str) {
+        let author = author.to_owned();
+        self.signer = Signer::new(move || (author.clone(), now()));
+    }
+
+    /// Sets what gives the author of the changes the user makes, and
+    /// their date, when they are made.
+    pub fn set_signer(&mut self, signer: Signer) {
+        self.signer = signer;
+    }
+
+    /// What gives the author of the changes and their date.
+    pub fn signer(&self) -> &Signer {
+        &self.signer
+    }
+
+    /// The author of the changes and the time, while the document tracks
+    /// its changes.
+    fn tracker(&self) -> Option<Tracker> {
+        (self.document.text_settings().tracking == crate::Tracking::On).then(|| {
+            let (author, date) = (self.signer.0)();
+            Tracker::new(&author, Some(&date))
+        })
+    }
+
     /// Starts editing a document, with an empty history.
     pub fn new(document: Document) -> Self {
         Self {
@@ -995,6 +1367,7 @@ impl Editor {
             redo: Vec::new(),
             recorded: 0,
             joinable: false,
+            signer: Signer::new(|| (String::new(), now())),
         }
     }
 
@@ -1032,7 +1405,8 @@ impl Editor {
         name: impl Into<String>,
         edits: impl FnOnce(&mut Edit) -> Result<T, ModelError>,
     ) -> Result<T, ModelError> {
-        let (value, transaction) = self.document.transact(name, edits)?;
+        let tracker = self.tracker();
+        let (value, transaction) = self.document.transact_tracked(name, tracker, edits)?;
         if !transaction.is_empty() {
             self.push_undo(transaction);
             self.redo.clear();
@@ -1050,7 +1424,8 @@ impl Editor {
         name: impl Into<String>,
         edits: impl FnOnce(&mut Edit) -> Result<T, ModelError>,
     ) -> Result<(T, bool), ModelError> {
-        let (value, transaction) = self.document.transact(name, edits)?;
+        let tracker = self.tracker();
+        let (value, transaction) = self.document.transact_tracked(name, tracker, edits)?;
         if transaction.is_empty() {
             return Ok((value, false));
         }

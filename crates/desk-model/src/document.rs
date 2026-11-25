@@ -105,6 +105,21 @@ pub struct TextSettings {
     /// The colours that authors of comments and changes chose for the
     /// document, by name (W150).
     pub author_colors: Vec<(String, crate::AuthorColor)>,
+    /// Whether the changes made to the text are tracked (W148, REV-03).
+    pub tracking: Tracking,
+}
+
+/// Whether the changes made to a document are tracked (W148, REV-03).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Tracking {
+    /// Changes are made as they are.
+    #[default]
+    Off,
+    /// Each change is kept, with its author and date, until it is
+    /// accepted or rejected.
+    On,
+    /// The changes kept stay, and new ones are made as they are.
+    Paused,
 }
 
 /// A guide fixed on a page, dragged out of a ruler, that objects snap to
@@ -154,6 +169,7 @@ impl Default for TextSettings {
             chart_styles: crate::ChartStyle::library().to_vec(),
             custom_formats: Vec::new(),
             author_colors: Vec::new(),
+            tracking: Tracking::Off,
         }
     }
 }

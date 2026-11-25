@@ -261,6 +261,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(inactive) = text.links_inactive {
             config_item(&mut w, "LinksInactive", "boolean", boolean(inactive));
         }
+        if text.tracking_paused {
+            config_item(&mut w, "TrackingPaused", "boolean", "true");
+        }
         if let Some(pages) = text.layout_pages {
             config_item(&mut w, "PageLayoutPages", "int", &pages.to_string());
         }

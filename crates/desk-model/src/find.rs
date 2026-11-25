@@ -180,6 +180,27 @@ impl Edit {
             .map_or(0, char::len_utf8);
         let (style, attrs) = paragraph.format_at(found.range.start + first);
         let with: String = with.chars().filter(|c| !matches!(c, '\n' | '\r')).collect();
+        // Tracked, the replacement is added after the text found, which is
+        // deleted (W148).
+        if self.tracking() {
+            let end = Position::new(found.paragraph, found.range.end);
+            if !with.is_empty() {
+                let mut attrs = attrs.clone();
+                attrs.change = Some(Some(self.insertion_at(end)?));
+                attrs.formatted = None;
+                self.apply(Op::ReplaceText {
+                    paragraph: found.paragraph,
+                    range: end.offset..end.offset,
+                    runs: vec![Run::with_attrs(&with, style, attrs)],
+                })?;
+            }
+            let after = Position::new(found.paragraph, end.offset + with.len());
+            let start = Position::new(found.paragraph, found.range.start);
+            let before = self.document().paragraph(found.paragraph)?.len();
+            self.delete(start, end)?;
+            let gone = before - self.document().paragraph(found.paragraph)?.len();
+            return Ok(Position::new(after.paragraph, after.offset - gone));
+        }
         let runs = if with.is_empty() {
             Vec::new()
         } else {

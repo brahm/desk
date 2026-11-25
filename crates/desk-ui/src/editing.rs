@@ -627,7 +627,11 @@ impl TextEditor {
             view: view.clone(),
             im,
             state: Rc::new(RefCell::new(State {
-                editor: Editor::new(document),
+                editor: {
+                    let mut editor = Editor::new(document);
+                    editor.set_signer(signer());
+                    editor
+                },
                 layout,
                 selection: Selection::default(),
                 goal: None,
@@ -1407,7 +1411,13 @@ impl TextEditor {
                 let document = edit.document();
                 let from = at_spot(document, start)?;
                 let to = at_spot(document, end)?;
-                let at = edit.delete(from, to)?;
+                // Tracked, the Delete key goes past the text it deletes,
+                // which stays (W148).
+                let at = if forward && before.is_empty() {
+                    edit.delete_forward(from, to)?
+                } else {
+                    edit.delete(from, to)?
+                };
                 Ok(Spot::of(edit.document(), at))
             })
         };
@@ -4501,6 +4511,12 @@ async fn read_bounded(
     }
     let _ = stream.close_future(glib::Priority::DEFAULT).await;
     Ok(glib::Bytes::from_owned(out))
+}
+
+/// Who makes the changes that tracking keeps: the author of comments,
+/// from the preferences, at the local time (W148).
+fn signer() -> desk_model::Signer {
+    desk_model::Signer::new(|| (crate::comments_page::author(), crate::comments_page::now()))
 }
 
 #[cfg(test)]
