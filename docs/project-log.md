@@ -2630,6 +2630,27 @@ paragraph, and objects on a second page.
   new document does, the dialog suggests the name with "(Final)", a
   copy cannot replace its document, and the item is reached with S.
 
+### 25 November: comments and markup in print move to W5 (step 15 of W2)
+
+- Step 15 of W2 asked for the comments and the markup of tracked
+  changes in print and PDF. Desk does not print or export PDF from the
+  window yet: both are in W5 (W034, W031, W173), and including the
+  comments and the markup is an option of those dialogs. The owner
+  chose on 25 November to move the step there (B-077).
+
+### 25 November: the breaks of the dictionary of macOS move to W6 (step 16 of W2)
+
+- txt-09-never-hyphenate, txt-09-hyphenation-cases and
+  txt-09-hyphenation-widths, laid out by Desk and compared with the
+  PDFs of Pages 15.4, differ in where words break: Pages breaks
+  pho-tographs, cel-ebration, extra-ordinarily and extraordinari-ly,
+  and never photo-, cele- or ex-, which the patterns of LibreOffice
+  allow; the lines after them differ in turn (wonder-ful, which the
+  patterns allow too, falls elsewhere). Those breaks come from the
+  dictionary of macOS.
+- The owner kept the choice of 20 November, rules tested on their own
+  and no list of words, and moved B-045 to W6.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
