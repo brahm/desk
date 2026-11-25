@@ -247,6 +247,10 @@ pub struct Preferences {
     /// The name that comments and changes are written under (W150); empty
     /// for the full name of the user of the computer.
     pub author: String,
+    /// The names that comments and changes were written under before
+    /// the author's name changed, which show under the current name, as
+    /// in Pages 15.4 (B-066).
+    pub former_authors: Vec<String>,
 }
 
 /// The color of invisible characters until it is changed: the blue of
@@ -303,6 +307,7 @@ impl Default for Preferences {
             move_objects_aside: true,
             open_links: None,
             author: String::new(),
+            former_authors: Vec::new(),
         }
     }
 }
@@ -391,6 +396,14 @@ impl Preferences {
             .and_then(|w| OpenLinks::from_word(&w));
         if let Ok(author) = file.string(EDITING, "author") {
             out.author = author.trim().to_owned();
+        }
+        // One a line, as a name has none.
+        if let Ok(names) = file.string(EDITING, "former-authors") {
+            out.former_authors = names
+                .lines()
+                .filter(|n| !n.is_empty())
+                .map(str::to_owned)
+                .collect();
         }
         out.show_warnings = file
             .boolean(WINDOW, "show-warnings")
@@ -486,6 +499,11 @@ impl Preferences {
             let _ = file.remove_key(EDITING, "author");
         } else {
             file.set_string(EDITING, "author", &self.author);
+        }
+        if self.former_authors.is_empty() {
+            let _ = file.remove_key(EDITING, "former-authors");
+        } else {
+            file.set_string(EDITING, "former-authors", &self.former_authors.join("\n"));
         }
         file.set_boolean(WINDOW, "show-warnings", self.show_warnings);
         file.set_boolean(WINDOW, "screen-view", self.screen_view);
@@ -888,6 +906,16 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
     dialog.present(Some(parent));
 }
 
+/// The earlier names of the author once their name changes from `before`
+/// to `now`: with `before`, and without `now`, which is theirs again.
+pub(crate) fn renamed(former: &[String], before: &str, now: &str) -> Vec<String> {
+    let mut out: Vec<String> = former.iter().filter(|n| *n != now).cloned().collect();
+    if !before.is_empty() && before != now && !out.iter().any(|n| n == before) {
+        out.push(before.to_owned());
+    }
+    out
+}
+
 /// Author: the name that comments and tracked changes are written under,
 /// as Settings > General > Author of Pages 15.4 (W150, `pref.author`).
 /// Left empty, it is the full name of the user of the computer.
@@ -903,7 +931,14 @@ fn author_group() -> adw::PreferencesGroup {
     let keep = |row: &adw::EntryRow| {
         let name = row.text().trim().to_owned();
         if name != get().author {
-            change(|p| p.author = name.clone());
+            // What was written under the name before shows under the
+            // new one (B-066).
+            let before = crate::comments_page::author();
+            change(|p| {
+                p.author = name.clone();
+                let now = crate::comments_page::author_of(p);
+                p.former_authors = renamed(&p.former_authors, &before, &now);
+            });
         }
     };
     row.connect_apply(keep);
@@ -1167,6 +1202,7 @@ mod tests {
             move_objects_aside: false,
             open_links: Some(OpenLinks::Never),
             author: "Ana Souza".into(),
+            former_authors: vec!["Ana".into(), "Silva; Ana".into()],
         };
         let file = glib::KeyFile::new();
         preferences.write(&file);
@@ -1181,6 +1217,13 @@ mod tests {
         assert!(Preferences::read(&empty).detect_links);
         assert!(Preferences::read(&empty).include_preview);
         assert!(Preferences::read(&empty).author.is_empty());
+        assert!(Preferences::read(&empty).former_authors.is_empty());
+        // B-066: a name changed is kept, and taken back it is the
+        // current one again.
+        let former = renamed(&[], "Ana", "Ana Souza");
+        assert_eq!(former, ["Ana"]);
+        assert_eq!(renamed(&former, "Ana Souza", "Ana"), ["Ana Souza"]);
+        assert_eq!(renamed(&former, "Ana Souza", "Ana Souza"), ["Ana"]);
         assert_eq!(Preferences::read(&empty).zoom, 125);
         assert_eq!(Preferences::read(&empty).invisibles_color, INVISIBLES_COLOR);
         assert_eq!(Preferences::read(&empty).guide_color, GUIDE_COLOR);

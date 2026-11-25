@@ -160,6 +160,13 @@ impl crate::Document {
     /// identifiers of comments, is the same once the document is saved
     /// and opened again.
     pub fn author_palette(&self, local: &str) -> AuthorPalette {
+        self.author_palette_of(local, &[])
+    }
+
+    /// The same, when the local author wrote under the names of `former`
+    /// before, which take the local author's colour, as the colour chosen
+    /// under one of them is theirs still (B-066).
+    pub fn author_palette_of(&self, local: &str, former: &[String]) -> AuthorPalette {
         let chosen = self.author_colors();
         let mut colors: std::collections::HashMap<String, AuthorColor> =
             chosen.iter().cloned().collect();
@@ -172,15 +179,30 @@ impl crate::Document {
             std::iter::once(&comment.author).chain(comment.replies.iter().map(|r| &r.author))
         });
         for name in names.chain(self.changes().iter().map(|c| &c.author)) {
-            if &**name != local && !colors.contains_key(&**name) {
+            if &**name != local
+                && !colors.contains_key(&**name)
+                && !former.iter().any(|f| f == &**name)
+            {
                 others.insert(&**name);
             }
+        }
+        // The local author keeps the colour chosen under an earlier name.
+        if !colors.contains_key(local)
+            && let Some(color) = former.iter().find_map(|f| colors.get(f).copied())
+        {
+            colors.insert(local.to_owned(), color);
         }
         let mut placed = 0;
         let unchosen = (!colors.contains_key(local)).then_some(local);
         for name in unchosen.into_iter().chain(others) {
             colors.insert(name.to_owned(), free_color(&free, placed));
             placed += 1;
+        }
+        // And what they wrote under their earlier names takes it.
+        if let Some(&mine) = colors.get(local) {
+            for name in former {
+                colors.insert(name.clone(), mine);
+            }
         }
         AuthorPalette {
             colors,
@@ -236,6 +258,35 @@ mod tests {
                 .map(|_| ())
             })
             .unwrap();
+    }
+
+    #[test]
+    fn b_066_earlier_names_of_the_local_author_take_no_colour() {
+        let mut document = Document::new_word_processing();
+        document
+            .transact("Typing", |edit| {
+                let start = edit.document().start();
+                edit.insert_text(start, "one two").map(|_| ())
+            })
+            .unwrap();
+        comment_by(&mut document, "Ana");
+        comment_by(&mut document, "Bo");
+        // Ana is Ana Souza now: Bo keeps the colour after hers.
+        let former = ["Ana".to_owned()];
+        let palette = document.author_palette_of("Ana Souza", &former);
+        assert_eq!(palette.color("Ana Souza"), AuthorColor::Yellow);
+        assert_eq!(palette.color("Ana"), AuthorColor::Yellow);
+        assert_eq!(palette.color("Bo"), AuthorColor::Green);
+        // The colour chosen as Ana is still hers.
+        document
+            .transact("Author Color", |edit| {
+                edit.set_author_color("Ana", AuthorColor::Red)
+            })
+            .unwrap();
+        let palette = document.author_palette_of("Ana Souza", &former);
+        assert_eq!(palette.color("Ana Souza"), AuthorColor::Red);
+        assert_eq!(palette.color("Ana"), AuthorColor::Red);
+        assert_eq!(palette.color("Bo"), AuthorColor::Yellow);
     }
 
     #[test]

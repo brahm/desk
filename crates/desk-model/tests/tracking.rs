@@ -443,3 +443,167 @@ fn w148_changes_made_in_a_story_come_back_with_it() {
         .unwrap();
     assert_eq!(main.document().changes().get(change.id), Some(&change));
 }
+
+/// A document with changes of each kind made while tracking: "one" added,
+/// "two" and the break after it deleted, and "four" italic.
+fn changed() -> (Editor, NodeId) {
+    let (mut editor, p) = typed("two");
+    editor
+        .edit("Typing", |edit| {
+            let next = edit.split_paragraph(Position::new(p, 3))?;
+            edit.insert_text(next, "three four")
+        })
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    let second = editor.document().body().get(1).unwrap().id();
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(Position::new(p, 0), "one ")
+        })
+        .unwrap();
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(p, 4), Position::new(second, 0))
+        })
+        .unwrap();
+    let italic = CharAttrs {
+        italic: Some(true),
+        ..CharAttrs::default()
+    };
+    editor
+        .edit("Italic", |edit| {
+            edit.set_character_attrs(Position::new(second, 6), Position::new(second, 10), &italic)
+        })
+        .unwrap();
+    assert_eq!(editor.document().changes().len(), 3);
+    (editor, p)
+}
+
+fn texts(editor: &Editor) -> Vec<String> {
+    editor
+        .document()
+        .body()
+        .iter()
+        .map(|p| p.text().to_string())
+        .collect()
+}
+
+#[test]
+fn rev_06_accepting_all_keeps_what_was_added_and_drops_what_was_deleted() {
+    let (mut editor, p) = changed();
+    let count = editor
+        .edit("Accept All Changes", |edit| {
+            edit.resolve_changes(true, |_| true)
+        })
+        .unwrap();
+    assert_eq!(count, 3);
+    assert_eq!(texts(&editor), ["one three four"]);
+    assert!(editor.document().changes().is_empty());
+    let document = editor.document();
+    let paragraph = document.paragraph(p).unwrap();
+    assert!(
+        paragraph
+            .runs()
+            .all(|r| r.attrs.change.is_none() && r.attrs.formatted.is_none())
+    );
+    assert_eq!(paragraph.runs().last().unwrap().attrs.italic, Some(true));
+    assert_eq!(paragraph.attrs().break_change, None);
+    // One step of undo puts them back.
+    editor.undo().unwrap();
+    assert_eq!(editor.document().changes().len(), 3);
+    assert_eq!(texts(&editor), ["one two", "three four"]);
+}
+
+#[test]
+fn rev_06_rejecting_all_puts_the_text_back_as_it_was() {
+    let (mut editor, p) = changed();
+    editor
+        .edit("Reject All Changes", |edit| {
+            edit.resolve_changes(false, |_| true)
+        })
+        .unwrap();
+    assert_eq!(texts(&editor), ["two", "three four"]);
+    assert!(editor.document().changes().is_empty());
+    let document = editor.document();
+    assert!(
+        document
+            .body()
+            .iter()
+            .all(|p| p.attrs().break_change.is_none()
+                && p.runs().all(|r| r.attrs.change.is_none()
+                    && r.attrs.formatted.is_none()
+                    && r.attrs.italic.is_none()))
+    );
+    let _ = p;
+}
+
+#[test]
+fn rev_06_a_paragraph_formatted_takes_back_what_it_had() {
+    let (mut editor, p) = typed("one");
+    track(&mut editor, Tracking::On);
+    let attrs = desk_model::ParaAttrs {
+        alignment: Some(desk_model::Alignment::Center),
+        ..desk_model::ParaAttrs::default()
+    };
+    editor
+        .edit("Center", |edit| {
+            edit.set_paragraph_attrs(Position::new(p, 0), Position::new(p, 0), &attrs)
+        })
+        .unwrap();
+    editor
+        .edit("Reject All Changes", |edit| {
+            edit.resolve_changes(false, |_| true)
+        })
+        .unwrap();
+    let paragraph = editor.document().paragraph(p).unwrap();
+    assert_eq!(paragraph.attrs().alignment, None);
+    assert_eq!(paragraph.attrs().format_change, None);
+    assert_eq!(paragraph.attrs().formatted, None);
+}
+
+#[test]
+fn rev_06_changes_of_notes_are_resolved_too() {
+    let (mut editor, p) = typed("a");
+    let note = editor
+        .edit("Note", |edit| {
+            let note = edit.new_id();
+            let text = edit.new_id();
+            let paragraph = desk_model::Paragraph::from_runs(
+                text,
+                edit.document().styles().default_paragraph(),
+                desk_model::ParaAttrs::default(),
+                [desk_model::Run::new("kept added")],
+            )?;
+            let added = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+            edit.set_note(
+                note,
+                Some(desk_model::Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![paragraph].into(),
+                }),
+            )?;
+            let mark = CharAttrs {
+                field: Some(Some(desk_model::Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(Position::new(p, 0), Position::new(p, 1), &mark)?;
+            edit.edit_story(desk_model::Story::Note(note), |edit| {
+                let first = edit.document().body().get(0).unwrap().id();
+                edit.mark_change(Position::new(first, 4), Position::new(first, 10), added)
+            })?;
+            Ok(note)
+        })
+        .unwrap();
+    assert_eq!(editor.document().change_places().len(), 1);
+    editor
+        .edit("Reject All Changes", |edit| {
+            edit.resolve_changes(false, |_| true)
+        })
+        .unwrap();
+    let text = editor.document().notes().get(note).unwrap().paragraphs[0]
+        .text()
+        .to_string();
+    assert_eq!(text, "kept");
+    assert!(editor.document().changes().is_empty());
+}

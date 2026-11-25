@@ -32,7 +32,7 @@ mod cell_drag;
 mod changes;
 mod chart_looks;
 mod comments;
-pub use comments::CommentTarget;
+pub use comments::{CommentTarget, ReviewItem};
 mod connections;
 mod copies;
 mod custom_formats;
@@ -415,6 +415,12 @@ impl std::ops::DerefMut for Selections {
 struct State {
     editor: Editor,
     layout: DocumentLayout,
+    /// The comment or change that Previous or Next of the bar of
+    /// comments and changes selected last (REV-02).
+    reviewed: Option<ReviewItem>,
+    /// The comments and changes in their order, for the document they
+    /// were found in, which moving the cursor does not find again.
+    review_order: std::cell::RefCell<Option<comments::ReviewOrder>>,
     selection: Selection,
     /// The distance from the left of the page that Up and Down keep.
     goal: Option<f64>,
@@ -633,6 +639,8 @@ impl TextEditor {
                     editor
                 },
                 layout,
+                reviewed: None,
+                review_order: std::cell::RefCell::new(None),
                 selection: Selection::default(),
                 goal: None,
                 undo: Selections::default(),

@@ -27,6 +27,58 @@ struct Placed {
     end: Spot,
     object: Option<NodeId>,
     cell: Option<(u32, u32)>,
+    /// Whether it is a tracked change rather than a comment (W148).
+    change: bool,
+}
+
+/// A comment or a tracked change, as Previous and Next of the bar of
+/// comments and changes go through them (REV-02).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReviewItem {
+    /// A comment.
+    Comment(NodeId),
+    /// A tracked change.
+    Change(NodeId),
+}
+
+impl Placed {
+    fn item(&self) -> ReviewItem {
+        if self.change {
+            ReviewItem::Change(self.id)
+        } else {
+            ReviewItem::Comment(self.id)
+        }
+    }
+}
+
+/// Every tracked change of a document, with the text it covers in each
+/// text it is in, from the start of its first piece to the end of its
+/// last (W148).
+fn placed_changes(document: &Document) -> Vec<Placed> {
+    let mut out: Vec<Placed> = Vec::new();
+    for (story, span) in document.change_places() {
+        let spots = match story {
+            None => Spot::of(document, span.start).zip(Spot::of(document, span.end)),
+            Some(story) => {
+                let paragraphs = document.story_paragraphs(story);
+                spot_in(&paragraphs, span.start).zip(spot_in(&paragraphs, span.end))
+            }
+        };
+        let Some((start, end)) = spots else { continue };
+        match out.iter_mut().find(|p| p.id == span.id && p.story == story) {
+            Some(place) => place.end = end,
+            None => out.push(Placed {
+                id: span.id,
+                story,
+                start,
+                end,
+                object: None,
+                cell: None,
+                change: true,
+            }),
+        }
+    }
+    out
 }
 
 /// What a new comment is on: the text between two spots of the text being
@@ -68,6 +120,7 @@ fn placed(document: &Document) -> Vec<Placed> {
                 end,
                 object: None,
                 cell: None,
+                change: false,
             })
         })
         .chain(
@@ -81,6 +134,7 @@ fn placed(document: &Document) -> Vec<Placed> {
                     end: Spot::default(),
                     object: Some(object),
                     cell: None,
+                    change: false,
                 }),
         )
         .chain(document.cell_comments().into_iter().map(|c| Placed {
@@ -90,6 +144,7 @@ fn placed(document: &Document) -> Vec<Placed> {
             end: Spot::default(),
             object: Some(c.table),
             cell: Some((c.row, c.col)),
+            change: false,
         }))
         .collect()
 }
@@ -274,6 +329,13 @@ impl<'a> Texts<'a> {
         (page, group, y, x, start, end)
     }
 
+    /// The place of a comment or change in the order of the bar of
+    /// comments and changes: its text, and then comments before changes
+    /// on the same text, by identifier.
+    fn full_key(&self, place: &Placed) -> FullKey {
+        (self.key(place), place.change, place.id)
+    }
+
     /// The comments, in that order.
     fn ordered(&self, mut places: Vec<Placed>) -> Vec<Placed> {
         places.sort_by_cached_key(|p| self.key(p));
@@ -284,6 +346,15 @@ impl<'a> Texts<'a> {
 /// The place of a text in the order of the comments: its page, which of
 /// its texts, where it is on the page and where in the text.
 type Key = (usize, u8, u64, u64, Spot, Spot);
+
+/// The place of a comment or change in the order of the bar.
+type FullKey = (Key, bool, NodeId);
+
+/// The comments and changes of a document in the order of the bar.
+pub(super) struct ReviewOrder {
+    document: Document,
+    places: Vec<Placed>,
+}
 
 /// The text that a comment is on, on one line, as its card quotes it.
 fn commented_text(document: &Document, start: Position, end: Position) -> String {
@@ -590,9 +661,16 @@ impl TextEditor {
     /// Selects the text that a comment is on, and shows it: in the body,
     /// or in the header, footer, note, text box or shape it is in.
     pub fn select_comment(&self, id: NodeId) -> bool {
-        let Some(place) = self.place_of(id) else {
-            return false;
-        };
+        match self.place_of(id) {
+            Some(place) => self.select_place(&place),
+            None => false,
+        }
+    }
+
+    /// Selects the text or the object of a comment or change, and shows
+    /// it.
+    fn select_place(&self, place: &Placed) -> bool {
+        let place = *place;
         let current = self.story();
         if let Some(object) = place.object {
             if current.is_some() {
@@ -637,41 +715,161 @@ impl TextEditor {
     /// 15.4, in the order of the pages. Gives the comment, none at the last
     /// or the first.
     pub fn go_to_comment(&self, forward: bool) -> Option<NodeId> {
-        let found = {
+        let place = {
+            let state = self.state.borrow();
+            self.next_place(&state, placed(Self::main_document(&state)), forward)
+        }?;
+        if !self.select_place(&place) {
+            return None;
+        }
+        self.state.borrow_mut().reviewed = Some(place.item());
+        Some(place.id)
+    }
+
+    /// Goes to the next comment or tracked change after the selection, or
+    /// the one before it, as the arrows of the bar of comments and
+    /// changes do (REV-02), and selects it.
+    pub fn go_to_review_item(&self, forward: bool) -> Option<ReviewItem> {
+        let place = {
             let state = self.state.borrow();
             let document = Self::main_document(&state);
-            let places = placed(document);
-            let (start, end) = state.selection.ordered();
-            let story = state.story.as_ref().map(|m| m.story);
-            // With the text being edited, where the selection is.
-            let stories = places.iter().filter_map(|p| p.story).chain(story);
-            let texts = Texts::with(document, Self::main_layout(&state), stories);
-            let object = match state.objects[..] {
-                [object] if story.is_none() => Some(object),
-                _ => None,
-            };
-            let cell = state
-                .cells
-                .filter(|c| Some(c.id) == object)
-                .map(|c| c.focus);
-            let here = texts.key(&Placed {
-                id: NodeId::new(1).expect("not zero"),
-                story,
-                start,
-                end,
-                object,
-                cell,
-            });
-            let keyed = places.into_iter().map(|p| (texts.key(&p), p.id));
-            if forward {
-                keyed.filter(|(k, _)| *k > here).min()
-            } else {
-                keyed.filter(|(k, _)| *k < here).max()
-            }
-            .map(|(_, id)| id)
+            let mut places = placed(document);
+            places.extend(placed_changes(document));
+            self.next_place(&state, places, forward)
+        }?;
+        if !self.select_place(&place) {
+            return None;
+        }
+        self.state.borrow_mut().reviewed = Some(place.item());
+        Some(place.item())
+    }
+
+    /// The comment or change that the selection is on, with its place in
+    /// the order of the comments and changes from 1, and how many there
+    /// are, as the label of the bar of comments and changes says them
+    /// (REV-02). The one that Previous or Next selected is the one, while
+    /// it stays selected.
+    pub fn review_position(&self) -> (Option<(usize, ReviewItem)>, usize) {
+        let state = self.state.borrow();
+        let document = Self::main_document(&state);
+        let story = state.story.as_ref().map(|m| m.story);
+        let (start, end) = state.selection.ordered();
+        let object = match state.objects[..] {
+            [object] if story.is_none() => Some(object),
+            _ => None,
         };
-        let id = found?;
-        self.select_comment(id).then_some(id)
+        let cell = state
+            .cells
+            .filter(|c| Some(c.id) == object)
+            .map(|c| c.focus);
+        let mut cache = state.review_order.borrow_mut();
+        if cache.as_ref().is_none_or(|c| c.document != *document) {
+            let mut places = placed(document);
+            places.extend(placed_changes(document));
+            let texts = Texts::new(document, Self::main_layout(&state), &places);
+            let _work = desk_model::table::share_work();
+            let mut keyed: Vec<(FullKey, Placed)> = places
+                .into_iter()
+                .map(|p| (texts.full_key(&p), p))
+                .collect();
+            keyed.sort_by_key(|a| a.0);
+            *cache = Some(ReviewOrder {
+                document: document.clone(),
+                places: keyed.into_iter().map(|(_, p)| p).collect(),
+            });
+        }
+        let ordered = &cache.as_ref().expect("just made").places;
+        let on = |p: &Placed| match p.object {
+            Some(o) => object == Some(o) && p.cell == cell,
+            None => object.is_none() && p.story == story && p.start <= start && end <= p.end,
+        };
+        let remembered = state.reviewed.and_then(|item| {
+            ordered
+                .iter()
+                .position(|p| p.item() == item && on(p) && (p.start, p.end) == (start, end))
+        });
+        let current = remembered
+            .or_else(|| {
+                ordered
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| on(p))
+                    .max_by_key(|(_, p)| p.start)
+                    .map(|(i, _)| i)
+            })
+            .map(|i| (i + 1, ordered[i].item()));
+        (current, ordered.len())
+    }
+
+    /// The first place after the selection, or the last before it, in the
+    /// order of the pages; of places on the same text, in the order of
+    /// their kind and identifier, from the one Previous or Next selected
+    /// last.
+    fn next_place(
+        &self,
+        state: &super::State,
+        places: Vec<Placed>,
+        forward: bool,
+    ) -> Option<Placed> {
+        let document = Self::main_document(state);
+        let (start, end) = state.selection.ordered();
+        let story = state.story.as_ref().map(|m| m.story);
+        // With the text being edited, where the selection is.
+        let stories = places.iter().filter_map(|p| p.story).chain(story);
+        let texts = Texts::with(document, Self::main_layout(state), stories);
+        let object = match state.objects[..] {
+            [object] if story.is_none() => Some(object),
+            _ => None,
+        };
+        let cell = state
+            .cells
+            .filter(|c| Some(c.id) == object)
+            .map(|c| c.focus);
+        let selected = Placed {
+            id: NodeId::new(1).expect("not zero"),
+            story,
+            start,
+            end,
+            object,
+            cell,
+            change: false,
+        };
+        // The item selected last, while it is still the selection, or else
+        // the first that is the selection.
+        let exact = |p: &&Placed| {
+            (p.story, p.start, p.end, p.object, p.cell) == (story, start, end, object, cell)
+        };
+        let here = places
+            .iter()
+            .filter(exact)
+            .find(|p| state.reviewed == Some(p.item()))
+            .or_else(|| {
+                places
+                    .iter()
+                    .filter(exact)
+                    .min_by_key(|p| texts.full_key(p))
+            })
+            .map_or_else(
+                || {
+                    (
+                        texts.key(&selected),
+                        false,
+                        NodeId::new(1).expect("not zero"),
+                    )
+                },
+                |p| texts.full_key(p),
+            );
+        let keyed = places.into_iter().map(|p| (texts.full_key(&p), p));
+        if forward {
+            keyed
+                .filter(|(k, _)| *k > here)
+                .min_by(|a, b| a.0.cmp(&b.0))
+        } else {
+            keyed
+                .filter(|(k, _)| *k < here)
+                .max_by(|a, b| a.0.cmp(&b.0))
+        }
+        .map(|(_, p)| p)
     }
 
     /// The comment that the cursor or the selection is in, in the text
@@ -722,7 +920,7 @@ impl TextEditor {
         local: &str,
     ) -> impl Fn(NodeId) -> desk_model::AuthorColor + use<> {
         let document = self.document();
-        let palette = document.author_palette(local);
+        let palette = document.author_palette_of(local, &crate::preferences::get().former_authors);
         let of: std::collections::HashMap<NodeId, desk_model::AuthorColor> = document
             .comments()
             .iter()

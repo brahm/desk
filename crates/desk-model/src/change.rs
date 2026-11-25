@@ -175,6 +175,162 @@ pub(crate) fn change_spans_in<'a>(
     out
 }
 
+impl crate::Edit {
+    /// Accepts or rejects the tracked changes for which `which` is true,
+    /// in every text of the document (W148, REV-06): accepted, text added
+    /// stays, text deleted goes and text formatted keeps its new
+    /// formatting; rejected, text added goes, text deleted stays and text
+    /// formatted takes back the formatting it had, when it is known. The
+    /// changes resolved are no longer kept. Gives how many there were.
+    pub fn resolve_changes(
+        &mut self,
+        accept: bool,
+        which: impl Fn(NodeId) -> bool,
+    ) -> Result<usize, crate::ModelError> {
+        let resolved: Vec<NodeId> = self
+            .document()
+            .changes()
+            .iter()
+            .map(|c| c.id)
+            .filter(|id| which(*id))
+            .collect();
+        if resolved.is_empty() {
+            return Ok(0);
+        }
+        let kinds: std::collections::HashMap<NodeId, ChangeKind> = resolved
+            .iter()
+            .filter_map(|id| self.document().changes().get(*id).map(|c| (*id, c.kind)))
+            .collect();
+        let resolve = |edit: &mut crate::Edit| resolve_text(edit, accept, &kinds);
+        resolve(self)?;
+        for story in self.document().stories() {
+            let changed = self
+                .document()
+                .story_paragraphs(story)
+                .iter()
+                .any(|p| has_change(p, &kinds));
+            if changed {
+                self.edit_story(story, resolve)?;
+            }
+        }
+        for id in &resolved {
+            self.set_change(*id, None)?;
+        }
+        Ok(resolved.len())
+    }
+}
+
+/// Whether a paragraph has any of some changes.
+fn has_change(
+    paragraph: &Paragraph,
+    kinds: &std::collections::HashMap<NodeId, ChangeKind>,
+) -> bool {
+    let attrs = paragraph.attrs();
+    [attrs.break_change, attrs.format_change]
+        .into_iter()
+        .any(|c| c.flatten().is_some_and(|c| kinds.contains_key(&c)))
+        || paragraph.runs().any(|r| {
+            r.attrs
+                .change
+                .flatten()
+                .is_some_and(|c| kinds.contains_key(&c))
+        })
+}
+
+/// Resolves some changes in the body of an edit: first what stays, then,
+/// from the end, what goes.
+fn resolve_text(
+    edit: &mut crate::Edit,
+    accept: bool,
+    kinds: &std::collections::HashMap<NodeId, ChangeKind>,
+) -> Result<(), crate::ModelError> {
+    // Whether what a change covers goes: text added and rejected, or
+    // deleted and accepted.
+    let goes = |kind: ChangeKind| match kind {
+        ChangeKind::Insertion => !accept,
+        ChangeKind::Deletion => accept,
+        ChangeKind::Format => false,
+    };
+    let kind_of = |id: Option<NodeId>| id.and_then(|id| kinds.get(&id).copied());
+    let ids: Vec<NodeId> = edit.document().body().iter().map(Paragraph::id).collect();
+    let mut gone: Vec<(Position, Position)> = Vec::new();
+    for (i, &id) in ids.iter().enumerate() {
+        let paragraph = edit.document().paragraph(id)?.clone();
+        // The paragraph: its formatting, and its break when it stays.
+        let mut attrs = paragraph.attrs().clone();
+        let mut style = paragraph.style();
+        if let Some(kind) = kind_of(attrs.format_change.flatten()) {
+            debug_assert_eq!(kind, ChangeKind::Format);
+            if !accept && let Some(Some(before)) = attrs.formatted.clone() {
+                let structure = attrs.structure();
+                style = before.style;
+                attrs = before.attrs.clone();
+                attrs.merge(&structure);
+            }
+            attrs.format_change = None;
+            attrs.formatted = None;
+        }
+        // The break goes after the text before it.
+        let mut joins = None;
+        if let Some(kind) = kind_of(attrs.break_change.flatten()) {
+            if goes(kind) && i + 1 < ids.len() {
+                joins = Some((
+                    Position::new(id, paragraph.len()),
+                    Position::new(ids[i + 1], 0),
+                ));
+            } else {
+                attrs.break_change = None;
+            }
+        }
+        if &attrs != paragraph.attrs() || style != paragraph.style() {
+            edit.apply(crate::Op::SetParagraphFormat {
+                paragraph: id,
+                style,
+                attrs,
+            })?;
+        }
+        // Its text.
+        let mut offset = 0;
+        for run in paragraph.runs() {
+            let (from, to) = (offset, offset + run.len());
+            offset = to;
+            if let Some(kind) = kind_of(run.attrs.change.flatten())
+                && goes(kind)
+            {
+                gone.push((Position::new(id, from), Position::new(id, to)));
+            }
+        }
+        gone.extend(joins);
+        let end = Position::new(id, paragraph.len());
+        edit.map_runs(Position::new(id, 0), end, |run| {
+            let Some(kind) = kind_of(run.attrs.change.flatten()) else {
+                return;
+            };
+            if goes(kind) {
+                return;
+            }
+            if kind == ChangeKind::Format
+                && !accept
+                && let Some(Some(before)) = run.attrs.formatted.clone()
+            {
+                let bound = run.attrs.text_bound();
+                run.style = before.style;
+                run.attrs = before.attrs.clone();
+                run.attrs.merge(&bound);
+            }
+            run.attrs.change = None;
+            run.attrs.formatted = None;
+        })?;
+    }
+    // From the end, so that the places before stay where they are.
+    edit.untracked(|edit| {
+        for (from, to) in gone.into_iter().rev() {
+            edit.delete(from, to)?;
+        }
+        Ok(())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
