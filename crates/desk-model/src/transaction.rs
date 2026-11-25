@@ -651,6 +651,47 @@ impl Edit {
         })
     }
 
+    /// Puts a paragraph in a tracked change of its formatting, keeping
+    /// the style and the formatting it has now, which rejecting the
+    /// change puts back (W148). A paragraph already in a change of its
+    /// formatting keeps it, with the formatting it had first.
+    pub fn mark_paragraph_format_change(
+        &mut self,
+        paragraph: NodeId,
+        change: NodeId,
+    ) -> Result<(), ModelError> {
+        let p = self.doc.paragraph(paragraph)?;
+        if p.attrs().format_change.flatten().is_some() {
+            return Ok(());
+        }
+        let before = crate::ParaFormatting {
+            style: p.style(),
+            attrs: p.attrs().without_structure(),
+        };
+        self.mark_paragraph_formatted(paragraph, change, Some(Arc::new(before)))
+    }
+
+    /// Puts a paragraph in a tracked change of its formatting whose
+    /// formatting before is `before`, or unknown, as a file gives it
+    /// (W148).
+    pub fn mark_paragraph_formatted(
+        &mut self,
+        paragraph: NodeId,
+        change: NodeId,
+        before: Option<Arc<crate::ParaFormatting>>,
+    ) -> Result<(), ModelError> {
+        let p = self.doc.paragraph(paragraph)?;
+        let mut attrs = p.attrs().clone();
+        attrs.format_change = Some(Some(change));
+        attrs.formatted = Some(before);
+        let style = p.style();
+        self.apply(Op::SetParagraphFormat {
+            paragraph,
+            style,
+            attrs,
+        })
+    }
+
     /// Puts the break at the end of a paragraph in a tracked change, or
     /// takes it out of any with none (W148).
     pub fn mark_break_change(

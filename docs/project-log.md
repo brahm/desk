@@ -2249,6 +2249,21 @@ paragraph, and objects on a second page.
 - The changes of paragraph styles and of the formatting of paragraphs
   come in the second pull request of step 9.
 
+### 25 November: changes of paragraphs (step 9 of W2, second part)
+
+- A change of the style of a paragraph, or of the formatting set on it,
+  is on the paragraph, which keeps the style and the formatting it had,
+  as the text of a change of formatting keeps its own. A paragraph split
+  in two leaves both halves in the change; a copy is in none.
+- ODF writes it as a `text:format-change` whose marks are at the start
+  and the end of the text of the paragraph, as LibreOffice writes the
+  changes of the attributes of paragraphs, and Desk names the paragraph
+  style before in `desk:paragraph-style-name`, which also tells a change
+  of paragraphs from one of their text. The marks of a paragraph and of
+  its text may overlap, so the regions they open are kept apart by name.
+- The pages mark the text of a changed paragraph as they do formatted
+  text, until the markup views of step 11.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -869,6 +869,13 @@ formatting! {
         /// at the end of the paragraph is part of (W148, REV-01). It
         /// belongs to the paragraph, never to its style.
         break_change: Option<crate::NodeId> = None,
+        /// The tracked change of the formatting of the paragraph, its
+        /// style or what is set on it, that the paragraph is part of
+        /// (W148). It belongs to the paragraph, never to its style.
+        format_change: Option<crate::NodeId> = None,
+        /// The style and the formatting the paragraph had before that
+        /// change, when it is known, which rejecting it puts back.
+        formatted: Option<Arc<crate::ParaFormatting>> = None,
     }
 }
 
@@ -905,7 +912,8 @@ impl CharAttrs {
 impl ParaAttrs {
     /// The breaks of the paragraph that are part of the text rather than
     /// of its formatting: its column break and the section or layout that
-    /// starts at it. Styles never hold them, and reverting or copying a
+    /// starts at it, with its entry of a table of contents and its
+    /// tracked changes. Styles never hold them, and reverting or copying a
     /// style keeps them where they are.
     pub fn structure(&self) -> Self {
         Self {
@@ -913,6 +921,8 @@ impl ParaAttrs {
             start: self.start.clone(),
             toc_entry: self.toc_entry,
             break_change: self.break_change,
+            format_change: self.format_change,
+            formatted: self.formatted.clone(),
             ..Self::default()
         }
     }
@@ -924,6 +934,8 @@ impl ParaAttrs {
             start: None,
             toc_entry: None,
             break_change: None,
+            format_change: None,
+            formatted: None,
             ..self.clone()
         }
     }

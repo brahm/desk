@@ -595,3 +595,79 @@ fn rev_01_changes_of_formatting_around_others_or_of_nothing() {
             .all(|r| r.attrs.formatted == Some(None))
     );
 }
+
+#[test]
+fn rev_01_changes_of_paragraph_styles_keep_the_style_before() {
+    use desk_model::{Alignment, ParaAttrs, Position};
+    let mut document = Document::new_word_processing();
+    let first = document.body().iter().next().unwrap().id();
+    let heading = document.new_id();
+    document
+        .put_style(desk_model::ParagraphStyle::new(heading, "Heading"))
+        .unwrap();
+    let body_style = document.body().iter().next().unwrap().style();
+    document
+        .transact("Format", |edit| {
+            let start = edit.document().start();
+            let end = edit.insert_text(start, "Centered text")?;
+            let second = edit.split_paragraph(end)?;
+            edit.insert_text(second, "Second")?;
+            let centered = ParaAttrs {
+                alignment: Some(Alignment::Center),
+                ..ParaAttrs::default()
+            };
+            let p = edit.document().paragraph(first)?;
+            let style = p.style();
+            edit.apply(desk_model::Op::SetParagraphFormat {
+                paragraph: first,
+                style,
+                attrs: centered,
+            })?;
+            let change = edit.add_change(ChangeKind::Format, "Ana", None)?;
+            edit.mark_paragraph_format_change(first, change)?;
+            let at = Position::new(first, 0);
+            edit.set_paragraph_style(at, at, heading)
+        })
+        .unwrap();
+    let state = |d: &Document| {
+        let p = d.body().iter().next().unwrap();
+        let before = p.attrs().formatted.clone().flatten().unwrap();
+        let name = |id| d.styles().get(id).unwrap().name().to_string();
+        (
+            name(p.style()),
+            p.attrs().format_change.flatten().is_some(),
+            name(before.style),
+            before.attrs.alignment,
+            d.body().iter().nth(1).unwrap().attrs().format_change,
+        )
+    };
+    let made = state(&document);
+    assert_eq!(
+        made.2,
+        document
+            .styles()
+            .get(body_style)
+            .unwrap()
+            .name()
+            .to_string()
+    );
+    assert_eq!(made.3, Some(Alignment::Center));
+    // Only that paragraph is in the change.
+    assert_eq!(made.4, None);
+    let bytes = write_odt(&document).unwrap();
+    keep("rev-01-changes-of-paragraphs.odt", &bytes);
+    let content = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(content.tracked_changes.len(), 1);
+    assert!(
+        content.tracked_changes[0]
+            .previous_paragraph_style
+            .is_some()
+    );
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(state(&read), made);
+    assert_eq!(
+        read.body().iter().map(|p| p.text()).collect::<Vec<_>>(),
+        ["Centered text", "Second"]
+    );
+}

@@ -1829,7 +1829,7 @@ impl Exporter<'_> {
         };
         let names = self.names;
         let comments = self.comments;
-        let spans = export_spans(paragraph, None, comments, Some(track), |run| {
+        let mut spans = export_spans(paragraph, None, comments, Some(track), |run| {
             let attrs = run.attrs.without_field();
             let named = run.style.and_then(|id| names.get(&id).cloned());
             if attrs.is_empty() {
@@ -1846,6 +1846,32 @@ impl Exporter<'_> {
                 let prefix = if self.master { "MOT" } else { "OT" };
                 Some(self.style(prefix, odf::Family::Text, named, properties))
             }
+        });
+        super::paragraph_change(paragraph, &mut spans, |before| {
+            let parent = names
+                .get(&before.style)
+                .cloned()
+                .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
+            let own = desk_model::ParaAttrs {
+                list_level: None,
+                list_start: None,
+                list_override: None,
+                list_style: None,
+                ..before.attrs.without_structure()
+            };
+            if own.is_empty() {
+                return parent;
+            }
+            let properties = odf::Properties {
+                paragraph: odf_paragraph_properties(
+                    &own,
+                    &styles.resolve_paragraph(before.style, &own),
+                    false,
+                ),
+                ..Default::default()
+            };
+            let prefix = if self.master { "MOP" } else { "OP" };
+            self.style(prefix, odf::Family::Paragraph, Some(parent), properties)
         });
         odf::Paragraph {
             style: Some(style),

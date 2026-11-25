@@ -36,6 +36,17 @@ pub enum ChangeKind {
     Format,
 }
 
+/// The style and the formatting that a paragraph had before a change of
+/// its formatting.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ParaFormatting {
+    /// The paragraph style.
+    pub style: crate::StyleId,
+    /// The formatting set on the paragraph, without its structure, as
+    /// its breaks and changes.
+    pub attrs: crate::ParaAttrs,
+}
+
 /// The formatting that text had before a change of its formatting: its
 /// character style and the formatting set on it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -136,6 +147,15 @@ pub(crate) fn change_spans_in<'a>(
                 }
             }
             offset = end;
+        }
+        // A change of the formatting of the paragraph covers its text.
+        if let Some(Some(change)) = paragraph.attrs().format_change {
+            out.push(ChangeSpan {
+                id: change,
+                start: Position::new(id, 0),
+                end: Position::new(id, paragraph.len()),
+                with_break: false,
+            });
         }
         if let Some(Some(change)) = paragraph.attrs().break_change {
             match out[first..].last_mut() {
@@ -305,5 +325,51 @@ mod tests {
                 .iter()
                 .all(|(_, _, a)| a.change.is_none() && a.formatted.is_none())
         );
+    }
+
+    #[test]
+    fn w148_a_paragraph_keeps_the_formatting_it_had() {
+        let mut document = Document::new_word_processing();
+        let first = document.body().iter().next().unwrap().id();
+        let style = document.body().iter().next().unwrap().style();
+        let (change, _) = document
+            .transact("Format", |edit| {
+                let start = edit.document().start();
+                edit.insert_text(start, "one two")?;
+                let change = edit.add_change(ChangeKind::Format, "Ana", None)?;
+                edit.mark_paragraph_format_change(first, change)?;
+                // Marked again, it keeps the formatting it had first.
+                let again = edit.add_change(ChangeKind::Format, "Bo", None)?;
+                edit.mark_paragraph_format_change(first, again)?;
+                Ok(change)
+            })
+            .unwrap();
+        // Split, both halves are in the change; its text is covered.
+        document
+            .transact("Typing", |edit| {
+                edit.split_paragraph(Position::new(first, 3))
+            })
+            .unwrap();
+        let changes: Vec<_> = document
+            .body()
+            .iter()
+            .map(|p| p.attrs().format_change.flatten())
+            .collect();
+        assert_eq!(changes, [Some(change), Some(change)]);
+        let before = document
+            .body()
+            .iter()
+            .next()
+            .unwrap()
+            .attrs()
+            .formatted
+            .clone();
+        assert_eq!(before.flatten().unwrap().style, style);
+        assert!(document.change_spans().iter().any(|s| s.id == change));
+        // A copy is in no change.
+        let fragment = document
+            .copy_fragment(Position::new(first, 0), Position::new(first, 3))
+            .unwrap();
+        assert!(fragment.paragraphs[0].attrs.format_change.is_none());
     }
 }

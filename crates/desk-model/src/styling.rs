@@ -256,6 +256,8 @@ impl Document {
                 .collect();
             let mut attrs = paragraph.attrs().clone();
             attrs.break_change = None;
+            attrs.format_change = None;
+            attrs.formatted = None;
             paragraphs.push(FragmentParagraph {
                 style: self
                     .flat_paragraph_style(paragraph.style())

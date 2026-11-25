@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer keeps the changes of paragraph styles and of the
+  formatting of paragraphs tracked in ODT files, with what the
+  paragraphs were before (#PR).
 * Added: Desk Writer keeps the changes of formatting tracked in ODT
   files, with the formatting the text had before, and marks them with a
   dashed line in the colour of their author (#218).
