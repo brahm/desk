@@ -439,7 +439,8 @@ impl Edit {
     /// of it: its styles, page setup, text settings and information, and
     /// the identifiers handed out. A
     /// story edited in a copy of the document changes them with the tools
-    /// of the body (see [`Document::with_body`]), and its comments.
+    /// of the body (see [`Document::with_body`]), and its comments and
+    /// the changes tracked in it.
     pub fn adopt_document_settings(&mut self, from: &Document) -> Result<(), ModelError> {
         self.follow_ids(from);
         for style in from.styles().iter() {
@@ -476,6 +477,12 @@ impl Edit {
             .collect();
         for id in gone {
             self.set_comment(id, None)?;
+        }
+        // And the tracked changes made in the story (W148).
+        for change in from.changes().iter() {
+            if self.document().changes().get(change.id) != Some(change) {
+                self.set_change(change.id, Some(change.clone()))?;
+            }
         }
         Ok(())
     }

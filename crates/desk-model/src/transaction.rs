@@ -80,8 +80,8 @@ impl Tracker {
     }
 }
 
-/// The date and time now, in UTC, as ISO 8601 writes it without a zone
-/// (`2026-11-25T09:30:00`), as tracked changes carry it.
+/// The date and time now, in UTC, as ISO 8601 writes it
+/// (`2026-11-25T09:30:00Z`).
 pub fn now() -> String {
     let seconds = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -99,7 +99,7 @@ pub fn now() -> String {
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = yoe + era * 400 + i64::from(month <= 2);
     format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}",
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
         time / 3600,
         time / 60 % 60,
         time % 60
@@ -155,21 +155,41 @@ impl Edit {
     fn own(&self, id: Option<NodeId>, kind: crate::ChangeKind) -> Option<NodeId> {
         let tracker = self.tracker.as_ref()?;
         let change = self.doc.changes().get(id?)?;
-        (change.kind == kind && change.author == tracker.author).then_some(change.id)
+        // A change of no known author is nobody's own.
+        (change.kind == kind && !tracker.author.is_empty() && change.author == tracker.author)
+            .then_some(change.id)
     }
 
     /// The insertion that text typed at a position joins: the one the
     /// text before it is in, when the author is the same, or a new one.
-    fn insertion_at(&mut self, at: Position) -> Result<NodeId, ModelError> {
+    pub(crate) fn insertion_at(&mut self, at: Position) -> Result<NodeId, ModelError> {
         let paragraph = self.doc.paragraph(at.paragraph)?;
-        let before = (at.offset > 0)
-            .then(|| paragraph.slice(at.offset - 1..at.offset).ok())
-            .flatten()
-            .and_then(|runs| runs.last().and_then(|r| r.attrs.change.flatten()));
+        // The change of the run the character before the position is in.
+        let mut offset = 0;
+        let mut before = None;
+        for run in paragraph.runs() {
+            if offset >= at.offset {
+                break;
+            }
+            offset += run.len();
+            before = run.attrs.change.flatten();
+        }
         match self.own(before, crate::ChangeKind::Insertion) {
             Some(id) => Ok(id),
             None => self.tracked(crate::ChangeKind::Insertion),
         }
+    }
+
+    /// Runs some edits with their changes made as they are, even while
+    /// the edit tracks changes.
+    pub(crate) fn untracked<T>(
+        &mut self,
+        edits: impl FnOnce(&mut Self) -> Result<T, ModelError>,
+    ) -> Result<T, ModelError> {
+        let tracker = self.tracker.take();
+        let result = edits(self);
+        self.tracker = tracker;
+        result
     }
 
     /// Applies one operation.
@@ -338,7 +358,32 @@ impl Edit {
     /// (W148): text the author added in this way goes, text already
     /// deleted stays as it is, and the rest stays, marked as deleted, with
     /// the breaks between the paragraphs.
+    /// Deletes the text between two positions, as the Delete key does,
+    /// and gives the position after what stays of it: while the edit
+    /// tracks changes, the text deleted stays, so the cursor goes past it.
+    pub fn delete_forward(
+        &mut self,
+        start: Position,
+        end: Position,
+    ) -> Result<Position, ModelError> {
+        if self.tracking() {
+            Ok(self.delete_tracked_at(start, end)?.1)
+        } else {
+            self.delete(start, end)
+        }
+    }
+
     fn delete_tracked(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
+        Ok(self.delete_tracked_at(start, end)?.0)
+    }
+
+    /// Deletes as a tracked change, and gives where the text deleted
+    /// starts and ends after it.
+    fn delete_tracked_at(
+        &mut self,
+        start: Position,
+        end: Position,
+    ) -> Result<(Position, Position), ModelError> {
         use crate::ChangeKind;
         let ranges = self.doc.paragraph_ranges(start, end)?;
         // The pieces that go, in the order of the text: a range of a
@@ -382,6 +427,7 @@ impl Edit {
         }
         if !marked.is_empty() || !breaks.is_empty() {
             let deletion = self.tracked(ChangeKind::Deletion)?;
+            // TODO(B-070): text in another change keeps it too.
             for (from, to) in marked {
                 self.map_runs(from, to, |run| {
                     run.attrs.change = Some(Some(deletion));
@@ -394,14 +440,23 @@ impl Edit {
         }
         // What the author added goes, from the last piece, so that the
         // places of those before stay where they are.
+        let mut after = end;
         let tracker = self.tracker.take();
-        let result = gone
-            .into_iter()
-            .rev()
-            .try_for_each(|(from, to)| self.delete(from, to).map(drop));
+        let result = gone.into_iter().rev().try_for_each(|(from, to)| {
+            self.delete(from, to)?;
+            if to.paragraph == after.paragraph {
+                after = if from.paragraph == to.paragraph {
+                    Position::new(after.paragraph, after.offset - (to.offset - from.offset))
+                } else {
+                    // The break went: what follows joins the paragraph.
+                    Position::new(from.paragraph, from.offset + after.offset)
+                };
+            }
+            Ok(())
+        });
         self.tracker = tracker;
         result?;
-        Ok(start)
+        Ok((start, after))
     }
 
     fn delete_text(&mut self, start: Position, end: Position) -> Result<Position, ModelError> {
@@ -513,7 +568,8 @@ impl Edit {
             for run in self.doc.paragraph(id)?.slice(range)? {
                 let mut new = run.clone();
                 change(&mut new);
-                if new != run {
+                // Text in a change already keeps it.
+                if new != run && run.attrs.change.flatten().is_none() {
                     changed.push((
                         Position::new(id, offset),
                         Position::new(id, offset + run.len()),
@@ -535,7 +591,15 @@ impl Edit {
     /// Tracked, puts a paragraph in a change of its formatting before its
     /// style or attributes change (W148).
     fn track_paragraph(&mut self, paragraph: NodeId) -> Result<(), ModelError> {
-        if !self.tracking() {
+        if !self.tracking()
+            || self
+                .doc
+                .paragraph(paragraph)?
+                .attrs()
+                .format_change
+                .flatten()
+                .is_some()
+        {
             return Ok(());
         }
         let format = self.tracked(crate::ChangeKind::Format)?;
@@ -1246,22 +1310,53 @@ pub struct Editor {
     /// Whether the next action may join the last one: false after an
     /// Undo or a Redo.
     joinable: bool,
-    /// The author of the changes that the user makes, which tracking
-    /// keeps (W148).
-    author: Arc<str>,
+    /// Who makes the changes that tracking keeps, and when (W148).
+    signer: Signer,
+}
+
+/// Gives the author of a change and its date, when it is made.
+#[derive(Clone)]
+pub struct Signer(Arc<dyn Fn() -> (String, String) + Send + Sync>);
+
+impl Signer {
+    /// Changes signed by what `sign` gives: the author and the date.
+    pub fn new(sign: impl Fn() -> (String, String) + Send + Sync + 'static) -> Self {
+        Self(Arc::new(sign))
+    }
+}
+
+impl std::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Signer").field(&(self.0)().0).finish()
+    }
 }
 
 impl Editor {
-    /// Sets the name of the author of the changes the user makes.
+    /// Sets the name of the author of the changes the user makes, made
+    /// at the time [`now`] gives.
     pub fn set_author(&mut self, author: &str) {
-        self.author = author.into();
+        let author = author.to_owned();
+        self.signer = Signer::new(move || (author.clone(), now()));
+    }
+
+    /// Sets what gives the author of the changes the user makes, and
+    /// their date, when they are made.
+    pub fn set_signer(&mut self, signer: Signer) {
+        self.signer = signer;
+    }
+
+    /// What gives the author of the changes and their date.
+    pub fn signer(&self) -> &Signer {
+        &self.signer
     }
 
     /// The author of the changes and the time, while the document tracks
     /// its changes.
     fn tracker(&self) -> Option<Tracker> {
-        (self.document.text_settings().tracking == crate::Tracking::On)
-            .then(|| Tracker::new(&self.author, Some(&now())))
+        (self.document.text_settings().tracking == crate::Tracking::On).then(|| {
+            let (author, date) = (self.signer.0)();
+            Tracker::new(&author, Some(&date))
+        })
     }
 
     /// Starts editing a document, with an empty history.
@@ -1272,7 +1367,7 @@ impl Editor {
             redo: Vec::new(),
             recorded: 0,
             joinable: false,
-            author: "".into(),
+            signer: Signer::new(|| (String::new(), now())),
         }
     }
 

@@ -472,7 +472,9 @@ impl TextEditor {
             if story_copy_ok(state.editor.document(), story) {
                 let copy = story_copy(state.editor.document(), story);
                 let layout = story_layout(&state.layout, story, page, &copy);
-                let main = std::mem::replace(&mut state.editor, Editor::new(copy));
+                let mut sub = Editor::new(copy);
+                sub.set_signer(state.editor.signer().clone());
+                let main = std::mem::replace(&mut state.editor, sub);
                 let main_layout = std::mem::replace(&mut state.layout, layout);
                 let depth = main.recorded();
                 state.story = Some(StoryMode {

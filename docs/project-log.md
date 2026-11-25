@@ -2279,9 +2279,16 @@ paragraph, and objects on a second page.
   programs then do, and Desk keeps the pause in a setting of its own.
 - Clearing the formatting of text keeps its links, changes and
   comments, which belong to the text and not to its formatting.
+- Paste and Replace are tracked as typing is; the Delete key goes past
+  the text it deletes, which stays; changes made in a header, footer,
+  note or text box come back to the document with its comments. The
+  author is the one comments are written under, from the preferences,
+  at the local time; a change of no known author is nobody's own.
+- A run holds one change, so text in another author's insertion or in
+  a change of formatting takes the deletion when it is deleted, and the
+  earlier change is lost; keeping both moves to step 12 (B-070).
 - The bar that turns tracking on and off, pauses it and moves between
-  the changes, and the author of the changes from the preferences, come
-  in the second pull request of step 10, with B-066.
+  the changes come in the second pull request of step 10, with B-066.
 
 ## Decisions, with their reasons and consequences
 

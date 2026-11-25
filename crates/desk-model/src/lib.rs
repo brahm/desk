@@ -154,7 +154,7 @@ pub use styling::{CopiedStyle, Fragment, FragmentParagraph, Overrides, StylePart
 pub use table_style::{TableLook, TableStyleEntry, TableStyles};
 pub use text::{LINE_BREAK, NO_BREAK_SPACE, Paragraph, Position, Run, TextFlow};
 pub use toc::{TocEntry, TocLevel, TocSettings, tables_of_contents};
-pub use transaction::{Edit, Editor, MAX_UNDO, Tracker, Transaction, now};
+pub use transaction::{Edit, Editor, MAX_UNDO, Signer, Tracker, Transaction, now};
 pub use units::{Length, Rgba};
 
 /// A table of a document: the table model shared by the apps, with the

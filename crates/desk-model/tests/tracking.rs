@@ -80,7 +80,7 @@ fn w148_typed_text_is_one_insertion_by_the_author_with_a_date() {
     let change = editor.document().changes().iter().next().unwrap().clone();
     assert_eq!(editor.document().changes().len(), 1);
     let date = change.date.unwrap();
-    assert_eq!(date.len(), "2026-11-25T09:30:00".len());
+    assert_eq!(date.len(), "2026-11-25T09:30:00Z".len());
     assert_eq!(&date[10..11], "T");
     // Return makes the break an insertion too.
     let (next, _) = editor
@@ -286,4 +286,160 @@ fn w148_paused_or_off_changes_are_made_as_they_are_and_undo_takes_tracked_ones_a
     editor.undo().unwrap();
     assert_eq!(runs(&editor, p), [plain("ne two")]);
     assert!(editor.document().changes().is_empty());
+}
+
+#[test]
+fn w148_typing_on_after_any_character_joins_the_insertion() {
+    let (mut editor, p) = typed("");
+    track(&mut editor, Tracking::On);
+    let mut at = Position::new(p, 0);
+    for c in ["c", "a", "f", "é", "s", "日", "本"] {
+        at = editor
+            .edit("Typing", |edit| edit.insert_text(at, c))
+            .unwrap();
+    }
+    assert_eq!(runs(&editor, p), [ins("cafés日本")]);
+    assert_eq!(editor.document().changes().len(), 1);
+}
+
+#[test]
+fn w148_formatting_text_already_in_a_change_makes_no_new_one() {
+    let (mut editor, p) = typed("one");
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(Position::new(p, 3), " two")
+        })
+        .unwrap();
+    let italic = CharAttrs {
+        italic: Some(true),
+        ..CharAttrs::default()
+    };
+    editor
+        .edit("Italic", |edit| {
+            edit.set_character_attrs(Position::new(p, 3), Position::new(p, 7), &italic)
+        })
+        .unwrap();
+    assert_eq!(editor.document().changes().len(), 1);
+    // A paragraph formatted twice is in its first change.
+    for alignment in [desk_model::Alignment::Center, desk_model::Alignment::Right] {
+        let attrs = desk_model::ParaAttrs {
+            alignment: Some(alignment),
+            ..desk_model::ParaAttrs::default()
+        };
+        editor
+            .edit("Align", |edit| {
+                edit.set_paragraph_attrs(Position::new(p, 0), Position::new(p, 0), &attrs)
+            })
+            .unwrap();
+    }
+    assert_eq!(editor.document().changes().len(), 2);
+}
+
+#[test]
+fn w148_the_delete_key_goes_past_the_text_it_deletes() {
+    let (mut editor, p) = typed("abc");
+    let second = editor
+        .edit("Typing", |edit| {
+            let next = edit.split_paragraph(Position::new(p, 3))?;
+            edit.insert_text(next, "de")?;
+            Ok(next.paragraph)
+        })
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    let mut at = Position::new(p, 0);
+    for _ in 0..3 {
+        let next = Position::new(p, at.offset + 1);
+        at = editor
+            .edit("Delete", |edit| edit.delete_forward(at, next))
+            .unwrap();
+    }
+    assert_eq!(at, Position::new(p, 3));
+    // Over the break.
+    at = editor
+        .edit("Delete", |edit| {
+            edit.delete_forward(at, Position::new(second, 0))
+        })
+        .unwrap();
+    assert_eq!(at, Position::new(second, 0));
+    // Text the author added goes, and the cursor stays after what stays.
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(Position::new(second, 1), "x")
+        })
+        .unwrap();
+    at = editor
+        .edit("Delete", |edit| {
+            edit.delete_forward(Position::new(second, 0), Position::new(second, 2))
+        })
+        .unwrap();
+    assert_eq!(at, Position::new(second, 1));
+    assert_eq!(runs(&editor, second), [del("d", "Ana"), plain("e")]);
+}
+
+#[test]
+fn w148_a_change_of_no_known_author_is_not_the_users_own() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let p = start.paragraph;
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(start, "abc")?;
+            let added = edit.add_change(ChangeKind::Insertion, "", None)?;
+            edit.mark_change(Position::new(p, 0), Position::new(p, 3), added)
+        })
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(p, 0), Position::new(p, 1))
+        })
+        .unwrap();
+    assert_eq!(editor.document().paragraph(p).unwrap().text(), "abc");
+}
+
+#[test]
+fn w148_pasted_and_replaced_text_is_tracked() {
+    let (mut editor, p) = typed("one two");
+    let fragment = editor
+        .document()
+        .copy_fragment(Position::new(p, 0), Position::new(p, 3))
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Paste", |edit| {
+            edit.paste_fragment(Position::new(p, 7), &fragment)
+        })
+        .unwrap();
+    assert_eq!(runs(&editor, p), [plain("one two"), ins("one")]);
+    let query = desk_model::Query {
+        text: "two".into(),
+        match_case: true,
+        whole_words: false,
+    };
+    let count = editor
+        .edit("Replace All", |edit| edit.replace_all(&query, "2"))
+        .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(
+        runs(&editor, p),
+        [plain("one "), del("two", "Ana"), ins("2"), ins("one")]
+    );
+}
+
+#[test]
+fn w148_changes_made_in_a_story_come_back_with_it() {
+    let (mut main, p) = typed("one");
+    track(&mut main, Tracking::On);
+    let mut story = Editor::new(main.document().clone());
+    story.set_signer(main.signer().clone());
+    story
+        .edit("Typing", |edit| edit.insert_text(Position::new(p, 3), "!"))
+        .unwrap();
+    let copy = story.document().clone();
+    let change = copy.changes().iter().next().unwrap().clone();
+    assert_eq!(change.author.as_ref(), "Ana");
+    main.edit("Story", |edit| edit.adopt_document_settings(&copy))
+        .unwrap();
+    assert_eq!(main.document().changes().get(change.id), Some(&change));
 }
