@@ -1506,6 +1506,7 @@ fn changed_region(e: &Element) -> Option<ChangedRegion> {
         previous_paragraph_style: (kind == ChangeKind::FormatChange)
             .then(|| change.attr(DESK, "paragraph-style-name").map(str::to_owned))
             .flatten(),
+        change_name: change.attr(DESK, "change-name").map(str::to_owned),
     })
 }
 

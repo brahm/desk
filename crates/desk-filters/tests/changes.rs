@@ -1102,3 +1102,54 @@ fn b_072_a_change_of_formatting_goes_on_past_a_deleted_break_in_odt() {
     assert_eq!(formats, 1);
     assert!(read.body().iter().all(|p| p.attrs().break_former.is_none()));
 }
+
+/// B-073: a change that another change interrupts, an insertion part of
+/// which another author deleted, comes back from ODT as one change, and
+/// changes of the same author and date stay apart.
+#[test]
+fn b_073_a_change_another_interrupts_comes_back_as_one() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    let first = document.body().iter().next().unwrap().id();
+    let (bo, _) = document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, "one two three four five")?;
+            let bo = edit.add_change(ChangeKind::Insertion, "Bo", Some("2026-11-24T09:30:00"))?;
+            let ana = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T10:00:00"))?;
+            let cy = edit.add_change(ChangeKind::Insertion, "Cy", Some("2026-11-24T11:00:00"))?;
+            let dee = edit.add_change(ChangeKind::Insertion, "Cy", Some("2026-11-24T11:00:00"))?;
+            // Bo added "one two three", whose "two" Ana deleted; Cy
+            // added "four" and, as another change in the same second,
+            // "five".
+            edit.mark_change(Position::new(first, 0), Position::new(first, 14), bo)?;
+            edit.mark_change(Position::new(first, 4), Position::new(first, 7), ana)?;
+            edit.mark_former(Position::new(first, 4), Position::new(first, 7), bo, None)?;
+            edit.mark_change(Position::new(first, 14), Position::new(first, 18), cy)?;
+            edit.mark_change(Position::new(first, 19), Position::new(first, 23), dee)?;
+            Ok(bo)
+        })
+        .unwrap();
+    let _ = bo;
+    let bytes = write_odt(&document).unwrap();
+    keep("b-073-interrupted.odt", &bytes);
+    let (mut read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let of = |d: &Document, author: &str| {
+        d.changes()
+            .iter()
+            .filter(|c| &*c.author == author)
+            .map(|c| c.id)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(of(&read, "Bo").len(), 1);
+    assert_eq!(of(&read, "Ana").len(), 1);
+    assert_eq!(of(&read, "Cy").len(), 2);
+    // Rejecting Bo's one insertion takes all it added.
+    let bo = of(&read, "Bo")[0];
+    read.transact("Resolve", |edit| {
+        edit.resolve_changes(false, |c| c == bo).map(|_| ())
+    })
+    .unwrap();
+    assert_eq!(read.body().iter().next().unwrap().text(), "four five");
+}

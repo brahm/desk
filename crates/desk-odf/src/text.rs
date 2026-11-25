@@ -1137,6 +1137,11 @@ pub struct ChangedRegion {
     /// known, for a change of the formatting of paragraphs
     /// (odf-extensions.md).
     pub previous_paragraph_style: Option<String>,
+    /// `desk:change-name` of its insertion, deletion or change of
+    /// formatting: the name that the regions of one change share, when
+    /// another change interrupts it and ODF makes a region of each piece
+    /// (odf-extensions.md, B-073).
+    pub change_name: Option<String>,
 }
 
 /// A comment (`office:annotation`). One with an `office:name` is on the

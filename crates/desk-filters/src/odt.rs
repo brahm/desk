@@ -110,7 +110,13 @@ pub fn read_odt_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterErro
     let document = import(&source)?;
     // Changes whose marks no text that Desk reads has, as in tables, are
     // left out as accepted.
-    let regions = source.tracked_changes.len();
+    // The pieces of one change are regions of their own (B-073).
+    let regions = source
+        .tracked_changes
+        .iter()
+        .map(changes::key)
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     let unread = regions.saturating_sub(document.changes().iter().count());
     if unread > 0 {
         log.add(Warning::Content(Content::AcceptedChanges), unread);

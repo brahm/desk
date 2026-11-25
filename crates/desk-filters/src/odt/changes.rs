@@ -37,6 +37,33 @@ pub(super) struct Taken {
     pub formers: HashMap<String, Vec<Vec<(usize, odf::Field)>>>,
 }
 
+/// What makes regions one change: its kind and the name that the
+/// regions of a change that another interrupts share, or the region
+/// alone (B-073).
+pub(super) type ChangeKey<'a> = (ChangeKind, Result<&'a str, &'a str>);
+
+/// The change that a region is part of, as [`ChangeKey`] tells them.
+pub(super) fn key(region: &odf::ChangedRegion) -> ChangeKey<'_> {
+    (
+        kind_of(region.kind),
+        region.change_name.as_deref().ok_or(region.id.as_str()),
+    )
+}
+
+/// The date of a region, when it is known.
+fn known_date(region: &odf::ChangedRegion) -> Option<Arc<str>> {
+    super::comments::date(region.date.as_deref()).filter(|d| &**d != odf::UNKNOWN_DATE)
+}
+
+/// The kind of change that a region is.
+fn kind_of(kind: odf::ChangeKind) -> ChangeKind {
+    match kind {
+        odf::ChangeKind::Deletion => ChangeKind::Deletion,
+        odf::ChangeKind::FormatChange => ChangeKind::Format,
+        odf::ChangeKind::Insertion => ChangeKind::Insertion,
+    }
+}
+
 /// Whether a field of the text is the mark of a tracked change.
 pub(super) fn is_mark(field: &odf::Field) -> bool {
     matches!(
@@ -87,19 +114,25 @@ pub(super) fn import(
     let texts = super::comments::by_text(document, events);
     document.transact("Tracked Changes", |edit| {
         let mut ids: HashMap<&str, (NodeId, ChangeKind)> = HashMap::new();
+        // The regions of one change: the pieces of a change that another
+        // interrupts are regions of their own (B-073).
+        let mut changes: HashMap<ChangeKey<'_>, NodeId> = HashMap::new();
         for region in &read {
-            let kind = match region.kind {
-                odf::ChangeKind::Deletion => ChangeKind::Deletion,
-                odf::ChangeKind::FormatChange => ChangeKind::Format,
-                odf::ChangeKind::Insertion => ChangeKind::Insertion,
+            let kind = kind_of(region.kind);
+            let key = key(region);
+            let id = match changes.get(&key) {
+                Some(&id) => id,
+                None => {
+                    let date = known_date(region);
+                    let id = edit.add_change(
+                        kind,
+                        region.creator.as_deref().unwrap_or_default(),
+                        date.as_deref(),
+                    )?;
+                    changes.insert(key, id);
+                    id
+                }
             };
-            let date =
-                super::comments::date(region.date.as_deref()).filter(|d| &**d != odf::UNKNOWN_DATE);
-            let id = edit.add_change(
-                kind,
-                region.creator.as_deref().unwrap_or_default(),
-                date.as_deref(),
-            )?;
             ids.insert(region.id.as_str(), (id, kind));
         }
         for (story, events) in texts {
@@ -183,7 +216,8 @@ fn put(
     let paragraphs_of = paragraphs;
     // The insertions and changes of formatting first, which leave the
     // text as it is.
-    let mut open: Vec<(NodeId, Position, usize)> = Vec::new();
+    // By region, as the regions of one change are its pieces (B-073).
+    let mut open: Vec<(&str, Position, usize)> = Vec::new();
     let mut deletions: Vec<(NodeId, Position, String, usize)> = Vec::new();
     // The changes of paragraphs, put on them once the deletions have
     // split the paragraphs they joined (B-069): each with the places of
@@ -193,17 +227,16 @@ fn put(
         let at = Position::new(*paragraph, *offset);
         match field {
             odf::Field::ChangeStart { id } => {
-                if let Some(&(change, ChangeKind::Insertion | ChangeKind::Format)) =
-                    ids.get(id.as_str())
+                if let Some((_, ChangeKind::Insertion | ChangeKind::Format)) = ids.get(id.as_str())
                 {
-                    open.push((change, at, order));
+                    open.push((id.as_str(), at, order));
                 }
             }
             odf::Field::ChangeEnd { id } => {
                 let Some(&(change, kind)) = ids.get(id.as_str()) else {
                     continue;
                 };
-                let Some(i) = open.iter().position(|(c, _, _)| *c == change) else {
+                let Some(i) = open.iter().position(|(r, _, _)| *r == id.as_str()) else {
                     continue;
                 };
                 let (_, start, from) = open.remove(i);
@@ -515,6 +548,9 @@ fn export(
             deleted: Vec::new(),
             previous_style: previous.filter(|_| format && !of_paragraph).cloned(),
             previous_paragraph_style: previous.filter(|_| format && of_paragraph).cloned(),
+            // Named for now; `export_all` keeps the names of changes
+            // with more than one region.
+            change_name: Some(format!("c{}", change.id.get())),
         });
         Some((regions.len() - 1, change.kind))
     };
@@ -661,6 +697,21 @@ pub(super) fn export_all(
         .flatten()
         {
             text(&mut part.paragraphs, document, &mut regions);
+        }
+    }
+    // Only the regions of a change that has more than one share its name
+    // (B-073).
+    let mut count: HashMap<String, usize> = HashMap::new();
+    for name in regions.iter().filter_map(|r| r.change_name.clone()) {
+        *count.entry(name).or_default() += 1;
+    }
+    for region in &mut regions {
+        if region
+            .change_name
+            .as_ref()
+            .is_some_and(|name| count[name] < 2)
+        {
+            region.change_name = None;
         }
     }
     // The regions are written in content.xml: the automatic styles of

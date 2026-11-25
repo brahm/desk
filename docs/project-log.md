@@ -2446,6 +2446,24 @@ paragraph, and objects on a second page.
   a place of its own for Previous and Next: it shows again when the
   deletion is rejected.
 
+### 25 November: an interrupted change reads back as one (step 13 of W2, second part)
+
+- ODF names one region for each pair of marks, so a change that another
+  interrupts, as an insertion part of which another author deleted,
+  was written as several regions and read back as several changes
+  (B-073). Desk now writes `desk:change-name` on the regions of a
+  change that has more than one, and reads the regions that share it
+  as one change; the import log counts what it leaves out by those
+  changes.
+- The first version took the regions of the same kind, author and date
+  as one change. The review showed that different changes share them:
+  dates go to the second, and comparing documents dates every change
+  alike, so rejecting one would reject them all. Only Desk's own name
+  joins regions now, and those of other programs stay apart.
+- The ends of the marks of insertions and changes of formatting are
+  matched to their starts by region, not by change, so that the pieces
+  of one change keep the formatting before of their own regions.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

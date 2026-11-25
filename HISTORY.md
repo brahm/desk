@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: in Desk Writer, a tracked change that another change
+  interrupts opens from ODT as one change (#229).
 * Fixed: in Desk Writer, a paragraph break that another author added
   keeps that insertion when it is deleted while tracking changes, and
   rejecting the deletion gives it back, also in ODT (#228).

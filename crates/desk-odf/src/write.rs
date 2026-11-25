@@ -1278,6 +1278,7 @@ fn write_tracked_changes(w: &mut Writer, document: &TextDocument) {
             "desk:paragraph-style-name",
             region.previous_paragraph_style.as_deref(),
         );
+        w.attr_opt("desk:change-name", region.change_name.as_deref());
         w.start("office:change-info");
         w.text_element("dc:creator", region.creator.as_deref().unwrap_or_default());
         // ODF needs a date: an unknown one is written as the epoch.
