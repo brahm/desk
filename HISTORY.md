@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: in Desk Writer, the views of markup without deletions join
   the paragraphs whose break was deleted in notes, headers, footers,
-  text boxes and shapes too (#PR).
+  text boxes and shapes too (#230).
 * Fixed: in Desk Writer, a tracked change that another change
   interrupts opens from ODT as one change (#229).
 * Fixed: in Desk Writer, a paragraph break that another author added
