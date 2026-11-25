@@ -1119,6 +1119,11 @@ pub struct ChangedRegion {
     /// The paragraphs that a deletion took: the text after the first
     /// joined the paragraph where it was.
     pub deleted: Vec<Paragraph>,
+    /// `desk:style-name` of a `text:format-change`: the text style that
+    /// holds the formatting its text had before, or empty for text that
+    /// had no formatting of its own, which other programs do not keep
+    /// (odf-extensions.md).
+    pub previous_style: Option<String>,
 }
 
 /// A comment (`office:annotation`). One with an `office:name` is on the

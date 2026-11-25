@@ -650,6 +650,22 @@ A highlight is an annotation whose one paragraph is empty (PXV-19).
   one after the other, as a reader without the extension shows them.
   It is also written on `desk:annotation`.
 
+#### `desk:style-name`
+
+- **Feature:** the formatting that text had before a tracked change of
+  its formatting, which rejecting the change puts back (W148, REV-01).
+- **On:** `text:format-change`, in a `text:changed-region` of
+  `text:tracked-changes`.
+- **Value:** the name of a text style of `content.xml`, common or
+  automatic, whose properties are the formatting the text between the
+  marks of the region had of its own, over its paragraph, with the
+  common style it had as its parent; empty when that text had no
+  formatting of its own. Text whose formatting before differs is
+  written in regions of its own.
+- **Fallback:** the change of formatting, as LibreOffice writes it,
+  without what the text was before; rejecting it there keeps the
+  formatting as it is.
+
 #### `desk:annotation`
 
 - **Feature:** a comment on an object itself, as Pages 15.4 puts one on

@@ -3559,10 +3559,10 @@ fn int_22_what_a_file_of_another_program_loses_is_listed() {
     assert_eq!(
         found,
         [
-            // Insertions and deletions are read; a change of formatting
-            // is not yet (W148).
-            (Warning::Content(Content::AcceptedChanges), 1),
             (Warning::Content(Content::UnreadObjects), 1),
+            // Insertions and deletions are read; the change of formatting
+            // has no marks in the text, so it is left out (W148).
+            (Warning::Content(Content::AcceptedChanges), 1),
         ]
     );
     // The comment of the body is read, on the word before it (W149).

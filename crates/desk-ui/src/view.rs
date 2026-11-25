@@ -1526,7 +1526,8 @@ fn draw_comments(
 }
 
 /// The text of tracked changes on a page, in the colour of each author:
-/// a line under text added, and through text deleted (W148, REV-04).
+/// a line under text added, through text deleted, and a dashed line under
+/// text whose formatting changed (W148, REV-04).
 fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
     cr.set_line_width((1.5 * scale).max(1.0));
     for (span, kind, color) in state.change_marks.iter().filter(|(s, _, _)| s.page == page) {
@@ -1537,13 +1538,20 @@ fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
             f64::from(ink.b) / 255.0,
         );
         let y = match kind {
-            desk_model::ChangeKind::Insertion => span.y1 - (span.y1 - span.y0) * 0.12,
+            desk_model::ChangeKind::Insertion | desk_model::ChangeKind::Format => {
+                span.y1 - (span.y1 - span.y0) * 0.12
+            }
             desk_model::ChangeKind::Deletion => (span.y0 + span.y1) / 2.0,
         };
         let y = rect.y + y * scale;
+        if *kind == desk_model::ChangeKind::Format {
+            let dash = (3.0 * scale).max(2.0);
+            cr.set_dash(&[dash, dash], 0.0);
+        }
         cr.move_to(rect.x + span.x0 * scale, y);
         cr.line_to(rect.x + span.x1 * scale, y);
         cr.stroke().ok();
+        cr.set_dash(&[], 0.0);
     }
 }
 

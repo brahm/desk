@@ -11,6 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::sync::Arc;
 
 use desk_model::{
     Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
@@ -107,13 +108,9 @@ pub fn read_odt_logged(bytes: &[u8]) -> Result<(Document, ImportLog), FilterErro
         log.add(Warning::Content(content), *count);
     }
     let document = import(&source)?;
-    // Insertions and deletions whose marks no text that Desk reads has,
-    // as in tables, are left out as accepted.
-    let regions = source
-        .tracked_changes
-        .iter()
-        .filter(|r| r.kind != odf::ChangeKind::FormatChange)
-        .count();
+    // Changes whose marks no text that Desk reads has, as in tables, are
+    // left out as accepted.
+    let regions = source.tracked_changes.len();
     let unread = regions.saturating_sub(document.changes().iter().count());
     if unread > 0 {
         log.add(Warning::Content(Content::AcceptedChanges), unread);
@@ -352,6 +349,7 @@ fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) ->
         bookmark: None,
         comments: None,
         change: None,
+        formatted: None,
     }
 }
 
@@ -2175,7 +2173,20 @@ fn import_tracked(
         }
         deleted.insert(region.id.clone(), paragraphs);
     }
-    changes::import(document, regions, deleted, events)
+    // The formatting that text had before its changes of formatting.
+    let previous: HashMap<String, Arc<desk_model::Formatting>> = regions
+        .iter()
+        .filter(|r| met.contains(&r.id))
+        .filter_map(|r| {
+            let name = r.previous_style.as_deref()?;
+            let (style, attrs) = span_format(source, ids, name, odf_default_size(source));
+            Some((
+                r.id.clone(),
+                Arc::new(desk_model::Formatting { style, attrs }),
+            ))
+        })
+        .collect();
+    changes::import(document, regions, deleted, &previous, events)
 }
 
 /// The marks of tracked changes among the events of some text, apart
@@ -2409,6 +2420,33 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
 /// point, which page references name (EST-22).
 type Marks = HashMap<String, NodeId>;
 
+/// The character style and the formatting that a text style of ODF names:
+/// a common style, or an automatic one over its parent, in text of the
+/// size `size` around it.
+fn span_format(
+    source: &odf::TextDocument,
+    ids: &HashMap<(odf::Family, &str), StyleId>,
+    name: &str,
+    size: f64,
+) -> (Option<StyleId>, CharAttrs) {
+    if let Some(&id) = ids.get(&(odf::Family::Text, name)) {
+        return (Some(id), CharAttrs::default());
+    }
+    let Some(automatic) = source
+        .automatic_styles
+        .iter()
+        .find(|s| s.family == odf::Family::Text && s.name == name)
+    else {
+        return (None, CharAttrs::default());
+    };
+    let style = automatic
+        .parent
+        .as_deref()
+        .and_then(|p| ids.get(&(odf::Family::Text, p)).copied());
+    let size = odf_font_size(source, odf::Family::Text, Some(name)).unwrap_or(size);
+    (style, char_attrs(source, &automatic.properties.text, size))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn import_paragraph(
     source: &odf::TextDocument,
@@ -2471,21 +2509,9 @@ fn import_paragraph(
         let mut run_style = None;
         let mut run_attrs = base.clone();
         if let Some(name) = &span.style {
-            if let Some(&id) = ids.get(&(odf::Family::Text, name.as_str())) {
-                run_style = Some(id);
-            } else if let Some(automatic) = source
-                .automatic_styles
-                .iter()
-                .find(|s| s.family == odf::Family::Text && &s.name == name)
-            {
-                run_style = automatic
-                    .parent
-                    .as_deref()
-                    .and_then(|p| ids.get(&(odf::Family::Text, p)).copied());
-                let size =
-                    odf_font_size(source, odf::Family::Text, Some(name)).unwrap_or(paragraph_size);
-                run_attrs.merge(&char_attrs(source, &automatic.properties.text, size));
-            }
+            let (style, attrs) = span_format(source, ids, name, paragraph_size);
+            run_style = style;
+            run_attrs.merge(&attrs);
         }
         if let Some(odf::Field::Note(note)) = &span.field {
             let id = import_note(
@@ -2662,31 +2688,46 @@ fn export_spans(
     // `changes::export` makes regions of (W148). The change open at the
     // start comes from the break before, and the one at the end goes on
     // past the break when it took it.
-    let mut open = track.as_deref().copied().flatten();
-    let mut switch = |spans: &mut Vec<odf::Span>, to: Option<NodeId>, run: Option<&Run>| {
-        if track.is_none() || open == to {
-            return;
-        }
-        let link = run.and_then(|r| r.attrs.link.clone().flatten());
-        let bookmark = run.and_then(|r| r.attrs.bookmark.clone().flatten());
-        let mark = |field| odf::Span {
-            field: Some(field),
-            link: link.as_deref().map(str::to_owned),
-            bookmark: bookmark.as_deref().map(str::to_owned),
-            ..odf::Span::default()
+    // A change of formatting starts again where the formatting before it
+    // differs, as its mark names that formatting.
+    let mut open = (track.as_deref().copied().flatten(), None);
+    let mut switch =
+        |spans: &mut Vec<odf::Span>,
+         to: (Option<NodeId>, Option<Arc<desk_model::Formatting>>),
+         run: Option<&Run>,
+         previous: &mut dyn FnMut(&desk_model::Formatting) -> Option<String>| {
+            if track.is_none() || open == to {
+                return;
+            }
+            let link = run.and_then(|r| r.attrs.link.clone().flatten());
+            let bookmark = run.and_then(|r| r.attrs.bookmark.clone().flatten());
+            let mark = |field| odf::Span {
+                field: Some(field),
+                link: link.as_deref().map(str::to_owned),
+                bookmark: bookmark.as_deref().map(str::to_owned),
+                ..odf::Span::default()
+            };
+            if let Some(id) = open.0 {
+                spans.push(mark(odf::Field::ChangeEnd {
+                    id: id.get().to_string(),
+                }));
+            }
+            if let Some(id) = to.0 {
+                // The mark of a change of formatting carries the style of the
+                // formatting before, which `changes::export` puts on its
+                // region: no name for text that had none of its own.
+                spans.push(odf::Span {
+                    style: to
+                        .1
+                        .as_deref()
+                        .map(|before| previous(before).unwrap_or_default()),
+                    ..mark(odf::Field::ChangeStart {
+                        id: id.get().to_string(),
+                    })
+                });
+            }
+            open = to;
         };
-        if let Some(id) = open {
-            spans.push(mark(odf::Field::ChangeEnd {
-                id: id.get().to_string(),
-            }));
-        }
-        if let Some(id) = to {
-            spans.push(mark(odf::Field::ChangeStart {
-                id: id.get().to_string(),
-            }));
-        }
-        open = to;
-    };
     // The comments that start and end before a run (W149).
     let comments = |spans: &mut Vec<odf::Span>, at: usize, run: Option<&Run>| {
         let Some(marks) = marks.get(&(paragraph.id(), at)) else {
@@ -2704,7 +2745,13 @@ fn export_spans(
     };
     let mut last = None;
     for run in paragraph.runs() {
-        switch(&mut spans, run.attrs.change.flatten(), Some(run));
+        let to = (
+            run.attrs.change.flatten(),
+            run.attrs.formatted.clone().flatten(),
+        );
+        switch(&mut spans, to, Some(run), &mut |before| {
+            style(&Run::with_attrs("", before.style, before.attrs.clone()))
+        });
         comments(&mut spans, offset, Some(run));
         offset += run.len();
         last = Some(run);
@@ -2773,9 +2820,9 @@ fn export_spans(
     }
     comments(&mut spans, offset, last);
     let ends = paragraph.attrs().break_change.flatten();
-    switch(&mut spans, ends, None);
+    switch(&mut spans, (ends, None), None, &mut |_| None);
     if let Some(track) = track {
-        *track = open;
+        *track = open.0;
     }
     spans
 }

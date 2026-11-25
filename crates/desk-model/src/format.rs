@@ -436,10 +436,14 @@ formatting! {
         /// The comments that the text is under (W149, REV-08), which
         /// belong to the text, as bookmarks do.
         comments: crate::CommentIds = crate::CommentIds::none(),
-        /// The tracked change, an insertion or a deletion, that the text
-        /// is part of (W148, REV-01), which belongs to the text, as
-        /// comments do.
+        /// The tracked change, an insertion, a deletion or a change of
+        /// formatting, that the text is part of (W148, REV-01), which
+        /// belongs to the text, as comments do.
         change: Option<crate::NodeId> = None,
+        /// The formatting the text had before a change of its formatting
+        /// (W148), when it is known, which belongs to the text with its
+        /// change.
+        formatted: Option<Arc<crate::Formatting>> = None,
     }
 }
 
@@ -878,6 +882,7 @@ impl CharAttrs {
             bookmark: None,
             comments: None,
             change: None,
+            formatted: None,
             ..self.clone()
         }
     }
@@ -891,6 +896,7 @@ impl CharAttrs {
             bookmark: self.bookmark.clone(),
             comments: self.comments.clone(),
             change: self.change,
+            formatted: self.formatted.clone(),
             ..Self::default()
         }
     }

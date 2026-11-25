@@ -905,13 +905,9 @@ fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
             }
             Some("annotation")
         } else if name.is(TEXT, "changed-region") {
-            // Insertions and deletions are read; changes of formatting
-            // are not yet.
-            if child.child(TEXT, "format-change").is_some() {
-                Some("changed-region")
-            } else {
-                continue;
-            }
+            // Read, and those whose marks are not found are counted
+            // where the document is read.
+            continue;
         } else if name.ns == DRAW && name.local != "a" {
             // Only objects that the reader drops: what is inside the
             // others is theirs.
@@ -1502,6 +1498,9 @@ fn changed_region(e: &Element) -> Option<ChangedRegion> {
         creator: element(DC, "creator"),
         date: element(DC, "date"),
         deleted,
+        previous_style: (kind == ChangeKind::FormatChange)
+            .then(|| change.attr(DESK, "style-name").map(str::to_owned))
+            .flatten(),
     })
 }
 

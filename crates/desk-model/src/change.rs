@@ -1,16 +1,20 @@
 // SPDX-FileCopyrightText: 2026 Desk contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tracked changes of the text: insertions and deletions (W148, REV-01).
+//! Tracked changes of the text: insertions, deletions and changes of
+//! formatting (W148, REV-01).
 //!
 //! A change is kept with the other changes of the document, and the text
 //! it covers carries its identifier ([`CharAttrs::change`]), as comments
 //! are kept. Deleted text stays in the document, marked, until the
 //! deletion is accepted or rejected. A paragraph break inserted or
 //! deleted is marked on the paragraph that ends at it
-//! ([`ParaAttrs::break_change`]).
+//! ([`ParaAttrs::break_change`]). Text whose formatting changed carries
+//! the formatting it had before ([`CharAttrs::formatted`]), which
+//! rejecting the change puts back.
 //!
 //! [`CharAttrs::change`]: crate::CharAttrs::change
+//! [`CharAttrs::formatted`]: crate::CharAttrs::formatted
 //! [`ParaAttrs::break_change`]: crate::ParaAttrs::break_change
 
 use std::sync::Arc;
@@ -27,6 +31,20 @@ pub enum ChangeKind {
     Insertion,
     /// Text was deleted; it stays, marked, until the deletion is accepted.
     Deletion,
+    /// The formatting of text changed: its character style or the
+    /// formatting set on it.
+    Format,
+}
+
+/// The formatting that text had before a change of its formatting: its
+/// character style and the formatting set on it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Formatting {
+    /// The character style.
+    pub style: Option<crate::StyleId>,
+    /// The formatting set on the text, without what belongs to the text,
+    /// as fields, comments and changes.
+    pub attrs: crate::CharAttrs,
 }
 
 /// A tracked change.
@@ -236,6 +254,56 @@ mod tests {
                 .iter()
                 .all(|p| p.attrs.break_change.is_none()
                     && p.runs.iter().all(|(_, _, a)| a.change.is_none()))
+        );
+    }
+
+    #[test]
+    fn w148_formatted_text_keeps_the_formatting_it_had() {
+        use crate::CharAttrs;
+        let mut document = Document::new_word_processing();
+        let first = document.body().iter().next().unwrap().id();
+        let italic = CharAttrs {
+            italic: Some(true),
+            ..CharAttrs::default()
+        };
+        let (change, _) = document
+            .transact("Format", |edit| {
+                let start = edit.document().start();
+                edit.insert_text(start, "old new")?;
+                let added = edit.add_change(ChangeKind::Insertion, "Ana", None)?;
+                edit.mark_change(Position::new(first, 4), Position::new(first, 7), added)?;
+                let change = edit.add_change(ChangeKind::Format, "Bo", None)?;
+                edit.mark_format_change(Position::new(first, 0), Position::new(first, 7), change)?;
+                edit.set_character_attrs(
+                    Position::new(first, 0),
+                    Position::new(first, 7),
+                    &italic,
+                )?;
+                // Formatted again, it keeps what it had first.
+                let again = edit.add_change(ChangeKind::Format, "Cy", None)?;
+                edit.mark_format_change(Position::new(first, 0), Position::new(first, 3), again)?;
+                Ok(change)
+            })
+            .unwrap();
+        let paragraph = document.body().iter().next().unwrap().clone();
+        let runs: Vec<_> = paragraph.runs().collect();
+        // The old text is in the change, with no formatting before; the
+        // text added stays in its insertion.
+        assert_eq!(runs[0].text(), "old ");
+        assert_eq!(runs[0].attrs.change, Some(Some(change)));
+        let before = runs[0].attrs.formatted.clone().flatten().unwrap();
+        assert_eq!(before.attrs, CharAttrs::default());
+        assert_ne!(runs[1].attrs.change, Some(Some(change)));
+        assert_eq!(runs[1].attrs.formatted, None);
+        // A copy is in no change.
+        let fragment = document
+            .copy_fragment(Position::new(first, 0), Position::new(first, 3))
+            .unwrap();
+        assert!(
+            fragment.paragraphs[0]
+                .runs
+                .iter()
+                .all(|(_, _, a)| a.change.is_none() && a.formatted.is_none())
         );
     }
 }

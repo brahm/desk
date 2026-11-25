@@ -1822,11 +1822,11 @@ impl Exporter<'_> {
             self.style("OP", odf::Family::Paragraph, Some(style_name), properties)
         };
         let names = self.names;
-        let mut runs = Vec::new();
-        for run in paragraph.runs() {
+        let comments = self.comments;
+        let spans = export_spans(paragraph, None, comments, Some(track), |run| {
             let attrs = run.attrs.without_field();
             let named = run.style.map(|id| names[&id].clone());
-            runs.push(if attrs.is_empty() {
+            if attrs.is_empty() {
                 named
             } else {
                 let properties = odf::Properties {
@@ -1838,11 +1838,7 @@ impl Exporter<'_> {
                     ..Default::default()
                 };
                 Some(self.style("OT", odf::Family::Text, named, properties))
-            });
-        }
-        let mut names = runs.into_iter();
-        let spans = export_spans(paragraph, None, self.comments, Some(track), |_| {
-            names.next().flatten()
+            }
         });
         odf::Paragraph {
             style: Some(style),

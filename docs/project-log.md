@@ -2229,6 +2229,26 @@ paragraph, and objects on a second page.
   needs the identity of the author that turning tracking on gives, and
   moves to step 10.
 
+### 25 November: changes of formatting (step 9 of W2, first part)
+
+- A change of the formatting of text is a tracked change of its own.
+  Each run in it keeps the formatting it had, its character style and
+  what was set on it, so a change over text of mixed formatting puts
+  each part back as it was when it is rejected (step 12).
+- Text added or deleted keeps that change when it is formatted: added
+  text has nothing to go back to, and deleted text is going. Text
+  formatted twice keeps the formatting it had first.
+- ODF names a change of formatting but not what the text was; Desk
+  writes it in `desk:style-name` on the `text:format-change`, a text
+  style of `content.xml`, empty for text with no formatting of its own.
+  A region is written for each formatting before, so one change may
+  read back as several. A change that LibreOffice wrote is read with
+  the formatting before unknown, and so is written again.
+- The pages draw a dashed line under formatted text in the colour of its
+  author, until the markup views of step 11.
+- The changes of paragraph styles and of the formatting of paragraphs
+  come in the second pull request of step 9.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

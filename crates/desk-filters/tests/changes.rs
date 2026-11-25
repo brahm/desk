@@ -38,7 +38,7 @@ const HEAD: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 const TAIL: &str = "</office:text></office:body></office:document-content>";
 
 /// Each paragraph of the body, its text with the changes in it: `[+…+]`
-/// for text added, `[-…-]` for text deleted, and `¶+` or `¶-` at the end
+/// for text added, `[-…-]` for text deleted, `[~…~]` for text formatted, and `¶+` or `¶-` at the end
 /// for a break added or deleted; then each change, with its author and
 /// date.
 fn described(document: &Document) -> (Vec<String>, Vec<String>) {
@@ -71,6 +71,9 @@ fn lines_of<'a>(
             {
                 Some(c) if c.kind == ChangeKind::Insertion => {
                     line += &format!("[+{}+]", run.text());
+                }
+                Some(c) if c.kind == ChangeKind::Format => {
+                    line += &format!("[~{}~]", run.text());
                 }
                 Some(_) => line += &format!("[-{}-]", run.text()),
                 None => line += run.text(),
@@ -464,4 +467,99 @@ fn rev_01_a_note_in_deleted_text_keeps_its_own_changes() {
     assert!(log.is_empty(), "{:?}", log.entries());
     assert_eq!(note(&again), note(&document));
     assert_eq!(described(&again), described(&document));
+}
+
+#[test]
+fn rev_01_changes_of_formatting_keep_the_formatting_before() {
+    use desk_model::{CharAttrs, Position};
+    let mut document = Document::new_word_processing();
+    let first = document.body().iter().next().unwrap().id();
+    let italic = CharAttrs {
+        italic: Some(true),
+        ..CharAttrs::default()
+    };
+    let underlined = CharAttrs {
+        underline: Some(desk_model::LineStyle::Single),
+        ..CharAttrs::default()
+    };
+    document
+        .transact("Format", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, "plain italic rest")?;
+            edit.set_character_attrs(Position::new(first, 6), Position::new(first, 12), &italic)?;
+            let change = edit.add_change(ChangeKind::Format, "Ana", Some("2026-11-25T09:00:00"))?;
+            // Underlined over plain and italic text: each keeps what it had.
+            edit.mark_format_change(Position::new(first, 0), Position::new(first, 12), change)?;
+            edit.set_character_attrs(
+                Position::new(first, 0),
+                Position::new(first, 12),
+                &underlined,
+            )
+        })
+        .unwrap();
+    let before = described(&document);
+    assert_eq!(before.0, ["[~plain ~][~italic~] rest"]);
+    let befores = |d: &Document| -> Vec<Option<(Option<desk_model::LineStyle>, Option<bool>)>> {
+        d.body()
+            .iter()
+            .next()
+            .unwrap()
+            .runs()
+            .map(|r| {
+                r.attrs
+                    .formatted
+                    .clone()
+                    .flatten()
+                    .map(|f| (f.attrs.underline, f.attrs.italic))
+            })
+            .collect()
+    };
+    assert_eq!(
+        befores(&document),
+        [Some((None, None)), Some((None, Some(true))), None]
+    );
+    let bytes = write_odt(&document).unwrap();
+    keep("rev-01-changes-of-formatting.odt", &bytes);
+    let content = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(content.tracked_changes.len(), 2);
+    assert!(
+        content
+            .tracked_changes
+            .iter()
+            .all(|r| r.kind == desk_odf::ChangeKind::FormatChange && r.previous_style.is_some())
+    );
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(
+        read.body().iter().next().unwrap().text(),
+        "plain italic rest"
+    );
+    assert_eq!(befores(&read), befores(&document));
+    let lines = described(&read);
+    assert_eq!(lines.0, before.0);
+}
+
+#[test]
+fn rev_01_changes_of_formatting_of_libreoffice_are_read() {
+    let content = format!(
+        r#"{HEAD}<text:tracked-changes>
+<text:changed-region text:id="f"><text:format-change><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-25T10:00:00</dc:date></office:change-info></text:format-change></text:changed-region>
+</text:tracked-changes>
+<text:p>Some <text:change-start text:change-id="f"/>bold<text:change-end text:change-id="f"/> text</text:p>{TAIL}"#
+    );
+    let (document, log) = read_odt_logged(&odt(&content)).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let (lines, changes) = described(&document);
+    assert_eq!(lines, ["Some [~bold~] text"]);
+    assert_eq!(changes, ["Format Ana Some(\"2026-11-25T10:00:00\")"]);
+    // What it was before is not known: written again, the region has no
+    // formatting before either.
+    let written = write_odt(&document).unwrap();
+    let again = desk_odf::read_odt(&written).unwrap();
+    assert_eq!(again.tracked_changes.len(), 1);
+    assert_eq!(again.tracked_changes[0].previous_style, None);
+    assert_eq!(
+        described(&read_odt(&written).unwrap()),
+        described(&document)
+    );
 }
