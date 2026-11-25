@@ -2651,6 +2651,17 @@ paragraph, and objects on a second page.
 - The owner kept the choice of 20 November, rules tested on their own
   and no list of words, and moved B-045 to W6.
 
+### 25 November: the writing tools in the new window (step 17 of W2)
+
+- The UI tests already went through spelling, Find & Replace, the
+  Search Results page and the word count in the window (W151, W153 to
+  W155). The proofreader (W152) had none: with Check Grammar on in
+  Spelling and Grammar, Find Next in a paragraph selected now finds a
+  word written twice and names it.
+- `ci/check-backlog.py --phase W2` passes; what `ci/check-all.sh` runs
+  is what the continuous integration runs on each pull request. The
+  validation on the Mac is left for the owner.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
