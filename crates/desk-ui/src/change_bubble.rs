@@ -14,7 +14,7 @@ use gtk::glib;
 use gtk::prelude::*;
 
 use crate::editing::ChangeBubble;
-use crate::i18n::tr;
+use crate::i18n::{tr, trn};
 use crate::text_nav::SpanRect;
 use crate::view::DocumentView;
 
@@ -23,6 +23,8 @@ pub struct ChangeBubbleView {
     popover: gtk::Popover,
     content: gtk::Box,
     shown: Cell<Option<(desk_model::NodeId, SpanRect)>>,
+    /// What it shows, so that the same bubble is not built again.
+    current: std::cell::RefCell<Option<ChangeBubble>>,
 }
 
 impl ChangeBubbleView {
@@ -49,6 +51,7 @@ impl ChangeBubbleView {
             popover,
             content,
             shown: Cell::new(None),
+            current: std::cell::RefCell::new(None),
         }
     }
 
@@ -57,8 +60,15 @@ impl ChangeBubbleView {
         self.shown.get().map(|(id, _)| id)
     }
 
-    /// Shows the bubble of a change at its text.
+    /// Shows the bubble of a change at its text, built again only when
+    /// what it says changed.
     pub fn show(&self, bubble: &ChangeBubble, view: &DocumentView) {
+        self.shown.set(Some((bubble.id, bubble.rect)));
+        if self.current.borrow().as_ref() == Some(bubble) {
+            self.place(view);
+            return;
+        }
+        *self.current.borrow_mut() = Some(bubble.clone());
         while let Some(child) = self.content.first_child() {
             self.content.remove(&child);
         }
@@ -94,16 +104,21 @@ impl ChangeBubbleView {
             .max_width_chars(36)
             .build();
         self.content.append(&label);
-        self.shown.set(Some((bubble.id, bubble.rect)));
         self.place(view);
-        self.popover.popup();
     }
 
     /// Hides the bubble.
     pub fn hide(&self) {
+        self.current.take();
         if self.shown.take().is_some() {
             self.popover.popdown();
         }
+    }
+
+    /// Takes the bubble off the pages, when the window closes.
+    pub fn unparent(&self) {
+        self.hide();
+        self.popover.unparent();
     }
 
     /// Points the bubble at its change again, after the pages moved.
@@ -115,6 +130,8 @@ impl ChangeBubbleView {
             view.to_area(at.page, at.x0, at.y0),
             view.to_area(at.page, at.x1, at.y1),
         ) else {
+            // Its change is not on the pages shown.
+            self.popover.popdown();
             return;
         };
         let rect = gtk::gdk::Rectangle::new(
@@ -124,6 +141,9 @@ impl ChangeBubbleView {
             ((y1 - y0) as i32).max(1),
         );
         self.popover.set_pointing_to(Some(&rect));
+        if !self.popover.is_visible() {
+            self.popover.popup();
+        }
     }
 }
 
@@ -135,11 +155,20 @@ pub fn what(bubble: &ChangeBubble) -> String {
         desk_model::ChangeKind::Deletion => tr("Deleted:"),
         desk_model::ChangeKind::Format => tr("Formatted:"),
     };
-    let text = if bubble.text.is_empty() {
-        // The formatting of a paragraph, which holds no text of its own.
-        tr("Paragraph")
-    } else {
+    let text = if !bubble.text.is_empty() {
         tr("“{text}”").replace("{text}", &bubble.text)
+    } else if bubble.kind == desk_model::ChangeKind::Format {
+        // The formatting of paragraphs, which hold no text of their own.
+        trn(
+            "{n} Paragraph",
+            "{n} Paragraphs",
+            bubble.paragraphs.max(1) as u64,
+        )
+        .replace("{n}", &bubble.paragraphs.max(1).to_string())
+    } else if bubble.object {
+        tr("Object")
+    } else {
+        tr("Paragraph Break")
     };
     format!(
         "<b>{}</b> {}",

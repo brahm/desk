@@ -4349,6 +4349,7 @@ impl FramePage for DocumentWindow {
     }
 
     fn closed(&self) {
+        self.change_bubble.unparent();
         let _ = WINDOWS.try_with(|w| {
             if let Ok(mut w) = w.try_borrow_mut() {
                 w.retain(|o| !std::ptr::eq(Rc::as_ptr(o), self));
