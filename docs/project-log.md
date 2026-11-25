@@ -2516,6 +2516,43 @@ paragraph, and objects on a second page.
   paragraph with a master page of its own are not kept: they are built
   for the body only. That moves to W5 with B-075 (B-076).
 
+### 25 November: objects in tracked changes (step 13 of W2, fifth part)
+
+- An object in the line of the text is a character of it, its mark, so
+  tracking already put the object the user inserts in the insertion,
+  and kept one deleted until the deletion is accepted; accepting or
+  rejecting takes the object with its mark. What ODT lost was the
+  object of a mark that a deletion took: it was written in the region
+  of the deletion but not read back from there. Now it is.
+- Pages '09 tracked floating objects moved or resized, which Desk
+  keeps (D-003). A change of a new kind, a change of place, keeps on
+  the object where it was, with what it moved with; moved again it
+  stays in that change, put back where it was it is in none, and the
+  change goes when no object is in it. Accepted, the object stays
+  where it went; rejected, it goes back, unless the paragraph it moved
+  with is gone. Only objects fixed on a page or moving with a
+  paragraph are tracked: one moved into the text or out of it is not,
+  since rejecting the insertion of its mark would delete it.
+- ODF tracks text only. The object says where it was in
+  `desk:moved-from`, which names a region of a change of formatting
+  that no text marks, one for all the objects of the change; other
+  programs leave that region out and the object where it is. The
+  paragraph it was at is counted in the body as Desk has it, with the
+  paragraphs that deletions took, since reading puts those back
+  before the objects take their changes.
+- The review found that an object moved within the text lost the
+  change of its mark, so that rejecting no longer took away an object
+  added; its new mark now keeps the changes of the old one. Objects
+  grouped, or put in the text, leave the change that moved them, which
+  goes when it holds no object. Objects that move by themselves, pushed
+  aside by a table that grows or connection lines that follow their
+  shapes, are in no change of the user. Reading an object that a
+  deletion took, the marks of the changes after it in the paragraph
+  move back with the text when Desk cannot hold the object.
+- The markup of moved objects, Previous and Next through them, and
+  Accept and Reject of a selected object come in the next part, and
+  the cells after it.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

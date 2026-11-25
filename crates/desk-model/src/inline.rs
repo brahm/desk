@@ -170,19 +170,46 @@ impl Edit {
         }
         self.document().paragraph(at.paragraph)?;
         let mut at = at;
+        // The tracked changes its mark is in, which the mark keeps where
+        // it goes (W148).
+        let mut changes = (None, None);
         if let Some(mark) = self.document().object_mark(id) {
+            let end = mark.offset + FIELD_CHARACTER.len_utf8();
+            if let Some(run) = self
+                .document()
+                .paragraph(mark.paragraph)?
+                .slice(mark.offset..end)?
+                .first()
+            {
+                changes = (run.attrs.change, run.attrs.former);
+            }
             self.remove_mark(mark)?;
             if mark.paragraph == at.paragraph && mark.offset < at.offset {
                 at.offset -= FIELD_CHARACTER.len_utf8();
             }
         }
         if object.anchor != Anchor::InText {
-            let mut placed = object;
+            let mut placed = object.clone();
             placed.anchor = Anchor::InText;
             placed.rotation = 0;
+            placed.moved = None;
             self.replace_object(placed)?;
+            // Out of the change that moved it, which goes when no object
+            // is left in it.
+            if let Some(moved) = object.moved {
+                self.drop_unplaced(moved.change)?;
+            }
         }
-        self.insert_mark(at, id)?;
+        // Moving an object that is there already, its mark is no text
+        // added, which rejecting would take away with the object: it
+        // keeps the changes it was in (W148).
+        let after = self.untracked(|edit| edit.insert_mark(at, id))?;
+        if changes != (None, None) {
+            self.map_runs(at, after, |run| {
+                run.attrs.change = changes.0;
+                run.attrs.former = changes.1;
+            })?;
+        }
         Ok(())
     }
 
@@ -219,6 +246,8 @@ impl Edit {
         // A copy is a new object, without the comments of the first, on
         // it or on its cells.
         copy.comments = crate::CommentIds::none();
+        // Nor its tracked change of place (W148).
+        copy.moved = None;
         if let crate::ObjectKind::Table(table) = &mut copy.kind
             && !table.comments().is_empty()
         {

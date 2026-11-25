@@ -64,6 +64,7 @@ pub struct Tracker {
     insertion: Option<NodeId>,
     deletion: Option<NodeId>,
     format: Option<NodeId>,
+    placement: Option<NodeId>,
 }
 
 impl Tracker {
@@ -76,6 +77,7 @@ impl Tracker {
             insertion: None,
             deletion: None,
             format: None,
+            placement: None,
         }
     }
 }
@@ -135,6 +137,7 @@ impl Edit {
             crate::ChangeKind::Insertion => tracker.insertion,
             crate::ChangeKind::Deletion => tracker.deletion,
             crate::ChangeKind::Format => tracker.format,
+            crate::ChangeKind::Placement => tracker.placement,
         };
         if let Some(id) = made {
             return Ok(id);
@@ -146,6 +149,7 @@ impl Edit {
             crate::ChangeKind::Insertion => tracker.insertion = Some(id),
             crate::ChangeKind::Deletion => tracker.deletion = Some(id),
             crate::ChangeKind::Format => tracker.format = Some(id),
+            crate::ChangeKind::Placement => tracker.placement = Some(id),
         }
         Ok(id)
     }
@@ -1284,15 +1288,83 @@ impl Edit {
 
     /// Removes an object.
     pub fn remove_object(&mut self, id: crate::NodeId) -> Result<(), ModelError> {
-        self.apply(Op::RemoveObject { object: id })
+        let moved = self.doc.objects().get(id).and_then(|o| o.moved);
+        self.apply(Op::RemoveObject { object: id })?;
+        if let Some(moved) = moved {
+            self.drop_unplaced(moved.change)?;
+        }
+        Ok(())
     }
 
-    /// Replaces an object with another with the same identifier.
-    pub fn replace_object(&mut self, object: crate::Object) -> Result<(), ModelError> {
+    /// Replaces an object with another with the same identifier. While
+    /// the edit tracks changes, a floating object moved or resized keeps
+    /// where it was, in a change, until the change is accepted or
+    /// rejected; one already in such a change stays in it, and one put
+    /// back where it was is in none (W148, REV-01).
+    pub fn replace_object(&mut self, mut object: crate::Object) -> Result<(), ModelError> {
+        let floating = |anchor: crate::Anchor| {
+            matches!(anchor, crate::Anchor::Page(_) | crate::Anchor::Paragraph(_))
+        };
+        let before = self
+            .doc
+            .objects()
+            .get(object.id)
+            .map(|o| (o.anchor, o.frame, o.moved));
+        let mut unplaced = None;
+        if self.tracking()
+            && let Some((anchor, frame, moved)) = before
+            && object.moved == moved
+            && floating(anchor)
+            && floating(object.anchor)
+        {
+            match moved {
+                Some(m) if m.anchor == object.anchor && m.frame == object.frame => {
+                    object.moved = None;
+                    unplaced = Some(m.change);
+                }
+                Some(_) => {}
+                None if (anchor, frame) != (object.anchor, object.frame) => {
+                    let change = self.tracked(crate::ChangeKind::Placement)?;
+                    object.moved = Some(crate::Moved {
+                        change,
+                        anchor,
+                        frame,
+                    });
+                }
+                None => {}
+            }
+        }
         if self.doc.objects().get(object.id) != Some(&object) {
             self.apply(Op::ReplaceObject { object })?;
         }
+        if let Some(change) = unplaced {
+            self.drop_unplaced(change)?;
+        }
         Ok(())
+    }
+
+    /// Takes away a change of the places of objects that no object is in
+    /// any longer (W148).
+    pub(crate) fn drop_unplaced(&mut self, change: crate::NodeId) -> Result<(), ModelError> {
+        let used = self
+            .doc
+            .objects()
+            .iter()
+            .any(|o| o.moved.is_some_and(|m| m.change == change));
+        let placement = self
+            .doc
+            .changes()
+            .get(change)
+            .is_some_and(|c| c.kind == crate::ChangeKind::Placement);
+        if used || !placement {
+            return Ok(());
+        }
+        if let Some(tracker) = &mut self.tracker
+            && tracker.placement == Some(change)
+        {
+            tracker.placement = None;
+        }
+        self.set_change(change, None)
     }
 
     /// Sets the settings of the text of the whole document.

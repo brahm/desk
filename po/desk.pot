@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-25 14:41+0000\n"
+"POT-Creation-Date: 2026-11-25 20:06+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -206,21 +206,25 @@ msgstr ""
 msgid "Formatted:"
 msgstr ""
 
-#: crates/desk-ui/src/change_bubble.rs:181
+#: crates/desk-ui/src/change_bubble.rs:179
+msgid "Moved:"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:182
 msgid "“{text}”"
 msgstr ""
 
-#: crates/desk-ui/src/change_bubble.rs:185
+#: crates/desk-ui/src/change_bubble.rs:186
 msgid "{n} Paragraph"
 msgid_plural "{n} Paragraphs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/change_bubble.rs:191
+#: crates/desk-ui/src/change_bubble.rs:192
 msgid "Object"
 msgstr ""
 
-#: crates/desk-ui/src/change_bubble.rs:193
+#: crates/desk-ui/src/change_bubble.rs:194
 msgid "Paragraph Break"
 msgstr ""
 

@@ -80,6 +80,22 @@ pub struct Object {
     /// The comments on the object itself, as Pages 15.4 puts one on a
     /// selected object, by identifier (W149).
     pub comments: crate::CommentIds,
+    /// Where a floating object was before a tracked change moved or
+    /// resized it, which rejecting the change puts it back to (W148,
+    /// REV-01); none when it is in no such change.
+    pub moved: Option<Moved>,
+}
+
+/// Where a floating object was before a tracked change moved or resized
+/// it (W148, REV-01), as Pages '09 tracked it (D-003).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Moved {
+    /// The change, of the kind [`crate::ChangeKind::Placement`].
+    pub change: NodeId,
+    /// What it moved with.
+    pub anchor: Anchor,
+    /// Where it was, as its anchor said.
+    pub frame: Frame,
 }
 
 /// How a picture shows in its frame: masked, with colors taken out, and
@@ -240,6 +256,7 @@ impl Object {
             text: None,
             picture: PictureSettings::default(),
             comments: crate::CommentIds::none(),
+            moved: None,
         }
     }
 

@@ -1842,7 +1842,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // The objects, once the body and the pages they go on are there, and
     // the comments of their text (W149).
     let mut object_comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
-    objects::import_objects(source, &mut document, &mut |document, paragraph| {
+    let moved = objects::import_objects(source, &mut document, &mut |document, paragraph| {
         let mut found = Vec::new();
         let built = import_paragraph(
             source,
@@ -2004,6 +2004,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         relative,
         tracked,
     )?;
+    // Then the objects that changes moved, with the paragraphs they were
+    // at all there.
+    changes::import_moves(source, &mut document, &moved)?;
 
     let meta = &source.meta;
     document.apply(Op::SetMetadata {
@@ -2303,6 +2306,47 @@ fn import_tracked(
                 )?;
             }
             paragraphs.push(built);
+        }
+        // The objects in the lines it took (REV-01, OBJ-01). The marks of
+        // those Desk cannot hold go, and the marks of changes after them
+        // move back with the text (B-070).
+        let before: Vec<Vec<(NodeId, usize)>> = paragraphs
+            .iter()
+            .map(|p| {
+                desk_model::marks_in(std::slice::from_ref(p))
+                    .into_iter()
+                    .map(|(id, at)| (id, at.offset))
+                    .collect()
+            })
+            .collect();
+        objects::import_story_inline_objects(
+            source,
+            document,
+            &region.deleted,
+            &mut paragraphs,
+            &mut |document, paragraph| {
+                import_paragraph(
+                    source,
+                    document,
+                    ids,
+                    default,
+                    paragraph,
+                    relative,
+                    &Marks::new(),
+                    None,
+                )
+            },
+        )?;
+        for ((paragraph, marks), found) in paragraphs.iter().zip(&before).zip(&mut inner) {
+            let kept: HashSet<NodeId> = desk_model::marks_in(std::slice::from_ref(paragraph))
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            for &(_, gone) in marks.iter().filter(|(id, _)| !kept.contains(id)).rev() {
+                for (at, _) in found.iter_mut().filter(|(at, _)| *at > gone) {
+                    *at -= FIELD_CHARACTER.len_utf8();
+                }
+            }
         }
         for (_, field) in inner.iter().flatten() {
             if let odf::Field::ChangeStart { id } = field {

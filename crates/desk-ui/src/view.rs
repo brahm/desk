@@ -1591,9 +1591,9 @@ fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
             f64::from(ink.b) / 255.0,
         );
         let y = match kind {
-            desk_model::ChangeKind::Insertion | desk_model::ChangeKind::Format => {
-                span.y1 - (span.y1 - span.y0) * 0.12
-            }
+            desk_model::ChangeKind::Insertion
+            | desk_model::ChangeKind::Format
+            | desk_model::ChangeKind::Placement => span.y1 - (span.y1 - span.y0) * 0.12,
             desk_model::ChangeKind::Deletion => (span.y0 + span.y1) / 2.0,
         };
         let y = rect.y + y * scale;

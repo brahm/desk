@@ -1267,3 +1267,181 @@ fn b_068_a_joined_item_keeps_the_style_overriding_its_list() {
     let read = read_odt(&bytes).unwrap();
     assert_eq!(own(&read), item);
 }
+
+#[test]
+fn rev_01_objects_put_in_and_deleted_from_the_text_are_kept_in_odt() {
+    use desk_model::{FIELD_CHARACTER, Frame, Object, Position, Shape};
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, "ab cd")?;
+            let p = start.paragraph;
+            let oval = |edit: &mut desk_model::Edit| {
+                Object::new(
+                    edit.new_id(),
+                    Shape::Ellipse.into(),
+                    Frame::from_pt(0.0, 0.0, 20.0, 10.0),
+                )
+            };
+            let (one, two) = (oval(edit), oval(edit));
+            edit.insert_object_in_text(Position::new(p, 4), two)?;
+            edit.insert_object_in_text(Position::new(p, 1), one)?;
+            let mark = FIELD_CHARACTER.len_utf8();
+            let ins = edit.add_change(ChangeKind::Insertion, "Ana", None)?;
+            let del = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_change(Position::new(p, 1), Position::new(p, 1 + mark), ins)?;
+            edit.mark_change(
+                Position::new(p, 4 + mark),
+                Position::new(p, 4 + 2 * mark),
+                del,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = described(&document);
+    let bytes = write_odt(&document).unwrap();
+    keep("rev-01-objects-in-changes.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(described(&read), before);
+    // Both objects come back, the one in the deletion too, each where
+    // its mark is, as large as it was.
+    let marks = read.object_marks();
+    assert_eq!(marks.len(), 2);
+    assert_eq!(read.objects().iter().count(), 2);
+    for &id in marks.keys() {
+        let object = read.objects().get(id).unwrap();
+        assert_eq!(object.frame, Frame::from_pt(0.0, 0.0, 20.0, 10.0));
+    }
+    // Accepted, the deletion takes its object.
+    let mut read = read;
+    read.transact("Accept", |edit| edit.resolve_changes(true, |_| true))
+        .unwrap();
+    assert_eq!(read.objects().iter().count(), 1);
+}
+
+#[test]
+fn rev_01_objects_moved_or_resized_are_kept_in_odt() {
+    use desk_model::{Anchor, Frame, Length, Object, Shape, TextSettings, Tracking};
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let (fixed, moving) = editor
+        .edit("Objects", |edit| {
+            let end = edit.insert_text(start, "One")?;
+            let next = edit.split_paragraph(end)?;
+            edit.insert_text(next, "Two")?;
+            let mut fixed = Object::new(
+                edit.new_id(),
+                Shape::Ellipse.into(),
+                Frame::from_pt(100.0, 100.0, 50.0, 40.0),
+            );
+            fixed.anchor = Anchor::Page(0);
+            let mut moving = Object::new(
+                edit.new_id(),
+                Shape::Rectangle.into(),
+                Frame::from_pt(90.0, 10.0, 30.0, 30.0),
+            );
+            moving.anchor = Anchor::Paragraph(next.paragraph);
+            let ids = (fixed.id, moving.id);
+            edit.add_object(fixed)?;
+            edit.add_object(moving)?;
+            Ok(ids)
+        })
+        .unwrap();
+    let first = editor.document().body().get(0).unwrap().id();
+    editor.set_author("Ana");
+    let settings = TextSettings {
+        tracking: Tracking::On,
+        ..editor.document().text_settings().clone()
+    };
+    editor
+        .edit("Track Changes", |edit| edit.set_text_settings(settings))
+        .unwrap();
+    editor
+        .edit("Move", |edit| {
+            edit.move_objects(&[fixed], Length::from_pt(20.0), Length::from_pt(-10.0))?;
+            edit.place_object(
+                moving,
+                Anchor::Paragraph(first),
+                Frame::from_pt(80.0, 5.0, 60.0, 45.0),
+            )
+        })
+        .unwrap();
+    let document = editor.document();
+    let bytes = write_odt(document).unwrap();
+    keep("rev-01-objects-moved.odt", &bytes);
+    // One region, of a change of formatting, which the objects name.
+    let content = desk_odf::read_odt(&bytes).unwrap();
+    assert_eq!(content.tracked_changes.len(), 1);
+    assert_eq!(
+        content.tracked_changes[0].kind,
+        desk_odf::ChangeKind::FormatChange
+    );
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.changes().len(), 1);
+    let change = read.changes().iter().next().unwrap();
+    assert_eq!(change.kind, ChangeKind::Placement);
+    assert_eq!(change.author.as_ref(), "Ana");
+    // Each object where it is, with where it was: the second moved from
+    // the second paragraph to the first.
+    let second = read.body().get(1).unwrap().id();
+    let placed: Vec<_> = read
+        .objects()
+        .iter()
+        .map(|o| {
+            (
+                o.anchor,
+                o.frame,
+                o.moved.map(|m| (m.change, m.anchor, m.frame)),
+            )
+        })
+        .collect();
+    let read_first = read.body().get(0).unwrap().id();
+    assert_eq!(
+        placed,
+        [
+            (
+                Anchor::Page(0),
+                Frame::from_pt(120.0, 90.0, 50.0, 40.0),
+                Some((
+                    change.id,
+                    Anchor::Page(0),
+                    Frame::from_pt(100.0, 100.0, 50.0, 40.0)
+                ))
+            ),
+            (
+                Anchor::Paragraph(read_first),
+                Frame::from_pt(80.0, 5.0, 60.0, 45.0),
+                Some((
+                    change.id,
+                    Anchor::Paragraph(second),
+                    Frame::from_pt(90.0, 10.0, 30.0, 30.0)
+                ))
+            ),
+        ]
+    );
+    // Rejected, they are back where they were.
+    let mut read = read;
+    read.transact("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    let placed: Vec<_> = read
+        .objects()
+        .iter()
+        .map(|o| (o.anchor, o.frame, o.moved))
+        .collect();
+    assert_eq!(
+        placed,
+        [
+            (
+                Anchor::Page(0),
+                Frame::from_pt(100.0, 100.0, 50.0, 40.0),
+                None
+            ),
+            (
+                Anchor::Paragraph(second),
+                Frame::from_pt(90.0, 10.0, 30.0, 30.0),
+                None
+            ),
+        ]
+    );
+}

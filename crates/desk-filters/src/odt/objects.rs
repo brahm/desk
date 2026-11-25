@@ -1589,18 +1589,75 @@ fn shape_id(id: NodeId) -> String {
     format!("desk-object-{id}")
 }
 
+/// `desk:moved-from` of an object that a tracked change moved, with
+/// the change named `c` and its identifier, which the region written for
+/// it replaces (see `changes::export_all`): `page` and the page from 1,
+/// or `paragraph` and the index of the paragraph in the body from 0, and
+/// the frame, in points, as Desk keeps it (W148, REV-01). None when the
+/// paragraph it moved with is not in the body.
+fn moved_from(document: &Document, moved: &desk_model::Moved) -> Option<String> {
+    let anchor = match moved.anchor {
+        Anchor::Page(page) => format!("page {}", page + 1),
+        Anchor::Paragraph(id) => {
+            let index = document.body().iter().position(|p| p.id() == id)?;
+            format!("paragraph {index}")
+        }
+        Anchor::InText | Anchor::Master(..) => return None,
+    };
+    let f = moved.frame;
+    Some(format!(
+        "c{} {anchor} {} {} {} {}",
+        moved.change.get(),
+        odf::Length(f.x.to_pt()),
+        odf::Length(f.y.to_pt()),
+        odf::Length(f.width.to_pt()),
+        odf::Length(f.height.to_pt()),
+    ))
+}
+
+/// What `desk:moved-from` says: the name of the region of the change,
+/// what the object moved with (a page from 0 or the index of a paragraph
+/// of the body), and the frame. None when it cannot be read.
+pub(super) fn parse_moved_from(value: &str) -> Option<(&str, Result<u32, usize>, Frame)> {
+    let mut words = value.split_whitespace();
+    let region = words.next()?;
+    let anchor = match (words.next()?, words.next()?.parse::<u64>().ok()?) {
+        ("page", page) if page > 0 => Ok(u32::try_from(page - 1).ok()?),
+        ("paragraph", index) => Err(usize::try_from(index).ok()?),
+        _ => return None,
+    };
+    let mut next = || odf::Length::parse(words.next()?).map(|l| Length::from_pt(l.0));
+    let (x, y, width, height) = (next()?, next()?, next()?, next()?);
+    if words.next().is_some() || width < Length::ZERO || height < Length::ZERO {
+        return None;
+    }
+    Some((
+        region,
+        anchor,
+        Frame {
+            x,
+            y,
+            width,
+            height,
+        },
+    ))
+}
+
 /// The `draw:name` of a text box, which the boxes linked to it name.
 fn text_box_name(id: NodeId) -> String {
     format!("Text Box {id}")
 }
 
 /// Adds the drawing objects of an ODF document to a document whose body
-/// has its paragraphs, in the order of their `draw:z-index`.
-pub(super) fn import_objects(
-    source: &odf::TextDocument,
+/// has its paragraphs, in the order of their `draw:z-index`. Gives the
+/// objects that say where they were before a tracked change moved them,
+/// with what they say (`desk:moved-from`), for once the changes are read
+/// (W148).
+pub(super) fn import_objects<'a>(
+    source: &'a odf::TextDocument,
     document: &mut Document,
     paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
-) -> Result<(), FilterError> {
+) -> Result<Vec<(NodeId, &'a str)>, FilterError> {
     import_object_styles(source, document)?;
     super::tables::import_table_styles(source, document)?;
     let setup = *document.page_setup();
@@ -1618,8 +1675,12 @@ pub(super) fn import_objects(
     // The shapes by id, and the connectors that join them (OBJ-31).
     let mut shapes: HashMap<&str, NodeId> = HashMap::new();
     let mut connectors: Vec<(NodeId, Option<&str>, Option<&str>)> = Vec::new();
+    let mut moved = Vec::new();
     for (object, anchor) in found {
         if let Some(built) = import_one(source, document, object, anchor, &setup, paragraph, 0)? {
+            if let Some(from) = &object.moved_from {
+                moved.push((built.id, from.as_str()));
+            }
             if let Some(name) = &object.name {
                 names.insert(name, built.id);
             }
@@ -1686,7 +1747,7 @@ pub(super) fn import_objects(
             document.apply(Op::ReplaceObject { object })?;
         }
     }
-    Ok(())
+    Ok(moved)
 }
 
 /// What export needs to name the styles of the objects and their text.
@@ -2271,6 +2332,8 @@ impl Exporter<'_> {
         out.style = Some(style);
         out.text = text;
         out.origin = object.origin.map(|o| format!("{o:016x}"));
+        // Where it was before a tracked change moved it (W148).
+        out.moved_from = object.moved.and_then(|m| moved_from(self.document, &m));
         // The comments on the object (W149).
         out.annotations = super::comments::object_annotations(self.document, object);
         if !matches!(object.kind, ObjectKind::Shape(_)) {

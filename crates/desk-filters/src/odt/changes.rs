@@ -185,6 +185,13 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
             carried.extend(paragraph.attrs().format_change.flatten());
         }
     }
+    // And objects, those that changes moved.
+    carried.extend(
+        document
+            .objects()
+            .iter()
+            .filter_map(|o| o.moved.map(|m| m.change)),
+    );
     let unused: Vec<NodeId> = document
         .changes()
         .iter()
@@ -542,7 +549,9 @@ fn export(
             kind: match change.kind {
                 ChangeKind::Insertion => odf::ChangeKind::Insertion,
                 ChangeKind::Deletion => odf::ChangeKind::Deletion,
-                ChangeKind::Format => odf::ChangeKind::FormatChange,
+                // A change of the place of objects has a region of its
+                // own, which no text marks (see `object_text`).
+                ChangeKind::Format | ChangeKind::Placement => odf::ChangeKind::FormatChange,
             },
             creator: Some(change.author.to_string()),
             date: change.date.as_deref().map(str::to_owned),
@@ -597,7 +606,10 @@ fn export(
                         // Text added or formatted stays, between its marks;
                         // in text deleted, the change it was in before
                         // goes with it (B-070).
-                        Some((index, ChangeKind::Insertion | ChangeKind::Format)) => {
+                        Some((
+                            index,
+                            ChangeKind::Insertion | ChangeKind::Format | ChangeKind::Placement,
+                        )) => {
                             let name = regions[index].id.clone();
                             let start = odf::Span {
                                 field: Some(odf::Field::ChangeStart { id: name.clone() }),
@@ -778,6 +790,7 @@ fn object_text(
     document: &Document,
     regions: &mut Vec<odf::ChangedRegion>,
 ) {
+    moved_region(object, document, regions);
     text(&mut object.text, document, regions);
     match &mut object.kind {
         odf::DrawKind::TextBox { paragraphs, .. } => text(paragraphs, document, regions),
@@ -788,4 +801,108 @@ fn object_text(
         }
         _ => {}
     }
+}
+
+/// Names in `desk:moved-from` of an object the region of the change that
+/// moved it, a change of formatting that no text marks, one for all the
+/// objects of the change (W148, REV-01).
+fn moved_region(
+    object: &mut odf::DrawObject,
+    document: &Document,
+    regions: &mut Vec<odf::ChangedRegion>,
+) {
+    let Some(value) = object.moved_from.take() else {
+        return;
+    };
+    let Some((token, rest)) = value.split_once(' ') else {
+        return;
+    };
+    let Some(change) = token
+        .strip_prefix('c')
+        .and_then(|n| n.parse::<u64>().ok())
+        .and_then(NodeId::new)
+        .and_then(|id| document.changes().get(id))
+    else {
+        return;
+    };
+    let name = format!("c{}", change.id.get());
+    let at = match regions
+        .iter()
+        .position(|r| r.change_name.as_deref() == Some(name.as_str()))
+    {
+        Some(at) => at,
+        None => {
+            regions.push(odf::ChangedRegion {
+                id: format!("ct{}", regions.len() + 1),
+                kind: odf::ChangeKind::FormatChange,
+                creator: Some(change.author.to_string()),
+                date: change.date.as_deref().map(str::to_owned),
+                change_name: Some(name),
+                ..odf::ChangedRegion::default()
+            });
+            regions.len() - 1
+        }
+    };
+    object.moved_from = Some(format!("{} {rest}", regions[at].id));
+}
+
+/// Puts the objects that tracked changes moved, with what their
+/// `desk:moved-from` says, in those changes, once the body has the
+/// paragraphs that deletions took (W148, REV-01). One that names no
+/// change of formatting, or a paragraph the body has not, is in none.
+pub(super) fn import_moves(
+    source: &odf::TextDocument,
+    document: &mut Document,
+    moved: &[(NodeId, &str)],
+) -> Result<(), FilterError> {
+    if moved.is_empty() {
+        return Ok(());
+    }
+    let body: Vec<NodeId> = document.body().iter().map(Paragraph::id).collect();
+    document.transact("Tracked Changes", |edit| {
+        let mut changes: HashMap<ChangeKey<'_>, NodeId> = HashMap::new();
+        for &(id, value) in moved {
+            let Some((name, anchor, frame)) = super::objects::parse_moved_from(value) else {
+                continue;
+            };
+            let Some(region) = source
+                .tracked_changes
+                .iter()
+                .find(|r| r.id == name && r.kind == odf::ChangeKind::FormatChange)
+            else {
+                continue;
+            };
+            let anchor = match anchor {
+                Ok(page) => desk_model::Anchor::Page(page),
+                Err(index) => match body.get(index) {
+                    Some(&paragraph) => desk_model::Anchor::Paragraph(paragraph),
+                    None => continue,
+                },
+            };
+            let Some(mut object) = edit.document().objects().get(id).cloned() else {
+                continue;
+            };
+            let change = match changes.get(&key(region)) {
+                Some(&change) => change,
+                None => {
+                    let date = known_date(region);
+                    let change = edit.add_change(
+                        ChangeKind::Placement,
+                        region.creator.as_deref().unwrap_or_default(),
+                        date.as_deref(),
+                    )?;
+                    changes.insert(key(region), change);
+                    change
+                }
+            };
+            object.moved = Some(desk_model::Moved {
+                change,
+                anchor,
+                frame,
+            });
+            edit.replace_object(object)?;
+        }
+        Ok(())
+    })?;
+    Ok(())
 }
