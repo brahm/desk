@@ -119,6 +119,143 @@ impl TextEditor {
     }
 }
 
+/// What the bubble of a tracked change shows (REV-04): who made it and
+/// when, what it did and to what text, and where it is on the page.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChangeBubble {
+    /// The change.
+    pub id: desk_model::NodeId,
+    /// What it did.
+    pub kind: ChangeKind,
+    /// Who made it.
+    pub author: String,
+    /// When, as ISO 8601, if it is known.
+    pub date: Option<String>,
+    /// The colour of its author.
+    pub color: desk_model::AuthorColor,
+    /// Its text, its start only when it is long, without the marks of
+    /// objects and fields.
+    pub text: String,
+    /// How many paragraphs it is in, its text, its break or its
+    /// formatting.
+    pub paragraphs: usize,
+    /// Whether it holds an object or a field, which its text leaves out.
+    pub object: bool,
+    /// Where the selection on it starts on the pages.
+    pub rect: SpanRect,
+}
+
+/// The characters of the text of a change that its bubble shows.
+const BUBBLE_TEXT: usize = 80;
+
+impl TextEditor {
+    /// The bubble of the tracked change that the selection is on, while
+    /// text is selected or Previous and Next of the bar selected it, for
+    /// the author of this computer named `local` (REV-04). None in
+    /// Final, where changes do not show.
+    pub fn change_bubble(&self, local: &str) -> Option<ChangeBubble> {
+        if self.markup() == Markup::Final {
+            return None;
+        }
+        let Some((_, item @ super::ReviewItem::Change(id))) = self.review_position().0 else {
+            return None;
+        };
+        let state = self.state.borrow();
+        // A change of no text, as a break, or one the view hides, is
+        // selected as a cursor: its bubble shows when the bar went to it.
+        if state.selection.is_empty() && state.reviewed != Some(item) {
+            return None;
+        }
+        let rect = match text_nav::selection_rects(&state.layout, &state.selection).first() {
+            Some(rect) => *rect,
+            None => {
+                let caret = text_nav::caret(&state.layout, state.selection.focus)?;
+                SpanRect {
+                    page: caret.page,
+                    x0: caret.x,
+                    y0: caret.top,
+                    x1: caret.x + 1.0,
+                    y1: caret.bottom,
+                }
+            }
+        };
+        let document = Self::main_document(&state);
+        let change = document.changes().get(id)?;
+        let palette = document.author_palette_of(local, &crate::preferences::get().former_authors);
+        // The text being edited: the body, or the story visited.
+        let paragraphs: Vec<_> = state.editor.document().body().iter().cloned().collect();
+        let (text, object) = change_text(&paragraphs, id);
+        Some(ChangeBubble {
+            id,
+            kind: change.kind,
+            author: change.author.to_string(),
+            date: change.date.as_deref().map(str::to_owned),
+            color: palette.color(&change.author),
+            text: excerpt(&text),
+            object,
+            paragraphs: paragraphs.iter().filter(|p| in_change(p, id)).count(),
+            rect,
+        })
+    }
+}
+
+/// Whether a change is in a paragraph: its text, its break or its
+/// formatting.
+fn in_change(paragraph: &desk_model::Paragraph, id: desk_model::NodeId) -> bool {
+    let attrs = paragraph.attrs();
+    attrs.break_change.flatten() == Some(id)
+        || attrs.format_change.flatten() == Some(id)
+        || paragraph
+            .runs()
+            .any(|r| r.attrs.change.flatten() == Some(id))
+}
+
+/// The text that a change holds in some paragraphs, a space between
+/// its paragraphs, without the marks that stand for objects and fields.
+/// Gives too whether it holds any.
+fn change_text(paragraphs: &[desk_model::Paragraph], id: desk_model::NodeId) -> (String, bool) {
+    let mut out = String::new();
+    let mut object = false;
+    for paragraph in paragraphs {
+        let mut here = String::new();
+        for run in paragraph
+            .runs()
+            .filter(|r| r.attrs.change.flatten() == Some(id))
+        {
+            if run.attrs.field.clone().flatten().is_some() {
+                object = true;
+                continue;
+            }
+            for c in run.text().chars() {
+                if c == '\u{fffc}' {
+                    object = true;
+                } else if c.is_control() {
+                    // A tab or a line break.
+                    here.push(' ');
+                } else {
+                    here.push(c);
+                }
+            }
+        }
+        if !here.is_empty() {
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push_str(&here);
+        }
+    }
+    (out, object)
+}
+
+/// The start of a text, with an ellipsis, when it is long.
+fn excerpt(text: &str) -> String {
+    let text = text.trim();
+    match text.char_indices().nth(BUBBLE_TEXT) {
+        Some((at, _)) => format!("{}\u{2026}", text[..at].trim_end()),
+        None => text.to_owned(),
+    }
+}
+
 /// The space between a change bar and the text, in points.
 const BAR_GAP: f64 = 9.0;
 
@@ -400,6 +537,94 @@ mod tests {
                 "one two hree"
             );
         });
+    }
+
+    #[test]
+    fn rev_04_the_change_selected_has_a_bubble() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let p = document.start().paragraph;
+            let ((added, gone), _) = document
+                .transact("Changes", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three")?;
+                    let added =
+                        edit.add_change(ChangeKind::Insertion, "Bo", Some("2026-11-25T10:00:00Z"))?;
+                    let gone = edit.add_change(ChangeKind::Deletion, "Ana", None)?;
+                    edit.mark_change(Position::new(p, 0), Position::new(p, 3), added)?;
+                    edit.mark_change(Position::new(p, 4), Position::new(p, 8), gone)?;
+                    Ok((added, gone))
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            // The cursor alone shows none.
+            assert_eq!(editor.change_bubble("Ana"), None);
+            assert_eq!(
+                editor.go_to_review_item(true),
+                Some(super::super::ReviewItem::Change(added))
+            );
+            let bubble = editor.change_bubble("Ana").unwrap();
+            assert_eq!(
+                (
+                    bubble.id,
+                    bubble.kind,
+                    bubble.author.as_str(),
+                    bubble.text.as_str()
+                ),
+                (added, ChangeKind::Insertion, "Bo", "one")
+            );
+            assert_eq!(bubble.date.as_deref(), Some("2026-11-25T10:00:00Z"));
+            // Bo takes the first colour Ana leaves.
+            assert_eq!(bubble.color, AuthorColor::Green);
+            assert_eq!(
+                crate::change_bubble::what(&bubble),
+                "<b>Added:</b> \u{201c}one\u{201d}"
+            );
+            editor.go_to_review_item(true);
+            let bubble = editor.change_bubble("Ana").unwrap();
+            assert_eq!((bubble.id, bubble.text.as_str()), (gone, "two"));
+            // A deletion that the view hides is selected as a cursor,
+            // and has its bubble when the bar went to it.
+            editor.set_markup(Markup::WithoutDeletions);
+            editor.go_to_review_item(false);
+            assert_eq!(
+                editor.go_to_review_item(true),
+                Some(super::super::ReviewItem::Change(gone))
+            );
+            assert!(editor.selection().is_empty());
+            let bubble = editor.change_bubble("Ana").unwrap();
+            assert_eq!((bubble.id, bubble.text.as_str()), (gone, "two"));
+            // Final shows no change, nor its bubble.
+            editor.set_markup(Markup::Final);
+            assert_eq!(editor.change_bubble("Ana"), None);
+            // What a change of no text did.
+            let format = ChangeBubble {
+                kind: ChangeKind::Format,
+                text: String::new(),
+                paragraphs: 3,
+                ..bubble.clone()
+            };
+            assert_eq!(
+                crate::change_bubble::what(&format),
+                "<b>Formatted:</b> 3 Paragraphs"
+            );
+            let object = ChangeBubble {
+                kind: ChangeKind::Insertion,
+                text: String::new(),
+                object: true,
+                ..bubble
+            };
+            assert_eq!(crate::change_bubble::what(&object), "<b>Added:</b> Object");
+        });
+    }
+
+    #[test]
+    fn rev_04_a_long_change_shows_its_start() {
+        let long = "word ".repeat(30);
+        let short = excerpt(&long);
+        assert!(short.chars().count() <= BUBBLE_TEXT + 1);
+        assert!(short.ends_with("word\u{2026}"));
+        assert_eq!(excerpt(" two "), "two");
     }
 
     #[test]
