@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: in Desk Writer, the tracked change that Previous or Next
   selects shows a bubble with its author, its date and what it did
-  (#PR).
+  (#223).
 * Added: Desk Writer shows tracked changes with their marks, without
   the text deleted, or as final, from View > Change Markup and the
   tracking bar, keeps the view in the file, and marks the lines with
