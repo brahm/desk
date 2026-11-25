@@ -188,6 +188,7 @@ impl Edit {
                 let mut attrs = attrs.clone();
                 attrs.change = Some(Some(self.insertion_at(end)?));
                 attrs.formatted = None;
+                attrs.former = None;
                 self.apply(Op::ReplaceText {
                     paragraph: found.paragraph,
                     range: end.offset..end.offset,

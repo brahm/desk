@@ -444,6 +444,11 @@ formatting! {
         /// (W148), when it is known, which belongs to the text with its
         /// change.
         formatted: Option<Arc<crate::Formatting>> = None,
+        /// The change that deleted text was part of before a tracked
+        /// deletion took it, an insertion or a change of formatting of
+        /// another author (W148, B-070): rejecting the deletion gives it
+        /// back. It belongs to the text with its change.
+        former: Option<crate::NodeId> = None,
     }
 }
 
@@ -890,6 +895,7 @@ impl CharAttrs {
             comments: None,
             change: None,
             formatted: None,
+            former: None,
             ..self.clone()
         }
     }
@@ -904,6 +910,7 @@ impl CharAttrs {
             comments: self.comments.clone(),
             change: self.change,
             formatted: self.formatted.clone(),
+            former: self.former,
             ..Self::default()
         }
     }

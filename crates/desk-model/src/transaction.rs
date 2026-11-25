@@ -221,6 +221,7 @@ impl Edit {
             if self.tracking() {
                 attrs.change = Some(Some(self.insertion_at(position)?));
                 attrs.formatted = None;
+                attrs.former = None;
             } else if let Some(Some(change)) = attrs.change
                 && self
                     .doc
@@ -228,8 +229,11 @@ impl Edit {
                     .get(change)
                     .is_some_and(|c| c.kind == crate::ChangeKind::Deletion)
             {
-                // Text typed next to a deletion is not deleted (REV-04).
+                // Text typed next to a deletion is not deleted (REV-04),
+                // and is in no change it held.
                 attrs.change = None;
+                attrs.formatted = None;
+                attrs.former = None;
             }
             self.apply(Op::ReplaceText {
                 paragraph: position.paragraph,
@@ -436,11 +440,16 @@ impl Edit {
         }
         if !marked.is_empty() || !breaks.is_empty() {
             let deletion = self.tracked(ChangeKind::Deletion)?;
-            // TODO(B-070): text in another change keeps it too.
+            // Text in another change keeps it, to have it back when the
+            // deletion is rejected (B-070).
             for (from, to) in marked {
                 self.map_runs(from, to, |run| {
+                    let before = run.attrs.change.flatten();
                     run.attrs.change = Some(Some(deletion));
-                    run.attrs.formatted = None;
+                    run.attrs.former = before.map(Some);
+                    if before.is_none() {
+                        run.attrs.formatted = None;
+                    }
                 })?;
             }
             for paragraph in breaks {
@@ -926,6 +935,31 @@ impl Edit {
             run.attrs.change = Some(Some(change));
             // Added or deleted, it has no change of formatting.
             run.attrs.formatted = None;
+            run.attrs.former = None;
+        })
+    }
+
+    /// Puts text that a tracked deletion holds in the change it was in
+    /// before the deletion took it, an insertion or a change of its
+    /// formatting with the formatting before, as a file gives it (W148,
+    /// B-070).
+    pub fn mark_former(
+        &mut self,
+        start: Position,
+        end: Position,
+        former: NodeId,
+        formatted: Option<Arc<crate::Formatting>>,
+    ) -> Result<(), ModelError> {
+        let format = self
+            .doc
+            .changes()
+            .get(former)
+            .is_some_and(|c| c.kind == crate::ChangeKind::Format);
+        self.map_runs(start, end, |run| {
+            run.attrs.former = Some(Some(former));
+            if format {
+                run.attrs.formatted = Some(formatted.clone());
+            }
         })
     }
 

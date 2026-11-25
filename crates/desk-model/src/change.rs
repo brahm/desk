@@ -230,10 +230,9 @@ fn has_change(
         .into_iter()
         .any(|c| c.flatten().is_some_and(|c| kinds.contains_key(&c)))
         || paragraph.runs().any(|r| {
-            r.attrs
-                .change
-                .flatten()
-                .is_some_and(|c| kinds.contains_key(&c))
+            [r.attrs.change, r.attrs.former]
+                .into_iter()
+                .any(|c| c.flatten().is_some_and(|c| kinds.contains_key(&c)))
         })
 }
 
@@ -253,6 +252,10 @@ fn resolve_text(
     };
     let kind_of = |id: Option<NodeId>| id.and_then(|id| kinds.get(&id).copied());
     let ids: Vec<NodeId> = edit.document().body().iter().map(Paragraph::id).collect();
+    // The changes there are, which the text of a deletion rejected goes
+    // back to: one that is gone leaves it in none.
+    let changes: std::collections::HashSet<NodeId> =
+        edit.document().changes().iter().map(|c| c.id).collect();
     let mut gone: Vec<(Position, Position)> = Vec::new();
     for (i, &id) in ids.iter().enumerate() {
         let paragraph = edit.document().paragraph(id)?.clone();
@@ -294,32 +297,47 @@ fn resolve_text(
         for run in paragraph.runs() {
             let (from, to) = (offset, offset + run.len());
             offset = to;
-            if let Some(kind) = kind_of(run.attrs.change.flatten())
-                && goes(kind)
-            {
+            if run_goes(run, accept, &kind_of) {
                 gone.push((Position::new(id, from), Position::new(id, to)));
             }
         }
         gone.extend(joins);
         let end = Position::new(id, paragraph.len());
         edit.map_runs(Position::new(id, 0), end, |run| {
-            let Some(kind) = kind_of(run.attrs.change.flatten()) else {
-                return;
-            };
-            if goes(kind) {
+            if run_goes(run, accept, &kind_of) {
                 return;
             }
-            if kind == ChangeKind::Format
-                && !accept
-                && let Some(Some(before)) = run.attrs.formatted.clone()
-            {
-                let bound = run.attrs.text_bound();
-                run.style = before.style;
-                run.attrs = before.attrs.clone();
-                run.attrs.merge(&bound);
+            let change = run.attrs.change.flatten();
+            let former = run.attrs.former.flatten();
+            match (kind_of(change), kind_of(former)) {
+                // A deletion rejected gives the text back to the change it
+                // was in before, unless that one is resolved too (B-070).
+                (Some(ChangeKind::Deletion), None) => {
+                    let former = former.filter(|id| changes.contains(id));
+                    run.attrs.change = former.map(Some);
+                    run.attrs.former = None;
+                    if former.is_none() {
+                        run.attrs.formatted = None;
+                    }
+                }
+                (Some(ChangeKind::Deletion), Some(_)) => {
+                    unformat(run, accept);
+                    run.attrs.change = None;
+                    run.attrs.former = None;
+                }
+                (Some(_), _) => {
+                    unformat(run, accept);
+                    run.attrs.change = None;
+                }
+                // The change that deleted text was in, resolved while
+                // the text stays deleted: it keeps the formatting it has
+                // then.
+                (None, Some(_)) => {
+                    unformat(run, accept);
+                    run.attrs.former = None;
+                }
+                (None, None) => {}
             }
-            run.attrs.change = None;
-            run.attrs.formatted = None;
         })?;
     }
     // From the end, so that the places before stay where they are.
@@ -329,6 +347,38 @@ fn resolve_text(
         }
         Ok(())
     })
+}
+
+/// Whether a run goes when some changes are resolved: text added and
+/// rejected, or deleted and accepted, or deleted and rejected back into
+/// an insertion rejected too, or deleted still and in an insertion
+/// rejected (B-070).
+fn run_goes(
+    run: &crate::Run,
+    accept: bool,
+    kind_of: &impl Fn(Option<NodeId>) -> Option<ChangeKind>,
+) -> bool {
+    let change = kind_of(run.attrs.change.flatten());
+    let former = kind_of(run.attrs.former.flatten());
+    match change {
+        Some(ChangeKind::Insertion) => !accept,
+        Some(ChangeKind::Deletion) => accept || former == Some(ChangeKind::Insertion),
+        Some(ChangeKind::Format) => false,
+        None => !accept && former == Some(ChangeKind::Insertion),
+    }
+}
+
+/// The formatting a run had before a change of its formatting, put back
+/// when the change is rejected; the change of formatting is gone either
+/// way.
+fn unformat(run: &mut crate::Run, accept: bool) {
+    if !accept && let Some(Some(before)) = run.attrs.formatted.clone() {
+        let bound = run.attrs.text_bound();
+        run.style = before.style;
+        run.attrs = before.attrs.clone();
+        run.attrs.merge(&bound);
+    }
+    run.attrs.formatted = None;
 }
 
 #[cfg(test)]

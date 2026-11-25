@@ -27,6 +27,16 @@ use super::FilterError;
 /// The changes met in the body, by paragraph and offset, in its order.
 pub(super) type Events = Vec<(NodeId, usize, odf::Field)>;
 
+/// What the deletions of a text took, by region: the paragraphs, already
+/// read as paragraphs of the document, and in each the marks of the
+/// changes their text was in before (B-070), by offset.
+pub(super) struct Taken {
+    /// The paragraphs.
+    pub deleted: HashMap<String, Vec<Paragraph>>,
+    /// The marks in each paragraph.
+    pub formers: HashMap<String, Vec<Vec<(usize, odf::Field)>>>,
+}
+
 /// Whether a field of the text is the mark of a tracked change.
 pub(super) fn is_mark(field: &odf::Field) -> bool {
     matches!(
@@ -54,14 +64,19 @@ pub(super) fn marked(events: &Events) -> std::collections::HashSet<&str> {
 pub(super) fn import(
     document: &mut Document,
     regions: &[odf::ChangedRegion],
-    mut deleted: HashMap<String, Vec<Paragraph>>,
+    mut taken: Taken,
     previous: &HashMap<String, Arc<Formatting>>,
     paragraphs: &HashMap<String, Option<Arc<ParaFormatting>>>,
     events: Events,
 ) -> Result<(), FilterError> {
-    // The regions whose marks the text has.
-    let met: std::collections::HashSet<String> =
+    // The regions whose marks the text has, or the text deletions took.
+    let mut met: std::collections::HashSet<String> =
         marked(&events).into_iter().map(str::to_owned).collect();
+    for (_, field) in taken.formers.values().flatten().flatten() {
+        if let odf::Field::ChangeStart { id } = field {
+            met.insert(id.clone());
+        }
+    }
     let read: Vec<&odf::ChangedRegion> = regions
         .iter()
         .filter(|r| met.contains(r.id.as_str()))
@@ -89,10 +104,10 @@ pub(super) fn import(
         }
         for (story, events) in texts {
             match story {
-                None => put(edit, &ids, &mut deleted, previous, paragraphs, events)?,
+                None => put(edit, &ids, &mut taken, previous, paragraphs, events)?,
                 Some(story) => {
                     edit.edit_story(story, |edit| {
-                        put(edit, &ids, &mut deleted, previous, paragraphs, events)
+                        put(edit, &ids, &mut taken, previous, paragraphs, events)
                     })?;
                 }
             }
@@ -112,11 +127,25 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
         .into_iter()
         .map(|(_, span)| span.id)
         .collect();
+    // The changes that deleted text was in before (B-070).
+    let mut texts: Vec<Vec<Paragraph>> = vec![document.body().iter().cloned().collect()];
+    texts.extend(
+        document
+            .stories()
+            .into_iter()
+            .map(|story| document.story_paragraphs(story)),
+    );
+    for paragraphs in &texts {
+        for paragraph in paragraphs {
+            carried.extend(paragraph.runs().filter_map(|r| r.attrs.former.flatten()));
+        }
+    }
     // Notes too, wherever their marks are.
     for note in document.notes().iter() {
         let paragraphs = document.story_paragraphs(desk_model::Story::Note(note.id));
         for paragraph in paragraphs.iter() {
             carried.extend(paragraph.runs().filter_map(|r| r.attrs.change.flatten()));
+            carried.extend(paragraph.runs().filter_map(|r| r.attrs.former.flatten()));
             carried.extend(paragraph.attrs().break_change.flatten());
             carried.extend(paragraph.attrs().format_change.flatten());
         }
@@ -144,7 +173,7 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
 fn put(
     edit: &mut desk_model::Edit,
     ids: &HashMap<&str, (NodeId, ChangeKind)>,
-    deleted: &mut HashMap<String, Vec<Paragraph>>,
+    taken: &mut Taken,
     previous: &HashMap<String, Arc<Formatting>>,
     paragraphs: &HashMap<String, Option<Arc<ParaFormatting>>>,
     events: Events,
@@ -217,7 +246,7 @@ fn put(
     // Then the deletions, from the last, so that the places of those
     // before stay where they are.
     for (change, at, region) in deletions.into_iter().rev() {
-        let Some(paragraphs) = deleted.remove(&region) else {
+        let Some(paragraphs) = taken.deleted.remove(&region) else {
             continue;
         };
         let fits = edit
@@ -225,8 +254,74 @@ fn put(
             .paragraph(at.paragraph)
             .is_ok_and(|p| at.offset <= p.len() && p.is_boundary(at.offset));
         if fits {
-            restore(edit, change, at, paragraphs)?;
+            let starts = restore(edit, change, at, paragraphs)?;
+            let formers = taken.formers.remove(&region).unwrap_or_default();
+            mark_formers(edit, ids, previous, &starts, &formers)?;
         }
+    }
+    Ok(())
+}
+
+/// Puts the text that a deletion took back in the changes it was in
+/// before (B-070), from the marks of their regions in it: `starts` are
+/// where the text of each paragraph it took is now, and where it ends.
+fn mark_formers(
+    edit: &mut desk_model::Edit,
+    ids: &HashMap<&str, (NodeId, ChangeKind)>,
+    previous: &HashMap<String, Arc<Formatting>>,
+    starts: &[(Position, usize)],
+    formers: &[Vec<(usize, odf::Field)>],
+) -> Result<(), desk_model::ModelError> {
+    // The change open, which goes on in the next paragraph.
+    let mut open: Option<(NodeId, Option<Arc<Formatting>>)> = None;
+    for ((start, end), marks) in starts.iter().zip(formers) {
+        let end = *end;
+        let len = edit.document().paragraph(start.paragraph)?.len();
+        let mut from = start.offset;
+        let put = |edit: &mut desk_model::Edit,
+                   open: &Option<(NodeId, Option<Arc<Formatting>>)>,
+                   from: usize,
+                   to: usize|
+         -> Result<(), desk_model::ModelError> {
+            let Some((id, before)) = open.clone() else {
+                return Ok(());
+            };
+            if from >= to {
+                return Ok(());
+            }
+            edit.mark_former(
+                Position::new(start.paragraph, from),
+                Position::new(start.paragraph, to),
+                id,
+                before,
+            )
+        };
+        for (offset, field) in marks {
+            let at = (start.offset + offset).min(len);
+            match field {
+                odf::Field::ChangeStart { id } => {
+                    if let Some(&(change, ChangeKind::Insertion | ChangeKind::Format)) =
+                        ids.get(id.as_str())
+                    {
+                        put(edit, &open, from, at)?;
+                        open = Some((change, previous.get(id).cloned()));
+                        from = at;
+                    }
+                }
+                odf::Field::ChangeEnd { id }
+                    if open.as_ref().is_some_and(|(c, _)| {
+                        ids.get(id.as_str()).is_some_and(|(i, _)| i == c)
+                    }) =>
+                {
+                    put(edit, &open, from, at)?;
+                    open = None;
+                    from = at;
+                }
+                _ => {}
+            }
+        }
+        // Up to the end of the text the deletion took in the paragraph.
+        put(edit, &open, from, end.min(len))?;
     }
     Ok(())
 }
@@ -239,26 +334,28 @@ fn restore(
     change: NodeId,
     at: Position,
     paragraphs: Vec<Paragraph>,
-) -> Result<(), desk_model::ModelError> {
+) -> Result<Vec<(Position, usize)>, desk_model::ModelError> {
     let marked = |p: &Paragraph| -> Vec<desk_model::Run> {
         p.runs()
             .cloned()
             .map(|mut run| {
                 run.attrs.change = Some(Some(change));
                 run.attrs.formatted = None;
+                run.attrs.former = None;
                 run
             })
             .collect()
     };
     let Some((first, rest)) = paragraphs.split_first() else {
-        return Ok(());
+        return Ok(Vec::new());
     };
     if rest.is_empty() {
-        return edit.apply(Op::ReplaceText {
+        edit.apply(Op::ReplaceText {
             paragraph: at.paragraph,
             range: at.offset..at.offset,
             runs: marked(first),
-        });
+        })?;
+        return Ok(vec![(at, at.offset + first.len())]);
     }
     let body = edit.document().body();
     let index = body
@@ -275,6 +372,7 @@ fn restore(
         runs: marked(first),
     })?;
     edit.mark_break_change(at.paragraph, Some(change))?;
+    let mut ranges = vec![(at, at.offset + first.len())];
     let (last, middle) = rest.split_last().expect("there are two or more");
     let mut place = index + 1;
     for p in middle {
@@ -285,6 +383,7 @@ fn restore(
             index: place,
             paragraph: Paragraph::from_runs(id, p.style(), attrs, marked(p))?,
         })?;
+        ranges.push((Position::new(id, 0), p.len()));
         place += 1;
     }
     // The last one takes the text after the mark, and ends where the
@@ -298,7 +397,8 @@ fn restore(
         index: place,
         paragraph: Paragraph::from_runs(id, last.style(), attrs, runs)?,
     })?;
-    Ok(())
+    ranges.push((Position::new(id, 0), last.len()));
+    Ok(ranges)
 }
 
 /// Takes the deleted text of the body out to the regions of its
@@ -400,14 +500,20 @@ fn export(
                             ));
                             open.push((id.clone(), String::new()));
                         }
-                        // Text added or formatted stays, between its marks.
+                        // Text added or formatted stays, between its marks;
+                        // in text deleted, the change it was in before
+                        // goes with it (B-070).
                         Some((index, ChangeKind::Insertion | ChangeKind::Format)) => {
                             let name = regions[index].id.clone();
-                            here.spans.push(odf::Span {
+                            let start = odf::Span {
                                 field: Some(odf::Field::ChangeStart { id: name.clone() }),
                                 style: None,
                                 ..span.clone()
-                            });
+                            };
+                            match &mut deleting {
+                                Some((_, taking)) => taking.spans.push(start),
+                                None => here.spans.push(start),
+                            }
                             open.push((id.clone(), name));
                         }
                         None => {}
@@ -423,10 +529,14 @@ fn export(
                             regions[index].deleted.push(taking);
                         }
                     } else {
-                        here.spans.push(odf::Span {
+                        let end = odf::Span {
                             field: Some(odf::Field::ChangeEnd { id: name }),
                             ..span.clone()
-                        });
+                        };
+                        match &mut deleting {
+                            Some((_, taking)) => taking.spans.push(end),
+                            None => here.spans.push(end),
+                        }
                     }
                 }
                 // Comments stay in the text, where deleted text was.

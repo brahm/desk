@@ -1803,7 +1803,7 @@ impl Exporter<'_> {
 
     /// A paragraph of a text box, with automatic styles for what is set
     /// on it and its text.
-    fn paragraph(&mut self, paragraph: &Paragraph, track: &mut Option<NodeId>) -> odf::Paragraph {
+    fn paragraph(&mut self, paragraph: &Paragraph, track: &mut super::Track) -> odf::Paragraph {
         let styles = self.document.styles();
         let style_name = self.names[&paragraph.style()].clone();
         let own = ParaAttrs {
@@ -2182,7 +2182,7 @@ impl Exporter<'_> {
                 }
                 odf::DrawKind::TextBox {
                     paragraphs: {
-                        let mut track = None;
+                        let mut track = super::Track::default();
                         text.paragraphs
                             .iter()
                             .map(|p| self.paragraph(p, &mut track))
@@ -2234,7 +2234,7 @@ impl Exporter<'_> {
                 g.column_count = Some(u32::from(inside.columns));
                 g.column_gap = Some(odf_length(inside.column_gap));
             }
-            let mut track = None;
+            let mut track = super::Track::default();
             text = inside
                 .paragraphs
                 .iter()

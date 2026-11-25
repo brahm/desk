@@ -350,6 +350,7 @@ fn char_attrs(source: &odf::TextDocument, t: &odf::TextProperties, size: f64) ->
         comments: None,
         change: None,
         formatted: None,
+        former: None,
     }
 }
 
@@ -2141,20 +2142,34 @@ fn import_tracked(
     if events.is_empty() {
         return Ok(());
     }
-    let met: HashSet<String> = changes::marked(&events)
+    let mut met: HashSet<String> = changes::marked(&events)
         .into_iter()
         .map(str::to_owned)
         .collect();
     let mut deleted = HashMap::new();
+    // The marks in the text that deletions took: the changes it was in
+    // before, by paragraph (B-070).
+    let mut formers: HashMap<String, Vec<Vec<(usize, odf::Field)>>> = HashMap::new();
     for region in regions {
         if region.kind != odf::ChangeKind::Deletion || !met.contains(&region.id) {
             continue;
         }
         let mut paragraphs = Vec::new();
+        let mut inner = Vec::new();
         for paragraph in &region.deleted {
+            let mut found = Vec::new();
             let mut built = import_paragraph(
-                source, document, ids, default, paragraph, relative, marks, None,
+                source,
+                document,
+                ids,
+                default,
+                paragraph,
+                relative,
+                marks,
+                Some(&mut found),
             )?;
+            found.retain(|(_, field)| changes::is_mark(field));
+            inner.push(found);
             // The list it was an item of, for when the deletion is
             // rejected (B-067).
             if let Some(member) = &paragraph.list
@@ -2184,6 +2199,12 @@ fn import_tracked(
             }
             paragraphs.push(built);
         }
+        for (_, field) in inner.iter().flatten() {
+            if let odf::Field::ChangeStart { id } = field {
+                met.insert(id.clone());
+            }
+        }
+        formers.insert(region.id.clone(), inner);
         deleted.insert(region.id.clone(), paragraphs);
     }
     // The formatting that text had before its changes of formatting.
@@ -2218,7 +2239,14 @@ fn import_tracked(
             Some((r.id.clone(), before))
         })
         .collect();
-    changes::import(document, regions, deleted, &previous, &paragraphs, events)
+    changes::import(
+        document,
+        regions,
+        changes::Taken { deleted, formers },
+        &previous,
+        &paragraphs,
+        events,
+    )
 }
 
 /// The marks of tracked changes among the events of some text, apart
@@ -2742,7 +2770,7 @@ fn export_spans(
     paragraph: &Paragraph,
     mut notes: Option<&mut NoteRefs<'_>>,
     marks: &CommentMarks,
-    track: Option<&mut Option<NodeId>>,
+    track: Option<&mut Track>,
     mut style: impl FnMut(&Run) -> Option<String>,
 ) -> Vec<odf::Span> {
     let mut spans = Vec::new();
@@ -2753,7 +2781,8 @@ fn export_spans(
     // past the break when it took it.
     // A change of formatting starts again where the formatting before it
     // differs, as its mark names that formatting.
-    let mut open = (track.as_deref().copied().flatten(), None);
+    let track_on = track.is_some();
+    let mut open = (track.as_deref().and_then(|t| t.change), None);
     let mut switch =
         |spans: &mut Vec<odf::Span>,
          to: (Option<NodeId>, Option<Arc<desk_model::Formatting>>),
@@ -2807,14 +2836,73 @@ fn export_spans(
         }
     };
     let mut last = None;
+    // The change that deleted text was in before, whose marks go inside
+    // those of the deletion (B-070), with the formatting before that its
+    // mark names. It goes on past a break the deletion took, as the
+    // deletion does, and starts again where the formatting before differs.
+    let mut former_open = track.as_deref().and_then(|t| t.former.clone());
+    // The change open, as `switch` leaves it.
+    let mut before_change = track.as_deref().and_then(|t| t.change);
+    let close_former = |spans: &mut Vec<odf::Span>,
+                        former_open: &mut Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
+                        run: Option<&Run>| {
+        if let Some((id, _)) = former_open.take() {
+            spans.push(odf::Span {
+                field: Some(odf::Field::ChangeEnd {
+                    id: id.get().to_string(),
+                }),
+                link: run
+                    .and_then(|r| r.attrs.link.clone().flatten())
+                    .map(|l| l.to_string()),
+                bookmark: run
+                    .and_then(|r| r.attrs.bookmark.clone().flatten())
+                    .map(|b| b.to_string()),
+                ..odf::Span::default()
+            });
+        }
+    };
     for run in paragraph.runs() {
-        let to = (
-            run.attrs.change.flatten(),
-            run.attrs.formatted.clone().flatten(),
-        );
-        switch(&mut spans, to, Some(run), &mut |before| {
+        let change = run.attrs.change.flatten();
+        let former = if track_on {
+            run.attrs
+                .former
+                .flatten()
+                .map(|id| (id, run.attrs.formatted.clone().flatten()))
+        } else {
+            None
+        };
+        // A change of the deletion closes the change before inside it.
+        if former_open.is_some() && (former_open != former || before_change != change) {
+            close_former(&mut spans, &mut former_open, Some(run));
+        }
+        before_change = change;
+        // The formatting before is that of the change before, when there
+        // is one.
+        let formatted = if former.is_none() {
+            run.attrs.formatted.clone().flatten()
+        } else {
+            None
+        };
+        switch(&mut spans, (change, formatted), Some(run), &mut |before| {
             style(&Run::with_attrs("", before.style, before.attrs.clone()))
         });
+        if let Some((id, before)) = &former
+            && former_open.is_none()
+        {
+            let previous = before.as_deref().map(|before| {
+                style(&Run::with_attrs("", before.style, before.attrs.clone())).unwrap_or_default()
+            });
+            spans.push(odf::Span {
+                style: previous,
+                field: Some(odf::Field::ChangeStart {
+                    id: id.get().to_string(),
+                }),
+                link: run.attrs.link.clone().flatten().map(|l| l.to_string()),
+                bookmark: run.attrs.bookmark.clone().flatten().map(|b| b.to_string()),
+                ..odf::Span::default()
+            });
+            former_open = former;
+        }
         comments(&mut spans, offset, Some(run));
         offset += run.len();
         last = Some(run);
@@ -2883,11 +2971,27 @@ fn export_spans(
     }
     comments(&mut spans, offset, last);
     let ends = paragraph.attrs().break_change.flatten();
+    // The change before goes on past the break only when the deletion it
+    // is in took the break too.
+    if before_change != ends || ends.is_none() {
+        close_former(&mut spans, &mut former_open, None);
+    }
     switch(&mut spans, (ends, None), None, &mut |_| None);
     if let Some(track) = track {
-        *track = open.0;
+        track.change = open.0;
+        track.former = former_open;
     }
     spans
+}
+
+/// The tracked changes open past the break of a paragraph, which go on in
+/// the next (W148): the change, and the change that its deleted text was
+/// in before, with the formatting before that the mark of that one names
+/// (B-070).
+#[derive(Default)]
+pub(super) struct Track {
+    change: Option<NodeId>,
+    former: Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
 }
 
 /// Puts the marks of the change of the formatting of a paragraph around
@@ -3023,7 +3127,7 @@ fn export_margins(
         }
         let mut out = Vec::new();
         // The tracked change open past a break (W148).
-        let mut tracked: Option<NodeId> = None;
+        let mut tracked = Track::default();
         for paragraph in paragraphs {
             let style_name = names[&paragraph.style()].clone();
             let own = ParaAttrs {
@@ -3443,7 +3547,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
     };
     let comment_marks = comments::export(document);
     // The tracked change open past the break of the paragraph before.
-    let mut tracked: Option<NodeId> = None;
+    let mut tracked = Track::default();
     // The master pages of the sections with headers and footers of their
     // own, by the paragraph that starts each (EST-16).
     let masters = section_masters(document);
@@ -3661,7 +3765,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let note = document.notes().get(*id).expect("the body refers to it");
         let mut paragraphs = Vec::new();
         // The tracked change open past a break (W148).
-        let mut tracked: Option<NodeId> = None;
+        let mut tracked = Track::default();
         for paragraph in note.paragraphs.iter() {
             let own = paragraph.attrs().without_structure();
             let style_name = names[&paragraph.style()].clone();

@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Fixed: in Desk Writer, text that another author added or formatted
+  keeps that change when it is deleted while tracking changes, and
+  rejecting the deletion gives it back, also in ODT (#225).
 * Added: Desk Writer accepts or rejects the tracked change selected,
   or those of the selection, from its bubble, the tracking bar and the
   command search (#224).
