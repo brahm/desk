@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Fixed: in Desk Writer, a paragraph whose break before it was deleted
   while tracking changes keeps the section it starts, its entry of a
-  table of contents and the style overriding its list in ODT (#PR).
+  table of contents and the style overriding its list in ODT (#231).
 * Added: in Desk Writer, the views of markup without deletions join
   the paragraphs whose break was deleted in notes, headers, footers,
   text boxes and shapes too (#230).
