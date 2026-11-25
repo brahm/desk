@@ -130,6 +130,10 @@ pub struct FieldValues {
     /// (OBJ-01): the mark of one that is not here shows nothing.
     pub objects:
         Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, (Length, Length)>>>,
+    /// The tracked changes whose text does not show, as the deletions in
+    /// the views of markup without them (W148, REV-04): it takes no room,
+    /// and a cursor in it stands where it would be.
+    pub hidden: Option<std::sync::Arc<std::collections::HashSet<desk_model::NodeId>>>,
 }
 
 impl Default for FieldValues {
@@ -140,6 +144,7 @@ impl Default for FieldValues {
             notes: None,
             pages_of: None,
             objects: None,
+            hidden: None,
         }
     }
 }
@@ -188,6 +193,10 @@ pub struct ParagraphText {
     /// The model offset of each character start of the laid out text, and
     /// of its end, when the two texts differ. Empty when they are the same.
     offsets: Vec<(usize, usize)>,
+    /// Where text that does not show was left out: the offset in the laid
+    /// out text and the model offset where it starts, which a cursor there
+    /// stands before (W148).
+    gaps: Vec<(usize, usize)>,
     formats: Vec<CharFormat>,
     pub(crate) ranges: Vec<StyledRange>,
     paragraph: ParaFormat,
@@ -465,6 +474,7 @@ impl ParagraphText {
         let mut out = Self {
             text: String::new(),
             offsets: Vec::new(),
+            gaps: Vec::new(),
             formats: vec![base],
             ranges: Vec::new(),
             paragraph,
@@ -480,6 +490,17 @@ impl ParagraphText {
         let mut first_word = true;
         let hyphenate = out.paragraph.hyphenate && settings.hyphenation;
         for (text, mut format) in runs {
+            // Text that does not show is left out (W148).
+            if let (Some(hidden), Some(change)) = (&values.hidden, format.change)
+                && hidden.contains(&change)
+            {
+                if out.gaps.last().is_none_or(|g| g.0 != out.text.len()) {
+                    out.gaps.push((out.text.len(), model_offset));
+                }
+                model_offset += text.len();
+                transformed = true;
+                continue;
+            }
             // A document without ligatures has none anywhere (FMT-09).
             if !settings.ligatures {
                 format.ligatures = Ligatures::None;
@@ -681,9 +702,16 @@ impl ParagraphText {
             .collect();
         let mut paragraph = self.paragraph.clone();
         paragraph.drop_cap = None;
+        let gaps = self
+            .gaps
+            .iter()
+            .filter(|&&(laid, _)| laid >= start)
+            .map(|&(laid, model)| (laid - start, model))
+            .collect();
         Self {
             text,
             offsets,
+            gaps,
             formats: self.formats.clone(),
             ranges,
             paragraph,
@@ -707,6 +735,9 @@ impl ParagraphText {
     pub fn to_model(&self, offset: usize) -> usize {
         if self.offsets.is_empty() {
             return offset;
+        }
+        if let Ok(i) = self.gaps.binary_search_by_key(&offset, |g| g.0) {
+            return self.gaps[i].1;
         }
         let index = self.offsets.partition_point(|&(laid, _)| laid <= offset);
         self.offsets[index.saturating_sub(1)].1
@@ -848,6 +879,7 @@ mod tests {
                 notes: None,
                 pages_of: None,
                 objects: None,
+                hidden: None,
             },
             ParaFormat::default(),
             CharFormat::default(),

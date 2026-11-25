@@ -242,7 +242,7 @@ pub struct SectionStyle {
 
 /// How a document shows, as the first view of `ooo:view-settings` in
 /// `settings.xml` says, with the items that LibreOffice writes.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ViewSettings {
     /// `ZoomType`: 0 for a percentage, 2 for a whole page, 3 for the
     /// width of the page.
@@ -262,6 +262,9 @@ pub struct ViewSettings {
     /// `DeskOutlineThumbnails`: whether the outline shows objects in
     /// miniature.
     pub outline_thumbnails: Option<bool>,
+    /// `DeskMarkupView`: how tracked changes show: `markup`,
+    /// `without-deletions` or `final` (W148).
+    pub markup: Option<String>,
 }
 
 impl ViewSettings {

@@ -2785,7 +2785,9 @@ impl TextEditor {
     /// computer is renamed (W149, W150).
     pub fn show_comment_marks(&self) {
         let local = crate::comments_page::author();
-        self.view.set_change_marks(self.change_marks(&local));
+        let (marks, bars) = self.change_view(&local);
+        self.view.set_change_marks(marks);
+        self.view.set_change_bars(bars);
         let color = self.comment_colors(&local);
         self.view.set_comment_marks(
             self.comment_marks()

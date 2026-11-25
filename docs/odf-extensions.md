@@ -612,6 +612,17 @@ make changes as they are then, as Desk does, and keep those already
 tracked. Other programs ignore the item, and a file they save tracks
 changes again or not as their own setting says.
 
+#### Markup view (settings, not an attribute)
+
+How tracked changes show (W148, REV-04), as View > Change Markup of
+Desk Writer and the review toolbar of Pages 15.4 set it, is kept in the
+`DeskMarkupView` item of the view settings in `settings.xml`, beside the
+zoom and the outline: `without-deletions` hides the text deleted, and
+`final` shows the text as if every change were accepted, without marks.
+It is written only when it is not the markup, which is what a file
+without it shows. Other programs ignore the item and show changes as
+their own setting says.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

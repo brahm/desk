@@ -3,20 +3,60 @@
 
 //! The tracked changes of the body on the pages (W148, REV-04): text
 //! added is underlined, and text deleted struck, in the colour of its
-//! author. The views of markup come with step 11 of W2.
+//! author, with a bar beside their lines in the margin, as the view of
+//! markup shows them: with these marks, without the text deleted, or as
+//! if every change were accepted, without marks.
 
-use desk_model::ChangeKind;
+use desk_model::{ChangeKind, Markup};
 use gtk::glib;
 
 use super::comments::{Texts, spot_in};
 use super::{Selection, Spot, TextEditor};
 use crate::text_nav::{self, SpanRect};
+use crate::view::ChangeBar;
 
 impl TextEditor {
     /// Where the text of each change of the body is on the pages, with
     /// what the change did and the colour of its author, for the author of
-    /// this computer named `local` (W148, W150).
+    /// this computer named `local`, as the view of markup shows them: none
+    /// in Final, and no text deleted without deletions (W148, W150,
+    /// REV-04).
+    #[cfg(test)]
     pub(super) fn change_marks(
+        &self,
+        local: &str,
+    ) -> Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)> {
+        self.change_view(local).0
+    }
+
+    /// The marks of the changes as [`TextEditor::change_marks`] gives
+    /// them, and the change bars beside their lines.
+    pub(super) fn change_view(
+        &self,
+        local: &str,
+    ) -> (
+        Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)>,
+        Vec<ChangeBar>,
+    ) {
+        let markup = self.markup();
+        if markup == Markup::Final {
+            return (Vec::new(), Vec::new());
+        }
+        let all = self.placed_change_marks(local);
+        let bars = {
+            let state = self.state.borrow();
+            change_bars(&all, Self::main_layout(&state))
+        };
+        let marks = all
+            .into_iter()
+            .filter(|(_, kind, _)| markup.shows_deletions() || *kind != ChangeKind::Deletion)
+            .collect();
+        (marks, bars)
+    }
+
+    /// Where the text of every change is on the pages, with what it did
+    /// and the colour of its author.
+    fn placed_change_marks(
         &self,
         local: &str,
     ) -> Vec<(SpanRect, ChangeKind, desk_model::AuthorColor)> {
@@ -54,6 +94,61 @@ impl TextEditor {
         }
         out
     }
+
+    /// How the tracked changes show (REV-04).
+    pub fn markup(&self) -> Markup {
+        Self::main_document(&self.state.borrow()).markup()
+    }
+
+    /// Shows the tracked changes with their marks, without the text
+    /// deleted, or as if they were all accepted (REV-04). It is not an
+    /// edit: the history does not change, and the document keeps it as
+    /// how it shows.
+    pub fn set_markup(&self, markup: Markup) {
+        if markup == self.markup() {
+            return;
+        }
+        if self.story().is_some() {
+            self.leave_story(None);
+        }
+        self.state.borrow_mut().editor.set_markup(markup);
+        self.lay_out_again();
+        self.show_comment_marks();
+    }
+}
+
+/// The space between a change bar and the text, in points.
+const BAR_GAP: f64 = 9.0;
+
+/// A bar for each line with changes, in the left margin of its page:
+/// lighter when the changes of the line only change its formatting, as
+/// in Pages (REV-04).
+fn change_bars(
+    marks: &[(SpanRect, ChangeKind, desk_model::AuthorColor)],
+    layout: &desk_layout::DocumentLayout,
+) -> Vec<ChangeBar> {
+    let mut bars: Vec<ChangeBar> = Vec::new();
+    for (rect, kind, _) in marks {
+        let margin = layout
+            .pages
+            .get(rect.page)
+            .map_or(0.0, |p| f64::from(p.margins.0));
+        let format_only = *kind == ChangeKind::Format;
+        let same = bars.iter_mut().find(|b| {
+            b.page == rect.page && (b.y0 - rect.y0).abs() < 0.5 && (b.y1 - rect.y1).abs() < 0.5
+        });
+        match same {
+            Some(bar) => bar.format_only &= format_only,
+            None => bars.push(ChangeBar {
+                page: rect.page,
+                x: (margin - BAR_GAP).max(1.0),
+                y0: rect.y0,
+                y1: rect.y1,
+                format_only,
+            }),
+        }
+    }
+    bars
 }
 
 impl TextEditor {
@@ -169,6 +264,74 @@ mod tests {
             );
             // On the text: the deleted word is to the right of the added.
             assert!(marks[1].0.x0 > marks[0].0.x1);
+        });
+    }
+
+    #[test]
+    fn rev_04_the_views_of_markup_hide_deletions_and_marks() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let p = document.start().paragraph;
+            document
+                .transact("Changes", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three")?;
+                    let added = edit.add_change(ChangeKind::Insertion, "Ana", None)?;
+                    let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+                    edit.mark_change(Position::new(p, 0), Position::new(p, 3), added)?;
+                    edit.mark_change(Position::new(p, 4), Position::new(p, 8), gone)?;
+                    Ok(())
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            let kinds = |editor: &TextEditor| -> Vec<ChangeKind> {
+                editor
+                    .change_marks("Ana")
+                    .iter()
+                    .map(|(_, k, _)| *k)
+                    .collect()
+            };
+            // Markup: both, with one bar for their line.
+            assert_eq!(editor.markup(), Markup::Markup);
+            assert_eq!(
+                kinds(&editor),
+                [ChangeKind::Insertion, ChangeKind::Deletion]
+            );
+            let (_, bars) = editor.change_view("Ana");
+            assert_eq!(bars.len(), 1);
+            assert!(!bars[0].format_only);
+            let three = |editor: &TextEditor| {
+                let state = editor.state.borrow();
+                let selection = Selection {
+                    anchor: Spot {
+                        paragraph: 0,
+                        offset: 8,
+                    },
+                    focus: Spot {
+                        paragraph: 0,
+                        offset: 13,
+                    },
+                };
+                text_nav::selection_rects(&state.layout, &selection)[0].x0
+            };
+            let shown = three(&editor);
+            // Without deletions: the deleted word takes no room, and its
+            // line keeps its bar.
+            editor.set_markup(Markup::WithoutDeletions);
+            assert_eq!(editor.markup(), Markup::WithoutDeletions);
+            assert_eq!(kinds(&editor), [ChangeKind::Insertion]);
+            assert_eq!(editor.change_view("Ana").1.len(), 1);
+            assert!(three(&editor) < shown - 5.0);
+            // Final: no marks, no bars.
+            editor.set_markup(Markup::Final);
+            assert_eq!(editor.change_view("Ana"), (Vec::new(), Vec::new()));
+            // The view is not an edit, and edits keep it.
+            assert_eq!(editor.state.borrow().editor.undo_depth(), 0);
+            editor.set_markup(Markup::WithoutDeletions);
+            editor.set_tracking(desk_model::Tracking::On);
+            editor.undo();
+            assert_eq!(editor.markup(), Markup::WithoutDeletions);
+            assert_eq!(editor.document().markup(), Markup::WithoutDeletions);
         });
     }
 

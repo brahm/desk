@@ -41,7 +41,7 @@ pub(crate) use tables::TABLE_ACCELS;
 pub(crate) mod command_search;
 mod format_actions;
 mod header;
-pub(crate) use header::author_color_name;
+pub(crate) use header::{author_color_name, markup_menu};
 mod objects;
 mod rename;
 mod slides;
@@ -245,7 +245,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 90] = [
+const DOCUMENT_ACTIONS: [&str; 91] = [
     "outline",
     "screen-view",
     "text-size",
@@ -309,6 +309,7 @@ const DOCUMENT_ACTIONS: [&str; 90] = [
     "previous-comment",
     "track-changes",
     "tracking-on",
+    "markup",
     "accept-all-changes",
     "reject-all-changes",
     "next-review-item",
@@ -1187,6 +1188,7 @@ impl DocumentWindow {
             two_pages: self.view.columns() == 2,
             outline: self.action_state("outline"),
             outline_options: self.outline.options(),
+            markup: self.editor().map_or_else(Default::default, |e| e.markup()),
         }
     }
 
@@ -1496,6 +1498,7 @@ impl DocumentWindow {
                 "tracking-on",
                 (editor.tracking() == desk_model::Tracking::On).to_variant(),
             );
+            formatting::set_state(&self.actions, "markup", editor.markup().key().to_variant());
             formatting::set_state(
                 &self.actions,
                 "track-changes",
@@ -3697,6 +3700,27 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&track);
+        // How the changes show, which the document keeps (REV-04).
+        let markup = gio::SimpleAction::new_stateful(
+            "markup",
+            Some(glib::VariantTy::STRING),
+            &desk_model::Markup::Markup.key().to_variant(),
+        );
+        let weak = Rc::downgrade(self);
+        markup.connect_activate(move |action, value| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(markup) = value
+                .and_then(|v| v.get::<String>())
+                .and_then(|k| desk_model::Markup::from_key(&k))
+            else {
+                return;
+            };
+            if let Some(editor) = this.editor() {
+                editor.set_markup(markup);
+                action.set_state(&editor.markup().key().to_variant());
+            }
+        });
+        self.actions.add_action(&markup);
         // On records changes; off, Paused, makes them as they are.
         let on = gio::SimpleAction::new_stateful("tracking-on", None, &false.to_variant());
         let weak = Rc::downgrade(self);

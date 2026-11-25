@@ -72,7 +72,7 @@ impl TextEditor {
 
     /// Lays out the document again as the view shows it, keeping the
     /// selection.
-    fn lay_out_again(&self) {
+    pub(super) fn lay_out_again(&self) {
         {
             let mut guard = self.state.borrow_mut();
             let state = &mut *guard;

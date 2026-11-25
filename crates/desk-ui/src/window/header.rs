@@ -273,6 +273,23 @@ pub(super) fn fill_recent(menu: &gio::Menu) {
     }
 }
 
+/// The views of the markup of tracked changes (REV-04).
+pub(crate) fn markup_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    for markup in desk_model::Markup::ALL {
+        let label = match markup {
+            desk_model::Markup::Markup => tr("_Markup"),
+            desk_model::Markup::WithoutDeletions => tr("Markup _Without Deletions"),
+            desk_model::Markup::Final => tr("_Final"),
+        };
+        menu.append(
+            Some(&label),
+            Some(&format!("win.markup('{}')", markup.key())),
+        );
+    }
+    menu
+}
+
 /// The View menu, a submenu of the main menu (GNM-10): the pages of the
 /// sidebar, what the window shows, the zoom, and `navigation`, Go to Page
 /// and the places to go to (INT-19).
@@ -299,6 +316,9 @@ pub(super) fn view_menu(navigation: &gio::Menu) -> gio::Menu {
         );
     }
     document.append_submenu(Some(&tr("_Author Color")), &colors);
+    // How tracked changes show, as the review toolbar of Pages 15.4
+    // (REV-04).
+    document.append_submenu(Some(&tr("Change _Markup")), &markup_menu());
     let window = gio::Menu::new();
     window.append(Some(&tr("As _Outline")), Some("win.outline"));
     // Screen View, and the size of its text (PXV-01).

@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer shows tracked changes with their marks, without
+  the text deleted, or as final, from View > Change Markup and the
+  tracking bar, keeps the view in the file, and marks the lines with
+  changes with a bar in the margin (#PR).
 * Added: Desk Writer has the bar of comments and changes, which turns
   change tracking on, pauses it and turns it off, goes through the
   comments and changes, and accepts or rejects them all; comments and

@@ -1896,6 +1896,7 @@ fn int_08_doc_16_the_view_is_kept_in_the_settings() {
             two_pages: true,
             outline: false,
             outline_options: desk_model::OutlineOptions::default(),
+            markup: desk_model::Markup::Markup,
         },
         desk_model::ViewSettings {
             zoom: desk_model::ViewZoom::FitWidth,
@@ -1908,12 +1909,15 @@ fn int_08_doc_16_the_view_is_kept_in_the_settings() {
                 first_line: true,
                 thumbnails: true,
             },
+            // How tracked changes show (W148, REV-04).
+            markup: desk_model::Markup::WithoutDeletions,
         },
         desk_model::ViewSettings {
             zoom: desk_model::ViewZoom::FitPage,
             two_pages: false,
             outline: false,
             outline_options: desk_model::OutlineOptions::default(),
+            markup: desk_model::Markup::Final,
         },
     ] {
         document.set_view(Some(view));

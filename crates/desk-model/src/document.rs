@@ -55,6 +55,46 @@ pub struct ViewSettings {
     /// What the outline shows, which is also what prints while the
     /// document shows as an outline (TXT-14).
     pub outline_options: OutlineOptions,
+    /// How tracked changes show (W148, REV-04).
+    pub markup: Markup,
+}
+
+/// How the tracked changes of a document show, as View > Comments &
+/// Changes of Pages 15.4 has it (W148, REV-04).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Markup {
+    /// Text added and deleted shows in the colour of its author, with
+    /// change bars in the margin.
+    #[default]
+    Markup,
+    /// The same, without the text deleted.
+    WithoutDeletions,
+    /// The text as if every change were accepted, without marks.
+    Final,
+}
+
+impl Markup {
+    /// Every view, in the order of the menu.
+    pub const ALL: [Self; 3] = [Self::Markup, Self::WithoutDeletions, Self::Final];
+
+    /// Its name in the state of the action and in files.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Markup => "markup",
+            Self::WithoutDeletions => "without-deletions",
+            Self::Final => "final",
+        }
+    }
+
+    /// The view with a name.
+    pub fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|m| m.key() == key)
+    }
+
+    /// Whether text deleted shows.
+    pub fn shows_deletions(self) -> bool {
+        self == Self::Markup
+    }
 }
 
 /// What the outline of a document shows (TXT-14).
@@ -499,6 +539,29 @@ impl Document {
     /// and has no place in the history.
     pub fn set_view(&mut self, view: Option<ViewSettings>) {
         self.view = view;
+    }
+
+    /// How the tracked changes show (W148, REV-04).
+    pub fn markup(&self) -> Markup {
+        self.view.map(|v| v.markup).unwrap_or_default()
+    }
+
+    /// Sets how the tracked changes show. It is not content, and has no
+    /// place in the history.
+    pub fn set_markup(&mut self, markup: Markup) {
+        match &mut self.view {
+            Some(view) => view.markup = markup,
+            None if markup != Markup::default() => {
+                self.view = Some(ViewSettings {
+                    zoom: ViewZoom::Percent(100),
+                    two_pages: false,
+                    outline: false,
+                    outline_options: OutlineOptions::default(),
+                    markup,
+                });
+            }
+            None => {}
+        }
     }
 
     /// The settings of the text of the whole document.

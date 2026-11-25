@@ -225,10 +225,12 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     let plan = crate::notes::NotePlan::new(document);
     let labels = plan.labels(document, None);
     let objects = crate::objects::inline_sizes(document);
+    let hidden = crate::hidden_changes(document);
     let mut values: Vec<FieldValues> = vec![
         FieldValues {
             notes: Some(labels.clone()),
             objects: objects.clone(),
+            hidden: hidden.clone(),
             ..FieldValues::default()
         };
         document.body().len()
@@ -264,6 +266,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
                 notes: Some(labels.clone()),
                 pages_of: Some(pages_of.clone()),
                 objects: objects.clone(),
+                hidden: hidden.clone(),
             };
         }
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
@@ -433,6 +436,7 @@ pub fn margin_lines(
         pages_of: None,
         // Objects in the lines of headers and footers (EST-12).
         objects: crate::objects::inline_sizes(document),
+        hidden: crate::hidden_changes(document),
     };
     let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
     let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
@@ -506,6 +510,7 @@ impl MarginRoom {
                 }
                 let values = FieldValues {
                     objects: crate::objects::inline_sizes(document),
+                    hidden: crate::hidden_changes(document),
                     ..FieldValues::default()
                 };
                 let (lines, bottom) = margin_block(document, paragraphs, width, &values, system);

@@ -1376,6 +1376,12 @@ impl Editor {
         &self.document
     }
 
+    /// Sets how the tracked changes of the document show, outside the
+    /// history (W148, REV-04).
+    pub fn set_markup(&mut self, markup: crate::Markup) {
+        self.document.set_markup(markup);
+    }
+
     /// A snapshot of the document, which later edits do not change.
     pub fn snapshot(&self) -> Document {
         self.document.clone()
