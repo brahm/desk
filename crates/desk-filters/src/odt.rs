@@ -1930,6 +1930,14 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 page_links: source.toc_levels.iter().any(|l| l.link),
             },
             links_inactive: text.links_inactive.unwrap_or(false),
+            // Paused, the document says it tracks none (W148).
+            tracking: if source.track_changes {
+                desk_model::Tracking::On
+            } else if text.tracking_paused {
+                desk_model::Tracking::Paused
+            } else {
+                desk_model::Tracking::Off
+            },
             guides: fixed_guides(&text.guides),
             drop_cap_styles: text.drop_cap_styles.as_ref().map_or_else(
                 || DropCapStyle::library().to_vec(),
@@ -3232,6 +3240,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             // document that does not say takes the sum (FMT-15).
             larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
             links_inactive: settings.links_inactive.then_some(true),
+            tracking_paused: settings.tracking == desk_model::Tracking::Paused,
             guides: settings
                 .guides
                 .iter()
@@ -3843,6 +3852,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
     };
     // Last, as it joins paragraphs whose breaks deletions took (W148).
     out.tracked_changes = changes::export_all(&mut out, document);
+    out.track_changes = document.text_settings().tracking == desk_model::Tracking::On;
     out
 }
 

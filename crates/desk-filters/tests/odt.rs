@@ -429,6 +429,8 @@ fn sample() -> Document {
                 ],
                 // An author who chose teal (W150).
                 author_colors: vec![("Ana".into(), desk_model::AuthorColor::Teal)],
+                // Tracking paused (W148).
+                tracking: desk_model::Tracking::Paused,
             },
         })
         .unwrap();

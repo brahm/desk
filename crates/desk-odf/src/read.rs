@@ -739,6 +739,7 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("HeaderMargin") => out.header_margin = Some(text.trim().to_owned()),
                 Some("FooterMargin") => out.footer_margin = Some(text.trim().to_owned()),
                 Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
+                Some("TrackingPaused") => out.tracking_paused = text.trim() == "true",
                 Some("PageLayoutPages") => {
                     out.layout_pages = text
                         .trim()

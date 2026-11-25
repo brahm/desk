@@ -501,6 +501,7 @@ fn full_document() -> TextDocument {
             never_hyphenate: vec!["desk".into(), "liberation".into()],
             larger_spacing: Some(true),
             links_inactive: Some(true),
+            tracking_paused: true,
             note_kind: Some("section".into()),
             note_format: Some("symbols".into()),
             note_numbering: Some("page".into()),

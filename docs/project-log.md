@@ -2264,6 +2264,25 @@ paragraph, and objects on a second page.
 - The pages mark the text of a changed paragraph as they do formatted
   text, until the markup views of step 11.
 
+### 25 November: tracked editing (step 10 of W2, first part)
+
+- While the document tracks its changes, each action of the user is
+  made with the author and the date of its changes: the text typed is
+  an insertion, which typing on after it joins; text deleted stays,
+  marked as a deletion, but what the author added themselves goes, as
+  in Pages, and text deleted already stays in its change; formatting
+  text or a paragraph puts what changes in a change of formatting first,
+  so that it keeps what it had. Each action makes at most one change of
+  each kind, which undo takes away with it.
+- Paused, changes are made as they are and those kept stay. ODF has
+  only on and off, so a paused document says it tracks none, as other
+  programs then do, and Desk keeps the pause in a setting of its own.
+- Clearing the formatting of text keeps its links, changes and
+  comments, which belong to the text and not to its formatting.
+- The bar that turns tracking on and off, pauses it and moves between
+  the changes, and the author of the changes from the preferences, come
+  in the second pull request of step 10, with B-066.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

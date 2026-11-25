@@ -600,6 +600,18 @@ which is yellow unless someone chose it, then the others by name, an
 order that saving and opening again keeps.
 Other programs ignore the item and colour comments their own way.
 
+#### Tracking paused (settings, not an attribute)
+
+Whether the tracking of changes is paused (W148), as the Pause switch of
+the change tracking bar leaves it in Desk Writer as in Pages 15.4, is
+kept in the `TrackingPaused` item of the `DeskTextSettings` set in
+`settings.xml`, written only when it is. ODF has only on and off:
+`text:track-changes` of `text:tracked-changes` says `true` while changes
+are tracked and `false` while tracking is paused, so that other programs
+make changes as they are then, as Desk does, and keep those already
+tracked. Other programs ignore the item, and a file they save tracks
+changes again or not as their own setting says.
+
 ### Text: lists (`text:list-level-style-image`)
 
 #### `desk:relative-size`

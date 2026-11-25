@@ -297,6 +297,10 @@ pub struct TextSettings {
     pub note_gap: Option<String>,
     /// Whether links do nothing when clicked.
     pub links_inactive: Option<bool>,
+    /// Whether the tracking of changes is paused (W148): changes are
+    /// made as they are, while those kept stay. `text:track-changes`
+    /// says false then, as other programs track none.
+    pub tracking_paused: bool,
     /// How far the header is from the top of the paper, as `36pt`, while
     /// the pages show none, which ODF has no place for.
     pub header_margin: Option<String>,
