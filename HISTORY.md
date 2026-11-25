@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: in Desk Writer, an object moved or resized while tracking
+  changes shows in a dashed frame in its author's colour, with its
+  bubble, and Previous, Next, Accept and Reject of the bar of comments
+  and changes go to it and take it (#PR).
 * Added: in Desk Writer, a floating object moved or resized while
   tracking changes keeps where it was until the change is accepted or
   rejected, also in ODT, and an object in the line of the text that a

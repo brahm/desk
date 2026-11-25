@@ -63,8 +63,20 @@ impl TextEditor {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
         let places = document.change_places();
+        let palette = document.author_palette_of(local, &crate::preferences::get().former_authors);
+        // The objects that changes moved or resized, around where they
+        // are now (REV-01).
+        let mut out: Vec<_> = document
+            .objects()
+            .iter()
+            .filter_map(|o| {
+                let change = document.changes().get(o.moved?.change)?;
+                let rect = super::comments::object_rect(Self::main_layout(&state), o.id)?;
+                Some((rect, change.kind, palette.color(&change.author)))
+            })
+            .collect();
         if places.is_empty() {
-            return Vec::new();
+            return out;
         }
         // The body and the stories as the pages show them.
         let texts = Texts::with(
@@ -72,8 +84,6 @@ impl TextEditor {
             Self::main_layout(&state),
             places.iter().filter_map(|(story, _)| *story),
         );
-        let palette = document.author_palette_of(local, &crate::preferences::get().former_authors);
-        let mut out = Vec::new();
         for (story, span) in places {
             let spots = match story {
                 None => Spot::of(document, span.start).zip(Spot::of(document, span.end)),
@@ -214,6 +224,29 @@ impl TextEditor {
             return None;
         };
         let state = self.state.borrow();
+        // An object that a change moved, selected (REV-01).
+        if let [object] = state.objects[..]
+            && state.story.is_none()
+        {
+            let document = Self::main_document(&state);
+            let change = document.changes().get(id)?;
+            if document.objects().get(object)?.moved?.change != id {
+                return None;
+            }
+            let palette =
+                document.author_palette_of(local, &crate::preferences::get().former_authors);
+            return Some(ChangeBubble {
+                id,
+                kind: change.kind,
+                author: change.author.to_string(),
+                date: change.date.as_deref().map(str::to_owned),
+                color: palette.color(&change.author),
+                text: String::new(),
+                object: true,
+                paragraphs: 0,
+                rect: super::comments::object_rect(Self::main_layout(&state), object)?,
+            });
+        }
         // A change of no text, as a break, or one the view hides, is
         // selected as a cursor: its bubble shows when the bar went to it.
         if state.selection.is_empty() && state.reviewed != Some(item) {
@@ -420,7 +453,8 @@ impl TextEditor {
     /// Whether any text of the document has tracked changes.
     pub fn has_changes(&self) -> bool {
         let state = self.state.borrow();
-        !Self::main_document(&state).change_places().is_empty()
+        let document = Self::main_document(&state);
+        !document.change_places().is_empty() || document.objects().iter().any(|o| o.moved.is_some())
     }
 
     /// The tracked changes that Accept and Reject of the selection take
@@ -431,6 +465,21 @@ impl TextEditor {
     pub fn changes_at_selection(&self) -> Vec<desk_model::NodeId> {
         let current = self.review_position().0;
         let state = self.state.borrow();
+        // The objects selected, the changes that moved them (REV-01).
+        if !state.objects.is_empty() {
+            let objects = Self::main_document(&state).objects();
+            let mut out: Vec<desk_model::NodeId> = Vec::new();
+            for id in &state.objects {
+                if let Some(moved) = objects.get(*id).and_then(|o| o.moved)
+                    && !out.contains(&moved.change)
+                {
+                    out.push(moved.change);
+                }
+            }
+            if !out.is_empty() {
+                return out;
+            }
+        }
         if let Some((_, item @ super::ReviewItem::Change(id))) = current
             && (state.selection.is_empty() || state.reviewed == Some(item))
             && state.others.is_empty()
@@ -854,6 +903,76 @@ mod tests {
                 ..bubble
             };
             assert_eq!(crate::change_bubble::what(&object), "<b>Added:</b> Object");
+        });
+    }
+
+    #[test]
+    fn rev_01_an_object_moved_is_marked_gone_to_and_resolved() {
+        use desk_model::{Anchor, Frame, Object, Shape, TextSettings, Tracking};
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let (shape, _) = document
+                .transact("Shape", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one")?;
+                    let mut shape = Object::new(
+                        edit.new_id(),
+                        Shape::Ellipse.into(),
+                        Frame::from_pt(200.0, 300.0, 50.0, 40.0),
+                    );
+                    shape.anchor = Anchor::Page(0);
+                    let id = shape.id;
+                    edit.add_object(shape)?;
+                    edit.set_text_settings(TextSettings {
+                        tracking: Tracking::On,
+                        ..edit.document().text_settings().clone()
+                    })?;
+                    Ok(id)
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.state.borrow_mut().editor.set_author("Bo");
+            assert!(!editor.has_changes());
+            // Moved with the arrows while tracking, it is in a change.
+            editor.select_objects(vec![shape]);
+            assert!(editor.object_key(gtk::gdk::Key::Right, gtk::gdk::ModifierType::empty()));
+            let change = editor.document().changes().iter().next().unwrap().clone();
+            assert_eq!(change.kind, ChangeKind::Placement);
+            assert!(editor.has_changes());
+            // Marked with a frame around it, in the colour of its author.
+            let marks = editor.change_marks("Ana");
+            assert_eq!(marks.len(), 1);
+            assert_eq!(marks[0].1, ChangeKind::Placement);
+            assert!((marks[0].0.x0 - 201.0).abs() < 0.5, "{:?}", marks[0].0);
+            // Selected, it has its bubble, and its change is the one of
+            // the selection.
+            let bubble = editor.change_bubble("Ana").unwrap();
+            assert_eq!(
+                (bubble.id, bubble.kind, bubble.object),
+                (change.id, ChangeKind::Placement, true)
+            );
+            assert_eq!(crate::change_bubble::what(&bubble), "<b>Moved:</b> Object");
+            assert_eq!(editor.changes_at_selection(), [change.id]);
+            // The bar goes to it from the text.
+            editor.select_objects(Vec::new());
+            editor.select(Selection::cursor(Spot::new(0, 0)));
+            assert_eq!(
+                editor.go_to_review_item(true),
+                Some(super::super::ReviewItem::Change(change.id))
+            );
+            assert_eq!(editor.selected_objects(), [shape]);
+            assert_eq!(
+                editor.review_position(),
+                (Some((1, super::super::ReviewItem::Change(change.id))), 1)
+            );
+            // Rejected, it is back where it was.
+            assert_eq!(editor.resolve_selected_changes(false), 1);
+            let object = editor.document().objects().get(shape).unwrap().clone();
+            assert_eq!(
+                (object.frame.x, object.moved),
+                (desk_model::Length::from_pt(200.0), None)
+            );
+            assert!(!editor.has_changes());
         });
     }
 

@@ -1579,8 +1579,9 @@ fn draw_change_bars(
 }
 
 /// The text of tracked changes on a page, in the colour of each author:
-/// a line under text added, through text deleted, and a dashed line under
-/// text whose formatting changed (W148, REV-04).
+/// a line under text added, through text deleted, a dashed line under
+/// text whose formatting changed (W148, REV-04), and a dashed frame around
+/// an object moved or resized (REV-01).
 fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
     cr.set_line_width((1.5 * scale).max(1.0));
     for (span, kind, color) in state.change_marks.iter().filter(|(s, _, _)| s.page == page) {
@@ -1590,6 +1591,21 @@ fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
             f64::from(ink.g) / 255.0,
             f64::from(ink.b) / 255.0,
         );
+        if *kind == desk_model::ChangeKind::Placement {
+            // An object moved or resized: a dashed frame around it.
+            let dash = (3.0 * scale).max(2.0);
+            cr.set_dash(&[dash, dash], 0.0);
+            let pad = 2.0;
+            cr.rectangle(
+                rect.x + (span.x0 - pad) * scale,
+                rect.y + (span.y0 - pad) * scale,
+                (span.x1 - span.x0 + 2.0 * pad) * scale,
+                (span.y1 - span.y0 + 2.0 * pad) * scale,
+            );
+            cr.stroke().ok();
+            cr.set_dash(&[], 0.0);
+            continue;
+        }
         let y = match kind {
             desk_model::ChangeKind::Insertion
             | desk_model::ChangeKind::Format

@@ -2553,6 +2553,20 @@ paragraph, and objects on a second page.
   Accept and Reject of a selected object come in the next part, and
   the cells after it.
 
+### 25 November: the markup of objects moved (step 13 of W2, sixth part)
+
+- An object that a change moved or resized shows in a dashed frame, in
+  the colour of the author of the change, where it is now, as text
+  formatted shows with a dashed line; Final shows none. Where it was
+  is not drawn: rejecting puts it there.
+- Previous and Next of the bar go through those objects with the
+  comments and the other changes, in the order of the pages, and
+  select the object; the label counts them. A selected object in a
+  change has the bubble of the change, Moved: Object, and Accept and
+  Reject take the changes of the objects selected.
+- Whether the document has changes, which Accept All, Reject All and
+  turning tracking off look at, counts the objects moved too.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

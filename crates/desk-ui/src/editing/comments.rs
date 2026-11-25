@@ -78,6 +78,21 @@ fn placed_changes(document: &Document) -> Vec<Placed> {
             }),
         }
     }
+    // The objects that changes moved or resized, each where it is now
+    // (REV-01).
+    out.extend(document.objects().iter().filter_map(|o| {
+        let moved = o.moved?;
+        document.changes().get(moved.change)?;
+        Some(Placed {
+            id: moved.change,
+            story: None,
+            start: Spot::default(),
+            end: Spot::default(),
+            object: Some(o.id),
+            cell: None,
+            change: true,
+        })
+    }));
     out
 }
 
@@ -181,7 +196,7 @@ fn cell_text(document: &Document, table: NodeId, (row, col): (u32, u32)) -> Stri
 }
 
 /// Where an object is on the pages, in a group too.
-fn object_rect(layout: &DocumentLayout, id: NodeId) -> Option<SpanRect> {
+pub(super) fn object_rect(layout: &DocumentLayout, id: NodeId) -> Option<SpanRect> {
     fn find(placed: &desk_layout::PlacedObject, id: NodeId) -> Option<&desk_layout::PlacedObject> {
         if placed.object.id == id {
             return Some(placed);
