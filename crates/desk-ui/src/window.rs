@@ -247,7 +247,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 93] = [
+const DOCUMENT_ACTIONS: [&str; 94] = [
     "outline",
     "screen-view",
     "text-size",
@@ -269,6 +269,7 @@ const DOCUMENT_ACTIONS: [&str; 93] = [
     "save",
     "save-as",
     "save-copy",
+    "save-final",
     "duplicate",
     "fullscreen",
     "select-all",
@@ -1647,18 +1648,45 @@ impl DocumentWindow {
     /// Writes the document to `path`, with the fields of its file name
     /// showing `named`.
     fn write_named(&self, path: &Path, named: &Path) -> bool {
+        self.write_document(path, named, false)
+    }
+
+    /// Writes the document to `path`, with the fields of its file name
+    /// showing `named`, or a copy of it as final when `as_final`: every
+    /// change accepted and no comments (REV-07).
+    fn write_document(&self, path: &Path, named: &Path, as_final: bool) -> bool {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
         let pages = editor.pages();
-        let mut document = crate::fields::saved(editor.document(), &named.to_string_lossy());
-        // How it shows, to reopen the same way (INT-08, DOC-16).
+        let document = if as_final {
+            match editor.document().final_copy() {
+                Ok(copy) => copy,
+                Err(error) => {
+                    self.alert(
+                        &tr("Cannot save {name}").replace("{name}", &display_name(path)),
+                        &error.to_string(),
+                    );
+                    return false;
+                }
+            }
+        } else {
+            editor.document()
+        };
+        let mut document = crate::fields::saved(document, &named.to_string_lossy());
+        // How it shows, to reopen the same way (INT-08, DOC-16); a copy
+        // as final shows changes as a new document does (REV-07).
         document.set_view(Some(self.current_view()));
+        if as_final {
+            document.set_markup(desk_model::Markup::default());
+        }
         // A picture of the first page, unless the preferences leave it out
         // (DOC-09).
+        // The pages show the changes and comments that a copy as final
+        // leaves out: it has no picture.
         let preview = pages
             .first()
-            .filter(|_| crate::preferences::get().include_preview);
+            .filter(|_| crate::preferences::get().include_preview && !as_final);
         match crate::save_document(opener, &document, preview, path) {
             Ok(()) => true,
             Err(message) => {
@@ -1842,6 +1870,31 @@ impl DocumentWindow {
         });
     }
 
+    /// Asks where to save a copy of the document as final, with every
+    /// tracked change accepted and no comments, and saves it there, still
+    /// editing the same file with its changes and comments (REV-07).
+    fn save_final(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        let named = tr("{name} (Final)");
+        self.ask_file_named(&tr("Save a Copy as Final"), Some(&named), move |path| {
+            let (Some(this), Some(path)) = (weak.upgrade(), path) else {
+                return;
+            };
+            // The copy never takes the place of the document, whose
+            // changes and comments it leaves out.
+            if this.path.borrow().as_deref() == Some(path.as_path()) {
+                this.alert(
+                    &tr("Cannot save {name}").replace("{name}", &display_name(&path)),
+                    &tr("A copy as final cannot replace the document it is made from. Choose another name or folder."),
+                );
+                return;
+            }
+            if this.write_document(&path, &path, true) {
+                remember_recent(&path);
+            }
+        });
+    }
+
     /// Writes the recovery draft of the document, when it has changes
     /// that are not saved nor in the draft yet.
     fn keep_draft(&self) {
@@ -1934,6 +1987,17 @@ impl DocumentWindow {
     /// offers the name of the document with the extension of the kind the
     /// app saves, in its folder.
     fn ask_file(&self, title: &str, chosen: impl FnOnce(Option<PathBuf>) + 'static) {
+        self.ask_file_named(title, None, chosen);
+    }
+
+    /// Asks where to save, as [`Self::ask_file`], suggesting the name of
+    /// the document as `named` says it, `{name}` standing for it.
+    fn ask_file_named(
+        &self,
+        title: &str,
+        named: Option<&str>,
+        chosen: impl FnOnce(Option<PathBuf>) + 'static,
+    ) {
         let Some(opener) = self.opener else { return };
         let (kind, extension) = opener.saves;
         let filter = gtk::FileFilter::new();
@@ -1951,7 +2015,10 @@ impl DocumentWindow {
             .modal(true)
             .filters(&filters)
             .default_filter(&filter)
-            .initial_name(format!("{stem}.{extension}"))
+            .initial_name(format!(
+                "{}.{extension}",
+                named.map_or(stem.clone(), |n| n.replace("{name}", &stem))
+            ))
             .build();
         if let Some(folder) = path.as_deref().and_then(Path::parent) {
             dialog.set_initial_folder(Some(&gio::File::for_path(folder)));
@@ -2827,7 +2894,7 @@ impl DocumentWindow {
     }
 
     fn add_actions(self: &Rc<Self>) {
-        let simple: [(&str, WindowAction); 13] = [
+        let simple: [(&str, WindowAction); 14] = [
             ("warnings", |this| this.show_warnings()),
             // Edit in the table of contents of the sidebar: the styles it
             // lists are in the Document tab of the Inspector (W011).
@@ -2840,6 +2907,7 @@ impl DocumentWindow {
             ("save", |this| this.save(|_| {})),
             ("save-as", |this| this.save_as(|_| {})),
             ("save-copy", Self::save_copy),
+            ("save-final", Self::save_final),
             ("duplicate", |this| this.duplicate()),
             ("revert", Self::revert),
             ("properties", |this| {
@@ -4729,6 +4797,7 @@ pub(crate) fn edit_menu() -> gio::Menu {
         Some(&tr("Reject All Changes")),
         Some("win.reject-all-changes"),
     );
+    tracking.append(Some(&tr("Save a Copy as Final…")), Some("win.save-final"));
     menu.append_section(None, &tracking);
     menu.append_section(None, &transformations_menu());
     menu.append_section(None, &substitutions_menu());

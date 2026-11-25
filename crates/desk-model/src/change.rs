@@ -183,6 +183,30 @@ pub(crate) fn change_spans_in<'a>(
     out
 }
 
+impl crate::Document {
+    /// The copy of the document as final that Save a Copy as Final of
+    /// Pages '09 makes (W148, REV-07, D-003): every tracked change
+    /// accepted, without comments or highlights, with tracking off and
+    /// the changes shown with their markup, as a new document has them.
+    /// The document itself keeps its changes, comments and tracking.
+    pub fn final_copy(&self) -> Result<crate::Document, crate::ModelError> {
+        let mut copy = self.clone();
+        copy.transact("Save a Copy as Final", |edit| {
+            edit.resolve_changes(true, |_| true)?;
+            let comments: Vec<NodeId> = edit.document().comments().iter().map(|c| c.id).collect();
+            for id in comments {
+                edit.remove_comment(id)?;
+            }
+            edit.set_text_settings(crate::TextSettings {
+                tracking: crate::Tracking::Off,
+                ..edit.document().text_settings().clone()
+            })
+        })?;
+        copy.set_markup(crate::Markup::default());
+        Ok(copy)
+    }
+}
+
 impl crate::Edit {
     /// Accepts or rejects the tracked changes for which `which` is true,
     /// in every text of the document (W148, REV-06): accepted, text added

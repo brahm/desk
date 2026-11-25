@@ -1386,3 +1386,50 @@ fn rev_05_a_cell_whose_change_is_gone_is_tracked_again() {
         Content::Text("a".into())
     );
 }
+
+#[test]
+fn rev_07_a_copy_as_final_has_every_change_accepted_and_no_comment() {
+    use desk_model::table::Content;
+    let (mut editor, p) = changed();
+    let table = table_object(&mut editor);
+    track(&mut editor, Tracking::On);
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+    });
+    editor
+        .edit("Comment", |edit| {
+            edit.add_comment(
+                Position::new(p, 0),
+                Position::new(p, 3),
+                desk_model::Comment {
+                    id: NodeId::new(1).unwrap(),
+                    author: "Bo".into(),
+                    date: None,
+                    text: "Conferir".into(),
+                    replies: std::sync::Arc::from([]),
+                },
+            )
+        })
+        .unwrap();
+    let document = editor.document().clone();
+    let copy = document.final_copy().unwrap();
+    assert!(copy.changes().is_empty());
+    assert!(copy.comments().is_empty());
+    assert!(copy.cell_changes().is_empty());
+    assert_eq!(copy.text_settings().tracking, Tracking::Off);
+    let text: Vec<String> = copy.body().iter().map(|p| p.text().to_string()).collect();
+    assert_eq!(text, ["one three four"]);
+    assert!(copy.body().iter().all(|p| {
+        p.runs()
+            .all(|r| r.attrs.change.is_none() && r.attrs.comments.is_none())
+    }));
+    let desk_model::ObjectKind::Table(t) = &copy.objects().get(table).unwrap().kind else {
+        unreachable!()
+    };
+    assert_eq!(t.cell(0, 0).content, Content::Text("b".into()));
+    // The document keeps them.
+    assert_eq!(editor.document(), &document);
+    assert_eq!(document.changes().len(), 4);
+    assert_eq!(document.comments().iter().count(), 1);
+    assert_eq!(document.text_settings().tracking, Tracking::On);
+}
