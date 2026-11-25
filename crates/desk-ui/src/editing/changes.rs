@@ -712,12 +712,12 @@ mod tests {
                 .filter(|m| m.kind == text_nav::Invisible::Paragraph)
                 .count();
             assert_eq!(ends, 1);
-            // The text of a story, laid out where it is, does not join yet
-            // (B-074): its breaks stay.
+            // The text of a story goes past them too, as it joins where it
+            // is laid out (B-074).
             let story = document.with_body(document.body().iter().cloned().collect());
             assert_eq!(
                 text_nav::move_char(&story, Spot::new(0, 4), true),
-                Spot::new(1, 3)
+                Spot::new(2, 1)
             );
             drop(state);
             // Delete takes the next character that shows.
@@ -726,6 +726,56 @@ mod tests {
             let texts: Vec<String> = editor.document().body().iter().map(|p| p.text()).collect();
             assert_eq!(texts, ["one ", "two", "hree"]);
         });
+    }
+
+    /// B-074 review: Show Invisibles marks no end of a paragraph in a
+    /// text box where its deleted break does not show.
+    #[test]
+    fn b_074_a_joined_paragraph_of_a_text_box_shows_no_end_mark() {
+        use desk_model::{Frame, Markup, Object, ObjectKind, ParaAttrs, Paragraph, Run, TextBox};
+        let mut document = Document::new_word_processing();
+        document
+            .transact("Box", |edit| {
+                let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+                let style = edit.document().styles().default_paragraph();
+                let mut texts = Vec::new();
+                for (i, text) in ["one ", "two"].into_iter().enumerate() {
+                    let mut attrs = ParaAttrs::default();
+                    if i == 0 {
+                        attrs.break_change = Some(Some(gone));
+                    }
+                    texts.push(Paragraph::from_runs(
+                        edit.new_id(),
+                        style,
+                        attrs,
+                        [Run::new(text)],
+                    )?);
+                }
+                let text = TextBox::new(
+                    std::sync::Arc::from(texts),
+                    desk_model::Length::from_points(5),
+                );
+                let id = edit.new_id();
+                let mut object = Object::new(
+                    id,
+                    ObjectKind::TextBox(text),
+                    Frame::from_pt(100.0, 100.0, 300.0, 200.0),
+                );
+                object.wrap = desk_model::Wrap::Through;
+                edit.add_object(object)
+            })
+            .unwrap();
+        let ends = |document: &Document| {
+            let layout = crate::with_text_system(|system| desk_layout::paginate(document, system));
+            text_nav::invisibles(document, &layout)
+                .into_iter()
+                .filter(|m| m.kind == text_nav::Invisible::Paragraph)
+                .count()
+        };
+        // The end of the body and of each paragraph of the box.
+        assert_eq!(ends(&document), 3);
+        document.set_markup(Markup::WithoutDeletions);
+        assert_eq!(ends(&document), 2);
     }
 
     #[test]

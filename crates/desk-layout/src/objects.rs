@@ -1001,6 +1001,24 @@ pub fn flow_text_boxes(
     paragraphs: &[desk_model::Paragraph],
     system: &mut TextSystem,
 ) -> Vec<Vec<PlacedLine>> {
+    // Paragraphs whose deleted breaks do not show, joined (B-074).
+    let hidden = crate::hidden_changes(document);
+    let Some(shown) = crate::joins::Shown::new(paragraphs, hidden.as_deref()) else {
+        return flow_shown(document, boxes, paragraphs, system);
+    };
+    let mut out = flow_shown(document, boxes, &shown.paragraphs, system);
+    shown.restore(out.iter_mut());
+    out
+}
+
+/// The lines of paragraphs laid out through linked text boxes, as they
+/// show.
+fn flow_shown(
+    document: &Document,
+    boxes: &[&PlacedObject],
+    paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
+) -> Vec<Vec<PlacedLine>> {
     if let [placed] = boxes
         && let Some(space) = ShapeSpace::of(placed)
     {

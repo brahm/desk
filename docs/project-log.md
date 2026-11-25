@@ -2464,6 +2464,29 @@ paragraph, and objects on a second page.
   matched to their starts by region, not by change, so that the pieces
   of one change keep the formatting before of their own regions.
 
+### 25 November: stories join their paragraphs (step 13 of W2, third part)
+
+- In the views of markup without deletions, the paragraphs of notes,
+  headers, footers, text boxes and shapes whose deleted break does not
+  show join as those of the body do since B-071 (B-074).
+- Each of those texts is laid out by code of its own. Rather than
+  teach each one, the layout gives it the paragraphs as they show, the
+  first of joined ones with the text of all, and then gives the lines
+  back to the paragraphs of the text, cut where each starts, as the
+  body does. The cutting of the body and of the other texts is now the
+  same code.
+- The text of a story edited with the tools of the body no longer needs
+  to be told apart, so the mark that a document's body held a story,
+  added for B-071, is gone, and the arrows go past a hidden break in a
+  story as in the body.
+- The text of table cells in Writer has no tracked changes yet: it joins
+  with the changes of cells (REV-05), the sixth part of this step.
+- The review found the marks of Show Invisibles at the ends of the
+  joined paragraphs of text boxes, in the middle of their line, and
+  lines of notes numbered two ways; the marks go, the lines of a note
+  are numbered from the first of each paragraph, and the joins of
+  notes are found once for each layout.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
