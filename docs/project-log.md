@@ -2611,6 +2611,18 @@ paragraph, and objects on a second page.
   selected, and the changes no longer used are found once for all,
   not once for each.
 
+### 25 November: a copy as final (step 14 of W2)
+
+- Save a Copy as Final, which Pages '09 had in the action menu of
+  tracking and Pages 15.4 lacks (REV-07, D-003), is in the menu of the
+  bar of comments and changes and in the command search. It asks where
+  to save, and writes a copy with every tracked change accepted, the
+  comments and highlights taken out and tracking off, shown as a new
+  document shows changes. The document being edited keeps its changes,
+  its comments, its tracking and its file.
+- The copy has no picture of its first page: the pages on the screen
+  show the markup and the comments that the copy leaves out.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
