@@ -322,7 +322,7 @@ impl TextEditor {
     /// Changes the selected table as one step of the history, and the
     /// selected cells with it; the frame takes the size of the table.
     pub fn change_table(&self, name: &str, change: impl FnOnce(&mut Table, &mut CellSelection)) {
-        self.edit_table(name, true, change);
+        self.edit_table(name, Some(|_: &mut Table| {}), change);
     }
 
     /// Changes the rows, columns, borders, merges or order of the selected
@@ -330,13 +330,17 @@ impl TextEditor {
     /// none of it is a tracked change of its cells, as Pages '09 tracked
     /// none (REV-05).
     pub fn rearrange_table(&self, name: &str, change: impl FnOnce(&mut Table, &mut CellSelection)) {
-        self.edit_table(name, false, change);
+        self.edit_table(name, None::<fn(&mut Table)>, change);
     }
 
+    /// Changes the selected table with `change` in one step of the
+    /// history: tracked when `arrange` is given, which first rearranges
+    /// the table without being tracked, as a paste adds the rows and
+    /// columns it needs before it writes the cells (REV-05).
     fn edit_table(
         &self,
         name: &str,
-        tracked: bool,
+        arrange: Option<impl FnOnce(&mut Table)>,
         change: impl FnOnce(&mut Table, &mut CellSelection),
     ) {
         let Some((table, _)) = self.table_selection() else {
@@ -356,7 +360,12 @@ impl TextEditor {
                 anchor: (0, 0),
                 focus: (table.rows() - 1, table.cols() - 1),
             });
-        let mut changed = (*table).clone();
+        let tracked = arrange.is_some();
+        let mut arranged = (*table).clone();
+        if let Some(arrange) = arrange {
+            arrange(&mut arranged);
+        }
+        let mut changed = arranged.clone();
         change(&mut changed, &mut cells);
         if changed == *table {
             if self.state.borrow().cells != Some(cells) {
@@ -375,6 +384,7 @@ impl TextEditor {
         cells.anchor = clamp(cells.anchor);
         cells.focus = clamp(cells.focus);
         let (w, h) = self.table_size(&changed);
+        let arranged = (arranged != *table).then(|| Arc::new(arranged));
         let changed = Arc::new(changed);
         let aside = crate::preferences::get().move_objects_aside;
         self.arrange_objects(name, move |edit, _| {
@@ -382,6 +392,11 @@ impl TextEditor {
                 return Ok(None);
             };
             let old = object.frame;
+            if let Some(arranged) = arranged {
+                let mut object = object.clone();
+                object.kind = ObjectKind::Table(arranged);
+                edit.untracked(|edit| edit.replace_object(object))?;
+            }
             object.kind = ObjectKind::Table(changed);
             object.frame.width = desk_model::Length::from_pt(w);
             object.frame.height = desk_model::Length::from_pt(h);
@@ -1181,11 +1196,18 @@ impl TextEditor {
         };
         let locale = self.locale();
         let text = text.to_owned();
-        self.change_table("Paste", |table, sel| {
-            let area = table.paste_text(cells.focus, &text, &locale);
-            sel.anchor = (area.row, area.col);
-            sel.focus = (area.row_end() - 1, area.col_end() - 1);
-        });
+        let grow = text.clone();
+        self.edit_table(
+            "Paste",
+            Some(move |table: &mut Table| {
+                table.grow_for_text(cells.focus, &grow);
+            }),
+            |table, sel| {
+                let area = table.paste_text(cells.focus, &text, &locale);
+                sel.anchor = (area.row, area.col);
+                sel.focus = (area.row_end() - 1, area.col_end() - 1);
+            },
+        );
         true
     }
 }

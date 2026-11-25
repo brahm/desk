@@ -243,21 +243,8 @@ impl Edit {
         // A copy is a new object, without the comments of the first, on
         // it or on its cells.
         copy.comments = crate::CommentIds::none();
-        // Nor its tracked change of place (W148).
-        copy.moved = None;
-        // Nor the tracked changes of its cells (REV-05).
-        if let crate::ObjectKind::Table(table) = &mut copy.kind {
-            let tracked: Vec<(u32, u32)> = (0..table.rows())
-                .flat_map(|r| (0..table.cols()).map(move |c| (r, c)))
-                .filter(|&(r, c)| table.cell(r, c).tracked.is_some())
-                .collect();
-            if !tracked.is_empty() {
-                let table = std::sync::Arc::make_mut(table);
-                for (r, c) in tracked {
-                    table.cell_mut(r, c).tracked = None;
-                }
-            }
-        }
+        // Nor its tracked changes of place or of cells (W148, REV-05).
+        copy.untrack();
         if let crate::ObjectKind::Table(table) = &mut copy.kind
             && !table.comments().is_empty()
         {

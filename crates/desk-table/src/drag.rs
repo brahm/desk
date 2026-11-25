@@ -37,6 +37,9 @@ impl<T: CellText> Table<T> {
             let (nr, nc) = (r - area.row, c - area.col);
             *out.cell_mut(nr, nc) =
                 carried(self.cell(r, c), -i64::from(area.row), -i64::from(area.col));
+            // Taken out of the table, a cell is in none of its tracked
+            // changes (REV-05).
+            out.cell_mut(nr, nc).tracked = None;
             out.set_h_border(nr, nc, self.h_border(r, c));
             out.set_v_border(nr, nc, self.v_border(r, c));
             if r + 1 == area.row_end() {
@@ -134,6 +137,13 @@ impl<T: CellText> Table<T> {
             }
         }
         let landed = self.put_grown(to, &source, area);
+        if copying {
+            // A copy is in no tracked change of the cell it copies
+            // (REV-05).
+            for (r, c) in landed.cells() {
+                self.cell_mut(r, c).tracked = None;
+            }
+        }
         if !copying {
             // Moved formulas point at the same cells, as before.
             let (dr, dc) = (

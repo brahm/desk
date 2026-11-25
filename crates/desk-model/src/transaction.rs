@@ -1296,10 +1296,7 @@ impl Edit {
             .map(crate::Object::changes)
             .unwrap_or_default();
         self.apply(Op::RemoveObject { object: id })?;
-        for change in changes {
-            self.drop_unused(change)?;
-        }
-        Ok(())
+        self.drop_unused(&changes)
     }
 
     /// Replaces an object with another with the same identifier. While
@@ -1356,17 +1353,17 @@ impl Edit {
             }
         }
         if old.as_ref() != Some(&object) {
+            let kept: std::collections::HashSet<crate::NodeId> =
+                object.changes().into_iter().collect();
             let gone: Vec<crate::NodeId> = old
                 .as_ref()
                 .map(crate::Object::changes)
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|c| !object.changes().contains(c))
+                .filter(|c| !kept.contains(c))
                 .collect();
             self.apply(Op::ReplaceObject { object })?;
-            for change in gone {
-                self.drop_unused(change)?;
-            }
+            self.drop_unused(&gone)?;
         }
         Ok(())
     }
@@ -1394,7 +1391,12 @@ impl Edit {
                 if new.tracked != old.tracked || same(&old.content, &old.format, &old.style) {
                     continue;
                 }
-                let tracked = match &old.tracked {
+                // A cell whose change is gone is in none.
+                let live = old.tracked.as_ref().filter(|t| {
+                    crate::NodeId::new(t.change.get())
+                        .is_some_and(|id| self.doc.changes().get(id).is_some())
+                });
+                let tracked = match live {
                     Some(t) if same(&t.content, &t.format, &t.style) => None,
                     Some(t) => {
                         // Another author changing it again joins the
@@ -1432,25 +1434,36 @@ impl Edit {
         Ok(())
     }
 
-    /// Takes away a change of objects or cells that nothing is in any
+    /// Takes away the changes of objects or cells that nothing is in any
     /// longer (W148).
-    pub(crate) fn drop_unused(&mut self, change: crate::NodeId) -> Result<(), ModelError> {
-        let of_objects = self.doc.changes().get(change).is_some_and(|c| {
-            matches!(
-                c.kind,
-                crate::ChangeKind::Placement | crate::ChangeKind::Cell
-            )
-        });
-        if !of_objects
-            || self
-                .doc
-                .objects()
-                .iter()
-                .any(|o| o.changes().contains(&change))
-        {
+    pub(crate) fn drop_unused(&mut self, changes: &[crate::NodeId]) -> Result<(), ModelError> {
+        let of_objects: Vec<crate::NodeId> = changes
+            .iter()
+            .copied()
+            .filter(|&id| {
+                self.doc.changes().get(id).is_some_and(|c| {
+                    matches!(
+                        c.kind,
+                        crate::ChangeKind::Placement | crate::ChangeKind::Cell
+                    )
+                })
+            })
+            .collect();
+        if of_objects.is_empty() {
             return Ok(());
         }
-        self.set_change(change, None)
+        let used: std::collections::HashSet<crate::NodeId> = self
+            .doc
+            .objects()
+            .iter()
+            .flat_map(crate::Object::changes)
+            .collect();
+        for change in of_objects {
+            if !used.contains(&change) {
+                self.set_change(change, None)?;
+            }
+        }
+        Ok(())
     }
 
     /// Sets the settings of the text of the whole document.

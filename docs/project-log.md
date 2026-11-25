@@ -2598,6 +2598,18 @@ paragraph, and objects on a second page.
   programs read as a change of no text.
 - The text of cells has no changes inside it: a cell is changed whole,
   so the paragraphs of a cell have no deleted break to join (B-074).
+- The review found that filling and copying cells copied the change of
+  the cell they came from, which rejecting then put back in all of
+  them: a cell filled, copied or taken out of its table is in no
+  change. A table grouped kept the changes of its cells, which the
+  document no longer had, and its cells were not tracked again: grouped
+  or ungrouped, it leaves them, and a cell whose change is gone is
+  tracked anew. A paste that made the table grow was not tracked: the
+  rows and columns are added first, untracked, and the cells written
+  after are. Rejecting the changes of cells now fits the table to them
+  again, a moved table keeps its bubble with an unchanged cell
+  selected, and the changes no longer used are found once for all,
+  not once for each.
 
 ## Decisions, with their reasons and consequences
 

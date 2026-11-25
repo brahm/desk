@@ -239,6 +239,9 @@ impl<T: CellText> Table<T> {
                 let (fr, fc) = src[from_index];
                 let mut cell = from.clone();
                 cell.comment = None;
+                // A cell filled is in no tracked change of the one it
+                // comes from (REV-05).
+                cell.tracked = None;
                 let offset = |n: u32| if backward { -(n as f64) } else { n as f64 };
                 cell.content = match (&step, &from.content) {
                     (Some(Step::Number(d)), Content::Number(_)) => {
@@ -637,6 +640,29 @@ mod tests {
         (0..t.rows())
             .map(|r| t.source_text(r, col, &Locale::en_us()))
             .collect()
+    }
+
+    #[test]
+    fn rev_05_cells_filled_or_copied_are_in_no_tracked_change() {
+        let mut t = table(&[&["a", ""], &["", ""], &["", ""]]);
+        t.cell_mut(0, 0).tracked = Some(std::sync::Arc::new(crate::Tracked {
+            change: std::num::NonZeroU64::new(7).unwrap(),
+            content: Content::Text("z".into()),
+            format: crate::Format::Automatic,
+            style: t.cell(0, 0).style.clone(),
+            others: false,
+        }));
+        t.fill(Area::between((0, 0), (0, 0)), FillDirection::Down, 2);
+        assert!(t.cell(0, 0).tracked.is_some());
+        assert!(t.cell(1, 0).tracked.is_none() && t.cell(2, 0).tracked.is_none());
+        let landed = t.move_cells(Area::between((0, 0), (0, 0)), (0, 1), true);
+        assert!(t.cell(landed.row, landed.col).tracked.is_none());
+        assert!(t.cell(0, 0).tracked.is_some());
+        let out = t.sub_table(Area::between((0, 0), (0, 0)));
+        assert!(out.cell(0, 0).tracked.is_none());
+        // Moved, a cell keeps its change.
+        t.move_cells(Area::between((0, 0), (0, 0)), (2, 1), false);
+        assert!(t.cell(2, 1).tracked.is_some());
     }
 
     #[test]

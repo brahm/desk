@@ -1319,3 +1319,70 @@ fn rev_05_a_cell_changed_by_several_authors_says_so_and_a_table_grown_is_not_mov
     );
     assert!(editor.document().changes().is_empty());
 }
+
+#[test]
+fn rev_05_a_table_grouped_leaves_the_changes_of_its_cells() {
+    use desk_model::table::Content;
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    let shape = floating_shape(&mut editor);
+    track(&mut editor, Tracking::On);
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+    });
+    assert_eq!(editor.document().changes().len(), 1);
+    let group = editor
+        .edit("Group", |edit| edit.group_objects(&[table, shape]))
+        .unwrap()
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+    editor
+        .edit("Ungroup", |edit| edit.ungroup_objects(&[group]))
+        .unwrap();
+    assert!(cell(&editor, table, 0, 0).tracked.is_none());
+    // Changed again, it is in a change again.
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("c".into());
+    });
+    assert_eq!(editor.document().changes().len(), 1);
+    assert_eq!(
+        cell(&editor, table, 0, 0).tracked.unwrap().content,
+        Content::Text("b".into())
+    );
+}
+
+#[test]
+fn rev_05_a_cell_whose_change_is_gone_is_tracked_again() {
+    use desk_model::table::Content;
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    track(&mut editor, Tracking::On);
+    // A cell read with a change that the document does not have.
+    editor
+        .edit("Stale", |edit| {
+            edit.untracked(|edit| {
+                let mut object = edit.document().objects().get(table).unwrap().clone();
+                let desk_model::ObjectKind::Table(t) = &mut object.kind else {
+                    unreachable!()
+                };
+                let t = std::sync::Arc::make_mut(t);
+                t.cell_mut(0, 0).tracked = Some(std::sync::Arc::new(desk_model::table::Tracked {
+                    change: std::num::NonZeroU64::new(999).unwrap(),
+                    content: Content::Text("old".into()),
+                    format: desk_model::table::Format::Automatic,
+                    style: t.cell(0, 0).style.clone(),
+                    others: false,
+                }));
+                edit.replace_object(object)
+            })
+        })
+        .unwrap();
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+    });
+    assert_eq!(editor.document().changes().len(), 1);
+    assert_eq!(
+        cell(&editor, table, 0, 0).tracked.unwrap().content,
+        Content::Text("a".into())
+    );
+}

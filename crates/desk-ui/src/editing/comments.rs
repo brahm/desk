@@ -818,6 +818,12 @@ impl TextEditor {
             Some(o) => object == Some(o) && p.cell == cell,
             None => object.is_none() && p.story == story && p.start <= start && end <= p.end,
         };
+        // A table with a cell selected is in the change that moved it,
+        // when the cell is in no change of its own (REV-05).
+        let moved =
+            |p: &Placed| p.change && p.object.is_some() && p.object == object && p.cell.is_none();
+        let on_cell = cell.is_some() && ordered.iter().any(|p| p.change && on(p));
+        let on = |p: &Placed| on(p) || (cell.is_some() && !on_cell && moved(p));
         let remembered = state.reviewed.and_then(|item| {
             ordered
                 .iter()

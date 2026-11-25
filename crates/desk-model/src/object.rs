@@ -87,21 +87,35 @@ pub struct Object {
 }
 
 impl Object {
+    /// Takes the object out of its tracked changes, its place and its
+    /// cells, which it leaves as they are: a copy, or an object grouped
+    /// or ungrouped, is in none (W148, REV-05).
+    pub fn untrack(&mut self) {
+        self.moved = None;
+        if let ObjectKind::Table(table) = &mut self.kind
+            && !table.tracked_cells().is_empty()
+        {
+            let table = std::sync::Arc::make_mut(table);
+            for ((r, c), _) in table.tracked_cells() {
+                table.cell_mut(r, c).tracked = None;
+            }
+        }
+    }
+
     /// The tracked changes that the object is in: the one that moved it,
     /// and those of the cells of a table (W148, REV-01, REV-05).
     pub fn changes(&self) -> Vec<NodeId> {
         let mut out: Vec<NodeId> = self.moved.map(|m| m.change).into_iter().collect();
         if let ObjectKind::Table(table) = &self.kind {
-            for r in 0..table.rows() {
-                for c in 0..table.cols() {
-                    if let Some(tracked) = &table.cell(r, c).tracked
-                        && let Some(id) = NodeId::new(tracked.change.get())
-                        && !out.contains(&id)
-                    {
-                        out.push(id);
-                    }
-                }
-            }
+            let mut cells: Vec<NodeId> = table
+                .tracked_cells()
+                .into_iter()
+                .filter_map(|(_, id)| NodeId::new(id.get()))
+                .collect();
+            cells.sort_unstable();
+            cells.dedup();
+            cells.retain(|id| !out.contains(id));
+            out.extend(cells);
         }
         out
     }

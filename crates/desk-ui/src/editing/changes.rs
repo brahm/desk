@@ -141,6 +141,46 @@ impl TextEditor {
     }
 }
 
+/// Accepts or rejects the tracked changes that `which` takes, and gives
+/// how many there were: the tables whose cells took back what they held
+/// take the size of them, as every edit of cells does (REV-05).
+fn resolve_fitted(
+    edit: &mut desk_model::Edit,
+    accept: bool,
+    which: impl Fn(desk_model::NodeId) -> bool,
+) -> Result<usize, desk_model::ModelError> {
+    let tables: Vec<desk_model::NodeId> = edit
+        .document()
+        .objects()
+        .iter()
+        .filter(|o| matches!(o.kind, desk_model::ObjectKind::Table(_)))
+        .filter(|o| o.changes().into_iter().any(&which))
+        .map(|o| o.id)
+        .collect();
+    let count = edit.resolve_changes(accept, which)?;
+    for id in tables {
+        let Some(mut object) = edit.document().objects().get(id).cloned() else {
+            continue;
+        };
+        let desk_model::ObjectKind::Table(table) = &object.kind else {
+            continue;
+        };
+        let (w, h) = crate::with_text_system(|system| {
+            desk_layout::table_size(edit.document(), table, system)
+        });
+        let (w, h) = (
+            desk_model::Length::from_pt(f64::from(w)),
+            desk_model::Length::from_pt(f64::from(h)),
+        );
+        if (object.frame.width, object.frame.height) != (w, h) {
+            object.frame.width = w;
+            object.frame.height = h;
+            edit.untracked(|edit| edit.replace_object(object))?;
+        }
+    }
+    Ok(count)
+}
+
 /// Adds the tracked changes that a selection of some text holds, once
 /// each: its runs, the breaks it goes over and the formatting of the
 /// paragraphs it holds some of.
@@ -243,18 +283,19 @@ impl TextEditor {
         {
             let document = Self::main_document(&state);
             let change = document.changes().get(id)?;
-            let cell = state.cells.filter(|c| c.id == object).map(|c| c.focus);
-            let rect = match cell {
-                Some(cell) => {
-                    let changed = document
+            // The change of the focused cell, or else that of the object.
+            let cell = state
+                .cells
+                .filter(|c| c.id == object)
+                .map(|c| c.focus)
+                .filter(|&(row, col)| {
+                    document
                         .cell_changes()
                         .into_iter()
-                        .any(|c| (c.id, c.table, c.row, c.col) == (id, object, cell.0, cell.1));
-                    if !changed {
-                        return None;
-                    }
-                    super::comments::cell_rect(Self::main_layout(&state), object, cell)?
-                }
+                        .any(|c| (c.id, c.table, c.row, c.col) == (id, object, row, col))
+                });
+            let rect = match cell {
+                Some(cell) => super::comments::cell_rect(Self::main_layout(&state), object, cell)?,
                 None => {
                     if document.objects().get(object)?.moved?.change != id {
                         return None;
@@ -469,7 +510,7 @@ impl TextEditor {
         settings.tracking = desk_model::Tracking::Off;
         let done = self.format_edit_quiet("Turn Off Tracking", |edit| {
             if let Some(accept) = resolve {
-                edit.resolve_changes(accept, |_| true)?;
+                resolve_fitted(edit, accept, |_| true)?;
             }
             edit.set_text_settings(settings)
         });
@@ -579,7 +620,7 @@ impl TextEditor {
         let mut count = 0;
         let counted = &mut count;
         self.format_edit(name, |edit| {
-            *counted = edit.resolve_changes(accept, |id| ids.contains(&id))?;
+            *counted = resolve_fitted(edit, accept, |id| ids.contains(&id))?;
             Ok(())
         });
         if let Some((story, page)) = visit
@@ -608,7 +649,7 @@ impl TextEditor {
         let mut count = 0;
         let counted = &mut count;
         self.format_edit(name, |edit| {
-            *counted = edit.resolve_changes(accept, |_| true)?;
+            *counted = resolve_fitted(edit, accept, |_| true)?;
             Ok(())
         });
         count
@@ -1357,6 +1398,85 @@ mod tests {
             assert_eq!(t.cell(1, 1).content, Content::Text("Norte".into()));
             assert!(t.cell(1, 1).tracked.is_none());
             assert!(!editor.has_changes());
+        });
+    }
+
+    #[test]
+    fn rev_05_a_paste_is_tracked_a_reject_fits_and_a_moved_table_has_its_bubble() {
+        use desk_model::table::Content;
+        use desk_model::{Anchor, Frame, Object, ObjectKind, TextSettings, Tracking};
+        use std::sync::Arc;
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let (table, _) = document
+                .transact("Table", |edit| {
+                    let mut table = desk_model::Table::new(2, 2);
+                    table.set_content(0, 0, Content::Text("a".into()));
+                    let mut object = Object::new(
+                        edit.new_id(),
+                        ObjectKind::Table(Arc::new(table)),
+                        Frame::from_pt(100.0, 200.0, 144.0, 40.0),
+                    );
+                    object.anchor = Anchor::Page(0);
+                    let id = object.id;
+                    edit.add_object(object)?;
+                    edit.set_text_settings(TextSettings {
+                        tracking: Tracking::On,
+                        ..edit.document().text_settings().clone()
+                    })?;
+                    Ok(id)
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.state.borrow_mut().editor.set_author("Bo");
+            let cells = |editor: &TextEditor| editor.document().cell_changes();
+            let table_of = |editor: &TextEditor| {
+                let object = editor.document().objects().get(table).unwrap().clone();
+                let ObjectKind::Table(t) = &object.kind else {
+                    panic!("a table");
+                };
+                (object.frame, (**t).clone())
+            };
+            // A paste that adds a row tracks the cells it writes, in it too.
+            editor.select_objects(vec![table]);
+            editor.select_cell(table, (0, 0));
+            assert!(editor.paste_in_cells("x\ny\nz"));
+            let (_, t) = table_of(&editor);
+            assert_eq!(t.rows(), 3);
+            let changed: Vec<_> = cells(&editor).iter().map(|c| (c.row, c.col)).collect();
+            assert_eq!(changed, [(0, 0), (1, 0), (2, 0)]);
+            // Rejected, the cells hold what they held, and the table
+            // takes their size.
+            editor.select_cell(table, (0, 0));
+            editor.change_table("Typing", |t, _| {
+                t.set_content(
+                    0,
+                    0,
+                    Content::Text("a much longer line\nof text\nin its cell".into()),
+                );
+            });
+            let (grown, _) = table_of(&editor);
+            assert_eq!(editor.resolve_all_changes(false), 3);
+            let (frame, t) = table_of(&editor);
+            assert_eq!(t.cell(0, 0).content, Content::Text("a".into()));
+            assert!(cells(&editor).is_empty());
+            let (w, h) = editor.table_size(&t);
+            assert_eq!(
+                (frame.width, frame.height),
+                (
+                    desk_model::Length::from_pt(w),
+                    desk_model::Length::from_pt(h)
+                )
+            );
+            assert!(grown.height > frame.height);
+            // A table moved shows its bubble with a cell selected.
+            editor.select_objects(vec![table]);
+            assert!(editor.object_key(gtk::gdk::Key::Right, gtk::gdk::ModifierType::empty()));
+            let moved = editor.document().changes().iter().next().unwrap().id;
+            editor.select_cell(table, (1, 1));
+            let bubble = editor.change_bubble("Ana").unwrap();
+            assert_eq!((bubble.id, bubble.kind), (moved, ChangeKind::Placement));
+            assert_eq!(editor.changes_at_selection(), [moved]);
         });
     }
 }
