@@ -38,6 +38,9 @@ pub(crate) struct NotePlan {
     /// note.
     refs: Vec<(usize, usize, NodeId)>,
     settings: NoteSettings,
+    /// The paragraphs of each note as they show, by its mark, when some
+    /// of them join (B-074).
+    shown: Vec<Option<crate::joins::Shown>>,
 }
 
 impl NotePlan {
@@ -58,9 +61,18 @@ impl NotePlan {
                 offset += run.len();
             }
         }
+        let hidden = crate::hidden_changes(document);
+        let shown = refs
+            .iter()
+            .map(|&(_, _, id)| {
+                let note = notes.get(id)?;
+                crate::joins::Shown::new(&note.paragraphs, hidden.as_deref())
+            })
+            .collect();
         Self {
             refs,
             settings: document.text_settings().notes,
+            shown,
         }
     }
 
@@ -103,52 +115,57 @@ impl NotePlan {
         Arc::new(labels)
     }
 
-    /// The paragraphs of each note as they show, in the order the body
-    /// refers to them, when some of them join (B-074).
-    fn shown(&self, document: &Document) -> Vec<Option<crate::joins::Shown>> {
-        let hidden = crate::hidden_changes(document);
-        self.refs
-            .iter()
-            .map(|&(_, _, id)| {
-                let note = document.notes().get(id)?;
-                crate::joins::Shown::new(&note.paragraphs, hidden.as_deref())
-            })
-            .collect()
-    }
-
     /// Gives the lines of the notes laid out as their paragraphs show back
-    /// to those paragraphs, each with lines of its own (B-074).
-    fn split_note_lines(&self, document: &Document, layout: &mut DocumentLayout) {
-        for (note, shown) in self.shown(document).iter().enumerate() {
-            let Some(shown) = shown else { continue };
-            // The lines of the note on each page, with the paragraph of
-            // the note each is in, and where they were.
-            let mut groups: Vec<Vec<crate::PlacedLine>> = Vec::with_capacity(layout.pages.len());
-            let mut places = Vec::with_capacity(layout.pages.len());
-            for page in &mut layout.pages {
-                let mut group = Vec::new();
-                let mut place = None;
-                let mut k = 0;
-                while k < page.note_lines.len() {
-                    if page.note_lines[k].paragraph == note {
-                        place.get_or_insert(k);
-                        let mut line = page.note_lines.remove(k);
-                        line.paragraph = page.note_parts.remove(k);
-                        group.push(line);
-                    } else {
-                        k += 1;
-                    }
+    /// to those paragraphs, each with lines of its own, numbered from its
+    /// first (B-074).
+    fn split_note_lines(&self, layout: &mut DocumentLayout) {
+        if self.shown.iter().all(Option::is_none) {
+            return;
+        }
+        // The lines of each joining note on each page, with the paragraph
+        // of the note each is in.
+        let notes = self.shown.len();
+        let mut groups: Vec<Vec<Vec<crate::PlacedLine>>> = (0..notes)
+            .map(|_| vec![Vec::new(); layout.pages.len()])
+            .collect();
+        for (p, page) in layout.pages.iter_mut().enumerate() {
+            for (line, &part) in page.note_lines.iter().zip(&page.note_parts) {
+                if self.shown.get(line.paragraph).is_some_and(Option::is_some) {
+                    let mut line = line.clone();
+                    let note = std::mem::replace(&mut line.paragraph, part);
+                    groups[note][p].push(line);
                 }
-                groups.push(group);
-                places.push(place);
             }
-            shown.restore(groups.iter_mut());
-            for ((page, group), place) in layout.pages.iter_mut().zip(groups).zip(places) {
-                let Some(place) = place else { continue };
-                for (k, mut line) in group.into_iter().enumerate() {
-                    let part = std::mem::replace(&mut line.paragraph, note);
-                    page.note_lines.insert(place + k, line);
-                    page.note_parts.insert(place + k, part);
+        }
+        for (shown, groups) in self.shown.iter().zip(&mut groups) {
+            if let Some(shown) = shown {
+                shown.restore(groups.iter_mut());
+                // Every line of the note numbered from the first of its
+                // paragraph, as those of the body are.
+                let mut counts: HashMap<usize, usize> = HashMap::new();
+                for line in groups.iter_mut().flatten() {
+                    let count = counts.entry(line.paragraph).or_default();
+                    line.index = *count;
+                    *count += 1;
+                }
+            }
+        }
+        // The lines again, in their places, each note where it was.
+        for (p, page) in layout.pages.iter_mut().enumerate() {
+            let lines = std::mem::take(&mut page.note_lines);
+            let parts = std::mem::take(&mut page.note_parts);
+            let mut done = vec![false; notes];
+            for (line, part) in lines.into_iter().zip(parts) {
+                let note = line.paragraph;
+                if self.shown.get(note).is_none_or(Option::is_none) {
+                    page.note_lines.push(line);
+                    page.note_parts.push(part);
+                } else if !std::mem::replace(&mut done[note], true) {
+                    for mut piece in std::mem::take(&mut groups[note][p]) {
+                        let part = std::mem::replace(&mut piece.paragraph, note);
+                        page.note_lines.push(piece);
+                        page.note_parts.push(part);
+                    }
                 }
             }
         }
@@ -164,10 +181,9 @@ impl NotePlan {
     ) -> Vec<Vec<ParagraphText>> {
         let styles = document.styles();
         let settings = document.text_settings();
-        let shown = self.shown(document);
         self.refs
             .iter()
-            .zip(&shown)
+            .zip(&self.shown)
             .map(|(&(paragraph, _, id), shown)| {
                 let note = document.notes().get(id).expect("the plan has only notes");
                 let values = FieldValues {
@@ -223,7 +239,7 @@ impl NotePlan {
             document, values, labels, system, setup, sum, &joins, &joined,
         );
         crate::joins::split_lines(&mut layout, &joins);
-        self.split_note_lines(document, &mut layout);
+        self.split_note_lines(&mut layout);
         layout
     }
 

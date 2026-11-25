@@ -2481,6 +2481,11 @@ paragraph, and objects on a second page.
   story as in the body.
 - The text of table cells in Writer has no tracked changes yet: it joins
   with the changes of cells (REV-05), the sixth part of this step.
+- The review found the marks of Show Invisibles at the ends of the
+  joined paragraphs of text boxes, in the middle of their line, and
+  lines of notes numbered two ways; the marks go, the lines of a note
+  are numbered from the first of each paragraph, and the joins of
+  notes are found once for each layout.
 
 ## Decisions, with their reasons and consequences
 

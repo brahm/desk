@@ -468,11 +468,15 @@ pub fn out_of_hidden(document: &Document, selection: Selection) -> Selection {
 /// of markup without deletions, where it joins the paragraph to the next
 /// (B-071).
 pub(crate) fn break_hidden(document: &Document, paragraph: usize) -> bool {
+    let body = document.body();
+    paragraph + 1 < body.len() && break_deleted(document, body.get(paragraph))
+}
+
+/// Whether the break at the end of a paragraph that is not the last of
+/// its text does not show, as [`break_hidden`] for the body (B-074).
+fn break_deleted(document: &Document, paragraph: Option<&desk_model::Paragraph>) -> bool {
     !document.markup().shows_deletions()
-        && paragraph + 1 < document.body().len()
-        && document
-            .body()
-            .get(paragraph)
+        && paragraph
             .and_then(|p| p.attrs().break_change.flatten())
             .and_then(|id| document.changes().get(id))
             .is_some_and(|c| c.kind == desk_model::ChangeKind::Deletion)
@@ -808,7 +812,9 @@ pub fn invisibles(document: &Document, layout: &DocumentLayout) -> Vec<Invisible
             };
             let paragraphs: Vec<&desk_model::Paragraph> = text.paragraphs.iter().collect();
             for line in &placed.lines {
-                line_invisibles(&mut marks, page, line, &paragraphs, &|_| false);
+                line_invisibles(&mut marks, page, line, &paragraphs, &|i| {
+                    i + 1 < paragraphs.len() && break_deleted(document, paragraphs.get(i).copied())
+                });
             }
         }
     }
