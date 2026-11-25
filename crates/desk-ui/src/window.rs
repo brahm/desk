@@ -3761,7 +3761,7 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&on);
-        // Of the change selected, or those of the text selected (REV-05).
+        // Of the change selected, or those of the text selected (REV-06).
         for (name, accept) in [("accept-change", true), ("reject-change", false)] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(self);

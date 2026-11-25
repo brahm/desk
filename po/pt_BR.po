@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-25 14:34+0000\n"
+"POT-Creation-Date: 2026-11-25 14:41+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -4184,8 +4184,8 @@ msgstr[0] "{n} comentário ou alteração"
 msgstr[1] "{n} comentários e alterações"
 
 #: crates/desk-ui/src/review_bar.rs:172
-msgid "Accept _Change"
-msgstr "Aceitar _Alteração"
+msgid "Acc_ept Change"
+msgstr "Ace_itar Alteração"
 
 #: crates/desk-ui/src/review_bar.rs:173
 msgid "Re_ject Change"
@@ -7388,6 +7388,9 @@ msgid "Left out {what}, in {n} paragraph."
 msgid_plural "Left out {what}, in {n} paragraphs."
 msgstr[0] "Não importado: {what}, em {n} parágrafo."
 msgstr[1] "Não importado: {what}, em {n} parágrafos."
+
+#~ msgid "Accept _Change"
+#~ msgstr "Aceitar _Alteração"
 
 #~ msgid "The letters stand in the margin"
 #~ msgstr "As letras ficam na margem"

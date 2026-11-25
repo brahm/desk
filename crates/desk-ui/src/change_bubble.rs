@@ -95,7 +95,7 @@ impl ChangeBubbleView {
             date.as_deref(),
             &[&previous, &next],
         ));
-        // Accept and Reject of this change (REV-05).
+        // Accept and Reject of this change (REV-06).
         let accept = gtk::Button::builder()
             .label(tr("_Accept"))
             .use_underline(true)

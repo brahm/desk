@@ -126,7 +126,7 @@ const NAMES: &[&str] = &[
     n_("Reply"),
     n_("Edit Reply"),
     n_("Delete Reply"),
-    // The tracking of changes (W148, REV-03, REV-05, REV-06).
+    // The tracking of changes (W148, REV-03, REV-06).
     n_("Track Changes"),
     n_("Pause Tracking"),
     n_("Turn Off Tracking"),

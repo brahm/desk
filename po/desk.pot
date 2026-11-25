@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-25 14:34+0000\n"
+"POT-Creation-Date: 2026-11-25 14:41+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -4154,7 +4154,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: crates/desk-ui/src/review_bar.rs:172
-msgid "Accept _Change"
+msgid "Acc_ept Change"
 msgstr ""
 
 #: crates/desk-ui/src/review_bar.rs:173
