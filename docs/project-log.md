@@ -2376,6 +2376,21 @@ paragraph, and objects on a second page.
   interrupts still comes back from ODT as several, one for each piece,
   as it did before; reading them as one moves to step 13 (B-073).
 
+### 25 November: changes of paragraphs joined by a deletion (step 12 of W2, third part)
+
+- In ODT, the marks of the change of the formatting of a paragraph went
+  where its spans began and ended, so that a deletion of the break
+  after it or before it carried one of them into the deleted text, and
+  the change was lost or read on the paragraph before (B-069).
+- They now go around the text the paragraph shows: after the end of the
+  deletion that came from the break before, and before the start of the
+  one that takes its own break. A paragraph that a deletion took whole
+  keeps them in its paragraph of the deletion.
+- Reading puts the changes of paragraphs on them once the deletions are
+  back, following the text after each mark of a deletion to the
+  paragraph it ends up in, since putting a deletion back splits the
+  paragraph it joined.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

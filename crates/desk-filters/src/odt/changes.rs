@@ -178,28 +178,33 @@ fn put(
     paragraphs: &HashMap<String, Option<Arc<ParaFormatting>>>,
     events: Events,
 ) -> Result<(), desk_model::ModelError> {
+    let paragraphs_of = paragraphs;
     // The insertions and changes of formatting first, which leave the
     // text as it is.
-    let mut open: Vec<(NodeId, Position)> = Vec::new();
-    let mut deletions: Vec<(NodeId, Position, String)> = Vec::new();
-    for (paragraph, offset, field) in &events {
+    let mut open: Vec<(NodeId, Position, usize)> = Vec::new();
+    let mut deletions: Vec<(NodeId, Position, String, usize)> = Vec::new();
+    // The changes of paragraphs, put on them once the deletions have
+    // split the paragraphs they joined (B-069): each with the places of
+    // its marks and their order among the marks.
+    let mut of_paragraphs = Vec::new();
+    for (order, (paragraph, offset, field)) in events.iter().enumerate() {
         let at = Position::new(*paragraph, *offset);
         match field {
             odf::Field::ChangeStart { id } => {
                 if let Some(&(change, ChangeKind::Insertion | ChangeKind::Format)) =
                     ids.get(id.as_str())
                 {
-                    open.push((change, at));
+                    open.push((change, at, order));
                 }
             }
             odf::Field::ChangeEnd { id } => {
                 let Some(&(change, kind)) = ids.get(id.as_str()) else {
                     continue;
                 };
-                let Some(i) = open.iter().position(|(c, _)| *c == change) else {
+                let Some(i) = open.iter().position(|(c, _, _)| *c == change) else {
                     continue;
                 };
-                let (_, start) = open.remove(i);
+                let (_, start, from) = open.remove(i);
                 // An end before its start, as a file may have, marks
                 // nothing.
                 let body = edit.document().body();
@@ -214,15 +219,13 @@ fn put(
                 let breaks: Vec<NodeId> = (first..last)
                     .filter_map(|i| body.get(i).map(Paragraph::id))
                     .collect();
-                // A change of paragraphs is on each paragraph its marks
-                // are in, empty ones too.
                 if let Some(before) = paragraphs.get(id.as_str()) {
-                    let marked: Vec<NodeId> = (first..=last)
+                    // The paragraphs after the first that its marks take
+                    // in, as they are before the deletions are back.
+                    let rest: Vec<NodeId> = (first + 1..=last)
                         .filter_map(|i| body.get(i).map(Paragraph::id))
                         .collect();
-                    for paragraph in marked {
-                        edit.mark_paragraph_formatted(paragraph, change, before.clone())?;
-                    }
+                    of_paragraphs.push((change, before.clone(), (start, from), rest));
                     continue;
                 }
                 if kind == ChangeKind::Format {
@@ -237,7 +240,7 @@ fn put(
             }
             odf::Field::Change { id } => {
                 if let Some(&(change, ChangeKind::Deletion)) = ids.get(id.as_str()) {
-                    deletions.push((change, at, id.clone()));
+                    deletions.push((change, at, id.clone(), order));
                 }
             }
             _ => {}
@@ -245,7 +248,10 @@ fn put(
     }
     // Then the deletions, from the last, so that the places of those
     // before stay where they are.
-    for (change, at, region) in deletions.into_iter().rev() {
+    // Where the text after each mark of a deletion put back went: the
+    // mark, its order, and the paragraph and offset of that text.
+    let mut moves: Vec<(Position, usize, NodeId, usize)> = Vec::new();
+    for (change, at, region, order) in deletions.into_iter().rev() {
         let Some(paragraphs) = taken.deleted.remove(&region) else {
             continue;
         };
@@ -255,8 +261,32 @@ fn put(
             .is_ok_and(|p| at.offset <= p.len() && p.is_boundary(at.offset));
         if fits {
             let starts = restore(edit, change, at, paragraphs)?;
+            if let Some(&(tail, offset)) = starts.last() {
+                moves.push((at, order, tail.paragraph, offset));
+            }
             let formers = taken.formers.remove(&region).unwrap_or_default();
-            mark_formers(edit, ids, previous, &starts, &formers)?;
+            mark_formers(edit, ids, previous, paragraphs_of, &starts, &formers)?;
+        }
+    }
+    // A change of paragraphs is on each paragraph its marks are in, empty
+    // ones too, where they are once the deletions are back.
+    let moved = |(mut place, order): (Position, usize)| {
+        for &(at, mark, tail, offset) in &moves {
+            if place.paragraph == at.paragraph
+                && (place.offset > at.offset || place.offset == at.offset && order > mark)
+            {
+                place = Position::new(tail, place.offset - at.offset + offset);
+            }
+        }
+        place
+    };
+    // The paragraph of its start, where the deletion before it put that,
+    // and those whose text its marks take in, but not the paragraphs
+    // that the deletions in it put back.
+    for (change, before, start, rest) in of_paragraphs {
+        let first = moved(start).paragraph;
+        for paragraph in std::iter::once(first).chain(rest) {
+            edit.mark_paragraph_formatted(paragraph, change, before.clone())?;
         }
     }
     Ok(())
@@ -269,6 +299,7 @@ fn mark_formers(
     edit: &mut desk_model::Edit,
     ids: &HashMap<&str, (NodeId, ChangeKind)>,
     previous: &HashMap<String, Arc<Formatting>>,
+    paragraphs: &HashMap<String, Option<Arc<ParaFormatting>>>,
     starts: &[(Position, usize)],
     formers: &[Vec<(usize, odf::Field)>],
 ) -> Result<(), desk_model::ModelError> {
@@ -299,6 +330,17 @@ fn mark_formers(
         for (offset, field) in marks {
             let at = (start.offset + offset).min(len);
             match field {
+                // A paragraph the deletion took whole keeps the change of
+                // its formatting (B-069).
+                odf::Field::ChangeStart { id } if paragraphs.contains_key(id.as_str()) => {
+                    if let Some(&(change, _)) = ids.get(id.as_str()) {
+                        edit.mark_paragraph_formatted(
+                            start.paragraph,
+                            change,
+                            paragraphs[id.as_str()].clone(),
+                        )?;
+                    }
+                }
                 odf::Field::ChangeStart { id } => {
                     if let Some(&(change, ChangeKind::Insertion | ChangeKind::Format)) =
                         ids.get(id.as_str())

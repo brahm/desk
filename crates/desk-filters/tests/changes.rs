@@ -878,3 +878,102 @@ fn b_070_a_change_in_deleted_text_comes_back_whole_in_odt() {
     };
     assert_eq!(insertions(&read), 1);
 }
+
+/// B-069: the change of the formatting of a paragraph stays on its
+/// paragraph in ODT when a tracked deletion took the break before it,
+/// the break after it, or the whole paragraph.
+#[test]
+fn b_069_a_change_of_a_paragraph_joined_by_a_deletion_stays_on_it_in_odt() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            let mut at = edit.insert_text(start, "one")?;
+            for text in ["two", "three", "four"] {
+                at = edit.split_paragraph(at)?;
+                at = edit.insert_text(at, text)?;
+            }
+            let ids: Vec<_> = edit.document().body().iter().map(|p| p.id()).collect();
+            let gone = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T09:00:00"))?;
+            // Ana deleted the break after "one", all of "two" and its
+            // break, and the break after "three"; Bo changed the
+            // formatting of "one", "two" and "four".
+            edit.mark_break_change(ids[0], Some(gone))?;
+            edit.mark_change(Position::new(ids[1], 0), Position::new(ids[1], 3), gone)?;
+            edit.mark_break_change(ids[1], Some(gone))?;
+            for &i in &[0, 1, 3] {
+                let bo = edit.add_change(
+                    ChangeKind::Format,
+                    "Bo",
+                    Some(&format!("2026-11-24T09:3{i}:00")),
+                )?;
+                edit.mark_paragraph_formatted(ids[i], bo, None)?;
+            }
+            let other = edit.add_change(ChangeKind::Deletion, "Cy", None)?;
+            edit.mark_break_change(ids[2], Some(other))?;
+            Ok(())
+        })
+        .unwrap();
+    // Each paragraph: its text and the author of the change of its
+    // formatting.
+    let formats = |d: &Document| -> Vec<(String, Option<String>)> {
+        d.body()
+            .iter()
+            .map(|p| {
+                (
+                    p.text(),
+                    p.attrs()
+                        .format_change
+                        .flatten()
+                        .and_then(|id| d.changes().get(id))
+                        .map(|c| c.author.to_string()),
+                )
+            })
+            .collect()
+    };
+    let before = formats(&document);
+    assert_eq!(
+        before,
+        [
+            ("one".into(), Some("Bo".into())),
+            ("two".into(), Some("Bo".into())),
+            ("three".into(), None),
+            ("four".into(), Some("Bo".into())),
+        ]
+    );
+    let bytes = write_odt(&document).unwrap();
+    keep("b-069-paragraph-changes-joined.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    assert_eq!(formats(&read), before);
+    assert_eq!(described(&read), described(&document));
+}
+
+/// B-069 review: a change of a paragraph whose marks take in a deletion
+/// of breaks, as another program may write it, stays on the paragraph of
+/// its start and does not reach the paragraphs the deletion took.
+#[test]
+fn b_069_a_change_of_a_paragraph_around_a_deletion_stays_on_its_paragraph() {
+    let content = format!(
+        r#"{HEAD}<text:tracked-changes>
+<text:changed-region text:id="p"><text:format-change xmlns:desk="https://brahm.com.br/ns/desk/1.0" desk:paragraph-style-name=""><office:change-info><dc:creator>Bo</dc:creator><dc:date>2026-11-24T12:00:00</dc:date></office:change-info></text:format-change></text:changed-region>
+<text:changed-region text:id="d"><text:deletion><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-24T13:00:00</dc:date></office:change-info><text:p/><text:p>two</text:p><text:p/></text:deletion></text:changed-region>
+</text:tracked-changes>
+<text:p><text:change-start text:change-id="p"/>one<text:change text:change-id="d"/>three<text:change-end text:change-id="p"/></text:p>{TAIL}"#
+    );
+    let document = read_odt(&odt(&content)).unwrap();
+    let formatted: Vec<(String, bool)> = document
+        .body()
+        .iter()
+        .map(|p| (p.text(), p.attrs().format_change.flatten().is_some()))
+        .collect();
+    assert_eq!(
+        formatted,
+        [
+            ("one".into(), true),
+            ("two".into(), false),
+            ("three".into(), false)
+        ]
+    );
+}

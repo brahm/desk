@@ -696,7 +696,10 @@ A highlight is an annotation whose one paragraph is empty (PXV-19).
   back (W148, REV-01).
 - **On:** `text:format-change`, in a `text:changed-region` of
   `text:tracked-changes`, whose marks are at the start and the end of
-  the text of the paragraphs it changed.
+  the text of the paragraphs it changed. Those of a paragraph that a
+  tracked deletion joins to another are around the text it shows, out
+  of the `text:deletion`, and those of a paragraph the deletion took
+  whole are in its paragraph in the `text:deletion` (B-069).
 - **Value:** the name of a paragraph style of `content.xml`, common or
   automatic, whose properties are the formatting the paragraphs had of
   their own, with the common style they had as its parent, or empty when

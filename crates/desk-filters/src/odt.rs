@@ -2843,6 +2843,7 @@ fn export_spans(
     let mut former_open = track.as_deref().and_then(|t| t.former.clone());
     // The change open, as `switch` leaves it.
     let mut before_change = track.as_deref().and_then(|t| t.change);
+    let came = before_change;
     let close_former = |spans: &mut Vec<odf::Span>,
                         former_open: &mut Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
                         run: Option<&Run>| {
@@ -2980,6 +2981,7 @@ fn export_spans(
     if let Some(track) = track {
         track.change = open.0;
         track.former = former_open;
+        track.came = came;
     }
     spans
 }
@@ -2987,11 +2989,28 @@ fn export_spans(
 /// The tracked changes open past the break of a paragraph, which go on in
 /// the next (W148): the change, and the change that its deleted text was
 /// in before, with the formatting before that the mark of that one names
-/// (B-070).
+/// (B-070); and the change that was open at the start of the paragraph
+/// [`export_spans`] exported last, which [`paragraph_change`] reads for
+/// that paragraph (B-069).
 #[derive(Default)]
 pub(super) struct Track {
     change: Option<NodeId>,
+    /// The change open at the start of the paragraph last exported.
+    came: Option<NodeId>,
     former: Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
+}
+
+impl Track {
+    /// The deletion of the break before the paragraph last exported,
+    /// which joins it to the one before: none for another change.
+    pub(super) fn came_deleted(&self, document: &Document) -> Option<NodeId> {
+        self.came.filter(|&id| {
+            document
+                .changes()
+                .get(id)
+                .is_some_and(|c| c.kind == desk_model::ChangeKind::Deletion)
+        })
+    }
 }
 
 /// Puts the marks of the change of the formatting of a paragraph around
@@ -2999,29 +3018,68 @@ pub(super) struct Track {
 /// `name` gives for the formatting before, or none when it is unknown
 /// (W148). Their names are `p` and the identifier of the change, apart
 /// from those of the changes of the text, as `changes::export` reads
-/// them.
+/// them. A paragraph that a deletion joins to another keeps them around
+/// the text it shows, out of the deletion: after the end of the change
+/// that `came` from the break before, and before the start of the one
+/// that takes its own break (B-069).
 fn paragraph_change(
     paragraph: &Paragraph,
+    came: Option<NodeId>,
     spans: &mut Vec<odf::Span>,
     mut name: impl FnMut(&desk_model::ParaFormatting) -> String,
 ) {
     let Some(id) = paragraph.attrs().format_change.flatten() else {
         return;
     };
+    let is = |span: &odf::Span, end: bool, change: NodeId| {
+        let change = change.get().to_string();
+        match &span.field {
+            Some(odf::Field::ChangeEnd { id }) => end && *id == change,
+            Some(odf::Field::ChangeStart { id }) => !end && *id == change,
+            _ => false,
+        }
+    };
+    let start = came
+        .and_then(|came| spans.iter().position(|s| is(s, true, came)))
+        .map_or(0, |at| at + 1);
+    let end = paragraph
+        .attrs()
+        .break_change
+        .flatten()
+        .and_then(|ends| spans.iter().rposition(|s| is(s, false, ends)))
+        .filter(|&at| at >= start)
+        .unwrap_or(spans.len());
     let before = paragraph.attrs().formatted.clone().flatten();
     let id = format!("p{}", id.get());
+    // In the link and the bookmark of the text they are in, so as not to
+    // break them.
+    let around = |spans: &[odf::Span], at: usize| {
+        spans
+            .get(at)
+            .map(|s| (s.link.clone(), s.bookmark.clone()))
+            .unwrap_or_default()
+    };
+    let (link, bookmark) = around(spans, end);
     spans.insert(
-        0,
+        end,
         odf::Span {
-            style: Some(before.as_deref().map(&mut name).unwrap_or_default()),
-            field: Some(odf::Field::ChangeStart { id: id.clone() }),
+            field: Some(odf::Field::ChangeEnd { id: id.clone() }),
+            link,
+            bookmark,
             ..odf::Span::default()
         },
     );
-    spans.push(odf::Span {
-        field: Some(odf::Field::ChangeEnd { id }),
-        ..odf::Span::default()
-    });
+    let (link, bookmark) = around(spans, start);
+    spans.insert(
+        start,
+        odf::Span {
+            style: Some(before.as_deref().map(&mut name).unwrap_or_default()),
+            field: Some(odf::Field::ChangeStart { id }),
+            link,
+            bookmark,
+            ..odf::Span::default()
+        },
+    );
 }
 
 /// The annotations of the comments, by the paragraph and the offset where
@@ -3176,34 +3234,39 @@ fn export_margins(
                 })
             });
             let mut spans = spans;
-            paragraph_change(paragraph, &mut spans, |before| {
-                let parent = names
-                    .get(&before.style)
-                    .cloned()
-                    .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
-                let own = ParaAttrs {
-                    list_level: None,
-                    list_start: None,
-                    list_override: None,
-                    list_style: None,
-                    ..before.attrs.without_structure()
-                };
-                if own.is_empty() {
-                    return parent;
-                }
-                automatic_name(
-                    odf::Family::Paragraph,
-                    parent,
-                    odf::Properties {
-                        paragraph: odf_paragraph_properties(
-                            &own,
-                            &styles.resolve_paragraph(before.style, &own),
-                            false,
-                        ),
-                        ..Default::default()
-                    },
-                )
-            });
+            paragraph_change(
+                paragraph,
+                tracked.came_deleted(document),
+                &mut spans,
+                |before| {
+                    let parent = names
+                        .get(&before.style)
+                        .cloned()
+                        .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
+                    let own = ParaAttrs {
+                        list_level: None,
+                        list_start: None,
+                        list_override: None,
+                        list_style: None,
+                        ..before.attrs.without_structure()
+                    };
+                    if own.is_empty() {
+                        return parent;
+                    }
+                    automatic_name(
+                        odf::Family::Paragraph,
+                        parent,
+                        odf::Properties {
+                            paragraph: odf_paragraph_properties(
+                                &own,
+                                &styles.resolve_paragraph(before.style, &own),
+                                false,
+                            ),
+                            ..Default::default()
+                        },
+                    )
+                },
+            );
             out.push(odf::Paragraph {
                 style: Some(style),
                 spans,
@@ -3660,45 +3723,51 @@ pub fn export(document: &Document) -> odf::TextDocument {
             },
         );
         let mut spans = spans;
-        paragraph_change(paragraph, &mut spans, |before| {
-            let parent = names
-                .get(&before.style)
-                .cloned()
-                .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
-            // The level and start of an item are in the list elements; a
-            // list style that no longer is names none.
-            let own = ParaAttrs {
-                list_level: None,
-                list_start: None,
-                list_override: None,
-                ..before.attrs.without_structure()
-            };
-            if own.is_empty() {
-                return parent;
-            }
-            let (hyphenate, desk_hyphenate) = odf_hyphenate(own.hyphenate, settings.hyphenation);
-            automatic_name(
-                odf::Family::Paragraph,
-                Some(parent),
-                own.list_style.map(|list| {
-                    list.and_then(|id| names.get(&id).cloned())
-                        .unwrap_or_default()
-                }),
-                odf::Properties {
-                    paragraph: odf_paragraph_properties(
-                        &own,
-                        &styles.resolve_paragraph(before.style, &own),
-                        false,
-                    ),
-                    text: odf::TextProperties {
-                        hyphenate,
-                        desk_hyphenate,
-                        ..odf::TextProperties::default()
+        paragraph_change(
+            paragraph,
+            tracked.came_deleted(document),
+            &mut spans,
+            |before| {
+                let parent = names
+                    .get(&before.style)
+                    .cloned()
+                    .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
+                // The level and start of an item are in the list elements; a
+                // list style that no longer is names none.
+                let own = ParaAttrs {
+                    list_level: None,
+                    list_start: None,
+                    list_override: None,
+                    ..before.attrs.without_structure()
+                };
+                if own.is_empty() {
+                    return parent;
+                }
+                let (hyphenate, desk_hyphenate) =
+                    odf_hyphenate(own.hyphenate, settings.hyphenation);
+                automatic_name(
+                    odf::Family::Paragraph,
+                    Some(parent),
+                    own.list_style.map(|list| {
+                        list.and_then(|id| names.get(&id).cloned())
+                            .unwrap_or_default()
+                    }),
+                    odf::Properties {
+                        paragraph: odf_paragraph_properties(
+                            &own,
+                            &styles.resolve_paragraph(before.style, &own),
+                            false,
+                        ),
+                        text: odf::TextProperties {
+                            hyphenate,
+                            desk_hyphenate,
+                            ..odf::TextProperties::default()
+                        },
+                        ..Default::default()
                     },
-                    ..Default::default()
-                },
-            )
-        });
+                )
+            },
+        );
         let list = item.as_ref().map(|item| {
             let first = previous != Some(item.style);
             let start = paragraph.attrs().list_start.flatten();
@@ -3809,46 +3878,51 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 ))
             });
             let mut spans = spans;
-            paragraph_change(paragraph, &mut spans, |before| {
-                let parent = names
-                    .get(&before.style)
-                    .cloned()
-                    .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
-                // The level and start of an item are in the list elements; a
-                // list style that no longer is names none.
-                let own = ParaAttrs {
-                    list_level: None,
-                    list_start: None,
-                    list_override: None,
-                    ..before.attrs.without_structure()
-                };
-                if own.is_empty() {
-                    return parent;
-                }
-                let (hyphenate, desk_hyphenate) =
-                    odf_hyphenate(own.hyphenate, settings.hyphenation);
-                automatic_name(
-                    odf::Family::Paragraph,
-                    Some(parent),
-                    own.list_style.map(|list| {
-                        list.and_then(|id| names.get(&id).cloned())
-                            .unwrap_or_default()
-                    }),
-                    odf::Properties {
-                        paragraph: odf_paragraph_properties(
-                            &own,
-                            &styles.resolve_paragraph(before.style, &own),
-                            false,
-                        ),
-                        text: odf::TextProperties {
-                            hyphenate,
-                            desk_hyphenate,
-                            ..odf::TextProperties::default()
+            paragraph_change(
+                paragraph,
+                tracked.came_deleted(document),
+                &mut spans,
+                |before| {
+                    let parent = names
+                        .get(&before.style)
+                        .cloned()
+                        .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
+                    // The level and start of an item are in the list elements; a
+                    // list style that no longer is names none.
+                    let own = ParaAttrs {
+                        list_level: None,
+                        list_start: None,
+                        list_override: None,
+                        ..before.attrs.without_structure()
+                    };
+                    if own.is_empty() {
+                        return parent;
+                    }
+                    let (hyphenate, desk_hyphenate) =
+                        odf_hyphenate(own.hyphenate, settings.hyphenation);
+                    automatic_name(
+                        odf::Family::Paragraph,
+                        Some(parent),
+                        own.list_style.map(|list| {
+                            list.and_then(|id| names.get(&id).cloned())
+                                .unwrap_or_default()
+                        }),
+                        odf::Properties {
+                            paragraph: odf_paragraph_properties(
+                                &own,
+                                &styles.resolve_paragraph(before.style, &own),
+                                false,
+                            ),
+                            text: odf::TextProperties {
+                                hyphenate,
+                                desk_hyphenate,
+                                ..odf::TextProperties::default()
+                            },
+                            ..Default::default()
                         },
-                        ..Default::default()
-                    },
-                )
-            });
+                    )
+                },
+            );
             paragraphs.push(odf::Paragraph {
                 style: Some(style),
                 spans,
