@@ -64,7 +64,6 @@ pub struct Tracker {
     insertion: Option<NodeId>,
     deletion: Option<NodeId>,
     format: Option<NodeId>,
-    placement: Option<NodeId>,
 }
 
 impl Tracker {
@@ -77,7 +76,6 @@ impl Tracker {
             insertion: None,
             deletion: None,
             format: None,
-            placement: None,
         }
     }
 }
@@ -137,7 +135,9 @@ impl Edit {
             crate::ChangeKind::Insertion => tracker.insertion,
             crate::ChangeKind::Deletion => tracker.deletion,
             crate::ChangeKind::Format => tracker.format,
-            crate::ChangeKind::Placement => tracker.placement,
+            // Each object moved is a change of its own, which is
+            // accepted or rejected alone.
+            crate::ChangeKind::Placement => None,
         };
         if let Some(id) = made {
             return Ok(id);
@@ -149,7 +149,7 @@ impl Edit {
             crate::ChangeKind::Insertion => tracker.insertion = Some(id),
             crate::ChangeKind::Deletion => tracker.deletion = Some(id),
             crate::ChangeKind::Format => tracker.format = Some(id),
-            crate::ChangeKind::Placement => tracker.placement = Some(id),
+            crate::ChangeKind::Placement => {}
         }
         Ok(id)
     }
@@ -1299,8 +1299,9 @@ impl Edit {
     /// Replaces an object with another with the same identifier. While
     /// the edit tracks changes, a floating object moved or resized keeps
     /// where it was, in a change, until the change is accepted or
-    /// rejected; one already in such a change stays in it, and one put
-    /// back where it was is in none (W148, REV-01).
+    /// rejected, each in a change of its own; one already in such a
+    /// change stays in it, and one put back where it was is in none
+    /// (W148, REV-01).
     pub fn replace_object(&mut self, mut object: crate::Object) -> Result<(), ModelError> {
         let floating = |anchor: crate::Anchor| {
             matches!(anchor, crate::Anchor::Page(_) | crate::Anchor::Paragraph(_))
@@ -1358,11 +1359,6 @@ impl Edit {
             .is_some_and(|c| c.kind == crate::ChangeKind::Placement);
         if used || !placement {
             return Ok(());
-        }
-        if let Some(tracker) = &mut self.tracker
-            && tracker.placement == Some(change)
-        {
-            tracker.placement = None;
         }
         self.set_change(change, None)
     }
