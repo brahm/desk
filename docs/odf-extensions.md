@@ -728,12 +728,20 @@ a deletion keep any content of a paragraph; other
 programs that do not look for marks there read the text as deleted
 alone, and the region as a change that holds no text.
 
-ODF names one `text:changed-region` for each pair of marks, so the
-pieces of a change that another interrupts, as the text of an
-insertion before and after a deletion in it, are regions of their own.
-Desk reads the regions of the same kind, author and date as one change
-(B-073), as they are when it writes them; regions whose date is not
-known stay changes of their own.
+#### `desk:change-name`
+
+- **Feature:** the regions of one tracked change (W148, B-073). ODF
+  names one `text:changed-region` for each pair of marks, so the pieces
+  of a change that another interrupts, as the text of an insertion
+  before and after a deletion in it, are regions of their own.
+- **On:** `text:insertion`, `text:deletion` and `text:format-change`.
+  Desk writes the same name on the regions of a change that has more
+  than one, and reads the regions that share a name and a kind as one
+  change.
+- **Fallback:** a change of its own for each region, as other programs
+  read them. Regions without the name, as other programs write them,
+  are changes of their own even when their author and date are the
+  same, as different changes can be.
 
 #### `desk:annotation`
 

@@ -2451,14 +2451,18 @@ paragraph, and objects on a second page.
 - ODF names one region for each pair of marks, so a change that another
   interrupts, as an insertion part of which another author deleted,
   was written as several regions and read back as several changes
-  (B-073). Reading now takes the regions of the same kind, author and
-  date as one change, as Desk writes them; regions whose date is not
-  known stay apart, as nothing tells them to be one.
-- The import log counts what it leaves out by those changes, not by
-  regions, so the pieces of one change are not listed as left out.
-- The test of changes of formatting around others gives the change of
-  the empty paragraph a time of its own, so that it stays a change of
-  its own that the log lists.
+  (B-073). Desk now writes `desk:change-name` on the regions of a
+  change that has more than one, and reads the regions that share it
+  as one change; the import log counts what it leaves out by those
+  changes.
+- The first version took the regions of the same kind, author and date
+  as one change. The review showed that different changes share them:
+  dates go to the second, and comparing documents dates every change
+  alike, so rejecting one would reject them all. Only Desk's own name
+  joins regions now, and those of other programs stay apart.
+- The ends of the marks of insertions and changes of formatting are
+  matched to their starts by region, not by change, so that the pieces
+  of one change keep the formatting before of their own regions.
 
 ## Decisions, with their reasons and consequences
 

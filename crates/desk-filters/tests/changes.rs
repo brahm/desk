@@ -594,25 +594,18 @@ fn rev_01_changes_of_formatting_of_libreoffice_are_read() {
 
 #[test]
 fn rev_01_changes_of_formatting_around_others_or_of_nothing() {
-    // At times of their own: regions of the same author, kind and date
-    // are one change (B-073).
-    let region = |id: &str, kind: &str, style: &str, time: &str| {
+    let region = |id: &str, kind: &str, style: &str| {
         format!(
-            r#"<text:changed-region text:id="{id}"><text:{kind}{style}><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-25T{time}</dc:date></office:change-info></text:{kind}></text:changed-region>"#
+            r#"<text:changed-region text:id="{id}"><text:{kind}{style}><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-25T10:00:00</dc:date></office:change-info></text:{kind}></text:changed-region>"#
         )
     };
     let content = format!(
         r#"{HEAD}<text:tracked-changes xmlns:desk="https://brahm.com.br/ns/desk/1.0">{}{}{}</text:tracked-changes>
 <text:p><text:change-start text:change-id="f"/>ab<text:change-start text:change-id="i"/>cd<text:change-end text:change-id="i"/>ef<text:change-end text:change-id="f"/></text:p>
 <text:p><text:change-start text:change-id="e"/><text:change-end text:change-id="e"/></text:p>{TAIL}"#,
-        region(
-            "f",
-            "format-change",
-            r#" desk:style-name="Missing""#,
-            "10:00:00"
-        ),
-        region("i", "insertion", "", "10:00:00"),
-        region("e", "format-change", "", "10:05:00"),
+        region("f", "format-change", r#" desk:style-name="Missing""#),
+        region("i", "insertion", ""),
+        region("e", "format-change", ""),
     );
     let (document, log) = read_odt_logged(&odt(&content)).unwrap();
     // The insertion keeps its text; the change of an empty paragraph is
@@ -1112,7 +1105,7 @@ fn b_072_a_change_of_formatting_goes_on_past_a_deleted_break_in_odt() {
 
 /// B-073: a change that another change interrupts, an insertion part of
 /// which another author deleted, comes back from ODT as one change, and
-/// changes whose date is unknown stay apart.
+/// changes of the same author and date stay apart.
 #[test]
 fn b_073_a_change_another_interrupts_comes_back_as_one() {
     use desk_model::Position;
@@ -1124,10 +1117,11 @@ fn b_073_a_change_another_interrupts_comes_back_as_one() {
             edit.insert_text(start, "one two three four five")?;
             let bo = edit.add_change(ChangeKind::Insertion, "Bo", Some("2026-11-24T09:30:00"))?;
             let ana = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T10:00:00"))?;
-            let cy = edit.add_change(ChangeKind::Insertion, "Cy", None)?;
-            let dee = edit.add_change(ChangeKind::Insertion, "Cy", None)?;
+            let cy = edit.add_change(ChangeKind::Insertion, "Cy", Some("2026-11-24T11:00:00"))?;
+            let dee = edit.add_change(ChangeKind::Insertion, "Cy", Some("2026-11-24T11:00:00"))?;
             // Bo added "one two three", whose "two" Ana deleted; Cy
-            // added "four" and, at another time unknown, "five".
+            // added "four" and, as another change in the same second,
+            // "five".
             edit.mark_change(Position::new(first, 0), Position::new(first, 14), bo)?;
             edit.mark_change(Position::new(first, 4), Position::new(first, 7), ana)?;
             edit.mark_former(Position::new(first, 4), Position::new(first, 7), bo, None)?;
