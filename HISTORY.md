@@ -12,7 +12,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   while tracking changes keeps what it was until the change is
   accepted or rejected, shows a mark in its top right corner in its
   author's colour, gray when several authors changed it, and the bar
-  of comments and changes goes to it; ODT keeps it (#PR).
+  of comments and changes goes to it; ODT keeps it (#234).
 * Added: in Desk Writer, an object moved or resized while tracking
   changes shows in a dashed frame in its author's colour, with its
   bubble, and Previous, Next, Accept and Reject of the bar of comments
