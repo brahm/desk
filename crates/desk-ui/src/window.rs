@@ -247,7 +247,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 91] = [
+const DOCUMENT_ACTIONS: [&str; 93] = [
     "outline",
     "screen-view",
     "text-size",
@@ -312,6 +312,8 @@ const DOCUMENT_ACTIONS: [&str; 91] = [
     "track-changes",
     "tracking-on",
     "markup",
+    "accept-change",
+    "reject-change",
     "accept-all-changes",
     "reject-all-changes",
     "next-review-item",
@@ -3759,6 +3761,21 @@ impl DocumentWindow {
             }
         });
         self.actions.add_action(&on);
+        // Of the change selected, or those of the text selected (REV-06).
+        for (name, accept) in [("accept-change", true), ("reject-change", false)] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, _| {
+                let Some(this) = weak.upgrade() else { return };
+                if this
+                    .editor()
+                    .is_none_or(|e| e.resolve_selected_changes(accept) == 0)
+                {
+                    this.window().error_bell();
+                }
+            });
+            self.actions.add_action(&action);
+        }
         for (name, accept) in [("accept-all-changes", true), ("reject-all-changes", false)] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(self);
@@ -4702,6 +4719,8 @@ pub(crate) fn edit_menu() -> gio::Menu {
     // (REV-03).
     let tracking = gio::Menu::new();
     tracking.append(Some(&tr("_Track Changes")), Some("win.track-changes"));
+    tracking.append(Some(&tr("Accept Change")), Some("win.accept-change"));
+    tracking.append(Some(&tr("Reject Change")), Some("win.reject-change"));
     tracking.append(
         Some(&tr("Accept All Changes")),
         Some("win.accept-all-changes"),
