@@ -10,11 +10,14 @@
 //! it took: the text after the first joined the paragraph where the mark
 //! is. The model keeps deleted text in its place, marked, and the breaks
 //! it took on the paragraphs they end, so reading puts it back there and
-//! writing takes it out again.
+//! writing takes it out again. A change of formatting is the text
+//! between the marks of its `text:format-change`, whose `desk:style-name`
+//! names the formatting the text had before.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use desk_model::{ChangeKind, Document, NodeId, Op, Paragraph, Position};
+use desk_model::{ChangeKind, Document, Formatting, NodeId, Op, Paragraph, Position};
 use desk_odf as odf;
 
 use super::FilterError;
@@ -50,6 +53,7 @@ pub(super) fn import(
     document: &mut Document,
     regions: &[odf::ChangedRegion],
     mut deleted: HashMap<String, Vec<Paragraph>>,
+    previous: &HashMap<String, Arc<Formatting>>,
     events: Events,
 ) -> Result<(), FilterError> {
     // The regions whose marks the text has.
@@ -57,7 +61,7 @@ pub(super) fn import(
         marked(&events).into_iter().map(str::to_owned).collect();
     let read: Vec<&odf::ChangedRegion> = regions
         .iter()
-        .filter(|r| r.kind != odf::ChangeKind::FormatChange && met.contains(r.id.as_str()))
+        .filter(|r| met.contains(r.id.as_str()))
         .collect();
     if read.is_empty() || events.is_empty() {
         return Ok(());
@@ -68,7 +72,8 @@ pub(super) fn import(
         for region in &read {
             let kind = match region.kind {
                 odf::ChangeKind::Deletion => ChangeKind::Deletion,
-                _ => ChangeKind::Insertion,
+                odf::ChangeKind::FormatChange => ChangeKind::Format,
+                odf::ChangeKind::Insertion => ChangeKind::Insertion,
             };
             let date =
                 super::comments::date(region.date.as_deref()).filter(|d| &**d != odf::UNKNOWN_DATE);
@@ -81,11 +86,49 @@ pub(super) fn import(
         }
         for (story, events) in texts {
             match story {
-                None => put(edit, &ids, &mut deleted, events)?,
+                None => put(edit, &ids, &mut deleted, previous, events)?,
                 Some(story) => {
-                    edit.edit_story(story, |edit| put(edit, &ids, &mut deleted, events))?;
+                    edit.edit_story(story, |edit| {
+                        put(edit, &ids, &mut deleted, previous, events)
+                    })?;
                 }
             }
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Leaves out the changes that no text of a document read carries: those
+/// whose marks enclose no text, as a change of the formatting of an
+/// empty paragraph, or whose text is in another change. The log counts
+/// them, as the changes it does not find (W148).
+pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
+    let mut carried: std::collections::HashSet<NodeId> = document
+        .change_places()
+        .into_iter()
+        .map(|(_, span)| span.id)
+        .collect();
+    // Notes too, wherever their marks are.
+    for note in document.notes().iter() {
+        let paragraphs = document.story_paragraphs(desk_model::Story::Note(note.id));
+        for paragraph in paragraphs.iter() {
+            carried.extend(paragraph.runs().filter_map(|r| r.attrs.change.flatten()));
+            carried.extend(paragraph.attrs().break_change.flatten());
+        }
+    }
+    let unused: Vec<NodeId> = document
+        .changes()
+        .iter()
+        .map(|c| c.id)
+        .filter(|id| !carried.contains(id))
+        .collect();
+    if unused.is_empty() {
+        return Ok(());
+    }
+    document.transact("Tracked Changes", |edit| {
+        for id in unused {
+            edit.set_change(id, None)?;
         }
         Ok(())
     })?;
@@ -98,21 +141,25 @@ fn put(
     edit: &mut desk_model::Edit,
     ids: &HashMap<&str, (NodeId, ChangeKind)>,
     deleted: &mut HashMap<String, Vec<Paragraph>>,
+    previous: &HashMap<String, Arc<Formatting>>,
     events: Events,
 ) -> Result<(), desk_model::ModelError> {
-    // The insertions first, which leave the text as it is.
+    // The insertions and changes of formatting first, which leave the
+    // text as it is.
     let mut open: Vec<(NodeId, Position)> = Vec::new();
     let mut deletions: Vec<(NodeId, Position, String)> = Vec::new();
     for (paragraph, offset, field) in &events {
         let at = Position::new(*paragraph, *offset);
         match field {
             odf::Field::ChangeStart { id } => {
-                if let Some(&(change, ChangeKind::Insertion)) = ids.get(id.as_str()) {
+                if let Some(&(change, ChangeKind::Insertion | ChangeKind::Format)) =
+                    ids.get(id.as_str())
+                {
                     open.push((change, at));
                 }
             }
             odf::Field::ChangeEnd { id } => {
-                let Some(&(change, _)) = ids.get(id.as_str()) else {
+                let Some(&(change, kind)) = ids.get(id.as_str()) else {
                     continue;
                 };
                 let Some(i) = open.iter().position(|(c, _)| *c == change) else {
@@ -133,6 +180,11 @@ fn put(
                 let breaks: Vec<NodeId> = (first..last)
                     .filter_map(|i| body.get(i).map(Paragraph::id))
                     .collect();
+                if kind == ChangeKind::Format {
+                    // Breaks have no formatting of their own to change.
+                    edit.mark_formatted(start, at, change, previous.get(id).cloned())?;
+                    continue;
+                }
                 edit.mark_change(start, at, change)?;
                 for paragraph in breaks {
                     edit.mark_break_change(paragraph, Some(change))?;
@@ -177,6 +229,7 @@ fn restore(
             .cloned()
             .map(|mut run| {
                 run.attrs.change = Some(Some(change));
+                run.attrs.formatted = None;
                 run
             })
             .collect()
@@ -256,7 +309,13 @@ fn export(
     // The open deletion, by its region, with the paragraph it is taking.
     let mut deleting: Option<(usize, odf::Paragraph)> = None;
     let mut inserting: Option<String> = None;
-    let region = |regions: &mut Vec<odf::ChangedRegion>, id: &str| -> Option<(usize, ChangeKind)> {
+    // A region for the change a mark starts, with the automatic style of
+    // the formatting before that the mark of a change of formatting
+    // carries.
+    let region = |regions: &mut Vec<odf::ChangedRegion>,
+                  id: &str,
+                  previous: Option<&String>|
+     -> Option<(usize, ChangeKind)> {
         let change = id
             .parse::<u64>()
             .ok()
@@ -267,10 +326,14 @@ fn export(
             kind: match change.kind {
                 ChangeKind::Insertion => odf::ChangeKind::Insertion,
                 ChangeKind::Deletion => odf::ChangeKind::Deletion,
+                ChangeKind::Format => odf::ChangeKind::FormatChange,
             },
             creator: Some(change.author.to_string()),
             date: change.date.as_deref().map(str::to_owned),
             deleted: Vec::new(),
+            previous_style: previous
+                .filter(|_| change.kind == ChangeKind::Format)
+                .cloned(),
         });
         Some((regions.len() - 1, change.kind))
     };
@@ -297,30 +360,34 @@ fn export(
         }
         for span in paragraph.spans {
             match &span.field {
-                Some(odf::Field::ChangeStart { id }) => match region(regions, id) {
-                    Some((index, ChangeKind::Deletion)) => {
-                        let name = regions[index].id.clone();
-                        here.spans.push(mark(odf::Field::Change { id: name }));
-                        // Its first paragraph joins the one of the
-                        // mark, which keeps its own list and level.
-                        deleting = Some((
-                            index,
-                            odf::Paragraph {
-                                style: paragraph.style.clone(),
-                                ..odf::Paragraph::default()
-                            },
-                        ));
+                Some(odf::Field::ChangeStart { id }) => {
+                    match region(regions, id, span.style.as_ref()) {
+                        Some((index, ChangeKind::Deletion)) => {
+                            let name = regions[index].id.clone();
+                            here.spans.push(mark(odf::Field::Change { id: name }));
+                            // Its first paragraph joins the one of the
+                            // mark, which keeps its own list and level.
+                            deleting = Some((
+                                index,
+                                odf::Paragraph {
+                                    style: paragraph.style.clone(),
+                                    ..odf::Paragraph::default()
+                                },
+                            ));
+                        }
+                        // Text added or formatted stays, between its marks.
+                        Some((index, ChangeKind::Insertion | ChangeKind::Format)) => {
+                            let name = regions[index].id.clone();
+                            here.spans.push(odf::Span {
+                                field: Some(odf::Field::ChangeStart { id: name.clone() }),
+                                style: None,
+                                ..span.clone()
+                            });
+                            inserting = Some(name);
+                        }
+                        None => {}
                     }
-                    Some((index, ChangeKind::Insertion)) => {
-                        let name = regions[index].id.clone();
-                        here.spans.push(odf::Span {
-                            field: Some(odf::Field::ChangeStart { id: name.clone() }),
-                            ..span.clone()
-                        });
-                        inserting = Some(name);
-                    }
-                    None => {}
-                },
+                }
                 Some(odf::Field::ChangeEnd { .. }) => {
                     if let Some((index, taking)) = deleting.take() {
                         regions[index].deleted.push(taking);
@@ -399,13 +466,17 @@ pub(super) fn export_all(
         }
     }
     // The regions are written in content.xml: the automatic styles of
-    // styles.xml that the text of headers and footers took there go
-    // with it.
-    let named = regions.iter().flat_map(|r| &r.deleted).flat_map(|p| {
-        p.style
-            .iter()
-            .chain(p.spans.iter().filter_map(|s| s.style.as_ref()))
-    });
+    // styles.xml that the text of headers and footers took there, and
+    // their formatting before a change, go with them.
+    let named = regions
+        .iter()
+        .flat_map(|r| &r.deleted)
+        .flat_map(|p| {
+            p.style
+                .iter()
+                .chain(p.spans.iter().filter_map(|s| s.style.as_ref()))
+        })
+        .chain(regions.iter().filter_map(|r| r.previous_style.as_ref()));
     let mut wanted: Vec<odf::Style> = Vec::new();
     for name in named {
         let missing = !out.automatic_styles.iter().any(|s| &s.name == name)

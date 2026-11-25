@@ -250,6 +250,7 @@ impl Document {
                     // copies (W148).
                     let mut attrs = run.attrs.clone();
                     attrs.change = None;
+                    attrs.formatted = None;
                     (run.text().to_owned(), style, attrs)
                 })
                 .collect();

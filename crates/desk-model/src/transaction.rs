@@ -599,7 +599,56 @@ impl Edit {
         end: Position,
         change: NodeId,
     ) -> Result<(), ModelError> {
-        self.map_runs(start, end, |run| run.attrs.change = Some(Some(change)))
+        self.map_runs(start, end, |run| {
+            run.attrs.change = Some(Some(change));
+            // Added or deleted, it has no change of formatting.
+            run.attrs.formatted = None;
+        })
+    }
+
+    /// Puts the text between two positions in a tracked change of its
+    /// formatting, keeping in each run the formatting it has now, which
+    /// rejecting the change puts back (W148). Text already in a change,
+    /// added, deleted or formatted before, keeps that change: added text
+    /// has no formatting of its own to go back to, and formatted text
+    /// keeps the formatting it had first.
+    pub fn mark_format_change(
+        &mut self,
+        start: Position,
+        end: Position,
+        change: NodeId,
+    ) -> Result<(), ModelError> {
+        self.map_runs(start, end, |run| {
+            if run.attrs.change.flatten().is_some() {
+                return;
+            }
+            let before = crate::Formatting {
+                style: run.style,
+                attrs: run.attrs.without_field(),
+            };
+            run.attrs.change = Some(Some(change));
+            run.attrs.formatted = Some(Some(Arc::new(before)));
+        })
+    }
+
+    /// Puts the text between two positions in a tracked change of its
+    /// formatting whose formatting before is `before` for all of it, or
+    /// unknown, as a file gives it (W148). Text already in a change keeps
+    /// it, as with [`Edit::mark_format_change`].
+    pub fn mark_formatted(
+        &mut self,
+        start: Position,
+        end: Position,
+        change: NodeId,
+        before: Option<Arc<crate::Formatting>>,
+    ) -> Result<(), ModelError> {
+        self.map_runs(start, end, |run| {
+            if run.attrs.change.flatten().is_some() {
+                return;
+            }
+            run.attrs.change = Some(Some(change));
+            run.attrs.formatted = Some(before.clone());
+        })
     }
 
     /// Puts the break at the end of a paragraph in a tracked change, or
