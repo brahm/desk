@@ -874,6 +874,11 @@ formatting! {
         /// at the end of the paragraph is part of (W148, REV-01). It
         /// belongs to the paragraph, never to its style.
         break_change: Option<crate::NodeId> = None,
+        /// The insertion of another author that the break was part of
+        /// before a tracked deletion took it (W148, B-072): rejecting the
+        /// deletion gives it back, as it gives text back (B-070). It
+        /// belongs to the paragraph with its break.
+        break_former: Option<crate::NodeId> = None,
         /// The tracked change of the formatting of the paragraph, its
         /// style or what is set on it, that the paragraph is part of
         /// (W148). It belongs to the paragraph, never to its style.
@@ -928,6 +933,7 @@ impl ParaAttrs {
             start: self.start.clone(),
             toc_entry: self.toc_entry,
             break_change: self.break_change,
+            break_former: self.break_former,
             format_change: self.format_change,
             formatted: self.formatted.clone(),
             ..Self::default()
@@ -941,6 +947,7 @@ impl ParaAttrs {
             start: None,
             toc_entry: None,
             break_change: None,
+            break_former: None,
             format_change: None,
             formatted: None,
             ..self.clone()

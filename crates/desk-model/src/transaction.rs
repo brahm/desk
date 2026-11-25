@@ -294,9 +294,11 @@ impl Edit {
         // new one between them is in no tracked change (W148).
         let ends = paragraph.attrs().break_change;
         attrs.break_change = ends;
+        attrs.break_former = paragraph.attrs().break_former;
         if ends.flatten().is_some() {
             let mut own = paragraph.attrs().clone();
             own.break_change = None;
+            own.break_former = None;
             let style = paragraph.style();
             self.apply(Op::SetParagraphFormat {
                 paragraph: at.paragraph,
@@ -403,7 +405,7 @@ impl Edit {
         // paragraph, or its break.
         let mut gone: Vec<(Position, Position)> = Vec::new();
         let mut marked: Vec<(Position, Position)> = Vec::new();
-        let mut breaks: Vec<NodeId> = Vec::new();
+        let mut breaks: Vec<(NodeId, Option<NodeId>)> = Vec::new();
         for (i, (id, range)) in ranges.iter().enumerate() {
             let paragraph = self.doc.paragraph(*id)?;
             let mut offset = 0;
@@ -434,7 +436,7 @@ impl Edit {
                     .and_then(|c| self.doc.changes().get(c))
                     .is_some_and(|c| c.kind == ChangeKind::Deletion)
                 {
-                    breaks.push(*id);
+                    breaks.push((*id, ends));
                 }
             }
         }
@@ -452,8 +454,12 @@ impl Edit {
                     }
                 })?;
             }
-            for paragraph in breaks {
+            // So does a break in an insertion of another author (B-072).
+            for (paragraph, before) in breaks {
                 self.mark_break_change(paragraph, Some(deletion))?;
+                if let Some(before) = before {
+                    self.mark_break_former(paragraph, before)?;
+                }
             }
         }
         // What the author added goes, from the last piece, so that the
@@ -496,10 +502,14 @@ impl Edit {
         // The joined paragraph ends at the break the last one ended at,
         // and with its tracked change (W148).
         let ends = last_paragraph.attrs().break_change;
+        let former = last_paragraph.attrs().break_former;
         let first_paragraph = self.doc.paragraph(first)?;
-        if first_paragraph.attrs().break_change != ends {
+        if first_paragraph.attrs().break_change != ends
+            || first_paragraph.attrs().break_former != former
+        {
             let mut attrs = first_paragraph.attrs().clone();
             attrs.break_change = ends;
+            attrs.break_former = former;
             let style = first_paragraph.style();
             self.apply(Op::SetParagraphFormat {
                 paragraph: first,
@@ -1050,7 +1060,8 @@ impl Edit {
     }
 
     /// Puts the break at the end of a paragraph in a tracked change, or
-    /// takes it out of any with none (W148).
+    /// takes it out of any with none (W148). The break is then in no
+    /// change it was in before.
     pub fn mark_break_change(
         &mut self,
         paragraph: NodeId,
@@ -1059,6 +1070,26 @@ impl Edit {
         let p = self.doc.paragraph(paragraph)?;
         let mut attrs = p.attrs().clone();
         attrs.break_change = change.map(Some);
+        attrs.break_former = None;
+        let style = p.style();
+        self.apply(Op::SetParagraphFormat {
+            paragraph,
+            style,
+            attrs,
+        })
+    }
+
+    /// Puts the break at the end of a paragraph, which a tracked deletion
+    /// holds, in the insertion it was part of before the deletion took
+    /// it, as a file gives it (W148, B-072).
+    pub fn mark_break_former(
+        &mut self,
+        paragraph: NodeId,
+        former: NodeId,
+    ) -> Result<(), ModelError> {
+        let p = self.doc.paragraph(paragraph)?;
+        let mut attrs = p.attrs().clone();
+        attrs.break_former = Some(Some(former));
         let style = p.style();
         self.apply(Op::SetParagraphFormat {
             paragraph,

@@ -759,3 +759,84 @@ fn b_070_text_typed_next_to_deleted_text_is_in_no_change_it_was_in() {
         .unwrap();
     assert_eq!(editor.document().paragraph(p).unwrap().text(), "one Xthree");
 }
+
+/// B-072: a paragraph break that another author added keeps that
+/// insertion when a tracked deletion takes it, as text does (B-070).
+#[test]
+fn b_072_a_deleted_break_keeps_the_insertion_it_was_in() {
+    let (mut editor, p) = typed("one two");
+    // Bo added the break after "one".
+    let ((bo, q), _) = editor
+        .edit("Changes", |edit| {
+            let q = edit.split_paragraph(Position::new(p, 3))?.paragraph;
+            let bo = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+            edit.mark_break_change(p, Some(bo))?;
+            Ok(((bo, q), ()))
+        })
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(p, 3), Position::new(q, 0))
+                .map(|_| ())
+        })
+        .unwrap();
+    let document = editor.document();
+    let deletion = document
+        .changes()
+        .iter()
+        .find(|c| c.kind == ChangeKind::Deletion)
+        .unwrap()
+        .id;
+    let attrs = document.paragraph(p).unwrap().attrs();
+    assert_eq!(attrs.break_change.flatten(), Some(deletion));
+    assert_eq!(attrs.break_former.flatten(), Some(bo));
+    let resolve = |editor: &mut Editor, accept: bool, id: NodeId| {
+        editor
+            .edit("Resolve", |edit| {
+                edit.resolve_changes(accept, |c| c == id).map(|_| ())
+            })
+            .unwrap();
+    };
+    let texts = |editor: &Editor| -> Vec<String> {
+        editor
+            .document()
+            .body()
+            .iter()
+            .map(|p| p.text().to_owned())
+            .collect()
+    };
+    let ends = |editor: &Editor| {
+        let attrs = editor.document().paragraph(p).unwrap().attrs().clone();
+        (attrs.break_change.flatten(), attrs.break_former.flatten())
+    };
+    // Rejecting the deletion gives the break back to Bo's insertion.
+    resolve(&mut editor, false, deletion);
+    assert_eq!(texts(&editor), ["one", " two"]);
+    assert_eq!(ends(&editor), (Some(bo), None));
+    editor.undo().unwrap();
+    // Bo's insertion accepted while the break is deleted: rejecting the
+    // deletion then leaves a plain break.
+    resolve(&mut editor, true, bo);
+    assert_eq!(ends(&editor), (Some(deletion), None));
+    resolve(&mut editor, false, deletion);
+    assert_eq!(texts(&editor), ["one", " two"]);
+    assert_eq!(ends(&editor), (None, None));
+    editor.undo().unwrap();
+    editor.undo().unwrap();
+    // Bo's insertion rejected while the break is deleted: the break goes.
+    resolve(&mut editor, false, bo);
+    assert_eq!(texts(&editor), ["one two"]);
+    editor.undo().unwrap();
+    // The deletion accepted: the break goes too.
+    resolve(&mut editor, true, deletion);
+    assert_eq!(texts(&editor), ["one two"]);
+    editor.undo().unwrap();
+    // Everything rejected: the break that Bo added goes.
+    editor
+        .edit("Reject All", |edit| {
+            edit.resolve_changes(false, |_| true).map(|_| ())
+        })
+        .unwrap();
+    assert_eq!(texts(&editor), ["one two"]);
+}

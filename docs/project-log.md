@@ -2416,6 +2416,27 @@ paragraph, and objects on a second page.
   one does, and starts no page, column or section. The text of a story,
   edited as a body, is marked so, and its breaks stay until B-074.
 
+### 25 November: a deleted break keeps its insertion (step 13 of W2, first part)
+
+- A paragraph break that another author's insertion added keeps that
+  insertion when a tracked deletion takes it, as text does since B-070
+  (B-072). The paragraph holds it beside the deletion of its break, as
+  a run holds the change its text was in.
+- Rejecting the deletion gives the break back to the insertion;
+  accepting the insertion while the break is deleted leaves a plain
+  break when the deletion is rejected; rejecting the insertion while
+  the break is deleted, or both, takes the break and joins the
+  paragraphs.
+- In ODT the marks of the insertion go around the break inside the
+  paragraphs of the deletion, and a change that holds the text before
+  a deleted break but not the break now ends before it. Reading them,
+  an insertion still open at the end of one of those paragraphs puts
+  the break in it, and the paragraphs a deletion puts back keep the
+  insertion of the break they end at.
+- The two pieces of an insertion that another change interrupts are
+  still read as two changes, which is B-073, the next part of this
+  step.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -480,6 +480,7 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
     ParaAttrs {
         toc_entry: None,
         break_change: None,
+        break_former: None,
         format_change: None,
         formatted: None,
         hyphenate: flag(properties, "hyphenate"),

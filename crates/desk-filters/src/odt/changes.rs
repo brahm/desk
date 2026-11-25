@@ -138,6 +138,7 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
     for paragraphs in &texts {
         for paragraph in paragraphs {
             carried.extend(paragraph.runs().filter_map(|r| r.attrs.former.flatten()));
+            carried.extend(paragraph.attrs().break_former.flatten());
         }
     }
     // Notes too, wherever their marks are.
@@ -147,6 +148,7 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
             carried.extend(paragraph.runs().filter_map(|r| r.attrs.change.flatten()));
             carried.extend(paragraph.runs().filter_map(|r| r.attrs.former.flatten()));
             carried.extend(paragraph.attrs().break_change.flatten());
+            carried.extend(paragraph.attrs().break_former.flatten());
             carried.extend(paragraph.attrs().format_change.flatten());
         }
     }
@@ -305,7 +307,7 @@ fn mark_formers(
 ) -> Result<(), desk_model::ModelError> {
     // The change open, which goes on in the next paragraph.
     let mut open: Option<(NodeId, Option<Arc<Formatting>>)> = None;
-    for ((start, end), marks) in starts.iter().zip(formers) {
+    for (k, ((start, end), marks)) in starts.iter().zip(formers).enumerate() {
         let end = *end;
         let len = edit.document().paragraph(start.paragraph)?.len();
         let mut from = start.offset;
@@ -364,6 +366,16 @@ fn mark_formers(
         }
         // Up to the end of the text the deletion took in the paragraph.
         put(edit, &open, from, end.min(len))?;
+        // The break the deletion took after it, in an insertion still
+        // open there (B-072).
+        if k + 1 < starts.len()
+            && let Some((id, _)) = open
+            && ids
+                .values()
+                .any(|&(c, kind)| c == id && kind == ChangeKind::Insertion)
+        {
+            edit.mark_break_former(start.paragraph, id)?;
+        }
     }
     Ok(())
 }
@@ -407,6 +419,7 @@ fn restore(
     let len = paragraph.len();
     let tail = paragraph.slice(at.offset..len)?;
     let ends = paragraph.attrs().break_change;
+    let former = paragraph.attrs().break_former;
     // The first paragraph taken ends the one of the mark, with its break.
     edit.apply(Op::ReplaceText {
         paragraph: at.paragraph,
@@ -420,6 +433,7 @@ fn restore(
     for p in middle {
         let mut attrs = p.attrs().clone();
         attrs.break_change = Some(Some(change));
+        attrs.break_former = None;
         let id = edit.new_id();
         edit.apply(Op::InsertParagraph {
             index: place,
@@ -432,6 +446,7 @@ fn restore(
     // paragraph of the mark ended.
     let mut attrs = last.attrs().clone();
     attrs.break_change = ends;
+    attrs.break_former = former;
     let mut runs = marked(last);
     runs.extend(tail);
     let id = edit.new_id();

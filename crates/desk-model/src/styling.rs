@@ -261,6 +261,7 @@ impl Document {
                 .collect();
             let mut attrs = paragraph.attrs().clone();
             attrs.break_change = None;
+            attrs.break_former = None;
             attrs.format_change = None;
             attrs.formatted = None;
             paragraphs.push(FragmentParagraph {

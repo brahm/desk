@@ -689,6 +689,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         list_override: None,
         toc_entry: None,
         break_change: None,
+        break_former: None,
         format_change: None,
         formatted: None,
     }
@@ -2972,12 +2973,30 @@ fn export_spans(
     }
     comments(&mut spans, offset, last);
     let ends = paragraph.attrs().break_change.flatten();
+    // The insertion that a deleted break was in before (B-072).
+    let break_former = paragraph
+        .attrs()
+        .break_former
+        .flatten()
+        .filter(|_| track_on && ends.is_some())
+        .map(|id| (id, None));
     // The change before goes on past the break only when the deletion it
-    // is in took the break too.
-    if before_change != ends || ends.is_none() {
+    // is in took the break too, and the break was in it before.
+    if before_change != ends || ends.is_none() || former_open != break_former {
         close_former(&mut spans, &mut former_open, None);
     }
     switch(&mut spans, (ends, None), None, &mut |_| None);
+    if let Some((id, _)) = break_former
+        && former_open.is_none()
+    {
+        spans.push(odf::Span {
+            field: Some(odf::Field::ChangeStart {
+                id: id.get().to_string(),
+            }),
+            ..odf::Span::default()
+        });
+        former_open = break_former;
+    }
     if let Some(track) = track {
         track.change = open.0;
         track.former = former_open;
@@ -3652,6 +3671,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             list_override: None,
             toc_entry: None,
             break_change: None,
+            break_former: None,
             format_change: None,
             formatted: None,
             ..paragraph.attrs().clone()

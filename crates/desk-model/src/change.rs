@@ -226,7 +226,7 @@ fn has_change(
     kinds: &std::collections::HashMap<NodeId, ChangeKind>,
 ) -> bool {
     let attrs = paragraph.attrs();
-    [attrs.break_change, attrs.format_change]
+    [attrs.break_change, attrs.break_former, attrs.format_change]
         .into_iter()
         .any(|c| c.flatten().is_some_and(|c| kinds.contains_key(&c)))
         || paragraph.runs().any(|r| {
@@ -273,16 +273,38 @@ fn resolve_text(
             attrs.format_change = None;
             attrs.formatted = None;
         }
-        // The break goes after the text before it.
+        // The break goes after the text before it. Rejected, a deletion
+        // gives it back to the insertion it was in before, as it gives
+        // text back (B-072).
         let mut joins = None;
-        if let Some(kind) = kind_of(attrs.break_change.flatten()) {
-            if goes(kind) && i + 1 < ids.len() {
-                joins = Some((
-                    Position::new(id, paragraph.len()),
-                    Position::new(ids[i + 1], 0),
-                ));
-            } else {
-                attrs.break_change = None;
+        let change = attrs.break_change.flatten();
+        let former = attrs.break_former.flatten();
+        let (change_kind, former_kind) = (kind_of(change), kind_of(former));
+        let break_goes = match change_kind {
+            Some(kind) => {
+                goes(kind)
+                    || (kind == ChangeKind::Deletion && former_kind == Some(ChangeKind::Insertion))
+            }
+            None => !accept && former_kind == Some(ChangeKind::Insertion),
+        };
+        if break_goes && i + 1 < ids.len() {
+            joins = Some((
+                Position::new(id, paragraph.len()),
+                Position::new(ids[i + 1], 0),
+            ));
+        } else {
+            match (change_kind, former_kind) {
+                (Some(ChangeKind::Deletion), None) => {
+                    let former = former.filter(|id| changes.contains(id));
+                    attrs.break_change = former.map(Some);
+                    attrs.break_former = None;
+                }
+                (Some(_), _) => {
+                    attrs.break_change = None;
+                    attrs.break_former = None;
+                }
+                (None, Some(_)) => attrs.break_former = None,
+                (None, None) => {}
             }
         }
         if &attrs != paragraph.attrs() || style != paragraph.style() {
