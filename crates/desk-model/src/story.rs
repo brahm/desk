@@ -277,8 +277,16 @@ impl Document {
                 let _ = flow.insert(index, paragraph);
             }
             *document.body_mut() = flow;
+            document.story_body = true;
         }
         document
+    }
+
+    /// Whether the body holds the text of a story, as
+    /// [`Document::with_body`] makes it: its paragraphs are laid out where
+    /// the story is, not as those of the body.
+    pub fn is_story_body(&self) -> bool {
+        self.story_body
     }
 }
 

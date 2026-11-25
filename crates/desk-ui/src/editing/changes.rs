@@ -659,6 +659,76 @@ mod tests {
     }
 
     #[test]
+    fn b_071_a_deleted_break_joins_its_paragraphs_without_deletions() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            document
+                .transact("Changes", |edit| {
+                    let start = edit.document().start();
+                    let end = edit.insert_text(start, "one ")?;
+                    let second = edit.split_paragraph(end)?;
+                    let end = edit.insert_text(second, "two")?;
+                    let third = edit.split_paragraph(end)?;
+                    edit.insert_text(third, "three")?;
+                    let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+                    edit.mark_break_change(start.paragraph, Some(gone))?;
+                    edit.mark_change(second, Position::new(second.paragraph, 3), gone)?;
+                    edit.mark_break_change(second.paragraph, Some(gone))?;
+                    Ok(())
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.set_markup(Markup::WithoutDeletions);
+            let document = editor.document();
+            let state = editor.state.borrow();
+            let layout = &state.layout;
+            // "three" shows after "one " on its line.
+            let one = text_nav::caret(layout, Spot::new(0, 0)).unwrap();
+            let three = text_nav::caret(layout, Spot::new(2, 0)).unwrap();
+            let end = text_nav::caret(layout, Spot::new(0, 4)).unwrap();
+            assert_eq!(three.top, one.top);
+            assert_eq!(three.x, end.x);
+            // The arrows go past the break that does not show, as past a
+            // character, and Home and End to the edges of the line.
+            assert_eq!(
+                text_nav::move_char(&document, Spot::new(0, 4), true),
+                Spot::new(2, 1)
+            );
+            assert_eq!(
+                text_nav::move_char(&document, Spot::new(2, 0), false),
+                Spot::new(0, 3)
+            );
+            assert_eq!(
+                text_nav::line_edge(layout, Spot::new(0, 1), true),
+                Spot::new(2, 5)
+            );
+            assert_eq!(
+                text_nav::line_edge(layout, Spot::new(2, 3), false),
+                Spot::new(0, 0)
+            );
+            // One mark of the end of a paragraph, after "three".
+            let ends = text_nav::invisibles(&document, layout)
+                .into_iter()
+                .filter(|m| m.kind == text_nav::Invisible::Paragraph)
+                .count();
+            assert_eq!(ends, 1);
+            // The text of a story, laid out where it is, does not join yet
+            // (B-074): its breaks stay.
+            let story = document.with_body(document.body().iter().cloned().collect());
+            assert_eq!(
+                text_nav::move_char(&story, Spot::new(0, 4), true),
+                Spot::new(1, 3)
+            );
+            drop(state);
+            // Delete takes the next character that shows.
+            editor.select(Selection::cursor(Spot::new(0, 4)));
+            editor.delete(true, false);
+            let texts: Vec<String> = editor.document().body().iter().map(|p| p.text()).collect();
+            assert_eq!(texts, ["one ", "two", "hree"]);
+        });
+    }
+
+    #[test]
     fn rev_04_the_change_selected_has_a_bubble() {
         crate::with_gtk(|| {
             let mut document = Document::new_word_processing();

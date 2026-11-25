@@ -1539,3 +1539,115 @@ fn est_05_est_13_a_chain_laid_out_again_meets_its_notes_again() {
     }
     assert!(moved > 0);
 }
+
+/// B-071: in the views of markup without deletions, a paragraph whose
+/// break a tracked deletion took shows the next one after it on its line,
+/// each with its own places on that line; with the deletions shown, they
+/// are paragraphs of their own.
+#[test]
+fn b_071_a_deleted_break_joins_its_paragraphs_without_deletions() {
+    use desk_model::{ChangeKind, Markup, Position};
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Text", |edit| {
+            let start = edit.document().start();
+            let end = edit.insert_text(start, "one ")?;
+            let second = edit.split_paragraph(end)?;
+            let end = edit.insert_text(second, "two")?;
+            let third = edit.split_paragraph(end)?;
+            edit.insert_text(third, "three")?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            // The break after "one " and "two" with its break.
+            edit.mark_break_change(start.paragraph, Some(gone))?;
+            edit.mark_change(second, Position::new(second.paragraph, 3), gone)?;
+            edit.mark_break_change(second.paragraph, Some(gone))?;
+            Ok(())
+        })
+        .unwrap();
+    let mut system = TextSystem::new();
+    let shown = paginate(&document, &mut system);
+    let tops: Vec<(usize, f32)> = shown.pages[0]
+        .lines
+        .iter()
+        .map(|l| (l.paragraph, l.top()))
+        .collect();
+    assert_eq!(tops.len(), 3);
+    assert!(tops[1].1 > tops[0].1 && tops[2].1 > tops[1].1);
+    document.set_markup(Markup::WithoutDeletions);
+    let joined = paginate(&document, &mut system);
+    let lines = &joined.pages[0].lines;
+    // One line with a part for each paragraph, side by side.
+    assert_eq!(
+        lines.iter().map(|l| l.paragraph).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    assert!(lines.iter().all(|l| l.top() == lines[0].top()));
+    assert!(lines.iter().all(|l| l.index == 0));
+    let (one, two, three) = (&lines[0].line, &lines[1].line, &lines[2].line);
+    assert_eq!(one.range, 0..4);
+    assert_eq!(two.range, 0..3);
+    assert_eq!(three.range, 0..5);
+    // "two" takes no room, and "three" starts where "one " ends.
+    assert_eq!(two.caret_x(0), two.caret_x(3));
+    assert_eq!(one.caret_x(4), three.caret_x(0));
+    assert!(three.caret_x(5) > three.caret_x(0));
+    assert_eq!(three.carets.first().map(|c| c.0), Some(0));
+    // The first part draws the glyphs of the line.
+    assert!(!one.runs.is_empty() && two.runs.is_empty() && three.runs.is_empty());
+}
+
+/// B-071: a joined paragraph that goes on past its first line keeps its
+/// own lines after it, numbered from its first.
+#[test]
+fn b_071_a_joined_paragraph_goes_on_in_lines_of_its_own() {
+    use desk_model::{ChangeKind, Markup};
+    let mut document = Document::new_word_processing();
+    let long = "word ".repeat(60);
+    document
+        .transact("Text", |edit| {
+            let start = edit.document().start();
+            let end = edit.insert_text(start, "one ")?;
+            let second = edit.split_paragraph(end)?;
+            edit.insert_text(second, long.trim_end())?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_break_change(start.paragraph, Some(gone))?;
+            Ok(())
+        })
+        .unwrap();
+    document.set_markup(Markup::WithoutDeletions);
+    let layout = paginate(&document, &mut TextSystem::new());
+    let lines = &layout.pages[0].lines;
+    assert!(lines.len() >= 3, "{}", lines.len());
+    assert_eq!((lines[0].paragraph, lines[0].index), (0, 0));
+    assert_eq!(lines[1].top(), lines[0].top());
+    for (i, line) in lines[1..].iter().enumerate() {
+        assert_eq!((line.paragraph, line.index), (1, i));
+    }
+    // Its lines follow on from each other, to its end.
+    for pair in lines[1..].windows(2) {
+        assert_eq!(pair[0].line.range.end, pair[1].line.range.start);
+        assert!(pair[1].top() > pair[0].top());
+    }
+    assert_eq!(lines[1].line.range.start, 0);
+    assert_eq!(lines.last().unwrap().line.range.end, long.trim_end().len());
+}
+
+/// B-071 review: an object that moves with a paragraph joined to the one
+/// before stays on the page, with that one.
+#[test]
+fn b_071_an_object_of_a_joined_paragraph_stays_on_its_page() {
+    use desk_model::{ChangeKind, Markup};
+    let mut document = with_object(desk_model::Wrap::Both, Some(1));
+    document
+        .transact("Delete", |edit| {
+            let first = edit.document().start().paragraph;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_break_change(first, Some(gone))
+        })
+        .unwrap();
+    document.set_markup(Markup::WithoutDeletions);
+    let layout = paginate(&document, &mut TextSystem::new());
+    let objects: usize = layout.pages.iter().map(|p| p.objects.len()).sum();
+    assert_eq!(objects, 1);
+    assert_eq!(layout.pages[0].objects[0].paragraph, Some(0));
+}

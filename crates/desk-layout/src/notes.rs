@@ -139,7 +139,8 @@ impl NotePlan {
             .collect()
     }
 
-    /// Lays out the body with its notes.
+    /// Lays out the body with its notes, and the paragraphs whose deleted
+    /// breaks do not show joined (B-071).
     pub fn paginate(
         &self,
         document: &Document,
@@ -149,10 +150,59 @@ impl NotePlan {
         setup: PageSetup,
         sum: bool,
     ) -> DocumentLayout {
+        let hidden = crate::hidden_changes(document);
+        let mut joins = crate::joins::joins(document, hidden.as_deref());
+        let joined: Vec<Option<desk_model::Paragraph>> = (0..joins.len())
+            .map(|i| crate::joins::joined_paragraph(document, &joins, i))
+            .collect();
+        // Paragraphs that could not be joined show on their own.
+        for join in &mut joins {
+            if join.is_some_and(|(head, _)| joined[head].is_none()) {
+                *join = None;
+            }
+        }
+        let mut layout = self.paginate_joined(
+            document, values, labels, system, setup, sum, &joins, &joined,
+        );
+        crate::joins::split_lines(&mut layout, &joins);
+        layout
+    }
+
+    /// Lays out the body with its notes, each paragraph joined to others
+    /// laid out with them.
+    #[allow(clippy::too_many_arguments)]
+    fn paginate_joined(
+        &self,
+        document: &Document,
+        values: &[FieldValues],
+        labels: &Labels,
+        system: &mut TextSystem,
+        setup: PageSetup,
+        sum: bool,
+        joins: &[Option<(usize, usize)>],
+        joined: &[Option<desk_model::Paragraph>],
+    ) -> DocumentLayout {
         let styles = document.styles();
         let settings = document.text_settings();
-        let items = styles.list_items(document.body().iter());
-        let body: Vec<ParagraphText> = document
+        // The items of lists as they show: a paragraph joined to the one
+        // before is no item of its own (B-071).
+        let shown = styles.list_items(
+            document
+                .body()
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| joins[*i].is_none())
+                .map(|(_, p)| p),
+        );
+        let mut shown = shown.into_iter();
+        let items: Vec<Option<desk_model::ListItem>> = joins
+            .iter()
+            .map(|join| match join {
+                Some(_) => None,
+                None => shown.next().flatten(),
+            })
+            .collect();
+        let mut body: Vec<ParagraphText> = document
             .body()
             .iter()
             .enumerate()
@@ -160,16 +210,50 @@ impl NotePlan {
                 let mut text = ParagraphText::new_in_document_with(
                     styles,
                     settings,
-                    paragraph,
+                    joined[i].as_ref().unwrap_or(paragraph),
                     items[i].as_ref(),
                     values.get(i).cloned().unwrap_or_default(),
                 );
+                text.set_joined(joins[i].is_some());
                 system.screen_spacing(&mut text);
                 text.set_page_margins(setup.margin_left.to_pt(), setup.margin_right.to_pt());
                 text
             })
             .collect();
-        let room = crate::pages::MarginRoom::new(document, system);
+        // A paragraph joined to the one before keeps with the next as that
+        // one does, starts no page, column or section, and its objects go
+        // with it (B-071).
+        for (i, join) in joins.iter().enumerate() {
+            if let Some((head, _)) = *join {
+                let keep = body[head].paragraph().keep_with_next;
+                let format = body[i].paragraph_mut();
+                format.keep_with_next = keep;
+                format.page_break_before = false;
+                format.column_break_before = false;
+                format.start = None;
+            }
+        }
+        let mut room = crate::pages::MarginRoom::new(document, system);
+        if joins.iter().any(Option::is_some) {
+            room.floats = std::sync::Arc::new(
+                room.floats
+                    .iter()
+                    .map(|f| crate::objects::Floating {
+                        anchor: match f.anchor {
+                            crate::objects::Place::Paragraph(p) => joins
+                                .get(p)
+                                .copied()
+                                .flatten()
+                                .map_or(f.anchor, |(head, _)| {
+                                    crate::objects::Place::Paragraph(head)
+                                }),
+                            page => page,
+                        },
+                        ..f.clone()
+                    })
+                    .collect(),
+            );
+        }
         if self.refs.is_empty() {
             return paginate_with_footnotes(setup, &body, system, sum, None, Some(&room));
         }
@@ -180,7 +264,12 @@ impl NotePlan {
                 let width = setup.body_width().to_pt() as f32;
                 let mut refs = vec![Vec::new(); body.len()];
                 for (index, &(paragraph, offset, _)) in self.refs.iter().enumerate() {
-                    refs[paragraph].push((offset, index));
+                    // A note of a joined paragraph is in the text of the
+                    // first of them.
+                    match joins[paragraph] {
+                        Some((head, start)) => refs[head].push((start + offset, index)),
+                        None => refs[paragraph].push((offset, index)),
+                    }
                 }
                 let mut parts = Vec::with_capacity(notes.len());
                 let laid = notes

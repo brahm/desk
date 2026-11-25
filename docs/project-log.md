@@ -2391,6 +2391,31 @@ paragraph, and objects on a second page.
   paragraph it ends up in, since putting a deletion back splits the
   paragraph it joined.
 
+### 25 November: deleted breaks join paragraphs (step 12 of W2, fourth part)
+
+- In the views of markup without deletions, a paragraph whose break a
+  tracked deletion took is laid out with the next one as one paragraph,
+  from the text of both and with the formatting of the first, as
+  accepting the deletion would leave them (B-071).
+- Its lines are then cut where each paragraph starts, so that every
+  paragraph keeps lines of its own, with its own offsets: on the line
+  they share they are parts side by side, as the parts of a line beside
+  a wrapped object already were, which the cursor, a click and the
+  arrows up and down knew. The first part draws the glyphs of the line.
+- The paragraph joined to the one before takes no room of its own, and
+  a note in it is placed with the text it shows in.
+- The arrows, Delete and Backspace go past a break that does not show as
+  past deleted text, Home and End go to the edges of the line, and Show
+  Invisibles leaves out its mark.
+- Only the body joins its paragraphs: those of notes, headers, footers,
+  text boxes and cells are laid out elsewhere, and move to step 13,
+  with the changes of objects and cells (B-074).
+- The review found what a joined paragraph has of its own that the
+  paragraph it shows in must take: the objects that move with it go
+  with that one, it is no item of a list, keeps with the next as that
+  one does, and starts no page, column or section. The text of a story,
+  edited as a body, is marked so, and its breaks stay until B-074.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
