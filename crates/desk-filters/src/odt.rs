@@ -2205,7 +2205,7 @@ fn import_tracked(
         .filter(|r| met.contains(&r.id))
         .filter_map(|r| {
             let name = r.previous_paragraph_style.as_deref()?;
-            let before = paragraph_format(source, ids, name)
+            let before = paragraph_format(source, ids, lists, default, name)
                 .map(|(style, attrs)| Arc::new(desk_model::ParaFormatting { style, attrs }));
             Some((r.id.clone(), before))
         })
@@ -2445,11 +2445,14 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
 type Marks = HashMap<String, NodeId>;
 
 /// The paragraph style and the formatting that a paragraph style of ODF
-/// names: a common style, or an automatic one over its parent; none for a
+/// names: a common style, or an automatic one over its parent or the
+/// default style, with the list style it sets among `lists`; none for a
 /// name that the file does not have.
 fn paragraph_format(
     source: &odf::TextDocument,
     ids: &HashMap<(odf::Family, &str), StyleId>,
+    lists: &HashMap<&str, StyleId>,
+    default: StyleId,
     name: &str,
 ) -> Option<(StyleId, ParaAttrs)> {
     if let Some(&id) = ids.get(&(odf::Family::Paragraph, name)) {
@@ -2462,11 +2465,14 @@ fn paragraph_format(
     let style = automatic
         .parent
         .as_deref()
-        .and_then(|p| ids.get(&(odf::Family::Paragraph, p)).copied())?;
-    Some((
-        style,
-        para_attrs(&automatic.properties.paragraph, &automatic.properties.text),
-    ))
+        .and_then(|p| ids.get(&(odf::Family::Paragraph, p)).copied())
+        .unwrap_or(default);
+    let mut attrs = para_attrs(&automatic.properties.paragraph, &automatic.properties.text);
+    // The list style it sets, empty for none.
+    if let Some(list) = &automatic.list_style {
+        attrs.list_style = Some(lists.get(list.as_str()).copied());
+    }
+    Some((style, attrs))
 }
 
 /// The character style and the formatting that a text style of ODF names:
@@ -3539,21 +3545,36 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .get(&before.style)
                 .cloned()
                 .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
-            let own = before.attrs.without_structure();
+            // The level and start of an item are in the list elements; a
+            // list style that no longer is names none.
+            let own = ParaAttrs {
+                list_level: None,
+                list_start: None,
+                list_override: None,
+                ..before.attrs.without_structure()
+            };
             if own.is_empty() {
                 return parent;
             }
+            let (hyphenate, desk_hyphenate) = odf_hyphenate(own.hyphenate, settings.hyphenation);
             automatic_name(
                 odf::Family::Paragraph,
                 Some(parent),
-                own.list_style
-                    .map(|list| list.map_or_else(String::new, |id| names[&id].clone())),
+                own.list_style.map(|list| {
+                    list.and_then(|id| names.get(&id).cloned())
+                        .unwrap_or_default()
+                }),
                 odf::Properties {
                     paragraph: odf_paragraph_properties(
                         &own,
                         &styles.resolve_paragraph(before.style, &own),
                         false,
                     ),
+                    text: odf::TextProperties {
+                        hyphenate,
+                        desk_hyphenate,
+                        ..odf::TextProperties::default()
+                    },
                     ..Default::default()
                 },
             )
@@ -3673,21 +3694,37 @@ pub fn export(document: &Document) -> odf::TextDocument {
                     .get(&before.style)
                     .cloned()
                     .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
-                let own = before.attrs.without_structure();
+                // The level and start of an item are in the list elements; a
+                // list style that no longer is names none.
+                let own = ParaAttrs {
+                    list_level: None,
+                    list_start: None,
+                    list_override: None,
+                    ..before.attrs.without_structure()
+                };
                 if own.is_empty() {
                     return parent;
                 }
+                let (hyphenate, desk_hyphenate) =
+                    odf_hyphenate(own.hyphenate, settings.hyphenation);
                 automatic_name(
                     odf::Family::Paragraph,
                     Some(parent),
-                    own.list_style
-                        .map(|list| list.map_or_else(String::new, |id| names[&id].clone())),
+                    own.list_style.map(|list| {
+                        list.and_then(|id| names.get(&id).cloned())
+                            .unwrap_or_default()
+                    }),
                     odf::Properties {
                         paragraph: odf_paragraph_properties(
                             &own,
                             &styles.resolve_paragraph(before.style, &own),
                             false,
                         ),
+                        text: odf::TextProperties {
+                            hyphenate,
+                            desk_hyphenate,
+                            ..odf::TextProperties::default()
+                        },
                         ..Default::default()
                     },
                 )

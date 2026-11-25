@@ -130,6 +130,16 @@ pub(crate) fn change_spans_in<'a>(
     for paragraph in paragraphs {
         let id = paragraph.id();
         let mut offset = 0;
+        // A change of the formatting of the paragraph covers its text,
+        // first, as it starts where the paragraph does.
+        if let Some(Some(change)) = paragraph.attrs().format_change {
+            out.push(ChangeSpan {
+                id: change,
+                start: Position::new(id, 0),
+                end: Position::new(id, paragraph.len()),
+                with_break: false,
+            });
+        }
         let first = out.len();
         for run in paragraph.runs() {
             let end = offset + run.len();
@@ -147,15 +157,6 @@ pub(crate) fn change_spans_in<'a>(
                 }
             }
             offset = end;
-        }
-        // A change of the formatting of the paragraph covers its text.
-        if let Some(Some(change)) = paragraph.attrs().format_change {
-            out.push(ChangeSpan {
-                id: change,
-                start: Position::new(id, 0),
-                end: Position::new(id, paragraph.len()),
-                with_break: false,
-            });
         }
         if let Some(Some(change)) = paragraph.attrs().break_change {
             match out[first..].last_mut() {

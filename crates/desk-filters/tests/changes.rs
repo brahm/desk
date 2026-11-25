@@ -614,6 +614,7 @@ fn rev_01_changes_of_paragraph_styles_keep_the_style_before() {
             edit.insert_text(second, "Second")?;
             let centered = ParaAttrs {
                 alignment: Some(Alignment::Center),
+                hyphenate: Some(true),
                 ..ParaAttrs::default()
             };
             let p = edit.document().paragraph(first)?;
@@ -637,7 +638,7 @@ fn rev_01_changes_of_paragraph_styles_keep_the_style_before() {
             name(p.style()),
             p.attrs().format_change.flatten().is_some(),
             name(before.style),
-            before.attrs.alignment,
+            (before.attrs.alignment, before.attrs.hyphenate),
             d.body().iter().nth(1).unwrap().attrs().format_change,
         )
     };
@@ -651,7 +652,7 @@ fn rev_01_changes_of_paragraph_styles_keep_the_style_before() {
             .name()
             .to_string()
     );
-    assert_eq!(made.3, Some(Alignment::Center));
+    assert_eq!(made.3, (Some(Alignment::Center), Some(true)));
     // Only that paragraph is in the change.
     assert_eq!(made.4, None);
     let bytes = write_odt(&document).unwrap();
