@@ -840,3 +840,28 @@ fn b_072_a_deleted_break_keeps_the_insertion_it_was_in() {
         .unwrap();
     assert_eq!(texts(&editor), ["one two"]);
 }
+
+/// B-072 review: accepting the deletion of the break of the last
+/// paragraph, which cannot go, leaves it in no change.
+#[test]
+fn b_072_the_last_break_accepted_is_in_no_change() {
+    let (mut editor, p) = typed("one");
+    let ((bo, ana), _) = editor
+        .edit("Changes", |edit| {
+            let bo = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+            let ana = edit.add_change(ChangeKind::Deletion, "Ana", None)?;
+            edit.mark_break_change(p, Some(ana))?;
+            edit.mark_break_former(p, bo)?;
+            Ok(((bo, ana), ()))
+        })
+        .unwrap();
+    editor
+        .edit("Resolve", |edit| {
+            edit.resolve_changes(true, |c| c == ana).map(|_| ())
+        })
+        .unwrap();
+    let attrs = editor.document().paragraph(p).unwrap().attrs().clone();
+    assert_eq!(attrs.break_change.flatten(), None);
+    assert_eq!(attrs.break_former.flatten(), None);
+    let _ = bo;
+}

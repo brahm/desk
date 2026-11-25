@@ -1056,3 +1056,49 @@ fn b_072_a_deleted_break_keeps_its_insertion_in_odt() {
     let texts: Vec<_> = read.body().iter().map(|p| p.text().to_owned()).collect();
     assert_eq!(texts, ["one ", "threefour"]);
 }
+
+/// B-072 review: a change of formatting that deleted text was in goes on
+/// past a break the deletion took, which no change of formatting holds,
+/// and comes back from ODT as one change.
+#[test]
+fn b_072_a_change_of_formatting_goes_on_past_a_deleted_break_in_odt() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            let at = edit.insert_text(start, "one two")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "three four")?;
+            let ids: Vec<_> = edit.document().body().iter().map(|p| p.id()).collect();
+            let formatted =
+                edit.add_change(ChangeKind::Format, "Bo", Some("2026-11-24T09:30:00"))?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T10:00:00"))?;
+            // Bo formatted "two" and "three"; Ana deleted them and the
+            // break between them.
+            edit.mark_change(Position::new(ids[0], 4), Position::new(ids[0], 7), gone)?;
+            edit.mark_break_change(ids[0], Some(gone))?;
+            edit.mark_change(Position::new(ids[1], 0), Position::new(ids[1], 5), gone)?;
+            for (p, from, to) in [(ids[0], 4, 7), (ids[1], 0, 5)] {
+                edit.mark_former(
+                    Position::new(p, from),
+                    Position::new(p, to),
+                    formatted,
+                    None,
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("b-072-format-across-break.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let formats = read
+        .changes()
+        .iter()
+        .filter(|c| c.kind == ChangeKind::Format)
+        .count();
+    assert_eq!(formats, 1);
+    assert!(read.body().iter().all(|p| p.attrs().break_former.is_none()));
+}

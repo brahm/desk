@@ -294,7 +294,9 @@ fn resolve_text(
             ));
         } else {
             match (change_kind, former_kind) {
-                (Some(ChangeKind::Deletion), None) => {
+                // A deletion rejected (B-072); accepted, the break of the
+                // last paragraph, which cannot go, is in no change.
+                (Some(ChangeKind::Deletion), None) if !accept => {
                     let former = former.filter(|id| changes.contains(id));
                     attrs.break_change = former.map(Some);
                     attrs.break_former = None;

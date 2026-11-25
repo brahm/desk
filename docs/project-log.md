@@ -2436,6 +2436,15 @@ paragraph, and objects on a second page.
 - The two pieces of an insertion that another change interrupts are
   still read as two changes, which is B-073, the next part of this
   step.
+- The review kept a change of formatting open past a deleted break, as
+  no break is in one, so that it still reads back as one change, and
+  left the break of the last paragraph in no change when its deletion
+  is accepted. Files written by the builds of pull requests 225 to 227,
+  which were never released, kept an insertion open past every break a
+  deletion took, and now read that break as in the insertion. The
+  insertion a deleted break was in, like that of deleted text, is not
+  a place of its own for Previous and Next: it shows again when the
+  deletion is rejected.
 
 ## Decisions, with their reasons and consequences
 
