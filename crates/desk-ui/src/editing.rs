@@ -32,6 +32,7 @@ mod cell_drag;
 mod changes;
 mod chart_looks;
 mod comments;
+pub use changes::ChangeBubble;
 pub use comments::{CommentTarget, ReviewItem};
 mod connections;
 mod copies;

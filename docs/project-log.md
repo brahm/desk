@@ -2330,6 +2330,17 @@ paragraph, and objects on a second page.
   bubbles that show each change in the margin come in the second pull
   request.
 
+### 25 November: the bubbles of changes (step 11 of W2, second part)
+
+- The bubble of a change shows when Previous or Next selects it, as
+  in Pages 15.4, and not while the cursor is in a change, which would
+  cover the text at each keystroke of a tracked insertion; it stays
+  while the change is selected, without the keyboard, so that typing
+  goes on in the text.
+- It says who made the change, under the name the user writes under now
+  when it was an earlier one (B-066), when, in the words of the comment
+  cards, and what it did to which text, its start when it is long.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-25 13:17+0000\n"
+"POT-Creation-Date: 2026-11-25 14:03+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -108,17 +108,17 @@ msgstr ""
 #: crates/desk-ui/src/auto_numbers.rs:91
 #: crates/desk-ui/src/comments_page.rs:606
 #: crates/desk-ui/src/custom_format.rs:270
-#: crates/desk-ui/src/custom_format.rs:304 crates/desk-ui/src/editing.rs:4327
+#: crates/desk-ui/src/custom_format.rs:304 crates/desk-ui/src/editing.rs:4333
 #: crates/desk-ui/src/language_region.rs:215
 #: crates/desk-ui/src/styles_drawer.rs:625
 #: crates/desk-ui/src/styles_drawer.rs:687
 #: crates/desk-ui/src/styles_drawer.rs:824
 #: crates/desk-ui/src/styles_drawer.rs:897
 #: crates/desk-ui/src/tables/window.rs:802 crates/desk-ui/src/thumbnails.rs:395
-#: crates/desk-ui/src/window.rs:1707 crates/desk-ui/src/window.rs:1972
-#: crates/desk-ui/src/window.rs:2111 crates/desk-ui/src/window.rs:2332
-#: crates/desk-ui/src/window.rs:2531 crates/desk-ui/src/window.rs:2578
-#: crates/desk-ui/src/window.rs:3787
+#: crates/desk-ui/src/window.rs:1712 crates/desk-ui/src/window.rs:1977
+#: crates/desk-ui/src/window.rs:2116 crates/desk-ui/src/window.rs:2337
+#: crates/desk-ui/src/window.rs:2536 crates/desk-ui/src/window.rs:2583
+#: crates/desk-ui/src/window.rs:3813
 #: crates/desk-ui/src/window/format_actions.rs:377
 msgid "_Cancel"
 msgstr ""
@@ -174,6 +174,36 @@ msgstr ""
 
 #: crates/desk-ui/src/bullet_pictures.rs:226
 msgid "Images, Movies and Sounds"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:75 crates/desk-ui/src/review_bar.rs:53
+#: crates/desk-ui/src/review_bar.rs:55
+msgid "Previous Comment or Change"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:80 crates/desk-ui/src/review_bar.rs:59
+#: crates/desk-ui/src/review_bar.rs:61
+msgid "Next Comment or Change"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:134
+msgid "Added:"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:135
+msgid "Deleted:"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:136
+msgid "Formatted:"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:140
+msgid "Paragraph"
+msgstr ""
+
+#: crates/desk-ui/src/change_bubble.rs:142
+msgid "“{text}”"
 msgstr ""
 
 #: crates/desk-ui/src/chart_data.rs:177 crates/desk-ui/src/undo_names.rs:16
@@ -674,12 +704,12 @@ msgid "Comment"
 msgstr ""
 
 #: crates/desk-ui/src/comments_page.rs:184 crates/desk-ui/src/shortcuts.rs:155
-#: crates/desk-ui/src/tables/window.rs:54 crates/desk-ui/src/window.rs:596
+#: crates/desk-ui/src/tables/window.rs:54 crates/desk-ui/src/window.rs:599
 msgid "Comments"
 msgstr ""
 
 #: crates/desk-ui/src/comments_page.rs:188
-#: crates/desk-ui/src/tables/window.rs:270 crates/desk-ui/src/window.rs:4617
+#: crates/desk-ui/src/tables/window.rs:270 crates/desk-ui/src/window.rs:4643
 msgid "No Comments"
 msgstr ""
 
@@ -809,7 +839,7 @@ msgid "s"
 msgstr ""
 
 #: crates/desk-ui/src/contents_page.rs:100 crates/desk-ui/src/links_pane.rs:399
-#: crates/desk-ui/src/window.rs:578
+#: crates/desk-ui/src/window.rs:581
 msgid "Table of Contents"
 msgstr ""
 
@@ -979,7 +1009,7 @@ msgstr ""
 #: crates/desk-ui/src/custom_format.rs:117
 #: crates/desk-ui/src/format_pane.rs:189 crates/desk-ui/src/inspector.rs:260
 #: crates/desk-ui/src/notes_pane.rs:142 crates/desk-ui/src/tables/bars.rs:63
-#: crates/desk-ui/src/tables/inspector.rs:141 crates/desk-ui/src/window.rs:2806
+#: crates/desk-ui/src/tables/inspector.rs:141 crates/desk-ui/src/window.rs:2811
 msgid "Format"
 msgstr ""
 
@@ -1006,7 +1036,7 @@ msgstr ""
 
 #: crates/desk-ui/src/custom_format.rs:262
 #: crates/desk-ui/src/tables/window.rs:982 crates/desk-ui/src/undo_names.rs:29
-#: crates/desk-ui/src/window.rs:4397
+#: crates/desk-ui/src/window.rs:4423
 msgid "Delete"
 msgstr ""
 
@@ -1029,7 +1059,7 @@ msgstr ""
 #: crates/desk-ui/src/custom_format.rs:305
 #: crates/desk-ui/src/tables/header.rs:265
 #: crates/desk-ui/src/tables/header.rs:288 crates/desk-ui/src/thumbnails.rs:396
-#: crates/desk-ui/src/thumbnails.rs:493 crates/desk-ui/src/window.rs:2333
+#: crates/desk-ui/src/thumbnails.rs:493 crates/desk-ui/src/window.rs:2338
 msgid "_Delete"
 msgstr ""
 
@@ -1134,7 +1164,7 @@ msgid "Link"
 msgstr ""
 
 #: crates/desk-ui/src/document_controls.rs:150
-#: crates/desk-ui/src/editing.rs:2060 crates/desk-ui/src/links_pane.rs:71
+#: crates/desk-ui/src/editing.rs:2063 crates/desk-ui/src/links_pane.rs:71
 #: crates/desk-ui/src/links_pane.rs:276 crates/desk-ui/src/links_pane.rs:337
 msgid "Bookmark"
 msgstr ""
@@ -1230,7 +1260,7 @@ msgid "Navigate _By"
 msgstr ""
 
 #: crates/desk-ui/src/document_controls.rs:236
-#: crates/desk-ui/src/window.rs:4746
+#: crates/desk-ui/src/window.rs:4772
 msgid "Show _Statistics"
 msgstr ""
 
@@ -1406,15 +1436,15 @@ msgstr ""
 msgid "Delete Style"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4324
+#: crates/desk-ui/src/editing.rs:4330
 msgid "Open This Link?"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4328
+#: crates/desk-ui/src/editing.rs:4334
 msgid "_Open"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4333
+#: crates/desk-ui/src/editing.rs:4339
 msgid ""
 "{link}\n"
 "\n"
@@ -1423,19 +1453,19 @@ msgid ""
 "in Preferences."
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4335
+#: crates/desk-ui/src/editing.rs:4341
 msgid "Open Links to the Web?"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4336
+#: crates/desk-ui/src/editing.rs:4342
 msgid "_Never Open"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4337
+#: crates/desk-ui/src/editing.rs:4343
 msgid "_Ask First"
 msgstr ""
 
-#: crates/desk-ui/src/editing.rs:4338
+#: crates/desk-ui/src/editing.rs:4344
 msgid "Open at _Once"
 msgstr ""
 
@@ -1891,7 +1921,7 @@ msgstr ""
 msgid "Replace _All"
 msgstr ""
 
-#: crates/desk-ui/src/find.rs:254 crates/desk-ui/src/window.rs:1973
+#: crates/desk-ui/src/find.rs:254 crates/desk-ui/src/window.rs:1978
 msgid "_Replace"
 msgstr ""
 
@@ -1935,7 +1965,7 @@ msgid "Recent Searches"
 msgstr ""
 
 #: crates/desk-ui/src/find.rs:593 crates/desk-ui/src/tables/window.rs:55
-#: crates/desk-ui/src/window.rs:602
+#: crates/desk-ui/src/window.rs:605
 msgid "Search Results"
 msgstr ""
 
@@ -2313,7 +2343,7 @@ msgstr ""
 
 #: crates/desk-ui/src/format_pane.rs:348 crates/desk-ui/src/format_pane.rs:375
 #: crates/desk-ui/src/format_pane.rs:378 crates/desk-ui/src/formatting.rs:302
-#: crates/desk-ui/src/window.rs:2807
+#: crates/desk-ui/src/window.rs:2812
 msgid "Arrange"
 msgstr ""
 
@@ -2517,7 +2547,7 @@ msgstr ""
 
 #: crates/desk-ui/src/function_browser.rs:139
 #: crates/desk-ui/src/tables/header.rs:49
-#: crates/desk-ui/src/tables/window.rs:1221 crates/desk-ui/src/window.rs:2804
+#: crates/desk-ui/src/tables/window.rs:1221 crates/desk-ui/src/window.rs:2809
 #: crates/desk-ui/src/window/header.rs:68
 msgid "Insert"
 msgstr ""
@@ -2668,8 +2698,8 @@ msgctxt "inspector title"
 msgid "Group"
 msgstr ""
 
-#: crates/desk-ui/src/inspector.rs:69 crates/desk-ui/src/window.rs:615
-#: crates/desk-ui/src/window.rs:2815 crates/desk-ui/src/window/slides.rs:345
+#: crates/desk-ui/src/inspector.rs:69 crates/desk-ui/src/window.rs:618
+#: crates/desk-ui/src/window.rs:2820 crates/desk-ui/src/window/slides.rs:345
 msgid "Slide"
 msgstr ""
 
@@ -2925,34 +2955,34 @@ msgstr ""
 msgid "Outside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:402
+#: crates/desk-ui/src/lib.rs:403
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:405
+#: crates/desk-ui/src/lib.rs:406
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:408
+#: crates/desk-ui/src/lib.rs:409
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:723 crates/desk-ui/src/tables/window.rs:463
-#: crates/desk-ui/src/window.rs:1890 crates/desk-ui/src/window.rs:2865
+#: crates/desk-ui/src/lib.rs:724 crates/desk-ui/src/tables/window.rs:463
+#: crates/desk-ui/src/window.rs:1895 crates/desk-ui/src/window.rs:2870
 msgid "Untitled"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:726
+#: crates/desk-ui/src/lib.rs:727
 msgid "Recover Unsaved Changes?"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:729
+#: crates/desk-ui/src/lib.rs:730
 msgid ""
 "{app} closed unexpectedly. The changes to this document were kept: {names}."
 msgid_plural ""
@@ -2960,20 +2990,20 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/lib.rs:737 crates/desk-ui/src/window.rs:2532
-#: crates/desk-ui/src/window.rs:2579
+#: crates/desk-ui/src/lib.rs:738 crates/desk-ui/src/window.rs:2537
+#: crates/desk-ui/src/window.rs:2584
 msgid "_Discard"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:738
+#: crates/desk-ui/src/lib.rs:739
 msgid "_Recover"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:773
+#: crates/desk-ui/src/lib.rs:774
 msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:795
+#: crates/desk-ui/src/lib.rs:796
 msgid "All Documents"
 msgstr ""
 
@@ -3624,7 +3654,7 @@ msgid "Topic, level {n}"
 msgstr ""
 
 #: crates/desk-ui/src/outline_view.rs:601 crates/desk-ui/src/preferences.rs:846
-#: crates/desk-ui/src/window.rs:2812
+#: crates/desk-ui/src/window.rs:2817
 msgid "Objects"
 msgstr ""
 
@@ -4056,26 +4086,18 @@ msgstr ""
 msgid "Comments & Changes"
 msgstr ""
 
-#: crates/desk-ui/src/review_bar.rs:53 crates/desk-ui/src/review_bar.rs:55
-msgid "Previous Comment or Change"
-msgstr ""
-
-#: crates/desk-ui/src/review_bar.rs:59 crates/desk-ui/src/review_bar.rs:61
-msgid "Next Comment or Change"
-msgstr ""
-
 #: crates/desk-ui/src/review_bar.rs:76 crates/desk-ui/src/tables/header.rs:216
 #: crates/desk-ui/src/window/header.rs:408
 #: crates/desk-ui/src/window/slides.rs:294
 msgid "Co_mment"
 msgstr ""
 
-#: crates/desk-ui/src/review_bar.rs:81 crates/desk-ui/src/window.rs:4188
+#: crates/desk-ui/src/review_bar.rs:81 crates/desk-ui/src/window.rs:4214
 #: crates/desk-ui/src/window/header.rs:409
 msgid "_Highlight"
 msgstr ""
 
-#: crates/desk-ui/src/review_bar.rs:88 crates/desk-ui/src/window.rs:4677
+#: crates/desk-ui/src/review_bar.rs:88 crates/desk-ui/src/window.rs:4703
 msgid "_Track Changes"
 msgstr ""
 
@@ -4113,11 +4135,11 @@ msgid_plural "{n} Comments & Changes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/review_bar.rs:174 crates/desk-ui/src/window.rs:3789
+#: crates/desk-ui/src/review_bar.rs:174 crates/desk-ui/src/window.rs:3815
 msgid "_Accept All Changes"
 msgstr ""
 
-#: crates/desk-ui/src/review_bar.rs:178 crates/desk-ui/src/window.rs:3788
+#: crates/desk-ui/src/review_bar.rs:178 crates/desk-ui/src/window.rs:3814
 msgid "_Reject All Changes"
 msgstr ""
 
@@ -4199,7 +4221,7 @@ msgstr ""
 msgid "Open a document"
 msgstr ""
 
-#: crates/desk-ui/src/shortcuts.rs:19 crates/desk-ui/src/window.rs:1813
+#: crates/desk-ui/src/shortcuts.rs:19 crates/desk-ui/src/window.rs:1818
 msgid "Save"
 msgstr ""
 
@@ -4520,7 +4542,7 @@ msgstr ""
 
 #: crates/desk-ui/src/shortcuts.rs:168
 #: crates/desk-ui/src/tables/shortcuts.rs:73
-#: crates/desk-ui/src/tables/window.rs:1219 crates/desk-ui/src/window.rs:2803
+#: crates/desk-ui/src/tables/window.rs:1219 crates/desk-ui/src/window.rs:2808
 msgid "View"
 msgstr ""
 
@@ -4636,22 +4658,22 @@ msgid "(Delete)"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:183 crates/desk-ui/src/undo_names.rs:107
-#: crates/desk-ui/src/window.rs:582
+#: crates/desk-ui/src/window.rs:585
 msgid "Styles"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:185
-#: crates/desk-ui/src/styles_drawer.rs:196 crates/desk-ui/src/window.rs:2033
+#: crates/desk-ui/src/styles_drawer.rs:196 crates/desk-ui/src/window.rs:2038
 msgid "Paragraph Styles"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:198
-#: crates/desk-ui/src/styles_drawer.rs:209 crates/desk-ui/src/window.rs:2034
+#: crates/desk-ui/src/styles_drawer.rs:209 crates/desk-ui/src/window.rs:2039
 msgid "Character Styles"
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:216
-#: crates/desk-ui/src/styles_drawer.rs:227 crates/desk-ui/src/window.rs:2035
+#: crates/desk-ui/src/styles_drawer.rs:227 crates/desk-ui/src/window.rs:2040
 msgid "List Styles"
 msgstr ""
 
@@ -4723,8 +4745,8 @@ msgid "Another style is already named “{name}”."
 msgstr ""
 
 #: crates/desk-ui/src/styles_drawer.rs:573
-#: crates/desk-ui/src/tables/window.rs:240 crates/desk-ui/src/window.rs:452
-#: crates/desk-ui/src/window.rs:1621
+#: crates/desk-ui/src/tables/window.rs:240 crates/desk-ui/src/window.rs:454
+#: crates/desk-ui/src/window.rs:1626
 #: crates/desk-ui/src/window/format_actions.rs:399
 msgid "_Close"
 msgstr ""
@@ -5348,8 +5370,8 @@ msgstr ""
 #: crates/desk-ui/src/tables/header.rs:82
 #: crates/desk-ui/src/tables/header.rs:84
 #: crates/desk-ui/src/tables/window.rs:1217
-#: crates/desk-ui/src/tables/window.rs:1218 crates/desk-ui/src/window.rs:2799
-#: crates/desk-ui/src/window.rs:2802 crates/desk-ui/src/window/header.rs:116
+#: crates/desk-ui/src/tables/window.rs:1218 crates/desk-ui/src/window.rs:2804
+#: crates/desk-ui/src/window.rs:2807 crates/desk-ui/src/window/header.rs:116
 #: crates/desk-ui/src/window/header.rs:118
 msgid "Main Menu"
 msgstr ""
@@ -5411,8 +5433,8 @@ msgstr ""
 msgid "_Redo"
 msgstr ""
 
-#: crates/desk-ui/src/tables/header.rs:154 crates/desk-ui/src/window.rs:2076
-#: crates/desk-ui/src/window.rs:4183 crates/desk-ui/src/window.rs:4673
+#: crates/desk-ui/src/tables/header.rs:154 crates/desk-ui/src/window.rs:2081
+#: crates/desk-ui/src/window.rs:4209 crates/desk-ui/src/window.rs:4699
 msgid "_Deselect All"
 msgstr ""
 
@@ -5738,12 +5760,12 @@ msgid "Blue Fill"
 msgstr ""
 
 #: crates/desk-ui/src/tables/window.rs:230
-#: crates/desk-ui/src/tables/window.rs:234 crates/desk-ui/src/window.rs:430
-#: crates/desk-ui/src/window.rs:434
+#: crates/desk-ui/src/tables/window.rs:234 crates/desk-ui/src/window.rs:432
+#: crates/desk-ui/src/window.rs:436
 msgid "Leave Fullscreen"
 msgstr ""
 
-#: crates/desk-ui/src/tables/window.rs:238 crates/desk-ui/src/window.rs:450
+#: crates/desk-ui/src/tables/window.rs:238 crates/desk-ui/src/window.rs:452
 msgid ""
 "The screen is smaller than 1280 × 720, so parts of the window might not fit"
 msgstr ""
@@ -5851,11 +5873,11 @@ msgstr ""
 msgid "{slide}, skipped"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:371 crates/desk-ui/src/window.rs:2319
+#: crates/desk-ui/src/thumbnails.rs:371 crates/desk-ui/src/window.rs:2324
 msgid "Delete Page?"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:373 crates/desk-ui/src/window.rs:2325
+#: crates/desk-ui/src/thumbnails.rs:373 crates/desk-ui/src/window.rs:2330
 msgid "Delete Pages?"
 msgstr ""
 
@@ -5877,16 +5899,16 @@ msgid_plural "The {n} sections and all their pages will be deleted."
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/thumbnails.rs:489 crates/desk-ui/src/window.rs:4174
+#: crates/desk-ui/src/thumbnails.rs:489 crates/desk-ui/src/window.rs:4200
 msgid "Cu_t"
 msgstr ""
 
 #: crates/desk-ui/src/thumbnails.rs:490 crates/desk-ui/src/warnings.rs:82
-#: crates/desk-ui/src/window.rs:4175
+#: crates/desk-ui/src/window.rs:4201
 msgid "_Copy"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:491 crates/desk-ui/src/window.rs:4176
+#: crates/desk-ui/src/thumbnails.rs:491 crates/desk-ui/src/window.rs:4202
 msgid "_Paste"
 msgstr ""
 
@@ -5894,8 +5916,8 @@ msgstr ""
 msgid "D_uplicate"
 msgstr ""
 
-#: crates/desk-ui/src/thumbnails.rs:495 crates/desk-ui/src/window.rs:4182
-#: crates/desk-ui/src/window.rs:4672
+#: crates/desk-ui/src/thumbnails.rs:495 crates/desk-ui/src/window.rs:4208
+#: crates/desk-ui/src/window.rs:4698
 msgid "Select _All"
 msgstr ""
 
@@ -5995,8 +6017,8 @@ msgstr ""
 msgid "Guides"
 msgstr ""
 
-#: crates/desk-ui/src/undo_names.rs:62 crates/desk-ui/src/window.rs:1994
-#: crates/desk-ui/src/window.rs:2022 crates/desk-ui/src/window.rs:2141
+#: crates/desk-ui/src/undo_names.rs:62 crates/desk-ui/src/window.rs:1999
+#: crates/desk-ui/src/window.rs:2027 crates/desk-ui/src/window.rs:2146
 msgid "Import Styles"
 msgstr ""
 
@@ -6132,413 +6154,413 @@ msgstr ""
 msgid "Document Warnings"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:438 crates/desk-ui/src/window.rs:440
-#: crates/desk-ui/src/window.rs:444
+#: crates/desk-ui/src/window.rs:440 crates/desk-ui/src/window.rs:442
+#: crates/desk-ui/src/window.rs:446
 msgid "Background"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:456
+#: crates/desk-ui/src/window.rs:458
 msgid "Some of the document might not show as it was made"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:457
+#: crates/desk-ui/src/window.rs:459
 msgid "_See Warnings"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:469
+#: crates/desk-ui/src/window.rs:471
 msgid "Choose a Template"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:471
+#: crates/desk-ui/src/window.rs:473
 msgid "Start a new document, or open an OpenDocument text or a Pages document."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:476
+#: crates/desk-ui/src/window.rs:478
 msgid ""
 "This app is at an early stage of development and cannot open documents yet."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:548
+#: crates/desk-ui/src/window.rs:551
 msgid "Add Slide"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:551
+#: crates/desk-ui/src/window.rs:554
 msgid "Navigator"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:557 crates/desk-ui/src/window/slides.rs:388
+#: crates/desk-ui/src/window.rs:560 crates/desk-ui/src/window/slides.rs:388
 msgctxt "slides"
 msgid "Outline"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:563
+#: crates/desk-ui/src/window.rs:566
 msgid "Master Slides"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:569
+#: crates/desk-ui/src/window.rs:572
 msgid "Add Page"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:572 crates/desk-ui/src/writing_tools.rs:85
+#: crates/desk-ui/src/window.rs:575 crates/desk-ui/src/writing_tools.rs:85
 msgid "Pages"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:622
+#: crates/desk-ui/src/window.rs:625
 msgid "Animation"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1084
+#: crates/desk-ui/src/window.rs:1089
 msgid "Cannot Keep the Original of {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1086
+#: crates/desk-ui/src/window.rs:1091
 msgid ""
 "Desk could not keep a copy of the file as it was opened, so it will not save "
 "over the file on its own. Choose Save to save the changes in a file."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1159 crates/desk-ui/src/window.rs:2011
+#: crates/desk-ui/src/window.rs:1164 crates/desk-ui/src/window.rs:2016
 #: crates/desk-ui/src/window/objects.rs:190
 msgid "Cannot open {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1659
+#: crates/desk-ui/src/window.rs:1664
 msgid "Cannot save {name}"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1702
+#: crates/desk-ui/src/window.rs:1707
 msgid "Save Over “{name}”?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1704
+#: crates/desk-ui/src/window.rs:1709
 msgid ""
 "Desk did not read everything in this file, as Document Warnings lists. "
 "Saving over it leaves out what Desk did not read. The file as it was opened "
 "stays among its versions."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1708 crates/desk-ui/src/window.rs:2581
+#: crates/desk-ui/src/window.rs:1713 crates/desk-ui/src/window.rs:2586
 msgid "Save as _New File"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1709 crates/desk-ui/src/window.rs:2580
+#: crates/desk-ui/src/window.rs:1714 crates/desk-ui/src/window.rs:2585
 msgid "Save _Over"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1773
+#: crates/desk-ui/src/window.rs:1778
 msgid "Cannot Keep the Changes"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1829
+#: crates/desk-ui/src/window.rs:1834
 msgid "Save a Copy"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1894
+#: crates/desk-ui/src/window.rs:1899
 msgid "{name} (recovered)"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1967
+#: crates/desk-ui/src/window.rs:1972
 msgid "Replace {name}?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:1969
+#: crates/desk-ui/src/window.rs:1974
 msgid ""
 "A file with this name already exists. Replacing it overwrites its contents."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2023
+#: crates/desk-ui/src/window.rs:2028
 msgid "Choose the styles of “{name}” to import."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2072
+#: crates/desk-ui/src/window.rs:2077
 msgid "_Select All"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2095
+#: crates/desk-ui/src/window.rs:2100
 msgid "Replace Duplicates"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2096
+#: crates/desk-ui/src/window.rs:2101
 msgid "Styles with the same names take the imported ones"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2112
+#: crates/desk-ui/src/window.rs:2117
 msgid "_Import"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2144
+#: crates/desk-ui/src/window.rs:2149
 msgid "Cannot Import the Styles"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2173
+#: crates/desk-ui/src/window.rs:2178
 msgid "Cannot Follow Link"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2174
+#: crates/desk-ui/src/window.rs:2179
 msgid "Save this document first: the link names a file from its folder."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2279
+#: crates/desk-ui/src/window.rs:2284
 msgid "Some content is hidden in Screen View"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2281
+#: crates/desk-ui/src/window.rs:2286
 msgid "Screen View is on"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2287
+#: crates/desk-ui/src/window.rs:2292
 msgid "Screen View is off"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2320
+#: crates/desk-ui/src/window.rs:2325
 msgid "Everything on page {n} will be deleted."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2326
+#: crates/desk-ui/src/window.rs:2331
 msgid "Pages {first} to {last}, the section of this page, will be deleted."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2387
+#: crates/desk-ui/src/window.rs:2392
 msgid "Cannot Revert"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2388
+#: crates/desk-ui/src/window.rs:2393
 msgid "The version of the document as it was opened is no longer kept."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2446 crates/desk-ui/src/window.rs:2457
-#: crates/desk-ui/src/window.rs:2472
+#: crates/desk-ui/src/window.rs:2451 crates/desk-ui/src/window.rs:2462
+#: crates/desk-ui/src/window.rs:2477
 msgid "Cannot Restore the Version"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2493
+#: crates/desk-ui/src/window.rs:2498
 msgid "Cannot Open the Version"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2525 crates/desk-ui/src/window.rs:2572
+#: crates/desk-ui/src/window.rs:2530 crates/desk-ui/src/window.rs:2577
 msgid "Save Changes?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2527
+#: crates/desk-ui/src/window.rs:2532
 msgid ""
 "“{name}” contains unsaved changes. Changes which are not saved will be "
 "permanently lost."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2533 crates/desk-ui/src/window/header.rs:225
+#: crates/desk-ui/src/window.rs:2538 crates/desk-ui/src/window/header.rs:225
 msgid "_Save"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2574
+#: crates/desk-ui/src/window.rs:2579
 msgid ""
 "“{name}” contains unsaved changes. Desk did not read everything in this "
 "file, as Document Warnings lists: saving over it leaves out what Desk did "
 "not read, and saving as a new file keeps the file as it is."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:2805
+#: crates/desk-ui/src/window.rs:2810
 msgid "Edit"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:3782
+#: crates/desk-ui/src/window.rs:3808
 msgid "Turn Off Tracking?"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:3784
+#: crates/desk-ui/src/window.rs:3810
 msgid "To turn off change tracking, you must accept or reject all changes."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4177
+#: crates/desk-ui/src/window.rs:4203
 msgid "Dupl_icate"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4179 crates/desk-ui/src/window.rs:4658
+#: crates/desk-ui/src/window.rs:4205 crates/desk-ui/src/window.rs:4684
 msgid "Paste and _Match Style"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4190
+#: crates/desk-ui/src/window.rs:4216
 msgid "_Remove Highlights and Comments"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4196
+#: crates/desk-ui/src/window.rs:4222
 msgid "_Bold"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4197
+#: crates/desk-ui/src/window.rs:4223
 msgid "_Italic"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4198
+#: crates/desk-ui/src/window.rs:4224
 msgid "_Underline"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4202 crates/desk-ui/src/window.rs:4649
+#: crates/desk-ui/src/window.rs:4228 crates/desk-ui/src/window.rs:4675
 msgid "Copy _Paragraph Style"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4206 crates/desk-ui/src/window.rs:4653
+#: crates/desk-ui/src/window.rs:4232 crates/desk-ui/src/window.rs:4679
 msgid "Copy C_haracter Style"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4209 crates/desk-ui/src/window.rs:4656
+#: crates/desk-ui/src/window.rs:4235 crates/desk-ui/src/window.rs:4682
 msgid "Paste Sty_le"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4212
+#: crates/desk-ui/src/window.rs:4238
 msgid "_Writing Tools"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4213
+#: crates/desk-ui/src/window.rs:4239
 msgid "T_ransformations"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4214
+#: crates/desk-ui/src/window.rs:4240
 msgid "Su_bstitutions"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4215 crates/desk-ui/src/window/header.rs:303
+#: crates/desk-ui/src/window.rs:4241 crates/desk-ui/src/window/header.rs:303
 #: crates/desk-ui/src/window/slides.rs:255
 msgid "Spe_lling and Grammar"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4216
+#: crates/desk-ui/src/window.rs:4242
 msgid "_Arrange"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4219
+#: crates/desk-ui/src/window.rs:4245
 msgid "Delete _Page…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4393
+#: crates/desk-ui/src/window.rs:4419
 msgid "No Guesses Found"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4407
+#: crates/desk-ui/src/window.rs:4433
 msgid "_Ignore Spelling"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4408
+#: crates/desk-ui/src/window.rs:4434
 msgid "_Learn Spelling"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4426
+#: crates/desk-ui/src/window.rs:4452
 msgid "Never _Hyphenate"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4428
+#: crates/desk-ui/src/window.rs:4454
 msgid "Allow _Hyphenation"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4480
+#: crates/desk-ui/src/window.rs:4506
 msgid "Number _Format"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4499
+#: crates/desk-ui/src/window.rs:4525
 msgid "Date and Time _Format"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4501
+#: crates/desk-ui/src/window.rs:4527
 msgid "_Automatically Update on Open"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4511
+#: crates/desk-ui/src/window.rs:4537
 msgid "Show _Directory Path"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4515
+#: crates/desk-ui/src/window.rs:4541
 msgid "Always Show File_name Extension"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4543
+#: crates/desk-ui/src/window.rs:4569
 msgid "{name} copy"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4547 crates/desk-ui/src/window/slides.rs:347
+#: crates/desk-ui/src/window.rs:4573 crates/desk-ui/src/window/slides.rs:347
 msgid "Blank"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4547
+#: crates/desk-ui/src/window.rs:4573
 msgid "Blank Layout"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4583
+#: crates/desk-ui/src/window.rs:4609
 msgid "_Open a Document…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4618
+#: crates/desk-ui/src/window.rs:4644
 msgid "The comments of the document show here."
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4629
+#: crates/desk-ui/src/window.rs:4655
 msgid "_Blank Page"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4631 crates/desk-ui/src/window/header.rs:386
+#: crates/desk-ui/src/window.rs:4657 crates/desk-ui/src/window/header.rs:386
 msgid "_Section Break"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4641
+#: crates/desk-ui/src/window.rs:4667
 msgid "_Fonts…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4642
+#: crates/desk-ui/src/window.rs:4668
 msgid "_Colors…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4644 crates/desk-ui/src/window/header.rs:424
+#: crates/desk-ui/src/window.rs:4670 crates/desk-ui/src/window/header.rs:424
 #: crates/desk-ui/src/window/slides.rs:311
 msgid "Special _Characters…"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4679
+#: crates/desk-ui/src/window.rs:4705
 msgid "Accept All Changes"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4683
+#: crates/desk-ui/src/window.rs:4709
 msgid "Reject All Changes"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4698
+#: crates/desk-ui/src/window.rs:4724
 msgid "Convert _Quotes"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4707
+#: crates/desk-ui/src/window.rs:4733
 msgid "Make _Upper Case"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4708
+#: crates/desk-ui/src/window.rs:4734
 msgid "Make _Lower Case"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4709
+#: crates/desk-ui/src/window.rs:4735
 msgid "_Capitalize"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4717
+#: crates/desk-ui/src/window.rs:4743
 msgid "Show _Spelling and Grammar"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4720
+#: crates/desk-ui/src/window.rs:4746
 msgid "_Check Document Now"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4723
+#: crates/desk-ui/src/window.rs:4749
 msgid "Check Spelling While _Typing"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4727
+#: crates/desk-ui/src/window.rs:4753
 msgid "Check _Grammar While Typing"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4738
+#: crates/desk-ui/src/window.rs:4764
 msgid "Look Up in _Dictionary and Thesaurus"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4741
+#: crates/desk-ui/src/window.rs:4767
 msgid "Search the _Web"
 msgstr ""
 
-#: crates/desk-ui/src/window.rs:4743
+#: crates/desk-ui/src/window.rs:4769
 msgid "Search in Wi_kipedia"
 msgstr ""
 

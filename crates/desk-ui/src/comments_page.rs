@@ -710,7 +710,7 @@ fn card_box() -> gtk::Box {
 /// The line of a card that names who wrote it and when, with its buttons.
 /// The heading of a comment or a reply: a dot in the colour of its author
 /// (W150), the author and the date, and its buttons.
-fn heading(
+pub(crate) fn heading(
     author: &str,
     color: Option<desk_model::AuthorColor>,
     date: Option<&str>,

@@ -139,6 +139,8 @@ pub struct DocumentWindow {
     bubble_popover: gtk::Popover,
     /// The bar of comments and changes of Desk Writer (REV-02).
     review_bar: crate::review_bar::ReviewBar,
+    /// The bubble of the tracked change selected (REV-04).
+    change_bubble: crate::change_bubble::ChangeBubbleView,
     bubble_at: Cell<Option<(Option<desk_model::NodeId>, crate::text_nav::SpanRect)>>,
     outline: Rc<crate::outline_view::OutlineView>,
     /// The navigation sidebar, with the page thumbnails (GNM-12).
@@ -542,6 +544,7 @@ impl DocumentWindow {
             .css_classes(["desk-comment-popover"])
             .build();
         bubble_popover.set_parent(view.area());
+        let change_bubble = crate::change_bubble::ChangeBubbleView::new(&view);
         let nav = if let Some(slides) = &slides {
             // The navigator, the outline and the master slides of Keynote
             // (KINT-07, KINT-08, KGNM-13).
@@ -750,6 +753,7 @@ impl DocumentWindow {
             bubble,
             bubble_popover,
             review_bar,
+            change_bubble,
             bubble_at: Cell::new(None),
             outline,
             nav,
@@ -833,6 +837,7 @@ impl DocumentWindow {
                 if let Some(this) = weak.upgrade() {
                     this.show_position();
                     this.place_bubble();
+                    this.change_bubble.place(&this.view);
                 }
             });
             // The bubble of a comment goes when it has nothing to show, and
@@ -3676,6 +3681,19 @@ impl DocumentWindow {
         if self.slides.is_none() {
             self.review_bar.show(self.editor().as_ref());
         }
+        // The bubble of a change stays while its change is selected.
+        if let Some(id) = self.change_bubble.shown() {
+            match self.current_change_bubble() {
+                Some(bubble) if bubble.id == id => self.change_bubble.show(&bubble, &self.view),
+                _ => self.change_bubble.hide(),
+            }
+        }
+    }
+
+    /// The bubble of the change selected, if one is.
+    fn current_change_bubble(&self) -> Option<crate::editing::ChangeBubble> {
+        self.editor()?
+            .change_bubble(&crate::comments_page::author())
     }
 
     /// Track Changes and Turn Off Tracking, Paused and On, Accept All and
@@ -3765,6 +3783,14 @@ impl DocumentWindow {
                         if !this.nav_shows("comments") =>
                     {
                         this.show_bubble(id);
+                    }
+                    Some(crate::editing::ReviewItem::Change(_)) => {
+                        // At the change selected, in the colour of its
+                        // author (REV-04).
+                        match this.current_change_bubble() {
+                            Some(bubble) => this.change_bubble.show(&bubble, &this.view),
+                            None => this.change_bubble.hide(),
+                        }
                     }
                     Some(_) => {}
                     None => this.window().error_bell(),
