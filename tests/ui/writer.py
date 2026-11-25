@@ -488,21 +488,27 @@ def main():
             ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
             check=True,
         )
-        press("ctrl+End", "Return")
+        press("ctrl+End")
+        before = text_of(document)
+        press("Return")
         type_text("Go to to bed")
         wait_for("the repeated word", lambda: "Go to to bed" in text_of(document))
         press("shift+Home")
         wait_for("the new paragraph selected", lambda: selected() == "Go to to bed")
-        Atspi.Action.do_action(
-            next(
-                n
-                for n in walk(app)
-                if n.get_role() == Atspi.Role.PUSH_BUTTON
-                and n.get_name() == "Find Next"
-                and showing(n)
+        find_next = wait_for(
+            "the Find Next button",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.PUSH_BUTTON
+                    and n.get_name() == "Find Next"
+                    and showing(n)
+                ),
+                None,
             ),
-            0,
         )
+        Atspi.Action.do_action(find_next, 0)
         wait_for("the repeated word found", lambda: selected() == "to to")
         check(
             "the proofreader finds a repeated word (TXT-11)",
@@ -514,7 +520,7 @@ def main():
             check=True,
         )
         press("End", "shift+Home", "BackSpace", "BackSpace")
-        wait_for("the paragraph gone", lambda: "Go to" not in text_of(document))
+        wait_for("the paragraph gone", lambda: text_of(document) == before)
 
         # Ctrl+. shows the emoji and symbols at the cursor (TXT-05).
         subprocess.run(
