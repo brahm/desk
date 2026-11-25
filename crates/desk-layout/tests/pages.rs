@@ -1651,3 +1651,119 @@ fn b_071_an_object_of_a_joined_paragraph_stays_on_its_page() {
     assert_eq!(objects, 1);
     assert_eq!(layout.pages[0].objects[0].paragraph, Some(0));
 }
+
+/// B-074: the paragraphs of headers, footers and notes whose deleted
+/// breaks do not show join as those of the body do.
+#[test]
+fn b_074_stories_join_their_paragraphs_without_deletions() {
+    use desk_model::{
+        ChangeKind, CharAttrs, FIELD_CHARACTER, Field, Markup, Note, Paragraph, Position,
+    };
+    let mut document = Document::new_word_processing();
+    let note = document.new_id();
+    document
+        .transact("Text", |edit| {
+            let start = edit.document().start();
+            let end = edit.insert_text(start, "one ")?;
+            let second = edit.split_paragraph(end)?;
+            let end = edit.insert_text(second, "two")?;
+            let third = edit.split_paragraph(end)?;
+            edit.insert_text(third, "three")?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            edit.mark_break_change(start.paragraph, Some(gone))?;
+            edit.mark_change(second, Position::new(second.paragraph, 3), gone)?;
+            edit.mark_break_change(second.paragraph, Some(gone))?;
+            // A note with the same paragraphs, after "three".
+            let body: Vec<Paragraph> = edit.document().body().iter().cloned().collect();
+            let mut paragraphs = Vec::new();
+            for p in body {
+                paragraphs.push(Paragraph::from_runs(
+                    edit.new_id(),
+                    p.style(),
+                    p.attrs().clone(),
+                    p.runs().cloned().collect::<Vec<_>>(),
+                )?);
+            }
+            let end = Position::new(third.paragraph, 5);
+            let after = edit.insert_text(end, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(end, after, &mark)?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: paragraphs.into(),
+                }),
+            )
+        })
+        .unwrap();
+    document.set_markup(Markup::WithoutDeletions);
+    let mut system = TextSystem::new();
+    let layout = paginate(&document, &mut system);
+    // The note: a part of a line for each of its paragraphs, side by side.
+    let page = &layout.pages[0];
+    assert_eq!(page.note_parts, [0, 1, 2]);
+    assert!(
+        page.note_lines
+            .iter()
+            .all(|l| l.top() == page.note_lines[0].top() && l.paragraph == 0 && l.index == 0)
+    );
+    let ranges: Vec<_> = page
+        .note_lines
+        .iter()
+        .map(|l| l.line.range.clone())
+        .collect();
+    assert_eq!(ranges, [0..4, 0..3, 0..5]);
+    // A header with the paragraphs of the body.
+    let paragraphs: Vec<Paragraph> = document.body().iter().cloned().collect();
+    let lines = desk_layout::margin_lines(
+        &document,
+        &layout,
+        0,
+        desk_model::MarginKind::Header,
+        &paragraphs,
+        &mut system,
+    );
+    assert_eq!(
+        lines.iter().map(|l| l.paragraph).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    assert!(lines.iter().all(|l| l.top() == lines[0].top()));
+    let ranges: Vec<_> = lines.iter().map(|l| l.line.range.clone()).collect();
+    // "three" ends with the mark of the note.
+    assert_eq!(ranges, [0..4, 0..3, 0..paragraphs[2].len()]);
+    // A text box with them.
+    let mut boxed = with_text_box(1, desk_model::VerticalAlignment::Top, 1);
+    boxed
+        .transact("Text", |edit| {
+            let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+            let mut texts = Vec::new();
+            for (i, text) in ["one ", "two", "three"].into_iter().enumerate() {
+                let mut attrs = desk_model::ParaAttrs::default();
+                if i < 2 {
+                    attrs.break_change = Some(Some(gone));
+                }
+                let mut run = desk_model::Run::new(text);
+                if i == 1 {
+                    run.attrs.change = Some(Some(gone));
+                }
+                let style = edit.document().styles().default_paragraph();
+                texts.push(Paragraph::from_runs(edit.new_id(), style, attrs, [run])?);
+            }
+            let id = edit.document().objects().iter().next().unwrap().id;
+            edit.set_story(desk_model::Story::TextBox(id), texts)
+        })
+        .unwrap();
+    boxed.set_markup(Markup::WithoutDeletions);
+    let layout = paginate(&boxed, &mut system);
+    let lines = &layout.pages[0].objects[0].lines;
+    assert_eq!(
+        lines.iter().map(|l| l.paragraph).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    assert!(lines.iter().all(|l| l.top() == lines[0].top()));
+}

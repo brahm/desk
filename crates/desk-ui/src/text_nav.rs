@@ -468,10 +468,7 @@ pub fn out_of_hidden(document: &Document, selection: Selection) -> Selection {
 /// of markup without deletions, where it joins the paragraph to the next
 /// (B-071).
 pub(crate) fn break_hidden(document: &Document, paragraph: usize) -> bool {
-    // The text of a story shows where the story is, without joins yet
-    // (B-074).
     !document.markup().shows_deletions()
-        && !document.is_story_body()
         && paragraph + 1 < document.body().len()
         && document
             .body()

@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: in Desk Writer, the views of markup without deletions join
+  the paragraphs whose break was deleted in notes, headers, footers,
+  text boxes and shapes too (#PR).
 * Fixed: in Desk Writer, a tracked change that another change
   interrupts opens from ODT as one change (#229).
 * Fixed: in Desk Writer, a paragraph break that another author added

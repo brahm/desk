@@ -712,12 +712,12 @@ mod tests {
                 .filter(|m| m.kind == text_nav::Invisible::Paragraph)
                 .count();
             assert_eq!(ends, 1);
-            // The text of a story, laid out where it is, does not join yet
-            // (B-074): its breaks stay.
+            // The text of a story goes past them too, as it joins where it
+            // is laid out (B-074).
             let story = document.with_body(document.body().iter().cloned().collect());
             assert_eq!(
                 text_nav::move_char(&story, Spot::new(0, 4), true),
-                Spot::new(1, 3)
+                Spot::new(2, 1)
             );
             drop(state);
             // Delete takes the next character that shows.

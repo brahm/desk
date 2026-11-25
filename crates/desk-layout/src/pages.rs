@@ -590,6 +590,24 @@ fn margin_block(
     values: &FieldValues,
     system: &mut TextSystem,
 ) -> (Vec<PlacedLine>, f32) {
+    // Paragraphs whose deleted breaks do not show, joined (B-074).
+    let Some(shown) = crate::joins::Shown::new(paragraphs, values.hidden.as_deref()) else {
+        return margin_shown(document, paragraphs, width, values, system);
+    };
+    let (mut lines, bottom) = margin_shown(document, &shown.paragraphs, width, values, system);
+    shown.restore([&mut lines]);
+    (lines, bottom)
+}
+
+/// The lines of a header or footer as its paragraphs show, from the top of
+/// the first, and the bottom of its last line.
+fn margin_shown(
+    document: &Document,
+    paragraphs: &[Paragraph],
+    width: f32,
+    values: &FieldValues,
+    system: &mut TextSystem,
+) -> (Vec<PlacedLine>, f32) {
     let styles = document.styles();
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
