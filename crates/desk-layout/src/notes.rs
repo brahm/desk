@@ -156,11 +156,9 @@ impl NotePlan {
             .map(|i| crate::joins::joined_paragraph(document, &joins, i))
             .collect();
         // Paragraphs that could not be joined show on their own.
-        for i in 0..joins.len() {
-            if let Some((head, _)) = joins[i]
-                && joined[head].is_none()
-            {
-                joins[i] = None;
+        for join in &mut joins {
+            if join.is_some_and(|(head, _)| joined[head].is_none()) {
+                *join = None;
             }
         }
         let mut layout = self.paginate_joined(
