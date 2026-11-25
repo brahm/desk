@@ -2642,10 +2642,12 @@ paragraph, and objects on a second page.
 
 - txt-09-never-hyphenate, txt-09-hyphenation-cases and
   txt-09-hyphenation-widths, laid out by Desk and compared with the
-  PDFs of Pages 15.4, differ only in where words break: Pages breaks
-  pho-tographs, cel-ebration, extra-ordinarily, extraordinari-ly and
-  wonder-ful, and never photo-, cele- or ex-, which the patterns of
-  LibreOffice allow. Those breaks come from the dictionary of macOS.
+  PDFs of Pages 15.4, differ in where words break: Pages breaks
+  pho-tographs, cel-ebration, extra-ordinarily and extraordinari-ly,
+  and never photo-, cele- or ex-, which the patterns of LibreOffice
+  allow; the lines after them differ in turn (wonder-ful, which the
+  patterns allow too, falls elsewhere). Those breaks come from the
+  dictionary of macOS.
 - The owner kept the choice of 20 November, rules tested on their own
   and no list of words, and moved B-045 to W6.
 
